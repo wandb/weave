@@ -6521,7 +6521,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
-    ) -> tuple[AgentSpanCHInsertable, tsi.CompletionsCreateRes]:
+    ) -> "BuiltCompletionSpan":
         """Build the traced-call span and result without inserting it.
 
         Split out from `_log_completion_call` so callers that score many calls
@@ -6562,7 +6562,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             trace_id=trace_id,
             conversation_id=conversation_id,
         )
-        return span, result
+        return BuiltCompletionSpan(span=span, result=result)
 
     def _log_completion_call(
         self,
@@ -6576,13 +6576,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
-        span, result = self._build_completion_call_span(
-            req, prep, res, start_time, end_time
-        )
+        built = self._build_completion_call_span(req, prep, res, start_time, end_time)
         AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
-            span
+            built.span
         )
-        return result
+        return built.result
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -7823,6 +7821,16 @@ class CompletionPrepResult(NamedTuple):
 
     initial_messages: list[dict[str, Any]]
     completion_model_info: CompletionModelInfo
+
+
+class BuiltCompletionSpan(NamedTuple):
+    """Output of `_build_completion_call_span`: the span to write + the call result.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    span: AgentSpanCHInsertable
+    result: tsi.CompletionsCreateRes
 
 
 def _setup_completion_model_info(

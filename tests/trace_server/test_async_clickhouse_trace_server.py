@@ -12,10 +12,14 @@ import pytest_asyncio
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
+from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.types import AgentSpansQueryReq
 from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
+    CompletionSpanBuffer,
 )
+from weave.trace_server.clickhouse_trace_server_batched import BuiltCompletionSpan
 from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
@@ -27,7 +31,11 @@ LITELLM_ACOMPLETION_PATCH = (
 
 
 def _make_req(
-    *, track_llm_call: bool, model: str = "gpt-4o-mini", prompt: str | None = None
+    *,
+    track_llm_call: bool,
+    model: str = "gpt-4o-mini",
+    prompt: str | None = None,
+    project_id: str = "p1",
 ) -> tsi.CompletionsCreateReq:
     inputs_kwargs: dict[str, object] = {
         "model": model,
@@ -36,7 +44,7 @@ def _make_req(
     if prompt is not None:
         inputs_kwargs["prompt"] = prompt
     return tsi.CompletionsCreateReq(
-        project_id="p1",
+        project_id=project_id,
         wb_user_id="u1",
         track_llm_call=track_llm_call,
         inputs=tsi.CompletionsCreateRequestInputs(**inputs_kwargs),
@@ -116,7 +124,7 @@ async def test_span_sink_defers_insert_to_caller() -> None:
     srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
     fake_span = object()
     buffered = tsi.CompletionsCreateRes(response={"ok": True}, weave_call_id="call-1")
-    sink: list[object] = []
+    sink = CompletionSpanBuffer()
     try:
         with (
             patch(
@@ -126,7 +134,9 @@ async def test_span_sink_defers_insert_to_caller() -> None:
                 ),
             ),
             patch.object(
-                srv, "_build_completion_call_span", return_value=(fake_span, buffered)
+                srv,
+                "_build_completion_call_span",
+                return_value=BuiltCompletionSpan(fake_span, buffered),
             ) as build_mock,
             patch.object(srv, "_log_completion_call") as log_mock,
         ):
@@ -134,7 +144,7 @@ async def test_span_sink_defers_insert_to_caller() -> None:
                 _make_req(track_llm_call=True), span_sink=sink
             )
         assert res is buffered
-        assert sink == [fake_span]
+        assert sink.spans == [fake_span]
         assert build_mock.call_count == 1
         assert log_mock.call_count == 0
     finally:
@@ -166,6 +176,47 @@ async def test_ainsert_completion_spans_bulk_writes_on_executor() -> None:
         assert observed["path"] == "completions_create_batch"
     finally:
         ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_deferred_span_flow_lands_queryable_spans(ch_server) -> None:
+    """End-to-end: two traced completions buffer into a `CompletionSpanBuffer`,
+    the drained spans bulk-insert via `ainsert_completion_spans`, and both are
+    readable back from ClickHouse by the call ids the deferred path returned.
+    """
+    project_id = make_project_id("deferred_flow")
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(
+        host=ch_server._host,
+        port=ch_server._port,
+        database=ch_server._database,
+        ch_executor=ch_executor,
+    )
+    buf = CompletionSpanBuffer()
+    try:
+        with patch(
+            LITELLM_ACOMPLETION_PATCH,
+            new=AsyncMock(
+                return_value=tsi.CompletionsCreateRes(response={"choices": [{"x": 1}]})
+            ),
+        ):
+            res1 = await srv.acompletions_create(
+                _make_req(track_llm_call=True, project_id=project_id), span_sink=buf
+            )
+            res2 = await srv.acompletions_create(
+                _make_req(track_llm_call=True, project_id=project_id), span_sink=buf
+            )
+            # Buffered, not yet inserted: both spans wait in the sink.
+            assert len(buf.spans) == 2
+            await srv.ainsert_completion_spans(buf.drain())
+        assert buf.spans == []
+    finally:
+        ch_executor.shutdown(wait=True)
+
+    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert res.total_count == 2
+    assert {res1.span_id, res2.span_id} == {s.span_id for s in res.spans}
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ import contextvars
 import datetime
 from collections.abc import Callable
 from concurrent.futures import Executor
+from dataclasses import dataclass, field
 from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
@@ -16,6 +17,21 @@ from weave.trace_server.clickhouse_trace_server_batched import (
 )
 from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
+
+
+@dataclass
+class CompletionSpanBuffer:
+    """Accumulates deferred completion-call spans for one bulk insert."""
+
+    spans: list[AgentSpanCHInsertable] = field(default_factory=list)
+
+    def add(self, span: AgentSpanCHInsertable) -> None:
+        self.spans.append(span)
+
+    def drain(self) -> list[AgentSpanCHInsertable]:
+        """Return the buffered spans and reset, so a re-flush can't double-insert."""
+        drained, self.spans = self.spans, []
+        return drained
 
 
 class AsyncClickHouseTraceServer(ClickHouseTraceServer):
@@ -32,13 +48,13 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         self,
         req: tsi.CompletionsCreateReq,
         *,
-        span_sink: list[AgentSpanCHInsertable] | None = None,
+        span_sink: CompletionSpanBuffer | None = None,
     ) -> tsi.CompletionsCreateRes:
         """Async twin of `completions_create`.
 
-        When `span_sink` is given, the traced-call span is appended to it
-        instead of inserted, so a batch caller can bulk-write all spans in one
-        round-trip (see `AgentWriteHandler.insert_spans`).
+        When `span_sink` is given, the traced-call span is added to it instead of
+        inserted, so a batch caller can bulk-write all spans in one round-trip via
+        `ainsert_completion_spans(span_sink.drain())`.
         """
         prep = await asyncio.to_thread(self._prepare_completion_request, req)
         if isinstance(prep, tsi.CompletionsCreateRes):
@@ -76,24 +92,22 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
 
     def _buffer_completion_call(
         self,
-        span_sink: list[AgentSpanCHInsertable],
+        span_sink: CompletionSpanBuffer,
         req: tsi.CompletionsCreateReq,
         prep: CompletionPrepResult,
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
     ) -> tsi.CompletionsCreateRes:
-        """Build the traced-call span and append it to `span_sink` (no insert).
+        """Build the traced-call span and add it to `span_sink` (no insert).
 
-        Runs on `_ch_executor`; `list.append` is atomic under the GIL so
-        concurrent judges can share one sink safely.
+        Runs on `_ch_executor` because `_build_completion_call_span` reads CH
+        (project retention) via the thread-local `ch_client`.
         """
         # `acompletions_create` already gates on `track_llm_call` before here.
-        span, result = self._build_completion_call_span(
-            req, prep, res, start_time, end_time
-        )
-        span_sink.append(span)
-        return result
+        built = self._build_completion_call_span(req, prep, res, start_time, end_time)
+        span_sink.add(built.span)
+        return built.result
 
     async def _run_ch_insert(
         self,
