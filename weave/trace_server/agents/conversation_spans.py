@@ -13,18 +13,29 @@ from weave.trace_server.agents.schema import StatusCodeLiteral
 from weave.trace_server.agents.types import (
     AgentConversationSpan,
     AgentConversationSpanFeedback,
+    AgentConversationSpanScore,
+    AgentSpanFeedbackType,
     ConversationSpanKind,
 )
 from weave.trace_server.emoji_util import detone_emojis
-from weave.trace_server.interface.feedback_types import (
-    AGENT_USER_FEEDBACK_TYPE,
-    REACTION_FEEDBACK_TYPE,
-)
 from weave.trace_server.query_builder.agent_query_builder import (
     coerce_literal,
+    safe_float,
     safe_int,
     safe_str,
 )
+
+# Feedback types this endpoint surfaces (agent_user_feedback, agent_monitor);
+# every other row is skipped before a marker is built.
+_FEEDBACK_TYPES: frozenset[AgentSpanFeedbackType] = frozenset(
+    get_args(AgentSpanFeedbackType)
+)
+
+
+def is_supported_feedback(feedback_type: str) -> bool:
+    """Whether a feedback row's type is surfaced by agent_conversation_spans."""
+    return feedback_type in _FEEDBACK_TYPES
+
 
 # Valid span kinds; unexpected SQL values coerce to "unknown".
 _SPAN_KINDS: frozenset[ConversationSpanKind] = frozenset(get_args(ConversationSpanKind))
@@ -65,36 +76,64 @@ def parse_conversation_spans(raw: object) -> list[AgentConversationSpan]:
     return spans
 
 
-def _feedback_tags(feedback_type: str, raw: dict[str, Any]) -> list[str]:
-    """Return the human tags on a feedback row, skin-tone-detoned.
+def _feedback_tags(raw: dict[str, Any]) -> list[str]:
+    """Return the `scorer_tags` on a feedback row, skin-tone-detoned.
 
-    Agent user feedback carries its tags in `scorer_tags`; a classic reaction is
-    a single emoji tag in its payload. Emoji tags come back as the detoned glyph
-    (so the client renders it directly); text tags pass through unchanged.
+    Emoji tags come back as the detoned glyph (so the client renders it
+    directly); text tags pass through unchanged.
     """
-    if feedback_type == REACTION_FEEDBACK_TYPE:
-        payload = raw.get("payload")
-        glyph = payload.get("detoned") if isinstance(payload, dict) else None
-        return [glyph] if isinstance(glyph, str) and glyph else []
-    if feedback_type == AGENT_USER_FEEDBACK_TYPE:
-        tags = raw.get("scorer_tags")
-        if not isinstance(tags, list):
-            return []
-        return [detone_emojis(tag) for tag in tags if isinstance(tag, str) and tag]
-    return []
+    tags = raw.get("scorer_tags")
+    if not isinstance(tags, list):
+        return []
+    return [detone_emojis(tag) for tag in tags if isinstance(tag, str) and tag]
+
+
+def _feedback_scores(raw: dict[str, Any]) -> list[AgentConversationSpanScore]:
+    """Return the `scorer_ratings` on a feedback row as scores.
+
+    Each rating is a name -> value pair; optional reason/confidence are joined
+    in from the parallel `scorer_rating_reasons` / `scorer_rating_confidences`
+    maps by rating name.
+    """
+    ratings = raw.get("scorer_ratings")
+    if not isinstance(ratings, dict):
+        return []
+    reasons = raw.get("scorer_rating_reasons")
+    confidences = raw.get("scorer_rating_confidences")
+    reasons = reasons if isinstance(reasons, dict) else {}
+    confidences = confidences if isinstance(confidences, dict) else {}
+    scores: list[AgentConversationSpanScore] = []
+    for name, value in ratings.items():
+        if not isinstance(name, str):
+            continue
+        reason = reasons.get(name)
+        confidence = confidences.get(name)
+        scores.append(
+            AgentConversationSpanScore(
+                name=name,
+                value=safe_float(value),
+                reason=reason if isinstance(reason, str) and reason else None,
+                confidence=safe_float(confidence)
+                if isinstance(confidence, (int, float))
+                else None,
+            )
+        )
+    return scores
 
 
 def span_feedback_marker(
     raw: dict[str, Any], *, trace_id: str | None
 ) -> AgentConversationSpanFeedback:
-    """Shape a raw feedback row into a positioned feedback marker.
+    """Shape a supported feedback row into a positioned feedback marker.
 
     `trace_id` is the turn the feedback is anchored to, or None for
-    conversation-level feedback.
+    conversation-level feedback. Callers must filter to `is_supported_feedback`
+    rows first, since `feedback_type` is a constrained literal.
     """
     feedback_type = safe_str(raw.get("feedback_type"))
     return AgentConversationSpanFeedback(
         trace_id=trace_id,
-        feedback_type=feedback_type,
-        tags=_feedback_tags(feedback_type, raw),
+        feedback_type=feedback_type,  # type: ignore[arg-type]  # caller filters
+        tags=_feedback_tags(raw),
+        scores=_feedback_scores(raw),
     )

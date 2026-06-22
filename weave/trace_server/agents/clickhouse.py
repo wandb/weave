@@ -28,6 +28,7 @@ from weave.trace_server.agents.constants import (
     NO_CONVERSATION_LABEL,
 )
 from weave.trace_server.agents.conversation_spans import (
+    is_supported_feedback,
     parse_conversation_spans,
     span_feedback_marker,
 )
@@ -337,13 +338,17 @@ class AgentQueryHandler:
         for cid, items in grouped.by_conversation_id.items():
             if cid in by_conv:
                 by_conv[cid].extend(
-                    span_feedback_marker(raw, trace_id=None) for raw in items
+                    span_feedback_marker(raw, trace_id=None)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
                 )
         for tid, items in grouped.by_trace_id.items():
             conv_id = trace_to_conv.get(tid)
             if conv_id is not None and conv_id in by_conv:
                 by_conv[conv_id].extend(
-                    span_feedback_marker(raw, trace_id=tid) for raw in items
+                    span_feedback_marker(raw, trace_id=tid)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
                 )
         return by_conv
 
