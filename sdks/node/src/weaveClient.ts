@@ -6,6 +6,7 @@ import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
   type AgentSchema,
+  type AgentSpanSchema,
   type AgentVersionSchema,
   type CallSchema,
   type CallsQueryReq,
@@ -91,6 +92,7 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentSpan = AgentSpanSchema;
 export type AgentVersion = AgentVersionSchema;
 
 /**
@@ -135,6 +137,33 @@ export interface GetAgentVersionsOptions {
  */
 export type GetAgentVersionsResult = {
   versions: AgentVersion[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpans}.
+ */
+export interface GetAgentSpansOptions {
+  agentName?: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpans}.
+ */
+export type GetAgentSpansResult = {
+  spans: AgentSpan[];
   total_count?: number;
 };
 
@@ -317,6 +346,54 @@ export class WeaveClient {
         offset: options.offset,
       }
     );
+  }
+
+  /**
+   * Query agent spans, optionally filtered by agent name.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpans({agentName: 'my-agent', limit: 20});
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public async getAgentSpans(
+    options: GetAgentSpansOptions
+  ): Promise<Response<GetAgentSpansResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: options.agentName}],
+          },
+        },
+      });
+    }
+    const resp =
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost(
+        params
+      );
+
+    return {
+      ...resp,
+      data: {
+        ...resp.data,
+        spans: resp.data.spans ?? [],
+      },
+    };
   }
 
   private scheduleBatchProcessing() {
