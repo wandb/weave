@@ -37,8 +37,9 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
 )
 from weave.trace_server.interface.feedback_types import (
+    AGENT_MONITOR_FEEDBACK_TYPE,
+    AGENT_USER_FEEDBACK_TYPE,
     NOTE_FEEDBACK_TYPE,
-    REACTION_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
 
@@ -589,15 +590,17 @@ def _create_feedback(
     project_id: str,
     weave_ref: str,
     feedback_type: str,
-    payload: dict,
+    payload: dict | None = None,
+    **scorer_fields,
 ) -> None:
     ch_server.feedback_create(
         tsi.FeedbackCreateReq(
             project_id=project_id,
             weave_ref=weave_ref,
             feedback_type=feedback_type,
-            payload=payload,
+            payload=payload or {},
             wb_user_id="test-user",
+            **scorer_fields,
         )
     )
 
@@ -622,7 +625,8 @@ def test_conversation_spans_unknown_id_returns_empty(ch_server):
 def test_conversation_spans_sequence_and_feedback(ch_server):
     """agent_conversation_spans returns an ordered per-span sequence (kinds from
     operation_name, ERROR surfaced via status) plus turn-anchored feedback
-    markers carrying the feedback_type and any detoned tags.
+    markers carrying detoned tags and scorer ratings. Only agent_user_feedback
+    and agent_monitor are surfaced; other feedback types are dropped.
     """
     project_id = _make_project_id("conv-spans")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -673,11 +677,32 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     ]
     _insert_spans(ch_server.ch_client, spans)
 
-    # Turn-level reaction (👍 -> positive) on turn A; a note on turn B.
+    # Turn A: a human thumbs-up tag. Turn B: a scorer with a tag + a rating.
+    # Plus an unsupported note on turn B that must be filtered out.
     turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
     turn_b_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_b).uri
     _create_feedback(
-        ch_server, project_id, turn_a_ref, REACTION_FEEDBACK_TYPE, {"emoji": "👍"}
+        ch_server,
+        project_id,
+        turn_a_ref,
+        AGENT_USER_FEEDBACK_TYPE,
+        scorer_tags=["\U0001f44d"],
+    )
+    _create_feedback(
+        ch_server,
+        project_id,
+        turn_b_ref,
+        AGENT_MONITOR_FEEDBACK_TYPE,
+        runnable_ref=ri.InternalOpRef(
+            project_id=project_id, name="quality_scorer", version="v1"
+        ).uri,
+        call_ref=ri.InternalCallRef(project_id=project_id, id=trace_b).uri,
+        trigger_ref=ri.InternalObjectRef(
+            project_id=project_id, name="quality_scorer_trigger", version="v1"
+        ).uri,
+        scorer_tags=["helpful"],
+        scorer_ratings={"quality": 0.8},
+        scorer_rating_reasons={"quality": "clear answer"},
     )
     _create_feedback(
         ch_server, project_id, turn_b_ref, NOTE_FEEDBACK_TYPE, {"note": "nice"}
@@ -703,13 +728,18 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     assert row.spans[-1].trace_id == trace_b
     assert any(e.span_id == tool_span for e in row.spans)
 
-    # Feedback markers are keyed by turn (trace_id) and carry the feedback_type
-    # plus any detoned tags (empty for a note). An emoji tag is the glyph itself.
+    # Markers are keyed by turn (trace_id); the note is dropped, so each turn
+    # has exactly one marker. Emoji tags come back as the detoned glyph.
     by_trace = {f.trace_id: f for f in row.spans_feedback}
-    assert by_trace[trace_a].feedback_type == REACTION_FEEDBACK_TYPE
+    assert by_trace[trace_a].feedback_type == AGENT_USER_FEEDBACK_TYPE
     assert by_trace[trace_a].tags == ["\U0001f44d"]
-    assert by_trace[trace_b].feedback_type == NOTE_FEEDBACK_TYPE
-    assert by_trace[trace_b].tags == []
+    assert by_trace[trace_a].scores == []
+
+    assert by_trace[trace_b].feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
+    assert by_trace[trace_b].tags == ["helpful"]
+    assert len(by_trace[trace_b].scores) == 1
+    score = by_trace[trace_b].scores[0]
+    assert (score.name, score.value, score.reason) == ("quality", 0.8, "clear answer")
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
