@@ -10,6 +10,7 @@ import {
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
   ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
@@ -90,12 +91,10 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(invoke.parentSpanId).toBeUndefined();
-    expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
-    expect(invoke.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
-    expect(invoke.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
-      3
-    );
-    expect(invoke.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(15);
+    // The root carries no token usage of its own — per-model usage rides on
+    // child `chat` spans (asserted below) so the trace server costs and rolls
+    // it up per model. The SDK's authoritative total cost stays on the root.
+    expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
     expect(invoke.attributes['claude_agent_sdk.usage.cost_usd']).toBe(0.01);
     expect(invoke.attributes['claude_agent_sdk.num_turns']).toBe(1);
     expect(
@@ -105,7 +104,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
       JSON.parse(invoke.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([{role: 'assistant', content: 'It is sunny.'}]);
 
-    const chat = findSpan(spans, 'chat claude-x');
+    // Two spans are named `chat claude-x`: the per-message content span and the
+    // per-model usage span. Distinguish them by what each carries.
+    const chatSpans = spans.filter(s => s.name === 'chat claude-x');
+    const chat = chatSpans.find(
+      s => s.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] != null
+    )!;
     expect(chat.kind).toBe(SpanKind.CLIENT);
     expect(chat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
@@ -132,6 +136,23 @@ describe('Claude Agent SDK — OTel tracer', () => {
       },
     ]);
 
+    // The per-model usage span carries `modelUsage['claude-x']`, keyed by model
+    // (request + response) so the trace server costs and rolls it up per model.
+    const usageChat = chatSpans.find(
+      s => s.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS] != null
+    )!;
+    expect(usageChat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
+    expect(usageChat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
+    expect(usageChat.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBe('claude-x');
+    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
+    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
+    expect(
+      usageChat.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+    ).toBe(3);
+    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(15);
+    expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
+    expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
+
     const tool = findSpan(spans, 'execute_tool Bash');
     expect(tool.kind).toBe(SpanKind.INTERNAL);
     expect(tool.attributes[ATTR_GEN_AI_TOOL_NAME]).toBe('Bash');
@@ -146,6 +167,61 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const traceId = invoke.spanContext().traceId;
     expect(chat.spanContext().traceId).toBe(traceId);
     expect(tool.spanContext().traceId).toBe(traceId);
+  });
+
+  test('emits one usage chat span per model, preserving the per-model split', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
+    tracer.processMessage({
+      type: 'assistant',
+      session_id: 'sess-2',
+      message: {model: 'claude-opus', content: [{type: 'text', text: 'hi'}]},
+    } as any);
+    tracer.finalize({
+      type: 'result',
+      subtype: 'success',
+      is_error: false,
+      total_cost_usd: 0.05,
+      // Multi-model session: a fast model handled an internal step and never
+      // surfaced an assistant message of its own.
+      modelUsage: {
+        'claude-opus': {inputTokens: 100, outputTokens: 40},
+        'claude-haiku': {
+          inputTokens: 20,
+          outputTokens: 8,
+          cacheReadInputTokens: 5,
+        },
+      },
+    } as any);
+
+    const spans = getExporter().getFinishedSpans();
+    const invoke = findSpan(spans, INVOKE);
+    // The root never carries token usage; the server rolls it up from children.
+    expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
+    expect(invoke.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBeUndefined();
+    expect(invoke.attributes['claude_agent_sdk.usage.cost_usd']).toBe(0.05);
+
+    // One usage span per model, each keyed by its own model — the split is
+    // preserved (not summed), so the server prices each model at its own rate.
+    const opus = spans.find(
+      s =>
+        s.attributes[ATTR_GEN_AI_RESPONSE_MODEL] === 'claude-opus' &&
+        s.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS] != null
+    )!;
+    expect(opus.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(100);
+    expect(opus.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(40);
+    expect(opus.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(140);
+    expect(opus.parentSpanId).toBe(invoke.spanContext().spanId);
+
+    // The internal fast model has no content chat span, only a usage span —
+    // sourcing from `modelUsage` is what makes its tokens visible at all.
+    const haiku = spans.find(
+      s => s.attributes[ATTR_GEN_AI_RESPONSE_MODEL] === 'claude-haiku'
+    )!;
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(20);
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(8);
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(5);
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(28);
+    expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
   });
 
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {

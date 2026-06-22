@@ -135,27 +135,35 @@ function toolResultText(content: unknown): string {
 }
 
 /**
- * Sum the per-model `modelUsage` (or fall back to the aggregate `usage`) into
- * Weave's snake_case token keys. Reuses {@link toWeaveUsage} so the
- * camelCase→snake_case handling stays in one place.
+ * Map one model's SDK usage object to the scalar `gen_ai.usage.*` span
+ * attributes. {@link toWeaveUsage} normalizes both the camelCase per-model
+ * `modelUsage` values and the snake_case aggregate `usage`.
  */
-function aggregateUsage(result: SDKResultMessage): Record<string, number> {
-  const totals: Record<string, number> = {};
-  const add = (usage: Record<string, unknown>): void => {
-    for (const [key, value] of Object.entries(toWeaveUsage(usage))) {
-      if (typeof value === 'number') {
-        totals[key] = (totals[key] ?? 0) + value;
-      }
-    }
-  };
-  if (result.modelUsage) {
-    for (const usage of Object.values(result.modelUsage)) {
-      add(usage);
-    }
-  } else if (result.usage) {
-    add(result.usage);
+function usageAttributes(
+  rawUsage: Record<string, unknown>
+): Record<string, number> {
+  const usage = toWeaveUsage(rawUsage);
+  const attrs: Record<string, number> = {};
+  const input = usage.input_tokens;
+  const output = usage.output_tokens;
+  const cacheRead = usage.cache_read_input_tokens;
+  const cacheCreation = usage.cache_creation_input_tokens;
+  if (typeof input === 'number') {
+    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = input;
   }
-  return totals;
+  if (typeof output === 'number') {
+    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = output;
+  }
+  if (typeof cacheRead === 'number') {
+    attrs[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = cacheRead;
+  }
+  if (typeof cacheCreation === 'number') {
+    attrs[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] = cacheCreation;
+  }
+  if (typeof input === 'number' && typeof output === 'number') {
+    attrs[ATTR_GEN_AI_USAGE_TOTAL_TOKENS] = input + output;
+  }
+  return attrs;
 }
 
 export interface ClaudeAgentOtelTracerOptions {
@@ -263,27 +271,10 @@ export class ClaudeAgentOtelTracer {
     }
 
     if (result) {
-      const usage = aggregateUsage(result);
-      const usageAttrs: Record<string, number> = {};
-      if (usage.input_tokens != null) {
-        usageAttrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens;
-      }
-      if (usage.output_tokens != null) {
-        usageAttrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens;
-      }
-      if (usage.cache_read_input_tokens != null) {
-        usageAttrs[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] =
-          usage.cache_read_input_tokens;
-      }
-      if (usage.cache_creation_input_tokens != null) {
-        usageAttrs[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] =
-          usage.cache_creation_input_tokens;
-      }
-      if (usage.input_tokens != null && usage.output_tokens != null) {
-        usageAttrs[ATTR_GEN_AI_USAGE_TOTAL_TOKENS] =
-          usage.input_tokens + usage.output_tokens;
-      }
-      this.invokeAgentSpan.setAttributes(usageAttrs);
+      // Emit per-model usage on child spans and let the trace server cost and
+      // roll it up, rather than summing on the client. See
+      // {@link emitModelUsageSpans}.
+      this.emitModelUsageSpans(result);
 
       if (result.total_cost_usd != null) {
         this.invokeAgentSpan.setAttribute(ATTR_COST_USD, result.total_cost_usd);
@@ -325,6 +316,59 @@ export class ClaudeAgentOtelTracer {
     }
 
     this.invokeAgentSpan.end();
+  }
+
+  /**
+   * Emit one `chat` span per model carrying that model's token usage, keyed by
+   * `gen_ai.response.model`, as children of the root. The trace server keys
+   * `summary.usage` on each span's model, costs every model from its own price,
+   * and rolls the per-model totals up into the root `invoke_agent` span — so we
+   * hand it the SDK's per-model `modelUsage` breakdown verbatim instead of
+   * summing on the client, which would collapse a multi-model session onto one
+   * model's price and discard the per-model split the server's cost rollup needs.
+   *
+   * The root carries no token usage of its own, so it isn't double-counted in
+   * that descendant rollup; the SDK's authoritative `total_cost_usd` still rides
+   * on the root as a reference attribute. Sourcing usage from the result's
+   * `modelUsage` (rather than per-assistant-message usage) also captures models
+   * the SDK used without emitting an assistant message — e.g. a fast model for
+   * an internal step.
+   */
+  private emitModelUsageSpans(result: SDKResultMessage): void {
+    // Prefer the per-model breakdown; fall back to the flat aggregate keyed by
+    // the session's primary model when the SDK reports no `modelUsage`.
+    const perModel: Array<[string | undefined, Record<string, unknown>]> =
+      result.modelUsage && Object.keys(result.modelUsage).length > 0
+        ? Object.entries(result.modelUsage)
+        : result.usage
+          ? [[this.rootModel ?? undefined, result.usage]]
+          : [];
+
+    for (const [model, rawUsage] of perModel) {
+      const attrs = usageAttributes(rawUsage);
+      if (Object.keys(attrs).length === 0) {
+        continue;
+      }
+      const span = this.tracer.startSpan(
+        `chat ${model ?? ''}`.trimEnd(),
+        {
+          kind: SpanKind.CLIENT,
+          attributes: {
+            ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
+            [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+            [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+            ...(model ? {[ATTR_GEN_AI_REQUEST_MODEL]: model} : {}),
+            ...(model ? {[ATTR_GEN_AI_RESPONSE_MODEL]: model} : {}),
+            ...(this.conversationId
+              ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
+              : {}),
+            ...attrs,
+          },
+        },
+        this.invokeAgentCtx
+      );
+      span.end();
+    }
   }
 
   private processAssistant(msg: SDKAssistantMessage): void {

@@ -58,15 +58,25 @@ describe('hostApps — claude-agent-sdk', () => {
     // The fake CLI reports a session_id; it becomes the conversation id.
     const conversationId = invoke.attributes['gen_ai.conversation.id'];
     expect(conversationId).toBe('fake-session');
-    // Usage from the result message is lifted onto the root.
-    expect(invoke.attributes['gen_ai.usage.input_tokens']).toBe(8);
-    expect(invoke.attributes['gen_ai.usage.output_tokens']).toBe(12);
+    // The root carries no token usage — per-model usage rides on child `chat`
+    // spans so the trace server costs and rolls it up per model.
+    expect(invoke.attributes['gen_ai.usage.input_tokens']).toBeUndefined();
 
-    // chat spans (one per assistant message) and the tool span hang off the
-    // root and share its trace + conversation id.
+    // chat spans hang off the root and share its trace + conversation id: one
+    // per assistant message (carrying content) plus a per-model usage span.
     const chats = spans.filter(s => s.name === 'chat claude-fake');
     expect(chats.length).toBeGreaterThanOrEqual(1);
     expect(chats.every(c => c.parentSpanId === invoke.spanId)).toBe(true);
+
+    // Usage from the result's modelUsage rides on a per-model chat span, keyed
+    // by model so the server costs it at that model's price.
+    const usageChat = chats.find(
+      c => c.attributes['gen_ai.usage.input_tokens'] != null
+    );
+    expect(usageChat).toBeDefined();
+    expect(usageChat!.attributes['gen_ai.usage.input_tokens']).toBe(8);
+    expect(usageChat!.attributes['gen_ai.usage.output_tokens']).toBe(12);
+    expect(usageChat!.attributes['gen_ai.response.model']).toBe('claude-fake');
 
     const tool = findSpan('execute_tool Bash');
     expect(tool.attributes['gen_ai.operation.name']).toBe('execute_tool');
