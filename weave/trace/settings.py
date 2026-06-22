@@ -305,7 +305,7 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_DISABLE_WAL_SENDER`
     """
 
-    use_otel_v2: bool = False
+    use_otel_v2: bool = True
     """
     Routes OTel-capable integrations through their OTel variant.
 
@@ -313,6 +313,10 @@ class UserSettings:
     → ``openai_agents_otel``) dispatch to the OTel variant on implicit
     import-hook patching. Explicit ``patch_*`` calls are unaffected — they
     always do exactly what their name says.
+
+    NOTE: plain ``openai`` has no OTel variant, so it is no longer patched on
+    implicit import-hook patching. Call ``weave.integrations.patch_openai()``
+    explicitly (or set this to False) to trace direct ``openai.*`` calls.
 
     Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
     """

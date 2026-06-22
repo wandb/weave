@@ -1,30 +1,19 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {wrapOpenAI} from '../../integrations/openai';
 import {initWithCustomTraceServer} from '../clientMock';
 import {makeAPIPromiseShim, makeMockOpenAIChat} from '../openaiMock';
 
-// Helper function to get calls
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  const calls = await traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-      limit: 100,
-    })
-    .then(result => result.calls);
-  return calls;
-}
-
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 describe('OpenAI Integration', () => {
-  let inMemoryTraceServer: InMemoryTraceServer;
+  let traceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
   let mockOpenAI: any;
   let patchedOpenAI: any;
 
   beforeEach(() => {
-    inMemoryTraceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(testProjectName, traceServer);
 
     const mockOpenAIChat = makeMockOpenAIChat(messages => ({
       content: messages[messages.length - 1].content.toUpperCase(),
@@ -81,9 +70,12 @@ describe('OpenAI Integration', () => {
     expect(opResult.choices[0].message.content).toBe('HELLO, AI!');
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
+    // Integration-tracking metadata is stamped on every patched call.
+    expect(calls[0].attributes?.integration?.name).toBe('openai');
+    expect(calls[0].attributes?.integration?.meta?.package_name).toBe('openai');
     expect(calls[0].inputs).toEqual({messages});
     expect(calls[0].output).toMatchObject({
       object: opResult.object,
@@ -150,7 +142,7 @@ describe('OpenAI Integration', () => {
     // expect(usageChunkSeen).toBe(false);  // Ensure no usage chunk is seen in the user-facing stream
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
     expect(calls[0].inputs).toEqual({messages, stream: true});
@@ -181,7 +173,7 @@ describe('OpenAI Integration', () => {
     const rawCreate = mockOpenAI.chat.completions.create;
     mockOpenAI.chat.completions.create = (params: any) => {
       const shim = rawCreate(params);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
       const {_thenUnwrap: _removed, ...rest} = shim;
       return rest;
     };
@@ -194,7 +186,7 @@ describe('OpenAI Integration', () => {
       expect(result.choices[0].message.content).toBe('HELLO!');
 
       await wait(300);
-      const calls = await getCalls(inMemoryTraceServer, testProjectName);
+      const calls = await traceServer.getCalls(testProjectName);
       // Fail-fast: no half-started call on the trace server.
       expect(calls).toHaveLength(0);
     } finally {
@@ -225,7 +217,7 @@ describe('OpenAI Integration', () => {
 
     await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     // The key assertion: output is populated, which means finishCall
     // fired. Without the .withResponse() → traced-data substitution,
@@ -266,7 +258,7 @@ describe('OpenAI Integration', () => {
     expect(usageChunkSeen).toBe(true); // Ensure usage chunk is seen when explicitly requested
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].summary).toEqual({
       usage: {
@@ -339,7 +331,7 @@ describe('OpenAI Integration', () => {
     });
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
     expect(calls[0].inputs).toEqual({messages, functions});
@@ -464,7 +456,7 @@ describe('OpenAI Integration', () => {
     // Wait for any pending batch processing
     await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
     expect(calls[0].inputs).toMatchObject(options);
@@ -495,7 +487,6 @@ describe('OpenAI Integration', () => {
 
     let caught: unknown;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const _chunk of stream) {
         // consume; the error fires after the first chunk
       }
@@ -508,7 +499,7 @@ describe('OpenAI Integration', () => {
 
     await wait(300);
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     // The trace records the exception rather than declaring success
     // with partial output.

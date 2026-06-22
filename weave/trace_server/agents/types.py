@@ -117,6 +117,13 @@ _ALLOWED_AGGS_BY_TYPE: dict[AgentSpanStatsValueType, set[AgentSpanStatsAggregati
 }
 
 
+def _derived_value_type(key: str) -> AgentSpanStatsValueType:
+    for metric, value_type in AGENT_SPAN_STATS_DERIVED_VALUE_TYPES.items():
+        if metric == key:
+            return value_type
+    raise ValueError(f"unknown derived span value: {key!r}")
+
+
 def _as_utc(dt: datetime.datetime) -> datetime.datetime:
     if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
         return dt.replace(tzinfo=datetime.timezone.utc)
@@ -154,9 +161,7 @@ class AgentSpanMeasureSpec(BaseModel):
             raise ValueError("only count measures may omit value")
 
         if self.value is not None and self.value.source == "derived":
-            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[
-                self.value.key  # type: ignore[index]
-            ]
+            expected_type = _derived_value_type(self.value.key)
             if self.value_type is not None and self.value_type != expected_type:
                 raise ValueError(
                     f"derived value {self.value.key!r} has value_type "
@@ -189,9 +194,7 @@ class AgentSpanStatsMetricSpec(BaseModel):
     @model_validator(mode="after")
     def validate_metric_spec(self) -> AgentSpanStatsMetricSpec:
         if self.value.source == "derived":
-            expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[
-                self.value.key  # type: ignore[index]
-            ]
+            expected_type = _derived_value_type(self.value.key)
             if self.value_type != expected_type:
                 raise ValueError(
                     f"derived metric {self.value.key!r} has value_type "
@@ -295,9 +298,7 @@ class AgentSpanStatsNumericBucketSpec(BaseModel):
 
         if self.value is not None:
             if self.value.source == "derived":
-                expected_type = AGENT_SPAN_STATS_DERIVED_VALUE_TYPES[
-                    self.value.key  # type: ignore[index]
-                ]
+                expected_type = _derived_value_type(self.value.key)
                 if expected_type != "number":
                     raise ValueError(
                         f"derived bucket value {self.value.key!r} has value_type "
@@ -372,8 +373,15 @@ class AgentSpanStatsReq(BaseModel):
         end = self.end or datetime.datetime.now(datetime.timezone.utc)
         if end < self.start:
             raise ValueError("AgentSpanStatsReq end must be after start")
+        # Unfiltered, ungrouped requests are not bound by
+        # MAX_AGENT_STATS_RANGE_DAYS.
+        apply_max_range_days = (
+            bool(self.group_by)
+            or bool(self.group_filters)
+            or numeric_bucket is not None
+        )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
-        if end - self.start > max_range:
+        if apply_max_range_days and end - self.start > max_range:
             raise ValueError(
                 "AgentSpanStatsReq date range cannot exceed "
                 f"{MAX_AGENT_STATS_RANGE_DAYS} days"
@@ -782,21 +790,29 @@ class AgentCustomAttrsSchemaRes(BaseModel):
 
 
 class AgentSearchReq(BaseModel):
-    """Full-text search across message content and span metadata.
+    """Query the `messages` table by content and/or span-level filters.
 
-    Scans the `messages` table (one row per message occurrence, populated
-    by an MV from spans) and returns matching span-level hits. The caller
-    groups by conversation for the response shape.
+    Scans the `messages` table (one row per message occurrence, populated by an
+    MV from spans) and returns matching span-level hits. Full-text search sets
+    `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
+    empty and uses the filters below. The caller groups by conversation for the
+    response shape.
     """
 
     project_id: str
-    query: str
+    # Substring match on message content. Empty matches all (no content filter),
+    # turning this into structured retrieval over the filters below.
+    query: str = ""
 
+    trace_id: str | None = None
     roles: list[SearchMessageRole] | None = None
     conversation_id: str | None = None
     agent_name: str | None = None
     provider_name: str | None = None
     request_model: str | None = None
+    # Truncate message content to a preview (default) to keep search-UI payloads
+    # small; set False to return full content (e.g. for structured retrieval).
+    truncate_content: bool = True
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 
@@ -907,6 +923,8 @@ class AgentChatMessage(BaseModel):
     type: AgentChatMessageType
     span_id: str | None = None
     agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -959,6 +977,9 @@ class AgentTraceChatRes(BaseModel):
 
     trace_id: str
     root_span_name: str | None = None
+    agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     provider: str | None = None
     total_duration_ms: int | None = Field(
         default=None,

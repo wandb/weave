@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from collections.abc import Callable, Generator, Iterator
@@ -65,9 +66,21 @@ def tag_db_insert_path(
 
     Convenience over `db_insert_path` for decorating public API methods
     whose entire body should be attributed to a single ingestion path.
+
+    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry the
+    contextvar, so a caller handing CH writes to an executor must `copy_context().run`.
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if asyncio.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with db_insert_path(path):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper
+
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             with db_insert_path(path):

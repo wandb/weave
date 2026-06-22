@@ -1,4 +1,4 @@
-import {InMemoryTraceServer} from '../../inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {commonPatchGoogleGenAI} from '../../integrations/googleGenAI';
 import {initWithCustomTraceServer} from '../clientMock';
 
@@ -100,6 +100,11 @@ describe('Google GenAI Integration', () => {
     const calls = await inMemoryTraceServer.getCalls(testProjectName, 100);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('google.genai.models.generateContent');
+    // Integration-tracking metadata is stamped on every patched call.
+    expect(calls[0].attributes?.integration?.name).toBe('google_genai');
+    expect(calls[0].attributes?.integration?.meta?.package_name).toBe(
+      '@google/genai'
+    );
     expect(calls[0].inputs).toEqual({
       model: 'gemini-2.5-flash',
       contents: 'Hello Gemini',

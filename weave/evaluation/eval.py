@@ -13,6 +13,7 @@ from pydantic import PrivateAttr
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
+from weave.evaluation.eval_meta import EVAL_META_KEY, EvalMeta
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
 from weave.flow.model import (
@@ -29,6 +30,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
+from weave.trace.api import attributes
 from weave.trace.call import Call, CallsIter
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
@@ -378,8 +380,13 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name, eager_call_start=True)
     async def evaluate(self, model: Op | Model) -> dict:
-        eval_results = await self.get_eval_results(model)
-        summary = await self.summarize(eval_results)
+        # Tag every eval child call (mirrors the imperative path); merge into any
+        # existing _weave_eval_meta (e.g. evaluate_model_worker), don't overwrite.
+        prev_eval_meta = call_context.call_attributes.get().get(EVAL_META_KEY, {})
+        declarative_meta: EvalMeta = {"declarative": True}
+        with attributes({EVAL_META_KEY: {**prev_eval_meta, **declarative_meta}}):
+            eval_results = await self.get_eval_results(model)
+            summary = await self.summarize(eval_results)
 
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:

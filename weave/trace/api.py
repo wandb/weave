@@ -108,6 +108,8 @@ def init(
                     call data (start and end) into a single request instead of separate start/end requests.
                     This reduces server load and improves performance, especially for short-lived ops.
                     Default: `True`
+                - `use_otel_v2`: (bool): Routes OTel-capable integrations through their OTel variant.
+                    Default: `True`
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         postprocess_inputs: A function applied to the inputs of every op traced by this client.
         postprocess_output: A function applied to the output of every op traced by this client.

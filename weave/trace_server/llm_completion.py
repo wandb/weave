@@ -2,7 +2,9 @@ import threading
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import litellm
 from cachetools import TTLCache
+from litellm import CustomStreamWrapper
 from pydantic import BaseModel
 
 from weave.prompt.prompt import format_message_with_template_vars
@@ -246,9 +248,46 @@ def lite_llm_completion(
     provider: str | None = None,
     base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
-    return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
+    )
+    try:
+        res = litellm.completion(**kwargs)
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _litellm_error_response(e)
+
+
+async def lite_llm_acompletion(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    vertex_credentials: str | None = None,
+) -> tsi.CompletionsCreateRes:
+    """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
+    kwargs = _build_litellm_kwargs(
+        api_key, inputs, provider, base_url, extra_headers, vertex_credentials
+    )
+    try:
+        res = await litellm.acompletion(**kwargs)
+        return tsi.CompletionsCreateRes(response=res.model_dump())
+    except Exception as e:
+        return _litellm_error_response(e)
+
+
+def _build_litellm_kwargs(
+    api_key: str | None,
+    inputs: tsi.CompletionsCreateRequestInputs,
+    provider: str | None,
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+    vertex_credentials: str | None,
+) -> dict[str, Any]:
+    """Resolve credentials + inputs into kwargs for `litellm.[a]completion`."""
     # Normalize base_url to prevent issues with trailing slashes causing redirects
     # that change POST to GET (HTTP 301/302 redirect behavior)
     if base_url:
@@ -263,8 +302,6 @@ def lite_llm_completion(
         azure_api_version,
     ) = _setup_provider_credentials_and_model(inputs, provider)
 
-    import litellm
-
     # This allows us to drop params that are not supported by the LLM provider
     litellm.drop_params = True
 
@@ -276,28 +313,12 @@ def lite_llm_completion(
 
     # Handle custom provider
     if provider == "custom" and base_url:
-        try:
-            # Prepare headers
-            headers = extra_headers or {}
-
-            # Make the API call using litellm
-            res = litellm.completion(
-                **inputs_dict,
-                api_key=api_key,
-                api_base=base_url,
-                extra_headers=headers,
-            )
-
-            # Convert the response based on return_type if needed
-            if return_type and return_type != "openai":
-                # Handle different return types if needed in the future
-                pass
-
-            return tsi.CompletionsCreateRes(response=res.model_dump())
-        except Exception as e:
-            error_message = str(e)
-            error_message = error_message.replace("litellm.", "")
-            return tsi.CompletionsCreateRes(response={"error": error_message})
+        return {
+            **inputs_dict,
+            "api_key": api_key,
+            "api_base": base_url,
+            "extra_headers": extra_headers or {},
+        }
     elif provider == "custom" and not base_url:
         raise InvalidRequest(
             "Invalid provider configuration: must provide base_url if provider is 'custom'"
@@ -307,29 +328,26 @@ def lite_llm_completion(
             f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
         )
 
-    try:
-        # For vertex providers, use vertex_credentials when provided instead of api_key
-        is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
-        api_key_for_call = api_key
-        if is_vertex_provider and vertex_credentials:
-            api_key_for_call = None
-        completion_kwargs: dict[str, Any] = {
-            **inputs_dict,
-            "api_key": api_key_for_call,
-            "aws_access_key_id": aws_access_key_id,
-            "aws_secret_access_key": aws_secret_access_key,
-            "aws_region_name": aws_region_name,
-            "api_base": azure_api_base,
-            "api_version": azure_api_version,
-        }
-        if is_vertex_provider and vertex_credentials:
-            completion_kwargs["vertex_credentials"] = vertex_credentials
-        res = litellm.completion(**completion_kwargs)
-        return tsi.CompletionsCreateRes(response=res.model_dump())
-    except Exception as e:
-        error_message = str(e)
-        error_message = error_message.replace("litellm.", "")
-        return tsi.CompletionsCreateRes(response={"error": error_message})
+    # For vertex providers, use vertex_credentials when provided instead of api_key
+    is_vertex_provider = provider in VERTEX_PROVIDER_NAMES
+    api_key_for_call = None if (is_vertex_provider and vertex_credentials) else api_key
+    completion_kwargs: dict[str, Any] = {
+        **inputs_dict,
+        "api_key": api_key_for_call,
+        "aws_access_key_id": aws_access_key_id,
+        "aws_secret_access_key": aws_secret_access_key,
+        "aws_region_name": aws_region_name,
+        "api_base": azure_api_base,
+        "api_version": azure_api_version,
+    }
+    if is_vertex_provider and vertex_credentials:
+        completion_kwargs["vertex_credentials"] = vertex_credentials
+    return completion_kwargs
+
+
+def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
+    error_message = str(e).replace("litellm.", "")
+    return tsi.CompletionsCreateRes(response={"error": error_message})
 
 
 def get_bedrock_credentials(
@@ -600,8 +618,6 @@ def lite_llm_completion_stream(
         azure_api_version,
     ) = _setup_provider_credentials_and_model(inputs, provider)
 
-    import litellm
-
     litellm.drop_params = True
 
     # Helper to produce a generator of dicts from litellm chunks
@@ -649,12 +665,12 @@ def lite_llm_completion_stream(
                     stream_kwargs["vertex_credentials"] = vertex_credentials
                 stream = litellm.completion(**stream_kwargs)
 
+            # `stream=True` always yields a CustomStreamWrapper of pydantic
+            # chunks; downstream consumers and json serialization need dicts.
+            if not isinstance(stream, CustomStreamWrapper):
+                raise InvalidRequest("Expected a streaming response from litellm")
             for chunk in stream:
-                # ``chunk`` is a BaseModel (ChatCompletionChunk). Convert to dict.
-                if hasattr(chunk, "model_dump"):
-                    yield chunk.model_dump()
-                else:
-                    yield chunk  # type: ignore[return-value]
+                yield chunk.model_dump()
         except Exception as e:
             error_message = str(e).replace("litellm.", "")
             yield {"error": error_message}

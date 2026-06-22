@@ -1,12 +1,15 @@
 import {init, login} from '../../clientApi';
 import {Table} from '../../table';
+import {getWandbConfigs} from '../../wandb/settings';
+import {vcrTest} from '../helpers/vcrTest';
 
-describe.skip('Table', () => {
+describe('Table', () => {
   beforeEach(async () => {
-    await login(process.env.WANDB_API_KEY ?? '');
+    const {apiKey} = getWandbConfigs();
+    await login(apiKey ?? '');
   });
 
-  test('example', async () => {
+  vcrTest('example', async () => {
     // Table behaves like a container of rows
     const rows = [
       {a: 1, b: 2},

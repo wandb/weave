@@ -47,6 +47,35 @@ class InvalidRequest(Error):
     pass
 
 
+class ObjectNameTypeCollision(InvalidRequest):
+    """Raised when obj_create targets an object_id already bound to a different base_object_class.
+
+    Object names are bound to one type per project (WB-30574). Weave refs do not
+    carry type, so allowing same-name different-type would make refs ambiguous.
+    """
+
+    def __init__(
+        self,
+        object_id: str,
+        kind: str,
+        new_base_object_class: str | None,
+        existing_base_object_classes: list[str | None],
+    ):
+        self.object_id = object_id
+        self.kind = kind
+        self.new_base_object_class = new_base_object_class
+        self.existing_base_object_classes = existing_base_object_classes
+        existing_labels = [
+            _describe_object_class(c) for c in existing_base_object_classes
+        ]
+        existing_desc = " or ".join(dict.fromkeys(existing_labels))
+        super().__init__(
+            f"Cannot publish {object_id!r} as {_describe_object_class(new_base_object_class)}: "
+            f"that name is already used by {existing_desc} in this project. "
+            f"Object versions cannot share types, publish this object under a different name."
+        )
+
+
 class CallsCompleteModeRequired(InvalidRequest):
     """Raised when project requires calls_complete mode but SDK is using legacy mode.
 
@@ -125,6 +154,14 @@ class NotFoundError(Error):
     """Raised when a general not found error occurs."""
 
     pass
+
+
+class RefObjectsNotFoundError(NotFoundError):
+    """Raised when reference objects are not found."""
+
+    def __init__(self, message: str, missing_object_digests: list[str]):
+        self.missing_object_digests = missing_object_digests
+        super().__init__(message)
 
 
 class MissingLLMApiKeyError(Error):
@@ -277,6 +314,7 @@ class ErrorRegistry:
         # 400
         self.register(InvalidRequest, 400)
         self.register(CallsCompleteModeRequired, 400)
+        self.register(ObjectNameTypeCollision, 400)
         self.register(InvalidExternalRef, 400)
         self.register(DigestMismatchError, 409)
         self.register(QueryNoCommonTypeError, 400)
@@ -289,6 +327,13 @@ class ErrorRegistry:
 
         # 404
         self.register(NotFoundError, 404)
+        # Exact-type registration (the registry matches by exact type), so the
+        # missing-digest field is surfaced in the response body.
+        self.register(
+            RefObjectsNotFoundError,
+            404,
+            _format_ref_objects_not_found_error,
+        )
         self.register(ProjectNotFound, 404)
         self.register(RunNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
@@ -441,6 +486,13 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     raise e
 
 
+def _describe_object_class(base_object_class: str | None) -> str:
+    """Human-readable label for a base_object_class (None = an untyped object)."""
+    if base_object_class is None:
+        return "a generic (untyped) object"
+    return f"a {base_object_class}"
+
+
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:
     """Format MissingLLMApiKeyError with api_key field."""
     extra = {}
@@ -454,6 +506,14 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     extra = {}
     if isinstance(exc, ObjectDeletedError):
         extra["deleted_at"] = exc.deleted_at.isoformat()
+    return _format_error_to_json_with_extra(exc, extra)
+
+
+def _format_ref_objects_not_found_error(exc: Exception) -> dict[str, Any]:
+    """Format RefObjectsNotFoundError with the missing object digests."""
+    extra = {}
+    if isinstance(exc, RefObjectsNotFoundError):
+        extra["missing_object_digests"] = exc.missing_object_digests
     return _format_error_to_json_with_extra(exc, extra)
 
 

@@ -10,7 +10,7 @@ This module tests the V2 API endpoints for:
 - Predictions (create, read, list, delete)
 - Scores (create, read, list, delete)
 
-The tests run against both SQLite and ClickHouse backends.
+The tests run against the ClickHouse backend.
 """
 
 import datetime
@@ -18,6 +18,7 @@ import datetime
 import pytest
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
@@ -1017,6 +1018,7 @@ class ReadEvalRunModel(weave.Model):
 
         # Create models and runs
         run_ids = []
+        model_refs = []
         for i in range(3):
             model_req = tsi.ModelCreateReq(
                 project_id=project_id,
@@ -1030,6 +1032,7 @@ class ListEvalRunModel{i}(weave.Model):
 """,
             )
             model_res = client.server.model_create(model_req)
+            model_refs.append(model_res.model_ref)
 
             run_req = tsi.EvaluationRunCreateReq(
                 project_id=project_id,
@@ -1048,6 +1051,34 @@ class ListEvalRunModel{i}(weave.Model):
         returned_ids = [r.evaluation_run_id for r in runs]
         for run_id in run_ids:
             assert run_id in returned_ids
+
+        eval_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluations=[eval_res.evaluation_ref]),
+        )
+        eval_filtered_ids = {
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(eval_filter_req)
+        }
+        assert set(run_ids).issubset(eval_filtered_ids)
+
+        model_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(models=[model_refs[0]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(model_filter_req)
+        ] == [run_ids[0]]
+
+        id_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluation_run_ids=[run_ids[1]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(id_filter_req)
+        ] == [run_ids[1]]
 
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""
@@ -1782,6 +1813,7 @@ class ScoreEvalRunModel(weave.Model):
 class TestEvalResultsReadAPI:
     """Tests for the read-oriented eval results API."""
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_query_intersection(self, client):
         """Keeps only rows shared by all requested evaluations."""
         project_id = client.project_id
@@ -1901,6 +1933,7 @@ class TestEvalResultsReadAPI:
             run_b.evaluation_run_id,
         }
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_summary_pass_signal(self, client):
         """Aggregates pass-rate stats from scorer outputs with `passed` booleans."""
         project_id = client.project_id
@@ -2004,6 +2037,7 @@ class TestEvalResultsReadAPI:
         assert scorer_stats.pass_true_count == 1
         assert scorer_stats.pass_rate == 1.0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_summary_nested_passed_dimension(self, client):
         """Verify scorer_stats emits one entry per flattened leaf (e.g. token_distance.passed)."""
         project_id = client.project_id
@@ -2115,6 +2149,7 @@ class TestEvalResultsReadAPI:
         assert distance_stats.numeric_count == 1
         assert distance_stats.numeric_mean == 0.0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.asyncio
     async def test_eval_results_from_high_level_evaluation(self, client):
         """Run a real weave.Evaluation then verify eval_results_query and summary."""
@@ -2198,6 +2233,7 @@ class TestEvalResultsReadAPI:
         assert match_stats.pass_true_count == 2
         assert match_stats.pass_rate == 1.0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_from_imperative_evaluation(self, client):
         """Run a real EvaluationLogger then verify eval_results_query and summary."""
         project_id = client.project_id
@@ -2269,6 +2305,7 @@ class TestEvalResultsReadAPI:
         assert conf.numeric_mean == pytest.approx((0.9 + 0.3 + 0.7) / 3)
         assert conf.pass_known_count == 0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_summary_numeric_mean(self, client):
         """Verify numeric aggregation in eval_results_summary."""
         project_id = client.project_id
@@ -2344,6 +2381,7 @@ class TestEvalResultsReadAPI:
         assert stats.pass_rate is None
         assert stats.pass_known_count == 0
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_query_multiple_scorers(self, client):
         """Verify multiple scorers appear in query and summary results."""
         project_id = client.project_id
@@ -2478,6 +2516,7 @@ class TestEvalResultsReadAPI:
         assert beta.numeric_count == 2
         assert beta.numeric_mean == pytest.approx(0.15)
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_query_combined_sections_match_separate_calls(self, client):
         """Combined eval_results/query sections should match separate query+summary."""
         project_id = client.project_id
@@ -2536,6 +2575,7 @@ class TestEvalResultsReadAPI:
         assert combined_query.summary is not None
         assert combined_query.summary.model_dump() == separate_summary.model_dump()
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_summary_text_dimension_scalar(self, client):
         """A scorer that returns a plain string produces a 'text' scorer_stats entry."""
         project_id = client.project_id
@@ -2640,6 +2680,7 @@ class TestEvalResultsReadAPI:
         assert stats.pass_known_count == 0
         assert stats.pass_rate is None
 
+    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_eval_results_summary_text_dimension_mixed_dict(self, client):
         """A scorer returning a dict with string and bool produces one 'text' and one 'binary' entry."""
         project_id = client.project_id

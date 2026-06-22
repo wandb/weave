@@ -70,6 +70,7 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
+from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -617,6 +618,7 @@ class AgentWriteHandler:
     """
 
     _ch_client: CHClient
+    _insert_settings: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -682,10 +684,12 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self._ch_client.insert(
+            insert_with_empty_query_retry(
+                self._ch_client,
                 "spans",
                 data=[genai_span_to_row(s) for s in span_rows],
                 column_names=ALL_SPAN_INSERT_COLUMNS,
+                settings=self._insert_settings,
             )
             record_db_insert(table="spans", count=len(span_rows))
 
@@ -706,6 +710,22 @@ class AgentWriteHandler:
             error_message=error_msg,
         )
         return res, span_rows
+
+    def insert_span(self, span: AgentSpanCHInsertable) -> None:
+        """Insert a single pre-built span into the spans table.
+
+        Unlike ``insert_otel_spans`` this skips OTel protobuf parsing and
+        GenAI extraction — the caller is responsible for constructing a
+        fully populated ``AgentSpanCHInsertable``.
+        """
+        insert_with_empty_query_retry(
+            self._ch_client,
+            "spans",
+            data=[genai_span_to_row(span)],
+            column_names=ALL_SPAN_INSERT_COLUMNS,
+            settings=self._insert_settings,
+        )
+        record_db_insert(table="spans", count=1)
 
 
 # ---------------------------------------------------------------------------

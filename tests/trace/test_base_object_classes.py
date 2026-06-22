@@ -18,10 +18,20 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
-from weave.trace.weave_client import WeaveClient
+from weave.trace.serialization.serialize import to_json
+from weave.trace.weave_client import WeaveClient, map_to_refs
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.calls_query_builder import (
+    _invalid_field_message,
+)
+from weave.trace_server.errors import (
+    InvalidFieldError,
+    InvalidRequest,
+    ObjectNameTypeCollision,
+)
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyNestedBaseModel,
 )
@@ -1072,3 +1082,192 @@ def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient)
         obj.base_object_class != "TestOnlyNestedBaseObject"
         for obj in exclude_base_res.objs
     )
+
+
+def test_obj_create_rejects_name_type_collision(client: WeaveClient):
+    """WB-30574: object_id is bound to one base_object_class per project.
+
+    Creating a new object with an existing object_id but a different
+    base_object_class must be rejected. Otherwise the apparent type of the
+    object changes and prior versions become invisible on the type-filtered
+    assets page.
+    """
+    shared_object_id = "shared_name"
+
+    # First create succeeds with base_object_class=TestOnlyNestedBaseObject.
+    nested_obj = base_objects.TestOnlyNestedBaseObject(b=1)
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": shared_object_id,
+                    "val": nested_obj.model_dump(by_alias=True),
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                }
+            }
+        )
+    )
+
+    # Second create with the same object_id but a different base_object_class
+    # must fail loudly. The error message must reference the existing type so
+    # the user understands why the create was rejected.
+    top_obj = base_objects.TestOnlyExample(
+        primitive=1,
+        nested_base_model=TestOnlyNestedBaseModel(a=2, aliased_property_alias=3),
+        nested_base_object="weave:///fake/fake/object/fake:fake",
+    )
+    with pytest.raises(ObjectNameTypeCollision) as excinfo:
+        client.server.obj_create(
+            tsi.ObjCreateReq.model_validate(
+                {
+                    "obj": {
+                        "project_id": client.project_id,
+                        "object_id": shared_object_id,
+                        "val": top_obj.model_dump(by_alias=True),
+                        "builtin_object_class": "TestOnlyExample",
+                    }
+                }
+            )
+        )
+    assert excinfo.value.object_id == shared_object_id
+    assert excinfo.value.kind == "object"
+    assert excinfo.value.new_base_object_class == "TestOnlyExample"
+    assert excinfo.value.existing_base_object_classes == ["TestOnlyNestedBaseObject"]
+    assert "TestOnlyNestedBaseObject" in str(excinfo.value)
+
+    # And the original type must still be the only one present for that name.
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client.project_id,
+                "filter": {"object_ids": [shared_object_id]},
+            }
+        )
+    )
+    assert len(objs_res.objs) == 1
+    assert objs_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"
+
+    # A new version with the SAME base_object_class is still allowed.
+    nested_obj_v2 = base_objects.TestOnlyNestedBaseObject(b=2)
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": shared_object_id,
+                    "val": nested_obj_v2.model_dump(by_alias=True),
+                    "builtin_object_class": "TestOnlyNestedBaseObject",
+                }
+            }
+        )
+    )
+
+
+def _create_monitor(client: WeaveClient, name: str, query: dict | None):
+    """Create a Monitor via the client's serialization so the stored `query` carries weave bookkeeping keys, exercising the server-side strip + validation."""
+    monitor = weave.Monitor(name=name, scorers=[], query=query)
+    val = to_json(map_to_refs(monitor), client.project_id, client)
+    return client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": name,
+                    "val": val,
+                }
+            }
+        )
+    )
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
+    """A Monitor query on an unknown field is rejected with the complete allowed-field list."""
+    bad_query = {
+        "$expr": {"$eq": [{"$getField": "operation_name"}, {"$literal": "predict"}]}
+    }
+    with pytest.raises(InvalidFieldError) as exc_info:
+        _create_monitor(client, "bad-monitor", bad_query)
+
+    assert str(exc_info.value) == _invalid_field_message("operation_name")
+    assert "_dump" not in str(exc_info.value)
+
+    # A structurally invalid query (empty $and) is a bad request, not a field error.
+    with pytest.raises(InvalidRequest):
+        _create_monitor(client, "empty-and-monitor", {"$expr": {"$and": []}})
+
+    # Neither rejected monitor was stored.
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client.project_id,
+                "filter": {"object_ids": ["bad-monitor", "empty-and-monitor"]},
+            }
+        )
+    )
+    assert objs_res.objs == []
+
+
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
+    """Static, dynamic, and absent monitor queries all create successfully."""
+    valid_query = {
+        "$expr": {
+            "$and": [
+                {"$eq": [{"$getField": "parent_id"}, {"$literal": None}]},
+                {
+                    "$eq": [
+                        {"$getField": "summary.weave.status"},
+                        {"$literal": "success"},
+                    ]
+                },
+            ]
+        }
+    }
+    dynamic_query = {
+        "$expr": {"$eq": [{"$getField": "inputs.foo"}, {"$literal": "bar"}]}
+    }
+
+    _create_monitor(client, "valid-monitor", valid_query)
+    _create_monitor(client, "dynamic-monitor", dynamic_query)
+    _create_monitor(client, "no-query-monitor", None)
+
+    # A Monitor-classed object whose `query` is not a recognizable query shape is
+    # left untouched (we only validate queries we understand), never 500'd.
+    monitor = weave.Monitor(name="opaque-monitor", scorers=[], query=None)
+    opaque_val = to_json(map_to_refs(monitor), client.project_id, client)
+    opaque_val["query"] = "not-a-query"
+    client.server.obj_create(
+        tsi.ObjCreateReq.model_validate(
+            {
+                "obj": {
+                    "project_id": client.project_id,
+                    "object_id": "opaque-monitor",
+                    "val": opaque_val,
+                }
+            }
+        )
+    )
+
+    objs_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client.project_id,
+                "filter": {
+                    "object_ids": [
+                        "valid-monitor",
+                        "dynamic-monitor",
+                        "no-query-monitor",
+                        "opaque-monitor",
+                    ]
+                },
+            }
+        )
+    )
+    assert {obj.object_id for obj in objs_res.objs} == {
+        "valid-monitor",
+        "dynamic-monitor",
+        "no-query-monitor",
+        "opaque-monitor",
+    }

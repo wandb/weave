@@ -1,5 +1,4 @@
 import base64
-import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -53,10 +52,9 @@ def audio_file(tmp_path_factory) -> Path:
 
 
 # New parameterization list using fixture names
-# Note: Windows uses "audio/wav" while Unix uses "audio/x-wav"
 MEDIA_TEST_PARAMS = [
     ("image_file", ".png", "image/png"),
-    ("audio_file", ".wav", "audio/wav" if sys.platform == "win32" else "audio/x-wav"),
+    ("audio_file", ".wav", "audio/wav"),
     ("video_file", ".mp4", "video/mp4"),
     ("pdf_file", ".pdf", "application/pdf"),
 ]

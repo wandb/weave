@@ -17,10 +17,7 @@ def patch_mistral() -> Generator[None, None, None]:
     patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
 
@@ -64,6 +61,11 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     call = calls[0]
 
     assert call.exception is None
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "mistral"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "mistralai"
     assert call.ended_at is not None
     output = call.output
     assert output.choices[0].message.content == exp
@@ -81,10 +83,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 416
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -140,10 +139,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
     assert output.usage.total_tokens == model_usage["total_tokens"] == 373
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
@@ -200,10 +196,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
     assert output.usage.total_tokens == model_usage["total_tokens"] == 360
 
 
-@pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
     client: weave.trace.weave_client.WeaveClient,

@@ -36,16 +36,22 @@ def setup_tests():
     agents.set_trace_processors([WeaveTracingProcessor()])
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     agent = Agent(name="Assistant", instructions="You are a helpful assistant")
 
     result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
     calls = client.get_calls()
+
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    openai_agents_meta = [i for i in stamped if i["name"] == "openai_agents"]
+    assert openai_agents_meta, "expected >=1 call to carry openai_agents metadata"
+    assert all(i["meta"]["package_name"] == "openai-agents" for i in openai_agents_meta)
 
     assert len(calls) == 4
 
@@ -100,10 +106,8 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
 @pytest.mark.skip(
     reason="This test works, but the order of requests to OpenAI can be mixed up (by the Agent framework).  This causes the test to fail more than reasonable in CI."
 )
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
 async def test_openai_agents_quickstart_homework(

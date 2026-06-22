@@ -36,6 +36,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
+from weave.integrations.google_adk import _semconv
 from weave.integrations.google_adk.extractors import (
     _provider_name,
     set_llm_request_attributes,
@@ -46,6 +47,7 @@ from weave.integrations.google_adk.google_adk_sdk import (
     _wrap_trace_tool_call,
     get_google_adk_patcher,
 )
+from weave.trace_server.agents import semconv as server_semconv
 
 # The mocks below mirror the duck-typed surface our extractors inspect on
 # ``google.genai.types.*`` objects and ADK's ``LlmRequest`` / ``LlmResponse``
@@ -412,6 +414,36 @@ class TestWrappers:
         # Provider metadata is not content, so it still lands.
         assert span.attributes["gen_ai.provider.name"] == "gemini"
 
+    def test_trace_tool_call_forwards_added_trailing_kwargs(self) -> None:
+        """ADK adds trailing optional params to ``trace_tool_call`` over
+        releases — ``error_type`` landed in 2.2.0, where ADK calls the function
+        with all-keyword args. The wrapper must forward the unknown kwarg
+        verbatim (so ADK's own body still sets ``error.type``) instead of
+        raising ``TypeError``, while still enriching the span.
+        """
+        called: list[tuple[Any, ...]] = []
+
+        def fake_original(*args: Any, **kwargs: Any) -> None:
+            called.append((args, kwargs))
+
+        wrapped = _wrap_trace_tool_call(fake_original)
+        span = _AttrSpan()
+        # Mirror ADK 2.2.0's call shape: all keywords, ``error_type`` present.
+        wrapped(
+            object(),
+            {"city": "Paris"},
+            None,
+            error=None,
+            span=span,
+            error_type="HTTP_ERROR",
+        )
+
+        assert called, "original must still run so ADK's own attributes land"
+        _, forwarded_kwargs = called[0]
+        assert forwarded_kwargs.get("error_type") == "HTTP_ERROR"
+        # The wrapper still enriched the span despite the unknown kwarg.
+        assert span.attributes["gen_ai.provider.name"] == "gemini"
+
 
 class TestPatchInteraction:
     """Verify how the ADK patcher interacts with other Weave integrations."""
@@ -574,6 +606,16 @@ class TestAdkRunnerE2E:
             op = (span.attributes or {}).get("gen_ai.operation.name", "")
             by_op.setdefault(str(op), []).append(span)
 
+        # Integration-tracking provenance is stamped (flattened) on the ADK spans.
+        stamped = [
+            span.attributes
+            for span in adk_test_harness.exporter.get_finished_spans()
+            if "integration.name" in (span.attributes or {})
+        ]
+        assert stamped, "expected >=1 ADK span to carry integration metadata"
+        assert all(a["integration.name"] == "google_adk" for a in stamped)
+        assert all(a["integration.meta.package_name"] == "google-adk" for a in stamped)
+
         # ADK opens exactly one invoke_agent span per turn.
         invoke_spans = by_op.get("invoke_agent", [])
         assert invoke_spans, "ADK did not emit an invoke_agent span"
@@ -616,3 +658,66 @@ class TestAdkRunnerE2E:
                 "gen_ai.tool.definitions",
             ):
                 assert key in attrs, f"generate_content span missing {key}"
+
+
+class TestVendoredSemconv:
+    """The integration vendors its GenAI semconv keys (``_semconv``) instead of
+    importing them from ``opentelemetry.semconv._incubating`` so ``weave`` stays
+    installable alongside ``google-adk`` (which pins an older
+    ``opentelemetry-sdk``). These guard the two ways the vendored literals could
+    silently go wrong: drifting from the server's extraction keys, or drifting
+    from the upstream spec values.
+    """
+
+    def test_every_vendored_key_is_a_server_extraction_key(self) -> None:
+        """Each ``gen_ai.*`` key the integration emits must be one the trace
+        server recognises, or the attribute silently never lands in a column.
+        """
+        vendored = {
+            name: value
+            for name, value in vars(_semconv).items()
+            if name.startswith("GEN_AI_")
+        }
+        assert vendored, "no vendored GEN_AI_* constants found"
+        for name, value in vendored.items():
+            assert server_semconv.resolve_alias_to_canonical(value) is not None, (
+                f"{name}={value!r} is not a recognised server extraction key"
+            )
+
+    def test_vendored_values_match_upstream_when_available(self) -> None:
+        """When the upstream package defines a GenAI constant, our vendored
+        literal must match it exactly — a drift detector and proof the vendoring
+        is faithful. Constants absent from the installed semconv (e.g.
+        ``gen_ai.usage.reasoning.output_tokens``, which is missing from the
+        0.62b1 that ships with ``google-adk``) are simply not compared.
+        """
+        upstream = pytest.importorskip(
+            "opentelemetry.semconv._incubating.attributes.gen_ai_attributes"
+        )
+        # Genuine introspection: compare our namespace to upstream's by name so
+        # the test covers every overlapping key without a stale hand-kept list.
+        # Membership varies by version, hence the ``in`` guard rather than a
+        # blind attribute read.
+        upstream_names = vars(upstream)
+        compared = 0
+        for name, value in vars(_semconv).items():
+            if name.startswith("GEN_AI_") and name in upstream_names:
+                assert value == upstream_names[name], (
+                    f"vendored {name}={value!r} drifted from upstream "
+                    f"{upstream_names[name]!r}"
+                )
+                compared += 1
+        assert compared, "no vendored keys overlapped upstream — wrong module?"
+        # Enum members we replaced with plain string constants. These are the
+        # churn-prone values — provider/operation spellings the server stores
+        # verbatim — so pin them against upstream when the enum is present.
+        op_values = upstream_names.get("GenAiOperationNameValues")
+        system_values = upstream_names.get("GenAiSystemValues")
+        output_values = upstream_names.get("GenAiOutputTypeValues")
+        if op_values is not None:
+            assert _semconv.OPERATION_INVOKE_AGENT == op_values.INVOKE_AGENT.value
+        if system_values is not None:
+            assert _semconv.PROVIDER_VERTEX_AI == system_values.VERTEX_AI.value
+            assert _semconv.PROVIDER_GEMINI == system_values.GEMINI.value
+        if output_values is not None:
+            assert _semconv.OUTPUT_TYPE_TEXT == output_values.TEXT.value

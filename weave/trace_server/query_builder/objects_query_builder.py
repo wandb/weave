@@ -457,3 +457,43 @@ def make_objects_val_query_and_parameters(
         "digests": digests,
     }
     return query, parameters
+
+
+def make_obj_name_type_collision_query(
+    project_id: str, object_id: str, kind: str
+) -> tuple[str, dict[str, Any]]:
+    """Build the query that returns the set of distinct base_object_class
+    values currently bound to a given (project_id, kind, object_id).
+
+    Used by obj_create to enforce that an object_id maps to a single
+    base_object_class for the lifetime of the project (WB-30574).
+
+    Queries `object_versions` directly rather than the
+    `object_versions_deduped` view because the view computes two window
+    functions we don't need (`is_latest`, `version_index`) and under
+    parallel load that extra work is enough to overload the ClickHouse
+    coordinator. The raw table predicate is a perfect prefix match
+    against the table's `ORDER BY (project_id, kind, object_id, digest)`,
+    so this is a primary-key-prefix scan.
+
+    Reading the raw table (no FINAL) means a soft-deleted version's
+    pre-merge row can still satisfy `deleted_at IS NULL`, so a name
+    deleted and recreated with a new type may be rejected until the
+    ReplacingMergeTree merges. We accept over-rejecting here: this is a
+    write guard, and conservatively refusing a write is safer than
+    silently rebinding a name to a new type.
+    """
+    query = """
+        SELECT DISTINCT base_object_class
+        FROM object_versions
+        WHERE project_id = {project_id: String}
+            AND object_id = {object_id: String}
+            AND kind = {kind: String}
+            AND deleted_at IS NULL
+    """
+    parameters = {
+        "project_id": project_id,
+        "object_id": object_id,
+        "kind": kind,
+    }
+    return query, parameters

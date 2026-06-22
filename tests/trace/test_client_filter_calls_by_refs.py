@@ -1,16 +1,13 @@
 import pytest
 
 import weave
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
 def test_filter_calls_by_ref_properties(client, no_autoflush):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     nested1 = {"nested key with spaces": {"one": "1"}}
     nested_ref = weave.publish(nested1, "nested")
     nested2 = {"nested key with spaces": {"one": "2"}}
@@ -346,13 +343,12 @@ def test_filter_calls_by_ref_properties(client, no_autoflush):
     )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     client, no_autoflush
 ):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     # run an evaluation, then delete the evaluation and its children
     @weave.op
@@ -501,8 +497,6 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(
 
 def test_mixed_objects_and_refs(client):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     @weave.op
     def log_config(config: dict) -> None:

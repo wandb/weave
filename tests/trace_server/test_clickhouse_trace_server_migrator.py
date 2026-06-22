@@ -102,6 +102,8 @@ def migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -121,6 +123,8 @@ def replicated_migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -141,6 +145,8 @@ def distributed_migrator():
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
     return migrator
 
@@ -164,6 +170,8 @@ def test_apply_migrations_with_target_version(
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
     migrator._update_migration_status = Mock()
+    # Bypass the lock-free pre-check; these tests exercise the locked path.
+    migrator._has_migrations_to_apply = Mock(return_value=True)
     ch_client.command.reset_mock()
 
     # Setup
@@ -196,7 +204,10 @@ def test_apply_migrations_with_target_version(
     # Verify the actual SQL commands were executed
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
-        [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
+        [
+            call("CREATE TABLE test1 (id Int32)", settings=None),
+            call("CREATE TABLE test2 (id Int32)", settings=None),
+        ]
     )
 
 
@@ -245,6 +256,7 @@ def test_apply_migrations_discovers_existing_target_database_engine(
             return_value=[(26, migration_file.name)]
         )
         migrator._update_migration_status = Mock()
+        migrator._has_migrations_to_apply = Mock(return_value=True)
         ch_client.command.reset_mock()
 
         migrator.apply_migrations(target_db, target_version=26)
@@ -310,6 +322,7 @@ def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
             "partially_applied_version": 2,
         }
     )
+    migrator._has_migrations_to_apply = Mock(return_value=True)
 
     with pytest.raises(MigrationError, match="partially applied migration version 2"):
         migrator.apply_migrations("test_db")
@@ -323,6 +336,7 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
     migrator._get_migration_status = Mock()
     migrator._get_migrations = Mock()
     migrator._determine_migrations_to_apply = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
 
     migrator._get_migration_status.return_value = {
         "curr_version": 0,
@@ -347,6 +361,97 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
     mock_insert_costs.assert_not_called()
 
 
+def test_apply_migrations_skips_lock_when_nothing_pending():
+    """The lock-free pre-check short-circuits when no schema migration is due,
+    so rolling replicas don't serialize through the lock for a no-op.
+    """
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._has_migrations_to_apply = Mock(return_value=False)
+    migrator._apply_migrations_locked = Mock()
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.migration_lock"
+    ) as mock_lock:
+        migrator.apply_migrations("test_db")
+
+    mock_lock.assert_not_called()
+    migrator._apply_migrations_locked.assert_not_called()
+
+
+def test_has_migrations_to_apply_reads_status_without_writing(tmp_path):
+    """The pre-check is read-only and decides purely from version vs. disk."""
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    (migration_dir / "0001_a.up.sql").write_text("CREATE TABLE t1 (id Int32);")
+    (migration_dir / "0001_a.down.sql").write_text("DROP TABLE t1;")
+    (migration_dir / "0002_b.up.sql").write_text("CREATE TABLE t2 (id Int32);")
+    (migration_dir / "0002_b.down.sql").write_text("DROP TABLE t2;")
+
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, migration_dir=str(migration_dir), post_migration_hook=None
+    )
+
+    # Behind the latest on-disk version -> pending.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": None}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is True
+
+    # Caught up -> nothing pending, so the lock is skipped.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 2, "partially_applied_version": None}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is False
+
+    # A partial migration must take the lock so the error surfaces.
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 2}
+    )
+    assert migrator._has_migrations_to_apply("test_db") is True
+
+
+def test_read_migration_status_defaults_to_zero_without_row():
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+
+    empty = Mock()
+    empty.result_rows = []
+    ch_client.query = Mock(return_value=empty)
+    assert migrator._read_migration_status("test_db") == {
+        "curr_version": 0,
+        "partially_applied_version": None,
+    }
+    ch_client.insert.assert_not_called()
+
+    row = Mock()
+    row.result_rows = [(7, None)]
+    ch_client.query = Mock(return_value=row)
+    assert migrator._read_migration_status("test_db") == {
+        "curr_version": 7,
+        "partially_applied_version": None,
+    }
+
+
+def test_initialize_migration_db_adds_heartbeat_column():
+    """Existing lock tables get `heartbeat_at` added idempotently on init."""
+    ch_client = _make_ch_client()
+    trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+
+    executed = [c.args[0] for c in ch_client.command.call_args_list]
+    assert any(
+        "ADD COLUMN IF NOT EXISTS heartbeat_at" in sql and "migration_lock" in sql
+        for sql in executed
+    )
+
+
 def test_execute_migration_command(migrator):
     # Setup
     migrator.ch_client.database = "original_db"
@@ -358,14 +463,16 @@ def test_execute_migration_command(migrator):
     assert (
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
-    migrator.ch_client.command.assert_called_once_with("CREATE TABLE test (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE test (id Int32)", settings=None
+    )
 
 
 def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig)
+    migrator.ch_client.command.assert_called_once_with(orig, settings=None)
 
 
 def test_update_migration_status(migrator):
@@ -378,13 +485,15 @@ def test_update_migration_status(migrator):
     # Test start of migration
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
+        settings={"mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
+        settings={"mutations_sync": 2},
     )
 
 
@@ -1249,13 +1358,18 @@ def test_skip_materialize_command_distributed(distributed_migrator):
     assert distributed_migrator.ch_client.database == "original_db"
 
 
-def test_skip_insert_command_distributed(distributed_migrator):
-    """Test that INSERT INTO commands are skipped in distributed mode."""
-    insert_command = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
-
-    distributed_migrator._execute_migration_command("test_db", insert_command)
-
+def test_insert_command_distributed(distributed_migrator):
+    """INSERT ... SELECT backfills are skipped; INSERT ... VALUES seeds run synchronously."""
+    backfill = "INSERT INTO calls_complete_new SELECT * FROM calls_complete"
+    distributed_migrator._execute_migration_command("test_db", backfill)
     assert distributed_migrator.ch_client.command.call_count == 0
+
+    seed = "INSERT INTO llm_token_prices (id, llm_id) VALUES ('a', 'gpt-4')"
+    distributed_migrator._execute_migration_command("test_db", seed)
+    assert distributed_migrator.ch_client.command.call_count == 1
+    args, kwargs = distributed_migrator.ch_client.command.call_args
+    assert args[0] == seed
+    assert kwargs == {"settings": {"distributed_foreground_insert": 1}}
     assert distributed_migrator.ch_client.database == "original_db"
 
 

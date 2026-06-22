@@ -1,4 +1,5 @@
 import * as weave from 'weave';
+import type {WeaveClient} from 'weave';
 
 const func = weave.op(async () => 1);
 const myFunction = async (a: number = 1, b: string = 'hello', c: boolean = true) => {
@@ -13,7 +14,7 @@ const myFunction2 = async ({ a, b = 'wuh' }: { a?: number; b?: string }) => {
 };
 const func4 = weave.op(myFunction2, { parameterNames: 'useParam0Object' });
 
-async function bench(func: weave.Op<any>, calls: number, client: weave.WeaveClient) {
+async function bench(func: weave.Op<any>, calls: number, client: WeaveClient) {
   console.log(`Benchmarking with ${calls} calls...`);
   const startTime = Date.now();
   const promises = Array(calls)

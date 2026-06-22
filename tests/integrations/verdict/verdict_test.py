@@ -17,10 +17,8 @@ def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
         assert call.exception is None
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_simple_verdict_pipeline(client: WeaveClient) -> None:
@@ -58,6 +56,16 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     assert len(flattened) >= 1  # At least one call should be created
     assert_ends_and_errors(flattened)
 
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"]
+        for c, _ in flattened
+        if "integration" in c.attributes
+    ]
+    verdict_meta = [i for i in stamped if i["name"] == "verdict"]
+    assert verdict_meta, "expected >=1 call to carry verdict metadata"
+    assert all(i["meta"]["package_name"] == "verdict" for i in verdict_meta)
+
     # Check that we have the expected call names
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
@@ -66,10 +74,8 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     assert got[0][1] == 0  # Root level
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_layer_tracing(client: WeaveClient) -> None:
@@ -116,10 +122,8 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
     assert len(meanpool_calls) >= 1  # At least one mean pool call
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
@@ -167,10 +171,8 @@ def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
     assert len(custom_calls) >= 1  # Should have custom unit call
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_block_tracing(client: WeaveClient) -> None:
@@ -217,10 +219,8 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
     assert len(judge_calls) >= 2  # Should have both judges
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
@@ -266,10 +266,8 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
     assert len(judge_calls) >= 2
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
@@ -314,10 +312,8 @@ def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
     assert len(judge_calls) >= 2  # Should have both chain judges
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
@@ -367,10 +363,8 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
     assert len(meanpool_calls) >= 1  # Aggregator
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
@@ -421,10 +415,8 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
     assert len(pipeline_calls) >= 1  # Should still have pipeline call
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
 def test_verdict_tracer_inheritance(client: WeaveClient) -> None:

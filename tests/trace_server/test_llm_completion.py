@@ -1,5 +1,4 @@
 import datetime
-import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +15,6 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.interface.builtin_object_classes.provider import Provider
 from weave.trace_server.llm_completion import get_custom_provider_info
-from weave.trace_server.project_version.types import WriteTarget
 from weave.trace_server.secret_fetcher_context import (
     _secret_fetcher_context,
 )
@@ -417,7 +415,6 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def test_streaming_with_call_tracking(self):
         """Test streaming completion with call tracking enabled."""
-        # Mock the litellm completion stream
         mock_chunks = [
             {
                 "choices": [
@@ -454,19 +451,17 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             patch(
                 "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
             ) as mock_litellm,
-            patch.object(
-                chts.ClickHouseTraceServer, "_insert_call_complete"
-            ) as mock_insert_complete,
-            patch.object(
-                chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-            ) as mock_update_end,
+            patch(
+                "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+            ) as mock_agent_writer_cls,
         ):
-            # Mock the litellm completion stream
+            mock_agent_writer = MagicMock()
+            mock_agent_writer_cls.return_value = mock_agent_writer
+
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = mock_chunks
             mock_litellm.return_value = mock_stream
 
-            # Create test request
             req = tsi.CompletionsCreateReq(
                 project_id="dGVzdF9wcm9qZWN0",
                 inputs=tsi.CompletionsCreateRequestInputs(
@@ -476,24 +471,19 @@ class TestLLMCompletionStreaming(unittest.TestCase):
                 track_llm_call=True,
             )
 
-            # Get the stream
             stream = self.server.completions_create_stream(req)
-
-            # Collect all chunks
             chunks = list(stream)
 
-            # Verify the chunks
             assert len(chunks) == 3  # Meta chunk + 2 content chunks
             assert "_meta" in chunks[0]
             assert "weave_call_id" in chunks[0]["_meta"]
             assert chunks[1]["choices"][0]["delta"]["content"] == "Hello"
             assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
-            # Verify call tracking via calls_complete (empty project)
-            mock_insert_complete.assert_called_once()
-            mock_update_end.assert_called_once()
-            start_call = mock_insert_complete.call_args[0][0]
-            assert start_call.project_id == "dGVzdF9wcm9qZWN0"
+            # Open span + completed span = 2 insert_span calls
+            assert mock_agent_writer.insert_span.call_count == 2
+            completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+            assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
 
     def test_custom_provider_streaming(self):
         """Test streaming completion with a custom provider."""
@@ -1362,43 +1352,26 @@ def completions_mock_response():
     }
 
 
-@pytest.mark.parametrize(
-    ("write_target", "expect_complete_called", "expect_batch_called"),
-    [
-        pytest.param("CALLS_COMPLETE", True, False, id="routes_to_calls_complete"),
-        pytest.param("CALLS_MERGED", False, True, id="routes_to_calls_merged"),
-    ],
-)
-def test_completions_write_target_routing(
+def test_completions_writes_agent_span(
     completions_mock_server,
     completions_secret_fetcher,
     completions_mock_response,
-    write_target,
-    expect_complete_called,
-    expect_batch_called,
 ):
-    """Verify completions_create routes writes to the correct table based on project write target."""
-    target = getattr(WriteTarget, write_target)
-
+    """Verify completions_create writes an agent span via AgentWriteHandler."""
     with (
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
         ) as mock_litellm,
-        patch.object(
-            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
-        ) as mock_resolve,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_batch"
-        ) as mock_insert_batch,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
     ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
         mock_litellm.return_value = MagicMock(response=completions_mock_response)
-        mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -1408,53 +1381,41 @@ def test_completions_write_target_routing(
 
         result = completions_mock_server.completions_create(req)
 
-        mock_resolve.assert_called_once()
-        assert mock_insert_complete.called == expect_complete_called
-        assert mock_insert_batch.called == expect_batch_called
+        mock_agent_writer.insert_span.assert_called_once()
         assert result.weave_call_id is not None
+        assert result.span_id is not None
+        assert result.trace_id is not None
         assert result.response["choices"][0]["message"]["content"] == "Hello!"
 
-        if expect_batch_called:
-            batch_data = mock_insert_batch.call_args[0][0]
-            assert len(batch_data) == 2  # start + end
+        span = mock_agent_writer.insert_span.call_args[0][0]
+        assert span.project_id == "dGVzdF9wcm9qZWN0"
+        assert span.request_model == "gpt-3.5-turbo"
+        assert span.input_tokens == 10
+        assert span.output_tokens == 5
+        assert span.status_code == "OK"
 
 
-@pytest.mark.parametrize(
-    ("write_target", "check_exception_field"),
-    [
-        pytest.param("CALLS_COMPLETE", True, id="calls_complete_captures_error"),
-        pytest.param("CALLS_MERGED", False, id="calls_merged_captures_error"),
-    ],
-)
 def test_completions_handles_error_response(
     completions_mock_server,
     completions_secret_fetcher,
-    write_target,
-    check_exception_field,
 ):
-    """Verify error responses are properly captured in both write paths."""
-    target = getattr(WriteTarget, write_target)
+    """Verify error responses are properly captured in the agent span."""
     error_response = {"error": "Rate limit exceeded", "choices": []}
 
     with (
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
         ) as mock_litellm,
-        patch.object(
-            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
-        ) as mock_resolve,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_batch"
-        ) as mock_insert_batch,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
     ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
         mock_litellm.return_value = MagicMock(response=error_response)
-        mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -1466,34 +1427,30 @@ def test_completions_handles_error_response(
 
         assert result.response["error"] == "Rate limit exceeded"
 
-        if check_exception_field:
-            mock_insert_complete.assert_called_once()
-            ch_call = mock_insert_complete.call_args[0][0]
-            assert ch_call.exception == "Rate limit exceeded"
-        else:
-            mock_insert_batch.assert_called_once()
+        mock_agent_writer.insert_span.assert_called_once()
+        span = mock_agent_writer.insert_span.call_args[0][0]
+        assert span.status_code == "ERROR"
+        assert span.status_message == "Rate limit exceeded"
 
 
-def test_completions_usage_captured_in_summary(
+def test_completions_usage_captured_in_span(
     completions_mock_server, completions_secret_fetcher, completions_mock_response
 ):
-    """Verify usage data is properly captured in summary for calls_complete."""
+    """Verify usage data is properly captured in the agent span token fields."""
     with (
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion"
         ) as mock_litellm,
-        patch.object(
-            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
-        ) as mock_resolve,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
     ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
         mock_litellm.return_value = MagicMock(response=completions_mock_response)
-        mock_resolve.return_value = WriteTarget.CALLS_COMPLETE
 
         req = tsi.CompletionsCreateReq(
-            project_id="dGVzdF9wcm9qZWN0",  # base64 of "test_project"
+            project_id="dGVzdF9wcm9qZWN0",
             inputs=tsi.CompletionsCreateRequestInputs(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -1503,53 +1460,19 @@ def test_completions_usage_captured_in_summary(
 
         completions_mock_server.completions_create(req)
 
-        mock_insert_complete.assert_called_once()
-        ch_call = mock_insert_complete.call_args[0][0]
+        mock_agent_writer.insert_span.assert_called_once()
+        span = mock_agent_writer.insert_span.call_args[0][0]
 
-        summary = json.loads(ch_call.summary_dump)
-        assert "usage" in summary
-        assert "gpt-3.5-turbo" in summary["usage"]
-        usage = summary["usage"]["gpt-3.5-turbo"]
-        assert usage["prompt_tokens"] == 10
-        assert usage["completion_tokens"] == 5
-        assert usage["total_tokens"] == 15
+        assert span.input_tokens == 10
+        assert span.output_tokens == 5
+        assert span.request_model == "gpt-3.5-turbo"
 
 
-@pytest.mark.parametrize(
-    (
-        "write_target",
-        "expect_complete_called",
-        "expect_update_end_called",
-        "expect_insert_call_called",
-    ),
-    [
-        pytest.param(
-            "CALLS_COMPLETE",
-            True,
-            True,
-            False,
-            id="stream_routes_to_calls_complete",
-        ),
-        pytest.param(
-            "CALLS_MERGED",
-            False,
-            False,
-            True,
-            id="stream_routes_to_calls_merged",
-        ),
-    ],
-)
-def test_streaming_completions_write_target_routing(
+def test_streaming_completions_writes_agent_spans(
     completions_mock_server,
     completions_secret_fetcher,
-    write_target,
-    expect_complete_called,
-    expect_update_end_called,
-    expect_insert_call_called,
 ):
-    """Verify completions_create_stream routes writes to the correct table based on write target."""
-    target = getattr(WriteTarget, write_target)
-
+    """Verify completions_create_stream writes open + completed agent spans."""
     mock_chunks = [
         {
             "choices": [
@@ -1572,21 +1495,16 @@ def test_streaming_completions_write_target_routing(
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(
-            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
-        ) as mock_resolve,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-        ) as mock_update_end,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
     ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
+
         mock_stream = MagicMock()
         mock_stream.__iter__.return_value = mock_chunks
         mock_litellm.return_value = mock_stream
-        mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
             project_id="dGVzdF9wcm9qZWN0",
@@ -1600,47 +1518,27 @@ def test_streaming_completions_write_target_routing(
         stream = completions_mock_server.completions_create_stream(req)
         chunks = list(stream)
 
-        mock_resolve.assert_called_once()
-
-        # First chunk is always the meta chunk with call id
         assert "_meta" in chunks[0]
         assert "weave_call_id" in chunks[0]["_meta"]
+        assert "span_id" in chunks[0]["_meta"]
+        assert "trace_id" in chunks[0]["_meta"]
 
-        assert mock_insert_complete.called == expect_complete_called
-        assert mock_update_end.called == expect_update_end_called
-        assert mock_insert_call.called == expect_insert_call_called
+        # Open span + completed span = 2 insert_span calls
+        assert mock_agent_writer.insert_span.call_count == 2
 
-        if expect_complete_called:
-            # Start was written to calls_complete
-            ch_start = mock_insert_complete.call_args[0][0]
-            assert ch_start.op_name == "weave.completions_create"
-            assert ch_start.ended_at is None  # start-only row
+        open_span = mock_agent_writer.insert_span.call_args_list[0][0][0]
+        assert open_span.status_code == "UNSET"
 
-            # End was updated via lightweight UPDATE
-            end_call = mock_update_end.call_args[0][0]
-            assert end_call.ended_at is not None
-
-        if expect_insert_call_called:
-            # calls_merged: start + end via _insert_call
-            assert mock_insert_call.call_count == 2
+        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+        assert completed_span.status_code == "OK"
+        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
 
 
-@pytest.mark.parametrize(
-    ("write_target", "expect_complete_called", "expect_update_end_called"),
-    [
-        pytest.param("CALLS_COMPLETE", True, True, id="stream_error_calls_complete"),
-        pytest.param("CALLS_MERGED", False, False, id="stream_error_calls_merged"),
-    ],
-)
-def test_streaming_completions_error_routes_correctly(
+def test_streaming_completions_error_writes_error_span(
     completions_mock_server,
     completions_secret_fetcher,
-    write_target,
-    expect_complete_called,
-    expect_update_end_called,
 ):
-    """Verify streaming errors are captured in both write paths."""
-    target = getattr(WriteTarget, write_target)
+    """Verify streaming errors are captured in the completed agent span."""
 
     def _error_stream():
         yield {
@@ -1657,19 +1555,13 @@ def test_streaming_completions_error_routes_correctly(
         patch(
             "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
         ) as mock_litellm,
-        patch.object(
-            completions_mock_server.table_routing_resolver, "resolve_v2_write_target"
-        ) as mock_resolve,
-        patch.object(
-            chts.ClickHouseTraceServer, "_insert_call_complete"
-        ) as mock_insert_complete,
-        patch.object(
-            chts.ClickHouseTraceServer, "_update_call_end_in_calls_complete"
-        ) as mock_update_end,
-        patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.AgentWriteHandler"
+        ) as mock_agent_writer_cls,
     ):
+        mock_agent_writer = MagicMock()
+        mock_agent_writer_cls.return_value = mock_agent_writer
         mock_litellm.return_value = _error_stream()
-        mock_resolve.return_value = target
 
         req = tsi.CompletionsCreateReq(
             project_id="dGVzdF9wcm9qZWN0",
@@ -1681,12 +1573,14 @@ def test_streaming_completions_error_routes_correctly(
         )
 
         stream = completions_mock_server.completions_create_stream(req)
-        # Consume — the wrapper records end call in finally before re-raising
-        with pytest.raises(RuntimeError, match="stream died"):
-            list(stream)
+        # The new wrapper catches the error and records it in the span
+        chunks = list(stream)
 
-        assert mock_insert_complete.called == expect_complete_called
-        assert mock_update_end.called == expect_update_end_called
+        # Open span + completed (error) span
+        assert mock_agent_writer.insert_span.call_count == 2
+        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
+        assert completed_span.status_code == "ERROR"
+        assert "stream died" in completed_span.status_message
 
 
 def _make_provider(base_url: str, extra_headers: dict | None = None):

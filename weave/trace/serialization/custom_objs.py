@@ -127,7 +127,7 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
             serializer.load = op(serializer.load)
             # We don't want to actually trace the load_instance op,
             # just save it.
-            serializer.load._tracing_enabled = False  # type: ignore
+            serializer.load._tracing_enabled = False
 
         if serializer.publish_load_op:
             # Save the load_instance_op
@@ -137,7 +137,7 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
             # Calculating this URL is blocking, but we only have to pay it once per custom type
             load_instance_op_ref = wc._save_op(
                 serializer.load, "load_" + serializer.id()
-            )  # type: ignore
+            )
             load_op_uri = load_instance_op_ref.uri
 
     encoded: EncodedCustomObjDict = {
@@ -165,14 +165,18 @@ def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
         return None
     if art.path_contents:
         encoded_path_contents = {
-            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-            for k, v in art.path_contents.items()
+            k: _ensure_bytes(v) for k, v in art.path_contents.items()
         }
         encoded["files"] = encoded_path_contents
     if val is not None:
         encoded["val"] = val
 
     return encoded
+
+
+def _ensure_bytes(value: str | bytes) -> bytes:
+    """Normalize artifact file contents to bytes for storage."""
+    return value.encode("utf-8") if isinstance(value, str) else value
 
 
 def _load_custom_obj_files(
@@ -205,8 +209,10 @@ def _load_custom_obj(
     val: Any | None,
     load_instance_op: AllLoadCallables,
 ) -> Any:
-    # Disables tracing so that calls to loading data itself don't get traced
-    load_instance_op._tracing_enabled = False  # type: ignore
+    # Disables tracing so that calls to loading data itself don't get traced.
+    # Only ops carry this flag; legacy plain callables aren't traced anyway.
+    if isinstance(load_instance_op, Op):
+        load_instance_op._tracing_enabled = False
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
     if is_probably_legacy_file_load(load_instance_op):
         res = load_instance_op(art, "obj")

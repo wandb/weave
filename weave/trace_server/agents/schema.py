@@ -33,13 +33,12 @@ OutputTypeLiteral = Literal["", "text", "json", "image", "speech"]
 class NormalizedMessage(BaseModel):
     """A single message normalized from any provider format.
 
-    Maps to ClickHouse `Tuple(role String, content String, finish_reason String)`.
+    Maps to ClickHouse ``Tuple(role String, content String, finish_reason String)``.
 
     - role: message role (user, assistant, tool, system)
-    - content: concatenated text for search/display
+    - content: plain text for simple messages, or JSON-serialized parts
+      array for multimodal/structured messages
     - finish_reason: per-message finish reason (output messages only)
-
-    Lossless original data is preserved in `raw_span_dump` on the span.
     """
 
     role: str = ""

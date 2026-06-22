@@ -10,18 +10,21 @@ from unittest.mock import patch
 
 import pytest
 
+from weave.trace_server import environment as wf_env
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    _format_table_name_with_cluster,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
-from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.feedback import TABLE_FEEDBACK
+from weave.trace_server.orm import ParamBuilder, _format_table_name_with_cluster
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_update_query,
     make_queue_delete_query,
     make_queue_update_query,
 )
+from weave.trace_server.token_costs import LLM_TOKEN_PRICES_TABLE
 
 CLUSTER = "weave_cluster"
 
@@ -82,13 +85,22 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
     # --- annotation queues ---
     pb = ParamBuilder()
     q_delete = make_queue_delete_query(
-        project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        table_name="annotation_queues",
+        cluster_name=CLUSTER,
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_delete
 
     pb = ParamBuilder()
     q_update = make_queue_update_query(
-        project_id="proj", queue_id="q", pb=pb, cluster_name=CLUSTER, name="n"
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        table_name="annotation_queues",
+        cluster_name=CLUSTER,
+        name="n",
     )
     assert f"annotation_queues ON CLUSTER {CLUSTER}" in q_update
 
@@ -99,9 +111,48 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         annotator_id="a",
         annotation_state="done",
         pb=pb,
+        table_name="annotator_queue_items_progress",
         cluster_name=CLUSTER,
     )
     assert f"annotator_queue_items_progress ON CLUSTER {CLUSTER}" in progress
+
+
+def test_annotation_queue_mutations_use_caller_provided_local_name() -> None:
+    """In distributed mode the caller passes `<table>_local`; the builder must
+    use that name verbatim (lightweight UPDATE isn't supported on Distributed).
+    """
+    pb = ParamBuilder()
+    q_delete = make_queue_delete_query(
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotation_queues_local",
+    )
+    assert f"annotation_queues_local ON CLUSTER {CLUSTER}" in q_delete
+
+    pb = ParamBuilder()
+    q_update = make_queue_update_query(
+        project_id="proj",
+        queue_id="q",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotation_queues_local",
+        name="n",
+    )
+    assert f"annotation_queues_local ON CLUSTER {CLUSTER}" in q_update
+
+    pb = ParamBuilder()
+    progress = make_annotator_progress_update_query(
+        project_id="proj",
+        queue_item_id="qi",
+        annotator_id="a",
+        annotation_state="done",
+        pb=pb,
+        cluster_name=CLUSTER,
+        table_name="annotator_queue_items_progress_local",
+    )
+    assert f"annotator_queue_items_progress_local ON CLUSTER {CLUSTER}" in progress
 
 
 @pytest.mark.parametrize(
@@ -117,6 +168,7 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
     ids=["cloud", "replicated", "distributed"],
 )
 def test_calls_complete_table_resolution_by_mode(
+    monkeypatch: pytest.MonkeyPatch,
     use_distributed: bool,
     cluster_name: str | None,
     expected_table: str,
@@ -129,26 +181,102 @@ def test_calls_complete_table_resolution_by_mode(
     in replicated mode (cluster_name set, distributed=False), the old code produced
     'calls_complete_local ON CLUSTER ...' but calls_complete_local doesn't exist.
     """
-    env_vars = {
-        "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower(),
-    }
+    monkeypatch.setenv(
+        "WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", str(use_distributed).lower()
+    )
+    # delenv (not just skip-set): replicated CI sets this ambiently, so the
+    # cloud case must clear it to exercise the no-cluster path.
+    if cluster_name:
+        monkeypatch.setenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", cluster_name)
+    else:
+        monkeypatch.delenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", raising=False)
+
+    table_name = (
+        "calls_complete_local"
+        if wf_env.wf_clickhouse_use_distributed_tables()
+        else "calls_complete"
+    )
+    result = _format_table_name_with_cluster(
+        table_name, wf_env.wf_clickhouse_replicated_cluster()
+    )
+    expected = (
+        f"{expected_table} ON CLUSTER {cluster_name}"
+        if expected_on_cluster
+        else expected_table
+    )
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("use_distributed", "cluster_name", "on_cluster"),
+    [
+        # Cloud mode: no cluster, plain table.
+        (False, None, ""),
+        # Replicated mode: cluster set, but tables self-replicate the mutation via
+        # Keeper -> no ON CLUSTER and no _local.
+        (False, CLUSTER, ""),
+        # Distributed mode: DELETE must hit <table>_local ON CLUSTER to fan across shards.
+        (True, CLUSTER, f" ON CLUSTER {CLUSTER}"),
+    ],
+    ids=["cloud", "replicated", "distributed"],
+)
+def test_purge_delete_honors_caller_table_and_cluster(
+    use_distributed: bool, cluster_name: str | None, on_cluster: str
+) -> None:
+    """feedback/cost purge DELETE gets `_local` + ON CLUSTER only in distributed mode (WB-35378)."""
+    env_vars = {"WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES": str(use_distributed).lower()}
     if cluster_name:
         env_vars["WF_CLICKHOUSE_REPLICATED_CLUSTER"] = cluster_name
 
     with patch.dict("os.environ", env_vars, clear=False):
-        from weave.trace_server import environment as wf_env
+        distributed = wf_env.wf_clickhouse_use_distributed_tables()
+        suffix = "_local" if distributed else ""
+        mutation_cluster = (
+            wf_env.wf_clickhouse_replicated_cluster() if distributed else None
+        )
 
-        table_name = (
-            "calls_complete_local"
-            if wf_env.wf_clickhouse_use_distributed_tables()
-            else "calls_complete"
+        feedback = (
+            TABLE_FEEDBACK.purge()
+            .project_id("proj")
+            .where(
+                tsi.Query(
+                    **{"$expr": {"$eq": [{"$getField": "id"}, {"$literal": "abc"}]}}
+                )
+            )
+            .prepare(
+                param_builder=ParamBuilder(prefix="p"),
+                table_name=f"feedback{suffix}",
+                cluster_name=mutation_cluster,
+            )
         )
-        result = _format_table_name_with_cluster(
-            table_name, wf_env.wf_clickhouse_replicated_cluster()
+        assert feedback.sql == (
+            f"DELETE FROM feedback{suffix}{on_cluster}\n"
+            "WHERE ((project_id = {project_id:String}) AND ((id = {p_1:String})))"
         )
-        expected = (
-            f"{expected_table} ON CLUSTER {cluster_name}"
-            if expected_on_cluster
-            else expected_table
+        assert feedback.parameters == {"project_id": "proj", "p_1": "abc"}
+
+        cost = (
+            LLM_TOKEN_PRICES_TABLE.purge()
+            .where(
+                tsi.Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "pricing_level_id"},
+                                {"$literal": "proj"},
+                            ]
+                        }
+                    }
+                )
+            )
+            .prepare(
+                param_builder=ParamBuilder(prefix="p"),
+                table_name=f"llm_token_prices{suffix}",
+                cluster_name=mutation_cluster,
+            )
         )
-        assert result == expected
+        assert cost.sql == (
+            f"DELETE FROM llm_token_prices{suffix}{on_cluster}\n"
+            "WHERE (pricing_level_id = {p_0:String})"
+        )
+        assert cost.parameters == {"p_0": "proj"}

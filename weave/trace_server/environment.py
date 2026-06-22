@@ -50,6 +50,19 @@ def kafka_producer_max_buffer_size() -> int | None:
         return None
 
 
+def wf_kafka_project_id_bucket_count() -> int:
+    """Sub-buckets applied to `project_id`-keyed Kafka messages. `1` disables bucketing."""
+    raw = os.environ.get("WF_KAFKA_PROJECT_ID_BUCKET_COUNT", "1")
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.exception(
+            "WF_KAFKA_PROJECT_ID_BUCKET_COUNT value '%s' is not a valid int", raw
+        )
+        return 1
+    return max(1, value)
+
+
 # Scoring worker settings
 
 
@@ -134,8 +147,8 @@ def wf_scoring_worker_debounced_scoring_max_call_history() -> int:
 def wf_scoring_worker_remote_scorer_bearer_token() -> str | None:
     """Optional bearer credential for outbound remote scorer HTTP requests.
 
-    The wire format is ``Authorization: Bearer <token>``; this environment
-    variable supplies one possible ``<token>`` (alongside other mechanisms such
+    The wire format is "Authorization: Bearer <token>"; this environment
+    variable supplies one possible <token> (alongside other mechanisms such
     as per-scorer configuration or OAuth client-credentials token exchange).
     When set, the scoring worker's remote scorer path may prefer this value
     over those other sources; exact precedence is defined by that
@@ -159,6 +172,9 @@ REMOTE_SCORER_VALIDATE_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_VALIDATE_HOS
 REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_ALLOW_INSECURE_HTTP"
 )
+REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV = (
+    "WF_SCORING_WORKER_REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA"
+)
 
 
 def wf_scoring_worker_remote_scorer_enabled() -> bool:
@@ -176,7 +192,7 @@ def wf_scoring_worker_remote_scorer_enabled() -> bool:
 def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
     """Wall-clock timeout for each remote scorer HTTP request/response (seconds).
 
-    Default ``30`` matches the remote scorer product default.
+    Default 30 matches the remote scorer product default.
     """
     raw = os.environ.get(
         "WF_SCORING_WORKER_REMOTE_HTTP_TIMEOUT_SECONDS",
@@ -192,7 +208,7 @@ def wf_scoring_worker_remote_scorer_http_timeout_seconds() -> float:
 def wf_scoring_worker_remote_scorer_allowed_hosts() -> list[str]:
     """Hosts allowed for outbound remote scorer HTTP requests.
 
-    Values are comma-separated exact ``host``, ``host:port``, or URL origin
+    Values are comma-separated exact "host", "host:port", or URL origin
     entries. Empty and whitespace-only entries are ignored. The worker fails
     closed when this list is empty and remote scoring attempts to make an
     outbound request.
@@ -206,20 +222,35 @@ def wf_scoring_worker_remote_scorer_allowed_hosts() -> list[str]:
 def wf_scoring_worker_remote_scorer_validate_hosts() -> bool:
     """Whether the worker enforces remote scorer host allowlist validation.
 
-    Defaults to true. Set to ``false`` only for controlled development or
+    Defaults to true. Set to "false" only for controlled development or
     emergency operational bypasses; HTTPS policy still applies independently.
     """
     return os.environ.get(REMOTE_SCORER_VALIDATE_HOSTS_ENV, "true").lower() != "false"
 
 
 def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
-    """Whether remote scorer URLs may use insecure ``http``.
+    """Whether remote scorer URLs may use insecure http.
 
     This is intended as an explicit operator waiver for local/dev testing. The
     worker still applies the host allowlist when this is enabled.
     """
     return (
         os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
+    )
+
+
+def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
+    """Whether remote scorer results must match the structured scorer schema.
+
+    Defaults to true to nudge new RemoteScorer users onto the typed scorer
+    result shape. Set to "false" only for controlled compatibility testing or
+    emergency operational bypasses.
+    """
+    return (
+        os.environ.get(
+            REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV, "true"
+        ).lower()
+        != "false"
     )
 
 

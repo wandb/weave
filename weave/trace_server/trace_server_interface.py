@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeAlias, get_args
 
 from pydantic import (
     BaseModel,
@@ -9,6 +9,7 @@ from pydantic import (
     Field,
     field_serializer,
     model_validator,
+    with_config,
 )
 from typing_extensions import TypedDict
 
@@ -42,12 +43,10 @@ DEFAULT_FEEDBACK_SAMPLE_LIMIT = 2000
 MAX_FEEDBACK_SAMPLE_LIMIT = 5000
 
 
+# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
+@with_config(ConfigDict(extra="allow"))
 class ExtraKeysTypedDict(TypedDict):
     pass
-
-
-# https://docs.pydantic.dev/2.8/concepts/strict_mode/#dataclasses-and-typeddict
-ExtraKeysTypedDict.__pydantic_config__ = ConfigDict(extra="allow")  # type: ignore
 
 
 class LLMUsageSchema(TypedDict, total=False):
@@ -222,6 +221,13 @@ class StartedCallSchemaForInsert(BaseModel):
 class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
+
+    # Trace ID. Optional for backward compatibility: older clients omit it and
+    # the server derives it from the matching call-start. Carried here so a
+    # server-side ingest sampler can make a consistent keep/drop decision on the
+    # call-end message too. One field covers /call/end, the end-parts of
+    # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
+    trace_id: str | None = None
 
     # End time is required
     ended_at: datetime.datetime
@@ -540,11 +546,26 @@ class CompletionsCreateReq(BaseModelStrict):
     parent_id: str | None = Field(
         None, description="Parent call ID to nest this LLM call under"
     )
+    conversation_id: str | None = Field(
+        None,
+        description="Conversation ID to group related completions into a multi-turn conversation",
+    )
+    conversation_name: str | None = Field(
+        None,
+        description="Human-readable conversation name",
+    )
+    source: str | None = Field(
+        None,
+        description="Source of the completion request (e.g. 'playground', 'signals')",
+    )
 
 
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
-    weave_call_id: str | None = None
+    weave_call_id: str | None = None  # Deprecated: use span_id instead
+    span_id: str | None = None
+    trace_id: str | None = None
+    conversation_id: str | None = None
 
 
 class ImageGenerationRequestInputs(BaseModel):
@@ -579,6 +600,7 @@ class CallsFilter(BaseModelStrict):
     turn_ids: list[str] | None = None
     trace_roots_only: bool | None = None
     wb_user_ids: list[str] | None = None
+    # "entity/project/run", or a bare run id (qualified to the queried project).
     wb_run_ids: list[str] | None = None
 
 
@@ -1220,6 +1242,24 @@ class FeedbackCreateReq(BaseModelStrict):
         examples=[{"_rating_": 0.92}],
     )
 
+    # Denormalized columns from the `spans` table so we can filter without joining.
+    # Keeping these tables synced is best-effort: spans table remains the source of truth
+    span_agent_name: str = Field(
+        default="",
+        description="Display name of the scored agent (from spans.agent_name)",
+        examples=["midi-generator"],
+    )
+    span_agent_version: str = Field(
+        default="",
+        description="Version of the scored agent (from spans.agent_version)",
+        examples=["1.2.0"],
+    )
+    span_status_code: str = Field(
+        default="UNSET",
+        description="Status of the scored turn (from spans.status_code)",
+        examples=["SUCCESS"],
+    )
+
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -1427,6 +1467,165 @@ class FeedbackStatsRes(BaseModel):
     )
 
 
+# --- Feedback aggregate schema (for scores grouped by time bucket) ---
+
+FeedbackAggregateGroupByColumn: TypeAlias = Literal[
+    "scorer_id", "span_agent_name", "span_agent_version", "span_status_code"
+]
+
+# Valid GROUP BY columns for aggregate feedback requests.
+FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS: frozenset[FeedbackAggregateGroupByColumn] = (
+    frozenset(get_args(FeedbackAggregateGroupByColumn))
+)
+
+# Span types, matched on the feedback's weave_ref path segment
+FeedbackSpanType: TypeAlias = Literal["agent_turn", "agent_conversation"]
+
+# Limit aggregate feedback request time range and time bucket count
+MAX_FEEDBACK_AGG_TIME_RANGE_DAYS = 31
+MAX_FEEDBACK_AGG_TIME_BUCKETS = 256
+DAY_IN_MS = datetime.timedelta(days=1).total_seconds() * 1000
+
+
+class FeedbackAggregateReq(BaseModelStrict):
+    """Query for aggregate scores by time bucket and dimension."""
+
+    project_id: str = Field(examples=["entity/project"])
+    after_ms: int = Field(
+        description="Inclusive lower bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    before_ms: int = Field(
+        description="Exclusive upper bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size in seconds, e.g. 3600 for 1h buckets",
+        gt=0,
+    )
+    feedback_types: list[str] = Field(
+        default_factory=list,
+        description="Filter on feedback_type by prefix",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback that includes any of the given tags",
+    )
+    rating_min: float | None = Field(
+        default=None,
+        description="Include only rows with a rating >= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    rating_max: float | None = Field(
+        default=None,
+        description="Include only rows with a rating <= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    monitor_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter to these monitor ids (exact match; suffix with '*' for prefix match).",
+    )
+    scorer_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter to these scorer ids (exact match; suffix with '*' for prefix match).",
+    )
+    span_agent_names: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback whose span_agent_name matches any of these (exact).",
+    )
+    span_types: list[FeedbackSpanType] = Field(
+        default_factory=list,
+        description="Filter by span type (turn vs conversation).",
+    )
+    group_by: list[FeedbackAggregateGroupByColumn] = Field(
+        default_factory=list,
+        description=(f"Allowed: {sorted(FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS)}."),
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "FeedbackAggregateReq":
+        time_range_ms = self.before_ms - self.after_ms
+        if time_range_ms <= 0:
+            raise ValueError("before_ms must be greater than after_ms")
+        # Limit the time range for this query EXCEPT to fetch an ungrouped, unfiltered, all-time total
+        if time_range_ms > MAX_FEEDBACK_AGG_TIME_RANGE_DAYS * DAY_IN_MS:
+            has_filter = bool(
+                self.feedback_types
+                or self.tags
+                or self.monitor_ids
+                or self.scorer_ids
+                or self.span_agent_names
+                or self.span_types
+                or self.rating_min is not None
+                or self.rating_max is not None
+            )
+            if self.time_bucket_seconds is not None or self.group_by or has_filter:
+                raise ValueError(
+                    f"Feedback requests over {MAX_FEEDBACK_AGG_TIME_RANGE_DAYS} days must be a "
+                    "project-wide total: no time_bucket_seconds, no group_by, and no filters."
+                )
+        # Only cap the bucket count when bucketing; None means a single rollup row.
+        if self.time_bucket_seconds is not None:
+            n_buckets = (time_range_ms / 1000) / self.time_bucket_seconds
+            if n_buckets > MAX_FEEDBACK_AGG_TIME_BUCKETS:
+                raise ValueError(
+                    f"Feedback request range cannot exceed {MAX_FEEDBACK_AGG_TIME_BUCKETS} buckets"
+                )
+        return self
+
+
+class FeedbackAggregateBucket(BaseModel):
+    """One (time bucket, group) row of aggregated scorer feedback."""
+
+    time_bucket_start_ms: int | None = Field(
+        default=None,
+        description="Time bucket start, unix epoch ms (UTC). None when unbucketed.",
+    )
+    group: dict[str, str] = Field(
+        default_factory=dict,
+        description="Group-by dimension values for this row (e.g. {'scorer_id': '...'}).",
+    )
+    total_count: int = Field(
+        description="Number of feedback rows in this bucket/group."
+    )
+    scored_count: int = Field(
+        description=(
+            "Rows that emitted a score (at least one tag or rating). Excludes "
+            "agent-monitor rows that scored nothing — use this for score volume."
+        ),
+    )
+    tag_counts: dict[str, int] = Field(
+        default_factory=dict, description="Count of each scorer tag."
+    )
+    rating_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of rows carrying each rating key (e.g. '_rating_').",
+    )
+    rating_sums: dict[str, float] = Field(
+        default_factory=dict,
+        description="Sum of each rating key's values; client derives avg = sum/count.",
+    )
+
+
+class FeedbackAggregateRes(BaseModel):
+    """Sparse time-series of aggregated scorer feedback (empty buckets omitted)."""
+
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size used (seconds). None when unbucketed.",
+    )
+    after_ms: int = Field(
+        description="Resolved inclusive lower bound, unix epoch ms (UTC)."
+    )
+    before_ms: int = Field(
+        description="Resolved exclusive upper bound, unix epoch ms (UTC)."
+    )
+    buckets: list[FeedbackAggregateBucket] = Field(default_factory=list)
+
+
 # --- Feedback payload schema (discovered paths for stats) ---
 
 
@@ -1578,17 +1777,6 @@ class CostPurgeReq(BaseModelStrict):
 
 
 class CostPurgeRes(BaseModel):
-    pass
-
-
-class ActionsExecuteBatchReq(BaseModelStrict):
-    project_id: str
-    action_ref: str
-    call_ids: list[str]
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
@@ -3142,14 +3330,10 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
     def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes: ...
+    def feedback_aggregate(self, req: FeedbackAggregateReq) -> FeedbackAggregateRes: ...
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
-
-    # Action API
-    def actions_execute_batch(
-        self, req: ActionsExecuteBatchReq
-    ) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...

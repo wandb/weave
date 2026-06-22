@@ -66,8 +66,14 @@ def class_all_bases_names(cls: type) -> list[str]:
 
 def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
-    for k, v in getmembers(obj, is_op, lambda e: None):
-        attrs[k] = types.MethodType(v, obj)
+    # Config-only objects (e.g. RemoteScorer, LLMAsAJudgeScorer) can opt out of
+    # serializing their @op methods: those ops are never run in user code, and
+    # embedding them as weave:// op refs produces CustomWeaveType(Op) payloads
+    # the scoring worker rejects as unsafe (WB-33909). Skipping them yields the
+    # same slim shape the Weave UI persists.
+    if not getattr(type(obj), "_weave_exclude_ops_from_record", False):
+        for k, v in getmembers(obj, is_op, lambda e: None):
+            attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
     attrs["_bases"] = class_all_bases_names(obj.__class__)
     return ObjectRecord(attrs)

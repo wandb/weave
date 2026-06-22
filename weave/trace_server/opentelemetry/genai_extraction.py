@@ -248,13 +248,19 @@ def _text_from_parts(parts: list[Any]) -> str:
 def _normalize_single_message(
     msg: dict[str, Any], *, default_role: str = ""
 ) -> NormalizedMessage:
-    """Normalize a single message dict into a NormalizedMessage."""
+    """Normalize a single message dict into a NormalizedMessage.
+
+    When the message carries structured ``parts``, they are JSON-serialized
+    into ``content`` so the full multimodal payload survives the 3-field
+    ClickHouse tuple without a schema migration.  Plain-text messages store
+    the text directly.
+    """
     role = str(msg.get("role") or default_role)
 
     content = ""
     raw_parts = msg.get("parts")
     if isinstance(raw_parts, list):
-        content = _text_from_parts(raw_parts)
+        content = _json_str(raw_parts)
     elif isinstance(msg.get("content"), str):
         content = msg["content"]
     elif isinstance(msg.get("content"), list):

@@ -1,12 +1,14 @@
 import datetime
 import json
+import os
 from unittest import mock
+from unittest.mock import patch
 
 import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
@@ -45,15 +47,9 @@ from weave.trace_server.workers.evaluate_model_worker import evaluate_model_work
 from weave.utils.project_id import from_project_id, to_project_id
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_status(client):
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # TODO: FIX ME, should work in sqlite, but get database lock error:
-        # https://github.com/wandb/weave/actions/runs/16228542054/job/45826073140?pr=5069
-        # `Task failed: OperationalError: database table is locked: calls`
-        return
-
     eval_call_id = generate_id()
 
     def get_status():
@@ -282,6 +278,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
     return model_ref_uri, evaluation_ref_uri
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
     """Test the evaluate_model API endpoint with isolated execution.
@@ -295,7 +292,6 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     The test creates a model, dataset, scorer, and evaluation, then runs
     the evaluation through the evaluate_model API.
     """
-    is_sqlite = client_is_sqlite(client)
     project_id = client.project_id
     entity, project = from_project_id(project_id)
 
@@ -333,11 +329,12 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             "model_ref": model_ref_uri,
         }
     )
-    # Mock the LLM completions for all the calls during evaluation
-    # This is a simplified mock - in reality the evaluation would make multiple calls
-    with with_simple_mock_litellm_completion(
-        json.dumps({"score": 9})
-    ):  # Mock score response
+    # Mock the LLM completions for all the calls during evaluation.
+    # Also provide a fake OPENAI_API_KEY so the secret fetcher finds a key.
+    with (
+        with_simple_mock_litellm_completion(json.dumps({"score": 9})),
+        patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),
+    ):
         eval_res = evaluate_model_fn(req)
 
     # Query for calls
@@ -349,23 +346,15 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         )
     )
 
-    # Here are the 9 calls that are expected:
+    # Expected calls (completions write to spans table, not calls):
     # evaluate
     # predict_and_score
     #    predict
-    #       complete
     #    score
     #       predict
-    #          complete
     # summary
     #    scorer summary
-    # Note: SQLite does not support calling the LLM, so it is not correct.
-    # I want to keep the sqlite tests here however as we are more interested
-    # in testing the overal flow, not LLMs in particular.
-    if is_sqlite:
-        assert len(calls_res.calls) == 5
-    else:
-        assert len(calls_res.calls) == 9
+    assert len(calls_res.calls) == 7
 
     # Query for the specific evaluation call
     eval_calls_res = client.server.calls_query(
@@ -385,27 +374,16 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         f"weave:///{project_id}/op/Evaluation.evaluate:"
     )
     assert isinstance(eval_call.summary, dict)
-    if is_sqlite:
-        assert eval_call.summary["status_counts"] == {
-            TraceStatus.SUCCESS: 4,
-            TraceStatus.ERROR: 1,
-        }
-        assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
-        assert eval_call.output == {
-            "LLMAsAJudgeScorer": None,
-            "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
-        }
-    else:
-        assert eval_call.summary["status_counts"] == {
-            TraceStatus.SUCCESS: 7,
-            TraceStatus.ERROR: 0,
-        }
-        assert eval_call.summary["weave"]["status"] == TraceStatus.SUCCESS
-        assert eval_call.output == {
-            "output": {"score": {"mean": 9.0}},
-            "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
-            "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
-        }
+    assert eval_call.summary["status_counts"] == {
+        TraceStatus.SUCCESS: 7,
+        TraceStatus.ERROR: 0,
+    }
+    assert eval_call.summary["weave"]["status"] == TraceStatus.SUCCESS
+    assert eval_call.output == {
+        "output": {"score": {"mean": 9.0}},
+        "LLMAsAJudgeScorer": {"score": {"mean": 9.0}},
+        "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
+    }
 
 
 # The guard raises inside the lazy row-decode threadpool, which logs the failure
@@ -568,6 +546,7 @@ def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_basic(client):
     project_id = client.project_id
     entity, project = from_project_id(project_id)
@@ -629,6 +608,7 @@ def test_eval_results_query_basic(client):
     assert trial.scores["basic_scorer"] == 0.9
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_returns_genai_span_ref_without_children(client):
     project_id = client.project_id
     genai_span_ref = GenAISpanRef(
@@ -674,6 +654,7 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
     assert trial.genai_span_ref == [genai_span_ref]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_nonexistent_eval_root(client):
     project_id = client.project_id
 
@@ -688,6 +669,7 @@ def test_eval_results_query_nonexistent_eval_root(client):
     assert res.rows == []
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_multiple_evals(client):
     project_id = client.project_id
 
@@ -738,6 +720,7 @@ def test_eval_results_query_multiple_evals(client):
     }
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     """Verify that resolve_row_refs only resolves refs for the paginated slice"""
     project_id = client.project_id
@@ -796,74 +779,7 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
         assert len(call.refs) <= 2
 
 
-def test_eval_subtree_query_excludes_unrelated_top_level_calls(client, internal_server):
-    """Makes sure that _calls_query_stream_for_eval_subtree does not return calls outside the eval tree."""
-    if not client_is_sqlite(client):
-        pytest.skip("_calls_query_stream_for_eval_subtree only exists on SQLite")
-    project_id = client.project_id
-
-    # create an eval with one prediction
-    run = client.server.evaluation_run_create(
-        EvaluationRunCreateReq(
-            project_id=project_id,
-            evaluation="eval://subtree-test",
-            model="model://subtree-test",
-        )
-    )
-    pred = client.server.prediction_create(
-        PredictionCreateReq(
-            project_id=project_id,
-            model="model://subtree-test",
-            inputs={"x": 1},
-            output="result",
-            evaluation_run_id=run.evaluation_run_id,
-        )
-    )
-    client.server.prediction_finish(
-        PredictionFinishReq(
-            project_id=project_id,
-            prediction_id=pred.prediction_id,
-        )
-    )
-
-    # create call unrelated to the eval
-    unrelated_call_id = generate_id()
-    client.server.call_start(
-        CallStartReq(
-            start=StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=unrelated_call_id,
-                trace_id=unrelated_call_id,
-                op_name="unrelated_top_level_op",
-                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                attributes={},
-                inputs={"foo": "bar"},
-            )
-        )
-    )
-    client.server.call_end(
-        CallEndReq(
-            end=EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=unrelated_call_id,
-                ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
-                output={"result": "done"},
-                summary={},
-            )
-        )
-    )
-
-    raw_call_ids = {
-        c.id
-        for c in internal_server._calls_query_stream_for_eval_subtree(
-            project_id, [run.evaluation_run_id]
-        )
-    }
-    assert unrelated_call_id not in raw_call_ids, (
-        "Unrelated top-level call leaked into eval subtree query"
-    )
-
-
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_include_predict_and_score_children(client):
     """Verify include_predict_and_score_children controls child call data."""
     project_id = client.project_id
@@ -939,6 +855,7 @@ def test_eval_results_include_predict_and_score_children(client):
     assert trial_without.scores["children_test_scorer"] == 0.8
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_resolved_inputs_inline(client):
     """Inline inputs should be available as dicts in raw_data_row."""
     project_id = client.project_id
@@ -981,6 +898,7 @@ def test_eval_results_resolved_inputs_inline(client):
     assert row.raw_data_row["question"] == "What is 2+2?"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "predict_and_score_op_name",
     [
@@ -1105,10 +1023,9 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     return run.evaluation_run_id, predict_and_score_ids
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_row_order_is_stable(client):
     """Row order should be stable across repeated requests (default sort by row_digest)."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.3}],
@@ -1129,6 +1046,7 @@ def test_eval_results_row_order_is_stable(client):
             assert digests == digests_first, "Row order changed between requests"
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_excludes_deleted_calls(client):
     """Deleted PAS calls should not appear in eval results."""
     eval_id, predict_and_score_ids = _create_eval_with_scores(
@@ -1161,10 +1079,9 @@ def test_eval_results_excludes_deleted_calls(client):
     assert res.total_rows == 2
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
@@ -1183,10 +1100,9 @@ def test_eval_results_sort_by_score_desc(client):
     assert accuracies == [0.9, 0.6, 0.3]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_asc(client):
     """Sort by scores.accuracy ASC should return lowest-scoring row first."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
@@ -1204,10 +1120,9 @@ def test_eval_results_sort_by_score_asc(client):
     assert accuracies == [0.3, 0.6, 0.9]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_score_gte(client):
     """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.3}, {"accuracy": 0.9}, {"accuracy": 0.6}],
@@ -1246,10 +1161,9 @@ def test_eval_results_filter_score_gte(client):
     assert accuracies == [0.6, 0.9]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_and_filter_combined(client):
     """Sort + filter together: filter first, then sort the remaining rows."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.1}, {"accuracy": 0.5}, {"accuracy": 0.9}, {"accuracy": 0.7}],
@@ -1287,10 +1201,9 @@ def test_eval_results_sort_and_filter_combined(client):
     assert accuracies == [0.9, 0.7, 0.5]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_with_evaluation_call_id_scope(client):
     """Filter scoped to evaluation_call_id only tests that eval's scores."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.9}, {"accuracy": 0.3}, {"accuracy": 0.7}],
@@ -1339,6 +1252,7 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
     assert accuracies == [0.7, 0.9]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
     """Sorting on an unsupported field prefix returns InvalidRequest."""
     eval_id, _ = _create_eval_with_scores(
@@ -1354,10 +1268,9 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
         )
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_output(client):
     """Sort by output.label orders rows by nested model output field."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     project_id = client.project_id
     run = client.server.evaluation_run_create(
         EvaluationRunCreateReq(
@@ -1416,10 +1329,9 @@ def test_eval_results_sort_by_output(client):
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
+@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_summary_with_filter(client):
     """Summary reflects filtered rows, not all rows."""
-    if client_is_sqlite(client):
-        pytest.skip("sort/filter only implemented for ClickHouse")
     eval_id, _ = _create_eval_with_scores(
         client,
         [{"accuracy": 0.2}, {"accuracy": 0.6}, {"accuracy": 0.9}],

@@ -1,0 +1,206 @@
+name: nightly-replicated-leg
+
+# Reusable matrix for one replicated ClickHouse topology. Called once per
+# topology from nightly-tests.yaml so the shard matrix and step list have a
+# single source of truth; the legs differ only in topology/port/distributed.
+on:
+  workflow_call:
+    inputs:
+      topology:
+        description: "Topology name; matches the compose stem in tests/trace_server/conftest_lib/topologies/"
+        required: true
+        type: string
+      ch_port:
+        description: "Host port the topology entrypoint (ch-s1-r1) exposes"
+        required: true
+        type: string
+      use_distributed:
+        description: "Set WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES for the run"
+        required: false
+        default: false
+        type: boolean
+      shards:
+        description: "Comma-separated shard filter (empty = all)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  run:
+    name: ${{ inputs.topology }} (3.${{ matrix.python-version-minor }}, ${{ matrix.shard }})
+    permissions:
+      contents: read
+    # Successful 8-core trace leg ran in ~16 min; cap at 25 min so any hang
+    # fails fast and we can RCA from the captured CH logs + faulthandler dump.
+    timeout-minutes: 25
+    # `trace` shard is CH-heavy and was hitting ~2h on the 2-core default;
+    # mirror test.yaml's pattern and bump just that shard to 8-core. Other
+    # shards stay on free 2-core. 8-core is billed at $0.022/min, so a
+    # typical 30 min trace leg ~= $0.66.
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    env:
+      # MAX_ATTEMPTS=1 (no retry). Retries on replicated topologies amplify
+      # failures: each attempt re-runs against the same docker-compose CH
+      # cluster, which accumulates data/parts and starts OOMing. In one
+      # RCA, test fixture setup grew 52s -> 297s between attempt 1 and 2.
+      # A single attempt + uploaded CH logs is more diagnostic.
+      MAX_ATTEMPTS: 1
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        shard:
+          [
+            "trace",
+            "flow",
+            "trace_server",
+            "trace_server_bindings",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "crewai",
+            "dspy",
+            "groq",
+            "google_genai",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral",
+            "notdiamond",
+            "openai",
+            "scorers",
+            "verifiers_test",
+            "vertexai",
+            "pandas_test",
+            "fastmcp",
+            "smolagents",
+            "autogen_tests",
+          ]
+        exclude:
+          - python-version-major: "3"
+            python-version-minor: "10"
+            shard: "verifiers_test"
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Filter shards if specified
+        id: filter_shards
+        run: |
+          INPUT_SHARDS="${{ inputs.shards }}"
+          if [ -n "$INPUT_SHARDS" ]; then
+            echo "Running specific shards: $INPUT_SHARDS"
+            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "Running shard: ${{ matrix.shard }}"
+          echo "skip=false" >> $GITHUB_OUTPUT
+      - name: Enable debug logging
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install Libmagic dependency package
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: sudo apt update && sudo apt install -y libmagic1
+      - name: Start ${{ inputs.topology }} ClickHouse cluster
+        if: steps.filter_shards.outputs.skip != 'true'
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f ${{ inputs.topology }}.yaml up -d --wait
+          for i in $(seq 1 60); do
+            wget -q -O- 'http://localhost:${{ inputs.ch_port }}/ping' && break || sleep 2
+          done
+          docker compose -f ${{ inputs.topology }}.yaml exec -T ch-s1-r1 \
+            clickhouse-client -q "SELECT host_name, shard_num, replica_num, errors_count FROM system.clusters WHERE cluster='weave_cluster' FORMAT PrettyCompact"
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Check if shard needs trace_server markers
+        id: check_trace_markers
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas_test huggingface smolagents fastmcp autogen_tests trace trace_no_server"
+          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
+            echo "needs_markers=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_markers=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Run nox (replicated trace_server markers)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_USE_MEMRAY: 1
+          WF_CLICKHOUSE_HOST: localhost
+          WF_CLICKHOUSE_PORT: ${{ inputs.ch_port }}
+          WF_CLICKHOUSE_REPLICATED: "true"
+          WF_CLICKHOUSE_REPLICATED_CLUSTER: weave_cluster
+          WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES: ${{ inputs.use_distributed }}
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # --timeout=300: per-test cap so a single hung test fails with a
+          # thread-stack dump instead of stalling the whole job. Thread method
+          # works under pytest-xdist; signal method would be unreliable across
+          # workers. 300s is well above any clean-cluster setup (~50s observed)
+          # but tight enough that a wedged ClickHouse query fails fast.
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
+            -m "trace_server" \
+            --timeout=300 --timeout-method=thread
+      - name: Run nox (No marker filters for integration-only shards)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_USE_MEMRAY: 1
+          WF_CLICKHOUSE_HOST: localhost
+          WF_CLICKHOUSE_PORT: ${{ inputs.ch_port }}
+          WF_CLICKHOUSE_REPLICATED: "true"
+          WF_CLICKHOUSE_REPLICATED_CLUSTER: weave_cluster
+          WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES: ${{ inputs.use_distributed }}
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          .github/scripts/retry.sh nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+      - name: Capture ClickHouse logs on failure
+        if: failure()
+        working-directory: tests/trace_server/conftest_lib/topologies
+        run: |
+          docker compose -f ${{ inputs.topology }}.yaml logs --no-color --tail=1000 > ch-logs-${{ inputs.topology }}.txt || true
+      - name: Upload ClickHouse logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch-logs-${{ inputs.topology }}-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/trace_server/conftest_lib/topologies/ch-logs-${{ inputs.topology }}.txt
+          retention-days: 7
+          if-no-files-found: ignore

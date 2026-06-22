@@ -1,7 +1,29 @@
 from unittest.mock import MagicMock, patch
 
+from clickhouse_connect import common as ch_common
+from clickhouse_connect.driver.httpclient import HttpClient
+
 from weave.trace_server import clickhouse_trace_server_batched as chts
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import sanitize_invalid_utf8_surrogates
+
+
+def test_poisoned_client_settings_are_sent_not_rejected() -> None:
+    # A client minted during a CH degradation window caches an empty/readonly
+    # server_settings map; 'send' lets the rejected weave settings reach the server.
+    assert ch_common.get_setting("invalid_setting_action") == "send"
+
+    poisoned = HttpClient.__new__(HttpClient)
+    poisoned.server_settings = {}
+    poisoned.optional_transport_settings = set()
+
+    settings = {
+        **ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
+        **ch_settings.CLICKHOUSE_ASYNC_INSERT_SETTINGS,
+    }
+    validated = poisoned._validate_settings(settings)
+
+    assert validated == settings
 
 
 def test_sanitize_invalid_utf8_surrogates_replaces_lone_surrogates() -> None:

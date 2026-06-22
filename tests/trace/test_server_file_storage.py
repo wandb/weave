@@ -13,12 +13,14 @@ import boto3
 import pytest
 from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
+from google.auth import credentials as ga_credentials
+from google.cloud import storage
 from moto import mock_aws
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_settings
+from weave.trace_server import clickhouse_trace_server_settings, file_storage
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -49,8 +51,6 @@ def run_storage_test(client: WeaveClient):
         assert file.content == TEST_CONTENT
         return res
 
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
     return _run_test
 
 
@@ -85,6 +85,9 @@ class TestS3Storage:
             yield
 
     @pytest.mark.usefixtures("aws_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_aws_storage(self, run_storage_test, s3):
         """Test file storage using AWS S3."""
         res = run_storage_test()
@@ -99,6 +102,9 @@ class TestS3Storage:
         obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
         assert obj_response["Body"].read() == TEST_CONTENT
 
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
         # This test is critical in that it ensures that the system works correctly for large files. Both
         # before and after the migration to file storage, we should be able to read the file correctly.
@@ -145,9 +151,6 @@ class TestS3Storage:
             d3 = _run_single_test()
             assert d1 == d2 == d3
 
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         _run_test()
 
 
@@ -160,6 +163,9 @@ class TestGCSStorage:
     """
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage(self, run_storage_test, gcs, client: WeaveClient):
         """Test file storage using Google Cloud Storage."""
         res = run_storage_test()
@@ -171,15 +177,15 @@ class TestGCSStorage:
         assert gcs.state.upload_count == 1
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
         """Test that writing the same content twice skips the second write.
 
         This verifies the if_generation_match=0 conditional write works correctly
         to prevent GCS rate limiting when multiple pods write the same object.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         upload_count = 0
         blob_data = {}
 
@@ -242,6 +248,50 @@ class TestGCSStorage:
             assert file.content == TEST_CONTENT
 
 
+class _ScopedFakeCredentials(ga_credentials.Credentials, ga_credentials.Scoped):
+    """Service-account-like credentials that require scoping before use."""
+
+    def __init__(self, scopes: list[str] | None = None):
+        super().__init__()
+        self._scopes = scopes
+
+    @property
+    def requires_scopes(self) -> bool:
+        return not self._scopes
+
+    @property
+    def scopes(self) -> list[str] | None:
+        return self._scopes
+
+    def with_scopes(self, scopes, default_scopes=None) -> "_ScopedFakeCredentials":
+        return _ScopedFakeCredentials(scopes=list(scopes))
+
+    def refresh(self, request) -> None:
+        self.token = "fake-token"
+
+
+def test_keepalive_gcs_client_scopes_credentials_for_session():
+    """Regression for #7221: the keep-alive GCS session must carry scoped credentials."""
+    expected_scopes = list(storage.Client.SCOPE)
+
+    unscoped = _ScopedFakeCredentials()
+    assert unscoped.requires_scopes
+    client = file_storage._build_keepalive_gcs_client(unscoped)
+
+    # The session that mints tokens must hold scoped creds, else invalid_scope.
+    assert client._http.credentials.scopes == expected_scopes
+    assert not client._http.credentials.requires_scopes
+    assert isinstance(
+        client._http.get_adapter("https://storage.googleapis.com"),
+        file_storage._KeepAliveHTTPAdapter,
+    )
+
+    # Already-scoped creds (local user creds) pass through, so prod-only repro.
+    prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
+    passthrough = file_storage._build_keepalive_gcs_client(prescoped)
+    assert passthrough._http.credentials.scopes == ["existing-scope"]
+
+
 class TestAzureStorage:
     """Tests for Azure Blob Storage implementation using mocks."""
 
@@ -299,6 +349,9 @@ class TestAzureStorage:
             yield
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage(self, run_storage_test, azure_blob):
         """Test file storage using Azure Blob Storage."""
         res = run_storage_test()
@@ -313,6 +366,9 @@ class TestAzureStorage:
         assert blob_client.download_blob().readall() == TEST_CONTENT
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
         """Azure store must not clobber an existing content-addressable blob.
 
@@ -321,9 +377,6 @@ class TestAzureStorage:
         be a no-op, not an overwrite. Otherwise any project with write scope
         can substitute content at a known URI.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         blob_data: dict[str, bytes] = {}
         upload_calls: list[dict] = []
 
@@ -392,12 +445,13 @@ class TestAzureStorage:
             assert file.content == original
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_support_for_variable_length_chunks(client: WeaveClient):
     """Test that the system supports variable length chunks.
     We don't actually want to change this often, but we need to make sure it works.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
@@ -438,11 +492,11 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 
 
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_file_storage_retry_limit(client: WeaveClient):
     """Test that file storage operations retry exactly 3 times on storage failures."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     attempt_count = 0
 
     def mock_upload_fail(*args, **kwargs):
@@ -521,17 +575,19 @@ def _unique_payload(unique: str, size: int) -> bytes:
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
     """Multiple file_create calls inside one call_batch fan out to GCS in
     parallel: concurrent uploads happen, identical content within the batch
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
-    gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
+    # Barrier makes the peak deterministic so it can't flake under CI scheduler
+    # jitter (each upload blocks until all 4 are simultaneously in-flight).
+    gcs.state.expected_concurrency = 4
     payload_size = 50_000
     payloads = [
         _unique_payload("alpha", payload_size),
@@ -551,10 +607,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                 )
             )
 
-    # Pool defaults to 8 workers, so all 4 unique uploads should run
-    # concurrently. concurrent_peak is the load-bearing parallelism signal;
-    # wall-time assertions on top would flake on contended CI runners.
-    assert gcs.state.concurrent_peak >= 4, (
+    # Pool defaults to 8 workers, so all 4 unique uploads run concurrently;
+    # the upload barrier guarantees the peak reaches 4.
+    assert gcs.state.concurrent_peak == 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
 
@@ -578,6 +633,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     ],
     ids=["single-chunk-fallback", "multi-chunk-fallback"],
 )
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     client: WeaveClient, gcs, fail_payload_size: int
 ):
@@ -588,9 +646,6 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     server's read path -- it must reassemble bit-for-bit from CH chunks for
     both single-chunk and multi-chunk payloads.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 

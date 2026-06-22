@@ -10,29 +10,15 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
-import {globalSingleton} from '../utils/globalSingleton';
 import {packageVersion} from '../utils/packageVersion';
 import type {WeaveClient} from '../weaveClient';
 import {getWandbConfigs} from '../wandb/settings';
 
 import {WEAVE_RESOURCE_ATTR} from './weaveResource';
+import state from '../state';
 
 const SDK_LANGUAGE = 'node';
 const GENAI_OTLP_PATH = '/agents/otel/v1/traces';
-
-/** Key for the dual-package-hazard-safe singleton holder routed through
- *  `globalThis`. Exported so tests can reset the holder via `Symbol.for`. */
-export const PROVIDER_HOLDER_SYMBOL_NAME = '_weave_genai_provider';
-
-// Dual-package-hazard-safe: routed through globalThis so CJS and ESM copies
-// of this module share one provider instance per process.
-const _providerHolder = globalSingleton<{
-  provider: BasicTracerProvider | null;
-  beforeExitRegistered: boolean;
-}>(PROVIDER_HOLDER_SYMBOL_NAME, () => ({
-  provider: null,
-  beforeExitRegistered: false,
-}));
 
 // Standalone no-op provider for the "weave.init() not called" path. The
 // `AlwaysOffSampler` makes every emitted span non-recording, so all
@@ -65,12 +51,16 @@ export function getWeaveTracer(name: string): Tracer {
  * has been pulled yet. Used by the `flushOTel` / `beforeExit` paths.
  */
 export function getWeaveTracerProvider(): BasicTracerProvider | null {
-  return _providerHolder.provider;
+  return state.genAi.provider;
+}
+
+export function clearWeaveTracerProvider() {
+  state.genAi.provider = null;
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  if (_providerHolder.provider) {
-    return _providerHolder.provider;
+  if (state.genAi.provider) {
+    return state.genAi.provider;
   }
 
   const [entity, project] = client.projectId.includes('/')
@@ -84,28 +74,28 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
-  _providerHolder.provider = new BasicTracerProvider({
+  state.genAi.provider = new BasicTracerProvider({
     resource,
     spanProcessors: [buildSpanProcessor(client)],
   });
   registerBeforeExitHookOnce();
-  return _providerHolder.provider;
+  return state.genAi.provider;
 }
 
 // Best-effort flush on process exit. Registered the first time a real
 // provider is built, so processes that never use the GenAI surface don't pay
 // the hook cost.
 function registerBeforeExitHookOnce(): void {
-  if (_providerHolder.beforeExitRegistered) {
+  if (state.genAi.providerRegistered) {
     return;
   }
-  _providerHolder.beforeExitRegistered = true;
+  state.genAi.providerRegistered = true;
   process.once('beforeExit', async () => {
-    if (!_providerHolder.provider) {
+    if (!state.genAi.provider) {
       return;
     }
     try {
-      await _providerHolder.provider.shutdown();
+      await state.genAi.provider.shutdown();
     } catch {
       // If shutdown fails we have no good place to surface it — the
       // process is already on its way out.

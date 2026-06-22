@@ -34,7 +34,6 @@ flat format, so the dual-mode opt-in flag isn't needed.
 
 from __future__ import annotations
 
-import base64
 import json
 from typing import Any
 
@@ -42,36 +41,12 @@ from weave.session.types import MediaAttachment, Message, Reasoning, Usage
 
 
 def _media_to_part(media: MediaAttachment) -> dict[str, Any]:
-    """Build a BlobPart, UriPart, or FilePart per GenAI semconv.
-
-    Bytes content is base64-encoded; str content is assumed to already be
-    base64-encoded by the caller (matches the semconv field which is a
-    string of base64 data).
-    """
-    if media.kind == "blob":
-        encoded = (
-            base64.b64encode(media.content).decode("ascii")
-            if isinstance(media.content, bytes)
-            else media.content
-        )
-        return {
-            "type": "blob",
-            "mime_type": media.mime_type,
-            "modality": media.modality,
-            "content": encoded,
-        }
-    if media.kind == "uri":
-        return {
-            "type": "uri",
-            "mime_type": media.mime_type,
-            "modality": media.modality,
-            "uri": media.uri,
-        }
+    """Build a UriPart pointing to the published weave:// content ref."""
     return {
-        "type": "file",
+        "type": "uri",
         "mime_type": media.mime_type,
         "modality": media.modality,
-        "file_id": media.file_id,
+        "uri": media.ref,
     }
 
 
@@ -322,6 +297,11 @@ def llm_attributes(
     )
     if serialized_out is not None:
         attrs["gen_ai.output.messages"] = serialized_out
+
+    if media_attachments:
+        # Coerce to plain ``str``: OTel attribute validation does an exact-type
+        # check and rejects ``str`` subclasses (e.g. ``_CallableStr`` refs).
+        attrs["weave.content_refs"] = [str(m.ref) for m in media_attachments]
 
     return attrs
 

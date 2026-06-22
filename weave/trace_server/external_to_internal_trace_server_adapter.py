@@ -1,10 +1,12 @@
 import abc
-from collections.abc import Callable, Iterable, Iterator
+import asyncio
+from collections.abc import Awaitable, Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import KeyValue
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
 from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
@@ -155,6 +157,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         return res_conv
 
+    async def _aref_apply(
+        self,
+        method: Callable[[A], Awaitable[B]],
+        req: A,
+        internal_project_id: str,
+    ) -> B:
+        req_conv = universal_ext_to_int_ref_converter(
+            req,
+            self._idc.ext_to_int_project_id,
+            verify_internal_project_id=self._make_project_verifier(internal_project_id),
+        )
+        res = await method(req_conv)
+        res_conv = universal_int_to_ext_ref_converter(
+            res, self._idc.int_to_ext_project_id
+        )
+        return res_conv
+
     def _stream_ref_apply(
         self,
         method: Callable[[A], Iterator[B]],
@@ -245,16 +264,26 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             res.call.wb_user_id = self._idc.int_to_ext_user_id(res.call.wb_user_id)
         return res
 
+    def _ext_to_int_run_ids(
+        self, run_ids: list[str], ext_entity_project_id: str
+    ) -> list[str]:
+        # A bare run id (no "/") is prefixed with the queried "entity/project"
+        # to form the "entity/project/run" that ext_to_int_run_id requires.
+        int_run_ids = []
+        for run_id in run_ids:
+            qualified = run_id if "/" in run_id else f"{ext_entity_project_id}/{run_id}"
+            int_run_ids.append(self._idc.ext_to_int_run_id(qualified))
+        return int_run_ids
+
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         req = req.model_copy(deep=True)
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process run_id for the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
@@ -290,10 +319,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
@@ -336,13 +364,13 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
         req = req.model_copy(deep=True)
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         if req.filter is not None:
             if req.filter.wb_run_ids is not None:
-                req.filter.wb_run_ids = [
-                    self._idc.ext_to_int_run_id(run_id)
-                    for run_id in req.filter.wb_run_ids
-                ]
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
             # TODO: How do we correctly process the query filters?
             if req.filter.wb_user_ids is not None:
                 req.filter.wb_user_ids = [
@@ -608,6 +636,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.feedback_stats, req, req.project_id
         )
 
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.feedback_aggregate, req, req.project_id
+        )
+
     def feedback_payload_schema(
         self, req: tsi.FeedbackPayloadSchemaReq
     ) -> tsi.FeedbackPayloadSchemaRes:
@@ -646,20 +684,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 cost["pricing_level_id"] = original_project_id
         return res
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        req = req.model_copy(deep=True)
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        original_user_id = req.wb_user_id
-        if original_user_id is None:
-            raise ValueError("wb_user_id cannot be None")
-        req.wb_user_id = self._idc.ext_to_int_user_id(original_user_id)
-        res = self._ref_apply(
-            self._internal_trace_server.actions_execute_batch, req, req.project_id
-        )
-        return res
-
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
@@ -669,6 +693,22 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.completions_create, req, req.project_id
         )
         return res
+
+    async def acompletions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        inner = self._internal_trace_server
+        if isinstance(inner, AsyncClickHouseTraceServer):
+            return await self._aref_apply(
+                inner.acompletions_create, req, req.project_id
+            )
+        # Fallback for non-async backends: run the sync path in a thread so the
+        # event loop is still freed while we wait.
+        return await asyncio.to_thread(
+            self._ref_apply, inner.completions_create, req, req.project_id
+        )
 
     # Streaming completions - simply proxy through after converting project ID.
     def completions_create_stream(

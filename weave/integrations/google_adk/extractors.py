@@ -41,7 +41,9 @@ from google.adk.telemetry._experimental_semconv import (
     _to_system_instructions,
 )
 from google.genai.types import Content, GenerateContentConfig
-from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
+from opentelemetry.trace import Span
+
+from weave.integrations.google_adk._semconv import (
     GEN_AI_INPUT_MESSAGES,
     GEN_AI_OUTPUT_MESSAGES,
     GEN_AI_OUTPUT_TYPE,
@@ -59,10 +61,10 @@ from opentelemetry.semconv._incubating.attributes.gen_ai_attributes import (
     GEN_AI_TOOL_DEFINITIONS,
     GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
     GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
-    GenAiOutputTypeValues,
-    GenAiSystemValues,
+    OUTPUT_TYPE_TEXT,
+    PROVIDER_GEMINI,
+    PROVIDER_VERTEX_AI,
 )
-from opentelemetry.trace import Span
 
 # Runtime config — env vars the integration reads on every span. Both the
 # extractors below and the patcher wrappers in ``google_adk_sdk`` consult
@@ -102,17 +104,17 @@ def _capture_message_content() -> bool:
 def _provider_name() -> str:
     """Return the Weave-canonical provider name for the running ADK runtime.
 
-    Mirrors ADK's own ``_guess_gemini_system_name`` and emits the upstream
-    ``GenAiSystemValues`` value so the wire format matches the canonical
-    semconv enum.
+    Mirrors ADK's own ``_guess_gemini_system_name`` and emits the vendored
+    provider value (see ``_semconv``) so the wire format matches the
+    canonical semconv enum.
     """
     use_vertex = os.getenv(_GOOGLE_GENAI_USE_VERTEXAI_ENV, "").lower() in {
         "true",
         "1",
     }
     if use_vertex:
-        return GenAiSystemValues.VERTEX_AI.value
-    return GenAiSystemValues.GEMINI.value
+        return PROVIDER_VERTEX_AI
+    return PROVIDER_GEMINI
 
 
 def _adk_role_to_weave(role: str | None) -> str:
@@ -274,7 +276,7 @@ def set_llm_response_attributes(span: Span, llm_response: LlmResponse) -> None:
                 GEN_AI_OUTPUT_MESSAGES,
                 json.dumps([output_message], ensure_ascii=False),
             )
-            span.set_attribute(GEN_AI_OUTPUT_TYPE, GenAiOutputTypeValues.TEXT.value)
+            span.set_attribute(GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT)
 
     usage = llm_response.usage_metadata
     if usage is None:

@@ -1,6 +1,5 @@
 """Helper functions for eval_results_query.
 
-These are shared between ClickHouse and SQLite trace server implementations.
 Most helpers are pure (operate on in-memory data). The orchestration functions
 (eval_results_grouped_rows, fetch_eval_root_metadata, eval_results_query) take
 a TraceServerInterface and perform DB access via calls_query_stream and
@@ -11,8 +10,9 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from typing import Any, TypeVar
+from typing import Any
 
+import ddtrace
 from pydantic import ValidationError
 
 from weave.shared import refs_internal as ri
@@ -22,30 +22,12 @@ from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 
-try:
-    import ddtrace
-except ImportError:
-    ddtrace = None  # type: ignore[assignment]
-
-F = TypeVar("F", bound=Callable[..., Any])
-
 _SUPPORTED_SORT_PREFIXES = (
     "scores.",
     "inputs.",
     "output.",
 )
 _NUMERIC_SORT_PREFIXES = ("scores.",)
-
-
-def _trace_wrap(name: str) -> Callable[[F], F]:
-    """No-op if ddtrace unavailable; otherwise wrap with ddtrace.tracer.wrap."""
-
-    def decorator(fn: F) -> F:
-        if ddtrace is not None:
-            return ddtrace.tracer.wrap(name=name)(fn)  # type: ignore[return-value]
-        return fn
-
-    return decorator  # type: ignore[return-value]
 
 
 logger = logging.getLogger(__name__)
@@ -384,7 +366,7 @@ def _build_trial(
     )
 
 
-@_trace_wrap("eval_results_helpers.build_eval_rows_from_calls")
+@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows_from_calls")
 def build_eval_rows_from_calls(
     predict_and_score_calls: list[tsi.CallSchema],
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -450,7 +432,7 @@ def finalize_rows(
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
 
 
-@_trace_wrap("eval_results_helpers.build_eval_rows")
+@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows")
 def build_eval_rows(
     page_calls: list[tsi.CallSchema],
     eval_root_ids: list[str],
@@ -559,7 +541,7 @@ def resolve_eval_row_refs(
     return []
 
 
-@_trace_wrap("eval_results_helpers.eval_results_grouped_rows")
+@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
     req: tsi.EvalResultsQueryReq,
     eval_root_ids: list[str],
@@ -593,7 +575,7 @@ def eval_results_grouped_rows(
     )
 
 
-@_trace_wrap("eval_results_helpers.fetch_eval_root_metadata")
+@ddtrace.tracer.wrap(name="eval_results_helpers.fetch_eval_root_metadata")
 def fetch_eval_root_metadata(
     server: tsi.TraceServerInterface,
     project_id: str,
@@ -635,7 +617,7 @@ def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
                 )
 
 
-@_trace_wrap("eval_results_helpers.eval_results_query")
+@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_query")
 def eval_results_query(
     server: tsi.TraceServerInterface,
     req: tsi.EvalResultsQueryReq,
@@ -761,7 +743,7 @@ def _process_scorer_output(
             )
 
 
-@_trace_wrap("eval_results_helpers.compute_summary_from_rows")
+@ddtrace.tracer.wrap(name="eval_results_helpers.compute_summary_from_rows")
 def compute_summary_from_rows(
     rows: list[tsi.EvalResultsRow],
     eval_call_metadata: dict[str, dict[str, Any]] | None = None,

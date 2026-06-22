@@ -109,6 +109,40 @@ def is_available() -> bool:
     return available
 
 
+# Leading magic bytes of a WAV file. WAV is a RIFF container, so the bytes we
+# match live at fixed, little-endian offsets defined by the RIFF spec.
+_RIFF_MARKER = b"RIFF"  # offset 0: generic RIFF container marker (ChunkID)
+_WAVE_FORM = b"WAVE"  # offset 8: form type that marks this RIFF as WAVE audio
+
+
+def _is_wav_buffer(buffer: bytes) -> bool:
+    """Return True if the buffer's magic bytes identify it as a WAV file.
+
+    This works around a libmagic limitation: some builds only recognise the
+    generic RIFF container when classifying a WAV from an in-memory buffer
+    (``magic.from_buffer`` returns ``application/octet-stream``), even though
+    ``magic.from_file`` on the identical bytes correctly returns
+    ``audio/x-wav``. Content frequently detects from buffers (e.g. base64
+    payloads decoded in memory), so without this check WAV audio silently fails
+    to be recognised on the affected builds.
+
+    RIFF/WAVE header layout (fixed by the spec, little-endian)::
+
+        offset 0   4 bytes   "RIFF"   ChunkID   -- generic container marker
+        offset 4   4 bytes   <size>   ChunkSize
+        offset 8   4 bytes   "WAVE"   Format    -- the *form type*
+
+    The form type at offset 8 is what distinguishes WAV from every other RIFF
+    container ("AVI " video, "WEBP" image, "ANI " cursor, ...), so we require
+    BOTH the "RIFF" marker at offset 0 and the "WAVE" form at offset 8;
+    matching on "RIFF" alone would misclassify those as audio. These offsets
+    never move regardless of the audio payload, so a 12-byte prefix suffices.
+    """
+    return (
+        len(buffer) >= 12 and buffer[:4] == _RIFF_MARKER and buffer[8:12] == _WAVE_FORM
+    )
+
+
 def detect(
     *, filename: str | None, buffer: bytes | None
 ) -> tuple[str | None, str | None]:
@@ -144,6 +178,15 @@ def detect(
     if buffer is not None:
         try:
             mimetype = mime_magic.from_buffer(buffer)
+            # Some libmagic builds cannot identify WAV from an in-memory buffer
+            # and report the generic octet-stream type (see _is_wav_buffer).
+            # Sniff the RIFF/WAVE signature and override so buffer-based
+            # detection matches what from_file would return. This is a no-op on
+            # builds that already classify WAV correctly.
+            if mimetype in {None, "application/octet-stream"} and _is_wav_buffer(
+                buffer
+            ):
+                return "audio/x-wav", ".wav"
             if mimetype:
                 raw_ext = ext_magic.from_buffer(buffer) if ext_magic else None
                 return mimetype, _resolve_extension(raw_ext, mimetype)

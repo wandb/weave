@@ -1,6 +1,5 @@
 from typing import Any
 
-import jsonschema
 from pydantic import BaseModel, Field, create_model, field_validator, model_validator
 from pydantic.fields import FieldInfo
 
@@ -84,13 +83,20 @@ class AnnotationSpec(base_object_def.BaseObject):
 
         # Handle Pydantic model
         if isinstance(field_schema, type) and issubclass(field_schema, BaseModel):
-            data["field_schema"] = field_schema.model_json_schema()  # type: ignore
+            # Read back through `data` (typed `Any`): pydantic is invisible to
+            # the type-check env, so `issubclass` cannot narrow off bare `type`.
+            data["field_schema"] = data["field_schema"].model_json_schema()
             return data
 
         return data
 
     @field_validator("field_schema")
     def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
+        # Imported lazily: `import jsonschema` eagerly loads every installed
+        # format-checker lib (rfc3987_syntax builds a Lark grammar, ~0.45s),
+        # so keeping it out of module scope avoids paying that on `import weave`.
+        import jsonschema
+
         # Validate the schema
         try:
             jsonschema.validate(None, schema)
@@ -109,6 +115,10 @@ class AnnotationSpec(base_object_def.BaseObject):
         Returns:
             bool: True if validation succeeds, False otherwise
         """
+        # Lazy import: see note in validate_field_schema (avoids ~0.45s of
+        # jsonschema format-checker imports at `import weave` time).
+        import jsonschema
+
         try:
             jsonschema.validate(payload, self.field_schema)
         except jsonschema.exceptions.ValidationError:

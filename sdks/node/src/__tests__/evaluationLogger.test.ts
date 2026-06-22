@@ -5,19 +5,7 @@
 import {EvaluationLogger} from '../evaluationLogger';
 import {WeaveObject} from '../weaveObject';
 import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from '../inMemoryTraceServer';
-
-// Helper function to get calls from trace server
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  // Wait for async batch processing to complete
-  await traceServer.waitForPendingOperations();
-
-  return traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-    })
-    .then(result => result.calls);
-}
+import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
 describe('EvaluationLogger - Basic Functionality', () => {
   let traceServer: InMemoryTraceServer;
@@ -42,7 +30,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     expect(calls.length).toBeGreaterThan(0);
   });
 
@@ -61,7 +49,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
     // logSummary waits for everything to complete internally
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     expect(calls.length).toBeGreaterThan(0);
 
     // Verify scores were logged
@@ -101,7 +89,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
     // logSummary waits for everything to complete internally
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     expect(calls.length).toBeGreaterThan(0);
 
     // Verify scores were logged
@@ -125,7 +113,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
     // logSummary should auto-finish and complete successfully
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCall = calls.find(c =>
       c.op_name?.includes('predict_and_score')
     );
@@ -154,7 +142,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
 
     expect(evaluateCall?.attributes?.trial_id).toBe('abc123');
@@ -181,7 +169,7 @@ describe('EvaluationLogger - Call Hierarchy', () => {
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
     const predictAndScoreCall = calls.find(c =>
       c.op_name?.includes('predict_and_score')
@@ -223,7 +211,7 @@ describe('EvaluationLogger - Attribute Markers', () => {
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
     const predictCall = calls.find(
       c => c.op_name?.includes('predict') && !c.op_name?.includes('_and_')
@@ -246,7 +234,7 @@ describe('EvaluationLogger - Attribute Markers', () => {
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const scorerCall = calls.find(c => c.op_name?.includes('accuracy'));
 
     expect(scorerCall?.attributes?._weave_eval_meta?.imperative).toBe(true);
@@ -277,7 +265,7 @@ describe('EvaluationLogger - Summary Generation', () => {
 
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
 
     expect(evaluateCall?.output?.accuracy?.mean).toBeCloseTo(0.95, 2);
@@ -310,7 +298,7 @@ describe('EvaluationLogger - Summary Generation', () => {
 
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
 
     expect(evaluateCall?.output?.passed?.true_count).toBe(2);
@@ -333,7 +321,7 @@ describe('EvaluationLogger - Summary Generation', () => {
       accuracy: {mean: 0.99},
     });
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
 
     expect(evaluateCall?.output?.custom_metric).toBe('custom_value');
@@ -361,7 +349,7 @@ describe('EvaluationLogger - Edge Cases', () => {
 
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCall = calls.find(c =>
       c.op_name?.includes('predict_and_score')
     );
@@ -375,7 +363,7 @@ describe('EvaluationLogger - Edge Cases', () => {
 
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const evaluateCall = calls.find(c => c.op_name?.includes('evaluate'));
 
     expect(evaluateCall).toBeDefined();
@@ -397,7 +385,7 @@ describe('EvaluationLogger - Edge Cases', () => {
 
     await evalLogger.logSummary();
 
-    const calls = await getCalls(traceServer, projectId);
+    const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
       c.op_name?.includes('predict_and_score')
     );

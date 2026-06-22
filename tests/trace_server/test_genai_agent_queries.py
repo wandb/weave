@@ -1,6 +1,6 @@
 """Integration tests for GenAI agent tables and query layer.
 
-Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
+Runs against the ClickHouse backend (the only supported backend).
 Migration 030 creates the genai tables automatically.
 """
 
@@ -899,6 +899,49 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
     assert row["count_true_invocations"] == 1
 
 
+def test_agent_span_stats_ungrouped_all_time(ch_server):
+    """Ungrouped >31-day request with the whole range as one bucket returns a
+    single row of all-time totals (no range-cap rejection).
+
+    Mirrors the client recipe: start=epoch, end=now, granularity=now-epoch.
+    Time buckets anchor to the epoch origin, so this is the range that
+    collapses to exactly one bucket.
+    """
+    project_id = _make_project_id("stats-all-time")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    # Both spans predate `now` (started_at < end is exclusive) and one is far
+    # past MAX_AGENT_STATS_RANGE_DAYS.
+    recent = now - datetime.timedelta(minutes=1)
+    old = now - datetime.timedelta(days=100)
+
+    spans = [
+        _make_span(project_id, started_at=recent),
+        _make_span(project_id, started_at=old),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=epoch,
+            end=now,
+            granularity=int((now - epoch).total_seconds()) + 1,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+        )
+    )
+
+    assert len(res.rows) == 1
+    assert res.rows[0]["count_spans"] == 2
+
+
 def test_agent_span_stats_numeric_value_buckets(ch_server):
     """Stats API can bucket the full filtered span set by numeric value range."""
     project_id = _make_project_id("stats_hist")
@@ -1571,6 +1614,59 @@ def test_message_search_shared_digest_across_spans(ch_server):
     # Both occurrences share a single content_digest
     digests = {m.content_digest for r in res.results for m in r.matched_messages}
     assert len(digests) == 1
+
+
+def test_message_search_trace_id_full_content(ch_server):
+    """Structured retrieval: empty query + trace_id + full_content returns the
+    trace's user/assistant/system messages untruncated, excluding tool roles.
+    This is the path the agent scoring fallback uses.
+    """
+    project_id = _make_project_id("search_trace_full")
+    trace_id = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    long_text = "x" * 600  # exceeds the 500-char preview cap
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="chat",
+            started_at=now,
+            system_instructions=["be helpful"],
+            input_messages=[NormalizedMessage(role="user", content=long_text)],
+            output_messages=[NormalizedMessage(role="assistant", content="hi")],
+        ),
+        # A tool span in the same trace — its tool_result row must be filtered out.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="execute_tool",
+            started_at=now + datetime.timedelta(seconds=1),
+            tool_call_result="tool output",
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(
+        AgentSearchReq(
+            project_id=project_id,
+            query="",
+            trace_id=trace_id,
+            roles=["user", "assistant", "system"],
+            truncate_content=False,
+        )
+    )
+    by_role: dict[str, list[str]] = {}
+    for r in res.results:
+        for m in r.matched_messages:
+            by_role.setdefault(m.role, []).append(m.content_preview)
+
+    assert by_role["user"] == [long_text]  # full content, not the 500-char preview
+    assert by_role["assistant"] == ["hi"]
+    assert by_role["system"] == ["be helpful"]
+    assert "tool_result" not in by_role  # excluded by the roles filter
 
 
 def test_message_search_indexes_tool_calls(ch_server):

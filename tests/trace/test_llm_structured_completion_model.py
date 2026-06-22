@@ -18,6 +18,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     cast_to_message,
     cast_to_message_list,
     parse_params_to_litellm_params,
+    parse_response,
 )
 
 
@@ -435,6 +436,56 @@ def test_llm_structured_completion_model_predict_error_handling(mock_get_client)
         RuntimeError, match="Failed to extract message from LLM response"
     ):
         model.predict(user_input="Test")
+
+
+def test_parse_response_user_facing_errors():
+    """Guards in `parse_response` should surface user-actionable messages.
+
+    Replaces raw Python TypeError/JSONDecodeError when the LLM returns no
+    content or unparseable content. These were the top sources of
+    scoring-worker error noise (WB-34500).
+    """
+    # API-level error: still RuntimeError (unchanged contract).
+    with pytest.raises(RuntimeError, match="LLM API returned an error"):
+        parse_response({"error": "rate limit exceeded"}, "text")
+
+    # Missing choices -> clear ValueError instead of KeyError.
+    with pytest.raises(ValueError, match="missing 'choices'"):
+        parse_response({"some": "other"}, "json_object")
+
+    # Choice without a message dict -> TypeError (wrong shape).
+    with pytest.raises(TypeError, match="did not contain a message dict"):
+        parse_response({"choices": [{"finish_reason": "stop"}]}, "text")
+
+    # Text response with None content -> ValueError instead of returning None.
+    with pytest.raises(ValueError, match="content is None"):
+        parse_response({"choices": [{"message": {"content": None}}]}, "text")
+
+    # json_object with None content -> ValueError instead of TypeError on json.loads(None).
+    with pytest.raises(ValueError, match="empty when JSON output was requested"):
+        parse_response({"choices": [{"message": {"content": None}}]}, "json_object")
+
+    # json_object with empty string -> same ValueError (not JSONDecodeError).
+    with pytest.raises(ValueError, match="empty when JSON output was requested"):
+        parse_response({"choices": [{"message": {"content": "   "}}]}, "json_object")
+
+    # json_object with non-JSON string -> ValueError with content snippet.
+    with pytest.raises(ValueError, match="not valid JSON"):
+        parse_response(
+            {"choices": [{"message": {"content": "I think the answer is 42"}}]},
+            "json_object",
+        )
+
+
+def test_parse_response_happy_paths():
+    """`parse_response` returns the content / parsed JSON unchanged on good input."""
+    assert (
+        parse_response({"choices": [{"message": {"content": "hello"}}]}, "text")
+        == "hello"
+    )
+    assert parse_response(
+        {"choices": [{"message": {"content": '{"a": 1}'}}]}, "json_object"
+    ) == {"a": 1}
 
 
 def test_prepare_llm_messages():

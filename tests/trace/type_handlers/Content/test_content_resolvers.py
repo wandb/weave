@@ -215,7 +215,8 @@ def extensionless_png_file(tmp_path_factory, png_bytes) -> Path:
 BUFFER_CASES = [
     ("png_bytes", "image/png"),
     ("jpeg_bytes", "image/jpeg"),
-    ("wav_bytes", "audio/x-wav"),
+    # libmagic detects audio/x-wav; normalized to canonical audio/wav.
+    ("wav_bytes", "audio/wav"),
     ("pdf_bytes", "application/pdf"),
     ("gif_bytes", "image/gif"),
 ]
@@ -269,7 +270,8 @@ class TestResolverDetectFromBuffer:
 FILE_CASES = [
     ("png_file", "image/png", ".png"),
     ("jpeg_file", "image/jpeg", ".jpg"),
-    ("wav_file", "audio/x-wav", ".wav"),
+    # libmagic detects audio/x-wav; normalized to canonical audio/wav.
+    ("wav_file", "audio/wav", ".wav"),
     ("pdf_file", "application/pdf", ".pdf"),
 ]
 
@@ -400,7 +402,7 @@ class TestGetMimeAndExtension:
             mimetype=None,
             extension=None,
             filename="music.mp3",  # mimetypes says audio/mpeg
-            buffer=wav_bytes,  # buffer says audio/x-wav
+            buffer=wav_bytes,  # buffer would detect audio/wav
         )
         # Filename-based detection should win
         assert mime == "audio/mpeg"
@@ -410,7 +412,7 @@ class TestGetMimeAndExtension:
         [
             ("png_bytes", "image/png"),
             ("pdf_bytes", "application/pdf"),
-            ("wav_bytes", "audio/x-wav"),
+            ("wav_bytes", "audio/wav"),
             ("jpeg_bytes", "image/jpeg"),
         ],
     )
@@ -563,7 +565,8 @@ class TestContentIntegration:
 
     def test_from_path_wav(self, resolver_backend, wav_file):
         c = Content.from_path(wav_file)
-        assert c.mimetype in {"audio/x-wav", "audio/wav"}
+        # Detected audio/x-wav is normalized to canonical audio/wav.
+        assert c.mimetype == "audio/wav"
         assert c.extension == ".wav"
 
     def test_from_bytes_with_extension(self, resolver_backend, png_bytes):
@@ -577,6 +580,7 @@ class TestContentIntegration:
         assert c.mimetype == "application/pdf"
 
     def test_from_bytes_mimetype_only(self, resolver_backend, wav_bytes):
+        # Explicit caller mimetype is preserved; only detected types are normalized.
         c = Content.from_bytes(wav_bytes, mimetype="audio/x-wav")
         assert c.mimetype == "audio/x-wav"
         assert c.extension is not None  # should be resolved from mimetype

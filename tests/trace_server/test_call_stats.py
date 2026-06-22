@@ -12,7 +12,8 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import client_is_clickhouse
+from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import (
@@ -34,11 +35,11 @@ def force_merge_calls(client: weave_client.WeaveClient):
     ClickHouse merges ReplacingMergeTree rows asynchronously. In tests, we write
     and immediately query, so rows may not be merged yet. This forces a merge.
     """
-    if client_is_sqlite(client):
+    if not client_is_clickhouse(client):
+        # Only a real ClickHouse backend has async merges to force.
         return
-    # Access the underlying ClickHouse client
     ch_client = client.server._next_trace_server.ch_client
-    ch_client.command("OPTIMIZE TABLE calls_merged FINAL")
+    force_optimize_calls_merged(ch_client)
 
 
 def create_call_with_usage(

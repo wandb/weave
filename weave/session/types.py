@@ -241,14 +241,16 @@ class Reasoning(BaseModel):
 
 
 class MediaAttachment(BaseModel):
-    """A media attachment on an LLM call."""
+    """A media attachment on an LLM call.
 
-    kind: Literal["blob", "uri", "file"]
+    Always holds a ``weave://`` content ref URI.  Raw bytes, data-URLs,
+    and plain HTTP URIs are converted to a published ``Content`` object
+    by ``LLM.attach_media`` before being stored here.
+    """
+
+    ref: str
     modality: str = ""
     mime_type: str = ""
-    content: bytes | str = ""
-    uri: str = ""
-    file_id: str = ""
 
 
 class LogResult(BaseModel):
