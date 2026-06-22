@@ -30,6 +30,14 @@ ROW_COUNT_CHUNKING_THRESHOLD = 1000
 # parsed, the same cheap-header pattern RequestSizeLimitMiddleware already uses.
 TRACE_ID_HEADER = "X-Weave-Trace-Id"
 
+# Request header advertising the sampling-relevant capabilities this SDK build
+# guarantees, so a future server-side ingest sampler can tell a sampling-safe
+# client from an older one and leave unsupported traffic unsampled. Sent on
+# every request (it describes the client, not one trace); a comma-separated,
+# forward-compatible token list.
+CLIENT_CAPABILITIES_HEADER = "X-Weave-Client-Capabilities"
+CLIENT_CAPABILITIES = "trace_id_on_end,eval_child_meta"
+
 # Fixed wait between 404 retries. Short, because eventual-consistency windows
 # on reads-after-write are typically sub-second; longer waits just pad latency
 # when the object is genuinely missing.
