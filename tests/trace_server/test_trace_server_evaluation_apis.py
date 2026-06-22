@@ -8,7 +8,6 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
@@ -277,7 +276,6 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
     return model_ref_uri, evaluation_ref_uri
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
     """Test the evaluate_model API endpoint with isolated execution.
