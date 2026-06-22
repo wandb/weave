@@ -4,16 +4,12 @@
 sources. Shared invariants: deterministic ids, soft-delete tombstones,
 idempotent relink, and read-side dedup via GROUP BY + argMax (never FINAL).
 
-ARCHITECTURE NOTE: this module deliberately owns NO SQL against tables it does
-not own. Existence/cached-field fetches for the source entities live in their
-owners' builders:
-  - calls: ``make_queue_add_calls_fetch_calls_query`` (annotation_queues builder,
-    which queries the calls_merged / calls_complete tables the calls feature owns)
-  - spans: ``make_spans_existence_query`` (agent_query_builder)
-This module only builds SQL against the ``dataset_sources`` table itself.
+This module owns NO SQL against tables it does not own — source-entity
+existence/cached-field fetches live in their owners' builders (calls:
+``make_queue_add_calls_fetch_calls_query``; spans: ``make_spans_existence_query``).
 
 Every SELECT here collapses ReplacingMergeTree versions with
-``GROUP BY <logical key>`` + ``argMax(col, (updated_at, id))`` — NEVER ``FINAL``
+``GROUP BY <logical key>`` + ``argMax(col, updated_at)`` — NEVER ``FINAL``
 (benchmarked ~100x slower). All user-supplied values go through ``ParamBuilder``;
 no f-string interpolation of user data.
 """
@@ -22,13 +18,14 @@ from __future__ import annotations
 
 import uuid
 
-from weave.trace_server.calls_query_builder.calls_query_builder import (
-    _format_table_name_with_cluster,
-)
 from weave.trace_server.orm import ParamBuilder
 
-# Stable namespace for deterministic UUIDv5 link ids. Generated once and frozen;
-# changing this would re-key every existing link and break idempotent relink.
+# Stable namespace for deterministic UUIDv5 link ids. UUIDv5 is name-based (a
+# hash of namespace + key), so the same logical key always yields the same id —
+# that determinism is what makes relink idempotent. v4 (random) and v7
+# (time-ordered) are non-deterministic and unusable here.
+# Generated once and frozen; changing this would re-key every existing link and
+# break idempotent relink.
 # The KEY COMPOSITION is frozen too: the set and order of fields hashed into the
 # id (see deterministic_link_id) — including source_trace_id — must not change,
 # or existing links would re-key.
@@ -79,10 +76,23 @@ def deterministic_link_id(
     For ``conversation`` and (redundantly) ``call`` the trace is not part of the
     natural identity; callers pass ``""`` for conversation links and the
     call_id-unique value is harmless for calls — the key stays uniform.
+
+    Each field is length-prefixed (``<len>:<value>``) before hashing rather than
+    joined by a separator: a value that itself contains the separator (e.g.
+    ``project_id`` is ``entity/project``) could otherwise shift a field boundary
+    and collide with a different logical key. The length prefix makes the
+    encoding injective over the tuple regardless of field contents.
     """
-    name = (
-        f"{project_id}/{dataset_object_id}/{row_digest}/{source_kind}/{source_id}"
-        f"/{source_trace_id}"
+    name = "".join(
+        f"{len(part)}:{part}"
+        for part in (
+            project_id,
+            dataset_object_id,
+            row_digest,
+            source_kind,
+            source_id,
+            source_trace_id,
+        )
     )
     return str(uuid.uuid5(DATASET_SOURCE_LINK_NAMESPACE, name))
 
@@ -102,13 +112,12 @@ _ARGMAX_PAYLOAD_COLUMNS = [
 
 
 def _argmax_select(columns: list[str]) -> str:
-    """Build ``argMax(ds.col, (ds.updated_at, ds.id)) AS col`` per payload column.
+    """Build ``argMax(ds.col, ds.updated_at) AS col`` per payload column.
 
-    Note: ``id`` itself is resolved with argMax over ``updated_at`` only (it is
-    part of the version-tiebreaker tuple and constant within a logical key, so
-    ``argMax(id, updated_at)`` is well defined). Every other column uses the
-    full ``(updated_at, id)`` tiebreaker so two versions sharing an updated_at
-    resolve deterministically.
+    The version tiebreaker is ``updated_at`` alone. ``id`` is a pure function of
+    the logical key (the GROUP BY key), so it is identical for every version in
+    a group and cannot break a tie — including it in the tiebreaker would be a
+    no-op.
 
     Column references are qualified with the ``ds`` table alias because the
     output aliases (``AS updated_at``, ``AS id``) would otherwise shadow the
@@ -121,12 +130,7 @@ def _argmax_select(columns: list[str]) -> str:
     correct — there are no NULLs for the aggregate to skip, and the latest
     version's value (sentinel included) always wins.
     """
-    parts = []
-    for col in columns:
-        if col == "id":
-            parts.append("argMax(ds.id, ds.updated_at) AS id")
-        else:
-            parts.append(f"argMax(ds.{col}, (ds.updated_at, ds.id)) AS {col}")
+    parts = [f"argMax(ds.{col}, ds.updated_at) AS {col}" for col in columns]
     return ",\n            ".join(parts)
 
 
@@ -316,10 +320,18 @@ def make_source_datasets_select(
       - inner: collapse versions per logical key (argMax deleted_at, carry
         created_at). include_deleted=False drops collapsed-deleted rows here.
       - outer: group by (source_kind, source_id, source_trace_id,
-        dataset_object_id), capping row_digests at ``row_digests_cap`` via
-        groupArray(N)(...), and report the true total + truncation flag +
-        earliest first_seen_at.
+        dataset_object_id), capping row_digests at ``row_digests_cap`` and
+        reporting the true total + earliest first_seen_at.
+
+    The capped ``row_digests`` use ``groupArraySorted(cap)(row_digest)`` so the
+    truncated subset is both deterministic (the N lexicographically-smallest
+    digests) and memory-bounded to ``cap`` during aggregation — a bare
+    ``groupArray(N)`` keeps an arbitrary N, and ``arraySort(groupArray(...))``
+    would materialize the whole set before truncating.
     """
+    if not sources:
+        raise ValueError("sources must be non-empty")
+
     project_param = pb.add(project_id, param_type="String")
 
     source_ids = sorted({sid for _, sid, _ in sources})
@@ -343,7 +355,7 @@ def make_source_datasets_select(
     # HAVING intentionally references the collapsed alias (argMax output).
     inner_having = "" if include_deleted else "HAVING deleted_at = toDateTime64(0, 3)"
 
-    # groupArray(N) requires N as a parametric literal (not a query-bound
+    # groupArraySorted(N) requires N as a parametric literal (not a query-bound
     # parameter). row_digests_cap is a server-controlled constant
     # (MAX_ROW_DIGESTS_PER_RESULT), never user input, so coerce to a bounded
     # int and inline it.
@@ -357,7 +369,7 @@ def make_source_datasets_select(
             source_id,
             source_trace_id,
             dataset_object_id,
-            groupArray({cap_literal})(row_digest) AS row_digests,
+            groupArraySorted({cap_literal})(row_digest) AS row_digests,
             count() AS row_digests_total_count,
             min(created_at) AS first_seen_at
         FROM (
@@ -368,8 +380,8 @@ def make_source_datasets_select(
                 ds.source_kind,
                 ds.source_id,
                 ds.source_trace_id,
-                argMax(ds.created_at, (ds.updated_at, ds.id)) AS created_at,
-                argMax(ds.deleted_at, (ds.updated_at, ds.id)) AS deleted_at
+                argMax(ds.created_at, ds.updated_at) AS created_at,
+                argMax(ds.deleted_at, ds.updated_at) AS deleted_at
             FROM dataset_sources AS ds
             WHERE ds.project_id = {project_param}
                 AND ds.source_id IN {source_ids_param}
@@ -383,13 +395,9 @@ def make_source_datasets_select(
     """
 
 
-# Re-export so callers can format the local mutation table name if ever needed
-# (dataset_sources never mutates — insert-only — but keep symmetry with the
-# annotation_queues builder which exposes the same helper).
 __all__ = [
     "DATASET_SOURCES_INSERT_COLUMNS",
     "DATASET_SOURCE_LINK_NAMESPACE",
-    "_format_table_name_with_cluster",
     "deterministic_link_id",
     "make_dataset_sources_select",
     "make_link_state_by_ids_query",

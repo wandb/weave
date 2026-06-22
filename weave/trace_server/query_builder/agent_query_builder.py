@@ -1421,6 +1421,11 @@ def make_spans_existence_query(
     ``trace_id IN (...)`` and ``span_id IN (...)`` supersets (both bloom-indexed)
     and let the caller match exact pairs — the candidate set is bounded by the
     request size.
+
+    Aggregate column references are qualified with the ``spans`` table name so
+    the ``AS span_name`` / ``AS started_at`` output aliases cannot shadow the
+    raw columns inside the aggregate arguments (ClickHouse would otherwise risk
+    ILLEGAL_AGGREGATION) — same defensive pattern as the dataset_sources reads.
     """
     pid = pb.add(project_id, param_type="String")
     trace_ids = sorted({tid for tid, _ in span_keys})
@@ -1431,8 +1436,8 @@ def make_spans_existence_query(
         SELECT
             trace_id,
             span_id,
-            argMax(span_name, created_at) AS span_name,
-            argMax(started_at, created_at) AS started_at
+            argMax(spans.span_name, spans.created_at) AS span_name,
+            argMax(spans.started_at, spans.created_at) AS started_at
         FROM spans
         WHERE project_id = {pid}
           AND trace_id IN {trace_ids_slot}
