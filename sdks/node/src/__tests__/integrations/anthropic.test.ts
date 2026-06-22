@@ -2,17 +2,6 @@ import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {commonPatchAnthropic} from '../../integrations/anthropic';
 import {initWithCustomTraceServer} from '../clientMock';
 
-// Helper function to get calls
-async function getCalls(traceServer: InMemoryTraceServer, projectId: string) {
-  const calls = await traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-      limit: 100,
-    })
-    .then(result => result.calls);
-  return calls;
-}
-
 // Mock Anthropic SDK
 function createMockAnthropic() {
   const mockMessages = {
@@ -203,7 +192,7 @@ function createMockAnthropic() {
 }
 
 describe('Anthropic Integration', () => {
-  let inMemoryTraceServer: InMemoryTraceServer;
+  let traceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
   let mockAnthropic: any;
   let MockMessages: any;
@@ -211,8 +200,8 @@ describe('Anthropic Integration', () => {
   let patchedAnthropic: any;
 
   beforeEach(() => {
-    inMemoryTraceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(testProjectName, traceServer);
 
     const mockData = createMockAnthropic();
     mockAnthropic = mockData.mockAnthropic;
@@ -239,9 +228,6 @@ describe('Anthropic Integration', () => {
     const anthropic = new patchedAnthropic.Anthropic.Messages();
     const result = await anthropic.create(options);
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(result).toMatchObject({
       id: 'msg_123',
@@ -257,7 +243,7 @@ describe('Anthropic Integration', () => {
     });
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
     // Integration-tracking metadata is stamped on every patched call. The
@@ -302,14 +288,11 @@ describe('Anthropic Integration', () => {
       }
     }
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(collectedText).toBe('Hello! How can I help you today?');
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
     expect(calls[0].inputs).toEqual({arg0: options, self: {}});
@@ -367,14 +350,11 @@ describe('Anthropic Integration', () => {
       }
     }
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(collectedText).toBe('Hello! How can I help you today?');
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('stream');
     expect(calls[0].inputs).toMatchObject({arg1: options, self: {}});
@@ -417,9 +397,6 @@ describe('Anthropic Integration', () => {
     const batches = new patchedAnthropic.Anthropic.Messages.Batches();
     const result = await batches.create(batchOptions);
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(result).toMatchObject({
       id: 'batch_123',
@@ -428,7 +405,7 @@ describe('Anthropic Integration', () => {
     });
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
     expect(calls[0].inputs).toEqual({arg0: batchOptions, self: {}});
@@ -442,9 +419,6 @@ describe('Anthropic Integration', () => {
     const batches = new patchedAnthropic.Anthropic.Messages.Batches();
     const result = await batches.retrieve(batchId);
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(result).toMatchObject({
       id: 'batch_123',
@@ -453,7 +427,7 @@ describe('Anthropic Integration', () => {
     });
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('retrieve');
     expect(calls[0].inputs).toEqual({arg0: batchId, self: {}});
@@ -482,14 +456,11 @@ describe('Anthropic Integration', () => {
       }
     }
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check results
     expect(resultCount).toBe(1);
 
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('results');
     expect(calls[0].inputs).toEqual({arg0: batchId, self: {}});
@@ -530,11 +501,8 @@ describe('Anthropic Integration', () => {
 
     await expect(anthropic.create(options)).rejects.toThrow('API Error');
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
     expect(calls[0].inputs).toEqual({arg0: options, self: {}});
@@ -583,11 +551,8 @@ describe('Anthropic Integration', () => {
     await anthropic.create(options1);
     await anthropic.create(options2);
 
-    // Wait for pending operations to complete
-    await inMemoryTraceServer.waitForPendingOperations();
-
     // Check logged Call values
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(2);
 
     // Check first call

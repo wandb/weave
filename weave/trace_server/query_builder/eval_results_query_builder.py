@@ -159,7 +159,7 @@ def build_predict_and_score_calls_resolved_cte(
     SELECT
         predict_and_score_calls.*,
         COALESCE(
-            tr.val_dump,
+            nullIf(tr.val_dump, ''),
             JSONExtractRaw(predict_and_score_calls.inputs_dump, 'example')
         ) AS resolved_inputs
     FROM predict_and_score_calls
@@ -412,7 +412,7 @@ def build_page_rows_cte() -> str:
         predict_and_score_calls_resolved.row_digest AS row_digest,
         page_digests.row_order AS row_order,
         COALESCE(
-            page_resolved_inputs.val_dump,
+            nullIf(page_resolved_inputs.val_dump, ''),
             JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')
         ) AS resolved_inputs
     FROM predict_and_score_calls_resolved

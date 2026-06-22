@@ -4,7 +4,6 @@ from typing import Any
 
 import pytest
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import usage_utils
@@ -443,7 +442,6 @@ def test_aggregate_usage_handles_missing_summaries(
     assert_usage(leaf_id, expected_leaf)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
     project_id = client.project_id
     trace_id = str(uuid.uuid4())
@@ -496,7 +494,6 @@ def test_trace_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert child_usage.total_tokens == 7
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
     project_id = client.project_id
     trace_id = str(uuid.uuid4())
@@ -535,7 +532,6 @@ def test_trace_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
     assert usage_with_costs.completion_tokens_total_cost is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_trace_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
@@ -572,7 +568,6 @@ def test_trace_usage_returns_unfinished_call_ids(
     assert set(res.unfinished_call_ids) == {unfinished_child_id}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> None:
     project_id = client.project_id
     trace_id = str(uuid.uuid4())
@@ -635,7 +630,6 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert root_two_usage.total_tokens == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:
     project_id = client.project_id
     trace_id = str(uuid.uuid4())
@@ -674,7 +668,6 @@ def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> Non
     assert usage_with_costs.completion_tokens_total_cost is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_calls_usage_returns_unfinished_call_ids(
     client: weave_client.WeaveClient,
 ) -> None:
@@ -721,7 +714,6 @@ def test_calls_usage_returns_unfinished_call_ids(
     assert set(res.unfinished_call_ids) == {unfinished_child_id}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     ("root_usage", "middle_usage", "leaf_usage"),
     [

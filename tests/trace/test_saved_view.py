@@ -3,7 +3,6 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.flow.saved_view import (
     Filter,
     Filters,
@@ -371,7 +370,6 @@ def make_calls():
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_saved_view_column_select(client):
     make_calls()
     view = weave.SavedView("traces", "My saved view")

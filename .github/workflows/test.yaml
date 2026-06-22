@@ -134,6 +134,7 @@ jobs:
             "dspy",
             "groq",
             "google_genai",
+            "google_adk",
             "instructor",
             "langchain",
             "litellm",
@@ -194,8 +195,6 @@ jobs:
           exit 1
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install SQLite dev package
-        run: sudo apt update && sudo apt install -y libsqlite3-dev
       - name: Install Libmagic dependency package
         run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
