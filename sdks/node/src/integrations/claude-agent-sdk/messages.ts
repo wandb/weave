@@ -22,6 +22,7 @@ export type {
   SDKMessage,
   SDKResultMessage,
   SDKUserMessage,
+  SDKUserMessageReplay,
 } from '@anthropic-ai/claude-agent-sdk';
 
 // ── Usage mapping ───────────────────────────────────────────────────────

@@ -62,6 +62,7 @@ import {
   type SDKMessage,
   type SDKResultMessage,
   type SDKUserMessage,
+  type SDKUserMessageReplay,
 } from './messages';
 
 const TRACER_NAME = 'claude-agent-sdk';
@@ -217,7 +218,7 @@ export class ClaudeAgentOtelTracer {
   processMessage(msg: SDKMessage): void {
     // The SDK stamps session_id on every message; capture it once as the
     // conversation id so the root and its children all carry it.
-    const sessionId = (msg as {session_id?: string}).session_id;
+    const sessionId = msg.session_id;
     if (this.conversationId == null && sessionId) {
       this.conversationId = sessionId;
       this.invokeAgentSpan.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, sessionId);
@@ -225,10 +226,13 @@ export class ClaudeAgentOtelTracer {
 
     switch (msg.type) {
       case 'assistant':
-        this.processAssistant(msg as SDKAssistantMessage);
+        // `type: 'assistant'` already narrows msg to SDKAssistantMessage.
+        this.processAssistant(msg);
         break;
       case 'user':
-        this.processUser(msg as SDKUserMessage);
+        // `type: 'user'` narrows to SDKUserMessage | SDKUserMessageReplay; both
+        // carry `message: MessageParam`, so processUser reads either.
+        this.processUser(msg);
         break;
       default:
         break;
@@ -450,7 +454,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private processUser(msg: SDKUserMessage): void {
+  private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
     const content = Array.isArray(msg.message?.content)
       ? msg.message.content
       : [];
