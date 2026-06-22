@@ -1,7 +1,6 @@
 import datetime
 
 import pytest
-from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
 from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
@@ -12,7 +11,10 @@ from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    QueryIllegalTypeofArgumentError,
+)
 from weave.trace_server.feedback_agg_query_builder import (
     build_feedback_aggregate_query,
 )
@@ -1795,16 +1797,9 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
+@pytest.mark.disable_logging_error_check
 def test_feedback_query_contains_numeric_literal(client) -> None:
-    """Test that $contains works with numeric literals on JSON fields.
-
-    This test reproduces the ClickHouse error:
-    Illegal type Int64 of argument of function position
-
-    The issue occurs when using $contains with a numeric literal on a JSON field.
-    The query builder should convert the numeric literal to a string for the
-    position function, not cast it to an integer type.
-    """
+    """$contains with a numeric literal raises a guided error; string substr works."""
     project_id = client.project_id
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
 
@@ -1817,12 +1812,10 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     )
     client.server.feedback_create(feedback_req)
 
-    # Query for feedback where dataset_id contains the numeric literal 94
-    # This should work but currently fails with:
-    # "Illegal type Int64 of argument of function position"
+    # A numeric literal on a JSON field surfaces a guided error pointing at $convert.
     with pytest.raises(
-        DatabaseError,
-        match="Illegal type Int64 of argument of function position",
+        QueryIllegalTypeofArgumentError,
+        match="Illegal type of argument in query",
     ):
         client.server.feedback_query(
             FeedbackQueryReq(
