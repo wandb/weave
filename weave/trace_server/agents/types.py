@@ -632,8 +632,22 @@ class AgentConversationSpan(BaseModel):
     duration_ms: int
 
 
+# Feedback types this endpoint surfaces: human tags (agent_user_feedback) and
+# scorer tags + ratings (agent_monitor). Other feedback types are ignored.
+AgentSpanFeedbackType = Literal["wandb.agent_user_feedback", "wandb.agent_monitor"]
+
+
+class AgentConversationSpanScore(BaseModel):
+    """One numeric score (rating) applied to a turn or conversation."""
+
+    name: str
+    value: float
+    reason: str | None = None
+    confidence: float | None = None
+
+
 class AgentConversationSpanFeedback(BaseModel):
-    """A feedback marker for a conversation's trace.
+    """Tags and scores applied to a conversation's turn (or the conversation).
 
     Positioned client-side by matching `trace_id` (turn) against the spans;
     `trace_id` is None for conversation-level feedback.
@@ -642,11 +656,15 @@ class AgentConversationSpanFeedback(BaseModel):
     trace_id: str | None = Field(
         description="The turn this feedback is anchored to; None for conversation-level."
     )
-    feedback_type: str
+    feedback_type: AgentSpanFeedbackType
     tags: list[str] = Field(
         default_factory=list,
         description="Arbitrary descriptive tags applied to this feedback.",
         examples=[["\U0001f44d"]],
+    )
+    scores: list[AgentConversationSpanScore] = Field(
+        default_factory=list,
+        description="Numeric scores (ratings) applied to this feedback.",
     )
 
 
