@@ -41,7 +41,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
     // Integration-tracking metadata is stamped on calls this adapter
     // produces. Match by name rather than by index, since a realtime trace
     // can contain other calls.
-    const stamped = calls.map(c => c.attributes?.integration).filter(Boolean);
+    const stamped = calls.map(c => c.attributes.integration).filter(Boolean);
     const mine = stamped.filter(i => i.name === 'openai_agents_realtime');
     expect(mine.length).toBeGreaterThan(0);
     expect(
