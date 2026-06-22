@@ -18,6 +18,7 @@ export type {GetCallsOptions} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
+  wrapClaudeAgentSdk,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
   patchRealtimeSession,

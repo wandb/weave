@@ -1,7 +1,10 @@
 import {SpanStatusCode} from '@opentelemetry/api';
 
 import {ATTR_GEN_AI_INPUT_MESSAGES} from '../../genai/semconv';
-import {patchClaudeAgentSdk} from '../../integrations/claudeAgentSdk';
+import {
+  patchClaudeAgentSdk,
+  wrapClaudeAgentSdk,
+} from '../../integrations/claudeAgentSdk';
 import {toWeaveUsage} from '../../integrations/claude-agent-sdk/messages';
 import {
   clearGlobalClient,
@@ -237,6 +240,43 @@ describe('Claude Agent SDK — query() patch', () => {
     }
     expect(seen).toEqual(['assistant', 'result']);
 
+    expect(findSpan(getExporter().getFinishedSpans(), INVOKE)).toBeDefined();
+  });
+
+  test('wrapClaudeAgentSdk() returns a traced module view for manual instrumentation', async () => {
+    // The public manual-instrumentation entry point. Mirrors a user reaching
+    // for it when the auto-instrumentation hooks don't fire: they import the
+    // module and wrap it themselves. The SDK's `query` is a getter-only export,
+    // so callers must use the returned view rather than the original binding.
+    const messages = [
+      {
+        type: 'assistant',
+        message: {model: 'claude-x', content: [{type: 'text', text: 'hi'}]},
+      },
+      {type: 'result', subtype: 'success', is_error: false, result: 'done'},
+    ];
+    const realQuery = (_args: any) => {
+      async function* gen() {
+        for (const m of messages) {
+          yield m;
+        }
+      }
+      return gen() as any;
+    };
+    const mod: any = {};
+    Object.defineProperty(mod, '__esModule', {value: true});
+    Object.defineProperty(mod, 'query', {
+      get: () => realQuery,
+      enumerable: true,
+    });
+
+    const {query} = wrapClaudeAgentSdk(mod);
+
+    const seen: string[] = [];
+    for await (const m of query({prompt: 'hi there'})) {
+      seen.push(m.type);
+    }
+    expect(seen).toEqual(['assistant', 'result']);
     expect(findSpan(getExporter().getFinishedSpans(), INVOKE)).toBeDefined();
   });
 });

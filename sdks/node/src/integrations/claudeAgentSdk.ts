@@ -24,6 +24,9 @@ import type {SDKMessage, SDKResultMessage} from './claude-agent-sdk/messages';
 // invocations (e.g. CJS + ESM both firing) don't double-wrap.
 const PATCHED = Symbol.for('weave.claudeAgentSdk.patched');
 
+/** Minimum `@anthropic-ai/claude-agent-sdk` version this integration supports. */
+const SUPPORTED_VERSION_RANGE = '>= 0.3.178';
+
 type QueryFn = (args: {prompt?: unknown; [k: string]: unknown}) => unknown;
 
 /** The async generator protocol members we serve from our traced wrapper. */
@@ -169,23 +172,46 @@ export function patchClaudeAgentSdk(exports: any): any {
 }
 
 /**
- * Register automatic instrumentation for `@anthropic-ai/claude-agent-sdk`.
- * Called once from `integrations/hooks.ts`.
+ * Manually instrument the `@anthropic-ai/claude-agent-sdk` module. Reach for
+ * this when automatic instrumentation doesn't apply — e.g. a bundler whose
+ * module loading the CJS/ESM hooks can't observe, or an import path they don't
+ * cover. Returns a view of the module whose `query` export is traced; use the
+ * returned object rather than the original import (the SDK's `query` is a
+ * getter-only export, so the original binding can't be patched in place):
+ *
+ * @example
+ * import * as claudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
+ * import { wrapClaudeAgentSdk } from 'weave';
+ *
+ * const { query } = wrapClaudeAgentSdk(claudeAgentSdk);
+ * for await (const message of query({ prompt: 'hi' })) {
+ *   // ...traced
+ * }
+ */
+export function wrapClaudeAgentSdk<T>(sdk: T): T {
+  return patchClaudeAgentSdk(sdk);
+}
+
+/**
+ * Register automatic instrumentation for `@anthropic-ai/claude-agent-sdk`,
+ * called once from `integrations/hooks.ts`.
+ *
+ * Requires `@anthropic-ai/claude-agent-sdk` >= 0.3.178 — the version whose
+ * message/usage shape this integration was validated against (camelCase
+ * `modelUsage`, the result `subtype` enum, structured `system` messages).
+ * Older 0.3.x builds are passed through untraced rather than risk a
+ * silently-wrong span shape.
  */
 export function instrumentClaudeAgentSdk(): void {
-  // Floor pinned to the version whose message/usage shape this integration was
-  // validated against (camelCase `modelUsage`, result `subtype` enum, structured
-  // `system` messages) — the same version carried as a devDependency. Older
-  // 0.3.x builds pass through untraced rather than risk a silently-wrong shape.
   addCJSInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
     subPath: 'sdk.mjs',
-    version: '>= 0.3.178',
+    version: SUPPORTED_VERSION_RANGE,
     hook: patchClaudeAgentSdk,
   });
   addESMInstrumentation({
     moduleName: '@anthropic-ai/claude-agent-sdk',
-    version: '>= 0.3.178',
+    version: SUPPORTED_VERSION_RANGE,
     hook: patchClaudeAgentSdk,
   });
 }
