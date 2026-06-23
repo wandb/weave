@@ -116,3 +116,13 @@ clean-restack path would have dropped them).
 
 Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
 slice 01 5).
+
+---
+## Session addendum — review pass: drop ! (2026-06-23)
+
+Comment 1: every `.find()`-derived span in this slice now goes through the
+`requireSpan` helper, dropping all `!` non-null assertions and the redundant
+`expect(x).toBeDefined()` lines — runner_agent root (slice 05 switched this test
+to `.find()` for the hierarchy), tool/hierarchy root+agentSpan, nests-sub-agents
+root/pipeline/first/second (via the `byAgent` closure, now requireSpan-wrapped),
+and outside_agent. Validated: jest 24 pass.
