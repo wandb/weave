@@ -53,3 +53,9 @@ def leaderboard_path(entity_name: str, project_name: str, object_name: str) -> s
 
 def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
     return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
+
+
+def agent_conversation_path(
+    entity_name: str, project_name: str, conversation_id: str
+) -> str:
+    return f"{project_weave_root_url(entity_name, project_name)}/agents/conversations/{quote(conversation_id)}"

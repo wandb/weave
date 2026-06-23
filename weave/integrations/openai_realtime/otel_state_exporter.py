@@ -1,19 +1,14 @@
 """OTel GenAI export for the OpenAI Realtime integration.
 
-This is the OTel-native sibling of ``state_exporter.StateExporter``. It reuses
-*all* of the parent's delta-accumulation machinery — audio buffering, item
-threading, per-item timing, transcript gating, and FIFO response ordering —
-and overrides only the single export seam (``_emit_response``) so the same
-compiled ``inputs`` / ``output_dict`` / ``summary`` are emitted as
-OpenTelemetry GenAI spans to Weave's Agents tab instead of legacy Weave calls.
+The OTel-native sibling of ``StateExporter``: it inherits the parent's
+delta-accumulation machinery (audio buffering, item threading, transcript
+gating, FIFO response ordering) and overrides only ``_emit_response`` to emit
+the compiled response as OpenTelemetry GenAI spans rather than legacy Weave
+calls. Selected when ``WEAVE_USE_OTEL_V2`` is set (the default), like
+``claude_agent_sdk`` and ``openai_agents``.
 
-The dispatcher selects this variant when ``WEAVE_USE_OTEL_V2`` is set (the
-default), mirroring ``claude_agent_sdk`` and ``openai_agents``. Spans are
-created via ``otel_trace.get_tracer(...)`` and ride the global OTel
-``TracerProvider`` configured by ``weave.init()`` (``_setup_session_tracing``),
-which exports to ``/agents/otel/v1/traces``.
-
-Span tree — one per realtime session:
+The realtime API is speech-to-speech, so each ``response.done`` is one model
+generation and maps to one ``chat`` span:
 
     invoke_agent {agent_name}     # session root; ended on connection close
     ├── chat {model}              # one per response.done
@@ -21,21 +16,12 @@ Span tree — one per realtime session:
     ├── chat {model}
     └── chat {model}
 
-The realtime API is speech-to-speech: each ``response.done`` is one model
-generation, so it maps to one ``chat`` span. Two distinct concerns:
+Spans are grouped into one trace per realtime session (the websocket
+connection); ``gen_ai.conversation.id`` carries the API's conversation_id,
+falling back to the session id when absent (e.g. Beta).
 
-- **Tree grouping** is by the realtime **session** (the websocket connection,
-  ``session.id``) — the stable identifier for a whole voice call — so all of a
-  session's chat spans nest under one ``invoke_agent`` root in one trace.
-- **``gen_ai.conversation.id``** carries the realtime **conversation_id** when
-  the API supplies one (the semantically correct conversation identifier),
-  falling back to the session id only when it is absent (e.g. Beta).
-
-This path has no notion of legacy Weave "threads" / ``thread_id``.
-
-Audio (user speech in, model speech out) is published as a Weave ``Content``
-object and referenced from the message by a ``weave://`` URI ``UriPart``
-(plus ``weave.content_refs``), exactly as the Session SDK handles media.
+Audio is published as a Weave ``Content`` object and referenced from the
+message by a ``weave://`` ``UriPart``, as the Session SDK handles media.
 """
 
 from __future__ import annotations
@@ -72,6 +58,8 @@ from weave.session.types import (
     UriPart,
     Usage,
 )
+from weave.trace import urls
+from weave.trace.context.weave_client_context import get_weave_client
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +118,8 @@ def _as_arg_string(val: Any) -> str:
 class OTelStateExporter(StateExporter):
     """``StateExporter`` that exports compiled responses as OTel GenAI spans.
 
-    Only the export-time methods are overridden; every event handler that
-    accumulates state is inherited unchanged. The two audio-resolution hooks
-    (``_resolve_audio`` / ``_extract_audio_content``) are neutralized so the
+    Only the export seam is overridden; the state-accumulating event handlers
+    are inherited unchanged. The audio-resolution hooks are neutralized so the
     compiled payloads keep raw item dicts — this exporter reconstructs audio
     from the parent's buffers and publishes it to ``weave://`` refs itself.
     """
@@ -167,9 +154,9 @@ class OTelStateExporter(StateExporter):
         self._store_session(msg)
 
     def handle_response_created(self, msg: dict) -> None:
-        # Record creation timing (used as the chat span start) but do NOT
-        # create a conversation call — the OTel root span is created lazily
-        # in _emit_response so it can carry semconv attributes.
+        # Record creation timing for the chat span start. Unlike the parent we
+        # create no call here; the root span is built lazily in _emit_response
+        # so it can carry semconv attributes.
         self.pending_response = msg.get("response")
         response = self.pending_response or {}
         response_id = response.get("id")
@@ -179,8 +166,7 @@ class OTelStateExporter(StateExporter):
             )
 
     # ------------------------------------------------------------------
-    # Audio hooks — neutralized so the compiled payloads stay raw. This
-    # exporter pulls audio bytes from the parent buffers and publishes them.
+    # Audio hooks — neutralized; this exporter publishes audio itself.
     # ------------------------------------------------------------------
     def _resolve_audio(self, msg: dict) -> Any:
         return msg
@@ -321,13 +307,11 @@ class OTelStateExporter(StateExporter):
         model: str,
         created_at: datetime.datetime | None,
     ) -> Any:
-        """Return the open ``invoke_agent`` root span for a realtime session.
+        """Return the ``invoke_agent`` root span for the session, creating it on
+        first use.
 
-        Created lazily on the first response and held open until the connection
-        closes (``on_exit``), so every ``chat`` of the session nests under one
-        root (``group_key`` is the session-scoped grouping key). The root's
-        ``gen_ai.conversation.id`` is the realtime conversation_id when
-        available, established from the first response of the session.
+        Held open until the connection closes (``on_exit``) so every ``chat``
+        of the session nests under one root.
         """
         with self._otel_lock:
             existing = self._session_root_spans.get(group_key)
@@ -349,7 +333,19 @@ class OTelStateExporter(StateExporter):
             self._session_root_spans[group_key] = root
             if created_at:
                 self._session_last_activity[group_key] = created_at
-            return root
+        # Log outside the lock; this runs once, when the root is first created.
+        self._log_conversation_link(conversation_id)
+        return root
+
+    def _log_conversation_link(self, conversation_id: str) -> None:
+        """Log a link to this conversation's page in the Weave UI, once."""
+        client = get_weave_client()
+        if not conversation_id or client is None:
+            return
+        url = urls.agent_conversation_path(
+            client.entity, client.project, conversation_id
+        )
+        logger.info("View realtime conversation at %s", url)
 
     def _emit_response(
         self,
@@ -397,17 +393,11 @@ class OTelStateExporter(StateExporter):
         session = self.session_span.get_session() if self.session_span else None
         model = (session or {}).get("model") or "unknown"
 
-        # gen_ai.conversation.id priority (semantic-convention first):
-        #   1. realtime conversation_id  — the spec-correct conversation id, and
-        #      what lands in the `conversation_id` column the agents tab groups on
-        #   2. realtime session id       — fallback only. The `spans` table has
-        #      `conversation_id` + `conversation_name` but NO dedicated session
-        #      column (verified against the schema), so the session id has no
-        #      other home; it backstops conversation_id when the API omits one
-        #      (e.g. Beta).
-        # Tree grouping is independent: the span tree is always rooted per
-        # SESSION (the websocket call) so the whole voice call is one trace,
-        # regardless of which value ends up in conversation.id.
+        # gen_ai.conversation.id prefers the realtime conversation_id (the
+        # spec-correct id, and what the agents tab groups on), falling back to
+        # the session id when the API omits one (e.g. Beta) — the spans table
+        # has no dedicated session column. Tree grouping is independent: it is
+        # always rooted per session, so the whole voice call is one trace.
         session_id = (session or {}).get("id") or ""
         group_key = session_id or conv_id or response_id or "default"
         conversation_id = conv_id or session_id or ""
