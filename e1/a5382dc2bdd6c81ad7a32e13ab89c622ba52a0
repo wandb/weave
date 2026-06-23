@@ -1,0 +1,53 @@
+## Conversation
+User wants a stack of small PRs that drives the import-linter ignore_imports
+backlogs (in pyproject.toml) to zero, to decouple weave.trace_server + workers
+from the client SDK so they can move to the core repo. HARD CONSTRAINT: NO
+shared helper / neutral package (a shared module would still couple the moved
+server to the client repo). Each PR removes 1-5 ignore edges. "Use no-mistakes".
+
+This is PR1 of the stack (Contract A: trace_server -> client leaks).
+
+## Actions
+- Mapped all 3 contracts' ignores; consulted Codex (threadId
+  019ef527-0213-77e2-8b10-dd3e836ae809) on strategy. Codex confirmed: two
+  independent copies (duplicate/vendor) is the only correct resolution given
+  the no-shared-helper constraint; do NOT fake-fix with TYPE_CHECKING/lazy/shim/
+  indirect imports (they fool the linter while keeping the coupling).
+- format_message_with_template_vars in weave/prompt/prompt.py is a pure ~50-line
+  string-templating fn whose only dep is IncorrectPromptVarError (trivial
+  Exception). Server's llm_completion.py used it in resolve_and_apply_prompt.
+- Duplicated the fn + a server-local IncorrectPromptVarError into
+  llm_completion.py; removed `from weave.prompt.prompt import ...`; removed the
+  matching ignore from pyproject.toml.
+
+## Verification
+- lint-imports: 3 kept / 0 broken (deps 1382 -> 1381), ignore truly gone.
+- tests/trace_server/test_llm_completion.py -k 'prompt or template'
+  --trace-server=fake: 14 passed.
+- ruff check + ruff format --check on llm_completion.py: clean.
+
+## Errors & Mistakes
+- gt create failed: base branch andrew/remove-importlinter-ignores-v1 was
+  untracked. `gt track --parent master` reported "includes 1 commit" because
+  LOCAL master (21b27490f2) is STALE vs origin/master (d38f744761) — the
+  Conductor sibling-worktree quirk. My branch == origin/master tip, so it has
+  ZERO real diff; the "1 commit" is the already-merged #7346 and dedupes in PR
+  diffs. Chose to commit PR1 directly onto the tracked base branch (clean PR
+  diff vs origin/master) and will stack PR2+ as gt children.
+
+## Hints for Future Agents
+- Behaviour-preserving: the completions caller wraps resolve_and_apply_prompt in
+  a broad `except Exception` -> error response, and IncorrectPromptVarError is
+  only asserted in tests/flow/test_prompt.py against the CLIENT prompt, never
+  via the server completions path. So the server's own error type is safe.
+- Identity trap (Codex): duplicated pydantic models/enums won't share identity
+  across the split; fine over HTTP (JSON) but in-process fake/ClickHouse test
+  paths passing client models into server methods need serialize/validate
+  bridges. Matters for the later Contract B (client->server) vendoring, not here.
+
+## Open Questions
+- Contract B (client->server, ~48 edges, dominated by trace_server_interface
+  ~3700 lines across ~19 modules) requires vendoring the wire contract into the
+  client — large + risky (identity trap). Needs user buy-in before executing.
+- eval_worker move (isolated_client_executor + evaluate_model_worker) needs
+  cross-repo coordination (core imports the old workers path). Staged rollout.
