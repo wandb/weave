@@ -25,3 +25,6 @@ Phase-1 PR4 (final) of the import-linter decoupling stack. After the stack + cor
 
 ## Open Questions
 - None. (Earlier 'move test dirs to tests/eval_worker/?' still open but out of scope.)
+
+## Update (eval_worker contract)
+Per user review of PR4: the new top-level weave/eval_worker/ package was ungoverned by import-linter — nothing stopped the trace server from importing it and transitively re-acquiring the client. Added a 3rd contract 'Eval worker must not be imported by the trace server or client SDK' (forbidden; source = trace_server + all client packages; forbidden = weave.eval_worker; no ignores, never any). lint-imports now 3 kept / 0 broken. Updated the pyproject header note (eval_worker may import both sides but nothing in weave may import it) and the commit message. Folded into the PR4 commit via --amend; pushed with git (not gt submit) to avoid disturbing the terse PR descriptions the user just set.
