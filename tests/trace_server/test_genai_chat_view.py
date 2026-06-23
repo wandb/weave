@@ -451,15 +451,17 @@ def test_build_trace_chat_handles_null_started_at() -> None:
             input_messages=[{"role": "user", "content": "hello from now"}],
         ),
     ]
-    # Must not raise. _find_user_prompt prefers invoke_agent spans, so the
-    # null-start invoke_agent's prompt wins over the chat span's prompt.
-    # The important thing is that the sort doesn't crash on the mixed key.
+    # Must not raise. The chat (LLM) span's own user input drives the turn, so
+    # its prompt is what renders; the null-start invoke_agent prompt is only a
+    # fallback for when no LLM span carries user input. The important thing is
+    # that the sort doesn't crash on the mixed (None / datetime) key.
     res = build_trace_chat(spans, "trace-with-null")
     assert res.trace_id == "trace-with-null"
     user_msgs = [m for m in res.messages if m.type == "user_message"]
     assert len(user_msgs) == 1
-    assert _user_payload(user_msgs[0]).text == "hello from the void"
-    assert user_msgs[0].started_at is None
+    assert _user_payload(user_msgs[0]).text == "hello from now"
+    # Sourced from the chat span (which has a real start), not the null one.
+    assert user_msgs[0].started_at is not None
 
 
 def test_build_trace_chat_uses_latest_ended_span_when_root_missing() -> None:
@@ -983,6 +985,169 @@ def test_content_ref_without_inline_part_is_not_attached() -> None:
     assistant = next(m for m in messages if m.type == "assistant_message")
     assert _user_payload(user).content_refs == []
     assert _assistant_payload(assistant).content_refs == []
+
+
+def test_realtime_multi_turn_in_one_trace_renders_each_user_turn() -> None:
+    """Regression (OpenAI Realtime): a whole voice session is ONE trace with
+    one chat span per turn. Each turn's user message must render with its OWN
+    audio — not collapse to a single leading bubble holding every turn's audio.
+
+    Each chat span's input replays the prior thread and ends with that turn's
+    new user message; output is that turn's assistant reply. Media is matched
+    per message from the inline part digest to the span's internal content_refs.
+    """
+
+    def at(sec: int) -> datetime.datetime:
+        return datetime.datetime(2026, 1, 1, 0, 0, sec, tzinfo=datetime.timezone.utc)
+
+    def ext(d: str) -> str:
+        return f"weave:///e/p/object/Content:{d}"
+
+    def intl(d: str) -> str:
+        return f"weave-trace-internal:///PID/object/Content:{d}"
+
+    def u(text: str, d: str) -> dict:
+        return {"role": "user", "content": _parts(_text_part(text), _uri_part(ext(d)))}
+
+    def a(text: str, d: str) -> dict:
+        return {
+            "role": "assistant",
+            "content": _parts(_text_part(text), _uri_part(ext(d))),
+        }
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="openai_realtime",
+            started_at=at(0),
+        ),
+        _span(
+            span_id="c1",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(1),
+            input_messages=[u("Hello", "U1")],
+            output_messages=[a("Hi there!", "A1")],
+            content_refs=[intl("U1"), intl("A1")],
+        ),
+        _span(
+            span_id="c2",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(3),
+            input_messages=[
+                u("Hello", "U1"),
+                a("Hi there!", "A1"),
+                u("Tell me a fact.", "U2"),
+            ],
+            output_messages=[a("Oceans cover 70%.", "A2")],
+            content_refs=[intl("U1"), intl("A1"), intl("U2"), intl("A2")],
+        ),
+        _span(
+            span_id="c3",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(5),
+            input_messages=[
+                u("Hello", "U1"),
+                a("Hi there!", "A1"),
+                u("Tell me a fact.", "U2"),
+                a("Oceans cover 70%.", "A2"),
+                u("Thanks!", "U3"),
+            ],
+            output_messages=[a("Anytime!", "A3")],
+            content_refs=[
+                intl("U1"),
+                intl("A1"),
+                intl("U2"),
+                intl("A2"),
+                intl("U3"),
+                intl("A3"),
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    users = [m for m in messages if m.type == "user_message"]
+    assistants = [m for m in messages if m.type == "assistant_message"]
+
+    # All three user turns render, each with only its own audio.
+    assert [_user_payload(m).text for m in users] == [
+        "Hello",
+        "Tell me a fact.",
+        "Thanks!",
+    ]
+    assert [_user_payload(m).content_refs for m in users] == [
+        [intl("U1")],
+        [intl("U2")],
+        [intl("U3")],
+    ]
+    # Assistants keep their own audio (already per-span correct).
+    assert [_assistant_payload(m).content_refs for m in assistants] == [
+        [intl("A1")],
+        [intl("A2")],
+        [intl("A3")],
+    ]
+    # User/assistant alternate in order across the single trace.
+    chat_types = {"user_message", "assistant_message"}
+    assert [m.type for m in messages if m.type in chat_types] == [
+        "user_message",
+        "assistant_message",
+        "user_message",
+        "assistant_message",
+        "user_message",
+        "assistant_message",
+    ]
+
+
+def test_consecutive_user_messages_each_render_with_own_media() -> None:
+    """A turn can be several user messages in a row (no alternation). The
+    trailing run is all of them, and each renders as its own bubble keeping its
+    own media — not a single collapsed bubble that re-groups the audio.
+    """
+
+    def ext(d: str) -> str:
+        return f"weave:///e/p/object/Content:{d}"
+
+    def intl(d: str) -> str:
+        return f"weave-trace-internal:///PID/object/Content:{d}"
+
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("first"), _uri_part(ext("M1"))),
+                },
+                {"role": "assistant", "content": _parts(_text_part("ok"))},
+                # Two user messages in a row before the response.
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("second"), _uri_part(ext("M2"))),
+                },
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("third"), _uri_part(ext("M3"))),
+                },
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("reply"))}
+            ],
+            content_refs=[intl("M1"), intl("M2"), intl("M3")],
+        ),
+    ]
+
+    users = [m for m in build_chat_messages(spans) if m.type == "user_message"]
+    # Only the trailing run ("second", "third") is this span's new turn; the
+    # earlier "first" (before the assistant) is history and is not re-emitted.
+    assert [_user_payload(m).text for m in users] == ["second", "third"]
+    assert [_user_payload(m).content_refs for m in users] == [
+        [intl("M2")],
+        [intl("M3")],
+    ]
 
 
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:

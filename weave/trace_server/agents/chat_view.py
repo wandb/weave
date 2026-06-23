@@ -207,20 +207,39 @@ def build_trace_chat(
 def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     """Convert a list of agent spans into a linear chat trajectory.
 
-    Build the parent-child tree, prepend a single user prompt if one can be
-    found, then let `ChatTraversal` apply the explicit tree-walk policy.
+    Walk the parent-child tree, emitting one user message per turn — each LLM
+    span's *new* user input (see `ChatTraversal._emit_user_turn`) — interleaved
+    with its assistant/tool events. A single realtime trace can hold many turns
+    (one chat span each), so the conversation is reconstructed from the spans'
+    own messages rather than assuming one user prompt per trace.
+
+    Only when the walk surfaces no user message at all — e.g. an SDK that
+    records the prompt on the enclosing `invoke_agent` span rather than the LLM
+    span — do we fall back to a single synthesized leading prompt.
     """
     if not spans:
         return []
 
     tree = build_span_tree(spans)
     traversal = ChatTraversal()
-
-    if user_message := _find_user_message(spans):
-        traversal.messages.append(user_message)
-
     traversal.walk_roots(tree)
-    return traversal.messages
+
+    messages = traversal.messages
+    if not traversal.emitted_user and (user_message := _find_user_message(spans)):
+        messages.insert(0, user_message)
+
+    # The walk emits an invoke_agent's `agent_start` before descending to the
+    # chat span that carries that turn's user message, but the user speaks
+    # first and the agent is invoked in response. Restore that order so the
+    # opening prompt leads (matches the single-prompt-per-trace SDK shape).
+    if (
+        len(messages) >= 2
+        and messages[0].type == "agent_start"
+        and messages[1].type == "user_message"
+    ):
+        messages[0], messages[1] = messages[1], messages[0]
+
+    return messages
 
 
 @dataclass
@@ -235,6 +254,12 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
+    # True once any per-turn user message has been emitted during the walk;
+    # gates the invoke_agent leading-prompt fallback in build_chat_messages.
+    emitted_user: bool = False
+    # (text, media-digests) of the most recently emitted user message, so the
+    # same message replayed by a following LLM span is not emitted twice.
+    _last_user_sig: tuple[str, tuple[str, ...]] | None = None
 
     def walk_roots(self, roots: list[SpanNode]) -> None:
         for root in roots:
@@ -359,6 +384,7 @@ class ChatTraversal:
         """
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
+        self._emit_user_turn(span)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
@@ -370,6 +396,46 @@ class ChatTraversal:
         assistant = msg.assistant_message
         emitted_text = bool(assistant and assistant.text)
         return emitted_text or subtree_emitted_assistant
+
+    def _emit_user_turn(self, span: AgentSpanSchema) -> None:
+        """Emit the user message(s) for the new turn this LLM span answers.
+
+        The new user input is the trailing run of consecutive user-role
+        messages in ``input_messages`` — the messages appended since the
+        previous assistant/system message (or the start). Earlier turns are
+        replayed as history and are skipped; they were emitted by the span that
+        first answered them. The sequence is NOT assumed to alternate: a turn
+        can be several user messages in a row, and runs of assistant messages
+        are handled by the run boundary.
+
+        Each user message becomes its own bubble so its own media stays with
+        it (collapsing the run would re-group every turn's audio onto one
+        message — the bug this fixes). Media comes from the message's inline
+        ``uri`` parts, resolved to the internal ref form via the span's
+        ``content_refs`` because the read path requires internal refs (the int
+        -> ext converter rejects a bare external ref). Reading ``content_refs``
+        here is only that ref-form lookup, keyed by the inline part's digest;
+        the conversation itself drives everything else (removal of the
+        ``content_refs`` column is a planned follow-up).
+        """
+        for message in _trailing_user_messages(span.input_messages):
+            text = _display_text(message.content)
+            media = _directional_content_refs(span, _media_part_digests([message]))
+            if not text and not media:
+                continue
+            sig = (text, tuple(media))
+            if sig == self._last_user_sig:
+                continue
+            self._last_user_sig = sig
+            self.emitted_user = True
+            self.messages.append(
+                AgentChatMessage(
+                    type="user_message",
+                    agent_name="User",
+                    started_at=span.started_at,
+                    user_message=AgentChatUserMessage(text=text, content_refs=media),
+                )
+            )
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -636,6 +702,27 @@ def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]
     (so explicit ``user`` plus provider-variant empty/unknown roles).
     """
     return [m for m in messages if m.role not in _NON_USER_PROMPT_ROLES]
+
+
+def _trailing_user_messages(
+    messages: list[NormalizedMessage],
+) -> list[NormalizedMessage]:
+    """The contiguous run of user-role messages at the end of ``messages``.
+
+    This is the new user input an LLM span is responding to: the run of N user
+    messages appended since the previous assistant/system message (or the
+    start). The count N is whatever the run holds — a turn can be several user
+    messages in a row. Messages earlier in the history are excluded; they were
+    answered (and emitted) by earlier spans. Role decides the boundary (see
+    ``_user_messages``), so the sequence need not alternate user/assistant.
+    """
+    turn: list[NormalizedMessage] = []
+    for message in reversed(messages):
+        if message.role in _NON_USER_PROMPT_ROLES:
+            break
+        turn.append(message)
+    turn.reverse()
+    return turn
 
 
 def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
