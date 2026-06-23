@@ -111,18 +111,20 @@ function assistantParts(
   return parts;
 }
 
+/** The `tool_result` block carried on a user message, taken from the SDK type. */
+type ToolResultBlock = Extract<
+  SDKUserMessage['message']['content'][number],
+  {type: 'tool_result'}
+>;
+
 /** Stringify tool-result content (string, content-block array, or other). */
-function toolResultText(content: unknown): string {
+function toolResultText(content: ToolResultBlock['content']): string {
   if (typeof content === 'string') {
     return content;
   }
   if (Array.isArray(content)) {
     const text = content
-      .map(block =>
-        block && typeof block === 'object' && 'text' in block
-          ? String((block as {text: unknown}).text)
-          : ''
-      )
+      .map(block => ('text' in block ? String(block.text) : ''))
       .filter(Boolean)
       .join('\n');
     if (text) {
@@ -146,34 +148,34 @@ function usageAttributes(
 ): Record<string, number> {
   const usage = toWeaveUsage(rawUsage);
   const attrs: Record<string, number> = {};
+  // toWeaveUsage returns the typed WeaveUsage shape, so each field is already
+  // `number | undefined` — a nullish check is enough (and keeps a real 0).
   const input = usage.input_tokens;
   const output = usage.output_tokens;
   const cacheRead = usage.cache_read_input_tokens;
   const cacheCreation = usage.cache_creation_input_tokens;
-  if (typeof input === 'number') {
+  if (input != null) {
     attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = input;
   }
-  if (typeof output === 'number') {
+  if (output != null) {
     attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = output;
   }
-  if (typeof cacheRead === 'number') {
+  if (cacheRead != null) {
     attrs[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = cacheRead;
   }
-  if (typeof cacheCreation === 'number') {
+  if (cacheCreation != null) {
     attrs[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] = cacheCreation;
   }
-  if (typeof input === 'number' && typeof output === 'number') {
+  if (input != null && output != null) {
     attrs[ATTR_GEN_AI_USAGE_TOTAL_TOKENS] = input + output;
   }
   return attrs;
 }
 
-interface ClaudeAgentOtelTracerOptions {
+type ClaudeAgentOtelTracerOptions = {
   /** The user prompt, when invoked as a string (recorded as input on the root). */
   prompt?: string;
-  /** Tracer override (tests inject one backed by an in-memory exporter). */
-  tracer?: Tracer;
-}
+};
 
 export class ClaudeAgentOtelTracer {
   private readonly tracer: Tracer;
@@ -188,7 +190,7 @@ export class ClaudeAgentOtelTracer {
     // The shared Weave GenAI tracer targets /agents/otel/v1/traces and owns
     // auth, resource attrs, batching, and beforeExit flush. A no-op tracer is
     // returned when weave.init() hasn't run, so every span call stays safe.
-    this.tracer = opts.tracer ?? getWeaveTracer(TRACER_NAME);
+    this.tracer = getWeaveTracer(TRACER_NAME);
 
     // Root span under ROOT_CONTEXT so each query() is its own trace; sibling
     // prompts in one session are linked via gen_ai.conversation.id, not a
@@ -281,14 +283,11 @@ export class ClaudeAgentOtelTracer {
       // {@link emitModelUsageSpans}.
       this.emitModelUsageSpans(result);
 
-      if (result.total_cost_usd != null) {
-        this.invokeAgentSpan.setAttribute(ATTR_COST_USD, result.total_cost_usd);
-      }
-      if (result.num_turns != null) {
-        this.invokeAgentSpan.setAttribute(ATTR_NUM_TURNS, result.num_turns);
-      }
-      // `result` is only on the success member of the SDKResultMessage union.
-      if ('result' in result && result.result != null) {
+      // Both result members carry these as required numbers.
+      this.invokeAgentSpan.setAttribute(ATTR_COST_USD, result.total_cost_usd);
+      this.invokeAgentSpan.setAttribute(ATTR_NUM_TURNS, result.num_turns);
+      // `result` is the final assistant text, present only on the success member.
+      if (result.subtype === 'success') {
         const output: Message[] = [{role: 'assistant', content: result.result}];
         this.invokeAgentSpan.setAttribute(
           ATTR_GEN_AI_OUTPUT_MESSAGES,
@@ -302,16 +301,16 @@ export class ClaudeAgentOtelTracer {
     // failed runs (error_max_turns, error_during_execution, …) surface as errors.
     const errored =
       error != null ||
-      (result != null &&
-        (result.is_error ||
-          (result.subtype != null && result.subtype !== 'success')));
+      (result != null && (result.is_error || result.subtype !== 'success'));
     if (errored) {
-      // `result`/`errors` live on opposite members of the SDKResultMessage
-      // union — narrow with `in` before reading either.
+      // `result` and `errors` live on opposite members of the union; narrow on
+      // `subtype` to read either.
       const resultText =
-        result && 'result' in result ? result.result : undefined;
+        result?.subtype === 'success' ? result.result : undefined;
       const errorsText =
-        result && 'errors' in result ? result.errors.join('; ') : undefined;
+        result && result.subtype !== 'success'
+          ? result.errors.join('; ')
+          : undefined;
       const message =
         error != null
           ? error instanceof Error
@@ -336,8 +335,8 @@ export class ClaudeAgentOtelTracer {
   }
 
   // A `chat` span (CLIENT, child of the root) keyed by model. `extraAttrs`
-  // carries the per-message response (processAssistant) or the per-model usage
-  // (emitModelUsageSpans) — the only thing that differs between the two sites.
+  // carries the per-model usage from emitModelUsageSpans; processAssistant
+  // passes none and sets the response on the returned span directly.
   private startChatSpan(
     model: string | undefined,
     extraAttrs: Attributes = {}
@@ -400,12 +399,12 @@ export class ClaudeAgentOtelTracer {
   }
 
   private processAssistant(msg: SDKAssistantMessage): void {
-    const model = msg.message?.model;
+    const model = msg.message.model;
     if (this.rootModel == null && model) {
       this.rootModel = model;
     }
 
-    const content = msg.message?.content ?? [];
+    const content = msg.message.content;
 
     // Per-chat usage and input messages are intentionally omitted: the SDK only
     // reports aggregate usage in the terminal result (lifted onto the root), and
@@ -422,7 +421,7 @@ export class ClaudeAgentOtelTracer {
         JSON.stringify([outputMessage])
       );
     }
-    if (msg.message?.stop_reason) {
+    if (msg.message.stop_reason) {
       chatSpan.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [
         msg.message.stop_reason,
       ]);
@@ -456,7 +455,7 @@ export class ClaudeAgentOtelTracer {
   }
 
   private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
-    const content = Array.isArray(msg.message?.content)
+    const content = Array.isArray(msg.message.content)
       ? msg.message.content
       : [];
     for (const block of content) {
