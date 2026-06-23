@@ -34,6 +34,7 @@ from weave.trace_server.agents.schema import (
     SpanKindLiteral,
     StatusCodeLiteral,
 )
+from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 
 if TYPE_CHECKING:
@@ -628,35 +629,25 @@ class AgentConversationMessagePreview(BaseModel):
     text: str = ""
 
 
-# Coarse span kind classified from operation_name / status_code. Distinct from
-# AgentChatMessageType: the classifier only emits these values, not the full
-# message taxonomy (which needs message bodies).
-ConversationSpanKind = Literal["agent", "tool", "assistant", "unknown"]
-
-
 class AgentConversationSpan(BaseModel):
     """One span in a conversation's trace.
 
     Returned by `agent_conversation_spans`, which reads span scalar columns
     only (no message bodies). Spans are ordered by `started_at`, which
     approximates — but does not exactly match — the detail chat view's
-    parent/child tree-walk order.
+    parent/child tree-walk order. `operation_name` is the raw OTel value; the
+    client maps it to a display category.
     """
 
-    kind: ConversationSpanKind
+    operation_name: str
     trace_id: str
     span_id: str
     status: StatusCodeLiteral
     duration_ms: int
 
 
-# Feedback types this endpoint surfaces: human tags (agent_user_feedback) and
-# scorer tags + ratings (agent_monitor). Other feedback types are ignored.
-AgentSpanFeedbackType = Literal["wandb.agent_user_feedback", "wandb.agent_monitor"]
-
-
-class AgentConversationSpanScore(BaseModel):
-    """One numeric score (rating) applied to a turn or conversation."""
+class AgentConversationSpanRating(BaseModel):
+    """One numeric rating (a scorer score) applied to a turn or conversation."""
 
     name: str
     value: float
@@ -665,7 +656,7 @@ class AgentConversationSpanScore(BaseModel):
 
 
 class AgentConversationSpanFeedback(BaseModel):
-    """Tags and scores applied to a conversation's turn (or the conversation).
+    """Tags and ratings applied to a conversation's turn (or the conversation).
 
     Positioned client-side by matching `trace_id` (turn) against the spans;
     `trace_id` is None for conversation-level feedback.
@@ -678,11 +669,11 @@ class AgentConversationSpanFeedback(BaseModel):
     tags: list[str] = Field(
         default_factory=list,
         description="Arbitrary descriptive tags applied to this feedback.",
-        examples=[["\U0001f44d"]],
+        examples=[["👍", "needs-review"]],
     )
-    scores: list[AgentConversationSpanScore] = Field(
+    ratings: list[AgentConversationSpanRating] = Field(
         default_factory=list,
-        description="Numeric scores (ratings) applied to this feedback.",
+        description="Numeric scorer ratings applied to this feedback.",
     )
 
 
