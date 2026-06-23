@@ -1,11 +1,11 @@
-from weave.trace_server.external_to_internal_trace_server_adapter import (
-    IdConverter,
-    universal_int_to_ext_ref_converter,
-)
-from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
+from weave.eval_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
     evaluate_model,
+)
+from weave.trace_server.external_to_internal_trace_server_adapter import (
+    IdConverter,
+    universal_int_to_ext_ref_converter,
 )
 
 

@@ -10,6 +10,7 @@ import weave
 from tests.conftest import LATENCY_TOL
 from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
+from weave.eval_worker import evaluate_model_worker
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
 from weave.trace.weave_client import WeaveClient, generate_id
@@ -43,7 +44,6 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
-from weave.trace_server.workers.evaluate_model_worker import evaluate_model_worker
 from weave.utils.project_id import from_project_id, to_project_id
 
 
