@@ -58,8 +58,8 @@ from weave.durability.wal_lock import is_writer_alive
 from weave.telemetry.trace_sentry import log_error
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
 )
 
 logger = logging.getLogger(__name__)
@@ -447,12 +447,11 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    # RemoteHTTPTraceServer is missing a few abstract methods that the
+    # StainlessRemoteHTTPTraceServer is missing a few abstract methods that the
     # WAL sender doesn't use.  Suppress via Any intermediate.
-    remote_cls: Any = RemoteHTTPTraceServer
-    server: TraceServerClientInterface = remote_cls(
-        args.trace_server_url, auth=("api", args.api_key)
-    )
+    remote_cls: Any = StainlessRemoteHTTPTraceServer
+    server: TraceServerClientInterface = remote_cls(args.trace_server_url)
+    server.set_auth(("api", args.api_key))
     sender = create_sender(wal_dir, server, poll_interval=args.poll_interval)
 
     stop = threading.Event()

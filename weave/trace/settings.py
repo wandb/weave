@@ -243,15 +243,6 @@ class UserSettings:
     Can be overridden with the environment variable `WEAVE_HTTP_TIMEOUT`
     """
 
-    use_stainless_server: bool = False
-    """
-    Toggles use of the stainless-generated HTTP client for trace server communication.
-
-    If True, uses StainlessRemoteHTTPTraceServer instead of RemoteHTTPTraceServer.
-    This provides better type safety and automatic client generation from OpenAPI specs.
-    Can be overridden with the environment variable `WEAVE_USE_STAINLESS_SERVER`
-    """
-
     use_calls_complete: bool = True
     """
     Toggles use of the calls_complete write path for new calls.
@@ -369,7 +360,6 @@ class _SettingsOverrides(TypedDict, total=False):
     enable_disk_fallback: bool
     use_parallel_table_upload: bool
     http_timeout: float
-    use_stainless_server: bool
     use_calls_complete: bool
     enable_client_side_digests: bool
     enable_wal: bool
@@ -611,13 +601,6 @@ def should_implicitly_patch_integrations() -> bool:
 def http_timeout() -> float:
     """Returns the HTTP request timeout in seconds."""
     return _env_or_default("http_timeout", _current_settings.get().http_timeout)
-
-
-def should_use_stainless_server() -> bool:
-    """Returns whether the stainless-generated HTTP client should be used."""
-    return _env_or_default(
-        "use_stainless_server", _current_settings.get().use_stainless_server
-    )
 
 
 def should_use_calls_complete() -> bool:

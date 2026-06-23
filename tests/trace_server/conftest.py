@@ -64,8 +64,12 @@ def pytest_addoption(parser):
         parser.addoption(
             "--remote-http-trace-server",
             action="store",
-            default="remote",
-            help="Specify the remote HTTP trace server implementation: remote or stainless",
+            default="stainless",
+            help=(
+                "Legacy flag retained for CI compatibility. The remote trace "
+                "server client is always the generated SDK "
+                "(StainlessRemoteHTTPTraceServer)."
+            ),
         )
     except ValueError:
         pass
@@ -92,10 +96,10 @@ def get_trace_server_flag(request):
 
 
 def get_remote_http_trace_server_flag(request):
-    """Get the remote HTTP trace server implementation to use.
+    """Get the remote HTTP trace server flag.
 
-    Returns:
-        str: Either 'remote' for RemoteHTTPTraceServer or 'stainless' for StainlessRemoteHTTPTraceServer
+    Legacy: the client is always StainlessRemoteHTTPTraceServer. Retained for
+    CI compatibility (the ``--remote-http-trace-server`` option still parses).
     """
     return request.config.getoption("--remote-http-trace-server")
 

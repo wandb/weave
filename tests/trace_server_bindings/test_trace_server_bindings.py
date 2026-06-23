@@ -1,8 +1,7 @@
-"""Tests for RemoteHTTPTraceServer and StainlessRemoteHTTPTraceServer bindings.
+"""Tests for StainlessRemoteHTTPTraceServer bindings.
 
-These tests verify the batching, splitting, and retry behavior of both server
-implementations. The --remote-http-trace-server flag controls which implementation
-is tested (default: "remote", or "stainless").
+These tests verify the batching, splitting, and retry behavior of the remote
+trace server client.
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ import logging
 from queue import Full
 from unittest.mock import MagicMock
 
-import httpx
 import pytest
 import requests
 
@@ -26,9 +24,6 @@ from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
     StartBatchItem,
-)
-from weave.trace_server_bindings.remote_http_trace_server import (
-    RemoteHTTPTraceServer,
 )
 
 
@@ -255,15 +250,9 @@ def test_requeue_after_max_retries(server, server_class, caplog):
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
 
-    # Use the appropriate exception type for each implementation
-    if server_class == RemoteHTTPTraceServer:
-        server._send_batch_to_server = MagicMock(
-            side_effect=httpx.ConnectError("Connection error")
-        )
-    else:
-        server._send_batch_to_server = MagicMock(
-            side_effect=requests.ConnectionError("Connection error")
-        )
+    server._send_batch_to_server = MagicMock(
+        side_effect=requests.ConnectionError("Connection error")
+    )
 
     # Create a batch
     start, end = generate_call_start_end_pair()

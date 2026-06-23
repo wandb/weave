@@ -417,7 +417,7 @@ class WeaveClient:
         self._server_feedback_processor: AsyncBatchProcessor | None = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
-        # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
+        # The remote trace server contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
         # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
@@ -2167,7 +2167,7 @@ class WeaveClient:
         """
         # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
-        # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
+        # HTTPError 409: raised by the remote trace server when the remote
         # server returns HTTP 409 Conflict for a digest mismatch.
         is_remote_mismatch = (
             isinstance(e, HTTPError)
@@ -2490,11 +2490,11 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_post_request_executor")
-                assert hasattr(server._post_request_executor, "__wrapped__")
-                return server._post_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
+                # Call the typed method on the underlying remote server. This is
+                # implementation-agnostic: a missing endpoint surfaces as a 404
+                # (handled by check_endpoint_exists) regardless of whether the
+                # client is hand-rolled HTTP or the generated SDK.
+                return server.table_create_from_digests(req)
 
             use_parallel_chunks = check_endpoint_exists(
                 test_func, test_req, "table_create_from_digests"

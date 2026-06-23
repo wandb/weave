@@ -16,7 +16,6 @@ from weave.trace import env, init_message, weave_client
 from weave.trace.context import weave_client_context
 from weave.trace.settings import (
     should_redact_pii,
-    should_use_stainless_server,
     use_server_cache,
 )
 from weave.trace.urls import otel_traces_endpoint
@@ -28,7 +27,9 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
-from weave.trace_server_bindings.remote_http_trace_server import RemoteHTTPTraceServer
+from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+    StainlessRemoteHTTPTraceServer,
+)
 from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.wandb_interface.context import get_wandb_api_context
 
@@ -329,15 +330,9 @@ def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
-    res: TraceServerClientInterface
-    if should_use_stainless_server():
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
-            StainlessRemoteHTTPTraceServer,
-        )
-
-        res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
-    else:
-        res = RemoteHTTPTraceServer.from_env(should_batch)
+    res: TraceServerClientInterface = StainlessRemoteHTTPTraceServer.from_env(
+        should_batch
+    )
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
