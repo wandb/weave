@@ -96,3 +96,23 @@ substring strength. Left .toBeUndefined() absence checks as-is (toMatchObject
 asserts presence, not absence).
 
 Validated at stack tip: eslint clean, typecheck:esm clean, 26 ADK jest tests pass.
+
+---
+## Session addendum — literal OTEL keys in tests (2026-06-23)
+
+Per review feedback ("use the literal OTEL key instead of the const ... easier
+to read in the test"), googleAdk.test.ts now uses literal OTEL semconv strings
+(e.g. 'gen_ai.output.messages', 'gen_ai.tool.call.id') in place of the
+ATTR_GEN_AI_* consts imported from ../../genai/semconv; the now-unused semconv
+import was removed. TEST-ONLY — production googleAdk.ts still imports the consts.
+
+Applied uniformly across the whole ADK slice stack (01/02/03/05/06) via a
+deterministic, idempotent transform (.context/relit.mjs, gitignored): object
+keys [CONST]: -> 'lit':, property access x[CONST] -> x['lit']. Each upstack
+restack hit the test file and was resolved with `git checkout --theirs` +
+re-running the transform, so every slice's full file ends up literal-ized.
+Notes survived because these restacks took git's conflict path (gt's
+clean-restack path would have dropped them).
+
+Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
+slice 01 5).
