@@ -1,0 +1,59 @@
+## Conversation
+After I restacked + pushed the ADK stack, the user said: "a few files are still
+not staged. Please make sure the stack is correct and that none of the PRs have
+unstaged changes." The unstaged files were an H1 bugfix (span/state leak when a
+runAsync consumer breaks early or the run aborts) that appeared in the working
+tree DURING my earlier restack/push window — a concurrent editing session. By
+the time the user pointed at them the scratch repro (_adkRepro.test.ts) had been
+deleted and a real regression test folded into googleAdk.test.ts. User wanted
+them committed into the stack so no PR carries leftover unstaged changes.
+
+## Actions
+- Read the full diff of all 3 files (googleAdk.ts, googleAdk.types.ts,
+  googleAdk.test.ts) to understand code I did NOT author before committing it.
+- Verified: jest googleAdk 26/26 (the +1 is the new early-break test), eslint
+  clean, prettier clean, typecheck:esm shows no googleAdk errors.
+- Staged exactly those 3 files; committed to slice 06
+  (andrew/google-adk-06-auto-instrument).
+
+## The fix (what the diff does)
+- patchRunnerClass: the runAsync/runEphemeral wrapper changed from a plain
+  function returning the original generator to an `async function*` that records
+  each yielded event's invocationId and, in a `finally`, calls
+  finishInterruptedInvocations(this, ids). The finally runs on normal
+  completion, early break/return, throw, or abort.
+- WeaveAdkPlugin: afterRunCallback refactored to share a private endInvocation()
+  helper; new public idempotent finishInterruptedInvocation(invocationId) marks
+  the run interrupted. finishInterruptedInvocations() (module fn) resolves the
+  plugin via runner.pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME) and narrows
+  to the method (CJS/ESM instanceof is unreliable).
+- AdkEvent gains invocationId?: string.
+- Also documents the H2 SSE NonProgressiveStrategy limitation in a comment (text
+  + tool call in one turn split across two non-partial responses; tool call
+  still captured as its own execute_tool span; default streamingMode NONE is
+  unaffected). No behavior change for H2 — documentation only.
+
+## Errors & Mistakes
+- I initially (previous turn) framed these working-tree edits as an untouchable
+  concurrent session's WIP and deliberately did not commit them. That was the
+  right default at the time, but the user then directed that they belong in the
+  stack. No data lost — they were never clobbered.
+
+## Dead Ends
+- Amending the auto-instrument commit (5a74d463c5) to fold the fix in: rejected
+  — rewrites its SHA (drops its note, needs re-copy) and mixes concerns.
+- Splitting the change across slices (plugin bits to 01, wrapper bits to 06):
+  rejected — it's one logical fix exercised by 06's wrapper; artificial to split.
+  Committed as one unit on 06 (the top), so no lower branch needs restacking.
+
+## Hints for Future Agents
+- This commit sits on top of the examples-consolidation commit on slice 06, so
+  06's PR (#7306) now has: auto-instrument -> examples consolidation -> H1 fix.
+- finishInterruptedInvocation is idempotent; calling it after a normal run is a
+  no-op (state already deleted by afterRunCallback's endInvocation).
+- I did NOT author this code; I verified it (tests/lint/types) before committing
+  per the user's standards.
+
+## Open Questions
+- Whether the H1 fix should ultimately be its own PR vs part of #7306. Put it on
+  06 to satisfy "none of the PRs have unstaged changes"; easy to split later.
