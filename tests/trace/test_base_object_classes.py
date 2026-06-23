@@ -18,7 +18,6 @@ import pytest
 from pydantic import ValidationError
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
@@ -1181,7 +1180,6 @@ def _create_monitor(client: WeaveClient, name: str, query: dict | None):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     """A Monitor query on an unknown field is rejected with the complete allowed-field list."""
     bad_query = {
@@ -1209,7 +1207,6 @@ def test_monitor_create_rejects_unknown_query_field(client: WeaveClient):
     assert objs_res.objs == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
     """Static, dynamic, and absent monitor queries all create successfully."""
     valid_query = {
