@@ -635,7 +635,6 @@ ignore_imports = [
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.utils.project_id",
   "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
   "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
-  "weave.trace_server.llm_completion -> weave.prompt.prompt",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
   "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
