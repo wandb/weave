@@ -9,12 +9,8 @@
  * start of the run. The agent callbacks are still implemented, so nesting
  * improves automatically if a later ADK version starts calling them.
  *
- * Automatic usage: CJS apps should `require('weave')` before `@google/adk`;
- * ESM apps should preload Weave so the import hook is active before static
- * ADK imports run:
- * ```bash
- * node --import=weave/instrument app.mjs
- * ```
+ * Implicit: once `weave.init()` runs, ADK runners are traced automatically.
+ * CJS apps must `require('weave')` before `@google/adk`.
  * ```typescript
  * import * as weave from 'weave';
  * import {InMemoryRunner} from '@google/adk';
@@ -23,7 +19,7 @@
  * const runner = new InMemoryRunner(myAgent); // auto-traced
  * ```
  *
- * Explicit usage (no module hooks, e.g. bundlers):
+ * Explicit (no module hooks, e.g. bundlers):
  * ```typescript
  * import {init, WeaveAdkPlugin} from 'weave';
  * import {InMemorySessionService, LlmAgent, Runner} from '@google/adk';
@@ -724,24 +720,47 @@ export class WeaveAdkPlugin {
     invocationContext: AdkInvocationContext;
   }): Promise<undefined> {
     this.guard(() => {
-      const invocationId = params.invocationContext.invocationId;
-      const state = this.invocations.get(invocationId);
-      if (!state) {
-        return;
-      }
-      if (captureMessageContent() && state.finalContent) {
-        state.rootSpan.setAttribute(
-          ATTR_GEN_AI_OUTPUT_MESSAGES,
-          jsonAttr([contentToOutputMessage(state.finalContent, null)])
-        );
-        state.rootSpan.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
-      }
-      this.applyRootError(state);
-      this.finishInvocation(state, {interrupted: false});
-      this.invocations.delete(invocationId);
-      this.unregisterBeforeExitHookIfIdle();
+      this.endInvocation(params.invocationContext.invocationId, {
+        interrupted: false,
+      });
     });
     return undefined;
+  }
+
+  /**
+   * Finalizes a run that never reached `afterRunCallback`. ADK only dispatches
+   * `afterRunCallback` after the event loop drains normally, so a consumer that
+   * breaks out of `runAsync` early — or an aborted run — leaves the invocation
+   * (and its spans) open. The auto-instrument runner wrapper calls this from a
+   * `finally` to close them as interrupted. Idempotent: a no-op once the run
+   * has already finished (the common, fully-consumed case).
+   */
+  finishInterruptedInvocation(invocationId: string): void {
+    this.guard(() => {
+      this.endInvocation(invocationId, {interrupted: true});
+    });
+  }
+
+  /** Shared teardown for normal completion and interrupted finalization. */
+  private endInvocation(
+    invocationId: string,
+    options: {interrupted: boolean}
+  ): void {
+    const state = this.invocations.get(invocationId);
+    if (!state) {
+      return;
+    }
+    if (captureMessageContent() && state.finalContent) {
+      state.rootSpan.setAttribute(
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
+        jsonAttr([contentToOutputMessage(state.finalContent, null)])
+      );
+      state.rootSpan.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
+    }
+    this.applyRootError(state);
+    this.finishInvocation(state, {interrupted: options.interrupted});
+    this.invocations.delete(invocationId);
+    this.unregisterBeforeExitHookIfIdle();
   }
 
   // -------------------------------------------------------------------------
@@ -1310,9 +1329,44 @@ function ensurePluginRegistered(runner: AdkRunnerLike): void {
 }
 
 /**
+ * Finalizes invocations left open because the consumer abandoned the runner's
+ * event generator (early `break`/`return`) or the run aborted — ADK skips
+ * `afterRunCallback` on those paths, so without this their spans never end and
+ * the invocation state leaks. Resolves the plugin from the runner's own
+ * PluginManager so it finalizes whichever instance is registered (the shared
+ * auto-instrument plugin or a user-supplied one). A no-op on normal completion,
+ * where `afterRunCallback` already finalized the invocation.
+ */
+function finishInterruptedInvocations(
+  runner: AdkRunnerLike,
+  invocationIds: Set<string>
+): void {
+  if (invocationIds.size === 0) {
+    return;
+  }
+  try {
+    const plugin = runner?.pluginManager?.getPlugin(WEAVE_ADK_PLUGIN_NAME);
+    // `getPlugin` returns the structurally-typed foreign plugin object; narrow
+    // to the one method we call rather than assume the concrete class (CJS/ESM
+    // module copies can defeat `instanceof`).
+    const finalize = (plugin as {finishInterruptedInvocation?: unknown})
+      ?.finishInterruptedInvocation;
+    if (typeof finalize !== 'function') {
+      return;
+    }
+    for (const invocationId of invocationIds) {
+      finalize.call(plugin, invocationId);
+    }
+  } catch {
+    // Cleanup must never surface into the user's run.
+  }
+}
+
+/**
  * Patches `Runner.prototype.runAsync` / `runEphemeral` so every runner
- * (including subclasses) self-registers the Weave plugin on first use,
- * before ADK reads the plugin list.
+ * (including subclasses) self-registers the Weave plugin on first use (before
+ * ADK reads the plugin list) and finalizes its invocation even when the
+ * consumer abandons the event stream early.
  */
 function patchRunnerClass(RunnerClass: any): void {
   const proto = RunnerClass?.prototype;
@@ -1324,9 +1378,24 @@ function patchRunnerClass(RunnerClass: any): void {
     if (typeof original !== 'function') {
       continue;
     }
-    proto[method] = function (this: AdkRunnerLike, ...args: unknown[]) {
+    proto[method] = async function* (
+      this: AdkRunnerLike,
+      ...args: unknown[]
+    ): AsyncGenerator<AdkEvent, void> {
       ensurePluginRegistered(this);
-      return original.apply(this, args);
+      const invocationIds = new Set<string>();
+      const events = original.apply(this, args) as AsyncIterable<AdkEvent>;
+      try {
+        for await (const event of events) {
+          if (event?.invocationId) {
+            invocationIds.add(event.invocationId);
+          }
+          yield event;
+        }
+      } finally {
+        // Runs on normal completion, early `break`/`return`, throw, or abort.
+        finishInterruptedInvocations(this, invocationIds);
+      }
     };
   }
   Object.defineProperty(proto, weaveAdkRunnerPatched, {
