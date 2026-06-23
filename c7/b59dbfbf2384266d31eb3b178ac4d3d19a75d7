@@ -123,3 +123,56 @@ safe-stringify). User asked whether ADK users hit bigint/cycles; answer: not the
 common path, but reachable via tool RETURN values (cycles realistic, bigint
 rare). The branches aren't crash-protection (the try/catch is) — they preserve a
 degraded value instead of nulling the whole result. User did not ask to simplify.
+
+---
+
+## Session addendum — address local review comments on ADK docstrings (2026-06-23)
+
+### Conversation
+User left two local Conductor review comments (not GitHub threads) on slice-01
+files and asked to apply them, then said "push these up":
+1. sdks/node/src/__tests__/integrations/googleAdk.test.ts (lines 12-16):
+   "we dont need this comment" — the Note: paragraph explaining the jest
+   lodash-es -> lodash module-mapping shim.
+2. sdks/node/src/integrations/googleAdk.ts (lines 2-15): "Simplify this. The
+   user doesn't need to know all the details, just that we're implementing an
+   ADK plugin and logging to our OTEL endpoint. We don't need to know the
+   reasons for that."
+
+### Actions
+- Removed the lodash-es Note paragraph from the test file header (the jest
+  moduleNameMapper shim itself stays in jest config; only the explanatory
+  comment was removed).
+- Collapsed the googleAdk.ts module docstring from two rationale paragraphs
+  (why-a-plugin-not-native-OTel-spans, Pi/openai-agents pipeline comparison,
+  Python google_adk parity, Agents-view note) down to two lines: "implemented
+  as an ADK plugin that mirrors agent runs into OpenTelemetry spans and exports
+  them to Weave's agents OTel endpoint." The Usage: code block was untouched.
+- Ran prettier --check and eslint on both files via nvm node + local
+  node_modules/.bin (the PATH `node` is a Bun shim that crashes jest/eslint).
+  Both green.
+- Comment-only change; no behavior, no test impact.
+
+### Git mechanics
+- Folded both edits into slice 01 via `gt modify` (amend), which auto-restacked
+  the four upstack ADK branches 02-plugin-model -> 03-plugin-tool ->
+  05-agent-hierarchy -> 06-auto-instrument. Clean restack, no conflicts.
+- gt's no-conflict restack path DROPPED notes on 02/03/05/06 (known behavior);
+  slice 01's own note survived the amend (git notes.rewrite.amend default).
+  Restored the four with `git notes copy -f <old> <new>`:
+    02 ecfb67e6 -> a15b9b46
+    03 7c3cf5d6 -> 9682be7b
+    05 13349a1c -> da37a9a0
+    06 9305c8ba -> 147510b2
+  slice 01 old 4e2d8850 -> new c7b59dbfbf.
+- Published with `git push --force-with-lease` per branch rather than
+  `gt submit`, to avoid un-drafting the draft PRs (#7301-#7306) and to avoid
+  interactive prompts in a non-interactive shell. Notes pushed via
+  `git push origin refs/notes/commits`.
+
+### Errors & Mistakes
+None.
+
+### Hints for Future Agents
+- Any future `gt modify`/restack on this stack will again drop upstack notes;
+  re-copy old->new SHAs after every restack.
