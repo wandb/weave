@@ -23,6 +23,7 @@
  * across an async generator's yields by an external consumer.
  */
 import {
+  type Attributes,
   type Context,
   type Span,
   type Tracer,
@@ -327,6 +328,42 @@ export class ClaudeAgentOtelTracer {
     this.invokeAgentSpan.end();
   }
 
+  // The conversation/session id, attached to child spans only once it's known.
+  private conversationAttrs(): Attributes {
+    return this.conversationId
+      ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
+      : {};
+  }
+
+  // A `chat` span (CLIENT, child of the root) keyed by model. `extraAttrs`
+  // carries the per-message response (processAssistant) or the per-model usage
+  // (emitModelUsageSpans) — the only thing that differs between the two sites.
+  private startChatSpan(
+    model: string | undefined,
+    extraAttrs: Attributes = {}
+  ): Span {
+    return this.tracer.startSpan(
+      `chat ${model ?? ''}`.trimEnd(),
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
+          [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+          [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+          ...(model
+            ? {
+                [ATTR_GEN_AI_REQUEST_MODEL]: model,
+                [ATTR_GEN_AI_RESPONSE_MODEL]: model,
+              }
+            : {}),
+          ...this.conversationAttrs(),
+          ...extraAttrs,
+        },
+      },
+      this.invokeAgentCtx
+    );
+  }
+
   /**
    * Emit one `chat` span per model carrying that model's token usage, keyed by
    * `gen_ai.response.model`, as children of the root. The trace server keys
@@ -358,25 +395,7 @@ export class ClaudeAgentOtelTracer {
       if (Object.keys(attrs).length === 0) {
         continue;
       }
-      const span = this.tracer.startSpan(
-        `chat ${model ?? ''}`.trimEnd(),
-        {
-          kind: SpanKind.CLIENT,
-          attributes: {
-            ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
-            [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-            [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
-            ...(model ? {[ATTR_GEN_AI_REQUEST_MODEL]: model} : {}),
-            ...(model ? {[ATTR_GEN_AI_RESPONSE_MODEL]: model} : {}),
-            ...(this.conversationId
-              ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
-              : {}),
-            ...attrs,
-          },
-        },
-        this.invokeAgentCtx
-      );
-      span.end();
+      this.startChatSpan(model, attrs).end();
     }
   }
 
@@ -394,23 +413,7 @@ export class ClaudeAgentOtelTracer {
     //
     // One `chat` span per assistant message, carrying the full response
     // (text + reasoning + tool_call parts) as gen_ai.output.messages.
-    const chatSpan = this.tracer.startSpan(
-      `chat ${model ?? ''}`.trimEnd(),
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
-          [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-          [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
-          ...(model ? {[ATTR_GEN_AI_REQUEST_MODEL]: model} : {}),
-          ...(model ? {[ATTR_GEN_AI_RESPONSE_MODEL]: model} : {}),
-          ...(this.conversationId
-            ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
-            : {}),
-        },
-      },
-      this.invokeAgentCtx
-    );
+    const chatSpan = this.startChatSpan(model);
     const parts = assistantParts(content);
     if (parts.length > 0) {
       const outputMessage: Message = {role: 'assistant', parts};
@@ -443,9 +446,7 @@ export class ClaudeAgentOtelTracer {
             [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(
               block.input ?? {}
             ),
-            ...(this.conversationId
-              ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
-              : {}),
+            ...this.conversationAttrs(),
           },
         },
         this.invokeAgentCtx
