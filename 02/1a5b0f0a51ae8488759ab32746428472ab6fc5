@@ -102,3 +102,10 @@ removed the redundant openToolKeys / agentSpanOrder order-arrays, iterating the
 insertion-ordered Maps directly) propagates here via restack — this slice has 0
 references to the removed fields. Validated at tip: eslint + typecheck clean,
 jest 26 pass. Kept LOCAL/unpushed.
+
+---
+## Session addendum — review pass (2026-06-23)
+
+No own edits — slice 05's doc-comment simplifications (Agent-nesting docstring
+reworded; agentSpans/toolSpans field docs trimmed to one line) propagate here via
+restack. Validated at tip: jest 26 pass. Kept LOCAL/unpushed.
