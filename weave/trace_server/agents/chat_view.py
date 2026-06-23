@@ -588,10 +588,13 @@ def _ref_digest(ref: str) -> str:
 
 
 def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
-    """Object digests of media (uri/blob/file) parts inlined in these messages.
+    """Object digests of media (uri/blob/file) parts inlined in ``messages``.
 
-    Direction lives in the parts: a user-supplied audio/image is a ``uri`` part
-    on an input message; model-generated media is a part on an output message.
+    Pure extraction — it carries no notion of direction. Callers decide whose
+    media this is by choosing *which* messages to pass: media belongs to the
+    role that owns the message it sits on, not to whichever input/output list
+    the message happens to appear in (see ``_user_messages``). Position would
+    mislabel a prior assistant turn that a later turn replays into its inputs.
     """
     digests: set[str] = set()
     for message in messages:
@@ -606,31 +609,49 @@ def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
 def _directional_content_refs(
     span: AgentSpanSchema, part_digests: set[str]
 ) -> list[str]:
-    """Span ``content_refs`` whose object digest matches an inline part.
+    """Resolve ``part_digests`` against the span's ``content_refs``.
 
-    The value comes from ``content_refs`` because it holds the ref in the
-    internal, int<->ext-convertible form the response pipeline requires — the
-    int->ext adapter raises on a bare external ref. The direction comes from
-    the message parts (external form). Match the two by digest so each ref is
-    surfaced on the correct side (input -> user, output -> assistant).
+    ``content_refs`` is a direction-agnostic digest->ref lookup: it holds each
+    ref in the internal, int<->ext-convertible form the response pipeline
+    requires (the int->ext adapter raises on a bare external ``weave:///`` ref,
+    which is the form inline message parts carry). This returns the internal
+    refs whose digest matches a supplied part digest. Direction is decided by
+    the caller via the messages it digests (role-based — see ``_user_messages``
+    and ``_emit_assistant_message``), never by this lookup.
     """
     if not part_digests:
         return []
     return [r for r in _content_refs(span) if _ref_digest(r) in part_digests]
 
 
+def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]:
+    """The user's side of a message list, selected by role.
+
+    Direction is the message role, not its input/output position. A multi-turn
+    conversation replays the prior assistant turn — model-generated media and
+    all — back into the next turn's ``input_messages``; selecting by position
+    would mislabel that assistant audio/image as user-supplied (the multi-turn
+    misattribution this guards against). Uses the same role resolution as
+    ``_extract_user_text``: everything that isn't assistant/system/tool context
+    (so explicit ``user`` plus provider-variant empty/unknown roles).
+    """
+    return [m for m in messages if m.role not in _NON_USER_PROMPT_ROLES]
+
+
 def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
-    """Input-side media refs across a trace, de-duplicated, in internal form.
+    """User-supplied media refs across a trace, de-duplicated, in internal form.
 
     ``attach_media`` records media on the LLM/chat span, but the rendered user
     prompt is synthesized from the enclosing invoke_agent span, so the media
-    lives on a different span than the user text. Gather input media across all
-    spans so it lands on the user message regardless of which span carries it.
+    lives on a different span than the user text. Gather user-side input media
+    across all spans so it lands on the user message regardless of which span
+    carries it. Only user-role messages contribute (see ``_user_messages``);
+    assistant turns echoed into a later turn's inputs stay on the assistant.
     """
     refs: list[str] = []
     seen: set[str] = set()
     for span in spans:
-        in_digests = _media_part_digests(span.input_messages)
+        in_digests = _media_part_digests(_user_messages(span.input_messages))
         for ref in _directional_content_refs(span, in_digests):
             if ref not in seen:
                 seen.add(ref)
