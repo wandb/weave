@@ -13,6 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
+import ddtrace
+
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import (
     build_trace_chat,
@@ -71,7 +73,7 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
-from weave.trace_server.datadog import record_db_insert
+from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
@@ -684,14 +686,7 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            insert_with_empty_query_retry(
-                self._ch_client,
-                "spans",
-                data=[genai_span_to_row(s) for s in span_rows],
-                column_names=ALL_SPAN_INSERT_COLUMNS,
-                settings=self._insert_settings,
-            )
-            record_db_insert(table="spans", count=len(span_rows))
+            self._insert_spans(span_rows)
 
         if failure_counts:
             logger.warning(
@@ -718,14 +713,25 @@ class AgentWriteHandler:
         GenAI extraction — the caller is responsible for constructing a
         fully populated ``AgentSpanCHInsertable``.
         """
+        self._insert_spans([span])
+
+    @ddtrace.tracer.wrap(name="agents.clickhouse.insert_spans")
+    def _insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
+        """Insert pre-built span rows; traced so spans-table writes show in APM."""
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": "spans",
+                "weave_trace_server.insert.row_count": len(span_rows),
+            }
+        )
         insert_with_empty_query_retry(
             self._ch_client,
             "spans",
-            data=[genai_span_to_row(span)],
+            data=[genai_span_to_row(s) for s in span_rows],
             column_names=ALL_SPAN_INSERT_COLUMNS,
             settings=self._insert_settings,
         )
-        record_db_insert(table="spans", count=1)
+        record_db_insert(table="spans", count=len(span_rows))
 
 
 # ---------------------------------------------------------------------------
