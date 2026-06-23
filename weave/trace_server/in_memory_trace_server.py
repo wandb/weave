@@ -86,6 +86,7 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     RefObjectsNotFoundError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -7190,11 +7191,14 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
             lhs = process_operand(input_operand)
             rhs = process_operand(operation.contains_.substr)
             if isinstance(rhs, (bool, int, float)):
-                # ClickHouse position() rejects non-string needles; surface
-                # the same driver error the real backend produces.
+                # Reproduce ClickHouse's position() type error, then convert it
+                # the same way the real backend's _query path does.
                 type_name = "Int64" if isinstance(rhs, int) else "Float64"
-                raise DatabaseError(
-                    f"Illegal type {type_name} of argument of function position"
+                handle_clickhouse_query_error(
+                    DatabaseError(
+                        f"Illegal type {type_name} of argument of function "
+                        "position (ILLEGAL_TYPE_OF_ARGUMENT)"
+                    )
                 )
             return _ch_position(lhs, rhs, bool(operation.contains_.case_insensitive))
         else:
