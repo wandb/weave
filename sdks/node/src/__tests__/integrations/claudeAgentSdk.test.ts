@@ -60,13 +60,13 @@ describe('Claude Agent SDK — query() patch', () => {
     return {
       query: (_args: any) => {
         async function* gen() {
-          for (const m of messages) {
-            yield m;
+          for (const message of messages) {
+            yield message;
           }
         }
-        const q = gen() as any;
-        Object.assign(q, extras);
-        return q;
+        const query = gen() as any;
+        Object.assign(query, extras);
+        return query;
       },
     };
   }
@@ -90,8 +90,8 @@ describe('Claude Agent SDK — query() patch', () => {
     patchClaudeAgentSdk(sdk);
 
     const seen: string[] = [];
-    for await (const m of sdk.query({prompt: 'hi there'})) {
-      seen.push(m.type);
+    for await (const message of sdk.query({prompt: 'hi there'})) {
+      seen.push(message.type);
     }
     expect(seen).toEqual(['assistant', 'result']);
 
@@ -113,18 +113,18 @@ describe('Claude Agent SDK — query() patch', () => {
     );
     patchClaudeAgentSdk(sdk);
 
-    const q = sdk.query({prompt: 'x'});
-    await q.interrupt();
+    const query = sdk.query({prompt: 'x'});
+    await query.interrupt();
     expect(interrupt).toHaveBeenCalledTimes(1);
 
     // Membership checks must agree with what `get` actually serves: forwarded
     // control methods and generator-protocol members both report present.
-    expect('interrupt' in q).toBe(true);
-    expect(Symbol.asyncIterator in q).toBe(true);
-    expect('nonexistent' in q).toBe(false);
+    expect('interrupt' in query).toBe(true);
+    expect(Symbol.asyncIterator in query).toBe(true);
+    expect('nonexistent' in query).toBe(false);
 
     // drain so the root span finalizes
-    for await (const _msg of q) {
+    for await (const _msg of query) {
       void _msg;
     }
   });
@@ -171,8 +171,8 @@ describe('Claude Agent SDK — query() patch', () => {
     patchClaudeAgentSdk(sdk);
 
     const seen: string[] = [];
-    for await (const m of sdk.query({prompt: 'x'})) {
-      seen.push(m.type);
+    for await (const message of sdk.query({prompt: 'x'})) {
+      seen.push(message.type);
     }
     expect(seen).toEqual(['assistant', 'result']);
     // No client → no tracer constructed → no spans emitted.
@@ -217,8 +217,8 @@ describe('Claude Agent SDK — query() patch', () => {
     ];
     const realQuery = (_args: any) => {
       async function* gen() {
-        for (const m of messages) {
-          yield m;
+        for (const message of messages) {
+          yield message;
         }
       }
       return gen() as any;
@@ -235,8 +235,8 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(patched.__esModule).toBe(true);
 
     const seen: string[] = [];
-    for await (const m of patched.query({prompt: 'hi there'})) {
-      seen.push(m.type);
+    for await (const message of patched.query({prompt: 'hi there'})) {
+      seen.push(message.type);
     }
     expect(seen).toEqual(['assistant', 'result']);
 
@@ -257,8 +257,8 @@ describe('Claude Agent SDK — query() patch', () => {
     ];
     const realQuery = (_args: any) => {
       async function* gen() {
-        for (const m of messages) {
-          yield m;
+        for (const message of messages) {
+          yield message;
         }
       }
       return gen() as any;
@@ -273,8 +273,8 @@ describe('Claude Agent SDK — query() patch', () => {
     const {query} = wrapClaudeAgentSdk(mod);
 
     const seen: string[] = [];
-    for await (const m of query({prompt: 'hi there'})) {
-      seen.push(m.type);
+    for await (const message of query({prompt: 'hi there'})) {
+      seen.push(message.type);
     }
     expect(seen).toEqual(['assistant', 'result']);
     expect(findSpan(getExporter().getFinishedSpans(), INVOKE)).toBeDefined();
