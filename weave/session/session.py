@@ -819,6 +819,7 @@ class Turn(_SpanBase):
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
+    system_instructions: list[str] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
     spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
@@ -875,18 +876,25 @@ class Turn(_SpanBase):
         source so Presidio is never called for already-dropped content.
         """
         messages: list[Message] | None
+        system_instructions: list[str] | None
         if include_content:
             messages = self.messages
+            system_instructions = self.system_instructions
             if should_redact_pii():
                 messages = pii_redaction.redact_messages(messages)
+                system_instructions = pii_redaction.redact_system_instructions(
+                    system_instructions
+                )
         else:
             messages = None
+            system_instructions = None
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
             conversation_id=session_id,
             conversation_name=session_name,
             model=self.model,
             input_messages=messages,
+            system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,

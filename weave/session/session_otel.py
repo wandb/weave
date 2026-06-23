@@ -171,11 +171,18 @@ def invoke_agent_attributes(
     model: str = "",
     input_messages: list[Message] | None = None,
     output_messages: list[Message] | None = None,
+    system_instructions: list[str] | None = None,
     agent_id: str = "",
     agent_description: str = "",
     agent_version: str = "",
 ) -> dict[str, Any]:
-    """Build OTel attributes for an invoke_agent span."""
+    """Build OTel attributes for an invoke_agent span.
+
+    ``system_instructions`` carries the agent's system prompt so the Agents
+    tab can surface it on the agent-start marker. It is serialized to the same
+    TextPart array as the chat span (per semconv); a chat span nested under the
+    agent may repeat it for the specific LLM call.
+    """
     attrs: dict[str, Any] = {
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.agent.name": agent_name,
@@ -194,6 +201,10 @@ def invoke_agent_attributes(
         attrs["gen_ai.agent.description"] = agent_description
     if agent_version:
         attrs["gen_ai.agent.version"] = agent_version
+
+    serialized_si = _serialize_system_instructions(system_instructions)
+    if serialized_si is not None:
+        attrs["gen_ai.system_instructions"] = serialized_si
 
     serialized_in = _serialize_input_messages(input_messages)
     if serialized_in is not None:

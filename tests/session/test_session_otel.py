@@ -131,6 +131,24 @@ class TestInvokeAgentAttributes:
         assert "gen_ai.provider.name" not in attrs
         assert "gen_ai.request.model" not in attrs
 
+    def test_system_instructions_serialized(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot", system_instructions=["Be helpful", "Be concise"]
+        )
+        # Same TextPart array shape as the chat span (per semconv).
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be concise"},
+        ]
+
+    def test_empty_system_instructions_omitted(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="bot", system_instructions=[])
+        assert "gen_ai.system_instructions" not in attrs
+
+    def test_none_system_instructions_omitted(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="bot", system_instructions=None)
+        assert "gen_ai.system_instructions" not in attrs
+
     def test_input_messages_serialized(self) -> None:
         msgs = [Message(role="user", content="Hello")]
         attrs = invoke_agent_attributes(agent_name="bot", input_messages=msgs)
@@ -891,6 +909,36 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.agent.name"] == "weather-bot"
         assert attrs["gen_ai.conversation.id"] == "sess-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+
+    def test_turn_system_instructions_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="weather-bot", session_id="sess-si") as s:
+            with s.start_turn(user_message="hi") as turn:
+                turn.system_instructions = ["You are a weather bot"]
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent weather-bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+
+    def test_turn_system_instructions_omitted_when_content_excluded(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(
+            agent_name="bot", session_id="sess-si2", include_content=False
+        ) as s:
+            with s.start_turn() as turn:
+                turn.system_instructions = ["secret prompt"]
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert "gen_ai.system_instructions" not in attrs
 
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Session(agent_name="bot", session_id="sess-llm") as s:
