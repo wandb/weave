@@ -116,3 +116,28 @@ clean-restack path would have dropped them).
 
 Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
 slice 01 5).
+
+---
+## Session addendum — review pass: drop !, combine asserts (2026-06-23)
+
+Three review comments; user approved 1+2 and asked to use toMatchObject for 3.
+
+Comment 1 (unnecessary `root!`): added a `requireSpan(span | undefined):
+ReadableSpan` test helper (throws if missing, narrows the type) so tests stop
+needing the `!` non-null assertion after `.find()` — `expect(x).toBeDefined()`
+does NOT narrow the TS type, which is why `!` was there. THIS SLICE: model-error
+test now `requireSpan(byOperation(...).find(...))`, dropped `!` and the redundant
+toBeDefined.
+
+Comment 2 (combine): cached-response chat-span asserts folded into one
+`expect(chatSpan).toMatchObject({status:{code:0}, attributes:{...output...}})`.
+`status.code).not.toBe(2)` became `code:0` (UNSET) — a tightening, correct since
+the plugin only ever sets ERROR. The `interrupted` check stays separate
+(toMatchObject asserts presence, not absence).
+
+Comment 3 (genai-exclusion generateContent.name): tried toMatchObject but jest
+REJECTS functions ("received value must be a non-null object"), so kept
+`expect(fn.name).toBe('generateContent')`. Reported the limitation to the user.
+
+Validated: eslint clean, typecheck:esm clean, jest green (slice 02 19, tip 26).
+Kept LOCAL/unpushed, bundled with the prior literal-key change.
