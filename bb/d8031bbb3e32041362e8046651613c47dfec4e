@@ -36,3 +36,6 @@ Re-tagged FAKE_NOT_IMPLEMENTED -> NOT_CLICKHOUSE_BACKEND (permanent, not pending
 
 ## Open Questions
 - Whether to delete the now-unused FAKE_NOT_IMPLEMENTED alias from util.py.
+
+## Follow-up (CI fix, PR #7337)
+Re-gated test_filter_calls_by_ref_properties_with_table_rows_simple back to FAKE_NOT_IMPLEMENTED (CH-only). CI (Py3.13, full trace shard, -n4) failed it with 'assert 15 == 16': the target=16 row's inputs.example ref intermittently resolves to null at query time under the concurrent Evaluation, sorting it into the NULLS-LAST group (desc calls[1] becomes 15). Passed locally 50+ times (isolated, CPU-contended, and -n4) — unreproducible. The fake's sort/resolve path is deterministic given stored data (_resolve_ref_str_for_filter returns None gracefully); the nondeterminism is in eval-concurrency data production, not the fake query. Re-gated rather than mask with reruns (none configured: addopts='-v') or guess an unverifiable fix. This was the only test un-gated in that file by the PR, so the change reverts the file to its pre-PR state.
