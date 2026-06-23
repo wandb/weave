@@ -17,6 +17,7 @@ import ddtrace
 
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import (
+    add_optional_cost,
     build_trace_chat,
     first_user_preview_text,
     last_assistant_preview_text,
@@ -74,6 +75,7 @@ from weave.trace_server.agents.types import (
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
+from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
@@ -395,6 +397,12 @@ class AgentQueryHandler:
             )
             for r in rows
         ]
+        if req.include_costs and agents:
+            cost_map = self._grouped_cost_map(
+                req.project_id, "agent_name", [a.agent_name for a in agents]
+            )
+            for agent in agents:
+                agent.total_cost_usd = cost_map.get(agent.agent_name)
         return AgentsQueryRes(agents=agents, total_count=total)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
@@ -411,7 +419,62 @@ class AgentQueryHandler:
             )
             for r in rows
         ]
+        if req.include_costs and versions:
+            cost_map = self._grouped_cost_map(
+                req.project_id,
+                "agent_version",
+                [v.agent_version for v in versions],
+                extra_exprs=[
+                    {
+                        "$eq": [
+                            {"$getField": "agent_name"},
+                            {"$literal": req.agent_name},
+                        ]
+                    }
+                ],
+            )
+            for version in versions:
+                version.total_cost_usd = cost_map.get(version.agent_version)
         return AgentVersionsQueryRes(versions=versions, total_count=total)
+
+    def _grouped_cost_map(
+        self,
+        project_id: str,
+        field: str,
+        values: list[str],
+        *,
+        extra_exprs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, float]:
+        """Map each `field` value to its summed span cost (USD).
+
+        The agents / agent_versions materialized views don't store cost, so this
+        runs a supplementary cost-augmented grouped spans query scoped to the
+        `values` on the current page and returns {value: total_cost_usd} for the
+        priced ones. All-time (no time filter), matching the AMT aggregates.
+        """
+        names = [v for v in values if v]
+        if not names:
+            return {}
+        conditions: list[dict[str, Any]] = [
+            {"$in": [{"$getField": field}, [{"$literal": v} for v in names]]}
+        ]
+        if extra_exprs:
+            conditions.extend(extra_exprs)
+        expr = conditions[0] if len(conditions) == 1 else {"$and": conditions}
+        cost_req = AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate({"$expr": expr}),
+            group_by=[AgentGroupByRef(source="column", key=field)],
+            include_costs=True,
+            limit=len(names),
+        )
+        res = self.spans_query(cost_req)
+        out: dict[str, float] = {}
+        for group in res.groups:
+            key = group.group_keys.get(field)
+            if isinstance(key, str) and group.total_cost_usd is not None:
+                out[key] = group.total_cost_usd
+        return out
 
     # ------------------------------------------------------------------
     # Message search
@@ -528,6 +591,12 @@ class AgentQueryHandler:
             if trace_spans
         ]
 
+        conversation_cost: float | None = None
+        for turn in turns:
+            conversation_cost = add_optional_cost(
+                conversation_cost, turn.total_cost_usd
+            )
+
         res = AgentConversationChatRes(
             conversation_id=req.conversation_id,
             turns=turns,
@@ -535,6 +604,7 @@ class AgentQueryHandler:
             has_more=req.offset + len(turns) < total_turns,
             limit=req.limit,
             offset=req.offset,
+            total_cost_usd=conversation_cost,
         )
 
         if req.include_feedback:
@@ -798,6 +868,21 @@ def _first_cell_int(result: QueryResult) -> int:
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 
+def _optional_float(val: Any) -> float | None:
+    """Coerce to float, preserving None.
+
+    Unlike `safe_float` (which maps None -> 0.0), this keeps a missing/NULL
+    cost as None so the response distinguishes "unpriced" from "$0". Used for
+    cost columns that are only present when `include_costs` was requested.
+    """
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _agent_aggregate_fields(row: ClickHouseRow) -> dict[str, Any]:
     """Hydrate the aggregate fields shared by agent and version rows."""
     return {
@@ -857,6 +942,11 @@ def _hydrate_group_row(
         total_reasoning_tokens=safe_int(row.get("total_reasoning_tokens")),
         total_duration_ms=safe_int(row.get("total_duration_ms")),
         error_count=safe_int(row.get("error_count")),
+        # Cost aggregates are present only when include_costs was set; absent
+        # keys stay None (default on AgentSpanGroupRow).
+        total_cost_usd=_optional_float(row.get("total_cost_usd")),
+        total_input_cost_usd=_optional_float(row.get("total_input_cost_usd")),
+        total_output_cost_usd=_optional_float(row.get("total_output_cost_usd")),
         agent_names=unpack_string_array(row.get("agent_names")),
         agent_versions=unpack_string_array(row.get("agent_versions")),
         provider_names=unpack_string_array(row.get("provider_names")),

@@ -232,6 +232,74 @@ def test_full_agent_turn() -> None:
     assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
+def test_chat_view_aggregates_cost() -> None:
+    """Per-message cost sums across the agent subtree; trace cost sums all spans."""
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+            input_cost_usd=0.001,
+            output_cost_usd=0.002,
+            total_cost_usd=0.003,
+            started_at=at(0),
+        ),
+        _span(
+            span_id="tool",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            tool_name="get_weather",
+            started_at=at(1),
+        ),
+        _span(
+            span_id="llm",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_cost_usd=0.02,
+            output_cost_usd=0.01,
+            total_cost_usd=0.03,
+            started_at=at(2),
+        ),
+    ]
+
+    res = build_trace_chat(spans, "trace-cost")
+
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    # Aggregated across root + llm (tool contributes no cost).
+    assert assistant.input_cost_usd == pytest.approx(0.021)
+    assert assistant.output_cost_usd == pytest.approx(0.012)
+    assert assistant.total_cost_usd == pytest.approx(0.033)
+    # Trace total sums every span's cost.
+    assert res.total_cost_usd == pytest.approx(0.033)
+
+
+def test_chat_view_cost_none_when_unpriced() -> None:
+    """With no priced spans, costs stay None (unknown), not 0."""
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+        ),
+    ]
+    res = build_trace_chat(spans, "trace-unpriced")
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    assert assistant.total_cost_usd is None
+    assert res.total_cost_usd is None
+
+
 def test_chat_view_exposes_agent_metadata_for_reactions() -> None:
     """The chat view surfaces agent_version + status_code so reaction feedback
     can carry them: per-message from the message's span, and the trace root's
