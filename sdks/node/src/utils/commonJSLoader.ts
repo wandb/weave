@@ -16,7 +16,7 @@ const parse: (filePath: string) => {
 
 export let reset = () => {};
 
-let patching = Object.create(null);
+const patching = Object.create(null);
 
 const cachedModules = new Map<string, CacheEntry>();
 const passThroughModules = new Set<string>();

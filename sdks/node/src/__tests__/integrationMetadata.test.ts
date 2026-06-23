@@ -77,7 +77,7 @@ describe('op-level attributes', () => {
     await tracedOp();
 
     const calls = await traceServer.getCalls(projectId);
-    const call = calls.find(c => c.op_name?.includes('tracedOp'));
+    const call = calls.find(c => c.op_name.includes('tracedOp'));
     expect(call?.attributes?.integration?.name).toBe('demo');
     expect(call?.attributes?.integration?.version).toBe(packageVersion);
     expect(call?.attributes?.integration?.meta?.package_name).toBe('demo');
@@ -94,7 +94,7 @@ describe('op-level attributes', () => {
     await tracedOp();
 
     const calls = await traceServer.getCalls(projectId);
-    const call = calls.find(c => c.op_name?.includes('kindOp'));
+    const call = calls.find(c => c.op_name.includes('kindOp'));
     expect(call?.attributes?.kind).toBe('llm');
   });
 });

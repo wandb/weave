@@ -26,8 +26,8 @@ describe('attributes context', () => {
     });
 
     const calls = await traceServer.getCalls(projectId);
-    const parentCall = calls.find(c => c.op_name?.includes('parentOp'));
-    const childCall = calls.find(c => c.op_name?.includes('childOp'));
+    const parentCall = calls.find(c => c.op_name.includes('parentOp'));
+    const childCall = calls.find(c => c.op_name.includes('childOp'));
 
     expect(parentCall?.attributes?.requestId).toBe('req-123');
     expect(childCall?.attributes?.requestId).toBe('req-123');
@@ -49,8 +49,8 @@ describe('attributes context', () => {
     });
 
     const calls = await traceServer.getCalls(projectId);
-    const parentCall = calls.find(c => c.op_name?.includes('parentOp'));
-    const childCall = calls.find(c => c.op_name?.includes('leafOp'));
+    const parentCall = calls.find(c => c.op_name.includes('parentOp'));
+    const childCall = calls.find(c => c.op_name.includes('leafOp'));
 
     expect(parentCall?.attributes?.scope).toBe('outer');
     expect(parentCall?.attributes?.merged).toBe('parent');
@@ -73,7 +73,7 @@ describe('attributes context', () => {
     });
 
     const calls = await traceServer.getCalls(projectId);
-    const leafCall = calls.find(c => c.op_name?.includes('leafOp'));
+    const leafCall = calls.find(c => c.op_name.includes('leafOp'));
     expect(leafCall?.attributes?.tenant).toBe('acme');
     expect(leafCall?.attributes?.base).toBe('local'); // local overrides global
   });

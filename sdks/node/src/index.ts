@@ -29,6 +29,8 @@ export type {
   GetAgentSpansResult,
   GetAgentTurnOptions,
   GetAgentTurnResult,
+  GetAgentTurnsOptions,
+  GetAgentTurnsResult,
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,

@@ -1929,7 +1929,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     project_id = client.project_id
@@ -1981,7 +1980,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     assert no_queue_feedback["queue_id"] is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
     project_id = client.project_id
@@ -2001,7 +1999,6 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
     project_id = client.project_id
@@ -2032,7 +2029,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
     project_id = client.project_id

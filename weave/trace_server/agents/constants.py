@@ -116,3 +116,13 @@ MAX_INGEST_ERRORS_REPORTED = 20
 # Other operation names are treated as regular content spans.
 OP_INVOKE_AGENT = "invoke_agent"
 OP_EXECUTE_TOOL = "execute_tool"
+
+# ---------------------------------------------------------------------------
+# Agent-span monitor op names
+# ---------------------------------------------------------------------------
+
+# Op-name literals a Monitor lists in `op_names` to target agent turns. Mirrors
+# `AGENT_SPAN_OP_NAMES` in `weave/flow/monitor.py` (kept here as plain strings so
+# the trace server needn't import `weave.flow`; a test asserts they stay equal),
+# and drives agent vs. calls query validation in `monitor_query_validation`.
+AGENT_SPAN_OP_NAMES: frozenset[str] = frozenset({"weave.genai.turn_ended"})

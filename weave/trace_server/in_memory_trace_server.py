@@ -22,7 +22,7 @@ import math
 import re
 import statistics
 import threading
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from operator import attrgetter
@@ -47,18 +47,29 @@ from weave.shared.trace_server_interface_util import (
     wildcard_version_value_to_ref_prefix,
 )
 from weave.trace_server import constants, object_creation_utils, usage_utils
+from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.completion_spans import build_completion_span
+from weave.trace_server.agents.types import (
+    AgentSpanSchema,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+)
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
 from weave.trace_server.calls_query_builder.stats_query_base import (
     GRANULARITY_1H,
     auto_select_granularity_seconds,
     ensure_max_buckets,
 )
-from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 
 # Completion request preparation (prompt resolution, provider/secret setup) is
 # backend-agnostic business logic that currently lives in the ClickHouse
 # module; import it rather than fork it.
+from weave.trace_server.clickhouse_trace_server_batched import (
+    CompletionPrepResult,
+    _setup_completion_model_info,
+)
 from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
@@ -82,14 +93,25 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.feedback_payload_schema import discover_payload_schema
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.feedback_types import (
     MULTI_VALUE_FEEDBACK_TYPES,
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
 )
+from weave.trace_server.llm_completion import (
+    lite_llm_completion,
+    lite_llm_completion_stream,
+    resolve_and_apply_prompt,
+)
+from weave.trace_server.methods.evaluation_status import evaluation_status
+from weave.trace_server.model_providers.model_providers import (
+    read_model_to_provider_info_map,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
@@ -112,6 +134,10 @@ from weave.trace_server.trace_server_common import (
     op_name_matches,
     scorer_read_res_from_obj,
     set_nested_key,
+)
+from weave.trace_server.trace_server_interface import (
+    EvaluateModelArgs,
+    RescoringArgs,
 )
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
@@ -700,6 +726,67 @@ def _apply_aggregations(
             bucket[f"p{int(p)}_{metric}"] = sorted_vals[idx]
 
 
+@lru_cache(maxsize=1)
+def _model_to_provider_info_map() -> dict[str, Any]:
+    """Provider info for known model names, loaded once (it is static file
+    data; ClickHouse loads it per server instance in __init__).
+    """
+    return read_model_to_provider_info_map()
+
+
+def _aggregate_stream_chunks(
+    chunks: list[dict[str, Any]], model_name: str
+) -> dict[str, Any]:
+    """Assemble streamed completion chunks into a chat.completion response
+    (compact mirror of the ClickHouse stream wrapper's accumulation).
+    """
+    contents: dict[int, list[str]] = {}
+    finish_reasons: dict[int, Any] = {}
+    roles: dict[int, str] = {}
+    metadata: dict[str, Any] = {}
+    usage: dict[str, Any] | None = None
+    for chunk in chunks:
+        if not isinstance(chunk, dict):
+            continue
+        for key in ("id", "created", "model", "system_fingerprint"):
+            if key not in metadata and chunk.get(key) is not None:
+                metadata[key] = chunk[key]
+        if chunk.get("usage"):
+            usage = chunk["usage"]
+        for choice in chunk.get("choices") or []:
+            idx = choice.get("index", 0)
+            delta = choice.get("delta") or {}
+            if delta.get("role"):
+                roles[idx] = delta["role"]
+            if delta.get("content"):
+                contents.setdefault(idx, []).append(delta["content"])
+            if choice.get("finish_reason"):
+                finish_reasons[idx] = choice["finish_reason"]
+    choices = [
+        {
+            "index": idx,
+            "message": {
+                "role": roles.get(idx, "assistant"),
+                "content": "".join(contents.get(idx, [])),
+            },
+            "finish_reason": finish_reasons.get(idx),
+        }
+        for idx in sorted(set(contents) | set(finish_reasons) | {0})
+    ]
+    response: dict[str, Any] = {
+        "id": metadata.get("id", ""),
+        "object": "chat.completion",
+        "created": metadata.get("created", 0),
+        "model": model_name,
+        "choices": choices,
+    }
+    if metadata.get("system_fingerprint") is not None:
+        response["system_fingerprint"] = metadata["system_fingerprint"]
+    if usage is not None:
+        response["usage"] = usage
+    return response
+
+
 # Agent-monitor scores land under this scorer_ratings key; the feedback
 # aggregate rating filter targets it (mirrors feedback_agg_query_builder).
 _FEEDBACK_RATING_KEY = "_rating_"
@@ -861,6 +948,133 @@ class _TtlRec:
     retention_days: int
     updated_at: datetime.datetime
     updated_by: str
+
+
+# The value domain the evaluator produces and compares: query literals plus the
+# scalars ClickHouse's JSON_VALUE casting yields (a subset of these). Mirrors
+# ``LiteralOperation.literal_``; the _ch_* comparison helpers treat it dynamically.
+_FilterValue = (
+    str
+    | int
+    | float
+    | bool
+    | dict[str, tsi_query.LiteralOperation]
+    | list[tsi_query.LiteralOperation]
+    | None
+)
+
+
+class _QueryFilterEvaluator:
+    """Evaluate a ``tsi.Query`` filter expression against a single row.
+
+    Mirrors ClickHouse filter semantics in pure Python. The only row-specific
+    piece is ``resolve``, which maps a ``(field_path, cast)`` pair to the row's
+    value; everything else (operand evaluation, comparison, boolean recursion)
+    is identical across query sites, so it lives here once instead of being
+    re-implemented as nested closures inside each query method.
+    """
+
+    def __init__(
+        self, resolve: Callable[[str, tsi_query.CastTo | None], _FilterValue]
+    ) -> None:
+        self._resolve = resolve
+
+    def matches(self, query: tsi.Query) -> bool:
+        """The row matches when the query's top-level expression is truthy."""
+        return _truthy(self._evaluate(query.expr_))
+
+    def _operand_value(
+        self, operand: tsi_query.Operand, cast: tsi_query.CastTo | None = None
+    ) -> _FilterValue:
+        """Resolve an operand (an expression leaf) to a concrete value: a literal,
+        a field reference (looked up via the row resolver), a type cast, or a
+        nested boolean operation (handed back to _evaluate).
+        """
+        if isinstance(operand, tsi_query.LiteralOperation):
+            return operand.literal_
+        if isinstance(operand, tsi_query.GetFieldOperator):
+            return self._resolve(operand.get_field_, cast)
+        if isinstance(operand, tsi_query.ConvertOperation):
+            inner = self._operand_value(operand.convert_.input)
+            if operand.convert_.to == "exists":
+                return inner is not None
+            return _ch_cast_json_value(_ch_to_string(inner), operand.convert_.to)
+        return self._evaluate(operand)
+
+    def _binary(
+        self, lhs: tsi_query.Operand, rhs: tsi_query.Operand, op: str
+    ) -> bool | None:
+        """Compare two operands. ClickHouse infers a field's cast from the literal
+        it is compared against, so mirror that for each side before comparing.
+        """
+        lhs_cast = (
+            tsi_query.infer_literal_filter_cast(rhs)
+            if isinstance(rhs, tsi_query.LiteralOperation)
+            else None
+        )
+        rhs_cast = (
+            tsi_query.infer_literal_filter_cast(lhs)
+            if isinstance(lhs, tsi_query.LiteralOperation)
+            else None
+        )
+        return _ch_compare(
+            self._operand_value(lhs, lhs_cast),
+            self._operand_value(rhs, rhs_cast),
+            op,
+        )
+
+    def _evaluate(self, operation: tsi_query.Operation) -> bool | None:
+        """Recursively evaluate an operation node: boolean ops (and/or/not) combine
+        their sub-expressions; comparison ops (eq/gt/lt/in/contains/...) compare
+        resolved operand values.
+        """
+        if isinstance(operation, tsi_query.AndOperation):
+            return all(_truthy(self._evaluate_operand(op)) for op in operation.and_)
+        if isinstance(operation, tsi_query.OrOperation):
+            return any(_truthy(self._evaluate_operand(op)) for op in operation.or_)
+        if isinstance(operation, tsi_query.NotOperation):
+            inner = self._evaluate_operand(operation.not_[0])
+            return None if inner is None else not _truthy(inner)
+        if isinstance(operation, tsi_query.EqOperation):
+            return self._binary(operation.eq_[0], operation.eq_[1], "eq")
+        if isinstance(operation, tsi_query.GtOperation):
+            return self._binary(operation.gt_[0], operation.gt_[1], "gt")
+        if isinstance(operation, tsi_query.GteOperation):
+            return self._binary(operation.gte_[0], operation.gte_[1], "gte")
+        if isinstance(operation, tsi_query.LtOperation):
+            return self._binary(operation.lt_[0], operation.lt_[1], "lt")
+        if isinstance(operation, tsi_query.LteOperation):
+            return self._binary(operation.lte_[0], operation.lte_[1], "lte")
+        if isinstance(operation, tsi_query.InOperation):
+            lhs = self._operand_value(operation.in_[0])
+            if lhs is None:
+                return None
+            return any(
+                _truthy(_ch_compare(lhs, self._operand_value(op), "eq"))
+                for op in operation.in_[1]
+            )
+        if isinstance(operation, tsi_query.ContainsOperation):
+            return _ch_position(
+                self._operand_value(operation.contains_.input),
+                self._operand_value(operation.contains_.substr),
+                bool(operation.contains_.case_insensitive),
+            )
+        raise TypeError(f"Unknown operation type: {operation}")
+
+    def _evaluate_operand(self, operand: tsi_query.Operand) -> _FilterValue:
+        """Dispatch a sub-node: leaf operands resolve to a value, nested boolean or
+        comparison operations recurse back into _evaluate.
+        """
+        if isinstance(
+            operand,
+            (
+                tsi_query.LiteralOperation,
+                tsi_query.GetFieldOperator,
+                tsi_query.ConvertOperation,
+            ),
+        ):
+            return self._operand_value(operand)
+        return self._evaluate(operand)
 
 
 class InMemoryTraceServer(tsi.FullTraceServerInterface):
@@ -3948,6 +4162,339 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.CostPurgeRes()
 
     # ------------------------------------------------------------------
+    # LLM completions / image generation (mirrors ClickHouse: completions
+    # persist agent spans; image generation persists a call)
+    # ------------------------------------------------------------------
+
+    def _insert_agent_span(self, span: Any) -> None:
+        """ReplacingMergeTree semantics: same span_id replaces the row."""
+        with self.lock:
+            self._agent_spans[span.span_id] = span
+
+    def agent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        """Minimal spans query: project-scoped, newest first."""
+        schema_fields = set(AgentSpanSchema.model_fields)
+        with self.lock:
+            spans = [
+                span
+                for span in self._agent_spans.values()
+                if span.project_id == req.project_id
+            ]
+        spans.sort(key=lambda span: _ensure_tz(span.started_at), reverse=True)
+        total = len(spans)
+        if req.offset:
+            spans = spans[req.offset :]
+        if req.limit is not None:
+            spans = spans[: req.limit]
+        results = []
+        for span in spans:
+            data = {
+                key: value
+                for key, value in span.model_dump().items()
+                if key in schema_fields
+            }
+            results.append(AgentSpanSchema(**data))
+        return AgentSpansQueryRes(spans=results, total_count=total)
+
+    def _prepare_completion_request(
+        self, req: tsi.CompletionsCreateReq
+    ) -> CompletionPrepResult | tsi.CompletionsCreateRes:
+        """Resolve prompt + model info, or return a short-circuit error
+        response (mirrors the ClickHouse implementation).
+        """
+        prompt = req.inputs.prompt
+        template_vars = req.inputs.template_vars
+        initial_messages = req.inputs.messages or []
+
+        if prompt:
+            try:
+                combined_messages, initial_messages = resolve_and_apply_prompt(
+                    prompt=prompt,
+                    messages=req.inputs.messages,
+                    template_vars=template_vars,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                )
+                req.inputs.messages = combined_messages
+            except Exception as e:
+                logger.exception("Failed to resolve prompt")
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to resolve prompt: {e!s}"}
+                )
+
+        model_info = _model_to_provider_info_map().get(req.inputs.model)
+        try:
+            completion_model_info = _setup_completion_model_info(
+                model_info, req, self.obj_read
+            )
+        except Exception as e:
+            return tsi.CompletionsCreateRes(response={"error": str(e)})
+
+        return CompletionPrepResult(initial_messages, completion_model_info)
+
+    def _log_completion_span(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: CompletionPrepResult,
+        response: dict[str, Any] | None,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+        span_id: str,
+        trace_id: str,
+        conversation_id: str,
+    ) -> None:
+        """Build a completion span from the request + response and insert it.
+
+        Called with response=None to open a span before a stream, then again to
+        close it.
+        """
+        retention_days = self._get_project_retention_days(req.project_id)
+        span = build_completion_span(
+            project_id=req.project_id,
+            trace_id=trace_id,
+            span_id=span_id,
+            conversation_id=conversation_id,
+            conversation_name=req.conversation_name or "",
+            started_at=start_time,
+            ended_at=end_time,
+            provider_name=prep.completion_model_info.provider or "",
+            model_name=prep.completion_model_info.model_name,
+            request_inputs=req.inputs,
+            response=response if response is not None else None,
+            wb_user_id=req.wb_user_id or "",
+            retention_days=retention_days,
+            error=(response or {}).get("error"),
+            source=req.source,
+        )
+        self._insert_agent_span(span)
+
+    def completions_create(
+        self, req: tsi.CompletionsCreateReq
+    ) -> tsi.CompletionsCreateRes:
+        """Non-streaming completion: prepare the request, call the provider
+        (LiteLLM), and — when tracking is on — log a span and return its ids.
+        """
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            return prep
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+        res = lite_llm_completion(
+            api_key=info.api_key,
+            inputs=req.inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            vertex_credentials=info.vertex_credentials,
+        )
+        end_time = datetime.datetime.now()
+
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+
+        req.inputs.messages = prep.initial_messages
+        span_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        conversation_id = req.conversation_id or generate_id()
+        self._log_completion_span(
+            req,
+            prep,
+            res.response,
+            start_time,
+            end_time,
+            span_id,
+            trace_id,
+            conversation_id,
+        )
+        return tsi.CompletionsCreateRes(
+            response=res.response,
+            weave_call_id=span_id,
+            span_id=span_id,
+            trace_id=trace_id,
+            conversation_id=conversation_id,
+        )
+
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        """Streaming completion: open a span up front, stream the provider's
+        chunks to the caller, then close the span from the aggregated chunks
+        (or error) once the stream finishes.
+        """
+        prep = self._prepare_completion_request(req)
+        if isinstance(prep, tsi.CompletionsCreateRes):
+            error_response = prep.response
+
+            def error_iter() -> Iterator[dict[str, Any]]:
+                yield error_response
+
+            return error_iter()
+
+        info = prep.completion_model_info
+        start_time = datetime.datetime.now()
+
+        span_id = generate_id()
+        trace_id = req.trace_id or generate_id()
+        conversation_id = req.conversation_id or generate_id()
+
+        if req.track_llm_call:
+            # Open span (UNSET status) written before the stream starts.
+            req.inputs.messages = prep.initial_messages
+            self._log_completion_span(
+                req,
+                prep,
+                None,
+                start_time,
+                SENTINEL_EPOCH,
+                span_id,
+                trace_id,
+                conversation_id,
+            )
+
+        api_inputs = req.inputs.model_copy(deep=True)
+        api_inputs.prompt = None
+        api_inputs.template_vars = None
+        chunk_iter = lite_llm_completion_stream(
+            api_key=info.api_key,
+            inputs=api_inputs,
+            provider=info.provider,
+            base_url=info.base_url,
+            extra_headers=info.extra_headers,
+            return_type=info.return_type,
+            vertex_credentials=info.vertex_credentials,
+        )
+
+        if not req.track_llm_call:
+            return chunk_iter
+
+        req.inputs.messages = prep.initial_messages
+
+        def tracked() -> Iterator[dict[str, Any]]:
+            yield {
+                "_meta": {
+                    "weave_call_id": span_id,
+                    "span_id": span_id,
+                    "trace_id": trace_id,
+                    "conversation_id": conversation_id,
+                }
+            }
+            chunks: list[dict[str, Any]] = []
+            stream_error: str | None = None
+            try:
+                for chunk in chunk_iter:
+                    if "error" in chunk and "choices" not in chunk:
+                        stream_error = str(chunk["error"])
+                    chunks.append(chunk)
+                    yield chunk
+            except Exception as exc:
+                stream_error = str(exc)
+                raise
+            finally:
+                aggregated = _aggregate_stream_chunks(
+                    chunks, prep.completion_model_info.model_name
+                )
+                if stream_error is not None:
+                    aggregated["error"] = stream_error
+                self._log_completion_span(
+                    req,
+                    prep,
+                    aggregated,
+                    start_time,
+                    datetime.datetime.now(),
+                    span_id,
+                    trace_id,
+                    conversation_id,
+                )
+
+        return tracked()
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Image generation: validate inputs and credentials, call the provider,
+        and — when tracking is on — log it as a call.
+        """
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+        if not api_key:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        start_time = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e}"}
+            )
+        if "error" in res.response:
+            return res
+        end_time = datetime.datetime.now(datetime.timezone.utc)
+
+        if not req.track_llm_call:
+            return res
+
+        call_id = generate_id()
+        trace_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=call_id,
+            trace_id=trace_id,
+            op_name=constants.IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            attributes={},
+            inputs=req.inputs.model_dump(exclude_none=False),
+            wb_user_id=req.wb_user_id,
+        )
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=call_id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+        if "error" in res.response:
+            end.exception = res.response["error"]
+        try:
+            self.call_start(tsi.CallStartReq(start=start))
+            self.call_end(tsi.CallEndReq(end=end))
+        except Exception:
+            logger.exception("Failed to track image generation call")
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=call_id
+        )
+
+    # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
 
@@ -4260,6 +4807,483 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     _QUEUE_ITEM_SORT_FIELDS = frozenset(
         {"call_started_at", "call_op_name", "created_at", "updated_at"}
     )
+
+    def _queue_to_schema(self, queue: dict[str, Any]) -> tsi.AnnotationQueueSchema:
+        """Convert an internal queue dict to its API schema (tz-normalizing timestamps)."""
+        return tsi.AnnotationQueueSchema(
+            id=queue["id"],
+            project_id=queue["project_id"],
+            name=queue["name"],
+            description=queue["description"] or "",
+            scorer_refs=list(queue["scorer_refs"]),
+            created_at=_ensure_tz(queue["created_at"]),
+            created_by=queue["created_by"],
+            updated_at=_ensure_tz(queue["updated_at"]),
+            deleted_at=queue["deleted_at"],
+        )
+
+    def _live_queue(self, project_id: str, queue_id: str) -> dict[str, Any] | None:
+        """Fetch a queue only if it exists, belongs to the project, and isn't soft-deleted."""
+        queue = self._annotation_queues.get(queue_id)
+        if (
+            queue is None
+            or queue["project_id"] != project_id
+            or queue["deleted_at"] is not None
+        ):
+            return None
+        return queue
+
+    def annotation_queue_create(
+        self, req: tsi.AnnotationQueueCreateReq
+    ) -> tsi.AnnotationQueueCreateRes:
+        """Create a new annotation queue."""
+        assert_non_null_wb_user_id(req)
+        queue_id = generate_id()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        with self.lock:
+            self._annotation_queues[queue_id] = {
+                "id": queue_id,
+                "project_id": req.project_id,
+                "name": req.name,
+                "description": req.description,
+                "scorer_refs": list(req.scorer_refs),
+                "created_at": now,
+                "created_by": req.wb_user_id,
+                "updated_at": now,
+                "deleted_at": None,
+            }
+        return tsi.AnnotationQueueCreateRes(id=queue_id)
+
+    def annotation_queues_query_stream(
+        self, req: tsi.AnnotationQueuesQueryReq
+    ) -> Iterator[tsi.AnnotationQueueSchema]:
+        """List a project's live queues: optional name filter, then sort and paginate."""
+        with self.lock:
+            queues = [
+                queue
+                for queue in self._annotation_queues.values()
+                if queue["project_id"] == req.project_id and queue["deleted_at"] is None
+            ]
+        if req.name:
+            needle = req.name.lower()
+            queues = [q for q in queues if needle in q["name"].lower()]
+
+        sort_terms: list[tuple[str, str]] = []
+        if req.sort_by:
+            for sort in req.sort_by:
+                if sort.field in self._QUEUE_SORT_FIELDS and sort.direction.lower() in {
+                    "asc",
+                    "desc",
+                }:
+                    sort_terms.append((sort.field, sort.direction))
+        if sort_terms:
+            sort_terms.append(("id", "asc"))
+        else:
+            sort_terms = [("created_at", "desc"), ("id", "asc")]
+        queues = _ch_sorted_by_terms(queues, sort_terms, lambda q, term: q[term])
+
+        if req.offset is not None and req.offset > 0:
+            queues = queues[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            queues = queues[: req.limit]
+
+        for queue in queues:
+            if queue["created_at"] is None or queue["updated_at"] is None:
+                continue
+            yield self._queue_to_schema(queue)
+
+    def annotation_queue_read(
+        self, req: tsi.AnnotationQueueReadReq
+    ) -> tsi.AnnotationQueueReadRes:
+        """Read a single live queue (raises NotFound if missing or deleted)."""
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+        if queue is None:
+            raise NotFoundError(f"Queue {req.queue_id} not found")
+        return tsi.AnnotationQueueReadRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_update(
+        self, req: tsi.AnnotationQueueUpdateReq
+    ) -> tsi.AnnotationQueueUpdateRes:
+        """Update only the queue fields provided (name / description / scorer_refs)."""
+        assert_non_null_wb_user_id(req)
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+            if queue is None:
+                raise NotFoundError(
+                    f"Queue {req.queue_id} not found or already deleted"
+                )
+            if req.name is None and req.description is None and req.scorer_refs is None:
+                return tsi.AnnotationQueueUpdateRes(queue=self._queue_to_schema(queue))
+            if req.name is not None:
+                queue["name"] = req.name
+            if req.description is not None:
+                queue["description"] = req.description
+            if req.scorer_refs is not None:
+                queue["scorer_refs"] = list(req.scorer_refs)
+            queue["updated_at"] = datetime.datetime.now(datetime.timezone.utc)
+            return tsi.AnnotationQueueUpdateRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_delete(
+        self, req: tsi.AnnotationQueueDeleteReq
+    ) -> tsi.AnnotationQueueDeleteRes:
+        """Soft-delete a queue; items and progress rows are intentionally left in place."""
+        with self.lock:
+            queue = self._live_queue(req.project_id, req.queue_id)
+            if queue is None:
+                raise NotFoundError(
+                    f"Queue {req.queue_id} not found or already deleted"
+                )
+            now = datetime.datetime.now(datetime.timezone.utc)
+            queue["deleted_at"] = now
+            queue["updated_at"] = now
+            # No cascade: items and progress rows stay (mirrors ClickHouse).
+            return tsi.AnnotationQueueDeleteRes(queue=self._queue_to_schema(queue))
+
+    def annotation_queue_add_calls(
+        self, req: tsi.AnnotationQueueAddCallsReq
+    ) -> tsi.AnnotationQueueAddCallsRes:
+        """Add calls to a queue as items, skipping calls already queued or missing/deleted."""
+        assert_non_null_wb_user_id(req)
+        with self.lock:
+            existing_call_ids = {
+                item["call_id"]
+                for item in self._annotation_queue_items.values()
+                if item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+                and item["call_id"] in set(req.call_ids)
+            }
+            new_call_ids = [
+                call_id for call_id in req.call_ids if call_id not in existing_call_ids
+            ]
+            if not new_call_ids:
+                return tsi.AnnotationQueueAddCallsRes(
+                    added_count=0, duplicates=len(req.call_ids)
+                )
+
+            calls_data = [
+                rec
+                for call_id in new_call_ids
+                if (rec := self._calls.get((req.project_id, call_id))) is not None
+                and rec.project_id == req.project_id
+                and rec.deleted_at is None
+            ]
+            if not calls_data:
+                return tsi.AnnotationQueueAddCallsRes(
+                    added_count=0, duplicates=len(existing_call_ids)
+                )
+
+            now = datetime.datetime.now(datetime.timezone.utc)
+            for rec in calls_data:
+                item_id = generate_id()
+                self._annotation_queue_items[item_id] = {
+                    "id": item_id,
+                    "project_id": req.project_id,
+                    "queue_id": req.queue_id,
+                    "call_id": rec.id,
+                    "call_started_at": rec.started_at,
+                    "call_ended_at": rec.ended_at,
+                    "call_op_name": rec.op_name or "",
+                    "call_trace_id": rec.trace_id or "",
+                    "display_fields": list(req.display_fields),
+                    "added_by": req.wb_user_id,
+                    "created_at": now,
+                    "created_by": req.wb_user_id,
+                    "updated_at": now,
+                    "deleted_at": None,
+                }
+        return tsi.AnnotationQueueAddCallsRes(
+            added_count=len(calls_data), duplicates=len(existing_call_ids)
+        )
+
+    def _item_progress_state(self, item_id: str) -> tuple[str, str | None]:
+        """Global most-recent state across annotators (argMax by updated_at);
+        defaults to 'unstarted' with no annotator.
+        """
+        progress_rows = [
+            row
+            for row in self._annotation_progress.values()
+            if row["queue_item_id"] == item_id and row["deleted_at"] is None
+        ]
+        if not progress_rows:
+            # ClickHouse String default is the empty string, not NULL.
+            return ("unstarted", "")
+        latest = max(progress_rows, key=lambda row: row["updated_at"])
+        return (latest["annotation_state"], latest["annotator_id"])
+
+    def _queue_item_to_schema(
+        self,
+        item: dict[str, Any],
+        position_in_queue: int | None = None,
+    ) -> tsi.AnnotationQueueItemSchema:
+        """Convert an item dict to its schema, attaching the computed progress
+        state (across annotators) and an optional 1-based queue position.
+        """
+        state, annotator = self._item_progress_state(item["id"])
+        return tsi.AnnotationQueueItemSchema(
+            id=item["id"],
+            project_id=item["project_id"],
+            queue_id=item["queue_id"],
+            call_id=item["call_id"],
+            call_started_at=item["call_started_at"],
+            call_ended_at=item["call_ended_at"],
+            call_op_name=item["call_op_name"],
+            call_trace_id=item["call_trace_id"],
+            display_fields=list(item["display_fields"]),
+            added_by=item["added_by"],
+            annotation_state=state,
+            annotator_user_id=annotator,
+            created_at=item["created_at"],
+            created_by=item["created_by"],
+            updated_at=item["updated_at"],
+            deleted_at=item["deleted_at"],
+            position_in_queue=position_in_queue,
+        )
+
+    def annotation_queue_items_query(
+        self, req: tsi.AnnotationQueueItemsQueryReq
+    ) -> tsi.AnnotationQueueItemsQueryRes:
+        """List a queue's items: field filters, sort, then the annotation-state
+        filter (applied after the progress aggregation), optional positions,
+        then pagination.
+        """
+        with self.lock:
+            items = [
+                item
+                for item in self._annotation_queue_items.values()
+                if item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+            ]
+
+        item_filter = req.filter
+        if item_filter is not None:
+            if item_filter.id is not None:
+                items = [i for i in items if i["id"] == item_filter.id]
+            if item_filter.call_id is not None:
+                items = [i for i in items if i["call_id"] == item_filter.call_id]
+            if item_filter.call_op_name is not None:
+                items = [
+                    i for i in items if i["call_op_name"] == item_filter.call_op_name
+                ]
+            if item_filter.call_trace_id is not None:
+                items = [
+                    i for i in items if i["call_trace_id"] == item_filter.call_trace_id
+                ]
+            if item_filter.added_by is not None:
+                items = [i for i in items if i["added_by"] == item_filter.added_by]
+
+        sort_terms: list[tuple[str, str]] = []
+        if req.sort_by:
+            for sort in req.sort_by:
+                if (
+                    sort.field in self._QUEUE_ITEM_SORT_FIELDS
+                    and sort.direction.lower() in {"asc", "desc"}
+                ):
+                    sort_terms.append((sort.field, sort.direction))
+        if sort_terms:
+            sort_terms.append(("id", "asc"))
+        else:
+            sort_terms = [("created_at", "asc"), ("id", "asc")]
+        items = _ch_sorted_by_terms(items, sort_terms, lambda i, term: i[term])
+
+        # State filter applies after aggregation (the state is computed from
+        # the progress join).
+        if item_filter is not None and item_filter.annotation_states:
+            allowed = set(item_filter.annotation_states)
+            items = [
+                i for i in items if self._item_progress_state(i["id"])[0] in allowed
+            ]
+
+        positions: dict[str, int] = {}
+        if req.include_position:
+            # 1-based positions over the full filtered + sorted set, before
+            # pagination.
+            positions = {item["id"]: idx + 1 for idx, item in enumerate(items)}
+
+        if req.offset is not None and req.offset > 0:
+            items = items[req.offset :]
+        if req.limit is not None and req.limit >= 0:
+            items = items[: req.limit]
+
+        return tsi.AnnotationQueueItemsQueryRes(
+            items=[
+                self._queue_item_to_schema(
+                    item, positions.get(item["id"]) if req.include_position else None
+                )
+                for item in items
+            ]
+        )
+
+    def annotation_queues_stats(
+        self, req: tsi.AnnotationQueuesStatsReq
+    ) -> tsi.AnnotationQueuesStatsRes:
+        """Per-queue counts: total live items, and items that reached a terminal
+        (completed/skipped) state.
+        """
+        if not req.queue_ids:
+            return tsi.AnnotationQueuesStatsRes(stats=[])
+        with self.lock:
+            stats = []
+            for queue_id in req.queue_ids:
+                total_items = sum(
+                    1
+                    for item in self._annotation_queue_items.values()
+                    if item["project_id"] == req.project_id
+                    and item["queue_id"] == queue_id
+                    and item["deleted_at"] is None
+                )
+                completed_items = len(
+                    {
+                        row["queue_item_id"]
+                        for row in self._annotation_progress.values()
+                        if row["project_id"] == req.project_id
+                        and row["queue_id"] == queue_id
+                        and row["annotation_state"] in {"completed", "skipped"}
+                        and row["deleted_at"] is None
+                    }
+                )
+                stats.append(
+                    tsi.AnnotationQueueStatsSchema(
+                        queue_id=queue_id,
+                        total_items=total_items,
+                        completed_items=completed_items,
+                    )
+                )
+        return tsi.AnnotationQueuesStatsRes(stats=stats)
+
+    def annotator_queue_items_progress_update(
+        self, req: tsi.AnnotatorQueueItemsProgressUpdateReq
+    ) -> tsi.AnnotatorQueueItemsProgressUpdateRes:
+        """Upsert one annotator's progress (state) for a queue item."""
+        allowed_states = {"completed", "skipped", "in_progress"}
+        if req.annotation_state not in allowed_states:
+            raise ValueError(
+                f"Invalid annotation_state '{req.annotation_state}'. "
+                f"Must be one of: {', '.join(sorted(allowed_states))}"
+            )
+        annotator_id = req.wb_user_id
+        if not annotator_id:
+            raise ValueError("wb_user_id is required")
+
+        with self.lock:
+            own_rows = [
+                row
+                for row in self._annotation_progress.values()
+                if row["project_id"] == req.project_id
+                and row["queue_item_id"] == req.item_id
+                and row["annotator_id"] == annotator_id
+                and row["deleted_at"] is None
+            ]
+            current_state = own_rows[0]["annotation_state"] if own_rows else None
+            has_record = bool(own_rows)
+
+            item = self._annotation_queue_items.get(req.item_id)
+            item_exists = (
+                item is not None
+                and item["project_id"] == req.project_id
+                and item["queue_id"] == req.queue_id
+                and item["deleted_at"] is None
+            )
+
+            if current_state == req.annotation_state:
+                pass  # Idempotent no-op.
+            elif req.annotation_state == "in_progress" and has_record:
+                raise ValueError(
+                    "Cannot transition to 'in_progress' when a record already "
+                    f"exists (current state: '{current_state}')"
+                )
+            elif current_state is not None and current_state not in {
+                "in_progress",
+                "unstarted",
+            }:
+                raise ValueError(
+                    f"Invalid state transition from '{current_state}' to "
+                    f"'{req.annotation_state}'. Only transitions from "
+                    "'in_progress' or 'unstarted' are allowed."
+                )
+
+            if not item_exists:
+                raise ValueError(
+                    f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
+                )
+
+            if current_state != req.annotation_state:
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if has_record:
+                    own_rows[0]["annotation_state"] = req.annotation_state
+                    own_rows[0]["updated_at"] = now
+                else:
+                    progress_id = generate_id()
+                    self._annotation_progress[progress_id] = {
+                        "id": progress_id,
+                        "project_id": req.project_id,
+                        "queue_item_id": req.item_id,
+                        "queue_id": req.queue_id,
+                        "annotator_id": annotator_id,
+                        "annotation_state": req.annotation_state,
+                        "created_at": now,
+                        "updated_at": now,
+                        "deleted_at": None,
+                    }
+
+            assert item is not None
+            return tsi.AnnotatorQueueItemsProgressUpdateRes(
+                item=self._queue_item_to_schema(item)
+            )
+
+    # ------------------------------------------------------------------
+    # Evaluate model / rescore
+    # ------------------------------------------------------------------
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+        call_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=call_id,
+            )
+        )
+        return tsi.EvaluateModelRes(call_id=call_id)
+
+    def rescore(self, req: tsi.RescoreReq) -> tsi.RescoreRes:
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+
+        new_evaluation_run_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            RescoringArgs(
+                project_id=req.project_id,
+                source_evaluation_run_id=req.source_evaluation_run_id,
+                scorer_refs=req.scorer_refs,
+                wb_user_id=req.wb_user_id,
+                new_evaluation_run_id=new_evaluation_run_id,
+            )
+        )
+        return tsi.RescoreRes(
+            call_id=new_evaluation_run_id,
+            evaluation_run_id=new_evaluation_run_id,
+        )
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
+
+    def calls_score(self, req: tsi.CallsScoreReq) -> tsi.CallsScoreRes:
+        # ClickHouse publishes to Kafka for async scoring; with no producer
+        # configured it raises exactly this error. The fake has no producer.
+        raise ValueError("Kafka producer is not set")
 
     # ------------------------------------------------------------------
     # Object-class builder APIs (ops, datasets, scorers, evaluations,
@@ -5733,6 +6757,202 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         )
         self.calls_delete(calls_delete_req)
         return tsi.ScoreDeleteRes(num_deleted=len(req.score_ids))
+
+    def eval_results_query(
+        self, req: tsi.EvalResultsQueryReq
+    ) -> tsi.EvalResultsQueryRes:
+        """Return grouped prediction/trial/score data for evaluation results."""
+        eval_helpers.validate_eval_results_request(req)
+        eval_root_ids = eval_helpers.resolve_eval_root_ids(req)
+        if not eval_root_ids:
+            empty_summary = tsi.EvalResultsSummaryRes() if req.include_summary else None
+            return tsi.EvalResultsQueryRes(
+                rows=[], total_rows=0, summary=empty_summary, warnings=[]
+            )
+        all_calls = list(
+            self._calls_query_stream_for_eval_subtree(
+                req.project_id,
+                eval_root_ids,
+                include_children=req.include_predict_and_score_children,
+            )
+        )
+        if req.resolve_row_refs:
+            reader = lambda digests: self._table_rows_read_batch(
+                req.project_id, digests
+            )
+            eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
+        if not req.filters and not req.sort_by:
+            return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
+        return self._eval_results_query_sorted_filtered(req, eval_root_ids, all_calls)
+
+    @staticmethod
+    def _eval_row_field_values(
+        row: tsi.EvalResultsRow,
+        field_path: str,
+        scope_eval_call_id: str | None,
+    ) -> list[str]:
+        """Per-trial String values for a field, mirroring the CH builder's
+        JSON extraction (scores.* walks trial scores; inputs/output walk the
+        trial payloads; row_digest is scalar).
+        """
+        if field_path == "row_digest":
+            return [row.row_digest]
+        values: list[str] = []
+        for evaluation in row.evaluations:
+            if (
+                scope_eval_call_id is not None
+                and evaluation.evaluation_call_id != scope_eval_call_id
+            ):
+                continue
+            for trial in evaluation.trials:
+                if field_path.startswith("scores."):
+                    doc: Any = trial.scores
+                    parts = split_escaped_field_path(field_path[len("scores.") :])
+                elif field_path.startswith("output.") or field_path == "output":
+                    doc = trial.model_output
+                    parts = (
+                        split_escaped_field_path(field_path[len("output.") :])
+                        if field_path != "output"
+                        else []
+                    )
+                elif field_path.startswith("inputs.") or field_path == "inputs":
+                    doc = row.raw_data_row
+                    parts = (
+                        split_escaped_field_path(field_path[len("inputs.") :])
+                        if field_path != "inputs"
+                        else []
+                    )
+                else:
+                    raise InvalidRequest(
+                        f"Unsupported field: '{field_path}'. "
+                        "Supported prefixes: scores.*, inputs.*, output.*, row_digest."
+                    )
+                values.append(_ch_json_value(doc, parts))
+        return values
+
+    def _eval_results_row_matches(
+        self,
+        row: tsi.EvalResultsRow,
+        query: tsi.Query,
+        scope_eval_call_id: str | None,
+    ) -> bool:
+        def resolve(field_path: str, cast: tsi_query.CastTo | None) -> _FilterValue:
+            values = self._eval_row_field_values(row, field_path, scope_eval_call_id)
+            # Filter expressions wrap the per-trial value with any().
+            value = next((v for v in values if v != ""), values[0] if values else "")
+            return _ch_cast_json_value(value, cast)
+
+        return _QueryFilterEvaluator(resolve).matches(query)
+
+    def _eval_results_query_sorted_filtered(
+        self,
+        req: tsi.EvalResultsQueryReq,
+        eval_root_ids: list[str],
+        all_calls: list[tsi.CallSchema],
+    ) -> tsi.EvalResultsQueryRes:
+        """Sort/filter/paginate eval results, mirroring the ClickHouse CTE
+        query: filters wrap per-trial values with any(); score sorts use
+        avg(toFloat64OrNull(...)) with row_digest as the tiebreaker.
+        """
+        # ---- Fetch every grouped eval-results row ----
+        all_rows_req = tsi.EvalResultsQueryReq(
+            project_id=req.project_id,
+            evaluation_call_ids=req.evaluation_call_ids,
+            evaluation_run_ids=req.evaluation_run_ids,
+            require_intersection=False,
+            include_raw_data_rows=True,
+            resolve_row_refs=False,
+            include_rows=True,
+            include_summary=False,
+            include_predict_and_score_children=req.include_predict_and_score_children,
+            summary_require_intersection=None,
+            limit=None,
+            offset=0,
+        )
+        all_rows, _ = eval_helpers.eval_results_grouped_rows(
+            all_rows_req, eval_root_ids, all_calls
+        )
+
+        # ---- Apply per-evaluation filters ----
+        if req.filters:
+            for f in req.filters:
+                all_rows = [
+                    row
+                    for row in all_rows
+                    if self._eval_results_row_matches(
+                        row, f.query, f.evaluation_call_id
+                    )
+                ]
+
+        # ---- Keep only rows present in every evaluation (when intersecting) ----
+        if req.require_intersection and len(eval_root_ids) > 1:
+            eval_root_id_set = set(eval_root_ids)
+            all_rows = [
+                row
+                for row in all_rows
+                if eval_root_id_set.issubset(
+                    {e.evaluation_call_id for e in row.evaluations}
+                )
+            ]
+
+        # ---- Sort (score avg, or any() value), with row_digest as tiebreaker ----
+        if req.sort_by:
+            sort_terms: list[tuple[Any, str]] = []
+            for s in req.sort_by:
+                field_path = s.field
+
+                if field_path.startswith("scores."):
+
+                    def score_key(
+                        row: tsi.EvalResultsRow, _fp: str = field_path
+                    ) -> float | None:
+                        values = [
+                            parsed
+                            for v in self._eval_row_field_values(row, _fp, None)
+                            if (parsed := _ch_to_float64_or_null(v)) is not None
+                        ]
+                        if not values:
+                            return None
+                        return sum(values) / len(values)
+
+                    sort_terms.append((score_key, s.direction))
+                else:
+
+                    def any_key(
+                        row: tsi.EvalResultsRow, _fp: str = field_path
+                    ) -> str | None:
+                        values = self._eval_row_field_values(row, _fp, None)
+                        return next((v for v in values if v != ""), None)
+
+                    sort_terms.append((any_key, s.direction))
+            sort_terms.append((lambda row: row.row_digest, "asc"))
+            all_rows = _ch_sorted_by_terms(
+                all_rows, sort_terms, lambda row, key_fn: key_fn(row)
+            )
+        else:
+            all_rows.sort(key=lambda row: row.row_digest)
+
+        # ---- Paginate, resolve refs, and build the optional summary ----
+        total_rows = len(all_rows)
+        start = max(req.offset, 0)
+        end = start + req.limit if req.limit is not None else None
+        rows = all_rows[start:end] if req.include_rows else []
+        warnings: list[str] = []
+        if req.include_rows and req.include_raw_data_rows and req.resolve_row_refs:
+            warnings = eval_helpers.resolve_eval_row_refs(self, rows, req.project_id)
+
+        summary: tsi.EvalResultsSummaryRes | None = None
+        if req.include_summary:
+            eval_call_metadata = eval_helpers.fetch_eval_root_metadata(
+                self, req.project_id, eval_root_ids
+            )
+            summary = eval_helpers.compute_summary_from_rows(
+                all_rows, eval_call_metadata
+            )
+
+        return tsi.EvalResultsQueryRes(
+            rows=rows, total_rows=total_rows, summary=summary, warnings=warnings
+        )
 
 
 # ---------------------------------------------------------------------------

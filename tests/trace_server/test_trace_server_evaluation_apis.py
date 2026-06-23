@@ -8,7 +8,6 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
@@ -47,7 +46,6 @@ from weave.trace_server.workers.evaluate_model_worker import evaluate_model_work
 from weave.utils.project_id import from_project_id, to_project_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_status(client):
     eval_call_id = generate_id()
@@ -278,7 +276,6 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
     return model_ref_uri, evaluation_ref_uri
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
     """Test the evaluate_model API endpoint with isolated execution.
@@ -546,7 +543,6 @@ def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_basic(client):
     project_id = client.project_id
     entity, project = from_project_id(project_id)
@@ -608,7 +604,6 @@ def test_eval_results_query_basic(client):
     assert trial.scores["basic_scorer"] == 0.9
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_returns_genai_span_ref_without_children(client):
     project_id = client.project_id
     genai_span_ref = GenAISpanRef(
@@ -654,7 +649,6 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
     assert trial.genai_span_ref == [genai_span_ref]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_nonexistent_eval_root(client):
     project_id = client.project_id
 
@@ -669,7 +663,6 @@ def test_eval_results_query_nonexistent_eval_root(client):
     assert res.rows == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_multiple_evals(client):
     project_id = client.project_id
 
@@ -720,7 +713,6 @@ def test_eval_results_query_multiple_evals(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     """Verify that resolve_row_refs only resolves refs for the paginated slice"""
     project_id = client.project_id
@@ -779,7 +771,6 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
         assert len(call.refs) <= 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_include_predict_and_score_children(client):
     """Verify include_predict_and_score_children controls child call data."""
     project_id = client.project_id
@@ -855,7 +846,6 @@ def test_eval_results_include_predict_and_score_children(client):
     assert trial_without.scores["children_test_scorer"] == 0.8
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_resolved_inputs_inline(client):
     """Inline inputs should be available as dicts in raw_data_row."""
     project_id = client.project_id
@@ -898,7 +888,6 @@ def test_eval_results_resolved_inputs_inline(client):
     assert row.raw_data_row["question"] == "What is 2+2?"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "predict_and_score_op_name",
     [
@@ -1023,7 +1012,6 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     return run.evaluation_run_id, predict_and_score_ids
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_row_order_is_stable(client):
     """Row order should be stable across repeated requests (default sort by row_digest)."""
     eval_id, _ = _create_eval_with_scores(
@@ -1046,7 +1034,6 @@ def test_eval_results_row_order_is_stable(client):
             assert digests == digests_first, "Row order changed between requests"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_excludes_deleted_calls(client):
     """Deleted PAS calls should not appear in eval results."""
     eval_id, predict_and_score_ids = _create_eval_with_scores(
@@ -1079,7 +1066,6 @@ def test_eval_results_excludes_deleted_calls(client):
     assert res.total_rows == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
     eval_id, _ = _create_eval_with_scores(
@@ -1100,7 +1086,6 @@ def test_eval_results_sort_by_score_desc(client):
     assert accuracies == [0.9, 0.6, 0.3]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_asc(client):
     """Sort by scores.accuracy ASC should return lowest-scoring row first."""
     eval_id, _ = _create_eval_with_scores(
@@ -1120,7 +1105,6 @@ def test_eval_results_sort_by_score_asc(client):
     assert accuracies == [0.3, 0.6, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_score_gte(client):
     """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
     eval_id, _ = _create_eval_with_scores(
@@ -1161,7 +1145,6 @@ def test_eval_results_filter_score_gte(client):
     assert accuracies == [0.6, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_and_filter_combined(client):
     """Sort + filter together: filter first, then sort the remaining rows."""
     eval_id, _ = _create_eval_with_scores(
@@ -1201,7 +1184,6 @@ def test_eval_results_sort_and_filter_combined(client):
     assert accuracies == [0.9, 0.7, 0.5]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_with_evaluation_call_id_scope(client):
     """Filter scoped to evaluation_call_id only tests that eval's scores."""
     eval_id, _ = _create_eval_with_scores(
@@ -1252,7 +1234,6 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
     assert accuracies == [0.7, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
     """Sorting on an unsupported field prefix returns InvalidRequest."""
     eval_id, _ = _create_eval_with_scores(
@@ -1268,7 +1249,6 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_output(client):
     """Sort by output.label orders rows by nested model output field."""
     project_id = client.project_id
@@ -1329,7 +1309,6 @@ def test_eval_results_sort_by_output(client):
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_summary_with_filter(client):
     """Summary reflects filtered rows, not all rows."""
     eval_id, _ = _create_eval_with_scores(
