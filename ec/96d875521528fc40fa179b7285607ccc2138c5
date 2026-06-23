@@ -109,3 +109,20 @@ jest 26 pass. Kept LOCAL/unpushed.
 No own edits — slice 05's doc-comment simplifications (Agent-nesting docstring
 reworded; agentSpans/toolSpans field docs trimmed to one line) propagate here via
 restack. Validated at tip: jest 26 pass. Kept LOCAL/unpushed.
+
+---
+## Session addendum — docstring reword + move limitation comment down (2026-06-23)
+
+Per review:
+- Reworded the module docstring's usage section into two clearly-labeled ways,
+  "Implicit" and "Explicit". Dropped the ESM `node --import=weave/instrument`
+  preload block; the only requirement now called out is that CJS apps must
+  `require('weave')` before `@google/adk`.
+- Reverted afterModelCallback's expanded KNOWN LIMITATION comment back to the
+  one-liner; the full block moved down to slice 03 (where the limitation first
+  applies). This slice inherits it via restack.
+- A 3rd comment asked whether ADK_VERSION_RANGE ('>= 1.0.0') is the min version:
+  yes — it's a minimum (open-ended semver range, consumed by the instrumentation
+  `version` field at the addCJS/ESMInstrumentation registrations). No change.
+
+Validated: eslint + typecheck:esm clean, jest 26. Kept LOCAL/unpushed.
