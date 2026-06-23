@@ -153,3 +153,23 @@ file internally consistent.
 TEST behavior unchanged (no `!`/key indirection in source affects spans).
 Validated: eslint + typecheck:esm clean; jest slice 05 24, tip 26. Slice 06
 inherits via restack (0 references to the removed fields). Kept LOCAL/unpushed.
+
+---
+## Session addendum — review pass: simplify doc comments (2026-06-23)
+
+Doc-only changes to googleAdk.ts (no behavior change), per review comments:
+- Reworded the "Agent nesting" module-docstring paragraph into plainer English
+  (dropped the inline method names; same meaning).
+- Trimmed the `agentSpans` field doc to one line; dropped "ended in reverse" —
+  that rationale already lives in finishInvocation's inline comment.
+- Trimmed the `toolSpans` field doc to one line; dropped the insertion-ordering
+  note. The "innermost = last" mechanic is in innermostOpenToolSpan's comment,
+  and the "out-of-tree agent / AgentTool fallback parent" rationale is at the
+  caller (the `if (!agent ...)` branch).
+
+A 4th comment asked why findAgentInTree needs the manual-walk fallback — that
+was a question; answered in chat (findAgent is optional in our duck type + may
+throw; manual BFS keeps span-parenting working; caller degrades to
+innermostOpenToolSpan/rootSpan), left the code as-is pending the user's call.
+
+Validated: eslint + typecheck:esm clean, jest slice 05 24. Kept LOCAL/unpushed.
