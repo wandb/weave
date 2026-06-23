@@ -216,6 +216,38 @@ def test_annotation_feedback(client: WeaveClient) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "bad_spec",
+    [None, {"field_schema": None}, "not-a-spec"],
+    ids=["null_spec", "null_field_schema", "scalar"],
+)
+def test_annotation_feedback_malformed_spec_is_invalid_request(
+    client: WeaveClient, bad_spec: object
+) -> None:
+    """A malformed annotation spec yields InvalidRequest, not an unhandled 500 (WB-35940)."""
+    project_id = client.project_id
+    column_name = "malformed_spec"
+    digest = client.server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id, object_id=column_name, val=bad_spec
+            )
+        )
+    ).digest
+    annotation_ref = f"weave:///{project_id}/object/{column_name}:{digest}"
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/call_id_123",
+                feedback_type=f"wandb.annotation.{column_name}",
+                payload={"value": 1},
+                annotation_ref=annotation_ref,
+            )
+        )
+
+
 def test_runnable_feedback(client: WeaveClient) -> None:
     """Test feedback creation with runnable references."""
     project_id = client.project_id
