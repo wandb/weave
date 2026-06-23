@@ -1,39 +1,27 @@
 ## Conversation
-Phase-1 PR4 (final) of the import-linter decoupling stack. User: vendor what you need, no shared dir, don't codegen, leave codegen-destined files untouched. I earlier asked whether to handle the core-repo side in lockstep or land shims; user said 'go for phase 1' so I chose the safe shim path (no core access from this workspace).
+Phase-1 PR4 (final) of the import-linter decoupling stack. After the stack + core PR went up as drafts, the user said: 'don't include any backcompat shims, we don't need it.' So this commit was AMENDED to delete the shims outright (was previously: move + leave re-export shims at old paths).
 
-## Actions
-- Target ignores: 7 (Contract 1: isolated_client_executor x2 + evaluate_model_worker x5) + 5 (Contract 3: the same worker x5; Contract 3 dedups against Contract 1).
-- Verified the server depends on the worker ONLY via the EvaluateModelDispatcher ABC (clickhouse_trace_server_batched.py:324, in_memory_trace_server.py:153). No string/mock.patch/importlib refs to the modules (grepped).
-- Created weave/eval_worker/ (package, outside both contracts). git mv'd isolated_client_executor.py and evaluate_model_worker.py into it (preserves blame).
-- Created weave/trace_server/eval_model_dispatcher.py holding the EvaluateModelDispatcher ABC (client-free; imports EvaluateModelArgs from trace_server_interface). Removed the ABC from the moved worker; it now imports + re-exports it.
-- Repointed clickhouse + in_memory server imports to eval_model_dispatcher.
-- Left thin re-export shims at both OLD paths for core back-compat (public names only).
-- Repointed 4 in-repo test files to weave.eval_worker.* (shims are for core, not in-repo tests).
-- pyproject: removed the 7 Contract-1 entries (leaving only the 4 llm_structured_model), emptied Contract-3's list (ignore_imports = []), and added a header note that weave.eval_worker is intentionally outside the contracts.
+## Actions (current state, post-amend)
+- Moved evaluate_model_worker.py + isolated_client_executor.py to weave/eval_worker/ (git mv, preserves blame).
+- EvaluateModelDispatcher ABC -> client-free weave/trace_server/eval_model_dispatcher.py; clickhouse + in_memory servers import the seam from there.
+- NO SHIMS: deleted weave/trace_server/isolated_client_executor.py and the whole weave/trace_server/workers/ package (was the shim + empty __init__ packages).
+- pyproject: removed the 7 Contract-1 eval-worker/isolated ignores AND removed the entire 'Workers must not import the Weave client SDK' contract (its source module weave.trace_server.workers no longer exists; the trace-server contract already covers all of weave.trace_server). Updated the header comment (dropped the 'and workers must additionally...' clause; kept the eval_worker note).
+- Repointed 4 in-repo test files to weave.eval_worker.* (done earlier).
+- Core companion wandb/core#46453 repoints core's 3 services/weave-trace importers to weave.eval_worker.* — MUST land together now (no shims => old paths gone).
+
+## Verification (post-amend)
+- lint-imports: 2 kept / 0 broken (Workers contract removed). No weave-source import of the deleted package.
+- import smoke: weave + clickhouse + in_memory + eval_worker import cleanly; EvaluateModelDispatcher identity intact.
+- tests: tests/trace_server/isolated_client_executor/ + test_trace_server_evaluation_apis.py = 40 passed (fake); full trace_server collects 1379.
 
 ## Errors & Mistakes
-- First test run failed: conftest.py imports the PRIVATE _worker_loop, which my minimal shim (public names only) didn't re-export. Fix: repoint the in-repo tests to weave.eval_worker (correct anyway) rather than fattening the shim with a private name.
-- ruff I001 unsorted-imports on clickhouse/in_memory and the 4 test files (the new import needed reordering); ruff --fix resolved all.
-
-## Verification
-- lint-imports: 3 kept / 0 broken; analyzed files 441 -> 451 (new package). 12 ignores removed.
-- ruff: clean on all changed prod + test files.
-- runtime: EvaluateModelDispatcher identity is the SAME object via eval_model_dispatcher, eval_worker.evaluate_model_worker, and the old shim path; IsolatedClientExecutor identity same via shim + new path.
-- tests: tests/trace_server/isolated_client_executor/ + test_trace_server_evaluation_apis.py = 40 passed on --trace-server=fake. Full tests/trace_server collects 1379, no import errors.
-
-## Dead Ends
-Considered fattening the isolated shim to re-export _worker_loop (zero test churn). Rejected: a back-compat shim should expose only the public API; in-repo tests should reference the real (moved) location.
+- (pre-amend) first test run failed: conftest imported the PRIVATE _worker_loop which the minimal shim didn't re-export -> repointed in-repo tests to weave.eval_worker (kept after shim deletion, still correct).
+- amend re-used the stale note via notes.rewrite.amend=true; overwrote with this one (git notes add -f).
 
 ## Hints for Future Agents
-- CROSS-REPO: the core repo (services/weave-trace) imports evaluate_model + EvaluateModelArgs from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker and IsolatedClientExecutor from weave.trace_server.isolated_client_executor. The shims keep that working. The weave->core mirror CI (see memory weave_mirror_core_ci) would break without them. To finish the decoupling: repoint core to weave.eval_worker.* and weave.trace_server.eval_model_dispatcher, then delete the shims.
-- The shims live UNDER weave/trace_server/ and transitively import the client via weave.eval_worker. lint-imports allows this because allow_indirect_imports=true checks DIRECT edges only (shim's direct import is weave.eval_worker, not a forbidden module). The server's OWN production code (clickhouse/in_memory) imports the clean eval_model_dispatcher seam, so the extraction goal holds.
-- EvaluateModelArgs canonical home stays weave.trace_server.trace_server_interface; EvaluateModelDispatcher canonical home is now weave.trace_server.eval_model_dispatcher.
-- production dispatch also passes RescoringArgs through the same .dispatch() seam (EvalWorkerJob union); the ABC annotation says EvaluateModelArgs (narrower than reality) — left as-is to minimize churn.
-
-## Codebase Discoveries
-- isolated_client_executor.py has ZERO production importers in weave/ (only tests + core); it is shipped here but consumed at runtime by core.
-- The isolated_client_executor tests run real subprocesses; conftest monkeypatches IsolatedClientExecutor._ensure_process_running to use fork (not spawn) for speed.
+- NO SHIMS now: importing the old paths (weave.trace_server.isolated_client_executor / .workers.evaluate_model_worker.*) fails. All consumers (incl. core) MUST use weave.eval_worker.* and the eval_model_dispatcher seam.
+- COUPLED MERGE: weave PR #7360 and core #46453 must land together. Core gets weave via submodule services/weave-python/weave-public; its pin must include this commit, AND core master must already import the new paths, or whichever side updates first breaks. weave PR4's mirror CI (pins new-weave onto core master) will be RED until core #46453 merges — expected.
+- EvaluateModelArgs canonical home = trace_server_interface; EvaluateModelDispatcher = eval_model_dispatcher.
 
 ## Open Questions
-- Should the isolated_client_executor + workers test dirs eventually move to tests/eval_worker/ to mirror the source? Left in place to minimize churn this PR.
-- The 4 llm_structured_model ignores remain (codegen-destined); they + the builtin registry are Phase 2.
+- None. (Earlier 'move test dirs to tests/eval_worker/?' still open but out of scope.)
