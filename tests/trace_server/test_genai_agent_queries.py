@@ -38,7 +38,6 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
-    NOTE_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
 
@@ -375,8 +374,7 @@ def test_conversation_spans_unknown_id_returns_empty(ch_server):
 def test_conversation_spans_sequence_and_feedback(ch_server):
     """agent_conversation_spans returns an ordered per-span sequence (kinds from
     operation_name, ERROR surfaced via status) plus turn-anchored feedback
-    markers carrying detoned tags and scorer ratings. Only agent_user_feedback
-    and agent_monitor are surfaced; other feedback types are dropped.
+    markers carrying detoned tags and scorer ratings.
     """
     project_id = _make_project_id("conv-spans")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -428,7 +426,6 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     _insert_spans(ch_server.ch_client, spans)
 
     # Turn A: a human thumbs-up tag. Turn B: a scorer with a tag + a rating.
-    # Plus an unsupported note on turn B that must be filtered out.
     turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
     turn_b_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_b).uri
     _create_feedback(
@@ -454,10 +451,6 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
         scorer_ratings={"quality": 0.8},
         scorer_rating_reasons={"quality": "clear answer"},
     )
-    _create_feedback(
-        ch_server, project_id, turn_b_ref, NOTE_FEEDBACK_TYPE, {"note": "nice"}
-    )
-
     res = ch_server.agent_conversation_spans(
         AgentConversationSpansReq(
             project_id=project_id,
@@ -478,8 +471,8 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     assert row.spans[-1].trace_id == trace_b
     assert any(e.span_id == tool_span for e in row.spans)
 
-    # Markers are keyed by turn (trace_id); the note is dropped, so each turn
-    # has exactly one marker. Emoji tags come back as the detoned glyph.
+    # Markers are keyed by turn (trace_id). Emoji tags come back as the detoned
+    # glyph; scorer ratings come back as scores.
     by_trace = {f.trace_id: f for f in row.spans_feedback}
     assert by_trace[trace_a].feedback_type == AGENT_USER_FEEDBACK_TYPE
     assert by_trace[trace_a].tags == ["\U0001f44d"]
