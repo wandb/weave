@@ -3227,6 +3227,7 @@ class EvalResultsScorerStats(BaseModel):
 class EvalResultsEvaluationSummary(BaseModel):
     evaluation_call_id: str
     trial_count: int = 0
+    predict_total_tokens: int | None = None
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
     evaluation_ref: str | None = None
     model_ref: str | None = None
