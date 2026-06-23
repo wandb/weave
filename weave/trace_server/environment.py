@@ -320,6 +320,20 @@ def wf_clickhouse_max_execution_time() -> int | None:
         return None
 
 
+def wf_clickhouse_max_estimated_execution_time() -> int | None:
+    """The estimated-time (TOO_SLOW) projection guard for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError:
+        logger.exception(
+            "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME value '%s' is not valid", time
+        )
+        return None
+
+
 def wf_clickhouse_disable_query_failure_prediction() -> bool:
     """Whether to disable ClickHouse estimated-time query failure prediction."""
     return (
