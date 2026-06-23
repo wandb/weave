@@ -901,6 +901,66 @@ def test_output_media_attaches_to_assistant_message() -> None:
     assert _assistant_payload(assistant).content_refs == [image_internal]
 
 
+def test_prior_assistant_media_in_input_history_not_attached_to_user() -> None:
+    """Regression: a multi-turn turn replays the prior assistant turn — audio
+    and all — into its ``input_messages`` as an assistant-role message. That
+    echoed model-generated media must NOT surface as the user's attachment.
+
+    Direction is the message *role*, not its input/output position: both the
+    echoed assistant audio and the user's own audio live in this span's
+    ``input_messages``, but only the user-role one belongs to the user. This is
+    the OpenAI Realtime conversations bug — turn 2's user bubble showed turn 1's
+    assistant audio clip.
+    """
+    user_audio_internal = "weave-trace-internal:///PID/object/Content:USERAUDIO"
+    user_audio_external = "weave:///e/p/object/Content:USERAUDIO"
+    asst_audio_internal = "weave-trace-internal:///PID/object/Content:ASSTAUDIO"
+    asst_audio_external = "weave:///e/p/object/Content:ASSTAUDIO"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="voice-agent",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("And after that?"))}
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            # The prior assistant turn is replayed as history (assistant role),
+            # followed by the current user turn (user role) with its own audio.
+            input_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        _text_part("It's foggy."), _uri_part(asst_audio_external)
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("And after that?"),
+                        _uri_part(user_audio_external),
+                    ),
+                },
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("Clearing up."))}
+            ],
+            content_refs=[asst_audio_internal, user_audio_internal],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the user's own audio attaches; the echoed assistant audio does not.
+    assert _user_payload(user).content_refs == [user_audio_internal]
+    assert asst_audio_internal not in _user_payload(user).content_refs
+
+
 def test_content_ref_without_inline_part_is_not_attached() -> None:
     """A `content_refs` entry with no matching inline message part has no
     direction signal, so it attaches to neither bubble — only refs anchored to
