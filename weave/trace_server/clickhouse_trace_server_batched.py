@@ -395,6 +395,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._password = password
         self._database = database
         self._use_async_insert = use_async_insert
+        self._use_replicated_tables = wf_env.wf_clickhouse_replicated()
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
@@ -7282,6 +7283,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
             )
+
+        # Replicated/distributed engines block-dedup byte-identical inserts;
+        # a unique token opts out (non-replicated CH Cloud is unaffected).
+        if self._use_replicated_tables:
+            settings = {**(settings or {}), "insert_deduplication_token": generate_id()}
 
         start = time.monotonic()
         sanitized_invalid_utf8 = False
