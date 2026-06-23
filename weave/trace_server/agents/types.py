@@ -1,8 +1,42 @@
-"""Request/response types for the Weave Agents observability API.
+"""Pydantic request/response types for the Weave Agents observability API.
 
-All types are Pydantic BaseModel subclasses used by both the FastAPI
-endpoints (services/weave-trace) and the ClickHouse query handlers
-(weave/trace_server/clickhouse_trace_server_batched.py).
+These types are the shared interface between the FastAPI handlers in
+`services/weave-trace`, the ClickHouse handler in
+`weave/trace_server/clickhouse_trace_server_batched.py`, the in-memory fake,
+and every SDK binding. The same shape goes in on every backend, the same
+shape comes out.
+
+Domain model:
+
+1. **Agent** — identified by `agent_name`. The container at the top of the
+   Agents view.
+2. **Agent version** — identified by `(agent_name, agent_version)`. Lets a
+   user diff behavior across releases of the same agent.
+3. **Span** — one OTel GenAI span: agent invocation, LLM call, tool
+   execution, compaction, or handoff. The atomic unit of recorded
+   activity.
+4. **Turn** — one trace's span tree rendered as a linear chat timeline.
+   Roughly "one user message and the agent's complete response."
+5. **Conversation** — turns sharing a `conversation_id`, presented as
+   ordered multi-turn chat.
+
+Request/response pairs follow a `*Req` → `*Res` naming convention:
+
+* `agent_agents_query` — `AgentsQueryReq` → `AgentsQueryRes`
+* `agent_versions_query` — `AgentVersionsQueryReq` → `AgentVersionsQueryRes`
+* `agent_spans_query` — `AgentSpansQueryReq` → `AgentSpansQueryRes`
+  (list mode and group mode share one endpoint)
+* `agent_spans_stats` — `AgentSpanStatsReq` → `AgentSpanStatsRes`
+* `agent_traces_chat` — `AgentTraceChatReq` → `AgentTraceChatRes`
+* `agent_conversation_chat` — `AgentConversationChatReq` →
+  `AgentConversationChatRes`
+* `agent_search` — `AgentSearchReq` → `AgentSearchRes`
+* `agent_custom_attrs_schema` — `AgentCustomAttrsSchemaReq` →
+  `AgentCustomAttrsSchemaRes`
+* `genai_otel_export` — `GenAIOTelExportReq` → `GenAIOTelExportRes`
+
+See https://docs.wandb.ai/weave/guides/tracking/trace-agents for the
+user-facing concepts and instrumentation patterns.
 """
 
 from __future__ import annotations
@@ -141,7 +175,32 @@ def _as_utc(dt: datetime.datetime) -> datetime.datetime:
 
 
 class AgentSpanValueRef(BaseModel):
-    """Reference to a span field or typed custom attribute map value."""
+    """Pointer to one value pulled off a span row.
+
+    The primitive that every higher-level spec (`AgentSpanMeasureSpec`,
+    `AgentSpanStatsMetricSpec`, `AgentSpanGroupDistributionSpec`,
+    `AgentSpanStatsNumericBucketSpec`) uses to name "the thing to read."
+    The `source` chooses where the value lives and `key` chooses which
+    one:
+
+    1. `field` — a semconv field (`agent.name`) or direct column
+       (`agent_name`); resolved through the server-side allowlist.
+    2. `derived` — a query-time metric from
+       `AGENT_SPAN_STATS_DERIVED_VALUE_TYPES` (for example,
+       `duration_ms`, `total_tokens`, `total_cost_usd`).
+    3. `custom_attrs_string` / `custom_attrs_int` /
+       `custom_attrs_float` / `custom_attrs_bool` — a user-defined key
+       inside the matching typed custom attribute Map column.
+
+    Attributes:
+        source: Where the value lives. Defaults to `field`.
+        key: Field name, derived-metric name, or custom attribute key
+            depending on `source`.
+
+    Raises:
+        ValueError: When `source="derived"` but `key` isn't a recognized
+            derived metric.
+    """
 
     source: AgentSpanValueSource = "field"
     key: str
@@ -157,7 +216,38 @@ class AgentSpanValueRef(BaseModel):
 
 
 class AgentSpanMeasureSpec(BaseModel):
-    """One aggregate measure computed over spans in a group or bucket."""
+    """Aggregate roll-up of one span value into a single number per group.
+
+    Pair an `AgentSpanValueRef` with an aggregation function. Used by
+    `AgentSpansQueryReq.measures` (per-group measures returned in
+    `AgentSpanGroupRow.metrics`) and by `AgentSpanGroupFilter.measure`
+    (range-filtering groups on an aggregated value).
+
+    The aggregation must be legal for `value_type` — the allowed set is
+    in `_ALLOWED_AGGS_BY_TYPE`. `count` is the only aggregation that may
+    omit `value`.
+
+    Attributes:
+        alias: Output key in `AgentSpanGroupRow.metrics`. Must be a
+            valid Python identifier and must not collide with the
+            reserved aggregate fields on `AgentSpanGroupRow`.
+        aggregation: Which roll-up to apply.
+        value: Value to aggregate. Required for every aggregation
+            except `count`.
+        value_type: Declared type of `value`. Used to validate the
+            aggregation choice. Optional when the aggregation is
+            `count` or when `value.source="derived"` (the derived metric
+            already pins the type).
+        filter: Optional Mongo-style `Query` that further restricts
+            which spans contribute to this measure. Applied on top of
+            the request-level filter.
+
+    Raises:
+        ValueError: When `value` is missing for a non-`count`
+            aggregation, when `value_type` disagrees with a derived
+            metric's known type, or when the aggregation isn't legal
+            for `value_type`.
+    """
 
     alias: str = Field(pattern=_IDENT_RE)
     aggregation: AgentSpanStatsAggregation
@@ -193,7 +283,36 @@ class AgentSpanMeasureSpec(BaseModel):
 
 
 class AgentSpanStatsMetricSpec(BaseModel):
-    """Metric to extract from each matching span and aggregate into chart rows."""
+    """Series specification for the `agent_spans_stats` chart endpoint.
+
+    Use on `AgentSpanStatsReq.metrics`. Each spec fans out into one
+    response column per aggregation or percentile, named
+    `{alias}__{aggregation}` or `{alias}__p{percentile}`.
+
+    Note:
+        When both `aggregations` and `percentiles` are empty, the
+        validator picks a sensible default: `sum` for `number`,
+        `count` for everything else. Don't rely on this in new code —
+        pass at least one aggregation explicitly.
+
+    Attributes:
+        alias: Prefix shared by every column this metric produces.
+            Must be a valid Python identifier.
+        value_type: Type of the underlying span value. Drives which
+            aggregations are legal.
+        aggregations: Aggregations to compute. Must be unique and must
+            match `value_type` (see `_ALLOWED_AGGS_BY_TYPE`).
+        percentiles: Quantile cutoffs in the closed interval
+            `[0, 100]`. Only valid when `value_type="number"`. Must be
+            unique.
+        value: Span value the aggregations apply to.
+
+    Raises:
+        ValueError: When aggregations are non-unique or illegal for
+            `value_type`, when percentiles are out of range or
+            duplicated, or when percentiles are requested on a
+            non-numeric metric.
+    """
 
     alias: str = Field(pattern=_IDENT_RE)
     value_type: AgentSpanStatsValueType
@@ -240,7 +359,24 @@ class AgentSpanStatsMetricSpec(BaseModel):
 
 
 class AgentSpanStatsColumn(BaseModel):
-    """Metadata describing one column in an agent span stats result row."""
+    """Schema entry telling the client how to read one cell in a stats row.
+
+    `AgentSpanStatsRes.rows` is a list of untyped `dict` rows so the wire
+    format stays compact. This column list, returned alongside, is what
+    pins down the type and meaning of each key in those dicts.
+
+    Attributes:
+        name: Key used inside each row dict.
+        role: Provenance of the column. `time` for the time bucket
+            boundary, `bucket` for a numeric bucket boundary, `group`
+            for a group-by ref, `metric` for one aggregation/percentile
+            of a metric.
+        value_type: Cell type.
+        metric: Originating metric `alias` for `metric` columns. `None`
+            otherwise.
+        aggregation: Aggregation name (or `pNN` percentile label) for
+            `metric` columns. `None` otherwise.
+    """
 
     name: str
     role: Literal["time", "bucket", "group", "metric"]
@@ -250,7 +386,27 @@ class AgentSpanStatsColumn(BaseModel):
 
 
 class AgentSpanGroupFilter(BaseModel):
-    """Range filter over one grouped span measure."""
+    """Keep only span groups whose aggregated measure falls in a range.
+
+    Example: "agents whose error count is between 5 and 100" or
+    "conversations whose first span happened after yesterday." Used on
+    `AgentSpansQueryReq.group_filters` (post-grouping filter) and
+    `AgentSpanStatsReq.group_filters` (post-bucket filter).
+
+    At least one of `min` or `max` must be set. When both are set, they
+    must share a type and `max` must be greater than or equal to `min`.
+
+    Attributes:
+        group_by: Optional override for the grouping used by this
+            filter. Empty reuses the surrounding request's grouping.
+        measure: The aggregated measure the range applies to.
+        min: Lower bound, inclusive. `None` for no lower bound.
+        max: Upper bound, inclusive. `None` for no upper bound.
+
+    Raises:
+        ValueError: When both bounds are `None`, when `min` and `max`
+            have mismatched types, or when `max < min`.
+    """
 
     group_by: list[AgentGroupByRef] = Field(default_factory=list)
     measure: AgentSpanMeasureSpec
@@ -278,13 +434,52 @@ class AgentSpanGroupFilter(BaseModel):
 
 
 class AgentSpanStatsTimeBucketSpec(BaseModel):
-    """Bucket stats rows by started_at time intervals."""
+    """Time-series bucketing for the `agent_spans_stats` endpoint.
+
+    Default branch of the `AgentSpanStatsBucketSpec` discriminated union.
+    Bucket width comes from `AgentSpanStatsReq.granularity` (seconds);
+    when granularity is `None`, the server picks a sensible width based
+    on the date range. Use `AgentSpanStatsNumericBucketSpec` for
+    histogram-style charts instead.
+    """
 
     type: Literal["time"] = "time"
 
 
 class AgentSpanStatsNumericBucketSpec(BaseModel):
-    """Bucket stats rows by ranges of one numeric span or grouped value."""
+    """Histogram bucketing for the `agent_spans_stats` endpoint.
+
+    Numeric branch of `AgentSpanStatsBucketSpec`. Two modes:
+
+    1. **Per-span histogram** — set `value`, leave `group_by`/`measure`
+       empty. Each span's `value` is placed in one bucket.
+    2. **Grouped-measure histogram** — set `group_by` and `measure`,
+       leave `value` empty. Each *group's* aggregated measure is placed
+       in one bucket.
+
+    The two modes are mutually exclusive. `bins` divides `[min, max]`
+    into equal-width buckets; `min`/`max` default to the data range
+    when omitted.
+
+    Attributes:
+        alias: Output column name for the bucket boundary.
+        bins: Bucket count, 1 to 200. Defaults to 24.
+        min: Lower bound of the histogram. `None` to use the data
+            minimum.
+        max: Upper bound of the histogram. `None` to use the data
+            maximum.
+        value: Per-span numeric value to bucket. Mutually exclusive
+            with `group_by`/`measure`.
+        group_by: Group-by refs whose aggregated measure should be
+            bucketed. Requires `measure`.
+        measure: Aggregated measure to bucket. Requires `group_by`.
+
+    Raises:
+        ValueError: When the two modes overlap or both are empty,
+            when only one of `group_by`/`measure` is set, when a
+            non-numeric value/measure is referenced, or when
+            `max < min`.
+    """
 
     type: Literal["number"] = "number"
     alias: str = Field(default="value", pattern=_IDENT_RE)
@@ -341,7 +536,51 @@ AgentSpanStatsBucketSpec = Annotated[
 
 
 class AgentSpanStatsReq(BaseModel):
-    """Request chart-ready aggregations over GenAI agent spans."""
+    """Chart-ready aggregation request for the `agent_spans_stats` endpoint.
+
+    The pipeline runs in this order: filter spans (`query` +
+    `started_at` window) → bucket (`bucket_by`, default time buckets at
+    `granularity` seconds) → group within bucket (`group_by`) →
+    compute metrics → drop groups failing `group_filters`.
+
+    Pair with `AgentSpanStatsRes`.
+
+    Note:
+        Grouped requests cap the window at `MAX_AGENT_STATS_RANGE_DAYS`.
+        Unfiltered, ungrouped requests are exempt — they're used for
+        cheap top-line counts.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        query: Optional Mongo-style filter. Field names resolve through
+            the GenAI semantic conventions, direct span columns, or
+            typed custom attribute keys.
+        start: Window start, inclusive. Naive datetimes are read as
+            UTC.
+        end: Window end, exclusive. Defaults to "now (UTC)" when
+            omitted.
+        granularity: Time bucket width in seconds. Server picks a
+            default when `None`. Ignored for numeric buckets.
+        timezone: IANA timezone for time-of-day grouping in the
+            response. Defaults to `UTC`.
+        group_by: Group within each bucket by these refs. Mutually
+            exclusive with `bucket_by` set to a numeric bucket spec.
+        metrics: Metrics to compute per bucket and group. Required
+            unless a numeric bucket spec already produces counts.
+        group_limit: Maximum groups returned per bucket, 1 to
+            `MAX_AGENT_STATS_GROUP_LIMIT`.
+        bucket_by: How to bucket. `None` is equivalent to
+            `AgentSpanStatsTimeBucketSpec()`.
+        group_filters: Range filters over aggregated measures. Only
+            valid for time buckets and grouped numeric buckets.
+
+    Raises:
+        ValueError: When `metrics` are missing without a numeric bucket
+            spec, when metric aliases collide, when `end < start`, when
+            a grouped request exceeds `MAX_AGENT_STATS_RANGE_DAYS`, or
+            when `group_by`, `metrics`, and `bucket_by` combine
+            illegally.
+    """
 
     project_id: str
     query: Query | None = None
@@ -415,7 +654,25 @@ class AgentSpanStatsReq(BaseModel):
 
 
 class AgentSpanStatsRes(BaseModel):
-    """Response containing chart-ready agent span stats rows."""
+    """Chart-ready response for `agent_spans_stats`.
+
+    Read `columns` first to get the schema, then index into each `rows`
+    entry by `AgentSpanStatsColumn.name`. The `start`, `end`,
+    `granularity`, and `timezone` fields echo what the server actually
+    applied so clients can render axes without re-deriving them. Empty
+    buckets are omitted.
+
+    Attributes:
+        start: Window start the server used. UTC.
+        end: Window end the server used. UTC.
+        granularity: Time bucket width the server applied. `None` for
+            numeric buckets.
+        timezone: IANA timezone echoed from the request.
+        bucket_type: Which discriminant of `AgentSpanStatsBucketSpec`
+            was applied.
+        columns: Schema for cells in each `rows` dict.
+        rows: One dict per non-empty (bucket, group) combination.
+    """
 
     start: datetime.datetime
     end: datetime.datetime
@@ -427,7 +684,118 @@ class AgentSpanStatsRes(BaseModel):
 
 
 class AgentSpanSchema(BaseModel):
-    """A normalized agent span returned by query APIs."""
+    """Normalized agent span row, the output unit of `agent_spans_query`.
+
+    One OTel GenAI span, flattened into Weave's column layout. Same shape
+    regardless of how the span was produced: `weave.start_session()` /
+    `start_turn()` / `start_llm()` / `start_tool()`, a raw OTel exporter,
+    or one of the autopatched integrations.
+
+    Most fields are nullable because the producing span may not have
+    emitted the corresponding GenAI attribute. List fields default to
+    empty.
+
+    Note:
+        The `*_cost_usd` fields and `raw_span_dump` are opt-in: the
+        server populates them only when the request sets
+        `include_costs=True` or `include_details=True` respectively.
+        Cost fields use `None` (not `0`) to mean "no priced model
+        matched," so the UI can distinguish "unpriced" from "free."
+
+    Attributes:
+        project_id: Owning project in `entity/project` form.
+        trace_id: OTel trace ID. All spans in one turn share this.
+        span_id: OTel span ID. Unique within the trace.
+        parent_span_id: Parent span ID, or `None` for root spans.
+        span_name: OTel span name (e.g. `chat gpt-4o`,
+            `execute_tool search`).
+        span_kind: OTel span kind: `Server`, `Client`, `Internal`, etc.
+        started_at: Span start time. UTC.
+        ended_at: Span end time. UTC.
+        status_code: OTel status: `Ok`, `Error`, `Unset`.
+        status_message: Human-readable status detail; typically the
+            error message when `status_code == "Error"`.
+        operation_name: GenAI `gen_ai.operation.name`
+            (`invoke_agent`, `chat`, `execute_tool`, etc.).
+        provider_name: GenAI `gen_ai.provider.name`
+            (`openai`, `anthropic`, etc.).
+        agent_name: Identifier of the agent that owns the span.
+        agent_id: Stable agent ID emitted by the SDK, if any.
+        agent_description: Free-form agent description.
+        agent_version: Agent version string for cross-release grouping.
+        request_model: Model requested.
+        response_model: Model the provider reports actually served the
+            response.
+        response_id: Provider's response identifier.
+        input_tokens: Prompt tokens reported by the provider.
+        output_tokens: Completion tokens reported by the provider.
+        reasoning_tokens: Reasoning tokens (reasoning-capable models).
+        cache_creation_input_tokens: Tokens written to a provider
+            prompt cache.
+        cache_read_input_tokens: Tokens read from a provider prompt
+            cache.
+        input_cost_usd: Query-time input-token cost. Opt-in via
+            `include_costs`. See module note on `None` semantics.
+        output_cost_usd: Query-time output-token cost. Opt-in.
+        cache_read_cost_usd: Query-time cost of cached prompt reads.
+            Opt-in.
+        cache_creation_cost_usd: Query-time cost of cache writes.
+            Opt-in.
+        total_cost_usd: Sum of the per-direction cost fields above.
+            Opt-in.
+        reasoning_content: Reasoning text captured from a reasoning
+            model.
+        conversation_id: GenAI `gen_ai.conversation.id`. The key that
+            joins spans into multi-turn conversations.
+        conversation_name: Human-readable conversation label.
+        tool_name: Tool name for `execute_tool` spans.
+        tool_type: Optional tool classification.
+        tool_call_id: Tool-use call ID, links an LLM's tool call to
+            its `execute_tool` span.
+        tool_description: Tool description at call time.
+        tool_definitions: Serialized tool catalog given to the model.
+        finish_reasons: Provider finish reasons, one per output
+            choice.
+        error_type: Exception type or provider error code for failed
+            spans.
+        request_temperature: Sampling temperature.
+        request_max_tokens: Max completion tokens requested.
+        request_top_p: Top-p sampling parameter.
+        request_frequency_penalty: Frequency penalty.
+        request_presence_penalty: Presence penalty.
+        request_seed: Provider seed for deterministic sampling.
+        request_stop_sequences: Stop sequences.
+        request_choice_count: Number of completions requested.
+        output_type: Provider-specific output format (`text`,
+            `json_object`, etc.).
+        input_messages: Normalized input messages sent to the model.
+        output_messages: Normalized output messages returned by the
+            model.
+        system_instructions: System prompts attached to the call.
+        tool_call_arguments: JSON-encoded tool call arguments for
+            `execute_tool` spans.
+        tool_call_result: Serialized tool result.
+        compaction_summary: Summary emitted by a context-window
+            compaction event.
+        compaction_items_before: Items in context before compaction.
+        compaction_items_after: Items in context after compaction.
+        content_refs: Refs to large message content stored outside
+            the row.
+        artifact_refs: Refs to W&B artifacts attached to the span.
+        object_refs: Refs to Weave objects attached to the span.
+        custom_attrs_string: User-defined string attributes.
+        custom_attrs_int: User-defined integer attributes.
+        custom_attrs_float: User-defined float attributes.
+        custom_attrs_bool: User-defined boolean attributes.
+        server_address: Provider host recorded on the span.
+        server_port: Provider port recorded on the span.
+        wb_user_id: W&B user who recorded the span.
+        wb_run_id: Associated W&B run ID.
+        wb_run_step: W&B run step at span start.
+        wb_run_step_end: W&B run step at span end.
+        raw_span_dump: Full OTel JSON payload. Opt-in via
+            `include_details`.
+    """
 
     project_id: str
     trace_id: str
@@ -510,20 +878,47 @@ class AgentSpanSchema(BaseModel):
 
 
 class AgentSortBy(BaseModel):
-    """Sort specification for agent query endpoints."""
+    """One step of the sort order for list endpoints.
+
+    Passed as an ordered list to `AgentsQueryReq.sort_by`,
+    `AgentVersionsQueryReq.sort_by`, and `AgentSpansQueryReq.sort_by`.
+    Steps are applied left to right; allowed `field` values are validated
+    per endpoint server-side.
+
+    Attributes:
+        field: Sortable field name.
+        direction: `desc` (default) sorts newest/largest first; `asc`
+            sorts oldest/smallest first.
+    """
 
     field: str
     direction: Literal["asc", "desc"] = "desc"
 
 
 class AgentGroupByRef(BaseModel):
-    """Reference to a field or map-key that spans should be grouped by.
+    """Group-by axis for `agent_spans_query` and `agent_spans_stats`.
 
-    `source="field"` targets a semantic span field (`agent.name`) or direct
-    span column (`agent_name`), allowlisted server-side. `source="column"` is
-    accepted for existing callers.
-    The other sources target keys inside the typed custom attribute Map columns,
-    which accept arbitrary user-defined keys.
+    Used on `AgentSpansQueryReq.group_by`, `AgentSpanStatsReq.group_by`,
+    `AgentSpanStatsNumericBucketSpec.group_by`, and
+    `AgentSpanGroupFilter.group_by`. The resolved alias appears in
+    `AgentSpanGroupRow.group_keys`; compute it with
+    `group_by_ref_alias` rather than recomputing the resolution rules.
+
+    Sources split into two families:
+
+    1. **Field / column** (`field`, `column`) — an allowlisted semconv
+       field (`agent.name`) or direct span column (`agent_name`).
+       `column` is the legacy alias and behaves the same as `field`.
+    2. **Custom attribute** (`custom_attrs_string`, `custom_attrs_int`,
+       `custom_attrs_float`, `custom_attrs_bool`) — a user-defined key
+       inside the matching typed Map column on the span row.
+
+    Attributes:
+        source: Which family `key` resolves through.
+        key: Field name (family 1) or attribute key (family 2).
+        alias: Override for the output key in
+            `AgentSpanGroupRow.group_keys`. When `None`, the server
+            falls back to the resolved column or the raw `key`.
     """
 
     source: Literal[
@@ -539,10 +934,20 @@ class AgentGroupByRef(BaseModel):
 
 
 def group_by_ref_alias(ref: AgentGroupByRef) -> str:
-    """Return the SQL-safe output alias for a group-by ref.
+    """Resolve the output alias the server will use for a group-by ref.
 
-    Used for both request validation here and SQL projection in the query
-    builder, so both call sites agree on what shows up in `group_keys`.
+    Single source of truth for the alias resolution rules. Both request
+    validation and SQL projection call this so the validator's reserved
+    name check sees the same key that ends up in
+    `AgentSpanGroupRow.group_keys`.
+
+    Args:
+        ref: A group-by ref from `AgentSpansQueryReq.group_by` or
+            `AgentSpanStatsReq.group_by`.
+
+    Returns:
+        Explicit `ref.alias` when set; the semconv-resolved column name
+        for `field`/`column` sources; the raw `ref.key` otherwise.
     """
     if ref.alias is not None:
         return ref.alias
@@ -552,7 +957,37 @@ def group_by_ref_alias(ref: AgentGroupByRef) -> str:
 
 
 class AgentSpanGroupDistributionSpec(BaseModel):
-    """One custom attribute distribution to compute per returned span group."""
+    """Custom attribute distribution to attach to each returned span group.
+
+    Pass on `AgentSpansQueryReq.group_distributions`. For each group in
+    the response, the server adds an `AgentSpanGroupDistributionItem`
+    under `AgentSpanGroupRow.distributions[alias]` summarizing the
+    distribution of one custom attribute across that group's spans.
+
+    Numeric attributes (`custom_attrs_int`, `custom_attrs_float`)
+    produce a `bins`-wide histogram. Categorical attributes
+    (`custom_attrs_string`, `custom_attrs_bool`) produce a `top_n`
+    list.
+
+    Note:
+        Currently limited to a single `group_by` ref on the parent
+        request — see `AgentSpansQueryReq.validate_spans_query_request`.
+
+    Attributes:
+        alias: Output key in `AgentSpanGroupRow.distributions`.
+        value: Custom attribute to summarize. `value.source` must be
+            one of the `custom_attrs_*` sources.
+        bins: Histogram bin count for numeric attributes, 1 to
+            `MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_BINS`. Ignored for
+            categorical attributes.
+        top_n: Maximum categorical values returned, 1 to
+            `MAX_AGENT_CUSTOM_ATTR_DISTRIBUTION_TOP_N`. Ignored for
+            numeric attributes.
+
+    Raises:
+        ValueError: When `value.source` isn't a custom attribute
+            source.
+    """
 
     alias: str = Field(pattern=_IDENT_RE)
     value: AgentSpanValueRef
@@ -584,10 +1019,16 @@ class AgentSpanGroupDistributionSpec(BaseModel):
 
 
 class AgentSpanGroupDistributionBin(BaseModel):
-    """One numeric histogram bin for a custom attribute in a span group."""
+    """One bucket of a numeric custom attribute histogram in a span group.
 
-    # 0-based bucket position within the histogram; clients render bins in
-    # `index` order so this can double as a stable sort key.
+    Attributes:
+        index: 0-based bucket position. Clients render bins in `index`
+            order, so this doubles as a stable sort key.
+        min: Lower bound, inclusive.
+        max: Upper bound, exclusive (inclusive on the final bin).
+        count: Spans whose attribute value fell in this bucket.
+    """
+
     index: int
     min: float
     max: float
@@ -595,14 +1036,40 @@ class AgentSpanGroupDistributionBin(BaseModel):
 
 
 class AgentSpanGroupDistributionValue(BaseModel):
-    """One categorical custom attribute value count in a span group."""
+    """One observed value in a categorical distribution.
+
+    Attributes:
+        value: The attribute value, stringified for transport.
+        count: Spans in the group that carried this value.
+    """
 
     value: str
     count: int
 
 
 class AgentSpanGroupDistributionItem(BaseModel):
-    """Distribution data for one span-group/custom-attribute pair."""
+    """One distribution result inside an `AgentSpanGroupRow`.
+
+    Returned in `AgentSpanGroupRow.distributions` keyed by the
+    requesting `AgentSpanGroupDistributionSpec.alias`. Numeric attribute
+    requests populate `bins`; categorical attribute requests populate
+    `values`. The four `*_count` fields always sum to `total_count`.
+
+    Attributes:
+        alias: Echoes the requesting spec's `alias`.
+        source: The custom attribute source that produced the
+            distribution.
+        key: Attribute key inside the source map.
+        value_type: Inferred attribute type.
+        total_count: Spans evaluated for the distribution.
+        present_count: Spans where the attribute was set.
+        missing_count: Spans where the attribute was absent.
+        other_count: Spans whose values fell outside `bins` or below
+            the `top_n` cutoff.
+        bins: Histogram bins. Populated for numeric distributions only.
+        values: Top values. Populated for categorical distributions
+            only.
+    """
 
     alias: str
     source: AgentCustomAttrSource
@@ -617,11 +1084,19 @@ class AgentSpanGroupDistributionItem(BaseModel):
 
 
 class AgentConversationMessagePreview(BaseModel):
-    """A truncated first/last message snippet for a grouped conversation row.
+    """Length-capped message snippet attached to conversation group rows.
 
-    `role` is the chat-timeline message type (e.g. "user_message",
-    "assistant_message") so clients can style it consistently with the full
-    chat view; `text` is the trimmed, length-capped preview content.
+    Populated on `AgentSpanGroupRow.first_message` and
+    `AgentSpanGroupRow.last_message` when grouping by `conversation_id`.
+    Lets the conversations table render teaser text without an extra
+    per-row hydration query.
+
+    Attributes:
+        role: Chat-timeline message type (`user_message`,
+            `assistant_message`, etc.). Matches `AgentChatMessage.type`
+            so previews style identically to the full chat view.
+        text: Trimmed preview content. Empty when no renderable text
+            was available on the source span.
     """
 
     role: str = ""
@@ -629,10 +1104,53 @@ class AgentConversationMessagePreview(BaseModel):
 
 
 class AgentSpanGroupRow(BaseModel):
-    """A single row in a grouped spans query response.
+    """One aggregated row in `AgentSpansQueryRes.groups`.
 
-    `group_keys` maps each group_by ref's alias to its value for this row.
-    The remaining fields are a fixed aggregate bundle computed per group.
+    Returned by `agent_spans_query` in group mode. The fixed aggregate
+    bundle (`span_count`, `total_*_tokens`, `*_seen`, etc.) is always
+    present; `metrics` and `distributions` are populated only when the
+    request asked for the corresponding spec.
+
+    Note:
+        `first_message`/`last_message` are populated only when grouping
+        by `conversation_id`. The cost fields use `None` (not `0`) to
+        mean "no priced model matched in this group."
+
+    Attributes:
+        group_keys: Group-by values for the row, keyed by the resolved
+            alias (see `group_by_ref_alias`).
+        span_count: Total spans in the group.
+        invocation_count: Spans where
+            `operation_name == "invoke_agent"`.
+        conversation_count: Distinct `conversation_id` values in the
+            group.
+        total_input_tokens: Sum of `input_tokens`.
+        total_cache_creation_input_tokens: Sum of
+            `cache_creation_input_tokens`.
+        total_cache_read_input_tokens: Sum of `cache_read_input_tokens`.
+        total_output_tokens: Sum of `output_tokens`.
+        total_reasoning_tokens: Sum of `reasoning_tokens`.
+        total_duration_ms: Sum of span wall-clock durations.
+        error_count: Spans with `status_code == "Error"`.
+        total_cost_usd: Sum of `total_cost_usd` across the group's
+            spans. Opt-in via `include_costs`.
+        total_input_cost_usd: Sum of `input_cost_usd`. Opt-in.
+        total_output_cost_usd: Sum of `output_cost_usd`. Opt-in.
+        agent_names: Distinct `agent_name` values in the group.
+        agent_versions: Distinct `agent_version` values.
+        provider_names: Distinct `provider_name` values.
+        request_models: Distinct `request_model` values.
+        conversation_names: Distinct `conversation_name` values.
+        first_seen: Earliest `started_at`. UTC.
+        last_seen: Latest `started_at`. UTC.
+        first_message: Preview of the earliest renderable message.
+            Conversation grouping only.
+        last_message: Preview of the latest renderable message.
+            Conversation grouping only.
+        metrics: Per-measure aggregates keyed by
+            `AgentSpanMeasureSpec.alias`.
+        distributions: Per-distribution data keyed by
+            `AgentSpanGroupDistributionSpec.alias`.
     """
 
     group_keys: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
@@ -671,11 +1189,54 @@ class AgentSpanGroupRow(BaseModel):
 
 
 class AgentSpansQueryReq(BaseModel):
-    """Request to query agent spans for a project.
+    """Two-mode span query for the `agent_spans_query` endpoint.
 
-    When `group_by` is empty (or omitted), returns raw span rows in the
-    response's `spans` field. When `group_by` is non-empty, returns
-    aggregate group rows in the response's `groups` field.
+    One endpoint, two output shapes:
+
+    1. **List mode** — `group_by` empty/omitted. Returns one
+       `AgentSpanSchema` per matched span in `AgentSpansQueryRes.spans`.
+       Use this for the spans table and trace drill-downs.
+    2. **Group mode** — `group_by` set. Returns one `AgentSpanGroupRow`
+       per group in `AgentSpansQueryRes.groups`, with optional
+       `measures` and `distributions`. Use this for the agents,
+       versions, and conversations lists (group by `conversation_id`).
+
+    Note:
+        `group_by` is the discriminator. Setting any group-only field
+        (`measures`, `group_filters`, `group_distributions`) without
+        also setting `group_by` is a validation error. `include_details`
+        and `custom_attr_columns` are list-mode only.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        query: Optional Mongo-style filter. Field names resolve through
+            GenAI semantic conventions, direct span columns, or typed
+            custom attribute keys.
+        group_by: Refs to group by. Triggers group mode when non-empty.
+        measures: Aggregated measures per group.
+        group_filters: Range filters applied to aggregated measures.
+        group_distributions: Per-group custom attribute distributions.
+            Limited to one `group_by` ref.
+        custom_attr_columns: Extra custom attribute values to project
+            on each span row. List mode only.
+        include_details: Include large fields (messages, tool payloads,
+            `raw_span_dump`) on each span row. List mode only;
+            intended for single-trace fetches, not list views.
+        include_costs: Compute query-time USD costs by joining each
+            span's model against `llm_token_prices`.
+        sort_by: Sort steps. Allowed fields are validated server-side.
+        limit: Max rows, 0 to `MAX_AGENT_QUERY_LIMIT`.
+        offset: Rows to skip.
+        started_after: Filters `started_at >= start`.
+        started_before: Filters `started_at < end`.
+
+    Raises:
+        ValueError: When group-only fields are set without `group_by`,
+            when `custom_attr_columns` or `include_details` is combined
+            with `group_by`, when `group_distributions` has more than
+            one `group_by` ref, when `custom_attr_columns` aren't
+            custom-attr sources, or when measure/distribution aliases
+            collide or duplicate.
     """
 
     project_id: str
@@ -769,10 +1330,16 @@ class AgentSpansQueryReq(BaseModel):
 
 
 class AgentSpansQueryRes(BaseModel):
-    """Response from a spans query.
+    """Response from `agent_spans_query`.
 
-    Exactly one of `spans` or `groups` will be populated, based on
-    whether the request specified `group_by`.
+    Exactly one of `spans` or `groups` is populated, mirroring the
+    request's list/group mode discriminator.
+
+    Attributes:
+        spans: Raw span rows. Populated in list mode.
+        groups: Aggregated group rows. Populated in group mode.
+        total_count: Total rows that matched the filter before
+            `limit`/`offset`.
     """
 
     spans: list[AgentSpanSchema] = Field(default_factory=list)
@@ -781,7 +1348,22 @@ class AgentSpansQueryRes(BaseModel):
 
 
 class AgentCustomAttrsSchemaReq(BaseModel):
-    """Request to discover typed custom attribute keys for matching spans."""
+    """Discovery request for custom attribute keys.
+
+    Run this before constructing filters, group-bys, or distributions
+    that target user-defined attributes — it tells the client which
+    `(source, key, value_type)` triples actually exist in the data.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        query: Optional Mongo-style filter narrowing the discovery
+            scan.
+        started_after: Filters `started_at >= start`.
+        started_before: Filters `started_at < end`.
+        limit: Max keys returned, 1 to
+            `MAX_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT`.
+        offset: Keys to skip for pagination.
+    """
 
     project_id: str
     query: Query | None = None
@@ -796,7 +1378,15 @@ class AgentCustomAttrsSchemaReq(BaseModel):
 
 
 class AgentCustomAttrSchemaItem(BaseModel):
-    """One custom attribute key/type observed in the matching spans."""
+    """One discovered custom attribute key.
+
+    Attributes:
+        source: Which typed Map column the key lives in
+            (`custom_attrs_string`/`int`/`float`/`bool`).
+        key: Attribute key as recorded by the producing span.
+        value_type: Inferred value type.
+        span_count: Spans in the discovery scope that carried the key.
+    """
 
     source: AgentCustomAttrSource
     key: str
@@ -805,7 +1395,18 @@ class AgentCustomAttrSchemaItem(BaseModel):
 
 
 class AgentCustomAttrsSchemaRes(BaseModel):
-    """Typed custom attribute keys available for spans query/group/stats APIs."""
+    """Response from `agent_custom_attrs_schema`.
+
+    Feed each entry's `(source, key)` back into `AgentSpansQueryReq`
+    and `AgentSpanStatsReq` via the matching `custom_attrs_*` source
+    on `AgentSpanValueRef`/`AgentGroupByRef`.
+
+    Attributes:
+        attributes: One entry per discovered key.
+        limit: Echoes the request limit.
+        offset: Echoes the request offset.
+        has_more: `True` when at least one more page is available.
+    """
 
     attributes: list[AgentCustomAttrSchemaItem] = Field(default_factory=list)
     limit: int = DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT
@@ -819,13 +1420,40 @@ class AgentCustomAttrsSchemaRes(BaseModel):
 
 
 class AgentSearchReq(BaseModel):
-    """Query the `messages` table by content and/or span-level filters.
+    """Two-mode message search for the `agent_search` endpoint.
 
-    Scans the `messages` table (one row per message occurrence, populated by an
-    MV from spans) and returns matching span-level hits. Full-text search sets
-    `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
-    empty and uses the filters below. The caller groups by conversation for the
-    response shape.
+    Backed by the `messages` materialized view (one row per message
+    occurrence, fed from spans). Two ways to use it:
+
+    1. **Full-text search** — set `query` to a substring. Filters narrow
+       the scope (e.g. "only assistant messages from agent X in the last
+       week").
+    2. **Structured retrieval** — leave `query` empty. Use the filters
+       alone (e.g. set `trace_id` to fetch every message in a trace).
+       Set `truncate_content=False` to receive full bodies.
+
+    Note:
+        Results are grouped by conversation in the response shape, not
+        by trace. One conversation can contain matches from multiple
+        traces.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        query: Content substring. Empty disables the content filter.
+        trace_id: Restrict to messages in this trace.
+        roles: Restrict to these message roles.
+        conversation_id: Restrict to messages in this conversation.
+        agent_name: Restrict to messages from this agent.
+        provider_name: Restrict to messages from this provider.
+        request_model: Restrict to messages from this model.
+        truncate_content: `True` (default) returns previews;
+            `False` returns full message bodies. Flip to `False` for
+            structured retrieval, not for ad-hoc search UIs (payloads
+            get large).
+        started_after: Filters `started_at >= start`.
+        started_before: Filters `started_at < end`.
+        limit: Max messages, 0 to `MAX_SEARCH_LIMIT`.
+        offset: Messages to skip for pagination.
     """
 
     project_id: str
@@ -850,7 +1478,18 @@ class AgentSearchReq(BaseModel):
 
 
 class AgentSearchMatchedMessage(BaseModel):
-    """A single message that matched the search query."""
+    """A single message hit in an `AgentSearchRes`.
+
+    Attributes:
+        span_id: Span that produced the message.
+        trace_id: Trace containing the span.
+        role: Message role (`user`, `assistant`, `tool`, etc.).
+        content_preview: Trimmed preview, or the full body when the
+            request set `truncate_content=False`.
+        content_digest: Stable digest of the full content. Useful for
+            deduplicating identical messages across re-runs.
+        started_at: Time the producing span started. UTC.
+    """
 
     span_id: str
     trace_id: str
@@ -861,7 +1500,16 @@ class AgentSearchMatchedMessage(BaseModel):
 
 
 class AgentSearchConversationResult(BaseModel):
-    """A conversation containing messages that matched the search query."""
+    """One conversation's matching messages, the row shape of `AgentSearchRes`.
+
+    Attributes:
+        conversation_id: Conversation identifier shared by every
+            entry in `matched_messages`.
+        conversation_name: Human-readable conversation label.
+        agent_name: Agent that owns the conversation.
+        matched_messages: Matching messages, in chronological order.
+        last_activity: Time of the most recent matching message. UTC.
+    """
 
     conversation_id: str
     conversation_name: str
@@ -871,7 +1519,13 @@ class AgentSearchConversationResult(BaseModel):
 
 
 class AgentSearchRes(BaseModel):
-    """Response from a full-text search across agent messages."""
+    """Response from `agent_search`.
+
+    Attributes:
+        results: One entry per conversation containing a match.
+        total_conversations: Conversations matched before
+            `limit`/`offset`.
+    """
 
     results: list[AgentSearchConversationResult]
     total_conversations: int = 0
@@ -888,14 +1542,45 @@ AgentChatMessageType = Literal[
 
 
 class AgentChatUserMessage(BaseModel):
-    """Payload for a user prompt in the chat timeline."""
+    """Payload for the `user_message` branch of `AgentChatMessage`.
+
+    Attributes:
+        text: Rendered user prompt text.
+        content_refs: Refs to detached content blobs (e.g. uploaded
+            images).
+    """
 
     text: str
     content_refs: list[str] = Field(default_factory=list)
 
 
 class AgentChatAssistantMessage(BaseModel):
-    """Payload for assistant text emitted by an agent or LLM span."""
+    """Payload for the `assistant_message` branch of `AgentChatMessage`.
+
+    Carries one assistant response, plus the LLM-call metadata
+    (model, tokens, costs, status) the chat-view assembler folded in
+    from the underlying span.
+
+    Note:
+        The `*_cost_usd` fields use `None` (not `0`) to mean "no priced
+        model matched." For aggregated agent turns, cost fields are
+        summed across the agent's whole subtree.
+
+    Attributes:
+        text: Rendered assistant response text.
+        model: Model that produced the response.
+        reasoning_content: Reasoning text from a reasoning-capable
+            model.
+        reasoning_tokens: Reasoning tokens consumed.
+        input_tokens: Prompt tokens for this message's span.
+        output_tokens: Completion tokens for this message's span.
+        input_cost_usd: Input-token cost in USD.
+        output_cost_usd: Output-token cost in USD.
+        total_cost_usd: Sum of input and output costs.
+        duration_ms: Wall-clock duration of the producing span.
+        status: OTel status code from the producing span.
+        content_refs: Refs to detached content blobs.
+    """
 
     text: str
     model: str | None = None
@@ -914,7 +1599,20 @@ class AgentChatAssistantMessage(BaseModel):
 
 
 class AgentChatToolCall(BaseModel):
-    """Payload for a tool call timeline event."""
+    """Payload for the `tool_call` branch of `AgentChatMessage`.
+
+    Folds the LLM's tool-call request and the matching `execute_tool`
+    span result into one timeline event.
+
+    Attributes:
+        tool_name: Tool name as registered with the agent.
+        tool_arguments: JSON-encoded arguments passed to the tool.
+        tool_result: Serialized tool result.
+        duration_ms: Wall-clock duration of the `execute_tool` span.
+        status: OTel status code from the `execute_tool` span.
+        content_refs: Refs to detached content blobs attached to the
+            call or its result.
+    """
 
     tool_name: str | None = None
     tool_arguments: str | None = None
@@ -925,7 +1623,19 @@ class AgentChatToolCall(BaseModel):
 
 
 class AgentChatAgentStart(BaseModel):
-    """Payload for an agent lifecycle boundary."""
+    """Payload for the `agent_start` branch of `AgentChatMessage`.
+
+    Marks an `invoke_agent` boundary and carries the system
+    instructions and tool catalog the model was given for the
+    invocation.
+
+    Attributes:
+        model: Model bound to the agent for this invocation.
+        system_instructions: System prompt set on the agent.
+        tool_definitions: Serialized tool catalog provided to the
+            agent.
+        status: OTel status code from the `invoke_agent` span.
+    """
 
     model: str | None = None
     system_instructions: str | None = None
@@ -934,11 +1644,25 @@ class AgentChatAgentStart(BaseModel):
 
 
 class AgentChatAgentHandoff(BaseModel):
-    """Payload for a future agent-to-agent handoff event."""
+    """Payload for the `agent_handoff` branch of `AgentChatMessage`.
+
+    Reserved for handoff semantics in multi-agent frameworks. No fields
+    yet — present so the timeline model is forward-compatible with
+    handoff-aware UIs.
+    """
 
 
 class AgentChatContextCompacted(BaseModel):
-    """Payload for a context-window compaction event."""
+    """Payload for the `context_compacted` branch of `AgentChatMessage`.
+
+    Emitted when an agent rewrites its context window to fit within the
+    model's token budget.
+
+    Attributes:
+        compaction_summary: Summary of what was compacted.
+        compaction_items_before: Message items before compaction.
+        compaction_items_after: Message items after compaction.
+    """
 
     compaction_summary: str | None = None
     compaction_items_before: int | None = None
@@ -946,12 +1670,40 @@ class AgentChatContextCompacted(BaseModel):
 
 
 class AgentChatMessage(BaseModel):
-    """A single element in the structured agent trajectory / chat view.
+    """One event in the agent trajectory / chat timeline.
 
-    Common event fields live at the top level. Type-specific fields are
-    grouped under the payload matching `type`, and exactly one payload must be
-    set. This keeps subtype nullability explicit while preserving a single
-    ordered timeline model for callers.
+    The chat view flattens a trace's span tree into a linear list of
+    `AgentChatMessage`. Each event is one of six discriminated kinds
+    (see `AgentChatMessageType`); the payload field whose name matches
+    `type` is populated, and all other payload fields must be `None`.
+
+    Common header fields live at the top so headers and filters can be
+    rendered without unwrapping the payload.
+
+    Note:
+        Exactly one payload field must be set, and it must match
+        `type`. The validator rejects mismatched or missing payloads,
+        which prevents drift between the discriminator and the data.
+
+    Attributes:
+        type: Event kind. Picks which payload field is populated.
+        span_id: Producing span ID, when one exists.
+        agent_name: Agent that produced the event.
+        agent_version: Agent version that produced the event.
+        status_code: OTel status code from the producing span.
+        started_at: Event start time. UTC.
+        user_message: Payload when `type="user_message"`.
+        assistant_message: Payload when `type="assistant_message"`.
+        tool_call: Payload when `type="tool_call"`.
+        agent_start: Payload when `type="agent_start"`.
+        agent_handoff: Payload when `type="agent_handoff"`.
+        context_compacted: Payload when `type="context_compacted"`.
+        feedback: Feedback rows attached to this event. Populated only
+            when the parent request set `include_feedback=True`.
+
+    Raises:
+        ValueError: When the payload field matching `type` is missing
+            or any other payload field is also set.
     """
 
     type: AgentChatMessageType
@@ -997,7 +1749,19 @@ class AgentChatMessage(BaseModel):
 
 
 class AgentTraceChatReq(BaseModel):
-    """Request to get the structured chat / trajectory view for a trace."""
+    """Single-turn chat-view request for `agent_traces_chat`.
+
+    Folds the trace's span tree into a linear `AgentChatMessage`
+    timeline ready to render top-to-bottom. Pair with
+    `AgentTraceChatRes`.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        trace_id: OTel trace ID for the turn.
+        include_feedback: Attach feedback rows on the response and on
+            each message that has any. `False` by default to keep
+            payloads small.
+    """
 
     project_id: str
     trace_id: str
@@ -1005,8 +1769,32 @@ class AgentTraceChatReq(BaseModel):
 
 
 class AgentTraceChatRes(BaseModel):
-    """Structured chat view: a linear sequence of messages representing
-    the agent trajectory for a single trace.
+    """Single-turn chat view, the response of `agent_traces_chat`.
+
+    Header fields summarize the trace (agent identity, status,
+    duration, cost); `messages` is the ordered chat timeline. The same
+    shape is reused inside `AgentConversationChatRes.turns`, so one
+    client-side renderer covers both single-turn and per-turn views.
+
+    Note:
+        `total_duration_ms` is the *root span's* wall-clock duration,
+        not a sum across child spans. `total_cost_usd` *is* a sum
+        across every span in the trace.
+
+    Attributes:
+        trace_id: OTel trace ID echoed from the request.
+        root_span_name: Name of the trace's root span.
+        agent_name: Agent that owns the trace.
+        agent_version: Agent version.
+        status_code: OTel status of the root span.
+        provider: Provider name reported by the root span.
+        total_duration_ms: Wall-clock duration of the root span.
+        total_cost_usd: Sum of `total_cost_usd` across every span in
+            the trace. `None` (not `0`) signals no priced model
+            matched.
+        messages: Chat timeline in chronological order.
+        feedback: Trace-level feedback rows. Populated only when the
+            request set `include_feedback=True`.
     """
 
     trace_id: str
@@ -1030,7 +1818,21 @@ class AgentTraceChatRes(BaseModel):
 
 
 class AgentConversationChatReq(BaseModel):
-    """Request to get the multi-turn chat view for a conversation."""
+    """Multi-turn chat-view request for `agent_conversation_chat`.
+
+    Returns an ordered page of turns sharing one `conversation_id`. The
+    conversation id is `gen_ai.conversation.id` on the producing spans.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        conversation_id: Conversation identifier.
+        limit: Max turns returned per page, 0 to
+            `MAX_CONVERSATION_CHAT_TURNS`.
+        offset: Most-recent turns to skip. Within the selected page,
+            turns are returned in chronological order.
+        include_feedback: Attach feedback rows to each turn and
+            message that has any.
+    """
 
     project_id: str
     conversation_id: str
@@ -1052,13 +1854,28 @@ class AgentConversationChatReq(BaseModel):
 
 
 class AgentConversationChatRes(BaseModel):
-    """Multi-turn chat view: an ordered list of per-turn chat responses.
+    """Multi-turn chat view, the response of `agent_conversation_chat`.
 
-    Each entry in `turns` corresponds to one trace_id, which Weave treats as
-    one conversation turn. This is not necessarily one `invoke_agent` span:
-    a turn can contain zero, one, or many agent invocations. The frontend can
-    render turn-number dividers between entries and still reuse
-    `AgentTraceChatRes` rendering for each individual turn.
+    `turns` is an ordered list of per-turn `AgentTraceChatRes` rows so
+    the client can reuse single-turn rendering for each one. Conversation
+    totals (cost, feedback) sit on the parent response.
+
+    Note:
+        One turn corresponds to one trace, not one `invoke_agent` span.
+        A turn can contain zero, one, or many agent invocations.
+
+    Attributes:
+        conversation_id: Echoes the request.
+        turns: Per-turn chat views in chronological order.
+        total_turns: Turns in the conversation before
+            `limit`/`offset`.
+        has_more: `True` when another page is available.
+        limit: Echoes the request limit.
+        offset: Echoes the request offset.
+        total_cost_usd: Sum of `total_cost_usd` across the returned
+            turns. `None` (not `0`) signals no priced model matched.
+        feedback: Conversation-level feedback rows. Populated only
+            when the request set `include_feedback=True`.
     """
 
     conversation_id: str
@@ -1074,7 +1891,32 @@ class AgentConversationChatRes(BaseModel):
 
 
 class AgentSchema(BaseModel):
-    """Aggregated per-agent stats from the agents table."""
+    """One aggregated row from the agents materialized view.
+
+    Returned in `AgentsQueryRes.agents`. One row per `agent_name`,
+    summarizing every span attributed to that agent across all
+    versions and conversations. Entry point row for the Agents view.
+
+    Note:
+        `total_cost_usd` is filled by a supplementary grouped spans
+        query because the agents MV has no cost column. It uses
+        `None` (not `0`) to mean "costs weren't requested or no
+        priced model matched."
+
+    Attributes:
+        project_id: Owning project in `entity/project` form.
+        agent_name: Agent identifier.
+        invocation_count: `invoke_agent` spans attributed to the
+            agent.
+        span_count: Total spans attributed to the agent.
+        total_input_tokens: Sum of `input_tokens`.
+        total_output_tokens: Sum of `output_tokens`.
+        total_duration_ms: Sum of span wall-clock durations.
+        error_count: Spans with `status_code == "Error"`.
+        first_seen: Earliest `started_at`. UTC.
+        last_seen: Latest `started_at`. UTC.
+        total_cost_usd: Opt-in summed cost in USD.
+    """
 
     project_id: str
     agent_name: str
@@ -1094,13 +1936,33 @@ class AgentSchema(BaseModel):
 
 
 class AgentsQueryFilters(BaseModel):
-    """Optional filters for querying agents."""
+    """Optional filters block for `AgentsQueryReq`.
+
+    Attributes:
+        agent_name: Exact-match filter on agent name. `None` matches
+            every agent in the project.
+    """
 
     agent_name: str | None = None
 
 
 class AgentsQueryReq(BaseModel):
-    """Request to list agents with aggregated stats for a project."""
+    """Top-level agent listing request for `agent_agents_query`.
+
+    Entry point for the Agents view. Drill into a specific agent's
+    versions with `AgentVersionsQueryReq`; drill into its
+    conversations with `AgentSpansQueryReq` in group mode.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        filters: Optional narrowing of which agents are returned.
+        sort_by: Sort steps. Allowed fields are validated
+            server-side.
+        limit: Max rows, 0 to `MAX_AGENT_QUERY_LIMIT`.
+        offset: Rows to skip.
+        include_costs: Opt into supplementary cost computation for
+            `AgentSchema.total_cost_usd`.
+    """
 
     project_id: str
     filters: AgentsQueryFilters | None = None
@@ -1115,7 +1977,12 @@ class AgentsQueryReq(BaseModel):
 
 
 class AgentsQueryRes(BaseModel):
-    """Response containing aggregated agent stats."""
+    """Response from `agent_agents_query`.
+
+    Attributes:
+        agents: One `AgentSchema` per matched agent.
+        total_count: Agents matched before `limit`/`offset`.
+    """
 
     agents: list[AgentSchema]
     total_count: int = 0
@@ -1127,13 +1994,34 @@ class AgentsQueryRes(BaseModel):
 
 
 class AgentVersionSchema(AgentSchema):
-    """Aggregated per-version stats from the agent_versions AMT."""
+    """`AgentSchema` row keyed by `(agent_name, agent_version)`.
+
+    Returned by `agent_versions_query`. Extends `AgentSchema` with
+    `agent_version`; everything else has the same meaning.
+
+    Attributes:
+        agent_version: Version label on the producing spans.
+    """
 
     agent_version: str
 
 
 class AgentVersionsQueryReq(BaseModel):
-    """Request to list versions for an agent."""
+    """Version-listing request for `agent_versions_query`.
+
+    Run after `agent_agents_query` to compare behavior across releases
+    of one agent.
+
+    Attributes:
+        project_id: Target project in `entity/project` form.
+        agent_name: Agent to enumerate versions for.
+        sort_by: Sort steps. Allowed fields are validated
+            server-side.
+        limit: Max rows, 0 to `MAX_AGENT_QUERY_LIMIT`.
+        offset: Rows to skip.
+        include_costs: Opt into supplementary cost computation for
+            `AgentVersionSchema.total_cost_usd`.
+    """
 
     project_id: str
     agent_name: str
@@ -1148,7 +2036,13 @@ class AgentVersionsQueryReq(BaseModel):
 
 
 class AgentVersionsQueryRes(BaseModel):
-    """Response containing agent version stats."""
+    """Response from `agent_versions_query`.
+
+    Attributes:
+        versions: One `AgentVersionSchema` per matched
+            `(agent_name, agent_version)` pair.
+        total_count: Versions matched before `limit`/`offset`.
+    """
 
     versions: list[AgentVersionSchema]
     total_count: int = 0
@@ -1160,10 +2054,24 @@ class AgentVersionsQueryRes(BaseModel):
 
 
 class GenAIOTelExportReq(BaseModel):
-    """Request for the GenAI OTel ingest endpoint.
+    """Ingest request for `genai_otel_export`.
 
-    Carries the same ProcessedResourceSpans as the standard OTel endpoint
-    but routes through GenAI extraction and into spans.
+    The only write-side endpoint in this module. Sits at the start of
+    the workflow: spans flow in here from the SDK or a raw OTel
+    exporter, land in the agent spans table, and refresh the
+    downstream materialized views (agents, agent_versions, messages)
+    that the read-side endpoints query.
+
+    Note:
+        Carries `ProcessedResourceSpans` (post-deserialization), not
+        the raw protobuf payload. Set
+        `arbitrary_types_allowed=True` because Pydantic doesn't have
+        a built-in schema for the OTel proto type.
+
+    Attributes:
+        processed_spans: Deserialized OTel resource spans to ingest.
+        project_id: Target project in `entity/project` form.
+        wb_user_id: Optional W&B user ID to record on each span.
     """
 
     model_config = {"arbitrary_types_allowed": True}
@@ -1176,7 +2084,19 @@ class GenAIOTelExportReq(BaseModel):
 
 
 class GenAIOTelExportRes(BaseModel):
-    """Response for the GenAI OTel ingest endpoint."""
+    """Response from `genai_otel_export`.
+
+    Note:
+        Rejected spans don't block the rest of the batch. Inspect
+        `error_message` for a summary of why some were dropped.
+
+    Attributes:
+        accepted_spans: Spans that passed extraction and were
+            enqueued for insertion.
+        rejected_spans: Spans the server skipped.
+        error_message: Short summary of the rejection cause when
+            `rejected_spans > 0`. Empty when everything succeeded.
+    """
 
     accepted_spans: int = 0
     rejected_spans: int = 0
