@@ -32,7 +32,7 @@ if (typeof module !== 'undefined' && module.exports) {
     let filename;
     try {
       filename = Module._resolveFilename(request, this);
-    } catch (resolveErr) {
+    } catch (_resolveErr) {
       return originalRequire.apply(this, arguments as any);
     }
 
@@ -79,7 +79,7 @@ if (typeof module !== 'undefined' && module.exports) {
       let packageJson: any;
       try {
         packageJson = requirePackageJson(basedir, module.paths);
-      } catch (e) {
+      } catch (_e) {
         console.log('Cannot find package.json for', name, basedir);
         return originalExports;
       }

@@ -121,13 +121,13 @@ describe('OpenAI Integration', () => {
       stream: true,
     });
     let opContent = '';
-    let usageChunkSeen = false;
+    let _usageChunkSeen = false;
     for await (const chunk of opStream) {
       if (chunk.choices && chunk.choices[0]?.delta?.content) {
         opContent += chunk.choices[0].delta.content;
       }
       if ('usage' in chunk) {
-        usageChunkSeen = true;
+        _usageChunkSeen = true;
       }
     }
 

@@ -966,7 +966,7 @@ export class WeaveClient {
     if (obj.__savedRef) {
       return Promise.resolve(obj.__savedRef);
     }
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [_key, value] of Object.entries(obj)) {
       this.saveWeaveValues(value);
     }
 
@@ -1079,7 +1079,7 @@ export class WeaveClient {
       }
       visited.add(val);
 
-      for (const [key, value] of Object.entries(val)) {
+      for (const [_key, value] of Object.entries(val)) {
         this.saveWeaveValues(value, visited);
       }
     }

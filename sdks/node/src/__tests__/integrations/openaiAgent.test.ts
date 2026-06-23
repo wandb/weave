@@ -28,7 +28,6 @@ import {
 import {z} from 'zod';
 import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
-import {Settings} from '../../settings';
 import {initWithCustomTraceServer} from '../clientMock';
 import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
