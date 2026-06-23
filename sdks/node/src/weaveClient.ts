@@ -1067,7 +1067,9 @@ export class WeaveClient {
     } else if (val instanceof Table) {
       this.saveTable(val);
     } else if (isWeaveImage(val)) {
+      // no-op
     } else if (isWeaveAudio(val)) {
+      // no-op
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
