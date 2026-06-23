@@ -12,6 +12,7 @@ import pytest
 import sqlparse
 from pydantic import ValidationError
 
+from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
@@ -32,7 +33,10 @@ from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
+    QUALIFIED_CHAT_VIEW_COLS,
+    QUALIFIED_SPANS_COST_COLS,
     SPAN_SORTABLE_COLS,
+    SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
     make_agent_versions_count_query,
@@ -1036,18 +1040,20 @@ class TestMakeTraceDetailSpansQuery:
         pb = ParamBuilder("genai")
         query = make_trace_detail_spans_query(pb, "p1", "t1")
 
+        # Always cost-augmented (the chat/detail views render per-message and
+        # per-trace cost). Compose the expected cost source from the same
+        # helper so the snapshot stays exact without copying the price-JOIN SQL.
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project filter
+        expected_pb.add("t1", param_type="String")  # genai_1: trace filter
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {CHAT_VIEW_COLS} FROM spans s
+            SELECT {CHAT_VIEW_COLS}, {SPANS_COST_COLS} FROM {source} s
             WHERE s.project_id = {{genai_0:String}}
             AND s.trace_id = {{genai_1:String}}
             ORDER BY s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "t1"},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
 
 # ============================================================================
@@ -1456,9 +1462,17 @@ class TestMakeConversationChatSpansQuery:
             AgentConversationChatReq(project_id="p1", conversation_id="c1"),
         )
 
+        # Always cost-augmented (per-message + per-turn cost in the multi-turn
+        # chat view). Compose the expected cost source from the same helper.
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project
+        expected_pb.add("c1", param_type="String")  # genai_1: conversation
+        expected_pb.add(50, param_type="UInt64")  # genai_2: limit (default)
+        expected_pb.add(0, param_type="UInt64")  # genai_3: offset
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
-            FROM spans s
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
@@ -1471,12 +1485,7 @@ class TestMakeConversationChatSpansQuery:
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "c1", "genai_2": 50, "genai_3": 0},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
     def test_with_pagination(self) -> None:
         pb = ParamBuilder("genai")
@@ -1487,9 +1496,15 @@ class TestMakeConversationChatSpansQuery:
             ),
         )
 
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project
+        expected_pb.add("c1", param_type="String")  # genai_1: conversation
+        expected_pb.add(10, param_type="UInt64")  # genai_2: limit
+        expected_pb.add(20, param_type="UInt64")  # genai_3: offset
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
-            FROM spans s
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
@@ -1502,12 +1517,7 @@ class TestMakeConversationChatSpansQuery:
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "c1", "genai_2": 10, "genai_3": 20},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
     def test_limit_rejected_above_max_turns(self) -> None:
         with pytest.raises(ValidationError):
