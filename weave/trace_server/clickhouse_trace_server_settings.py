@@ -60,6 +60,12 @@ RETURN_TYPE_ALLOW_COMPLEX = "1"
 _env_max_execution_time = wf_env.wf_clickhouse_max_execution_time()
 # Treat 0 as unset; a zero-second timeout is not a useful service default.
 _max_execution_time = _env_max_execution_time or DEFAULT_MAX_EXECUTION_TIME
+# The projection guard is tuned independently of the hard runtime cap: a flaky
+# estimate can fire early, so operators may want a looser projection ceiling
+# while keeping a tight real-runtime cap. Falls back to the hard cap when unset.
+_max_estimated_execution_time = (
+    wf_env.wf_clickhouse_max_estimated_execution_time() or _max_execution_time
+)
 _disable_query_failure_prediction = (
     wf_env.wf_clickhouse_disable_query_failure_prediction()
 )
@@ -79,7 +85,7 @@ CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
 if not _disable_query_failure_prediction:
     CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS.update(
         {
-            "max_estimated_execution_time": _max_execution_time,
+            "max_estimated_execution_time": _max_estimated_execution_time,
             "timeout_before_checking_execution_speed": DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED,
             "timeout_overflow_mode": "throw",
         }
