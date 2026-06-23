@@ -459,12 +459,13 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     )
     row = {c.conversation_id: c for c in res.conversations}[conv]
 
-    # Ordered by started_at: agent, tool, tool(ERROR), assistant.
-    assert [(e.kind, e.status) for e in row.spans] == [
-        ("agent", "OK"),
-        ("tool", "OK"),
-        ("tool", "ERROR"),
-        ("assistant", "OK"),
+    # Spans carry the raw operation_name (the client classifies), ordered by
+    # started_at; ERROR surfaces via status.
+    assert [(e.operation_name, e.status) for e in row.spans] == [
+        ("invoke_agent", "OK"),
+        ("execute_tool", "OK"),
+        ("execute_tool", "ERROR"),
+        ("chat", "OK"),
     ]
     # Each span carries its turn (trace_id) and its own span_id.
     assert row.spans[0].trace_id == trace_a
@@ -472,17 +473,21 @@ def test_conversation_spans_sequence_and_feedback(ch_server):
     assert any(e.span_id == tool_span for e in row.spans)
 
     # Markers are keyed by turn (trace_id). Emoji tags come back as the detoned
-    # glyph; scorer ratings come back as scores.
+    # glyph; scorer ratings come back as ratings.
     by_trace = {f.trace_id: f for f in row.spans_feedback}
     assert by_trace[trace_a].feedback_type == AGENT_USER_FEEDBACK_TYPE
-    assert by_trace[trace_a].tags == ["\U0001f44d"]
-    assert by_trace[trace_a].scores == []
+    assert by_trace[trace_a].tags == ["👍"]
+    assert by_trace[trace_a].ratings == []
 
     assert by_trace[trace_b].feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
     assert by_trace[trace_b].tags == ["helpful"]
-    assert len(by_trace[trace_b].scores) == 1
-    score = by_trace[trace_b].scores[0]
-    assert (score.name, score.value, score.reason) == ("quality", 0.8, "clear answer")
+    assert len(by_trace[trace_b].ratings) == 1
+    rating = by_trace[trace_b].ratings[0]
+    assert (rating.name, rating.value, rating.reason) == (
+        "quality",
+        0.8,
+        "clear answer",
+    )
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
