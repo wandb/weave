@@ -125,6 +125,13 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
  * Patch a `@anthropic-ai/claude-agent-sdk` module's `query` export. Idempotent
  * and a no-op if the module has no `query`. Used as the CJS/ESM hook and called
  * directly from tests.
+ *
+ * `exports` is `any` by the module-loader `HookFn` contract: it's an opaque
+ * third-party module namespace we probe (`query`), mutate in place, mark with a
+ * symbol, and wrap in a `Proxy` — its keys are both string and symbol, and its
+ * members may be getter-only or frozen. A precise type would only push casts
+ * back to every access here and to the `wrapClaudeAgentSdk<T>` boundary, so we
+ * keep the contract's `any`.
  */
 export function patchClaudeAgentSdk(exports: any): any {
   if (
