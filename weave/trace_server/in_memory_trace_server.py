@@ -6846,7 +6846,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     doc: Any = trial.scores
                     parts = split_escaped_field_path(field_path[len("scores.") :])
                 elif field_path.startswith("output.") or field_path == "output":
-                    doc = trial.model_output
+                    # Field paths address the full output_dump, but
+                    # trial.model_output is already unwrapped -- rebuild the
+                    # wrapper so output.* resolves the same as on ClickHouse.
+                    doc = {"output": trial.model_output, "scores": trial.scores}
                     parts = (
                         split_escaped_field_path(field_path[len("output.") :])
                         if field_path != "output"
@@ -6954,14 +6957,26 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
                     sort_terms.append((score_key, s.direction))
                 else:
-
-                    def any_key(
+                    # Numeric-aware sort matching ClickHouse: numbers sort
+                    # numerically, with a lexicographic fallback for text.
+                    def any_raw(
                         row: tsi.EvalResultsRow, _fp: str = field_path
                     ) -> str | None:
                         values = self._eval_row_field_values(row, _fp, None)
                         return next((v for v in values if v != ""), None)
 
-                    sort_terms.append((any_key, s.direction))
+                    def numeric_key(
+                        row: tsi.EvalResultsRow, _raw: Any = any_raw
+                    ) -> float | None:
+                        return _ch_to_float64_or_null(_raw(row))
+
+                    def string_key(
+                        row: tsi.EvalResultsRow, _raw: Any = any_raw
+                    ) -> str | None:
+                        return _raw(row)
+
+                    sort_terms.append((numeric_key, s.direction))
+                    sort_terms.append((string_key, s.direction))
             sort_terms.append((lambda row: row.row_digest, "asc"))
             all_rows = _ch_sorted_by_terms(
                 all_rows, sort_terms, lambda row, key_fn: key_fn(row)

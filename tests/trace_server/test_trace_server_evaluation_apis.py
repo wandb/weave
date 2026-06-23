@@ -8,7 +8,6 @@ import pytest
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from tests.trace_server.completions_util import with_simple_mock_litellm_completion
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.custom_objs import UnsafeDeserializationError
@@ -1310,12 +1309,6 @@ def test_eval_results_sort_by_output(client):
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
-# TODO: remove the skip once the in-memory fake sorts output/input numerically
-# (it currently orders them lexicographically); ClickHouse already does.
-@pytest.mark.skipif(
-    FAKE_NOT_IMPLEMENTED,
-    reason="fake: output/input sort is lexicographic, not numeric, yet",
-)
 def test_eval_results_sort_by_numeric_output(client):
     """Numeric output columns sort by value, not lexicographically.
 
@@ -1390,12 +1383,6 @@ def test_eval_results_sort_by_numeric_output(client):
     assert sorted_predictions("desc") == [10, 2, 1]
 
 
-# TODO: remove the skip once the in-memory fake sorts output/input numerically
-# (it currently orders them lexicographically); ClickHouse already does.
-@pytest.mark.skipif(
-    FAKE_NOT_IMPLEMENTED,
-    reason="fake: output/input sort is lexicographic, not numeric, yet",
-)
 def test_eval_results_sort_by_numeric_input(client):
     """Numeric input columns sort by value, not lexicographically.
 
