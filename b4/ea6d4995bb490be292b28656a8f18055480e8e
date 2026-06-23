@@ -1,0 +1,129 @@
+## Split of Google ADK plugin-core — slice 3/3 (tool/execute_tool spans)
+Final slice. See slice 1 / tag bak-adk-old-plugincore for full original history.
+
+Adds: tool callbacks (beforeTool/afterTool/onToolError → execute_tool spans, replacing slice 2's stubs), endToolSpan, syntheticQueueKey, InvocationState tool fields (toolSpans/syntheticToolKeys/toolSeq) + finishInvocation tool loop, tool types.
+
+CRITICAL INVARIANT: this slice's googleAdk.ts + googleAdk.types.ts + semconv.ts are BYTE-IDENTICAL to the original plugin-core (tag bak-adk-old-plugincore) — verified 0-line diff. That is what lets the downstream branches (genai-exclusion/agent-hierarchy/auto-instrument) reparent onto this slice with their SOURCE applying cleanly; only the (reorganized) test file needed conflict resolution.
+
+Tests: tool-using e2e (real runner) + tool-errors + cyclic/bigint sanitization. Verified 20/20 jest + lint clean.
+
+## Session addendum — resolve restack duplicate helper after moved tests
+User clarified every PR must be standalone and the GoogleGenAI exclusion test was moved downstack into the model slice. Restacking the tool slice over the amended model slice produced a duplicate ScriptedLlm helper in sdks/node/src/__tests__/integrations/googleAdk.test.ts. Removed the duplicate at the tool slice so this PR is independently testable and the upstack branches inherit a clean test file.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (22 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed.
+
+---
+
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+
+Final verification for this branch:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (22 passed, 22 total)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
+
+No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 03 — owns tool/execute_tool spans)
+googleAdk.ts (beforeToolCallback + endToolSpan):
+- Dropped `ctx ? this.invocations.get(...) : undefined` ternaries and the `?.`
+  on ADK-guaranteed toolContext / tool (toolContext: Context, tool: BaseTool,
+  toolArgs: Record<string,unknown> are all required in ADK's BasePlugin
+  signature).
+- `jsonAttr(params.toolArgs ?? {})` -> `jsonAttr(params.toolArgs)` (toolArgs is
+  framework-built and required/non-null upstream).
+
+## Dead Ends / Deliberately NOT changed
+- KEPT afterToolCallback's `result: Record<string, unknown> | null` and the
+  `params.result ?? null`. A tool's RETURN VALUE is user code that can genuinely
+  be null/undefined, unlike the framework-provided fields — so this `| null` is
+  justified defensiveness, not laziness. Distinguished from the framework-field
+  `?.` removals on purpose.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-03 jest 22/22.
+
+===================================================================
+## ADDENDUM — discriminated union for tool outcome (later session)
+===================================================================
+Following the user's "use discriminated unions where they make sense", modeled
+endToolSpan's terminal outcome as a tagged union instead of {result?, error?}:
+  type ToolSpanOutcome =
+    | {kind:'result'; result: Record<string,unknown> | null}
+    | {kind:'error'; error: Error}
+Call sites pass {kind:'result',...} / {kind:'error',...}; the body branches on
+`outcome.kind`. This makes the result-XOR-error contract explicit and rejects
+the previously-representable invalid states (both set / neither set). The
+result `| null` is retained (tool return values can legitimately be null).
+Verified tsc esm+cjs, eslint, prettier, slice-03 jest 22/22.
+
+---
+## Session addendum — review-comment pass (2026-06-23)
+
+Comment 1 (tighten optionals): functionCallResponse(usage) changed from
+`usage?` to required `usage`, and the conditional `...(usage ? {usageMetadata}
+: {})` spread replaced with an always-emitted usageMetadata. Justification: the
+helper's ONLY caller across slices 03/05/06 always passes {prompt, completion},
+so optional was unjustified. (textResponse.usage stays optional — 5/7 callers
+omit it.)
+
+Comment 2 (toMatchObject): consolidated the "every span shares trace + session"
+loop's two lone asserts (CONVERSATION_ID, PROVIDER_NAME) into one
+expect(span.attributes).toMatchObject({...}). On restacking slice 05 this hunk
+conflicted with slice 05's root->root! change on the adjacent traceId line;
+resolved by keeping BOTH (root! + toMatchObject), so the conversion stays in
+THIS slice's diff and only the root! change lands in slice 05.
+
+Validated slice 03 in isolation: 22 ADK jest tests pass, eslint + typecheck clean.
+
+---
+## Session addendum — literal OTEL keys in tests (2026-06-23)
+
+Per review feedback ("use the literal OTEL key instead of the const ... easier
+to read in the test"), googleAdk.test.ts now uses literal OTEL semconv strings
+(e.g. 'gen_ai.output.messages', 'gen_ai.tool.call.id') in place of the
+ATTR_GEN_AI_* consts imported from ../../genai/semconv; the now-unused semconv
+import was removed. TEST-ONLY — production googleAdk.ts still imports the consts.
+
+Applied uniformly across the whole ADK slice stack (01/02/03/05/06) via a
+deterministic, idempotent transform (.context/relit.mjs, gitignored): object
+keys [CONST]: -> 'lit':, property access x[CONST] -> x['lit']. Each upstack
+restack hit the test file and was resolved with `git checkout --theirs` +
+re-running the transform, so every slice's full file ends up literal-ized.
+Notes survived because these restacks took git's conflict path (gt's
+clean-restack path would have dropped them).
+
+Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
+slice 01 5).
+
+---
+## Session addendum — review pass: drop ! (2026-06-23)
+
+Comment 1: firstChat/secondChat now acquired via the `requireSpan` helper
+(inherited from slice 02) instead of `chatSpans.find(...)` + `firstChat!`;
+dropped the `!` and the redundant toBeDefined lines. The model-error `root!` fix
+propagates from slice 02. Validated: jest 22 pass.
+
+---
+## Session addendum — move KNOWN LIMITATION comment here (2026-06-23)
+
+Per review: the afterModelCallback "KNOWN LIMITATION (non-default SSE streaming):
+text + tool call gets split into two non-partial responses, so the function call
+is absent from the chat span's output but captured as its own execute_tool span"
+comment was added in slice 06, but the limitation first APPLIES in this slice —
+it needs both chat spans (slice 02) and execute_tool spans (slice 03) to coexist,
+which first happens here. Expanded slice 03's one-line afterModelCallback comment
+into the full block; slice 06 reverted to the one-liner so the block propagates
+up from here without duplication. afterModelCallback body unchanged.
+Validated: tip jest 26, typecheck clean. Kept LOCAL/unpushed.
