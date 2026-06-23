@@ -115,7 +115,9 @@ def make_assistant_audio_item(item_id: str, transcript: str) -> dict:
     }
 
 
-def make_function_call_item(item_id: str, name: str, arguments: str, call_id: str) -> dict:
+def make_function_call_item(
+    item_id: str, name: str, arguments: str, call_id: str
+) -> dict:
     return {
         "id": item_id,
         "type": "function_call",
@@ -162,9 +164,7 @@ def drive_response(
     for item_id, audio in (response_audio or {}).items():
         exp.response_audio[item_id] = audio
 
-    exp.handle_response_created(
-        {"type": "response.created", "response": response}
-    )
+    exp.handle_response_created({"type": "response.created", "response": response})
     exp.handle_response_done({"type": "response.done", "response": response})
 
 
@@ -203,9 +203,7 @@ def test_basic_response_emits_invoke_agent_chat_tree(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     user = make_user_audio_item("item_u1", transcript="What's the weather?")
     out = make_assistant_audio_item("item_a1", transcript="It's sunny.")
@@ -246,9 +244,7 @@ def test_basic_response_emits_invoke_agent_chat_tree(
     # Output message carries the transcript (text) + audio (uri) parts.
     out_msgs = messages(chat, "gen_ai.output.messages")
     assert part_types(out_msgs) == {"text", "uri"}
-    uri_part = next(
-        p for m in out_msgs for p in m["parts"] if p["type"] == "uri"
-    )
+    uri_part = next(p for m in out_msgs for p in m["parts"] if p["type"] == "uri")
     assert uri_part["modality"] == "audio"
     assert uri_part["mime_type"] == "audio/wav"
     assert uri_part["uri"] == "weave:///entity/proj/object/content:1"
@@ -271,9 +267,7 @@ def test_input_audio_published_as_uri(
 ) -> None:
     """User speech is sliced from the input buffer and published as a uri."""
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     user = make_user_audio_item("item_u1")
     # 20ms @ 24kHz/16-bit mono = 960 bytes.
@@ -304,9 +298,7 @@ def test_function_call_emits_execute_tool_span(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     user = make_user_audio_item("item_u1", transcript="weather in Paris?")
     fc = make_function_call_item(
@@ -342,9 +334,7 @@ def test_usage_mapped_onto_chat_span(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     out = make_assistant_audio_item("item_a1", transcript="hi")
     usage = {
@@ -369,9 +359,7 @@ def test_multiple_responses_share_session_root(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     # Each response carries a DIFFERENT realtime conversation_id, yet they all
     # belong to one session — so they must nest under a single root.
@@ -409,9 +397,7 @@ def test_failed_response_sets_error_status(
     from opentelemetry.trace import StatusCode
 
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
     resp = make_response("resp_1", [], conversation_id="conv_e", status="failed")
     resp["status_details"] = {"error": {"message": "boom"}}
     drive_response(exp, resp)
@@ -451,9 +437,7 @@ def test_spans_populate_clickhouse_schema_via_extraction(
     from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 
     exp = OTelStateExporter()
-    exp.handle_session_updated(
-        {"type": "session.updated", "session": make_session()}
-    )
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
 
     # Turn 1: a spoken response to spoken input — exercises audio publishing on
     # both sides, usage, and the message columns.
