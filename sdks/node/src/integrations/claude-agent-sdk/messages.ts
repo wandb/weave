@@ -27,13 +27,22 @@ export type {
 
 // ── Usage mapping ───────────────────────────────────────────────────────
 
+/** Weave's snake_case usage shape — the only keys {@link toWeaveUsage} emits. */
+interface WeaveUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
+
 /**
  * Token fields mapped from the SDK's camelCase names to Weave's snake_case. The
- * camelCase keys are typed against the SDK's `ModelUsage`, so a rename in the
- * SDK surfaces here as a type error rather than a silently dropped field.
+ * camelCase keys are typed against the SDK's `ModelUsage` and the snake_case
+ * keys against `WeaveUsage`, so a rename on either side surfaces here as a type
+ * error rather than a silently dropped field.
  */
 const USAGE_FIELDS: ReadonlyArray<
-  readonly [camel: keyof ModelUsage, snake: string]
+  readonly [camel: keyof ModelUsage, snake: keyof WeaveUsage]
 > = [
   ['inputTokens', 'input_tokens'],
   ['outputTokens', 'output_tokens'],
@@ -52,13 +61,11 @@ const USAGE_FIELDS: ReadonlyArray<
  * already present (e.g. the aggregate `result.usage`, which the SDK reports in
  * snake_case) are passed through unchanged, so this is safe for either shape.
  */
-export function toWeaveUsage(
-  usage: Record<string, unknown>
-): Record<string, unknown> {
-  const mapped: Record<string, unknown> = {};
+export function toWeaveUsage(usage: Record<string, unknown>): WeaveUsage {
+  const mapped: WeaveUsage = {};
   for (const [camel, snake] of USAGE_FIELDS) {
     const value = usage[camel] ?? usage[snake];
-    if (value != null) {
+    if (typeof value === 'number') {
       mapped[snake] = value;
     }
   }
