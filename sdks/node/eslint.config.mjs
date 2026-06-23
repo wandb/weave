@@ -24,7 +24,6 @@ export default defineConfig([
       '@typescript-eslint/no-wrapper-object-types': 'off',
       'no-case-declarations': 'off',
       'no-useless-assignment': 'off',
-      'no-undef': 'off',
       'prefer-const': 'off',
       'prefer-rest-params': 'off',
       'preserve-caught-error': 'off',
