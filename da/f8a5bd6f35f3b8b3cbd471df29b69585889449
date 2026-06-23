@@ -1,0 +1,51 @@
+## Conversation
+PR-B of the 2-PR stack: make the Stainless client the default and delete the
+hand-rolled RemoteHTTPTraceServer. Builds on PR-A's parity work.
+
+## Actions
+- weave_init.py: init_weave_get_server always builds StainlessRemoteHTTPTraceServer;
+  removed the should_use_stainless_server branch + import.
+- settings.py: removed the use_stainless_server field (UserSettings + the env
+  TypedDict) and should_use_stainless_server().
+- api.py: removed the use_stainless_server doc entry.
+- weave_client.py: made the parallel-table-upload capability probe
+  implementation-agnostic — it now calls the typed table_create_from_digests
+  instead of reaching for the hand-rolled-only _post_request_executor.__wrapped__;
+  updated 2 stale comments.
+- wal_sender.py: switched to StainlessRemoteHTTPTraceServer + set_auth() (the
+  Stainless client has no auth= ctor kwarg).
+- Deleted weave/trace_server_bindings/remote_http_trace_server.py.
+- Test migration: trace_server_bindings/conftest (server_class always Stainless;
+  removed the pytest_ignore_collect dual-impl logic); test_trace_server_bindings
+  (removed the dead RemoteHTTPTraceServer branch + now-unused httpx import);
+  test_weave_init_availability + test_wave_client_file_cache (→ Stainless);
+  trace_server/conftest (flag now vestigial, default flipped to "stainless");
+  tests/conftest network_proxy_client fixture rebuilt to inject a
+  TestClient-backed SDK client + no-op _update_client_headers. Deleted
+  test_http_behavior_remote.py + test_tags_aliases_routes.py.
+
+## Errors & Mistakes
+- test_table_partitioning[True] failed (0 table_create_from_digests calls): the
+  capability probe asserted server._post_request_executor (a hand-rolled-only
+  internal the Stainless client lacks) → AssertionError → probe reported the
+  endpoint missing → parallel chunking silently skipped. Fixed by calling the
+  typed method.
+
+## Dead Ends
+- ASGITransport (async) can't back the SDK's sync client; used FastAPI
+  TestClient (a sync httpx.Client subclass) as the SDK's http_client.
+
+## Hints for Future Agents
+- The --remote-http-trace-server pytest flag is now vestigial (single impl);
+  kept for CI compat with the default flipped to "stainless".
+- network_proxy_client drives the SDK through a TestClient ASGI app and no-ops
+  _update_client_headers so the injected client isn't .copy()'d away mid-request.
+
+## Codebase Discoveries
+- Client-side coupling to hand-rolled internals was localized to one spot
+  (weave_client.py's _post_request_executor probe). No other coupling found.
+
+## Open Questions
+- Full weave CI (integration shards) was not run locally. The directly-affected
+  suites + the broad client suite passed (80 + 87, 0 failures); CI should run
+  before marking the PRs ready.
