@@ -93,3 +93,12 @@ Comment 1: no own edits — this slice's `!` were all inherited from slices 02/0
 and the fixes (requireSpan helper + wrapped acquisitions) propagate via restack.
 The slice-06 abandoned-run test uses `roots[0]` (index access, already
 non-undefined). Validated at tip: eslint + typecheck clean, jest 26 pass.
+
+---
+## Session addendum — review pass (2026-06-23)
+
+No own edits this round. Slice 05's source cleanup (reworded findAgentInTree doc;
+removed the redundant openToolKeys / agentSpanOrder order-arrays, iterating the
+insertion-ordered Maps directly) propagates here via restack — this slice has 0
+references to the removed fields. Validated at tip: eslint + typecheck clean,
+jest 26 pass. Kept LOCAL/unpushed.
