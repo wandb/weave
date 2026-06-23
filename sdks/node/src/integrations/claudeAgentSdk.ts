@@ -20,8 +20,13 @@ import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import type {SDKMessage, SDKResultMessage} from './claude-agent-sdk/messages';
 
-// Marks an exports object whose `query` we've already wrapped, so repeated hook
-// invocations (e.g. CJS + ESM both firing) don't double-wrap.
+// Idempotency marker stamped on each wrapped exports object. It is per-object
+// by design, not a single global flag in state.ts: the CJS and ESM hooks fire
+// on distinct exports views and wrapClaudeAgentSdk() can wrap a user's own
+// import — each needs its `query` wrapped exactly once, so the marker must
+// travel with the object rather than gate all of them on one boolean. Using
+// Symbol.for keeps the marker identical across duplicate CJS/ESM copies of this
+// module (the dual-package hazard state.ts otherwise handles via globalSingleton).
 const PATCHED = Symbol.for('weave.claudeAgentSdk.patched');
 
 /** Minimum `@anthropic-ai/claude-agent-sdk` version this integration supports. */
