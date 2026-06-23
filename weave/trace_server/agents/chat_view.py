@@ -401,22 +401,17 @@ class ChatTraversal:
         """Emit the user message(s) for the new turn this LLM span answers.
 
         The new user input is the trailing run of consecutive user-role
-        messages in ``input_messages`` — the messages appended since the
-        previous assistant/system message (or the start). Earlier turns are
-        replayed as history and are skipped; they were emitted by the span that
-        first answered them. The sequence is NOT assumed to alternate: a turn
-        can be several user messages in a row, and runs of assistant messages
-        are handled by the run boundary.
+        messages in ``input_messages`` — those appended since the previous
+        assistant/system message (or the start). Earlier turns are replayed as
+        history and skipped; they were emitted by the span that first answered
+        them. The run need not alternate: a turn can be several user messages.
 
-        Each user message becomes its own bubble so its own media stays with
-        it (collapsing the run would re-group every turn's audio onto one
-        message — the bug this fixes). Media comes from the message's inline
-        ``uri`` parts, resolved to the internal ref form via the span's
-        ``content_refs`` because the read path requires internal refs (the int
-        -> ext converter rejects a bare external ref). Reading ``content_refs``
-        here is only that ref-form lookup, keyed by the inline part's digest;
-        the conversation itself drives everything else (removal of the
-        ``content_refs`` column is a planned follow-up).
+        Each message becomes its own bubble so its own media stays with it;
+        collapsing the run would re-group every turn's audio onto one message.
+        Media comes from the message's inline ``uri`` parts, resolved to the
+        internal ref form via the span's ``content_refs`` because the read path
+        requires internal refs (the int->ext converter rejects a bare external
+        ref).
         """
         for message in _trailing_user_messages(span.input_messages):
             text = _display_text(message.content)
@@ -657,10 +652,9 @@ def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
     """Object digests of media (uri/blob/file) parts inlined in ``messages``.
 
     Pure extraction — it carries no notion of direction. Callers decide whose
-    media this is by choosing *which* messages to pass: media belongs to the
-    role that owns the message it sits on, not to whichever input/output list
-    the message happens to appear in (see ``_user_messages``). Position would
-    mislabel a prior assistant turn that a later turn replays into its inputs.
+    media this is by choosing which messages to pass: media belongs to the role
+    that owns the message it sits on, not to whichever input/output list it
+    appears in (see ``_user_messages``).
     """
     digests: set[str] = set()
     for message in messages:
@@ -677,13 +671,12 @@ def _directional_content_refs(
 ) -> list[str]:
     """Resolve ``part_digests`` against the span's ``content_refs``.
 
-    ``content_refs`` is a direction-agnostic digest->ref lookup: it holds each
-    ref in the internal, int<->ext-convertible form the response pipeline
-    requires (the int->ext adapter raises on a bare external ``weave:///`` ref,
-    which is the form inline message parts carry). This returns the internal
-    refs whose digest matches a supplied part digest. Direction is decided by
-    the caller via the messages it digests (role-based — see ``_user_messages``
-    and ``_emit_assistant_message``), never by this lookup.
+    ``content_refs`` is a direction-agnostic digest->ref lookup holding each ref
+    in the internal, int<->ext-convertible form the response pipeline requires
+    (the int->ext adapter raises on a bare external ``weave:///`` ref, the form
+    inline message parts carry). Returns the internal refs whose digest matches
+    a supplied part digest; direction is the caller's choice of messages, never
+    this lookup.
     """
     if not part_digests:
         return []
@@ -693,13 +686,13 @@ def _directional_content_refs(
 def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]:
     """The user's side of a message list, selected by role.
 
-    Direction is the message role, not its input/output position. A multi-turn
+    Direction is the message role, not its input/output position: a multi-turn
     conversation replays the prior assistant turn — model-generated media and
-    all — back into the next turn's ``input_messages``; selecting by position
-    would mislabel that assistant audio/image as user-supplied (the multi-turn
-    misattribution this guards against). Uses the same role resolution as
-    ``_extract_user_text``: everything that isn't assistant/system/tool context
-    (so explicit ``user`` plus provider-variant empty/unknown roles).
+    all — into the next turn's ``input_messages``, so selecting by position
+    would mislabel that assistant audio/image as user-supplied. Uses the same
+    role resolution as ``_extract_user_text``: everything that isn't
+    assistant/system/tool context (explicit ``user`` plus provider-variant
+    empty/unknown roles).
     """
     return [m for m in messages if m.role not in _NON_USER_PROMPT_ROLES]
 
@@ -709,12 +702,10 @@ def _trailing_user_messages(
 ) -> list[NormalizedMessage]:
     """The contiguous run of user-role messages at the end of ``messages``.
 
-    This is the new user input an LLM span is responding to: the run of N user
-    messages appended since the previous assistant/system message (or the
-    start). The count N is whatever the run holds — a turn can be several user
-    messages in a row. Messages earlier in the history are excluded; they were
-    answered (and emitted) by earlier spans. Role decides the boundary (see
-    ``_user_messages``), so the sequence need not alternate user/assistant.
+    This is the new user input an LLM span responds to: the messages appended
+    since the previous assistant/system message (or the start). Earlier history
+    is excluded; it was answered by earlier spans. Role decides the boundary
+    (see ``_user_messages``), so the sequence need not alternate.
     """
     turn: list[NormalizedMessage] = []
     for message in reversed(messages):
@@ -729,11 +720,10 @@ def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
     """User-supplied media refs across a trace, de-duplicated, in internal form.
 
     ``attach_media`` records media on the LLM/chat span, but the rendered user
-    prompt is synthesized from the enclosing invoke_agent span, so the media
-    lives on a different span than the user text. Gather user-side input media
-    across all spans so it lands on the user message regardless of which span
-    carries it. Only user-role messages contribute (see ``_user_messages``);
-    assistant turns echoed into a later turn's inputs stay on the assistant.
+    prompt is synthesized from the enclosing invoke_agent span, so media and
+    user text live on different spans. Gather user-side input media across all
+    spans so it lands on the user message regardless of which span carries it;
+    only user-role messages contribute (see ``_user_messages``).
     """
     refs: list[str] = []
     seen: set[str] = set()

@@ -39,11 +39,10 @@ class ConversationManager:
     def __init__(self, use_otel: bool | None = None) -> None:
         # Optional base URL for downstream export context
         self.client_base_url: str | None = None
-        # The exporter (StateExporter subclass) accumulates the same delta
-        # state regardless of destination; only the final ``_emit_response``
-        # differs. Under WEAVE_USE_OTEL_V2 we export OTel GenAI spans to the
-        # Agents tab; otherwise legacy Weave calls. ``use_otel`` lets callers
-        # (and tests) pin the destination explicitly.
+        # The exporter accumulates the same delta state regardless of
+        # destination; only ``_emit_response`` differs. Under WEAVE_USE_OTEL_V2
+        # it emits OTel GenAI spans, otherwise legacy Weave calls. ``use_otel``
+        # lets callers (and tests) pin the destination explicitly.
         if use_otel is None:
             from weave.trace.settings import should_use_otel_v2
 

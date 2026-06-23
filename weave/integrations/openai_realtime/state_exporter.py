@@ -749,16 +749,13 @@ class StateExporter(BaseModel):
         done_at: datetime.datetime | None,
         first_content_at: datetime.datetime | None,
     ) -> None:
-        """Export the compiled response state for one finished response.
+        """Export the compiled state for one finished response.
 
-        This is the single seam between the delta-accumulation machinery
-        (audio buffers, transcript gating, FIFO ordering — all above and in
-        the event handlers) and the destination it is exported to. The
-        default implementation creates the legacy ``realtime.response`` Weave
-        call, parented under its ``realtime.conversation`` / ``realtime.session``
-        call. Subclasses override this to export the *same* compiled
-        ``inputs`` / ``output_dict`` / ``summary`` elsewhere (e.g. as OTel
-        GenAI spans) without re-deriving any state.
+        The single seam between the delta-accumulation machinery and the export
+        destination. The default creates the legacy ``realtime.response`` Weave
+        call under its conversation/session call; subclasses override it to
+        export the same ``inputs`` / ``output_dict`` / ``summary`` elsewhere
+        (e.g. as OTel GenAI spans) without re-deriving state.
         """
         from weave.trace.context.weave_client_context import require_weave_client
 
@@ -902,11 +899,7 @@ class StateExporter(BaseModel):
                     pass
 
             def _cb() -> None:
-                try:
-                    self._advance_fifo()
-                finally:
-                    # If more remain and head not ready, a new timer will be scheduled
-                    pass
+                self._advance_fifo()
 
             self.fifo_timer = threading.Timer(FIFO_TIMER_INTERVAL_SECONDS, _cb)
             self.fifo_timer.start()
