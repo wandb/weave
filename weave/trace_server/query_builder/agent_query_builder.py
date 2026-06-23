@@ -24,6 +24,12 @@ from weave.trace_server.agents.constants import (
     SPAN_GROUP_AGGREGATE_COLS,
     SPAN_GROUP_RESULT_COLS,
 )
+from weave.trace_server.agents.span_costs import (
+    COST_COLUMN_NAMES,
+    COST_DERIVED_METRIC_NAMES,
+    GROUPED_COST_ALIASES,
+    cost_augmented_source_sql,
+)
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
@@ -172,7 +178,6 @@ _DERIVED_DURATION_MS: AgentSpanStatsDerivedMetric = "duration_ms"
 _DERIVED_TOTAL_TOKENS: AgentSpanStatsDerivedMetric = "total_tokens"
 _DERIVED_IS_ERROR: AgentSpanStatsDerivedMetric = "is_error"
 _DERIVED_IS_INVOCATION: AgentSpanStatsDerivedMetric = "is_invocation"
-
 _STATUS_CODE_ERROR = "ERROR"
 
 _CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
@@ -317,6 +322,12 @@ _SPANS_LIST_FIELD_NAMES = [
     "wb_run_step_end",
 ]
 SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+
+# Per-span cost columns, projected only when the caller sets `include_costs`.
+# These are computed by the cost-augmented spans source, not stored columns.
+SPANS_COST_COLS: str = _projection(list(COST_COLUMN_NAMES))
+QUALIFIED_SPANS_COST_COLS: str = _projection(list(COST_COLUMN_NAMES), table_alias="s")
+_SPAN_COST_SORTABLE_COLS: frozenset[str] = frozenset(COST_COLUMN_NAMES)
 
 # Detail-only fields: heavy text/array payloads. Included only when the
 # caller sets `include_details` (the span detail panel does this; the main
@@ -641,6 +652,15 @@ def _derived_value_sql(
             valid_sql="1",
             value_type=_VALUE_TYPE_BOOLEAN,
         )
+    if metric in COST_DERIVED_METRIC_NAMES:
+        # The cost column (same name as the metric) is supplied by the
+        # cost-augmented span source. NULL means the span's model had no
+        # matching price, so guard it out of aggregates rather than scoring 0.
+        return SpanValueSQL(
+            value_sql=f"toFloat64({table_alias}.{metric})",
+            valid_sql=f"isNotNull({table_alias}.{metric})",
+            value_type=_VALUE_TYPE_NUMBER,
+        )
     raise ValueError(f"unknown derived metric: {metric!r}")
 
 
@@ -958,12 +978,21 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
     span_filters = _spans_filter_sql(pb, req)
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
+    # Read from the cost-augmented source (per-span price JOIN) only when costs
+    # were requested; the bare `spans` table otherwise. Shared by both the
+    # ungrouped and grouped branches below.
+    source = (
+        cost_augmented_source_sql(pb, req.project_id) if req.include_costs else "spans"
+    )
 
     if not req.group_by:
         custom_sort_exprs = _custom_attr_sort_exprs(pb, req.custom_attr_columns)
+        sortable = SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys()))
+        if req.include_costs:
+            sortable = sortable.union(_SPAN_COST_SORTABLE_COLS)
         order_by = build_order_by(
             req.sort_by,
-            SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys())),
+            sortable,
             "started_at DESC",
             column_exprs=custom_sort_exprs,
         )
@@ -971,9 +1000,10 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
             pb, req.custom_attr_columns
         )
         details_projection = f", {SPANS_DETAILS_COLS}" if req.include_details else ""
+        cost_projection = f", {SPANS_COST_COLS}" if req.include_costs else ""
         return f"""
-            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}
-            FROM spans s
+            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}{cost_projection}
+            FROM {source} s
             WHERE {span_filters.where}
             ORDER BY {order_by}
             LIMIT {limit_slot} OFFSET {offset_slot}
@@ -994,9 +1024,18 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         aggregate_selects = (
             f"{aggregate_selects},\n               {dynamic_aggregate_selects}"
         )
+    if req.include_costs:
+        aggregate_selects = (
+            f"{aggregate_selects},\n"
+            "               sum(s.total_cost_usd) AS total_cost_usd,\n"
+            "               sum(s.input_cost_usd) AS total_input_cost_usd,\n"
+            "               sum(s.output_cost_usd) AS total_output_cost_usd"
+        )
     sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases)).union(
         measure.alias for measure in measure_sqls
     )
+    if req.include_costs:
+        sortable = sortable.union(frozenset(GROUPED_COST_ALIASES))
     default_order_by = (
         f"{measure_sqls[0].alias} DESC" if measure_sqls else "last_seen DESC"
     )
@@ -1012,7 +1051,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     return f"""
         SELECT {select_group_cols},
                {aggregate_selects}
-        FROM spans s
+        FROM {source} s
         WHERE {span_filters.where}
         GROUP BY {group_by_clause}
         {having_sql}
@@ -1401,8 +1440,11 @@ def make_trace_detail_spans_query(
     """
     pid = pb.add(project_id, param_type="String")
     tid = pb.add(trace_id, param_type="String")
+    # Always cost-augmented: the chat/detail views render per-message and
+    # per-trace cost, and this is a single-trace fetch so the price JOIN is cheap.
+    source = cost_augmented_source_sql(pb, project_id)
     return f"""
-        SELECT {CHAT_VIEW_COLS} FROM spans s
+        SELECT {CHAT_VIEW_COLS}, {SPANS_COST_COLS} FROM {source} s
         WHERE {_project_filter_sql("s.project_id", pid)}
           AND s.trace_id = {tid}
         ORDER BY s.started_at ASC
@@ -1539,9 +1581,12 @@ def make_conversation_chat_spans_query(
     cid = pb.add(req.conversation_id, param_type="String")
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    # Always cost-augmented so the multi-turn chat view can render per-message
+    # and per-turn cost; bounded to one conversation's turns, so cheap.
+    source = cost_augmented_source_sql(pb, req.project_id)
     return f"""
-        SELECT {QUALIFIED_CHAT_VIEW_COLS}
-        FROM spans s
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+        FROM {source} s
         INNER JOIN (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans

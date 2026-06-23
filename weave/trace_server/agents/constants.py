@@ -91,6 +91,11 @@ SPAN_GROUP_RESULT_COLS: frozenset[str] = SPAN_GROUP_AGGREGATE_COLS.union(
             "provider_names",
             "request_models",
             "conversation_names",
+            # Cost aggregate aliases (populated only when include_costs is set).
+            # Reserved here so user measure aliases can never collide with them.
+            "total_cost_usd",
+            "total_input_cost_usd",
+            "total_output_cost_usd",
         }
     )
 )
