@@ -185,7 +185,9 @@ class OTelStateExporter(StateExporter):
     def _resolve_audio(self, msg: dict) -> Any:
         return msg
 
-    def _extract_audio_content(self, output_list: list[dict], output_dict: dict) -> None:
+    def _extract_audio_content(
+        self, output_list: list[dict], output_dict: dict
+    ) -> None:
         return None
 
     # ------------------------------------------------------------------
@@ -238,7 +240,9 @@ class OTelStateExporter(StateExporter):
                 if ref:
                     parts.append(
                         UriPart(
-                            modality=_AUDIO_MODALITY, mime_type=_AUDIO_MIME_TYPE, uri=ref
+                            modality=_AUDIO_MODALITY,
+                            mime_type=_AUDIO_MIME_TYPE,
+                            uri=ref,
                         )
                     )
                     refs.append(ref)
@@ -252,7 +256,9 @@ class OTelStateExporter(StateExporter):
                 if ref:
                     parts.append(
                         UriPart(
-                            modality=_AUDIO_MODALITY, mime_type=_AUDIO_MIME_TYPE, uri=ref
+                            modality=_AUDIO_MODALITY,
+                            mime_type=_AUDIO_MIME_TYPE,
+                            uri=ref,
                         )
                     )
                     refs.append(ref)
@@ -277,7 +283,9 @@ class OTelStateExporter(StateExporter):
             call_id = item.get("call_id") or item.get("id") or ""
             return Message(
                 role="tool",
-                parts=[ToolCallResponsePart(id=call_id, response=item.get("output", ""))],
+                parts=[
+                    ToolCallResponsePart(id=call_id, response=item.get("output", ""))
+                ],
             )
         if itype == "message":
             role = item.get("role") or "user"
@@ -439,7 +447,9 @@ class OTelStateExporter(StateExporter):
                     )
                 )
                 tool_call_items.append(out_item)
-        output_messages = [Message(role="assistant", parts=out_parts)] if out_parts else []
+        output_messages = (
+            [Message(role="assistant", parts=out_parts)] if out_parts else []
+        )
 
         attrs = llm_attributes(
             model=model,
