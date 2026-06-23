@@ -71,3 +71,28 @@ googleAdk.ts:
 
 ## Verified
 tsc esm+cjs PASS, prettier clean, slice-02 jest 19/19.
+
+---
+## Session addendum — review-comment pass: toMatchObject + optional tightening (2026-06-23)
+
+User left two stack-wide review comments and approved a full sweep ("yes, and
+tighten comment 1 wherever you can. Do this up and down the stack").
+
+REVIEW VERDICT on comment 1 (make wrongly-optional things required):
+- Only ONE genuine tightening exists in the whole stack: functionCallResponse(usage)
+  in slice 03 (its sole caller always passes usage). Done in slice 03.
+- textResponse(usage?) STAYS optional: 5 of 7 callers omit usage.
+- googleAdk.types.ts fields STAY optional by design — they are structural duck
+  types of @google/adk/@google/genai objects, optional so the real (optional)
+  ADK types remain structurally assignable; always-present fields (name,
+  session.id, invocationId, agentName, contents) were already required.
+
+THIS SLICE (02, model/chat): comment 2 — converted 5 lone span-attribute
+assertions to expect(span.attributes).toMatchObject({...}):
+cached-response OUTPUT_MESSAGES, dangling-spans interrupted, capture=false
+REQUEST_MODEL, provider test.each PROVIDER_NAME, capture test.each
+OUTPUT_MESSAGES (the line the user flagged). expect.stringContaining preserves
+substring strength. Left .toBeUndefined() absence checks as-is (toMatchObject
+asserts presence, not absence).
+
+Validated at stack tip: eslint clean, typecheck:esm clean, 26 ADK jest tests pass.
