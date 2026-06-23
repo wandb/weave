@@ -1,3 +1,5 @@
+import pytest
+
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
@@ -10,6 +12,7 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.eval_results_query_builder import (
     build_eval_results_cte_chain,
     build_eval_results_query,
+    build_sort_expression,
 )
 
 
@@ -1106,4 +1109,173 @@ def test_full_query_calls_complete() -> None:
             "pb_4": SENTINEL_EPOCH,
             "pb_5": "proj-1",
         },
+    )
+
+
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_sort_output_numeric_then_string_fallback(direction: str) -> None:
+    """An output column sorts numerically (with a string fallback), not lexically.
+
+    Three terms mirror OrderField in the calls query: a fixed-DESC existence term
+    so numeric rows precede NULL/text rows in both directions, then the numeric
+    key and the string fallback in the requested direction.
+    """
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [tsi.EvalResultsSortBy(field="output.predicted", direction=direction)],
+        ["eval-1"],
+        pb,
+    )
+    d = direction.upper()
+    extract = (
+        "any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))"
+    )
+    assert_raw_sql(
+        order_by,
+        f"(toFloat64OrNull({extract}) IS NOT NULL) DESC, "
+        f"toFloat64OrNull({extract}) {d}, "
+        f"{extract} {d}, "
+        "row_digest ASC",
+        pb.get_params(),
+        {"pb_0": '$."predicted"'},
+    )
+
+
+def test_sort_inputs_numeric_then_string_fallback() -> None:
+    """An input column gets the same numeric-then-string fallback, on resolved_inputs."""
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [tsi.EvalResultsSortBy(field="inputs.truth_x2", direction="asc")],
+        ["eval-1"],
+        pb,
+    )
+    assert_raw_sql(
+        order_by,
+        """
+        (toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(resolved_inputs, {pb_0:String}), 'null'), ''))) IS NOT NULL) DESC,
+        toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(resolved_inputs, {pb_0:String}), 'null'), ''))) ASC,
+        any(coalesce(nullIf(JSON_VALUE(resolved_inputs, {pb_0:String}), 'null'), '')) ASC,
+        row_digest ASC
+        """,
+        pb.get_params(),
+        {"pb_0": '$."truth_x2"'},
+    )
+
+
+def test_sort_scores_unchanged() -> None:
+    """Scores keep the existing single-term numeric avg (with bool coercion)."""
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [
+            tsi.EvalResultsSortBy(
+                field="scores.accuracy",
+                direction="desc",
+                evaluation_call_id="eval-1",
+            )
+        ],
+        ["eval-1"],
+        pb,
+    )
+    assert_raw_sql(
+        order_by,
+        """
+        avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_1:String}
+            THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'true', '1',
+                coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'false', '0',
+                coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))
+            ELSE NULL END)) DESC,
+        row_digest ASC
+        """,
+        pb.get_params(),
+        {"pb_0": '$."scores"."accuracy"', "pb_1": "eval-1"},
+    )
+
+
+def test_sort_difference_mode_is_numeric() -> None:
+    """Difference-mode sort on an output column subtracts numeric scalars, not strings."""
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [
+            tsi.EvalResultsSortBy(
+                field="output.predicted", direction="desc", mode="difference"
+            )
+        ],
+        ["eval-1", "eval-2"],
+        pb,
+    )
+    assert_raw_sql(
+        order_by,
+        """
+        greatest(
+            toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_1:String} THEN coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') ELSE NULL END)),
+            toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_2:String} THEN coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') ELSE NULL END))
+        ) - least(
+            toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_1:String} THEN coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') ELSE NULL END)),
+            toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_2:String} THEN coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') ELSE NULL END))
+        ) DESC,
+        row_digest ASC
+        """,
+        pb.get_params(),
+        {"pb_0": '$."predicted"', "pb_1": "eval-1", "pb_2": "eval-2"},
+    )
+
+
+def test_sort_row_digest_value_mode() -> None:
+    """row_digest is the GROUP BY key, sorted bare (plus the stable tie-breaker)."""
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [tsi.EvalResultsSortBy(field="row_digest", direction="asc")],
+        ["eval-1"],
+        pb,
+    )
+    assert_raw_sql(
+        order_by,
+        "row_digest ASC, row_digest ASC",
+        pb.get_params(),
+        {},
+    )
+
+
+def test_sort_difference_mode_scores_is_numeric() -> None:
+    """Difference-mode sort on a score diffs the numeric avg scalar per eval."""
+    pb = ParamBuilder("pb")
+    order_by = build_sort_expression(
+        [
+            tsi.EvalResultsSortBy(
+                field="scores.accuracy", direction="desc", mode="difference"
+            )
+        ],
+        ["eval-1", "eval-2"],
+        pb,
+    )
+    assert_raw_sql(
+        order_by,
+        """
+        greatest(
+            avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_1:String}
+                THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'true', '1',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'false', '0',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))
+                ELSE NULL END)),
+            avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_2:String}
+                THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'true', '1',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'false', '0',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))
+                ELSE NULL END))
+        ) - least(
+            avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_1:String}
+                THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'true', '1',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'false', '0',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))
+                ELSE NULL END)),
+            avg(toFloat64OrNull(CASE WHEN eval_call_id = {pb_2:String}
+                THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'true', '1',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '') = 'false', '0',
+                    coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))
+                ELSE NULL END))
+        ) DESC,
+        row_digest ASC
+        """,
+        pb.get_params(),
+        {"pb_0": '$."scores"."accuracy"', "pb_1": "eval-1", "pb_2": "eval-2"},
     )
