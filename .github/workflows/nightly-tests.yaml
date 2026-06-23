@@ -2,8 +2,8 @@ name: nightly-tests
 
 on:
   schedule:
-    # Run at midnight UTC
-    - cron: "0 0 * * *"
+    # Run at midnight UTC, Monday-Friday only (skip weekends)
+    - cron: "0 0 * * 1-5"
   # Allow manual triggering
   workflow_dispatch:
     inputs:
