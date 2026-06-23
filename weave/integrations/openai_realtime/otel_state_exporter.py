@@ -205,7 +205,7 @@ class OTelStateExporter(StateExporter):
             from weave.trace.api import publish
             from weave.type_wrappers.Content.content import Content
 
-            content = Content.from_bytes(
+            content: Content = Content.from_bytes(
                 pcm_to_wav(bytes(pcm_bytes)), mimetype=_AUDIO_MIME_TYPE
             )
             ref = publish(content)

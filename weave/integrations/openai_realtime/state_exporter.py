@@ -799,6 +799,7 @@ class StateExporter(BaseModel):
         # Latency = TTFT: started_at=response.created, ended_at=first content
         # Use user-set thread_id if present, otherwise fall back to conv_id
         user_thread_id = get_thread_id()
+        thread_id: str | None
         if user_thread_id is not None and user_thread_id != "":
             thread_id = user_thread_id
         else:
