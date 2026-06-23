@@ -57,3 +57,11 @@ them committed into the stack so no PR carries leftover unstaged changes.
 ## Open Questions
 - Whether the H1 fix should ultimately be its own PR vs part of #7306. Put it on
   06 to satisfy "none of the PRs have unstaged changes"; easy to split later.
+
+---
+## Session addendum — review-comment pass (2026-06-23)
+
+Comment 2 (toMatchObject): converted the lone roots[0] interrupted assert to
+expect(roots[0].attributes).toMatchObject({'weave.google_adk.interrupted':
+true}). Validated at stack tip: eslint clean, typecheck:esm clean, 26 ADK jest
+tests pass.
