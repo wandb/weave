@@ -1,5 +1,4 @@
 import asyncio
-from abc import ABC, abstractmethod
 
 import ddtrace
 
@@ -9,6 +8,7 @@ from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_secure_weave_client
 from weave.trace.refs import Ref
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.eval_model_dispatcher import EvaluateModelDispatcher
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
@@ -17,17 +17,12 @@ from weave.trace_server.trace_server_interface import EvaluateModelArgs
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
 # Re-exported for backward compatibility with downstream callers (e.g. the
-# Kafka dispatcher in services/weave-trace) that historically imported
-# EvaluateModelArgs from this module. The canonical definition now lives in
-# trace_server_interface alongside RescoringArgs so both job types can share
-# the EvalWorkerJob discriminated union.
+# Kafka dispatcher in services/weave-trace) that historically imported these
+# names from this module. Canonical homes are now: EvaluateModelArgs in
+# trace_server_interface (alongside RescoringArgs, sharing the EvalWorkerJob
+# discriminated union) and EvaluateModelDispatcher in the client-free
+# weave.trace_server.eval_model_dispatcher seam.
 __all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
-
-
-class EvaluateModelDispatcher(ABC):
-    @abstractmethod
-    def dispatch(self, args: EvaluateModelArgs) -> None:
-        pass
 
 
 def evaluate_model(args: EvaluateModelArgs) -> None:

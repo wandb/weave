@@ -10,11 +10,11 @@ import sys
 
 import pytest
 
-from weave.trace.context.weave_client_context import set_weave_client_global
-from weave.trace_server.isolated_client_executor import (
+from weave.eval_worker.isolated_client_executor import (
     IsolatedClientExecutor,
     _worker_loop,
 )
+from weave.trace.context.weave_client_context import set_weave_client_global
 
 # fork is unavailable on Windows
 USE_FORK = sys.platform != "win32"

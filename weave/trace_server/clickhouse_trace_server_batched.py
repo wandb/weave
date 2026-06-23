@@ -187,6 +187,9 @@ from weave.trace_server.errors import (
     RequestTooLarge,
     handle_clickhouse_query_error,
 )
+from weave.trace_server.eval_model_dispatcher import (
+    EvaluateModelDispatcher,
+)
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
     format_feedback_to_res,
@@ -321,9 +324,6 @@ from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
     get_project_retention_days,
     invalidate_ttl_cache,
-)
-from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
-    EvaluateModelDispatcher,
 )
 
 logger = logging.getLogger(__name__)

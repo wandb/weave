@@ -574,12 +574,17 @@ too-many-positional-arguments = "ignore"
 not-iterable = "ignore"
 
 # ---------------------------------------------------------------------------
-# import-linter: enforce the trace-server / client / workers import boundaries.
+# import-linter: enforce the trace-server / client / eval-worker import boundaries.
 #
 # Goal: the trace server (`weave.trace_server`) and the Weave client SDK
-# (everything else under `weave`) must not import each other, and workers must
-# additionally not reach into the client SDK. `weave.shared` is the intentional
-# neutral zone that both sides may import.
+# (everything else under `weave`) must not import each other. `weave.shared` is
+# the intentional neutral zone that both sides may import.
+#
+# `weave.eval_worker` is the client-coupled glue that runs evaluations
+# out-of-process; it may import BOTH sides (it is never a `source` below). The
+# converse is locked down by the dedicated contract below: nothing inside the
+# trace server or the client SDK may import it. The trace server reaches eval
+# logic only through the client-free `eval_model_dispatcher` seam.
 #
 # The repo is currently entangled, so every existing cross-boundary import is
 # listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
@@ -631,13 +636,6 @@ ignore_imports = [
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.utils.project_id",
-  "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
-  "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
 ]
 
 [[tool.importlinter.contracts]]
@@ -741,10 +739,10 @@ ignore_imports = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Workers must not import the Weave client SDK"
+name = "Eval worker must not be imported by the trace server or client SDK"
 type = "forbidden"
-source_modules = ["weave.trace_server.workers"]
-forbidden_modules = [
+source_modules = [
+  "weave.trace_server",
   "weave.agent",
   "weave.chat",
   "weave.compat",
@@ -766,14 +764,11 @@ forbidden_modules = [
   "weave.utils",
   "weave.wandb_interface",
 ]
+forbidden_modules = ["weave.eval_worker"]
 allow_indirect_imports = true
-# TEMPORARY: existing workers -> client imports to untangle. Do not add.
-# These also appear in the trace_server -> client contract above (workers are a
-# subpackage of trace_server); both must clear before either ignore is removed.
-ignore_imports = [
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
-  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
-]
+# `weave.eval_worker` is the client-coupled, out-of-process eval runner, invoked
+# only by external callers (the core repo's Kafka dispatcher). Neither the trace
+# server nor the client SDK may import it: the trace server would transitively
+# re-acquire the client SDK it was just decoupled from, and the client SDK has
+# no reason to pull in the subprocess runner. No exceptions — there is no
+# `ignore_imports` list, and there should never be one.
