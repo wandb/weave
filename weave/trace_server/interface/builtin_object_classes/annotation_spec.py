@@ -45,8 +45,8 @@ class AnnotationSpec(base_object_def.BaseObject):
 
     @model_validator(mode="before")
     @classmethod
-    def preprocess_field_schema(cls, data: dict[str, Any]) -> dict[str, Any]:
-        if "field_schema" not in data:
+    def preprocess_field_schema(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or "field_schema" not in data:
             return data
 
         field_schema = data["field_schema"]
