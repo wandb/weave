@@ -756,7 +756,7 @@ class AgentWriteHandler:
                     accepted += 1
 
         if span_rows:
-            self._insert_spans(span_rows)
+            self.insert_spans(span_rows)
 
         if failure_counts:
             logger.warning(
@@ -783,11 +783,17 @@ class AgentWriteHandler:
         GenAI extraction — the caller is responsible for constructing a
         fully populated ``AgentSpanCHInsertable``.
         """
-        self._insert_spans([span])
+        self.insert_spans([span])
 
     @ddtrace.tracer.wrap(name="agents.clickhouse.insert_spans")
-    def _insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
-        """Insert pre-built span rows; traced so spans-table writes show in APM."""
+    def insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
+        """Bulk-insert pre-built span rows in one round-trip; traced for APM.
+
+        Shared by `insert_span`, OTel ingest, and the scoring worker's batch
+        span-write path. Empty input is a no-op.
+        """
+        if not span_rows:
+            return
         set_root_span_dd_tags(
             {
                 "weave_trace_server.insert.table": "spans",
