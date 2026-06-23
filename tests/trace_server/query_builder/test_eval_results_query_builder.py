@@ -1,3 +1,5 @@
+import pytest
+
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
@@ -1110,48 +1112,30 @@ def test_full_query_calls_complete() -> None:
     )
 
 
-def test_sort_output_numeric_then_string_fallback_asc() -> None:
+@pytest.mark.parametrize("direction", ["asc", "desc"])
+def test_sort_output_numeric_then_string_fallback(direction: str) -> None:
     """An output column sorts numerically (with a string fallback), not lexically.
 
     Three terms mirror OrderField in the calls query: a fixed-DESC existence term
     so numeric rows precede NULL/text rows in both directions, then the numeric
-    key, then the string key for non-numeric values.
+    key and the string fallback in the requested direction.
     """
     pb = ParamBuilder("pb")
     order_by = build_sort_expression(
-        [tsi.EvalResultsSortBy(field="output.predicted", direction="asc")],
+        [tsi.EvalResultsSortBy(field="output.predicted", direction=direction)],
         ["eval-1"],
         pb,
     )
-    assert_raw_sql(
-        order_by,
-        """
-        (toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))) IS NOT NULL) DESC,
-        toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))) ASC,
-        any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '')) ASC,
-        row_digest ASC
-        """,
-        pb.get_params(),
-        {"pb_0": '$."predicted"'},
-    )
-
-
-def test_sort_output_numeric_then_string_fallback_desc() -> None:
-    """On DESC, only the numeric and string terms flip; the existence term stays DESC."""
-    pb = ParamBuilder("pb")
-    order_by = build_sort_expression(
-        [tsi.EvalResultsSortBy(field="output.predicted", direction="desc")],
-        ["eval-1"],
-        pb,
+    d = direction.upper()
+    extract = (
+        "any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))"
     )
     assert_raw_sql(
         order_by,
-        """
-        (toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))) IS NOT NULL) DESC,
-        toFloat64OrNull(any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), ''))) DESC,
-        any(coalesce(nullIf(JSON_VALUE(output_dump, {pb_0:String}), 'null'), '')) DESC,
-        row_digest ASC
-        """,
+        f"(toFloat64OrNull({extract}) IS NOT NULL) DESC, "
+        f"toFloat64OrNull({extract}) {d}, "
+        f"{extract} {d}, "
+        "row_digest ASC",
         pb.get_params(),
         {"pb_0": '$."predicted"'},
     )
