@@ -126,3 +126,30 @@ Comment 1: every `.find()`-derived span in this slice now goes through the
 to `.find()` for the hierarchy), tool/hierarchy root+agentSpan, nests-sub-agents
 root/pipeline/first/second (via the `byAgent` closure, now requireSpan-wrapped),
 and outside_agent. Validated: jest 24 pass.
+
+---
+## Session addendum — review pass: doc reword + drop redundant order-arrays (2026-06-23)
+
+Three review questions on this slice's googleAdk.ts; user said reword #3, fix #5/#6.
+
+Comment 3 (line ~505): reworded findAgentInTree's doc from "without trusting ADK
+methods" to spell out the behavior — uses ADK's own `findAgent` when present,
+falls back to a manual BFS walk otherwise (findAgent is optional + may throw).
+
+Comments 5 & 6 (iteration): removed the redundant `openToolKeys` and
+`agentSpanOrder` string[] order-arrays from InvocationState. They duplicated the
+insertion order of `toolSpans` / `agentSpans` (JS Maps preserve insertion order)
+and were pruned in lockstep with them (endToolSpan deleted both; the after-agent
+path deleted both), so they carried no information the Maps didn't already have.
+  - innermostOpenToolSpan now iterates `toolSpans.values()` keeping the last
+    (insertion-ordered + pruned-on-close ⇒ last open span = innermost).
+  - finishInvocation ends agent spans via `[...agentSpans.values()].reverse()`
+    (children-first), matching the old reverse-order-array loop.
+  - Folded the ordering rationale into the agentSpans / toolSpans field docs.
+Removed all 7+7 maintenance sites (field/init/push/filter/clear/read). Tool
+cleanup already iterated toolSpans.values() directly, so this also makes the
+file internally consistent.
+
+TEST behavior unchanged (no `!`/key indirection in source affects spans).
+Validated: eslint + typecheck:esm clean; jest slice 05 24, tip 26. Slice 06
+inherits via restack (0 references to the removed fields). Kept LOCAL/unpushed.
