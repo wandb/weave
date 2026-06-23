@@ -39,3 +39,6 @@ None in the impl. (The test-enable commit's note records the bigger surprise:
 
 ## Open Questions
 None.
+
+## Follow-up (CI fix, PR #7337)
+ruff-format reflowed the _obj_ref_target_exists lambda (wrapped predicate in parens). No behavior change; CI 'Python lint' (ruff-format hook) was the only lint failure (mypy + ruff check passed).
