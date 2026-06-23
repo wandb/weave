@@ -356,6 +356,25 @@ class CallRef(RefWithExtra):
 
 @dataclass(frozen=True)
 class AgentTurnRef(Ref):
+    """Reference to one turn (trace) in the Weave Agents view.
+
+    A turn is the chat-style trajectory of a single OTel trace: one user
+    prompt, the assistant's response, and any tool calls or sub-agent
+    invocations that happened in between. Use this ref when you have a
+    `trace_id` and want a stable URI that points the Weave UI (or the
+    chat-view API) at that one turn.
+
+    URI form: `weave:///{entity}/{project}/agent_turn/{trace_id}`.
+
+    Attributes:
+        entity: W&B entity (team or username) that owns the project.
+        project: Project name within the entity.
+        trace_id: OTel trace ID that identifies the turn.
+
+    See also `AgentConversationRef` for multi-turn conversations and
+    `AgentSpanRef` for individual spans.
+    """
+
     entity: str
     project: str
     trace_id: str
@@ -366,6 +385,20 @@ class AgentTurnRef(Ref):
 
     @staticmethod
     def parse_uri(uri: str) -> AgentTurnRef:
+        """Parse a Weave URI back into an `AgentTurnRef`.
+
+        Args:
+            uri: A `weave:///` URI emitted by `AgentTurnRef.uri`.
+
+        Returns:
+            The parsed ref.
+
+        Raises:
+            TypeError: When `uri` is valid but points at a different ref
+                kind (for example, a call or object ref).
+            ValueError: When `uri` doesn't conform to the Weave URI
+                grammar.
+        """
         if not isinstance(parsed := Ref.parse_uri(uri), AgentTurnRef):
             raise TypeError(f"URI is not for an AgentTurn: {uri}")
         return parsed
@@ -373,6 +406,27 @@ class AgentTurnRef(Ref):
 
 @dataclass(frozen=True)
 class AgentConversationRef(Ref):
+    """Reference to one conversation in the Weave Agents view.
+
+    A conversation is an ordered set of turns sharing the same
+    `gen_ai.conversation.id`. Use this ref to link to the multi-turn
+    chat view for a conversation.
+
+    URI form:
+    `weave:///{entity}/{project}/agent_conversation/{encoded_conversation_id}`.
+    The `conversation_id` is URL-quoted in the URI so IDs containing `/`
+    or other reserved characters round-trip safely; the ref stores the
+    decoded value.
+
+    Attributes:
+        entity: W&B entity (team or username) that owns the project.
+        project: Project name within the entity.
+        conversation_id: Conversation identifier from
+            `gen_ai.conversation.id`.
+
+    See also `AgentTurnRef` for individual turns within a conversation.
+    """
+
     entity: str
     project: str
     conversation_id: str
@@ -384,6 +438,25 @@ class AgentConversationRef(Ref):
 
     @staticmethod
     def parse_uri(uri: str) -> AgentConversationRef:
+        """Parse a Weave URI back into an `AgentConversationRef`.
+
+        The encoded `conversation_id` segment is URL-decoded during
+        parsing, so the resulting `conversation_id` matches the value
+        emitted by the producing instrumentation.
+
+        Args:
+            uri: A `weave:///` URI emitted by
+                `AgentConversationRef.uri`.
+
+        Returns:
+            The parsed ref.
+
+        Raises:
+            TypeError: When `uri` is valid but points at a different ref
+                kind.
+            ValueError: When `uri` doesn't conform to the Weave URI
+                grammar.
+        """
         if not isinstance(parsed := Ref.parse_uri(uri), AgentConversationRef):
             raise TypeError(f"URI is not for an AgentConversation: {uri}")
         return parsed
@@ -391,6 +464,24 @@ class AgentConversationRef(Ref):
 
 @dataclass(frozen=True)
 class AgentSpanRef(Ref):
+    """Reference to one span in the Weave Agents view.
+
+    A span is a single OpenTelemetry GenAI span: an agent invocation, an
+    LLM call, a tool execution, or another GenAI event. Use this ref when
+    you want a stable URI that points at a specific span row inside an
+    agent trace.
+
+    URI form: `weave:///{entity}/{project}/agent_span/{span_id}`.
+
+    Attributes:
+        entity: W&B entity (team or username) that owns the project.
+        project: Project name within the entity.
+        span_id: OTel span ID.
+
+    See also `AgentTurnRef` for the trace that contains the span and
+    `AgentConversationRef` for the surrounding conversation.
+    """
+
     entity: str
     project: str
     span_id: str
@@ -401,6 +492,20 @@ class AgentSpanRef(Ref):
 
     @staticmethod
     def parse_uri(uri: str) -> AgentSpanRef:
+        """Parse a Weave URI back into an `AgentSpanRef`.
+
+        Args:
+            uri: A `weave:///` URI emitted by `AgentSpanRef.uri`.
+
+        Returns:
+            The parsed ref.
+
+        Raises:
+            TypeError: When `uri` is valid but points at a different ref
+                kind.
+            ValueError: When `uri` doesn't conform to the Weave URI
+                grammar.
+        """
         if not isinstance(parsed := Ref.parse_uri(uri), AgentSpanRef):
             raise TypeError(f"URI is not for an AgentSpan: {uri}")
         return parsed

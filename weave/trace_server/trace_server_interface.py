@@ -3245,33 +3245,199 @@ class TraceServerInterface(Protocol):
     def otel_export(self, req: OTelExportReq) -> OTelExportRes: ...
 
     # GenAI / Agent Observability API
+    #
+    # These methods make up the Weave Agents contract every trace-server
+    # backend (ClickHouse, in-memory fake, remote HTTP) implements.
+    # Backends accept the same Pydantic request/response shapes from
+    # `weave.trace_server.agents.types`, so callers can swap backends
+    # without rewriting request construction. The user-facing concept
+    # model behind these endpoints lives at
+    # https://docs.wandb.ai/weave/guides/tracking/trace-agents.
     def genai_otel_export(
         self, req: agent_types.GenAIOTelExportReq
-    ) -> agent_types.GenAIOTelExportRes: ...
+    ) -> agent_types.GenAIOTelExportRes:
+        """Ingest GenAI OTel spans into the agent observability store.
+
+        Accepts the same `ProcessedResourceSpans` payload as the generic
+        OTel endpoint but routes the spans through GenAI extraction so
+        they land in the agent spans table with semconv fields populated
+        and the downstream materialized views (agents, agent_versions,
+        messages) refreshed.
+
+        Args:
+            req: Spans to ingest, plus the destination project.
+
+        Returns:
+            Counts of accepted and rejected spans. Rejected spans don't
+            block the rest of the batch.
+        """
+        ...
     def agent_spans_query(
         self, req: agent_types.AgentSpansQueryReq
-    ) -> agent_types.AgentSpansQueryRes: ...
+    ) -> agent_types.AgentSpansQueryRes:
+        """List or aggregate agent spans for a project.
+
+        Powers the spans table, conversations list, and trace detail
+        drill-down in the Agents view. The same endpoint covers two
+        modes:
+
+        * **List mode** (`req.group_by` empty): returns one
+          `AgentSpanSchema` per matched span in `res.spans`.
+        * **Group mode** (`req.group_by` set): returns one
+          `AgentSpanGroupRow` per group in `res.groups`, with optional
+          measures and distributions.
+
+        Set `req.include_costs=True` to attach query-time USD costs
+        (joined against `llm_token_prices`), `req.include_details=True`
+        to include heavy fields like full messages and `raw_span_dump`,
+        and `req.custom_attr_columns` to project extra typed custom
+        attributes.
+
+        Args:
+            req: Filter, grouping, sort, and pagination parameters.
+
+        Returns:
+            Either `spans` or `groups` is populated based on whether
+            `req.group_by` was set.
+        """
+        ...
     def agent_spans_stats(
         self, req: agent_types.AgentSpanStatsReq
-    ) -> agent_types.AgentSpanStatsRes: ...
+    ) -> agent_types.AgentSpanStatsRes:
+        """Compute chart-ready aggregations over agent spans.
+
+        Buckets spans by time (default) or by a numeric column, then
+        groups within each bucket by the request's `group_by` refs and
+        computes the requested metrics. The response carries a column
+        schema (`AgentSpanStatsColumn`) so clients can render axes and
+        legends without re-deriving them.
+
+        Args:
+            req: Time window, grouping, bucketing, and metric specs.
+
+        Returns:
+            A column schema plus one row per non-empty bucket and
+            group combination.
+        """
+        ...
     def agent_custom_attrs_schema(
         self, req: agent_types.AgentCustomAttrsSchemaReq
-    ) -> agent_types.AgentCustomAttrsSchemaRes: ...
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        """Discover custom attribute keys present on agent spans.
+
+        Agent instrumentation can emit arbitrary user-defined keys
+        beyond the GenAI semantic conventions; they land in the typed
+        `custom_attrs_*` Map columns on each span row. This endpoint
+        scans the matching spans and returns the distinct keys, their
+        inferred types, and how often each key was seen. Use the
+        results to populate filter, group-by, and distribution
+        selectors.
+
+        Args:
+            req: Discovery scope (project, optional filter and time
+                window, pagination).
+
+        Returns:
+            One entry per discovered `(source, key, value_type)` triple,
+            with the count of spans that carried it.
+        """
+        ...
     def agent_agents_query(
         self, req: agent_types.AgentsQueryReq
-    ) -> agent_types.AgentsQueryRes: ...
+    ) -> agent_types.AgentsQueryRes:
+        """List agents in a project with aggregated stats.
+
+        Returns one `AgentSchema` per `agent_name` observed, summarizing
+        every span attributed to that agent. Powers the Agents list in
+        the Agents view.
+
+        Args:
+            req: Project, optional filters, sort, pagination, and
+                `include_costs` opt-in.
+
+        Returns:
+            Aggregated stats plus the total count of agents that
+            matched before `limit`/`offset`.
+
+        See `agent_versions_query` for drilling into versions of one
+        agent.
+        """
+        ...
     def agent_versions_query(
         self, req: agent_types.AgentVersionsQueryReq
-    ) -> agent_types.AgentVersionsQueryRes: ...
+    ) -> agent_types.AgentVersionsQueryRes:
+        """List the versions seen for an agent.
+
+        Returns one `AgentVersionSchema` per `(agent_name,
+        agent_version)` pair. Use this to compare behavior across
+        releases of the same agent.
+
+        Args:
+            req: Project, target `agent_name`, sort, pagination, and
+                `include_costs` opt-in.
+
+        Returns:
+            Per-version stats plus the total count of versions that
+            matched before `limit`/`offset`.
+        """
+        ...
     def agent_search(
         self, req: agent_types.AgentSearchReq
-    ) -> agent_types.AgentSearchRes: ...
+    ) -> agent_types.AgentSearchRes:
+        """Search agent messages by content or structured filters.
+
+        Scans the messages materialized view and groups matches by
+        conversation. Set `req.query` for substring full-text search or
+        leave it empty for structured retrieval (for example, every
+        message in a given `trace_id`).
+
+        Args:
+            req: Content query, structured filters, content-truncation
+                opt-out, and pagination.
+
+        Returns:
+            One result per conversation that contained a matching
+            message, with the matching messages listed inside.
+        """
+        ...
     def agent_traces_chat(
         self, req: agent_types.AgentTraceChatReq
-    ) -> agent_types.AgentTraceChatRes: ...
+    ) -> agent_types.AgentTraceChatRes:
+        """Render the structured chat view for a single trace (turn).
+
+        Folds the trace's span tree into a linear timeline of
+        `AgentChatMessage` events ready to render top-to-bottom. The
+        response header carries the agent identity, status, duration,
+        and total cost for the trace.
+
+        Args:
+            req: Project, `trace_id`, and `include_feedback` opt-in.
+
+        Returns:
+            The chat timeline plus trace-level metadata. The same shape
+            is reused inside `agent_conversation_chat` for each turn.
+        """
+        ...
     def agent_conversation_chat(
         self, req: agent_types.AgentConversationChatReq
-    ) -> agent_types.AgentConversationChatRes: ...
+    ) -> agent_types.AgentConversationChatRes:
+        """Render the multi-turn chat view for a conversation.
+
+        Returns an ordered page of turns sharing the same
+        `conversation_id`, each turn rendered as a full
+        `AgentTraceChatRes`. A turn corresponds to one trace, not
+        necessarily one `invoke_agent` span: a turn can contain zero,
+        one, or many agent invocations.
+
+        Args:
+            req: Project, `conversation_id`, pagination, and
+                `include_feedback` opt-in.
+
+        Returns:
+            Per-turn chat views in chronological order plus
+            conversation-level totals.
+        """
+        ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
