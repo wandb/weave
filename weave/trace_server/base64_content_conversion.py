@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 
 import ddtrace
 
+from weave.trace_server.content.content import Content
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -19,7 +20,6 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 

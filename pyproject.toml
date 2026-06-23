@@ -627,8 +627,6 @@ allow_indirect_imports = true
 # forbidding trace_server's internal imports; every file that does so also
 # leaks via a client subpackage below, so none escape the contract.
 ignore_imports = [
-  "weave.trace_server.base64_content_conversion -> weave.type_wrappers.Content.content",
-  "weave.trace_server.image_completion -> weave.type_wrappers.Content.content",
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.prompt.prompt",
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
   "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
