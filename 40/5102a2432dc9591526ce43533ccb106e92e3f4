@@ -173,3 +173,9 @@ throw; manual BFS keeps span-parenting working; caller degrades to
 innermostOpenToolSpan/rootSpan), left the code as-is pending the user's call.
 
 Validated: eslint + typecheck:esm clean, jest slice 05 24. Kept LOCAL/unpushed.
+
+---
+## Session addendum — review pass (2026-06-23)
+
+No own edits — inherits slice 03's KNOWN LIMITATION comment relocation and slice
+06's docstring reword via restack. Validated at tip: jest 26. Kept LOCAL/unpushed.
