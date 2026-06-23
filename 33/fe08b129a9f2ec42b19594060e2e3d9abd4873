@@ -1,0 +1,30 @@
+## Conversation
+Phase-1 PR4 (final) of the import-linter decoupling stack. After the stack + core PR went up as drafts, the user said: 'don't include any backcompat shims, we don't need it.' So this commit was AMENDED to delete the shims outright (was previously: move + leave re-export shims at old paths).
+
+## Actions (current state, post-amend)
+- Moved evaluate_model_worker.py + isolated_client_executor.py to weave/eval_worker/ (git mv, preserves blame).
+- EvaluateModelDispatcher ABC -> client-free weave/trace_server/eval_model_dispatcher.py; clickhouse + in_memory servers import the seam from there.
+- NO SHIMS: deleted weave/trace_server/isolated_client_executor.py and the whole weave/trace_server/workers/ package (was the shim + empty __init__ packages).
+- pyproject: removed the 7 Contract-1 eval-worker/isolated ignores AND removed the entire 'Workers must not import the Weave client SDK' contract (its source module weave.trace_server.workers no longer exists; the trace-server contract already covers all of weave.trace_server). Updated the header comment (dropped the 'and workers must additionally...' clause; kept the eval_worker note).
+- Repointed 4 in-repo test files to weave.eval_worker.* (done earlier).
+- Core companion wandb/core#46453 repoints core's 3 services/weave-trace importers to weave.eval_worker.* — MUST land together now (no shims => old paths gone).
+
+## Verification (post-amend)
+- lint-imports: 2 kept / 0 broken (Workers contract removed). No weave-source import of the deleted package.
+- import smoke: weave + clickhouse + in_memory + eval_worker import cleanly; EvaluateModelDispatcher identity intact.
+- tests: tests/trace_server/isolated_client_executor/ + test_trace_server_evaluation_apis.py = 40 passed (fake); full trace_server collects 1379.
+
+## Errors & Mistakes
+- (pre-amend) first test run failed: conftest imported the PRIVATE _worker_loop which the minimal shim didn't re-export -> repointed in-repo tests to weave.eval_worker (kept after shim deletion, still correct).
+- amend re-used the stale note via notes.rewrite.amend=true; overwrote with this one (git notes add -f).
+
+## Hints for Future Agents
+- NO SHIMS now: importing the old paths (weave.trace_server.isolated_client_executor / .workers.evaluate_model_worker.*) fails. All consumers (incl. core) MUST use weave.eval_worker.* and the eval_model_dispatcher seam.
+- COUPLED MERGE: weave PR #7360 and core #46453 must land together. Core gets weave via submodule services/weave-python/weave-public; its pin must include this commit, AND core master must already import the new paths, or whichever side updates first breaks. weave PR4's mirror CI (pins new-weave onto core master) will be RED until core #46453 merges — expected.
+- EvaluateModelArgs canonical home = trace_server_interface; EvaluateModelDispatcher = eval_model_dispatcher.
+
+## Open Questions
+- None. (Earlier 'move test dirs to tests/eval_worker/?' still open but out of scope.)
+
+## Update (eval_worker contract)
+Per user review of PR4: the new top-level weave/eval_worker/ package was ungoverned by import-linter — nothing stopped the trace server from importing it and transitively re-acquiring the client. Added a 3rd contract 'Eval worker must not be imported by the trace server or client SDK' (forbidden; source = trace_server + all client packages; forbidden = weave.eval_worker; no ignores, never any). lint-imports now 3 kept / 0 broken. Updated the pyproject header note (eval_worker may import both sides but nothing in weave may import it) and the commit message. Folded into the PR4 commit via --amend; pushed with git (not gt submit) to avoid disturbing the terse PR descriptions the user just set.
