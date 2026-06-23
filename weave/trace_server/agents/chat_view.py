@@ -328,7 +328,14 @@ class ChatTraversal:
     def _walk_content_span(
         self, node: SpanNode, nearest_agent: str | None, depth: int
     ) -> bool:
-        """Walk a regular content span and emit its assistant text if present."""
+        """Walk a regular content span and emit its assistant text if present.
+
+        A span that produced reasoning but no assistant text (an LLM step that
+        only emitted a tool call) still emits a reasoning-only message, so
+        thinking interleaved between tool calls is surfaced rather than dropped.
+        Such a step is not the turn's final assistant text, so it does not
+        suppress a mirrored final message on the enclosing `invoke_agent` span.
+        """
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
         subtree_emitted_assistant = self._walk_children(
@@ -336,10 +343,12 @@ class ChatTraversal:
         )
 
         msg = _emit_assistant_message(span, agent_name)
-        if msg:
-            self.messages.append(msg)
-            return True
-        return subtree_emitted_assistant
+        if msg is None:
+            return subtree_emitted_assistant
+        self.messages.append(msg)
+        assistant = msg.assistant_message
+        emitted_text = bool(assistant and assistant.text)
+        return emitted_text or subtree_emitted_assistant
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -671,12 +680,19 @@ def _emit_assistant_message(
     descendant LLM span. Callers pass `aggregate_node` only when the invoke span
     itself needs to emit because no descendant already did; in that case token
     usage is summed across the subtree so the emitted message reflects the
-    whole agent turn. Returns None when there is no non-user output text.
+    whole agent turn.
+
+    A span that produced reasoning but no assistant text (e.g. an LLM step that
+    only emitted a tool call) still yields a message carrying that reasoning, so
+    thinking interleaved between tool calls is surfaced rather than dropped.
+    Returns None only when there is neither output text nor reasoning content.
     """
-    if not span.output_messages:
-        return None
-    text = _extract_non_user_output_text(span.output_messages)
-    if not text:
+    text = (
+        _extract_non_user_output_text(span.output_messages)
+        if span.output_messages
+        else ""
+    )
+    if not text and not span.reasoning_content:
         return None
 
     if aggregate_node:
