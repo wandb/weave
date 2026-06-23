@@ -100,7 +100,7 @@ def test_query_light_column_with_costs() -> None:
                             llm_token_prices.effective_date DESC
                     ) AS rank
                 FROM llm_usage
-                LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
+                GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id) AND ((llm_token_prices.pricing_level_id = {pb_2:String})
                     OR (llm_token_prices.pricing_level_id = {pb_3:String})
                     OR (llm_token_prices.pricing_level_id = {pb_4:String}))) )
             -- Final Select, which just selects the correct fields, and adds a costs object
@@ -264,7 +264,7 @@ def test_query_with_costs_and_attributes_order() -> None:
                                              ELSE 4
                                          END, llm_token_prices.effective_date DESC) AS rank
    FROM llm_usage
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+   GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                   AND ((llm_token_prices.pricing_level_id = {pb_6:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_7:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_8:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -389,7 +389,7 @@ def test_query_with_costs_and_dynamic_summary_order() -> None:
                                              ELSE 4
                                          END, llm_token_prices.effective_date DESC) AS rank
    FROM llm_usage
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+   GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                   AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                        OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -510,7 +510,7 @@ def test_query_with_costs_and_feedback_order() -> None:
                                                          ELSE 4
                                                      END, llm_token_prices.effective_date DESC) AS rank
              FROM llm_usage
-             LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+             GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                             AND ((llm_token_prices.pricing_level_id = {pb_5:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_6:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_7:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -528,7 +528,7 @@ def test_query_with_costs_and_feedback_order() -> None:
                                         '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
-        LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
+        GLOBAL LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_8:UInt64})
         GROUP BY id,
                  started_at
@@ -635,7 +635,7 @@ def test_query_with_costs_and_nested_attributes_order() -> None:
                                                          ELSE 4
                                                      END, llm_token_prices.effective_date DESC) AS rank
              FROM llm_usage
-             LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+             GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                             AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                                  OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -748,7 +748,7 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_3:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -854,7 +854,7 @@ def test_query_calls_complete_with_costs_and_attributes_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_6:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -976,7 +976,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_6:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_7:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_8:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -994,7 +994,7 @@ def test_query_calls_complete_with_costs_and_feedback_order() -> None:
                                         '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',',
                                         '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }'), '}')) AS summary_dump
         FROM ranked_prices
-        LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_5:String}, '/call/', ranked_prices.id))
+        GLOBAL LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String} ) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_5:String}, '/call/', ranked_prices.id))
         WHERE (rank = {pb_9:UInt64})
         GROUP BY id,
                  started_at
@@ -1093,7 +1093,7 @@ def test_query_with_costs_and_summary_weave_trace_name_field() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_1:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_2:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_3:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
@@ -1208,7 +1208,7 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
                                                      ELSE 4
                                                  END, llm_token_prices.effective_date DESC) AS rank
            FROM llm_usage
-           LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
+           GLOBAL LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
                                           AND ((llm_token_prices.pricing_level_id = {pb_4:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_5:String})
                                                OR (llm_token_prices.pricing_level_id = {pb_6:String})))) -- Final Select, which just selects the correct fields, and adds a costs object

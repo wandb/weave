@@ -69,7 +69,8 @@ CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     or DEFAULT_MAX_MEMORY_USAGE,
     "max_execution_time": _max_execution_time,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
-    # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
+    # CH 24.3+ analyzer ignores this, so double-distributed JOINs must also set an
+    # explicit GLOBAL (see token_costs / object_ref); kept as it still applies pre-24.3.
     "distributed_product_mode": "global",
 }
 
