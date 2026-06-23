@@ -20,7 +20,6 @@ from typing import Any, NamedTuple, TypeAlias, TypeVar
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     MAX_CONVERSATION_SPANS,
-    OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
     SEARCH_CONTENT_PREVIEW_CHARS,
     SPAN_GROUP_AGGREGATE_COLS,
@@ -1080,7 +1079,7 @@ def make_conversation_spans_query(
 
     Scoped to `conversation_id IN (...)` and reads only scalar columns (no
     message bodies). Returns one row per conversation with a `spans` array of
-    `(started_at, kind, trace_id, span_id, status_code, duration_ms)` tuples,
+    `(started_at, operation_name, trace_id, span_id, status_code, duration_ms)` tuples,
     sorted by `(started_at, span_id)` and capped at `max_spans` keeping the most
     recent; `started_at` is only the sort key and is dropped by the handler.
     """
@@ -1103,14 +1102,6 @@ def make_conversation_spans_query(
         "toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), "
         "0)"
     )
-    # Coarse span kind from operation_name (see ConversationSpanKind): agent
-    # invocations -> agent, tool executions -> tool, everything else -> assistant.
-    kind = (
-        "multiIf("
-        f"s.operation_name = '{OP_INVOKE_AGENT}', 'agent', "
-        f"s.operation_name = '{OP_EXECUTE_TOOL}', 'tool', "
-        "'assistant')"
-    )
     return f"""
         SELECT s.conversation_id AS conversation_id,
                arraySlice(
@@ -1119,7 +1110,7 @@ def make_conversation_spans_query(
                        groupArray(
                            tuple(
                                s.started_at,
-                               {kind},
+                               s.operation_name,
                                s.trace_id,
                                s.span_id,
                                s.status_code,

@@ -13,11 +13,10 @@ from weave.trace_server.agents.schema import StatusCodeLiteral
 from weave.trace_server.agents.types import (
     AgentConversationSpan,
     AgentConversationSpanFeedback,
-    AgentConversationSpanScore,
-    AgentSpanFeedbackType,
-    ConversationSpanKind,
+    AgentConversationSpanRating,
 )
 from weave.trace_server.emoji_util import detone_emojis
+from weave.trace_server.interface.feedback_types import AGENT_SPAN_FEEDBACK_TYPES
 from weave.trace_server.query_builder.agent_query_builder import (
     coerce_literal,
     safe_float,
@@ -25,20 +24,11 @@ from weave.trace_server.query_builder.agent_query_builder import (
     safe_str,
 )
 
-# Feedback types this endpoint surfaces (agent_user_feedback, agent_monitor);
-# every other row is skipped before a marker is built.
-_FEEDBACK_TYPES: frozenset[AgentSpanFeedbackType] = frozenset(
-    get_args(AgentSpanFeedbackType)
-)
-
 
 def is_supported_feedback(feedback_type: str) -> bool:
     """Whether a feedback row's type is surfaced by agent_conversation_spans."""
-    return feedback_type in _FEEDBACK_TYPES
+    return feedback_type in AGENT_SPAN_FEEDBACK_TYPES
 
-
-# Valid span kinds; unexpected SQL values coerce to "unknown".
-_SPAN_KINDS: frozenset[ConversationSpanKind] = frozenset(get_args(ConversationSpanKind))
 
 # Valid span status codes; unexpected SQL values coerce to "UNSET".
 _STATUS_CODES: frozenset[StatusCodeLiteral] = frozenset(get_args(StatusCodeLiteral))
@@ -47,9 +37,9 @@ _STATUS_CODES: frozenset[StatusCodeLiteral] = frozenset(get_args(StatusCodeLiter
 def parse_conversation_spans(raw: object) -> list[AgentConversationSpan]:
     """Parse a conversation's `spans` array into typed spans.
 
-    Defensive: skips malformed tuples and coerces unknown kinds to "unknown" so
-    one bad row never breaks the best-effort spans hydration. Tuple shape is
-    `(started_at, kind, trace_id, span_id, status_code, duration_ms)`;
+    Defensive: skips malformed tuples and coerces an unknown status to "UNSET"
+    so one bad row never breaks the best-effort spans hydration. Tuple shape is
+    `(started_at, operation_name, trace_id, span_id, status_code, duration_ms)`;
     `started_at` was only the sort key and is dropped here.
     """
     if not isinstance(raw, (list, tuple)):
@@ -58,15 +48,12 @@ def parse_conversation_spans(raw: object) -> list[AgentConversationSpan]:
     for item in raw:
         if not isinstance(item, (list, tuple)) or len(item) < 6:
             continue
-        kind: ConversationSpanKind = coerce_literal(
-            safe_str(item[1]), _SPAN_KINDS, "unknown"
-        )
         status: StatusCodeLiteral = coerce_literal(
             safe_str(item[4]), _STATUS_CODES, "UNSET"
         )
         spans.append(
             AgentConversationSpan(
-                kind=kind,
+                operation_name=safe_str(item[1]),
                 trace_id=safe_str(item[2]),
                 span_id=safe_str(item[3]),
                 status=status,
@@ -88,8 +75,8 @@ def _feedback_tags(raw: dict[str, Any]) -> list[str]:
     return [detone_emojis(tag) for tag in tags if isinstance(tag, str) and tag]
 
 
-def _feedback_scores(raw: dict[str, Any]) -> list[AgentConversationSpanScore]:
-    """Return the `scorer_ratings` on a feedback row as scores.
+def _feedback_ratings(raw: dict[str, Any]) -> list[AgentConversationSpanRating]:
+    """Return the `scorer_ratings` on a feedback row.
 
     Each rating is a name -> value pair; optional reason/confidence are joined
     in from the parallel `scorer_rating_reasons` / `scorer_rating_confidences`
@@ -102,14 +89,14 @@ def _feedback_scores(raw: dict[str, Any]) -> list[AgentConversationSpanScore]:
     confidences = raw.get("scorer_rating_confidences")
     reasons = reasons if isinstance(reasons, dict) else {}
     confidences = confidences if isinstance(confidences, dict) else {}
-    scores: list[AgentConversationSpanScore] = []
+    out: list[AgentConversationSpanRating] = []
     for name, value in ratings.items():
         if not isinstance(name, str):
             continue
         reason = reasons.get(name)
         confidence = confidences.get(name)
-        scores.append(
-            AgentConversationSpanScore(
+        out.append(
+            AgentConversationSpanRating(
                 name=name,
                 value=safe_float(value),
                 reason=reason if isinstance(reason, str) and reason else None,
@@ -118,7 +105,7 @@ def _feedback_scores(raw: dict[str, Any]) -> list[AgentConversationSpanScore]:
                 else None,
             )
         )
-    return scores
+    return out
 
 
 def span_feedback_marker(
@@ -135,5 +122,5 @@ def span_feedback_marker(
         trace_id=trace_id,
         feedback_type=feedback_type,  # type: ignore[arg-type]  # caller filters
         tags=_feedback_tags(raw),
-        scores=_feedback_scores(raw),
+        ratings=_feedback_ratings(raw),
     )
