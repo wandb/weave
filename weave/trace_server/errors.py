@@ -320,10 +320,11 @@ class ErrorRegistry:
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidIdFormat, 400)
+        # A malformed query value is a client request error, not an authz failure.
+        self.register(BadQueryParameterError, 400)
 
         # 403
         self.register(QueryIllegalTypeofArgumentError, 403)
-        self.register(BadQueryParameterError, 403)
 
         # 404
         self.register(NotFoundError, 404)
@@ -461,10 +462,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         ) from e
     if "BAD_QUERY_PARAMETER" in error_str:
         raise BadQueryParameterError(
-            "Bad query parameter. "
-            "Example: A query like inputs.integer_value = -10000000000, when the parameter "
-            "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
-            "To resolve, ensure all query parameters are of the correct type and within valid ranges."
+            "Bad query parameter: a value in the query could not be parsed to its "
+            "expected type (for example a negative or non-integer value where an "
+            "unsigned integer is required). Ensure filter values match the field type. "
+            + error_str
         ) from e
     if "SUPPORT_IS_DISABLED" in error_str and "Lightweight updates" in error_str:
         raise LightweightUpdateNotAllowedError(
