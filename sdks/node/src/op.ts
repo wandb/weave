@@ -172,7 +172,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     );
 
     try {
-      let result = await client.runWithCallStack(newStack, async () => {
+      const result = await client.runWithCallStack(newStack, async () => {
         return await fn.apply(thisArg, params);
       });
 

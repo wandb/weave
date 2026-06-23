@@ -127,7 +127,7 @@ function patchAnthropicMessagesCreate(exports: any) {
 
       let result: any;
 
-      let weaveOp = op(() => {
+      const weaveOp = op(() => {
         result = originalCreate.apply(thisArg, args);
         return result;
       }, weaveOpOptions);
