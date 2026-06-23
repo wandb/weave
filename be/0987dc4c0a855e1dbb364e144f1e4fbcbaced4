@@ -67,3 +67,22 @@ Call sites pass {kind:'result',...} / {kind:'error',...}; the body branches on
 the previously-representable invalid states (both set / neither set). The
 result `| null` is retained (tool return values can legitimately be null).
 Verified tsc esm+cjs, eslint, prettier, slice-03 jest 22/22.
+
+---
+## Session addendum — review-comment pass (2026-06-23)
+
+Comment 1 (tighten optionals): functionCallResponse(usage) changed from
+`usage?` to required `usage`, and the conditional `...(usage ? {usageMetadata}
+: {})` spread replaced with an always-emitted usageMetadata. Justification: the
+helper's ONLY caller across slices 03/05/06 always passes {prompt, completion},
+so optional was unjustified. (textResponse.usage stays optional — 5/7 callers
+omit it.)
+
+Comment 2 (toMatchObject): consolidated the "every span shares trace + session"
+loop's two lone asserts (CONVERSATION_ID, PROVIDER_NAME) into one
+expect(span.attributes).toMatchObject({...}). On restacking slice 05 this hunk
+conflicted with slice 05's root->root! change on the adjacent traceId line;
+resolved by keeping BOTH (root! + toMatchObject), so the conversion stays in
+THIS slice's diff and only the root! change lands in slice 05.
+
+Validated slice 03 in isolation: 22 ADK jest tests pass, eslint + typecheck clean.
