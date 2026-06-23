@@ -84,3 +84,15 @@ googleAdk.ts:
 
 ## Verified
 tsc esm+cjs PASS, prettier clean, slice-05 jest 24/24.
+
+---
+## Session addendum — review-comment pass (2026-06-23)
+
+Comment 2 (toMatchObject): converted the lone agentSpan AGENT_NAME assert to
+expect(agentSpan!.attributes).toMatchObject({[ATTR_GEN_AI_AGENT_NAME]:
+'weather_agent'}). Converted here (not slice 03) because slice 05 is where this
+assertion reaches its final agentSpan form (slice 03 asserted on `root`).
+
+This slice's restack also absorbed slice 03's loop->toMatchObject conversion via
+conflict resolution (kept slice 05's root! + slice 03's toMatchObject); no
+behavior change. Validated at stack tip: 26 ADK jest tests pass, typecheck clean.
