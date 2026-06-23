@@ -23,7 +23,6 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-wrapper-object-types': 'off',
       'no-case-declarations': 'off',
-      'no-useless-assignment': 'off',
       'prefer-const': 'off',
       'prefer-rest-params': 'off',
       'preserve-caught-error': 'off',
