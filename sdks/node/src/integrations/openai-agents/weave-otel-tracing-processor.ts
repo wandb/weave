@@ -65,11 +65,18 @@ import type {
 } from '@openai/agents';
 import type OpenAI from 'openai';
 import type {GenerationUsageData} from '@openai/agents';
+import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 
 const TRACER_NAME = 'weave.openai_agents';
 const WEAVE_ATTR_PREFIX = 'weave.openai_agents';
 const PROVIDER_NAME = 'openai';
 const DEFAULT_CHAT_OUTPUT_TYPE = 'text';
+
+const OPENAI_AGENTS_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
+  libraryIntegration('openai_agents', {
+    packageName: '@openai/agents',
+  })
+);
 
 function otelSpanName(span: Span<SpanData>): string {
   switch (span.spanData.type) {
@@ -563,6 +570,7 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
 
       otelSpan.setAttributes({
         ...attrsForSpan(span),
+        ...OPENAI_AGENTS_INTEGRATION_OTEL_ATTRS,
         [ATTR_GEN_AI_CONVERSATION_ID]: traceInfo.conversationId,
         [ATTR_GEN_AI_AGENT_NAME]: agentName,
       });
