@@ -39,7 +39,9 @@ from weave.trace_server.calls_query_builder.stats_query_base import (
 )
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_query_builder import (
+    _FIELD_GROUP_BY_SOURCES,
     _project_filter_sql,
     add_time_filters,
     ensure_group_filters_match,
@@ -174,13 +176,6 @@ def _stats_requires_costs(req: AgentSpanStatsReq) -> bool:
     )
 
 
-def _resolve_spans_source(req: AgentSpanStatsReq, pb: ParamBuilder) -> str:
-    """Return the FROM relation for stats: bare `spans`, or cost-augmented."""
-    if _stats_requires_costs(req):
-        return cost_augmented_source_sql(pb, req.project_id)
-    return _SPANS_TABLE
-
-
 def _conversation_group_by() -> list[AgentGroupByRef]:
     return [AgentGroupByRef(source="column", key="conversation_id")]
 
@@ -239,9 +234,15 @@ class _StatsQuerySQLParts:
 
 @dataclass(frozen=True, slots=True)
 class _SpanSourceFilterSQL:
-    """WHERE filters for direct reads from the spans table."""
+    """WHERE filters and FROM source for direct reads from the spans table.
+
+    `source` is the raw `spans` table, or an attributed-spans subquery when the
+    request filters/groups/aggregates on an identity column that inherits from
+    its trace (see `agent_trace_attribution`).
+    """
 
     where: str
+    source: str = _SPANS_TABLE
 
     @property
     def clause(self) -> str:
@@ -257,7 +258,6 @@ def build_agent_span_stats_query(
     tz = req.timezone or "UTC"
 
     source_filter = _spans_source_filter_sql(pb, req, start, end)
-    spans_source = _resolve_spans_source(req, pb)
     group_refs = req.group_by or []
     resolved_groups = resolve_group_by(pb, group_refs) if group_refs else []
 
@@ -300,7 +300,6 @@ def build_agent_span_stats_query(
     if numeric_bucket is not None:
         raw_sql = _build_numeric_bucket_stats_query(
             source_filter=source_filter,
-            spans_source=spans_source,
             bucket=numeric_bucket,
             metric_exprs=metric_exprs,
             agg_selects=agg_selects,
@@ -333,7 +332,6 @@ def build_agent_span_stats_query(
 
     raw_sql = _build_stats_query(
         source_filter=source_filter,
-        spans_source=spans_source,
         resolved_groups=resolved_groups,
         metric_exprs=metric_exprs,
         agg_selects=agg_selects,
@@ -427,7 +425,50 @@ def _spans_source_filter_sql(
     )
     if req.query is not None:
         where_conditions.append(compile_agent_query(req.query, pb))
-    return _SpanSourceFilterSQL(where=" AND ".join(where_conditions))
+    # The base relation carries cost columns only when the request needs them;
+    # attribution then wraps that base so identity columns inherit from their
+    # trace while any cost columns pass through untouched.
+    base = (
+        cost_augmented_source_sql(pb, req.project_id)
+        if _stats_requires_costs(req)
+        else _SPANS_TABLE
+    )
+    source = base
+    if _stats_references_identity(req):
+        source = agent_trace_attribution.attributed_spans_source(
+            pb,
+            project_id=req.project_id,
+            started_after=start,
+            started_before=end,
+            base_relation=base,
+        )
+    return _SpanSourceFilterSQL(where=" AND ".join(where_conditions), source=source)
+
+
+def _stats_references_identity(req: AgentSpanStatsReq) -> bool:
+    """Whether a stats request touches a trace-attributed identity column.
+
+    Checks the filter, every group-by (top-level, numeric-bucket, and
+    group-filter), and metric value refs, so any identity reference pulls in the
+    attributed source. Errs toward attributing — a missed reference would read
+    raw values while the filter expects attributed ones.
+    """
+    if agent_trace_attribution.query_references_identity(req.query):
+        return True
+    group_refs = list(req.group_by)
+    bucket = req.bucket_by
+    if isinstance(bucket, AgentSpanStatsNumericBucketSpec):
+        group_refs += list(bucket.group_by)
+    for group_filter in req.group_filters or []:
+        group_refs += list(group_filter.group_by or [])
+    field_keys = [
+        ref.key for ref in group_refs if ref.source in _FIELD_GROUP_BY_SOURCES
+    ]
+    for metric in req.metrics:
+        value = metric.value
+        if value is not None and value.source in _FIELD_GROUP_BY_SOURCES:
+            field_keys.append(value.key)
+    return agent_trace_attribution.fields_reference_identity(field_keys)
 
 
 def _response_columns(
@@ -692,7 +733,6 @@ def _group_value_type(group_ref: AgentGroupByRef) -> AgentSpanStatsColumnValueTy
 def _build_stats_query(
     *,
     source_filter: _SpanSourceFilterSQL,
-    spans_source: str,
     resolved_groups: list[tuple[str, str]],
     metric_exprs: list[str],
     agg_selects: list[str],
@@ -721,7 +761,6 @@ def _build_stats_query(
     if not resolved_groups:
         return _build_ungrouped_stats_query(
             source_filter=source_filter,
-            spans_source=spans_source,
             parts=parts,
             group_filters=group_filters,
             pb=pb,
@@ -730,7 +769,6 @@ def _build_stats_query(
     assert group_limit_slot is not None
     return _build_grouped_stats_query(
         source_filter=source_filter,
-        spans_source=spans_source,
         resolved_groups=resolved_groups,
         group_limit_slot=group_limit_slot,
         parts=parts,
@@ -740,7 +778,6 @@ def _build_stats_query(
 def _build_numeric_bucket_stats_query(
     *,
     source_filter: _SpanSourceFilterSQL,
-    spans_source: str,
     bucket: AgentSpanStatsNumericBucketSpec,
     metric_exprs: list[str],
     agg_selects: list[str],
@@ -828,7 +865,7 @@ def _build_numeric_bucket_stats_query(
     WITH
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {spans_source} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ),
       {_CTE_VALUE_ROWS} AS (
@@ -909,7 +946,6 @@ def _stats_query_sql_parts(
 def _build_ungrouped_stats_query(
     *,
     source_filter: _SpanSourceFilterSQL,
-    spans_source: str,
     parts: _StatsQuerySQLParts,
     group_filters: list[AgentSpanGroupFilter],
     pb: ParamBuilder,
@@ -923,7 +959,7 @@ def _build_ungrouped_stats_query(
       ),
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {spans_source} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ){group_filter_ctes},
       {_CTE_AGGREGATED_DATA} AS (
@@ -998,7 +1034,6 @@ def _group_filter_ctes(
 def _build_grouped_stats_query(
     *,
     source_filter: _SpanSourceFilterSQL,
-    spans_source: str,
     resolved_groups: list[tuple[str, str]],
     group_limit_slot: str,
     parts: _StatsQuerySQLParts,
@@ -1027,7 +1062,7 @@ def _build_grouped_stats_query(
       ),
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {spans_source} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ),
       {_CTE_TOP_GROUPS} AS (

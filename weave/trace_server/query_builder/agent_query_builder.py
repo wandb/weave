@@ -52,6 +52,7 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
@@ -859,6 +860,49 @@ def _spans_filter_sql(
     return _FilterSQL(where=" AND ".join(where_conditions))
 
 
+def _group_by_references_identity(group_by: list[AgentGroupByRef] | None) -> bool:
+    """Whether any field/column group-by ref targets an identity column."""
+    if not group_by:
+        return False
+    field_keys = [ref.key for ref in group_by if ref.source in _FIELD_GROUP_BY_SOURCES]
+    return agent_trace_attribution.fields_reference_identity(field_keys)
+
+
+def _spans_query_references_identity(req: AgentSpansQueryReq) -> bool:
+    """Whether a spans query filters or groups by a trace-attributed column."""
+    return agent_trace_attribution.query_references_identity(
+        req.query
+    ) or _group_by_references_identity(req.group_by)
+
+
+def _spans_source(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    *,
+    attribute: bool,
+    include_costs: bool = False,
+) -> str:
+    """Return the FROM source for a spans query.
+
+    The base relation is the raw `spans` table, or the cost-augmented source
+    (per-span price JOIN) when `include_costs` is set so cost columns are
+    available downstream. When `attribute` is set, that base is wrapped so the
+    four identity columns inherit from their trace when unset (see
+    `agent_trace_attribution`); otherwise the base is used directly so
+    non-identity queries skip the extra trace scan.
+    """
+    base = cost_augmented_source_sql(pb, req.project_id) if include_costs else "spans"
+    if not attribute:
+        return base
+    return agent_trace_attribution.attributed_spans_source(
+        pb,
+        project_id=req.project_id,
+        started_after=req.started_after,
+        started_before=req.started_before,
+        base_relation=base,
+    )
+
+
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     conditions: list[str] = []
     if req.filters and req.filters.agent_name:
@@ -951,9 +995,15 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
 
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
+    # Count only needs trace attribution when identity participates in matching
+    # or grouping; otherwise the raw table avoids the extra trace scan. The
+    # attributed source is allocated last (see `_spans_source`) so it never
+    # renumbers the filter / group params.
+    attribute = _spans_query_references_identity(req)
     span_filters = _spans_filter_sql(pb, req)
     if not req.group_by:
-        return f"SELECT count() FROM spans s WHERE {span_filters.where}"
+        source = _spans_source(pb, req, attribute=attribute)
+        return f"SELECT count() FROM {source} s WHERE {span_filters.where}"
     resolved = resolve_group_by(pb, req.group_by)
     aliases = [alias for _, alias in resolved]
     _ensure_group_measure_aliases_do_not_collide(aliases, req.measures)
@@ -965,9 +1015,10 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans count")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f" HAVING {having}" if having else ""
+    source = _spans_source(pb, req, attribute=attribute)
     return (
         f"SELECT count() FROM ("
-        f"SELECT {group_exprs} FROM spans s WHERE {span_filters.where} "
+        f"SELECT {group_exprs} FROM {source} s WHERE {span_filters.where} "
         f"GROUP BY {group_exprs}"
         f"{having_sql}"
         f")"
@@ -976,14 +1027,12 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
+    # Always attribute: the spans table and its grouped rollups exist to show
+    # each span's agent / conversation identity, which child spans only have via
+    # their trace. The attributed source is allocated last (see `_spans_source`)
+    # so it never renumbers the filter / projection params.
     span_filters = _spans_filter_sql(pb, req)
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
-    # Read from the cost-augmented source (per-span price JOIN) only when costs
-    # were requested; the bare `spans` table otherwise. Shared by both the
-    # ungrouped and grouped branches below.
-    source = (
-        cost_augmented_source_sql(pb, req.project_id) if req.include_costs else "spans"
-    )
 
     if not req.group_by:
         custom_sort_exprs = _custom_attr_sort_exprs(pb, req.custom_attr_columns)
@@ -1001,6 +1050,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         )
         details_projection = f", {SPANS_DETAILS_COLS}" if req.include_details else ""
         cost_projection = f", {SPANS_COST_COLS}" if req.include_costs else ""
+        source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
         return f"""
             SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}{cost_projection}
             FROM {source} s
@@ -1047,6 +1097,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
+    source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
         SELECT {select_group_cols},
@@ -1200,10 +1251,11 @@ def make_span_group_distribution_counts_query(
     """Count filtered spans per returned group row."""
     span_filters = _spans_filter_sql(pb, req)
     context = _span_group_distribution_context(pb, req, group_values)
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     return f"""
         SELECT {context.group_key_sql} AS group_key,
                count() AS total_count
-        FROM spans s
+        FROM {source} s
         WHERE {span_filters.where}
           AND {context.group_key_sql} IN {context.group_values_slot}
         GROUP BY group_key
@@ -1229,6 +1281,7 @@ def make_span_group_numeric_distributions_query(
         numeric_specs,
         get_limit=lambda spec: spec.bins,
     )
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1280,7 +1333,7 @@ def make_span_group_numeric_distributions_query(
                      {spec_alias_sql} AS alias,
                      {spec_bins_sql} AS bins,
                      {value_sql} AS value
-              FROM spans s
+              FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
               WHERE {span_filters.where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
@@ -1363,6 +1416,7 @@ def make_span_group_categorical_distributions_query(
         categorical_specs,
         get_limit=lambda spec: spec.top_n,
     )
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1395,7 +1449,7 @@ def make_span_group_categorical_distributions_query(
                      {spec_alias_sql} AS alias,
                      {spec_top_n_sql} AS top_n,
                      {value_sql} AS raw_value
-              FROM spans s
+              FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
               WHERE {span_filters.where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
