@@ -114,3 +114,16 @@ Comment 1: firstChat/secondChat now acquired via the `requireSpan` helper
 (inherited from slice 02) instead of `chatSpans.find(...)` + `firstChat!`;
 dropped the `!` and the redundant toBeDefined lines. The model-error `root!` fix
 propagates from slice 02. Validated: jest 22 pass.
+
+---
+## Session addendum — move KNOWN LIMITATION comment here (2026-06-23)
+
+Per review: the afterModelCallback "KNOWN LIMITATION (non-default SSE streaming):
+text + tool call gets split into two non-partial responses, so the function call
+is absent from the chat span's output but captured as its own execute_tool span"
+comment was added in slice 06, but the limitation first APPLIES in this slice —
+it needs both chat spans (slice 02) and execute_tool spans (slice 03) to coexist,
+which first happens here. Expanded slice 03's one-line afterModelCallback comment
+into the full block; slice 06 reverted to the one-liner so the block propagates
+up from here without duplication. afterModelCallback body unchanged.
+Validated: tip jest 26, typecheck clean. Kept LOCAL/unpushed.
