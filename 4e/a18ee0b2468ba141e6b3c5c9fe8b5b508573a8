@@ -85,3 +85,11 @@ clean-restack path would have dropped them).
 
 Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
 slice 01 5).
+
+---
+## Session addendum — review pass: drop ! (2026-06-23)
+
+Comment 1: no own edits — this slice's `!` were all inherited from slices 02/03/05
+and the fixes (requireSpan helper + wrapped acquisitions) propagate via restack.
+The slice-06 abandoned-run test uses `roots[0]` (index access, already
+non-undefined). Validated at tip: eslint + typecheck clean, jest 26 pass.
