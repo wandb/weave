@@ -177,10 +177,17 @@ export function patchClaudeAgentSdk(exports: any): any {
 }
 
 /**
- * Manually instrument the `@anthropic-ai/claude-agent-sdk` module. Reach for
- * this when automatic instrumentation doesn't apply — e.g. a bundler whose
- * module loading the CJS/ESM hooks can't observe, or an import path they don't
- * cover. Returns a view of the module whose `query` export is traced; use the
+ * Manually instrument the `@anthropic-ai/claude-agent-sdk` module.
+ *
+ * Requires `@anthropic-ai/claude-agent-sdk` >= 0.3.178 — the message/usage
+ * shape this integration was validated against (camelCase `modelUsage`, the
+ * result `subtype` enum, structured `system` messages). Automatic
+ * instrumentation passes older builds through untraced; this manual path does
+ * not gate on the version, so wrapping an older build risks a wrong span shape.
+ *
+ * Reach for this when automatic instrumentation doesn't apply — e.g. a bundler
+ * whose module loading the CJS/ESM hooks can't observe, or an import path they
+ * don't cover. Returns a view of the module whose `query` export is traced; use the
  * returned object rather than the original import (the SDK's `query` is a
  * getter-only export, so the original binding can't be patched in place):
  *
