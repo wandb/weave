@@ -29,15 +29,16 @@ from weave.utils.ipython import (
     get_class_source,
     is_running_interactively,
 )
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import (
+    REDACTED_VALUE,
+    should_redact,
+    strip_memory_addresses,
+)
 
 logger = logging.getLogger(__name__)
 
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
-
-# Memory address with at least 4 characters (decrease false positives)
-MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
@@ -318,7 +319,7 @@ def get_code_deps_safe(
         fn: The Python function to analyze.
 
     Returns:
-        tupe: A tuple containing
+        A tuple containing
             import_code: str, the code that should be included in the generated code to ensure all
                 dependencies are available for the function body.
             code: str, the function body code.
@@ -456,8 +457,7 @@ def _get_code_deps(
                         json_val = REDACTED_VALUE
                     else:
                         json_val = to_json(var_value, client.project_id, client)
-                        if _has_memory_address(json_val):
-                            json_val = _replace_memory_address(json_val)
+                        json_val = strip_memory_addresses(json_val)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
@@ -476,22 +476,6 @@ def _get_code_deps(
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
-
-
-def _has_memory_address(obj: Any) -> bool:
-    return isinstance(obj, str) and MEMORY_ADDRESS_PATTERN.search(obj) is not None
-
-
-def _replace_memory_address(json_val: str) -> str:
-    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>."""
-
-    def _replacement_with_same_length(match: re.Match[str]) -> str:
-        # Get matched text and replace with 0s of the same length
-        address = match.group(0)
-        # Keep the 0x prefix and > suffix, replace the rest with 0s
-        return "0x" + "0" * (len(address) - 3) + ">"
-
-    return MEMORY_ADDRESS_PATTERN.sub(_replacement_with_same_length, json_val)
 
 
 def find_last_weave_op_function(

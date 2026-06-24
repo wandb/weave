@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.object_record import pydantic_object_record
-from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     is_pydantic_model_class,
@@ -12,6 +11,7 @@ from weave.trace.serialization.serialize import (
     stringify,
     to_json,
 )
+from weave.utils.sanitize import strip_memory_addresses
 
 
 def test_dictify_simple() -> None:
@@ -364,21 +364,14 @@ def test_to_json_function_with_memory_address_in_op(weave_active) -> None:
     assert len(log_me.calls()) == 4
 
 
-def test__replace_memory_address() -> None:
-    # Test with memory addresses of different lengths
+def test_strip_memory_addresses() -> None:
+    # Every ` at 0x...` is removed (not zero-filled), including multiple in one string.
     assert (
-        _replace_memory_address("<Function object at 0x1234>")
-        == "<Function object at 0x0000>"
+        strip_memory_addresses("<Object at 0x1234> and <Object at 0xdeadbeef>")
+        == "<Object> and <Object>"
     )
-    assert _replace_memory_address("<Class at 0xdeadbeef>") == "<Class at 0x00000000>"
-
-    # Test with multiple memory addresses
-    assert (
-        _replace_memory_address("<Object at 0x1234> and <Object at 0xabcd>")
-        == "<Object at 0x0000> and <Object at 0x0000>"
-    )
-    # Test with no memory addresses
-    assert _replace_memory_address("No memory address here") == "No memory address here"
+    # Strings without a memory address pass through unchanged.
+    assert strip_memory_addresses("No memory address here") == "No memory address here"
 
 
 def test_stable_repr_strips_memory_addresses() -> None:
