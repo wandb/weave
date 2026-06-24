@@ -1,0 +1,33 @@
+## Conversation
+User asked for a skill to "automatically instrument weave logging into a user's codebase," specifically the "agent logging APIs that were recently introduced." Via AskUserQuestion the scope was pinned: (1) BOTH Python and TypeScript; (2) NOT a single-strategy skill — user wants "session logging to the agents API AND the OTEL auto logging, depending on the user's context" (so the skill chooses a strategy by reading the codebase); (3) full skill-creator eval loop. User was "not aware of" the prior OTEL-only weave-instrument skill referenced in agent memory (that one is on a different uncommitted branch, andrew/madrid, and is NOT in this workspace), so this is built fresh and broader. After I presented the draft + 3-case test plan and asked for sign-off before spawning eval runs, user said "ok put this up as a draft PR" — i.e. ship the draft now, evals not yet run.
+
+## Actions
+- Used skill-creator skill for the workflow.
+- Two Explore subagents mapped the API surface against THIS workspace's source (not memory):
+  - Session SDK: weave/session/{session,types,session_otel}.py; top-level exports in weave/__init__.py:63-86,99-171; TS in sdks/node/src/genai/ (start* funcs runtime, classes type-only at index.ts).
+  - OTEL auto path: weave/trace/weave_init.py (_setup_session_tracing), weave/integrations/patch.py (INTEGRATION_MODULE_MAPPING + import hook), weave/trace/settings.py (use_otel_v2 default True), weave/trace/urls.py (only /agents/otel/v1/traces defined here).
+- Read source directly to ground the reference docs: weave/session/types.py, session.py:1-110 + 1031-1110, tests/session/test_session.py:549-562 (canonical CM pattern), sdks/node/examples/agent.ts (canonical TS try/finally pattern).
+- Wrote .claude/skills/weave-instrument/: SKILL.md, references/{decision,session_sdk_python,session_sdk_typescript,otel_auto}.md, evals/evals.json, evals/fixtures/{python-custom-agent,python-openai-agents,ts-custom-agent}/.
+- Committed all (894 lines, all new files). Placed in the repo's TRACKED .claude/skills/ alongside bump-version/publish-pypi.
+
+## Errors & mistakes
+None blocking. Initial assumption that this would mirror the memory's OTEL-only skill was wrong — user reframed to dual-mode; corrected before drafting. Memory entry project_weave_instrument_skill is partly STALE vs this workspace (see below).
+
+## Dead ends
+None pursued. Considered consulting Codex on the decision-tree design but deferred — the eval loop is the empirical test, and a skill is markdown, not a code-abstraction fork.
+
+## Hints & warnings
+- MEMORY IS STALE for this workspace: there is NO attach_otel_to_existing_provider setting / WEAVE_ATTACH_OTEL_TO_EXISTING_PROVIDER env here. _setup_session_tracing BACKS OFF if a TracerProvider already exists (weave_init.py:138-141) and otherwise installs its own global one (line 179). The skill's otel_auto.md documents this correctly; do not reintroduce the attach claim.
+- Python default use_otel_v2=True means plain `openai` is NOT auto-patched (patch.py _dispatch_openai returns early). Biggest real-world "no traces" gotcha. TS has no use_otel_v2 — plain openai IS auto-captured there.
+- Agents tab vs Traces tab is the load-bearing distinction: Session SDK + OpenAI-Agents-SDK + Claude-Agent-SDK (+ ADK) -> Agents tab; most provider/framework autopatch -> Traces tab (calls).
+- Version pinning: core Session SDK is in release v0.52.42 (pip install weave>=0.52.42). set_attributes/add_event landed AFTER 0.52.42 (this checkout is 0.52.43-dev0) — skill flags they need a newer build. TS package is `weave` (npm), version 0.15.1 in-repo; npm publish status unconfirmed.
+- TS specifics encoded in the skill: classes are type-only exports (no `new Turn()`), init is async (await), use start* functions, try/finally to close spans, ESM needs `node --import=weave/instrument`.
+
+## Codebase discoveries
+- INTEGRATION_MODULE_MAPPING (patch.py:479-513) is the autopatch registry; three OTEL-v2-aware dispatchers (_dispatch_openai, _dispatch_openai_agents, _dispatch_claude_agent_sdk).
+- TS auto-instruments openai/@anthropic-ai/sdk/@google/genai + OpenAI Agents/Realtime (sdks/node/src/integrations/hooks.ts); no langchain/llamaindex/crewai autopatch in TS.
+
+## Open questions / next steps
+- Evals NOT yet run. Task list has #8 (run with/without-skill, grade, launch eval-viewer/generate_review.py as static HTML) and #5 (iterate on feedback) pending. Eval run OUTPUTS should go in gitignored .context/, NOT committed; evals/fixtures + evals.json ARE committed (part of the skill).
+- Possible eval expansion the user floated: LangChain app (auto->Traces), plain-openai script (gotcha in isolation), codebase with pre-existing OTel.
+- Skill name `weave-instrument` may collide with the memory's OTEL-only skill if that ever lands in this repo; user is not currently aware of it.
