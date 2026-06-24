@@ -4794,8 +4794,8 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
-                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
                toUInt8(0) AS has_more,
                coalesce(
                           (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
