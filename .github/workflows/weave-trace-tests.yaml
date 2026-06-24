@@ -9,11 +9,17 @@ permissions:
   id-token: write
 
 jobs:
+  check-which-tests-to-run:
+    uses: ./.github/workflows/check-which-tests-to-run.yaml
+
   # This duplicates core's Build and Test App / Weave Trace Tests job while
   # trace-server still lives in core. Simplify this once trace-server moves into
   # weave or the core workflow can be reused directly.
   weave-trace-tests:
     name: Weave Trace Tests
+    needs:
+      - check-which-tests-to-run
+    if: needs.check-which-tests-to-run.outputs.trace_server_tests == 'true' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest-8-cores
     timeout-minutes: 45
 
