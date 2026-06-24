@@ -770,37 +770,35 @@ export class WeaveClient {
     }
   }
 
-  private async sendCallsComplete(batch: CompletedCallParams[]) {
-    await this.traceServerApi.request({
-      path: `/v2/${this.projectId}/calls/complete`,
+  private postV2(
+    pathSuffix: string,
+    body:
+      | {batch: CompletedCallParams[]}
+      | {start: CallStartParams}
+      | {end: Omit<CallEndParams, 'display_name'>}
+  ) {
+    return this.traceServerApi.request({
+      path: `/v2/${this.projectId}/${pathSuffix}`,
       method: 'POST',
-      body: {batch},
+      body,
       type: ContentType.Json,
       format: 'json',
     });
   }
 
-  private async sendCallStartV2(start: CallStartParams) {
-    await this.traceServerApi.request({
-      path: `/v2/${this.projectId}/call/start`,
-      method: 'POST',
-      body: {start},
-      type: ContentType.Json,
-      format: 'json',
-    });
+  private sendCallsComplete(batch: CompletedCallParams[]) {
+    return this.postV2('calls/complete', {batch});
   }
 
-  private async sendCallEndV2(end: CallEndParams) {
+  private sendCallStartV2(start: CallStartParams) {
+    return this.postV2('call/start', {start});
+  }
+
+  private sendCallEndV2(end: CallEndParams) {
     // The v2 end schema has no display_name (post-start renames go via
     // updateCall, matching the Python client); strip it before sending.
     const {display_name: _displayName, ...endReq} = end;
-    await this.traceServerApi.request({
-      path: `/v2/${this.projectId}/call/end`,
-      method: 'POST',
-      body: {end: endReq},
-      type: ContentType.Json,
-      format: 'json',
-    });
+    return this.postV2('call/end', {end: endReq});
   }
 
   // Re-pair the failed legacy batch through the calls_complete path.

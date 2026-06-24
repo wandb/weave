@@ -220,6 +220,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       },
     };
 
+    // Queue the call start
     client.saveCallStart(callStart);
 
     // Store Weave call data in global map keyed by OpenAI Agent trace ID
@@ -354,6 +355,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       },
     };
 
+    // Queue the call start
     client.saveCallStart(callStart);
 
     // Store Weave call data in global map keyed by OpenAI Agent span ID
