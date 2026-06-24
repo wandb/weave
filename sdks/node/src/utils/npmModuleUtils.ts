@@ -20,7 +20,7 @@ export function requirePackageJson(baseDir: string, modulePaths: string[]) {
     const candidate = path.join(modulePath, baseDir, 'package.json');
     try {
       return JSON.parse(fs.readFileSync(candidate, 'utf8'));
-    } catch (e) {
+    } catch (_e) {
       continue;
     }
   }

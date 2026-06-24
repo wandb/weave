@@ -784,6 +784,10 @@ def compute_summary_from_rows(
 
             for trial in eval_entry.trials:
                 eval_summary_map[eval_call_id].trial_count += 1
+                if trial.total_tokens is not None:
+                    eval_summary_map[eval_call_id].predict_total_tokens = (
+                        eval_summary_map[eval_call_id].predict_total_tokens or 0
+                    ) + trial.total_tokens
                 for scorer_key, scorer_val in trial.scores.items():
                     _process_scorer_output(
                         scorer_val,

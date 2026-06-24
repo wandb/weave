@@ -232,6 +232,9 @@ def slow_operation():
 
 
 def speed_test(client, count=5):
+    # Warm the pool so lazy worker-thread spawning isn't charged to queue_time.
+    for fut in [client.future_executor.defer(slow_operation) for _ in range(count)]:
+        fut.result()
     start = time.time()
     futs = [client.future_executor.defer(slow_operation) for _ in range(count)]
     queue_time = time.time()
@@ -332,12 +335,12 @@ def test_retry_max_attempts_settings(client_creator, caplog) -> None:
     assert len(retry_attempt_logs) == 1
     attempt_log = retry_attempt_logs[0]
     assert attempt_log.attempt_number == 1
-    assert "Test error" in attempt_log.exception
+    assert attempt_log.exception == "Test error"
 
     assert len(retry_failed_logs) == 1
     failed_log = retry_failed_logs[0]
     assert failed_log.attempt_number == 2
-    assert "Test error" in failed_log.exception
+    assert failed_log.exception == "Test error"
 
 
 def test_retry_max_attempts_env(caplog) -> None:
@@ -357,12 +360,12 @@ def test_retry_max_attempts_env(caplog) -> None:
     assert len(retry_attempt_logs) == 1
     attempt_log = retry_attempt_logs[0]
     assert attempt_log.attempt_number == 1
-    assert "Test error" in attempt_log.exception
+    assert attempt_log.exception == "Test error"
 
     assert len(retry_failed_logs) == 1
     failed_log = retry_failed_logs[0]
     assert failed_log.attempt_number == 2
-    assert "Test error" in failed_log.exception
+    assert failed_log.exception == "Test error"
 
     del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
 

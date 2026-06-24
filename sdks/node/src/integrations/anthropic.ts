@@ -202,7 +202,7 @@ const batchStreamReducer: StreamReducer<BatchChunk, ResultState> = {
     }
     return state;
   },
-  finalizeFn: state => {
+  finalizeFn: _state => {
     // no-op
   },
 };
