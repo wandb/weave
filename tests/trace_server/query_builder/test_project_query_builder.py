@@ -283,8 +283,6 @@ class TestMakeProjectStatsQuery:
                     WHERE project_id = {pb_0: String}
                 ) AS trace_storage_size_bytes
         """
-        # Project ID should be parameterized, not directly in query
-        assert "malicious" not in query
         assert_sql(
             query, expected_sql, pb.get_params(), {"pb_0": "malicious'--project"}
         )
