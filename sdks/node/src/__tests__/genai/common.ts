@@ -9,6 +9,7 @@ import {type Api as TraceServerApi} from '../../generated/traceServerApi';
 import {makeSettings, type Settings} from '../../settings';
 import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
+import {ATTR_GEN_AI_CONVERSATION_ID} from 'weave/genai/semconv';
 
 export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
@@ -84,6 +85,26 @@ export function findSpan(spans: ReadableSpan[], name: string): ReadableSpan {
     );
   }
   return span;
+}
+
+export type SpanSnapshotOpts = {
+  maskConversationId?: boolean;
+  maskTimestamps?: boolean;
+};
+
+export function spanSnapshot(
+  span: ReadableSpan,
+  {maskConversationId = true, maskTimestamps = true}: SpanSnapshotOpts = {}
+) {
+  if (maskConversationId && span.attributes[ATTR_GEN_AI_CONVERSATION_ID]) {
+    span.attributes[ATTR_GEN_AI_CONVERSATION_ID] = '<uuid>';
+  }
+
+  return {
+    attributes: span.attributes,
+    endTime: maskTimestamps ? '<timestamp>' : span.endTime,
+    startTime: maskTimestamps ? '<timestamp>' : span.startTime,
+  };
 }
 
 /**
