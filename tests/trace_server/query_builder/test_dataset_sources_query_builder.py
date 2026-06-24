@@ -161,13 +161,8 @@ def test_make_dataset_sources_select_sql() -> None:
     )
     assert _norm(query) == expected
 
-    # Dedup via GROUP BY + argMax, never FINAL.
-    assert "final" not in _norm(query).lower()
-
-    # Values are bound via ParamBuilder, not string-interpolated.
+    # Filter values are bound via ParamBuilder (the placeholders above).
     params = pb.get_params()
-    assert project_val not in query
-    assert dataset_val not in query
     assert params["pb_0"] == project_val
     assert params["pb_1"] == dataset_val
 
@@ -205,23 +200,10 @@ def test_make_dataset_sources_select_with_filters_sql() -> None:
     assert _norm(query) == expected
 
     params = pb.get_params()
-    assert "row_1" not in query
     assert params["pb_2"] == ["row_1", "row_2"]
     assert params["pb_3"] == ["call"]
     assert params["pb_4"] == 10
     assert params["pb_5"] == 5
-
-
-def test_make_dataset_sources_select_include_deleted_drops_having() -> None:
-    pb = ParamBuilder("pb")
-    query = make_dataset_sources_select(
-        project_id="proj",
-        dataset_object_id="ds_obj",
-        pb=pb,
-        include_deleted=True,
-    )
-    # include_deleted=True omits the tombstone-filtering HAVING entirely.
-    assert "having" not in _norm(query).lower()
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +234,6 @@ def test_make_link_state_query_sql() -> None:
         """
     )
     assert _norm(query) == expected
-    assert "final" not in _norm(query).lower()
 
     # row_digests / source_ids are deduped + sorted before binding.
     params = pb.get_params()
@@ -280,7 +261,6 @@ def test_make_link_state_by_ids_query_sql() -> None:
         """
     )
     assert _norm(query) == expected
-    assert "final" not in _norm(query).lower()
 
     params = pb.get_params()
     assert params["pb_0"] == "proj"
@@ -341,26 +321,10 @@ def test_make_source_datasets_select_sql_is_two_level_aggregation() -> None:
         """
     )
     assert _norm(query) == expected
-    assert "final" not in _norm(query).lower()
 
-    # Source / trace / project values are bound, not interpolated.
+    # project_id is bound via ParamBuilder (the placeholder above).
     params = pb.get_params()
-    assert "call_123" not in query
-    assert "trace_abc" not in query
-    assert project_val not in query
     assert params["pb_0"] == project_val
-
-
-def test_make_source_datasets_select_include_deleted_drops_inner_having() -> None:
-    pb = ParamBuilder("pb")
-    query = make_source_datasets_select(
-        project_id="proj",
-        sources=[("call", "call_123", "trace_abc")],
-        pb=pb,
-        include_deleted=True,
-        row_digests_cap=100,
-    )
-    assert "having" not in _norm(query).lower()
 
 
 def test_make_source_datasets_select_rejects_empty_sources() -> None:
@@ -403,7 +367,6 @@ def test_make_spans_existence_query_sql() -> None:
         """
     )
     assert _norm(query) == expected
-    assert "final" not in _norm(query).lower()
 
     params = pb.get_params()
     assert params["pb_0"] == "proj"

@@ -31,9 +31,9 @@ from weave.trace_server.orm import ParamBuilder
 # or existing links would re-key.
 DATASET_SOURCE_LINK_NAMESPACE = uuid.UUID("9f2c1d3e-7b4a-5c6d-8e9f-0a1b2c3d4e5f")
 
-# Physical column order for INSERTs into dataset_sources. Both backends build
-# rows in exactly this order (the ClickHouse insert and the SQLite insert), so
-# keep this list authoritative.
+# Physical column order for INSERTs into dataset_sources. The consumer's link
+# and tombstone inserts both build rows in exactly this order, so keep this list
+# authoritative.
 DATASET_SOURCES_INSERT_COLUMNS = [
     "id",
     "project_id",
