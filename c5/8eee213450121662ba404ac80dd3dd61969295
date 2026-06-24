@@ -271,3 +271,25 @@ with take-theirs conflict resolution per slice.
   jest alone would have missed it; always run typecheck, not just tests.
 - cast-mocks.mjs missed `const tool = {...}` variable mocks (it matched only
   `tool: {`); handled those by hand.
+
+## Addendum — @google/genai promoted to a direct devDep
+Follow-up to the type migration: the user said "import whatever you need, follow
+the openai pattern." googleAdk.ts imports types from @google/genai (Content,
+Part, FunctionDeclaration, GenerateContentConfig) but the package was only a
+TRANSITIVE dep via @google/adk — a phantom dependency. Promoted it to a direct
+devDependency here at the stack base (slice 01 is the first/only genai importer;
+the rest inherit it), mirroring how openai-agents declares both @openai/agents
+and openai.
+- package.json: added "@google/genai": "^1.37.0" to devDependencies (matches
+  @google/adk's OWN genai constraint of ^1.37.0; installed 1.52.0 satisfies it).
+- pnpm-lock.yaml: added ONLY the importer entry by hand
+  (version 1.52.0(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))); the package was
+  already resolved transitively, so no packages/snapshots changes were needed.
+  Verified with `pnpm install --frozen-lockfile` (consistent, build 0 errors).
+
+GOTCHA: this is a pnpm project (packageManager pnpm@10.8.1, pnpm-lock.yaml, a
+.pnpm store; NO package-lock.json). `npm install` here errors with "Cannot read
+properties of null (reading 'matches')" — use pnpm. A plain `pnpm install` ALSO
+drifted protobufjs 7.5.4 -> 7.6.4 in two snapshot entries (unrelated churn);
+reverted the lockfile and hand-added just the importer line to keep the diff to
+genai only.
