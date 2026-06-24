@@ -662,6 +662,28 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             agent_types.AgentConversationChatRes,
         )
 
+    @validate_call
+    def agent_agents_query(
+        self, req: agent_types.AgentsQueryReq
+    ) -> agent_types.AgentsQueryRes:
+        return self._generic_request(
+            "/agents/query",
+            req,
+            agent_types.AgentsQueryReq,
+            agent_types.AgentsQueryRes,
+        )
+
+    @validate_call
+    def agent_versions_query(
+        self, req: agent_types.AgentVersionsQueryReq
+    ) -> agent_types.AgentVersionsQueryRes:
+        return self._generic_request(
+            "/agents/agent-versions/query",
+            req,
+            agent_types.AgentVersionsQueryReq,
+            agent_types.AgentVersionsQueryRes,
+        )
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

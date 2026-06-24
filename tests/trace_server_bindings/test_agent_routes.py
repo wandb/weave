@@ -78,6 +78,25 @@ def _mock_response(json_data: dict | None = None) -> MagicMock:
             {"conversation_id": "conv-123"},
             id="agent_conversation_chat",
         ),
+        pytest.param(
+            "agent_agents_query",
+            agent_types.AgentsQueryReq(project_id="entity/project"),
+            "/agents/query",
+            agent_types.AgentsQueryRes,
+            {"agents": [], "total_count": 0},
+            id="agent_agents_query",
+        ),
+        pytest.param(
+            "agent_versions_query",
+            agent_types.AgentVersionsQueryReq(
+                project_id="entity/project",
+                agent_name="my-agent",
+            ),
+            "/agents/agent-versions/query",
+            agent_types.AgentVersionsQueryRes,
+            {"versions": [], "total_count": 0},
+            id="agent_versions_query",
+        ),
     ],
 )
 def test_agent_read_route_posts_request_and_parses_response(
