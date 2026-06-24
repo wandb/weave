@@ -9,6 +9,9 @@ from weave.trace_server import environment as wf_env
 # File and batch processing settings
 FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 1000
+# Pad the started_at window used to prune partitions on the calls/delete path,
+# absorbing cross-process clock skew between a call and its descendants.
+DELETE_STARTED_AT_PADDING_SECONDS = 1
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
