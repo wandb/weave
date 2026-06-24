@@ -348,6 +348,10 @@ export class ClaudeAgentOtelTracer {
         attributes: {
           ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
           [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+          // Stamp the agent name on children, not just the root: the per-agent
+          // usage rollup groups by `gen_ai.agent.name`, so a usage-bearing
+          // `chat` span without it would drop out of the agent's token totals.
+          [ATTR_GEN_AI_AGENT_NAME]: AGENT_NAME,
           [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
           ...(model
             ? {
@@ -440,6 +444,9 @@ export class ClaudeAgentOtelTracer {
           attributes: {
             ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
             [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
+            // Carry the agent name too (see startChatSpan) so tool spans group
+            // with their agent in the per-agent rollups.
+            [ATTR_GEN_AI_AGENT_NAME]: AGENT_NAME,
             [ATTR_GEN_AI_TOOL_NAME]: block.name,
             [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
             [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(

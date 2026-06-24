@@ -114,6 +114,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(chat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
+    // Child spans carry the agent name so per-agent usage rollups (which group
+    // by gen_ai.agent.name) attribute their tokens to the agent.
+    expect(chat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
       'tool_use',
     ]);
@@ -151,6 +154,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toBe(3);
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(15);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
+    expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
 
     const tool = findSpan(spans, 'execute_tool Bash');
@@ -161,6 +165,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
       '{"command":"ls"}'
     );
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('Sunny');
+    expect(tool.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
 
     // The whole tree shares one trace.
