@@ -322,3 +322,6 @@ GOTCHA for future agents: reordering imports across a stacked PR is conflict-pro
 it or add neighboring imports, and a "clean" auto-merge can SILENTLY duplicate
 imports (slice 06 here). Always re-validate each slice (typecheck + a dup-count
 grep), don't trust a clean restack.
+
+## Addendum — rebased onto origin/master 58285d4c6b
+Restacked the whole stack onto latest origin/master (was 841d7f879e). The 3 new commits are Python-only (eval predict-token-total #7364, trace-server owns AgentSpanOpName #7357, prompt/type_wrappers decouple) — zero sdks/node overlap, so the rebase was conflict-free and slice content is unchanged (re-parent only). Tip green: typecheck/eslint/jest 26/26.
