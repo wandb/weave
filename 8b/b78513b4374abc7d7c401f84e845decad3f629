@@ -141,3 +141,78 @@ REJECTS functions ("received value must be a non-null object"), so kept
 
 Validated: eslint clean, typecheck:esm clean, jest green (slice 02 19, tip 26).
 Kept LOCAL/unpushed, bundled with the prior literal-key change.
+
+===================================================================
+## ADDENDUM — duck-type file deleted; migrate to provided types (later session)
+===================================================================
+
+## Conversation
+Reviewer @drtangible left a GitHub comment on PR #7301 against
+sdks/node/src/integrations/googleAdk.types.ts (lines 5-6): "This file no longer
+exists [in the openai pattern], and we've started moving towards using provided
+types where possible. Guessing we could do the same with this library, assuming
+they export what we need." The user directed: rebase onto origin/master, prefer
+the types ADK exports, keep local types only for shapes it does NOT export, and
+follow how the OpenAI integration does it (openai.agent.ts / openai-agents/
+import provided types directly and have NO companion *.types.ts duck-type file).
+User then clarified "follow what Dan suggested" = option B: DELETE
+googleAdk.types.ts entirely.
+
+## Actions
+1. Rebased the whole 5-slice stack onto origin/master 841d7f879e (gt sync
+   --no-restack FF'd the worktree-shared master, then gt restack the slices).
+2. Deleted sdks/node/src/integrations/googleAdk.types.ts in every slice.
+3. In googleAdk.ts, replaced `import type {Adk*} from './googleAdk.types'` with
+   provided types, aliased to keep the Adk* names and dodge global collisions
+   (Event/Content/Part/Blob):
+     - from '@google/adk':   BaseAgent, BaseTool, Event, InvocationContext,
+                             LlmRequest, LlmResponse   (as Adk*)
+     - from '@google/genai': Content, FunctionDeclaration,
+                             GenerateContentConfig, Part   (as Adk*)
+   Verified against the installed .d.ts that @google/adk exports the ADK types
+   but does NOT re-export the genai types, so the @google/genai import is
+   genuinely required (can't fold everything into one @google/adk import).
+4. Inlined the shapes neither package exports, as local interfaces with
+   docstrings explaining why: AdkCallbackContext / AdkToolContext (invocationId
+   & agentName are getters on ADK's non-exported ReadonlyContext; ToolContext
+   adds functionCallId), AdkPluginManager / AdkRunnerLike (Runner/PluginManager
+   internals the hook touches). Each slice carries only the gaps it uses.
+5. Tests: the partial mock object literals the tests pass to plugin callbacks no
+   longer satisfy the strict provided types, so added `as any` to the
+   event/llmRequest/tool/toolContext mocks (test-only; behavior unchanged).
+6. The rebased master tightened eslint (@typescript-eslint/no-require-imports);
+   converted the test's setGlobalClient `require` to a top-level import.
+
+Migration was applied deterministically: .context/migrate-adk-types.mjs (import
+rewrite + gap-interface emission + file delete) and .context/cast-mocks.mjs
+(brace-matched `as any` on mock literals), cascaded bottom-up via gt restack
+with take-theirs conflict resolution per slice.
+
+## Validation (this slice, independent)
+- src/integrations/googleAdk.types.ts gone; googleAdk.ts imports provided types
+- npm run typecheck:esm: clean
+- eslint googleAdk.ts + googleAdk.test.ts: clean
+- jest googleAdk.test.ts: all passing
+
+## Hints for Future Agents
+- `import type` is erased at runtime, so @google/genai resolves transitively
+  through @google/adk; jest/runtime never need it and typecheck passes because
+  it is flat in node_modules. DEFERRED (flagged to user, intentionally NOT
+  done): promoting @google/genai to a direct devDep for parity with how
+  openai-agents declares both @openai/agents and openai. Held back to avoid
+  noisy package-lock churn in the requested push; it is a clean 1-line
+  package.json + lockfile follow-up. NB @google/adk@^1.2.0 is already on master
+  (no ADK slice touches package.json).
+- gt's clean-restack path DROPS git notes; these notes were recovered from the
+  pre-migration SHAs via reflog and `git notes copy -f <old> <new>`, then this
+  addendum appended.
+
+## Errors & Mistakes
+- migrate-adk-types.mjs first used a greedy `[\s\S]*?` regex that matched from
+  the FIRST `import type {` (the @opentelemetry block), mangling unrelated
+  imports and dropping AdkBaseAgent. Fixed to
+  `import type \{([^}]*)\} from '\./googleAdk\.types';` ([^}]* can't cross
+  another import's braces). Caught only because source typecheck was rerun —
+  jest alone would have missed it; always run typecheck, not just tests.
+- cast-mocks.mjs missed `const tool = {...}` variable mocks (it matched only
+  `tool: {`); handled those by hand.
