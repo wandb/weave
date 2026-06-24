@@ -1,0 +1,45 @@
+## Conversation
+PR 2 of the 2-PR stack (see [[andrew/decouple-client-ids]] note). User wants the
+Contract 2 reduction split into reviewable PRs; no shared dir (trace_server is
+leaving the repo, so each side owns its copy). User also rejected a parity test
+("won't last — it goes away when the files move"), so this PR vendors constants
+with NO test guard; the docstring just notes the values must match while both
+copies live in this repo.
+
+## Actions
+- weave/utils/constants.py: vendored exactly the client-used subset of
+  weave/trace_server/constants.py. Client-used set derived by grep:
+  INFERENCE_HOST, COMPLETIONS_CREATE_OP_NAME, MAX_{DISPLAY_NAME,OP_NAME,OBJECT_NAME}_LENGTH,
+  EVALUATION_RUN_OP_NAME, EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME(+_TS)+_OP_NAMES,
+  EVAL_{EVALUATION_NAME,PREDICT_AND_SCORE_CALL_ID,PROJECT_ID}_SPAN_ATTR,
+  GENAI_SPAN_REF_ATTR_KEY, WEAVE_ATTRIBUTES_NAMESPACE.
+- Repointed 7 importers: chat/completions, chat/inference_models, trace/call,
+  trace/weave_client (from-import style); evaluation/eval, evaluation/otel_eval_linker
+  (module style `from weave.trace_server import constants` -> `from weave.utils import
+  constants`); integrations/integration_utilities.
+- Completeness check: grepped eval.py + otel_eval_linker.py for ALL `constants.X`
+  refs (module-style access AttributeErrors at runtime, not import time) and
+  confirmed every referenced name is in the client copy.
+- pyproject.toml: removed the 7 '-> weave.trace_server.constants' rows; comment now
+  reads "(as already done for ids/constants)".
+
+## Dead ends / decisions (Codex-reviewed)
+- Parity test (tests/trace/test_constants_parity.py) was added then REMOVED at user
+  request — it imports weave.trace_server.constants, which breaks when trace_server
+  leaves the repo, so it's throwaway scaffolding.
+- Considered splitting constants by client-only vs server-only and MOVING — rejected:
+  the op-name/attr-key constants OVERLAP (both sides use EVALUATION_RUN_OP_NAME,
+  GENAI_SPAN_REF_ATTR_KEY, WEAVE_ATTRIBUTES_NAMESPACE), so a move leaves a shared
+  remainder. Vendor is the no-shared-dir answer.
+- Deferred (NOT in this stack): errors (cross-process raise/catch -> duplicate
+  exception classes silently break `except` for in-process client+server; raised in
+  in_memory/clickhouse, caught in weave_client/vals), common_interface + feedback_types
+  (pydantic wire models -> codegen territory), trace_server_interface/query (the big
+  wire contract -> codegen). After this stack Contract 2 = 65 -> 53.
+
+## Verification
+ruff clean; lint-imports 3 kept / 0 broken at tip; `import weave` smoke OK. Full prek
+pre-push OOM-killed earlier (mypy+pyright+ty), not re-run.
+
+## Build mechanics
+Stacked on andrew/decouple-client-ids. Amended once to drop the parity test per user.
