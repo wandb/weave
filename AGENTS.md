@@ -94,6 +94,32 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### Assert on the complete payload (no substring / membership checks)
+
+Assert on the **full value**, not that a fragment appears somewhere inside a
+stringified payload. Substring (`in`) and membership checks pass on accidental
+matches and let the rest of the payload drift undetected, so prefer them only
+when membership in a collection is genuinely the contract under test.
+
+❌ **Never do this:**
+
+```python
+assert "short memo" in msg                 # substring of a serialized blob
+assert "error" in str(response)
+assert "note" in feedback.payload          # key-presence instead of value
+```
+
+✅ **Always do this:**
+
+```python
+assert feedback.payload == {"note": "short memo", "emoji": "👍"}  # whole object
+assert feedback.payload["note"] == "short memo"                   # exact field
+```
+
+If you only care about one field, pin that field with `==`; if you care about
+the shape, compare the whole dict/object. The same rule applies to SQL: assert
+the complete query string, never `assert "WHERE x" in sql`.
+
 ### VCR + ClickHouse isolation (integration tests)
 
 - Integration tests replay provider traffic from VCR cassettes while the weave
@@ -139,7 +165,32 @@ Examples:
 - ✅ CORRECT: `-- tests/trace/test_dataset.py::test_basic_dataset_lifecycle`
 - ❌ WRONG: `-- trace/test_dataset.py::test_basic_dataset_lifecycle`
 
-#### Backend
+#### Backend Selection
+
+The `--trace-server` flag selects the backend: `clickhouse` (default) or
+`fake` (in-memory).
+
+**Fake / in-memory (Fastest for Development):**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=fake
+```
+
+The fake backend (`weave/trace_server/in_memory_trace_server.py`,
+`InMemoryTraceServer`) is a pure-Python, dict-backed drop-in replacement that
+lives parallel to the ClickHouse implementation. It replicates **ClickHouse**
+(the production backend) at the interface level: JSON_VALUE string typing for
+dynamic fields, `to*OrNull` cast rules, NULLS-LAST ordering, DateTime64
+comparisons, and computed summary fields. Tests that assert ClickHouse
+*internals* (SQL, table routing/residence, insert batching, bucket file
+storage) are gated with `client_is_clickhouse` and skip on the fake. No
+files, no SQL, no Docker.
+
+**ClickHouse (the real backend):**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op
+```
 
 ClickHouse is the only trace-server backend (`--trace-server` defaults to
 `clickhouse`):
@@ -150,7 +201,8 @@ nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace
 
 **Note:** ClickHouse tests require Docker to be running (the fixtures start a
 container automatically), or a local `clickhouse-server` binary with
-`--clickhouse-process=true`.
+`--clickhouse-process=true`. When neither is available, use the in-memory
+fake with `--trace-server=fake`.
 
 #### Remote HTTP Trace Server Implementation Selection
 

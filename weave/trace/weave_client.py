@@ -1258,6 +1258,7 @@ class WeaveClient:
                 end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
                     id=call.id,
+                    trace_id=call.trace_id,
                     started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,

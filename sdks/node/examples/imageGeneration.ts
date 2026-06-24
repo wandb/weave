@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import * as weave from 'weave';
 
 async function main() {
-  const client = await weave.init('examples');
+  const _client = await weave.init('examples');
   const openai = weave.wrapOpenAI(new OpenAI());
 
   // Generate an image

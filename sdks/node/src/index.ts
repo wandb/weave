@@ -11,10 +11,32 @@ export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export type {
   CallSchema,
   CallsFilter,
+  HttpResponse,
+  HTTPValidationError,
   Query,
   SortBy,
 } from './generated/traceServerApi';
-export type {GetCallsOptions} from './weaveClient';
+export type {Settings} from './settings';
+export type {
+  Agent,
+  AgentMessage,
+  AgentSpan,
+  AgentTurn,
+  AgentVersion,
+  GetAgentsOptions,
+  GetAgentsResult,
+  GetAgentSpansOptions,
+  GetAgentSpansResult,
+  GetAgentTurnOptions,
+  GetAgentTurnResult,
+  GetAgentTurnsOptions,
+  GetAgentTurnsResult,
+  GetAgentVersionsOptions,
+  GetAgentVersionsResult,
+  GetCallsOptions,
+  Response,
+  WeaveClient,
+} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
@@ -67,9 +89,10 @@ export {
   type WeaveImage,
 } from './media';
 export {op} from './op';
-export * from './types';
+export type {Op, OpDecorator} from './opType';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
+
 // CJS-only side-effect: install the `require()` patcher so CJS hosts
 // auto-instrument supported modules. ESM hosts use the loader hook in
 // `./esm/instrument.mjs` instead, registered via `--import=weave/instrument`.
@@ -79,6 +102,7 @@ export {MessagesPrompt, StringPrompt} from './prompt';
 // is emitted, the `require()` call here is dead code, and the typeof
 // check prevents the missing module from ever being requested.
 if (typeof require === 'function' && typeof module === 'object') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./utils/commonJSLoader');
 }
 

@@ -5,6 +5,11 @@ import {uuidv7} from 'uuidv7';
 import {MAX_OBJECT_NAME_LENGTH} from './constants';
 import {computeDigest} from './digest';
 import {
+  type AgentChatMessage as AgentChatMessageSchema,
+  type AgentTraceChatRes,
+  type AgentSchema,
+  type AgentSpanSchema,
+  type AgentVersionSchema,
   type CallSchema,
   type CallsQueryReq,
   type CallsFilter,
@@ -13,6 +18,8 @@ import {
   type SortBy,
   type StartedCallSchemaForInsert,
   type Api as TraceServerApi,
+  type HttpResponse,
+  type HTTPValidationError,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -30,7 +37,7 @@ import {
   getOpWrappedFunction,
   isOp,
 } from './opType';
-import {Settings} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {Table, TableRef, TableRowRef} from './table';
 import {linkAssetToRegistry} from './traceServerBindings/linkAssetToRegistry';
 import type {
@@ -38,7 +45,6 @@ import type {
   LinkAssetToRegistryRes,
 } from './traceServerBindings/linkAssetToRegistry';
 import {packageVersion} from './utils/userAgent';
-import {type WandbServerApi} from './wandb/wandbServerApi';
 import {ObjectRef, WeaveObject, getClassChain} from './weaveObject';
 import {type Call, CallState, InternalCall} from './call';
 import {CallRef} from './refs';
@@ -46,6 +52,8 @@ import type {Prompt} from './prompt';
 
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
+
+export type Response<T extends unknown> = HttpResponse<T, HTTPValidationError>;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -84,6 +92,129 @@ export interface GetCallsOptions {
   columns?: string[];
   expandColumns?: string[];
 }
+
+export type Agent = AgentSchema;
+export type AgentMessage = AgentChatMessageSchema;
+export type AgentSpan = AgentSpanSchema;
+export type AgentTurn = AgentTraceChatRes;
+export type AgentVersion = AgentVersionSchema;
+
+/**
+ * Options for {@link WeaveClient.getAgents}.
+ */
+export interface GetAgentsOptions {
+  agentName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgents}.
+ */
+export type GetAgentsResult = {
+  agents: Agent[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentVersions}.
+ */
+export interface GetAgentVersionsOptions {
+  agentName: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentVersions}.
+ */
+export type GetAgentVersionsResult = {
+  versions: AgentVersion[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpans}.
+ */
+export interface GetAgentSpansOptions {
+  agentName?: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpans}.
+ */
+export type GetAgentSpansResult = {
+  spans: AgentSpan[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentTurn}.
+ */
+export interface GetAgentTurnOptions {
+  traceId: string;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurn}.
+ */
+export type GetAgentTurnResult = AgentTurn;
+
+/**
+ * Options for {@link WeaveClient.getAgentTurns}.
+ */
+export interface GetAgentTurnsOptions {
+  conversationId: string;
+  /**
+   * @min 0
+   * @max 50
+   * @default 50
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurns}.
+ */
+export type GetAgentTurnsResult = {
+  conversation_id: string;
+  turns?: AgentTurn[];
+  total_turns?: number;
+  has_more?: boolean;
+  limit?: number;
+  offset?: number;
+  feedback?: Record<string, any>[] | null;
+};
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -175,7 +306,6 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
-
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
@@ -186,13 +316,200 @@ export class WeaveClient {
   private readonly BATCH_INTERVAL: number = 200;
   private errorCount = 0;
   private readonly MAX_ERRORS = 10;
+  public traceServerApi: TraceServerApi<any>;
+  public projectId: string;
+  public settings: Settings;
 
-  constructor(
-    public traceServerApi: TraceServerApi<any>,
-    private wandbServerApi: WandbServerApi,
-    public projectId: string,
-    public settings: Settings = new Settings()
-  ) {}
+  constructor({
+    traceServerApi,
+    projectId,
+    settings = {},
+  }: {
+    traceServerApi: TraceServerApi<any>;
+    projectId: string;
+    settings?: Partial<Settings>;
+  }) {
+    this.traceServerApi = traceServerApi;
+    this.projectId = projectId;
+    this.settings = makeSettings(settings);
+  }
+
+  /**
+   * List agents with aggregated stats.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgents({limit: 20});
+   *
+   * for (const agent of resp.data.agents) {
+   *   console.log(agent.agent_name, agent.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgents(
+    options: GetAgentsOptions = {}
+  ): Promise<Response<GetAgentsResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        filters: {agent_name: options.agentName},
+      });
+    }
+
+    return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
+  }
+
+  /**
+   * List versions for a given agent.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentVersions({agentName: 'my-agent', limit: 20});
+   *
+   * for (const version of resp.data.versions) {
+   *   console.log(version.agent_version, version.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgentVersions(
+    options: GetAgentVersionsOptions
+  ): Promise<Response<GetAgentVersionsResult>> {
+    return this.traceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost(
+      {
+        project_id: this.projectId,
+        agent_name: options.agentName,
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
+  }
+
+  /**
+   * Query agent spans, optionally filtered by agent name.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpans({agentName: 'my-agent', limit: 20});
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public async getAgentSpans(
+    options: GetAgentSpansOptions
+  ): Promise<Response<GetAgentSpansResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: options.agentName}],
+          },
+        },
+      });
+    }
+    const resp =
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost(
+        params
+      );
+
+    return {
+      ...resp,
+      data: {
+        ...resp.data,
+        spans: resp.data.spans ?? [],
+      },
+    };
+  }
+
+  /**
+   * Get data (including messages) for a single turn (by traceId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurn({
+   *   traceId: '01997b8a-2c89-7c4d-9d0e-2f7e5b9a1b2c',
+   *   includeFeedback: true,
+   * });
+   *
+   * console.log(resp.data.root_span_name, resp.data.total_duration_ms);
+   *
+   * for (const message of resp.data.messages ?? []) {
+   *   if (message.user_message) console.log('user:', message.user_message);
+   *   if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   * }
+   * ```
+   */
+  public getAgentTurn(
+    options: GetAgentTurnOptions
+  ): Promise<Response<GetAgentTurnResult>> {
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
+      project_id: this.projectId,
+      trace_id: options.traceId,
+      include_feedback: options.includeFeedback,
+    });
+  }
+
+  /**
+   * Get data (including messages) for many turns (by conversationId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurns({
+   *   conversationId: 'trace_c50312356de3487fa90e381c9399b5b4',
+   *   limit: 20,
+   *   includeFeedback: true,
+   * });
+   *
+   * for (const turn of resp.data.turns ?? []) {
+   *   console.log(turn.trace_id, turn.root_span_name);
+   *   for (const message of turn.messages ?? []) {
+   *     if (message.user_message) console.log('user:', message.user_message);
+   *     if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   *   }
+   * }
+   *
+   * console.log(`total turns: ${resp.data.total_turns}, has more: ${resp.data.has_more}`);
+   * ```
+   */
+  public getAgentTurns(
+    options: GetAgentTurnsOptions
+  ): Promise<Response<GetAgentTurnsResult>> {
+    return this.traceServerApi.agents.genaiConversationChatAgentsConversationsChatPost(
+      {
+        project_id: this.projectId,
+        conversation_id: options.conversationId,
+        limit: options.limit,
+        offset: options.offset,
+        include_feedback: options.includeFeedback,
+      }
+    );
+  }
 
   private scheduleBatchProcessing() {
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
@@ -222,7 +539,7 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    let batchToProcess = [];
+    const batchToProcess = [];
     let currentBatchSize = 0;
 
     while (
@@ -457,7 +774,7 @@ export class WeaveClient {
 
       const {content, description, name} = val;
 
-      let obj = new StringPrompt({
+      const obj = new StringPrompt({
         name,
         description,
         content,
@@ -473,7 +790,7 @@ export class WeaveClient {
 
       const {description, messages, name} = val;
 
-      let obj = new MessagesPrompt({
+      const obj = new MessagesPrompt({
         name,
         description,
         messages,
@@ -490,7 +807,7 @@ export class WeaveClient {
 
       const {description, rows, name} = val;
 
-      let obj = new Dataset({
+      const obj = new Dataset({
         name: name || dataObj.id,
         description,
         rows,
@@ -504,7 +821,7 @@ export class WeaveClient {
       return obj;
     } else if (t == 'Table') {
       const {rows} = val;
-      let obj = new Table(rows);
+      const obj = new Table(rows);
       obj.__savedRef = ref;
 
       // Load table rows if they are a ref
@@ -514,7 +831,7 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -530,7 +847,7 @@ export class WeaveClient {
         // TODO: Implement getting img back as buffer
         return 'Coming soon!';
       } else if (typeName == 'wave.Wave_read') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -649,7 +966,7 @@ export class WeaveClient {
     if (obj.__savedRef) {
       return Promise.resolve(obj.__savedRef);
     }
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [_key, value] of Object.entries(obj)) {
       this.saveWeaveValues(value);
     }
 
@@ -750,7 +1067,9 @@ export class WeaveClient {
     } else if (val instanceof Table) {
       this.saveTable(val);
     } else if (isWeaveImage(val)) {
+      // no-op
     } else if (isWeaveAudio(val)) {
+      // no-op
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
@@ -760,7 +1079,7 @@ export class WeaveClient {
       }
       visited.add(val);
 
-      for (const [key, value] of Object.entries(val)) {
+      for (const [_key, value] of Object.entries(val)) {
         this.saveWeaveValues(value, visited);
       }
     }
@@ -1064,6 +1383,7 @@ export class WeaveClient {
     this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
+      trace_id: currentCall.traceId,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1100,6 +1420,7 @@ export class WeaveClient {
     this.saveCallEnd({
       project_id: this.projectId,
       id: currentCall.callId,
+      trace_id: currentCall.traceId,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1218,7 +1539,7 @@ function processSummary(
   currentCall: CallStackEntry,
   parentCall: CallStackEntry | undefined
 ) {
-  let ownSummary = summarize && result != null ? summarize(result) : {};
+  const ownSummary = summarize && result != null ? summarize(result) : {};
 
   if (ownSummary.usage) {
     for (const model in ownSummary.usage) {

@@ -38,7 +38,7 @@ function isModernDecorator(
  */
 function isLegacyDecorator(
   args: any[]
-): args is [Object, string | symbol, TypedPropertyDescriptor<any>] {
+): args is [object, string | symbol, TypedPropertyDescriptor<any>] {
   return (
     args.length === 3 &&
     (typeof args[0] === 'object' || typeof args[0] === 'function') &&
@@ -86,7 +86,7 @@ function deriveOpName<T extends (...args: any[]) => any>(
   context?: MethodDecoratorContext
 ): string {
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let calculatedName = 'anonymous';
+  let calculatedName: string;
 
   if (options?.name) {
     calculatedName = options.name;
@@ -136,7 +136,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 
     const {currentCall, parentCall, newStack} = client.pushNewCall();
     const startTime = new Date();
-    if (client.settings.shouldPrintCallLink && parentCall == null) {
+    if (client.settings.printCallLink && parentCall == null) {
       const domain = getGlobalDomain();
       console.log(
         `${TRACE_CALL_EMOJI} https://${domain}/${client.projectId}/r/call/${currentCall.callId}`
@@ -172,7 +172,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     );
 
     try {
-      let result = await client.runWithCallStack(newStack, async () => {
+      const result = await client.runWithCallStack(newStack, async () => {
         return await fn.apply(thisArg, params);
       });
 
@@ -294,7 +294,7 @@ function handleModernDecorator<T extends (...args: any[]) => any>(
 }
 
 function handleLegacyDecorator<T extends (...args: any[]) => any>(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<T>,
   factoryOptions?: Partial<OpOptions<T>>
@@ -305,7 +305,7 @@ function handleLegacyDecorator<T extends (...args: any[]) => any>(
   }
 
   // Derive default legacy name
-  let className = 'anonymous';
+  let className: string;
   if (target.constructor === Function) {
     // Static method
     className = (target as Function).name || 'anonymous';
@@ -343,7 +343,7 @@ function handleDecoratorFactory<T extends (...args: any[]) => any>(
     // Legacy Factory Usage
     if (isLegacyDecorator(decoratorArgs)) {
       const [target, propertyKey, descriptor] = decoratorArgs as [
-        Object,
+        object,
         string | symbol,
         TypedPropertyDescriptor<(...args: any[]) => any>,
       ];
@@ -389,7 +389,7 @@ export function op<T extends (...args: any[]) => any>(
 ): Op<T>;
 // Legacy decorator usage (experimentalDecorators in tsconfig.json): @weave.op
 export function op(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<any>
 ): TypedPropertyDescriptor<any>;

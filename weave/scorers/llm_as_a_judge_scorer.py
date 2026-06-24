@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import AliasChoices, ConfigDict, Field, field_validator
 
@@ -28,6 +28,12 @@ class LLMAsAJudgeScorer(Scorer):
     """
 
     model_config = ConfigDict(populate_by_name=True)
+
+    # Don't serialize score()/summarize() as op refs on publish: the resulting
+    # CustomWeaveType(Op) payloads are what the scoring worker's safety guard
+    # rejects, and nothing reads them (the @op still wraps the live method). This
+    # matches the op-free shape the Weave UI already persists. See WB-35184.
+    _weave_exclude_ops_from_record: ClassVar[bool] = True
 
     model: LLMStructuredCompletionModel
     scoring_prompt: str | MessagesPrompt

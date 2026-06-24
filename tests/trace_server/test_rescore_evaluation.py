@@ -13,6 +13,7 @@ import pytest
 
 from tests.trace.server_utils import find_server_layer
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.trace_server_interface import (
     CallReadReq,
     EvaluationRunCreateReq,
@@ -95,7 +96,17 @@ def _setup_server_with_dispatcher(server):
     _evaluate_model_dispatcher, then swaps it for a MagicMock so rescore()
     can be tested without real worker invocation.
     """
-    target = find_server_layer(server, ClickHouseTraceServer)
+    target = None
+    last_err: TypeError | None = None
+    for server_type in (InMemoryTraceServer, ClickHouseTraceServer):
+        try:
+            target = find_server_layer(server, server_type)
+            break
+        except TypeError as err:
+            last_err = err
+    if target is None:
+        # No known concrete server found — re-raise the last lookup error
+        raise last_err from None
     mock_dispatcher = MagicMock()
     target._evaluate_model_dispatcher = mock_dispatcher
     return mock_dispatcher

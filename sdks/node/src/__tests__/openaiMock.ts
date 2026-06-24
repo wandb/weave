@@ -65,7 +65,7 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
     stream = false,
     model = 'gpt-4o-2024-05-13',
     stream_options,
-    ...otherOptions
+    ..._otherOptions
   }: {
     messages: any[];
     stream?: boolean;

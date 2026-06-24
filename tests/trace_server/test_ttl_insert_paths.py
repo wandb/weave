@@ -17,6 +17,7 @@ import uuid
 
 import pytest
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
@@ -127,6 +128,9 @@ def _now_utc() -> datetime.datetime:
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_end_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -177,6 +181,9 @@ def test_ttl_call_start_end_sets_expire_at(
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_batch_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -233,6 +240,9 @@ def test_ttl_call_start_batch_sets_expire_at(
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_calls_complete_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -272,6 +282,9 @@ def test_ttl_calls_complete_sets_expire_at(
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_v2_end_v2_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):

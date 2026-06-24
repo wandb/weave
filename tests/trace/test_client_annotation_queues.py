@@ -13,6 +13,7 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -614,6 +615,10 @@ def test_annotation_queue_add_calls_partial_duplicates(client):
     assert add_res2.duplicates == 3  # 3 were duplicates
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: direct annotator-progress table inserts",
+)
 def test_annotation_queues_stats(client):
     """Test getting stats for multiple annotation queues with partial completion."""
 
@@ -684,10 +689,7 @@ def test_annotation_queues_stats(client):
     # For Queue 2 (7 items): Mark 4 as skipped, 3 stay pending (no progress record)
 
     # We need to insert into the annotator_queue_items_progress table
-    try:
-        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
-    except TypeError:
-        pytest.skip("Direct DB manipulation only works with ClickHouse server")
+    ch_server = find_server_layer(client.server, ClickHouseTraceServer)
     ch_client = ch_server.ch_client
 
     # Ensure writes are flushed
@@ -2041,6 +2043,9 @@ def test_annotator_queue_items_progress_update_returns_correct_item(client):
     assert update_res.item.annotation_state == "completed"
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
+)
 def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     """Test adding calls to annotation queue when using calls_complete table.
 

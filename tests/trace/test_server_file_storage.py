@@ -17,6 +17,7 @@ from google.auth import credentials as ga_credentials
 from google.cloud import storage
 from moto import mock_aws
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings, file_storage
@@ -84,6 +85,9 @@ class TestS3Storage:
             yield
 
     @pytest.mark.usefixtures("aws_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_aws_storage(self, run_storage_test, s3):
         """Test file storage using AWS S3."""
         res = run_storage_test()
@@ -98,6 +102,9 @@ class TestS3Storage:
         obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
         assert obj_response["Body"].read() == TEST_CONTENT
 
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
         # This test is critical in that it ensures that the system works correctly for large files. Both
         # before and after the migration to file storage, we should be able to read the file correctly.
@@ -156,6 +163,9 @@ class TestGCSStorage:
     """
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage(self, run_storage_test, gcs, client: WeaveClient):
         """Test file storage using Google Cloud Storage."""
         res = run_storage_test()
@@ -167,6 +177,9 @@ class TestGCSStorage:
         assert gcs.state.upload_count == 1
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
         """Test that writing the same content twice skips the second write.
 
@@ -336,6 +349,9 @@ class TestAzureStorage:
             yield
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage(self, run_storage_test, azure_blob):
         """Test file storage using Azure Blob Storage."""
         res = run_storage_test()
@@ -350,6 +366,9 @@ class TestAzureStorage:
         assert blob_client.download_blob().readall() == TEST_CONTENT
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
         """Azure store must not clobber an existing content-addressable blob.
 
@@ -426,6 +445,9 @@ class TestAzureStorage:
             assert file.content == original
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_support_for_variable_length_chunks(client: WeaveClient):
     """Test that the system supports variable length chunks.
     We don't actually want to change this often, but we need to make sure it works.
@@ -470,6 +492,9 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 
 
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_file_storage_retry_limit(client: WeaveClient):
     """Test that file storage operations retry exactly 3 times on storage failures."""
     attempt_count = 0
@@ -550,14 +575,19 @@ def _unique_payload(unique: str, size: int) -> bytes:
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
     """Multiple file_create calls inside one call_batch fan out to GCS in
     parallel: concurrent uploads happen, identical content within the batch
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
-    gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
+    # Barrier makes the peak deterministic so it can't flake under CI scheduler
+    # jitter (each upload blocks until all 4 are simultaneously in-flight).
+    gcs.state.expected_concurrency = 4
     payload_size = 50_000
     payloads = [
         _unique_payload("alpha", payload_size),
@@ -577,10 +607,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                 )
             )
 
-    # Pool defaults to 8 workers, so all 4 unique uploads should run
-    # concurrently. concurrent_peak is the load-bearing parallelism signal;
-    # wall-time assertions on top would flake on contended CI runners.
-    assert gcs.state.concurrent_peak >= 4, (
+    # Pool defaults to 8 workers, so all 4 unique uploads run concurrently;
+    # the upload barrier guarantees the peak reaches 4.
+    assert gcs.state.concurrent_peak == 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
 
@@ -603,6 +632,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
         250_000,
     ],
     ids=["single-chunk-fallback", "multi-chunk-fallback"],
+)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
 )
 def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     client: WeaveClient, gcs, fail_payload_size: int

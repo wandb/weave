@@ -1341,6 +1341,17 @@ def test_refs_read_batch_dataset_rows(client):
     assert res.vals[1] == 6
 
 
+def test_refs_read_batch_dataset_rows_multi_project_same_digest(client):
+    client.project = f"table-row-a-{uuid.uuid4().hex}"
+    ref1 = client.save(weave.Dataset(rows=[{"a": 5}]), "my-dataset").rows[0]["a"].ref
+
+    client.project = f"table-row-b-{uuid.uuid4().hex}"
+    ref2 = client.save(weave.Dataset(rows=[{"a": 5}]), "my-dataset").rows[0]["a"].ref
+
+    res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref1.uri, ref2.uri]))
+    assert res.vals == [5, 5]
+
+
 def test_refs_read_batch_multi_project(client):
     client.project = "test111"
     ref = client._save_object([1, 2, 3], "my-list")

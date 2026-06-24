@@ -1,12 +1,22 @@
+from tests.trace_server.conftest import get_trace_server_flag
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     UserInjectingExternalTraceServer,
 )
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 
 
-def test_trace_server_fixture(trace_server: UserInjectingExternalTraceServer):
+def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceServer):
     assert isinstance(trace_server, UserInjectingExternalTraceServer)
-    assert isinstance(trace_server._internal_trace_server, ClickHouseTraceServer)
+    flag = get_trace_server_flag(request)
+    expected_internal_types = {
+        "fake": InMemoryTraceServer,
+        "clickhouse": ClickHouseTraceServer,
+    }
+    # KeyError on an unrecognized backend — fail loudly rather than guess.
+    assert isinstance(
+        trace_server._internal_trace_server, expected_internal_types[flag]
+    )
 
 
 # All instance attributes set in ClickHouseTraceServer.__init__.
@@ -33,6 +43,7 @@ KNOWN_SERVER_ATTRS = frozenset(
         "_table_routing_resolver",
         "_thread_local",
         "_use_async_insert",
+        "_use_replicated_tables",
         "_user",
     }
 )

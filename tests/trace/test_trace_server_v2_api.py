@@ -1017,6 +1017,7 @@ class ReadEvalRunModel(weave.Model):
 
         # Create models and runs
         run_ids = []
+        model_refs = []
         for i in range(3):
             model_req = tsi.ModelCreateReq(
                 project_id=project_id,
@@ -1030,6 +1031,7 @@ class ListEvalRunModel{i}(weave.Model):
 """,
             )
             model_res = client.server.model_create(model_req)
+            model_refs.append(model_res.model_ref)
 
             run_req = tsi.EvaluationRunCreateReq(
                 project_id=project_id,
@@ -1048,6 +1050,34 @@ class ListEvalRunModel{i}(weave.Model):
         returned_ids = [r.evaluation_run_id for r in runs]
         for run_id in run_ids:
             assert run_id in returned_ids
+
+        eval_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluations=[eval_res.evaluation_ref]),
+        )
+        eval_filtered_ids = {
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(eval_filter_req)
+        }
+        assert set(run_ids).issubset(eval_filtered_ids)
+
+        model_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(models=[model_refs[0]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(model_filter_req)
+        ] == [run_ids[0]]
+
+        id_filter_req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=tsi.EvaluationRunFilter(evaluation_run_ids=[run_ids[1]]),
+        )
+        assert [
+            r.evaluation_run_id
+            for r in client.server.evaluation_run_list(id_filter_req)
+        ] == [run_ids[1]]
 
     def test_evaluation_run_delete(self, client):
         """Test deleting evaluation runs via V2 API."""

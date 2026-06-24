@@ -23,6 +23,7 @@ import redis
 from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.redis_client import get_redis_client
 
@@ -190,6 +191,7 @@ def _query_clickhouse(ch_client: CHClient, project_id: str) -> int:
         "FROM project_ttl_settings "
         "WHERE project_id = {project_id:String}",
         parameters={"project_id": project_id},
+        settings=ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
     )
     if result.row_count == 0:
         return RETENTION_DAYS_NO_TTL

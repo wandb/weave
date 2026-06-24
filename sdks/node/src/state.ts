@@ -1,8 +1,10 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import type OpenAIAgents from '@openai/agents';
-import {BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
+import {type BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {globalSingleton} from './utils/globalSingleton';
-import {GenAIState} from './genai/context';
+import {type GenAIState} from './genai/context';
+import {type WeaveClient} from './weaveClient';
+import {type TracerProvider} from '@opentelemetry/api';
 
 /**
  * Holds all SDK-wide mutable state.
@@ -16,6 +18,9 @@ import {GenAIState} from './genai/context';
  * See: https://github.com/wandb/weave/pull/6682
  */
 type State = {
+  client: WeaveClient | null;
+  domain: string | null;
+
   genAi: {
     provider: BasicTracerProvider | null;
 
@@ -72,15 +77,26 @@ type State = {
       patched: boolean;
     };
   };
+
+  evalLink: {
+    registeredProviders: WeakSet<TracerProvider>;
+  };
 };
 
 function defaultState(): State {
   return {
+    client: null,
+    domain: null,
+
     genAi: {
       provider: null,
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
       defaultState: {session: null, turn: null, llm: null},
+    },
+
+    evalLink: {
+      registeredProviders: new WeakSet(),
     },
 
     integrations: {

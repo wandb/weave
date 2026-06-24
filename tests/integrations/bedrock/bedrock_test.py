@@ -204,29 +204,24 @@ MOCK_STREAM_EVENTS_TEXT_AND_TOOLS = [
     },
 ]
 
-MOCK_INVOKE_RESPONSE = {
-    "body": io.BytesIO(
-        json.dumps(
+MOCK_INVOKE_BODY = json.dumps(
+    {
+        "id": "msg_bdrk_01WpFc3918C93ZG9ZMKVqzCd",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-3-5-sonnet-20240620",
+        "content": [
             {
-                "id": "msg_bdrk_01WpFc3918C93ZG9ZMKVqzCd",
-                "type": "message",
-                "role": "assistant",
-                "model": "claude-3-5-sonnet-20240620",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "To list all text files in the current directory (excluding subdirectories) "
-                        "that have been modified in the last month using Bash, you can use",
-                    }
-                ],
-                "stop_reason": "end_turn",
-                "stop_sequence": None,
-                "usage": {"input_tokens": 40, "output_tokens": 30, "total_tokens": 70},
+                "type": "text",
+                "text": "To list all text files in the current directory (excluding subdirectories) "
+                "that have been modified in the last month using Bash, you can use",
             }
-        ).encode("utf-8")
-    ),
-    "ContentType": "application/json",
-}
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": None,
+        "usage": {"input_tokens": 40, "output_tokens": 30, "total_tokens": 70},
+    }
+).encode("utf-8")
 
 # Mock response for apply_guardrail
 MOCK_APPLY_GUARDRAIL_RESPONSE = {
@@ -367,7 +362,12 @@ def converse_stream_make_api_call(events: list[dict]) -> Callable:
 
 def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "InvokeModel":
-        return MOCK_INVOKE_RESPONSE
+        # Return a fresh body stream on each call so the response can be consumed
+        # independently across parametrized test runs.
+        return {
+            "body": io.BytesIO(MOCK_INVOKE_BODY),
+            "ContentType": "application/json",
+        }
     return orig(self, operation_name, api_params)
 
 
@@ -628,7 +628,10 @@ def test_bedrock_converse_stream_text_and_tools(
 
 
 @mock_aws
-def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
+@pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
+def test_bedrock_invoke(
+    client: weave.trace.weave_client.WeaveClient, model_identifier: str
+) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -646,7 +649,7 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
         )
 
         response = bedrock_client.invoke_model(
-            modelId=model_id,
+            modelId=model_identifier,
             body=body,
             contentType="application/json",
             accept="application/json",
