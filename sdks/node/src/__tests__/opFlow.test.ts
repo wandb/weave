@@ -1,6 +1,6 @@
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {wrapOpenAIChatCompletionsCreate} from '../integrations/openai';
-import {op} from '../op';
+import {markOpEager, op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {makeMockOpenAIChat} from './openaiMock';
 
@@ -341,7 +341,8 @@ describe('Op Flow', () => {
     // payload must independently carry trace_id (a merged read would mask it).
     const requestSpy = jest.spyOn(traceServer, 'request');
 
-    const myOp = op((x: number) => x * 2, {name: 'myOp', eagerCallStart: true});
+    const myOp = op((x: number) => x * 2, {name: 'myOp'});
+    markOpEager(myOp);
     await myOp(21);
 
     await traceServer.waitForPendingOperations();

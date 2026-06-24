@@ -69,12 +69,6 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   /** Custom color for the operation in the UI */
   opColor?: string;
   /**
-   * Sends this op's call start immediately rather than holding it to pair with
-   * its end into a single `calls/complete` write. Used for long-running ops
-   * (e.g. evaluations) that must be visible in the UI before they finish.
-   */
-  eagerCallStart?: boolean;
-  /**
    * Default attributes applied to every call this op creates. Integrations set
    * this to stamp `attributes.integration` provenance. Merged beneath `kind`/
    * `color`, which take precedence on key collision.

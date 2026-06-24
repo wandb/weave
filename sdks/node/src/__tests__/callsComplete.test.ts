@@ -4,7 +4,7 @@
  * and the automatic upgrade when a project is pinned to calls_complete mode.
  */
 import {getGlobalClient} from '../clientApi';
-import {op} from '../op';
+import {markOpEager, op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
@@ -182,12 +182,10 @@ describe('calls_complete eager path', () => {
 
   test('an eager op sends start and end via the v2 single endpoints', async () => {
     const requestSpy = jest.spyOn(traceServer, 'request');
-    const longRunning = op(
-      function longRunning(x: number) {
-        return x;
-      },
-      {eagerCallStart: true}
-    );
+    const longRunning = op(function longRunning(x: number) {
+      return x;
+    });
+    markOpEager(longRunning);
     await longRunning(7);
     await client().waitForBatchProcessing();
 
