@@ -211,3 +211,32 @@ clean. Added `// eslint-disable-next-line @typescript-eslint/no-require-imports`
 above it (mirroring the first require's disable in this file) and amended this
 slice's commit (new SHA). Re-validated: eslint clean, typecheck clean, jest 26
 passing.
+
+## Addendum — normalize import order (externals grouped at top)
+Reviewer flagged that the @google/adk import block "moved" between slices (churn
+between PRs) and asked to check all import moves. Audit found two inconsistencies
+at the 01→02 boundary, both now fixed to ONE convention — external imports
+(@opentelemetry, @google/adk, @google/genai, zod) grouped at the TOP, relative
+imports below — in BOTH googleAdk.ts and googleAdk.test.ts, every slice:
+- SOURCE: slice 01 had @google/* at the bottom (where the old ./googleAdk.types
+  relative import used to sit before the type migration); moved to the top to
+  match 02-06.
+- TEST: slices 02-06 had @google/adk at the bottom; moved to the top to match
+  slice 01.
+No linter enforces import order here (there is no import/order rule, and
+`eslint --fix` is a no-op on imports), so this is purely churn-reduction for
+cleaner per-PR diffs — not a lint fix.
+
+Restack mechanics: slice 01 amended (source only); 02-06 restacked. Conflicts hit
+on 02 (symbol-set merge: slice 02 adds LlmRequest/LlmResponse/FunctionDeclaration/
+GenerateContentConfig) and on 06 (the test import block tangled into DUPLICATE
+relative imports via git's auto-merge — clientApi appeared 3x). Both resolved to
+the canonical layout. 03/05 auto-merged clean (verified not tangled). Confirmed
+clientApi imported exactly once per test file and all slices green
+(typecheck/eslint/jest 5/19/22/24/26).
+
+GOTCHA for future agents: reordering imports across a stacked PR is conflict-prone
+— moving a block in a lower slice collides with later slices that add symbols to
+it or add neighboring imports, and a "clean" auto-merge can SILENTLY duplicate
+imports (slice 06 here). Always re-validate each slice (typecheck + a dup-count
+grep), don't trust a clean restack.
