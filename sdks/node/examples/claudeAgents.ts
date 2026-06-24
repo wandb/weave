@@ -32,7 +32,7 @@ function clip(text: string, max = 120): string {
 }
 
 /** Render a tool_result's content (string or content-block array) as a string. */
-function stringifyToolResult(content: unknown): string {
+function stringifyToolResult(content: string | object | undefined): string {
   if (content == null) return '';
   return typeof content === 'string' ? content : JSON.stringify(content);
 }
