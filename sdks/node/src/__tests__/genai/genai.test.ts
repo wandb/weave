@@ -870,7 +870,7 @@ describe('GenAI', () => {
   // // ...
   // weave.endTurn({endTime: '...'});
   //
-  test('allows backfilling data (via handle-based APIs)', async () => {
+  test('allows backfilling data (via top-level context-based APIs)', async () => {
     for (const recordedSession of AGENT_SESSIONS) {
       weave.startSession({
         agentName: recordedSession.agentName,
