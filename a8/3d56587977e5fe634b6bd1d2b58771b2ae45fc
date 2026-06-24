@@ -40,3 +40,13 @@ ruff clean.
 - Next in stack: andrew/decouple-client-constants (vendor client-used constants +
   parity test). Errors/common_interface/feedback_types are deferred (errors is a
   cross-process raise/catch trap; wire models are codegen-territory).
+
+## Update: cross-fence behavior test (added after user asked to confirm both impls match)
+Added a deterministic golden-vector test on BOTH sides: tests/utils/test_ids.py
+(client) and an addition to tests/trace_server/test_ids.py (server), each replaying
+tests/{utils,trace_server}/uuidv7_golden_vectors.jsonl (byte-identical copies) by
+patching only the module's os/time edges via monkeypatch.setattr(ids_mod, 'os'/'time',
+SimpleNamespace(...)) — narrow, no global os/time effect. Fixtures DUPLICATED per side
+(not shared) so each side is self-contained for the server's eventual move. Golden
+vectors generated from the real impl; cover zero/max entropy + min/max 48-bit ms.
+Client 2 tests / server 6 (5 pre-existing property tests + 1 golden) pass.
