@@ -3,6 +3,7 @@
 from unittest.mock import Mock, patch
 
 import pytest
+from gql.transport.exceptions import TransportQueryError
 
 from weave.compat.wandb import AuthenticationError, CommError
 from weave.wandb_interface.project_creator import (
@@ -136,6 +137,37 @@ def test_ensure_project_exists_authentication_error(mock_api_with_no_project):
     mock_api_with_no_project.upsert_project.assert_called_once_with(
         entity="test_entity", project="test_project"
     )
+
+
+@pytest.mark.disable_logging_error_check
+def test_ensure_project_exists_permission_denied(mock_api_with_no_project):
+    """Permission denial surfaces a clear error with no raw gql traceback or retries."""
+    permission_error = TransportQueryError(
+        "permission denied",
+        errors=[
+            {
+                "message": "permission denied",
+                "path": ["upsertModel"],
+                "extensions": {"code": "PERMISSION_ERROR"},
+            }
+        ],
+    )
+    mock_api_with_no_project.upsert_project.side_effect = permission_error
+
+    with pytest.raises(UnableToCreateProjectError) as exc_info:
+        ensure_project_exists("test_entity", "test_project")
+
+    assert str(exc_info.value) == (
+        "You do not have permission to access or create project "
+        "`test_entity/test_project`. Your API key may belong to a service "
+        "account or user that is not a member of the `test_entity` team, or "
+        "that lacks write access. Verify the key's team/entity scope."
+    )
+    assert not isinstance(exc_info.value, TransportQueryError)
+    assert exc_info.value.__cause__ is None
+    # Permission errors are non-retryable: one lookup, one create attempt, no retries.
+    assert mock_api_with_no_project.project.call_count == 1
+    assert mock_api_with_no_project.upsert_project.call_count == 1
 
 
 @pytest.mark.disable_logging_error_check
