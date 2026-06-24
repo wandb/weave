@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Mapping, Sequence
 from types import CoroutineType
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypedDict
@@ -292,6 +293,14 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     if isinstance(rep, str) and len(rep) > limit:
         rep = rep[: limit - 3] + "..."
     return rep
+
+
+_MEMORY_ADDRESS_RE = re.compile(r" at 0x[0-9a-fA-F]+")
+
+
+def stable_repr(obj: Any) -> str:
+    """`repr(obj)` with volatile ` at 0x...` memory addresses removed so object digests stay stable across processes."""
+    return _MEMORY_ADDRESS_RE.sub("", repr(obj))
 
 
 def is_primitive(obj: Any) -> bool:

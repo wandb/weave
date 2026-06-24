@@ -8,6 +8,7 @@ from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     is_pydantic_model_class,
+    stable_repr,
     stringify,
     to_json,
 )
@@ -378,3 +379,18 @@ def test__replace_memory_address() -> None:
     )
     # Test with no memory addresses
     assert _replace_memory_address("No memory address here") == "No memory address here"
+
+
+def test_stable_repr_strips_memory_addresses() -> None:
+    # Two distinct instances differ only by their `at 0x...` address in repr() (the
+    # source of object-version churn when such a repr is stored in published content).
+    a, b = object(), object()
+    assert repr(a) != repr(b)
+    assert " at 0x" in repr(a)
+    assert stable_repr(a) == stable_repr(b) == "<object object>"
+
+    # Functions (e.g. a dspy metric) collapse to a stable, address-free repr.
+    assert stable_repr(stringify) == "<function stringify>"
+
+    # Reprs without a memory address pass through unchanged.
+    assert stable_repr("no address here") == "'no address here'"
