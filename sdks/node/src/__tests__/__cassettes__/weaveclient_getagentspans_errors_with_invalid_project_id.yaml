@@ -51,6 +51,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/nonexistent-project","limit":5}'
   response:
     status: 403

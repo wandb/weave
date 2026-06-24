@@ -32,6 +32,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"table":{"project_id":"drtangible-mocha/test-project","rows":[{"id":1,"value":2},{"id":2,"value":3},{"id":3,"value":4}]}}'
   response:
     status: 200
@@ -51,6 +52,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/test-project","digest":"03b86e8588d298a1814945664597d94281cb0dbca3b4ff8b0fcff30a6305d33e"}'
   response:
     status: 200
@@ -70,6 +72,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"Dataset","val":{"_type":"Dataset","_class_name":"Dataset","_bases":["Object","BaseModel"],"rows":"weave:///drtangible-mocha/test-project/table/03b86e8588d298a1814945664597d94281cb0dbca3b4ff8b0fcff30a6305d33e"}}}'
   response:
     status: 200
