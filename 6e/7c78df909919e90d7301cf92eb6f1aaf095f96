@@ -245,3 +245,6 @@ GOTCHA for future agents: reordering imports across a stacked PR is conflict-pro
 it or add neighboring imports, and a "clean" auto-merge can SILENTLY duplicate
 imports (slice 06 here). Always re-validate each slice (typecheck + a dup-count
 grep), don't trust a clean restack.
+
+## Addendum — googleGenAI.ts wrap-case comment
+Reviewer (re isAdkInternalClientOptions, googleGenAI.ts:256) asked to spell out the else/wrap case in a comment. Added at the call site: "// The user is using GoogleGenAI directly, not through ADK: wrap it." isAdkInternalClientOptions is true ONLY for ADK-internal clients (skipped — WeaveAdkPlugin already traces them as chat spans, so wrapping would double-count); the wrap branch is standalone GenAI use. Comment-only; slice 02 amended, 03/05/06 clean-restacked (notes re-copied).
