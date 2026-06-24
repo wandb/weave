@@ -76,11 +76,6 @@ jobs:
         working-directory: ${{ env.CORE_DIR }}
         run: docker compose up --detach
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libmagic1
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:

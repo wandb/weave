@@ -109,9 +109,6 @@ jobs:
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install Libmagic dependency package
-        if: steps.filter_shards.outputs.skip != 'true'
-        run: sudo apt update && sudo apt install -y libmagic1
       - name: Start ${{ inputs.topology }} ClickHouse cluster
         if: steps.filter_shards.outputs.skip != 'true'
         working-directory: tests/trace_server/conftest_lib/topologies
