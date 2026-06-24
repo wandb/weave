@@ -6,7 +6,9 @@ from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
 
+from weave.integrations.openai_realtime.otel_state_exporter import OTelStateExporter
 from weave.integrations.openai_realtime.state_exporter import StateExporter
+from weave.trace.settings import should_use_otel_v2
 
 logger = logging.getLogger(__name__)
 
@@ -44,17 +46,10 @@ class ConversationManager:
         # it emits OTel GenAI spans, otherwise legacy Weave calls. ``use_otel``
         # lets callers (and tests) pin the destination explicitly.
         if use_otel is None:
-            from weave.trace.settings import should_use_otel_v2
-
             use_otel = should_use_otel_v2()
-        if use_otel:
-            from weave.integrations.openai_realtime.otel_state_exporter import (
-                OTelStateExporter,
-            )
-
-            self.state: StateExporter = OTelStateExporter()
-        else:
-            self.state = StateExporter()
+        self.state_exporter: StateExporter = (
+            OTelStateExporter() if use_otel else StateExporter()
+        )
         self._registry = EventHandlerRegistry()
         # Worker-thread based event queue + lifecycle
         self._queue: Queue[dict] = Queue()
@@ -64,34 +59,34 @@ class ConversationManager:
 
         handlers: dict[str, Handler] = {
             # Session lifecycle
-            "session.created": self.state.handle_session_created,
-            "session.update": self.state.handle_session_update,
-            "session.updated": self.state.handle_session_updated,
+            "session.created": self.state_exporter.handle_session_created,
+            "session.update": self.state_exporter.handle_session_update,
+            "session.updated": self.state_exporter.handle_session_updated,
             # Input audio buffer lifecycle
-            "input_audio_buffer.append": self.state.handle_input_audio_append,
-            "input_audio_buffer.cleared": self.state.handle_input_audio_cleared,
-            "input_audio_buffer.committed": self.state.handle_input_audio_committed,
-            "input_audio_buffer.speech_started": self.state.handle_speech_started,
-            "input_audio_buffer.speech_stopped": self.state.handle_speech_stopped,
+            "input_audio_buffer.append": self.state_exporter.handle_input_audio_append,
+            "input_audio_buffer.cleared": self.state_exporter.handle_input_audio_cleared,
+            "input_audio_buffer.committed": self.state_exporter.handle_input_audio_committed,
+            "input_audio_buffer.speech_started": self.state_exporter.handle_speech_started,
+            "input_audio_buffer.speech_stopped": self.state_exporter.handle_speech_stopped,
             # Conversation item changes (GA: .added/.done, Beta: .created)
-            "conversation.item.created": self.state.handle_item_created,
-            "conversation.item.added": self.state.handle_item_created,
-            "conversation.item.done": self.state.handle_item_done,
-            "conversation.item.deleted": self.state.handle_item_deleted,
-            "conversation.item.input_audio_transcription.completed": self.state.handle_item_input_audio_transcription_completed,
+            "conversation.item.created": self.state_exporter.handle_item_created,
+            "conversation.item.added": self.state_exporter.handle_item_created,
+            "conversation.item.done": self.state_exporter.handle_item_done,
+            "conversation.item.deleted": self.state_exporter.handle_item_deleted,
+            "conversation.item.input_audio_transcription.completed": self.state_exporter.handle_item_input_audio_transcription_completed,
             # Response lifecycle and parts
-            "response.created": self.state.handle_response_created,
-            "response.done": self.state.handle_response_done,
+            "response.created": self.state_exporter.handle_response_created,
+            "response.done": self.state_exporter.handle_response_done,
             # GA event names (output_audio, output_text)
-            "response.output_audio.delta": self.state.handle_response_audio_delta,
-            "response.output_audio.done": self.state.handle_response_audio_done,
-            "response.output_text.delta": self.state.handle_response_text_delta,
+            "response.output_audio.delta": self.state_exporter.handle_response_audio_delta,
+            "response.output_audio.done": self.state_exporter.handle_response_audio_done,
+            "response.output_text.delta": self.state_exporter.handle_response_text_delta,
             # Beta compatibility (audio)
-            "response.audio.delta": self.state.handle_response_audio_delta,
-            "response.audio.done": self.state.handle_response_audio_done,
-            "response.text.delta": self.state.handle_response_text_delta,
+            "response.audio.delta": self.state_exporter.handle_response_audio_delta,
+            "response.audio.done": self.state_exporter.handle_response_audio_done,
+            "response.text.delta": self.state_exporter.handle_response_text_delta,
             # Function call streaming
-            "response.function_call_arguments.delta": self.state.handle_function_call_arguments_delta,
+            "response.function_call_arguments.delta": self.state_exporter.handle_function_call_arguments_delta,
         }
 
         self._registry.update(handlers)

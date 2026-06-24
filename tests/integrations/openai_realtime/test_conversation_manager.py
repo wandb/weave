@@ -66,7 +66,7 @@ class DummyState:
 def test_conversation_manager_dispatch_sync(monkeypatch):
     # Patch StateExporter used by ConversationManager to our dummy. use_otel is
     # pinned False so the legacy (patchable) StateExporter branch is taken; the
-    # OTel branch imports OTelStateExporter directly and ignores this patch.
+    # OTel branch instantiates OTelStateExporter and ignores this patch.
     monkeypatch.setattr(cm_mod, "StateExporter", DummyState)
     mgr = cm_mod.ConversationManager(use_otel=False)
 
@@ -90,7 +90,7 @@ def test_conversation_manager_dispatch_sync(monkeypatch):
         },
     }
     mgr.process_event(msg)
-    assert "session.updated" in mgr.state.calls
+    assert "session.updated" in mgr.state_exporter.calls
 
 
 @pytest.mark.asyncio
@@ -104,4 +104,4 @@ async def test_conversation_manager_worker_queue(monkeypatch):
     # Wait until worker drains queue
     mgr._queue.join()
 
-    assert "input_audio_buffer.cleared" in mgr.state.calls
+    assert "input_audio_buffer.cleared" in mgr.state_exporter.calls
