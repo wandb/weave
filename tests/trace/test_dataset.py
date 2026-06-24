@@ -2,11 +2,9 @@ import pytest
 
 import weave
 from tests.trace.test_evaluate import Dataset
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context.tests_context import raise_on_captured_errors
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_basic_dataset_lifecycle(weave_active):
     for _i in range(2):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
@@ -73,7 +71,6 @@ def test_dataset_laziness(client):
         assert _top_level_logs(log) == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_published_dataset_laziness(client):
     """The intention of this test is to show that publishing a dataset,
     then iterating through the "gotten" version of the dataset has
@@ -123,7 +120,6 @@ def test_published_dataset_laziness(client):
         assert _top_level_logs(log) == ["table_query"] * ((i // 100) + 1)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_from_calls(client):
     @weave.op
     def greet(name: str, age: int) -> str:
@@ -145,7 +141,6 @@ def test_dataset_from_calls(client):
     assert rows[1]["output"] == "Hello Bob, you are 25!"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dataset_caching(weave_active):
     ds = weave.Dataset(rows=[{"a": i} for i in range(200)])
     ref = weave.publish(ds)
@@ -215,7 +210,6 @@ def test_dataset_select(weave_active):
         ds.select([-1])
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_add_rows(weave_active):
     ds = weave.Dataset(name="test", rows=[{"a": i} for i in range(10)])
     ref = weave.publish(ds)

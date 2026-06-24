@@ -1,14 +1,11 @@
-import pytest
 from pydantic import BaseModel
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.objectify import register_object
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import RefsReadBatchReq
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_round_trip_query_object(client) -> None:
     query_raw = {
         "$expr": {

@@ -7,7 +7,6 @@ import pytest
 from PIL import Image
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
@@ -52,7 +51,6 @@ def test_img(request) -> Image.Image:
         img.close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_image_publish(weave_active, test_img: Image.Image) -> None:
     weave.publish(test_img)
 
@@ -70,7 +68,6 @@ class ImageWrapper(weave.Object):
     img: Image.Image
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_property"
     img_wrapper = ImageWrapper(img=test_img)
@@ -88,7 +85,6 @@ def test_image_as_property(client: WeaveClient, test_img: Image.Image) -> None:
         gotten_img_wrapper.img.close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.flaky(reruns=3)
 def test_image_as_dataset_cell(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_dataset_cell"
@@ -136,7 +132,6 @@ def test_image_as_call_io(client: WeaveClient, test_img: Image.Image) -> None:
     assert image_as_input_and_output_part_call.output["out_img"].tobytes() == exp_bytes
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> None:
     client.project = "test_image_as_call_io_refs"
     non_published_img = image_as_solo_output(publish_first=True, img=test_img)
@@ -163,7 +158,6 @@ def test_image_as_call_io_refs(client: WeaveClient, test_img: Image.Image) -> No
         image_as_input_and_output_part_call.output["out_img"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_image_as_file(client: WeaveClient) -> None:
     client.project = "test_image_as_file"
     file_path = Path(__file__).parent.resolve() / "example.jpg"
@@ -210,7 +204,6 @@ def dataset_ref(weave_active):
     return ref
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_images_in_dataset_for_evaluation(weave_active, dataset_ref):
     dataset = dataset_ref.get()
@@ -252,7 +245,6 @@ async def test_many_images_will_consistently_log():
     assert "Task failed" not in res.stderr
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_images_in_load_of_dataset(weave_active):
     n_rows = 5
     rows = [{"img": make_random_image()} for _ in range(n_rows)]
@@ -269,7 +261,6 @@ def test_images_in_load_of_dataset(weave_active):
             gotten_row["img"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_images_in_dataset_without_client(weave_active):
     """Regression test for WB-21596: datasets with images should be iterable
     without an active global client (e.g. after ref.get() auto-init cleanup).

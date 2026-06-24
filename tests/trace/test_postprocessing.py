@@ -1,7 +1,6 @@
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
 def redact_keys(d: dict) -> dict:
@@ -28,7 +27,6 @@ def apply_postprocessing(client):
     client.postprocess_output = original_postprocess_output
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_global_postprocessing(client, apply_postprocessing) -> None:
     @weave.op
     def func(api_key: str, secret_key: str, name: str, age: int) -> str:

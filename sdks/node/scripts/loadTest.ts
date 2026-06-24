@@ -1,12 +1,12 @@
 import * as weave from 'weave';
 import type {WeaveClient} from 'weave';
 
-const func = weave.op(async () => 1);
+const _func = weave.op(async () => 1);
 const myFunction = async (a: number = 1, b: string = 'hello', c: boolean = true) => {
   return { first: a, second: b, third: c };
 };
-const func2 = weave.op(myFunction);
-const func3 = weave.op(async () => {
+const _func2 = weave.op(myFunction);
+const _func3 = weave.op(async () => {
   throw new Error('hmm');
 });
 const myFunction2 = async ({ a, b = 'wuh' }: { a?: number; b?: string }) => {

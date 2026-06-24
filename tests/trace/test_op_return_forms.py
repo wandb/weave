@@ -1,12 +1,10 @@
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.ref_util import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_empty(client):
     @weave.op
     def fn():
@@ -27,7 +25,6 @@ def test_op_return_sync_empty(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_empty(client):
     @weave.op
@@ -49,7 +46,6 @@ async def test_op_return_async_empty(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_obj(client):
     @weave.op
     def fn():
@@ -70,7 +66,6 @@ def test_op_return_sync_obj(client):
     assert res.calls[0].output == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_obj(client):
     @weave.op
@@ -106,7 +101,6 @@ def simple_list_accumulator(acc, value):
 """
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_generator(client):
     @weave.op(accumulator=simple_list_accumulator)
     def fn():
@@ -131,7 +125,6 @@ def test_op_return_sync_generator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator(client):
     @weave.op(accumulator=simple_list_accumulator)
@@ -157,7 +150,6 @@ async def test_op_return_async_generator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_iterator(client):
     class MyIterator:
         size = 10
@@ -191,7 +183,6 @@ def test_op_return_sync_iterator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_iterator(client):
     class MyAsyncIterator:
@@ -226,7 +217,6 @@ async def test_op_return_async_iterator(client):
     assert res.calls[0].output == list(range(9, -1, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_generator_never_iter(client):
     @weave.op(accumulator=simple_list_accumulator)
     def fn():
@@ -250,7 +240,6 @@ def test_op_return_sync_generator_never_iter(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator_never_iter(client):
     @weave.op(accumulator=simple_list_accumulator)
@@ -276,7 +265,6 @@ async def test_op_return_async_generator_never_iter(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_iterator_never_iter(client):
     class MyIterator:
         size = 10
@@ -309,7 +297,6 @@ def test_op_return_sync_iterator_never_iter(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_iterator_never_iter(client):
     class MyAsyncIterator:
@@ -343,7 +330,6 @@ async def test_op_return_async_iterator_never_iter(client):
     assert res.calls[0].output is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_generator_partial(client):
     @weave.op(accumulator=simple_list_accumulator)
     def fn():
@@ -369,7 +355,6 @@ def test_op_return_sync_generator_partial(client):
     assert res.calls[0].output == list(range(9, 4, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator_partial(client):
     @weave.op(accumulator=simple_list_accumulator)
@@ -397,7 +382,6 @@ async def test_op_return_async_generator_partial(client):
     assert res.calls[0].output == list(range(9, 4, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_iterator_partial(client):
     class MyIterator:
         size = 10
@@ -432,7 +416,6 @@ def test_op_return_sync_iterator_partial(client):
     assert res.calls[0].output == list(range(9, 4, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_iterator_partial(client):
     class MyAsyncIterator:
@@ -468,7 +451,6 @@ async def test_op_return_async_iterator_partial(client):
     assert res.calls[0].output == list(range(9, 4, -1))
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_generator_exception(client):
     @weave.op(accumulator=simple_list_accumulator)
     def fn():
@@ -499,7 +481,6 @@ def test_op_return_sync_generator_exception(client):
     assert res.calls[0].exception is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_generator_exception(client):
     @weave.op(accumulator=simple_list_accumulator)
@@ -531,7 +512,6 @@ async def test_op_return_async_generator_exception(client):
     assert res.calls[0].exception is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_op_return_sync_iterator_exception(client):
     class MyIterator:
         size = 10
@@ -571,7 +551,6 @@ def test_op_return_sync_iterator_exception(client):
     assert res.calls[0].exception is not None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_op_return_async_iterator_exception(client):
     class MyAsyncIterator:

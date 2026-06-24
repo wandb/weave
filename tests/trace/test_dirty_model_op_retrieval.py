@@ -1,10 +1,6 @@
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_dirty_model_op_retrieval(client):
     class MyModel(weave.Model):
         client: str

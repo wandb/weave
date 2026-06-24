@@ -232,6 +232,74 @@ def test_full_agent_turn() -> None:
     assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
+def test_chat_view_aggregates_cost() -> None:
+    """Per-message cost sums across the agent subtree; trace cost sums all spans."""
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+            input_cost_usd=0.001,
+            output_cost_usd=0.002,
+            total_cost_usd=0.003,
+            started_at=at(0),
+        ),
+        _span(
+            span_id="tool",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            tool_name="get_weather",
+            started_at=at(1),
+        ),
+        _span(
+            span_id="llm",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_cost_usd=0.02,
+            output_cost_usd=0.01,
+            total_cost_usd=0.03,
+            started_at=at(2),
+        ),
+    ]
+
+    res = build_trace_chat(spans, "trace-cost")
+
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    # Aggregated across root + llm (tool contributes no cost).
+    assert assistant.input_cost_usd == pytest.approx(0.021)
+    assert assistant.output_cost_usd == pytest.approx(0.012)
+    assert assistant.total_cost_usd == pytest.approx(0.033)
+    # Trace total sums every span's cost.
+    assert res.total_cost_usd == pytest.approx(0.033)
+
+
+def test_chat_view_cost_none_when_unpriced() -> None:
+    """With no priced spans, costs stay None (unknown), not 0."""
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+        ),
+    ]
+    res = build_trace_chat(spans, "trace-unpriced")
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    assert assistant.total_cost_usd is None
+    assert res.total_cost_usd is None
+
+
 def test_chat_view_exposes_agent_metadata_for_reactions() -> None:
     """The chat view surfaces agent_version + status_code so reaction feedback
     can carry them: per-message from the message's span, and the trace root's
@@ -495,6 +563,183 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     agent_messages = [m for m in messages if m.type == "assistant_message"]
     assert len(agent_messages) == 1
     assert _assistant_payload(agent_messages[0]).text == "hi there"
+
+
+def test_reasoning_part_not_duplicated_in_assistant_text() -> None:
+    """A reasoning part in output_messages surfaces only as `reasoning_content`,
+    never concatenated into the assistant body text.
+
+    `_serialize_output_messages` folds reasoning into the assistant message's
+    parts as a ReasoningPart (so downstream extraction can populate
+    `reasoning_content`). The chat view must render that reasoning solely in the
+    Reasoning block — otherwise the same text renders twice: once in the
+    collapsible and again as body text.
+    """
+    reasoning = "Investigating scenario counts"
+    answer = "There are 17 scenarios, not 16."
+    span = _span(
+        operation_name="chat",
+        output_messages=[
+            {
+                "role": "assistant",
+                "content": _parts(
+                    {"type": "reasoning", "content": reasoning},
+                    _text_part(answer),
+                ),
+            }
+        ],
+        reasoning_content=reasoning,
+    )
+
+    messages = build_chat_messages([span])
+    assistant = next(m for m in messages if m.type == "assistant_message")
+    payload = _assistant_payload(assistant)
+
+    assert payload.text == answer
+    assert reasoning not in payload.text
+    assert payload.reasoning_content == reasoning
+
+
+def _tool_call_part(name: str, arguments: str) -> dict:
+    return {"type": "tool_call", "id": "tc1", "name": name, "arguments": arguments}
+
+
+def test_interleaved_reasoning_before_tool_call_is_surfaced() -> None:
+    """Reasoning that precedes a tool call (an LLM step whose only output is a
+    tool call, no assistant text) must still surface as a reasoning-only
+    message, in order before the tool call — not be dropped because the step
+    produced no final text.
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    step_reasoning = "Deciding to inspect the workspace"
+    final_reasoning = "Summarizing what I found"
+    answer = "The eval suite has 17 scenarios."
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "How many scenarios?"}],
+            started_at=at(0),
+        ),
+        # LLM step that reasons then calls a tool: reasoning + tool_call parts,
+        # no text part.
+        _span(
+            span_id="llm1",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        {"type": "reasoning", "content": step_reasoning},
+                        _tool_call_part("shell", '{"command": "ls"}'),
+                    ),
+                }
+            ],
+            reasoning_content=step_reasoning,
+            started_at=at(1),
+        ),
+        _span(
+            span_id="tool1",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            span_name="execute_tool shell",
+            tool_name="shell",
+            tool_call_arguments='{"command": "ls"}',
+            tool_call_result="17 files",
+            started_at=at(2),
+        ),
+        # Final LLM step: reasoning + the answer text.
+        _span(
+            span_id="llm2",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        {"type": "reasoning", "content": final_reasoning},
+                        _text_part(answer),
+                    ),
+                }
+            ],
+            reasoning_content=final_reasoning,
+            started_at=at(3),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    types = [m.type for m in messages]
+
+    # The interleaved reasoning step is emitted before its tool call, and the
+    # final answer (with its own reasoning) comes last.
+    assert types == [
+        "user_message",
+        "agent_start",
+        "assistant_message",  # reasoning-only step
+        "tool_call",
+        "assistant_message",  # final answer
+    ]
+
+    step = _assistant_payload(messages[2])
+    assert step.text == ""
+    assert step.reasoning_content == step_reasoning
+
+    final = _assistant_payload(messages[4])
+    assert final.text == answer
+    assert final.reasoning_content == final_reasoning
+
+
+def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
+    """A tool-calling LLM step that carries neither assistant text nor
+    reasoning must not produce an empty assistant bubble.
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "run it"}],
+            started_at=at(0),
+        ),
+        _span(
+            span_id="llm1",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(_tool_call_part("shell", "{}")),
+                }
+            ],
+            started_at=at(1),
+        ),
+        _span(
+            span_id="tool1",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            span_name="execute_tool shell",
+            tool_name="shell",
+            tool_call_result="done",
+            started_at=at(2),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    assert [m.type for m in messages if m.type == "assistant_message"] == []
 
 
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:

@@ -5,6 +5,7 @@ import logging
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectDataResidence
@@ -36,7 +37,11 @@ def get_project_data_residence(
             (SELECT 1 FROM calls_merged WHERE project_id = {project_slot} LIMIT 1) as has_merged
     """
 
-    result = ch_client.query(query, parameters=pb.get_params())
+    result = ch_client.query(
+        query,
+        parameters=pb.get_params(),
+        settings=ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
+    )
 
     if result.result_rows:
         row = result.result_rows[0]

@@ -5,7 +5,6 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
@@ -345,7 +344,6 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     assert all(obj.val["i"] in {4, 5, 6} for obj in res.objs)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_publish_model_query_no_ref(client: WeaveClient):
     class MyModel(weave.Model):
         @weave.op

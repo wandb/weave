@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 import weave
 from tests.conftest import LATENCY_TOL
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave import Dataset, Evaluation, Model
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
@@ -38,7 +37,6 @@ def example_to_model_input(example):
     return {"input": example["input"]}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_callable_as_model(weave_active):
     @weave.op
@@ -53,7 +51,6 @@ async def test_evaluate_callable_as_model(weave_active):
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_predict_can_receive_other_params(weave_active):
     @weave.op
@@ -74,7 +71,6 @@ async def test_predict_can_receive_other_params(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_can_preprocess_model_input(weave_active):
     @weave.op
@@ -94,7 +90,6 @@ async def test_can_preprocess_model_input(weave_active):
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_rows_only(weave_active):
     evaluation = Evaluation(
@@ -122,7 +117,6 @@ async def test_evaluate_other_model_method_names():
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_score_as_class(weave_active):
     class MyScorer(weave.Scorer):
@@ -145,7 +139,6 @@ async def test_score_as_class(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_score_with_custom_summarize(weave_active):
     class MyScorer(weave.Scorer):
@@ -173,7 +166,6 @@ async def test_score_with_custom_summarize(weave_active):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("scorers", "expected_output_key"),
@@ -311,7 +303,6 @@ async def test_scorer_name_sanitization(scorer_name):
     assert result["my-scorer"] == {"true_count": 1, "true_fraction": 0.5}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_sync_eval_parallelism(weave_active):
     @weave.op
@@ -350,7 +341,6 @@ async def test_sync_eval_parallelism(weave_active):
     assert time.time() - now < (15 if sys.platform == "win32" else 8)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_from_weaveobject_missing_evaluation_name(weave_active):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
@@ -387,7 +377,6 @@ async def test_evaluation_from_weaveobject_missing_evaluation_name(weave_active)
     assert result == expected_eval_result
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_table_lazy_iter(client, monkeypatch):
     """The intention of this test is to show that an evaluation harness
@@ -457,7 +446,6 @@ async def test_evaluate_table_lazy_iter(client, monkeypatch):
     assert counts_split_by_table_query == [count, 28, 28, 14 + 5], log
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_table_order(weave_active):
     """Test that evaluation results maintain the original order of the dataset
@@ -518,7 +506,6 @@ async def test_evaluate_table_order(weave_active):
     assert len(scores) == 5
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluate_with_pydantic_summary(weave_active):
     class MyScorerSummary(BaseModel):

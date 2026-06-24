@@ -11,11 +11,32 @@ export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export type {
   CallSchema,
   CallsFilter,
+  HttpResponse,
+  HTTPValidationError,
   Query,
   SortBy,
 } from './generated/traceServerApi';
 export type {Settings} from './settings';
-export type {GetCallsOptions, WeaveClient} from './weaveClient';
+export type {
+  Agent,
+  AgentMessage,
+  AgentSpan,
+  AgentTurn,
+  AgentVersion,
+  GetAgentsOptions,
+  GetAgentsResult,
+  GetAgentSpansOptions,
+  GetAgentSpansResult,
+  GetAgentTurnOptions,
+  GetAgentTurnResult,
+  GetAgentTurnsOptions,
+  GetAgentTurnsResult,
+  GetAgentVersionsOptions,
+  GetAgentVersionsResult,
+  GetCallsOptions,
+  Response,
+  WeaveClient,
+} from './weaveClient';
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
@@ -80,6 +101,7 @@ export {MessagesPrompt, StringPrompt} from './prompt';
 // is emitted, the `require()` call here is dead code, and the typeof
 // check prevents the missing module from ever being requested.
 if (typeof require === 'function' && typeof module === 'object') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./utils/commonJSLoader');
 }
 

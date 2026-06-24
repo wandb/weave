@@ -1,14 +1,10 @@
 from concurrent.futures import Future
 
-import pytest
-
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.ref_util import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_send_score_call(client):
     @weave.op
     def my_op(x: int) -> int:

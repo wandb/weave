@@ -1,4 +1,4 @@
-import {MessagePart} from '../genai';
+import type {MessagePart} from '../genai';
 import {parseDataUrl} from './parseDataUrl';
 
 export type MediaPart = Extract<MessagePart, {type: 'blob' | 'uri' | 'file'}>;

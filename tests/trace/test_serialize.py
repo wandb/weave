@@ -1,10 +1,8 @@
 from dataclasses import dataclass
 
-import pytest
 from pydantic import BaseModel
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.object_record import pydantic_object_record
 from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
@@ -316,7 +314,6 @@ def test_to_json_pydantic_class(client) -> None:
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_to_json_object_excludes_ref(client) -> None:
     class MyObj(weave.Object):
         @weave.op
@@ -329,7 +326,6 @@ def test_to_json_object_excludes_ref(client) -> None:
     assert "ref" not in serialized
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_to_json_function_with_memory_address_in_op(weave_active) -> None:
     opaque = object()
 

@@ -12,7 +12,6 @@ from PIL import Image
 
 import weave
 from tests.trace.server_utils import find_server_layer
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -76,7 +75,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset(self, client: WeaveClient):
         rows = [{"x": i, "y": str(i)} for i in range(10)]
 
@@ -105,7 +103,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op(self, client: WeaveClient):
         @weave.op
         def my_test_op(x: int) -> int:
@@ -144,7 +141,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_large_dataset(self, client: WeaveClient):
         rows = [
             {"idx": i, "val": f"row_{i}", "data": list(range(i % 10))}
@@ -180,7 +176,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_custom_weave_type(self, client: WeaveClient):
         """CustomWeaveType (PIL Image) produces the same digest on both paths."""
         img_client = Image.new("RGB", (16, 16), color=(0, 128, 255))
@@ -195,7 +190,6 @@ class TestClientServerDigestConsistency:
 
         assert digest_client == digest_server
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_table_row_digests(self, client: WeaveClient):
         """Client-computed row and table digests match the server's."""
         rows = [{"x": i, "y": str(i)} for i in range(5)]
@@ -228,7 +222,6 @@ class TestDataCorrectness:
         assert got["number"] == 42
         assert got["list"] == [1, 2, 3]
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_dataset(self, client: WeaveClient, fast_path: None):
         rows = [{"a": i, "b": i * 2} for i in range(5)]
         ds = weave.Dataset(name="round_trip_ds", rows=rows)
@@ -254,7 +247,6 @@ class TestDataCorrectness:
         assert got["config"]["a"] == 1
         assert got["metadata"]["nested"]["deep"] is True
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_op(self, client: WeaveClient, fast_path: None):
         @weave.op
         def my_rt_op(x: int) -> int:
@@ -280,7 +272,6 @@ class TestDataCorrectness:
         assert got["emoji"] == "\U0001f680"
         assert got["cjk"] == "\u4f60\u597d"
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     def test_custom_weave_type(self, client: WeaveClient, fast_path: None):
         img = Image.new("RGB", (32, 32), color=(255, 0, 0))
         ref = weave.publish(img, name="fast_path_image")
@@ -330,7 +321,6 @@ class TestServerDigestValidation:
             with pytest.raises(DigestMismatchError):
                 client.server.obj_create(req)
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_table(self, client: WeaveClient, correct: bool):
         rows = [{"a": 1}, {"a": 2}, {"a": 3}]
@@ -355,7 +345,6 @@ class TestServerDigestValidation:
             with pytest.raises(DigestMismatchError):
                 client.server.table_create(req)
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.parametrize("correct", [True, False], ids=["correct", "wrong"])
     def test_file(self, client: WeaveClient, correct: bool):
         content = b"hello world"
@@ -491,7 +480,6 @@ class TestDigestMismatchAutoDisable:
 
         assert seen_digests == [None]
 
-    @pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
     @pytest.mark.disable_logging_error_check
     def test_table_mismatch_retries_and_disables(
         self, client: WeaveClient, fast_path: None, monkeypatch

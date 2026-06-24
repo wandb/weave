@@ -12,7 +12,6 @@ import tenacity
 
 import weave
 from tests.trace.util import (
-    FAKE_NOT_IMPLEMENTED,
     capture_output,
     flush_and_wait_for_output,
     flush_output,
@@ -44,7 +43,6 @@ def func():
     return 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_disabled_setting(client):
     replace_settings(UserSettings(disabled=True))
     disabled_time = timeit.timeit(func, number=10)
@@ -61,7 +59,6 @@ def test_disabled_setting(client):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_disabled_env(client):
     os.environ["WEAVE_DISABLED"] = "true"
     disabled_time = timeit.timeit(func, number=10)
@@ -147,7 +144,6 @@ def test_publish_when_disabled_ignores_tags_aliases(weave_active, monkeypatch):
     assert ref.digest == "DISABLED"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_print_call_link_setting(client_creator):
     with client_creator(settings=UserSettings(print_call_link=False)) as client:
         with capture_output() as captured:
@@ -162,7 +158,6 @@ def test_print_call_link_setting(client_creator):
     assert TRACE_CALL_EMOJI in captured.getvalue()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_print_call_link_env(client):
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
     with capture_output() as captured:
@@ -182,7 +177,6 @@ def test_print_call_link_env(client):
     del os.environ["WEAVE_PRINT_CALL_LINK"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_should_capture_code_setting(weave_active):
     replace_settings(UserSettings(capture_code=False))
 
@@ -209,7 +203,6 @@ def test_should_capture_code_setting(weave_active):
     assert "Code-capture was disabled" not in code3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_should_capture_code_env(weave_active):
     os.environ["WEAVE_CAPTURE_CODE"] = "false"
 
@@ -239,6 +232,9 @@ def slow_operation():
 
 
 def speed_test(client, count=5):
+    # Warm the pool so lazy worker-thread spawning isn't charged to queue_time.
+    for fut in [client.future_executor.defer(slow_operation) for _ in range(count)]:
+        fut.result()
     start = time.time()
     futs = [client.future_executor.defer(slow_operation) for _ in range(count)]
     queue_time = time.time()
@@ -339,12 +335,12 @@ def test_retry_max_attempts_settings(client_creator, caplog) -> None:
     assert len(retry_attempt_logs) == 1
     attempt_log = retry_attempt_logs[0]
     assert attempt_log.attempt_number == 1
-    assert "Test error" in attempt_log.exception
+    assert attempt_log.exception == "Test error"
 
     assert len(retry_failed_logs) == 1
     failed_log = retry_failed_logs[0]
     assert failed_log.attempt_number == 2
-    assert "Test error" in failed_log.exception
+    assert failed_log.exception == "Test error"
 
 
 def test_retry_max_attempts_env(caplog) -> None:
@@ -364,12 +360,12 @@ def test_retry_max_attempts_env(caplog) -> None:
     assert len(retry_attempt_logs) == 1
     attempt_log = retry_attempt_logs[0]
     assert attempt_log.attempt_number == 1
-    assert "Test error" in attempt_log.exception
+    assert attempt_log.exception == "Test error"
 
     assert len(retry_failed_logs) == 1
     failed_log = retry_failed_logs[0]
     assert failed_log.attempt_number == 2
-    assert "Test error" in failed_log.exception
+    assert failed_log.exception == "Test error"
 
     del os.environ["WEAVE_RETRY_MAX_ATTEMPTS"]
 
@@ -426,7 +422,6 @@ def test_retry_max_interval_env(caplog, monkeypatch) -> None:
     del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_level_setting(client_creator):
     """Test that log_level setting properly silences publish messages."""
 
@@ -451,7 +446,6 @@ def test_log_level_setting(client_creator):
     assert "Published to" in output
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_log_level_env(client_creator):
     """Test that WEAVE_LOG_LEVEL environment variable properly silences publish messages."""
 

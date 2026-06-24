@@ -8,7 +8,6 @@ from PIL import Image
 
 import weave
 from tests.trace.test_utils import FailingSaveType
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.serialization.custom_objs import (
     KNOWN_TYPES,
     UnsafeDeserializationError,
@@ -28,7 +27,6 @@ def test_encode_custom_obj_unknown_type():
     assert encode_custom_obj(unknown) is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_decode_custom_obj_known_type(client):
     img = Image.new("RGB", (100, 100))
     encoded = encode_custom_obj(img)
@@ -40,7 +38,6 @@ def test_decode_custom_obj_known_type(client):
     assert decoded.tobytes() == img.tobytes()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_custom_obj(client):
     dt = datetime(2025, 3, 7, 0, 0, 0)
     encoded = encode_custom_obj(dt)
@@ -56,7 +53,6 @@ def test_inline_custom_obj(client):
     assert decoded == dt_with_tz
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_inline_custom_obj_needs_load_op(client):
     """Test the condition that the current version of the SDK doesn't know how to load the object.
 
@@ -83,7 +79,6 @@ def test_inline_custom_obj_needs_load_op(client):
         KNOWN_TYPES.add("rich.markdown.Markdown")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_no_extra_calls_created(client):
     @weave.op
     def make_datetime():
@@ -103,7 +98,6 @@ def test_no_extra_calls_created(client):
     assert len(calls) == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_safe_type_decodes_when_unsafe_decode_disabled(client):
     # Data-only types must still decode on a worker client that forbids unsafe decode:
     # they reconstruct via the in-process serializer and run no user code. Breaking
@@ -145,7 +139,6 @@ def test_unsafe_decode_disabled_refuses_code_bearing(client, encoded):
         decode_custom_obj(encoded)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_setting_disables_unsafe_decode_globally(client):
     # `WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false` (here via override_settings) closes
     # the gate even on a normal client whose own flag still allows unsafe decode, so a
@@ -168,7 +161,6 @@ def test_setting_disables_unsafe_decode_globally(client):
         assert decoded.tobytes() == img.tobytes()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_encode_custom_obj_save_exception_returns_none(client, failing_serializer):
     """Requirement: Type handler save exceptions should not crash user code
     Interface: encode_custom_obj function
@@ -185,7 +177,6 @@ def test_encode_custom_obj_save_exception_returns_none(client, failing_serialize
     assert result is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_encode_custom_obj_save_exception_does_not_propagate(
     client, failing_serializer
 ):

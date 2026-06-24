@@ -8,6 +8,7 @@ We should never be breaking the user's program with an error.
 from __future__ import annotations
 
 import gc
+import time
 import weakref
 from collections import Counter
 from unittest.mock import MagicMock
@@ -15,7 +16,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, DummyTestException
+from tests.trace.util import DummyTestException
 from weave.trace import weave_client
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
@@ -32,7 +33,6 @@ def reset_call_context():
     call_context._call_stack.reset(token)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_resilience_to_user_code_errors(weave_active):
     def do_test():
         @weave.op
@@ -53,7 +53,6 @@ def test_resilience_to_user_code_errors(weave_active):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_server_errors(client_with_throwing_server, log_collector):
     def do_test():
@@ -121,6 +120,11 @@ def test_resilience_to_obj_create_failure_does_not_pin_payload(
         pass
     client_with_throwing_server.future_executor.flush()
 
+    # flush() can return before the future's failure done-callback clears the
+    # ref, so wait for the eventual release rather than racing it.
+    deadline = time.monotonic() + 5.0
+    while obj.ref is not None and time.monotonic() < deadline:
+        time.sleep(0.005)
     assert obj.ref is None
 
     del obj
@@ -128,7 +132,6 @@ def test_resilience_to_obj_create_failure_does_not_pin_payload(
     assert obj_weak() is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_output_handler_errors(weave_active, log_collector):
     def do_test():
@@ -159,7 +162,6 @@ def test_resilience_to_output_handler_errors(weave_active, log_collector):
     assert logs[0].msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_output_handler_errors_async(weave_active, log_collector):
@@ -191,7 +193,6 @@ async def test_resilience_to_output_handler_errors_async(weave_active, log_colle
     assert logs[0].msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_make_accumulator_errors(weave_active, log_collector):
     def do_test():
@@ -223,7 +224,6 @@ def test_resilience_to_accumulator_make_accumulator_errors(weave_active, log_col
     assert logs[0].msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_make_accumulator_errors_async(
@@ -260,7 +260,6 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
     assert logs[0].msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_accumulation_errors(weave_active, log_collector):
     def do_test():
@@ -296,7 +295,6 @@ def test_resilience_to_accumulator_accumulation_errors(weave_active, log_collect
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_accumulation_errors_async(
@@ -337,7 +335,6 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_should_accumulate_errors(
     weave_active, log_collector
@@ -380,7 +377,6 @@ def test_resilience_to_accumulator_should_accumulate_errors(
     assert logs[0].msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_should_accumulate_errors_async(
@@ -431,7 +427,6 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
 # and that is expected and tested for. It happens to be at the deletion moment
 # so pytest is complaining that the exception is not being raised in the
 # expected manner.
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_accumulator_on_finish_post_processor_errors(
@@ -477,7 +472,6 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
         assert log.msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
@@ -525,7 +519,6 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         assert log.msg.startswith("Error capturing call output")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_resilience_to_accumulator_internal_errors(weave_active):
     def do_test():
         @weave.op(accumulator=lambda *args, **kwargs: {})
@@ -547,7 +540,6 @@ def test_resilience_to_accumulator_internal_errors(weave_active):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_resilience_to_accumulator_internal_errors_async(weave_active):
     async def do_test():
@@ -593,7 +585,6 @@ def _bad_finish_handler(call, output, exception):
     raise DummyTestException("FAILURE in on_finish_handler!")
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_postprocess_inputs_errors(weave_active, log_collector):
     """Test that errors in postprocess_inputs don't crash the user's program."""
@@ -611,7 +602,6 @@ def test_resilience_to_postprocess_inputs_errors(weave_active, log_collector):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_postprocess_inputs_errors_async(
@@ -632,7 +622,6 @@ async def test_resilience_to_postprocess_inputs_errors_async(
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_postprocess_output_errors(weave_active, log_collector):
     """Test that errors in postprocess_output don't crash the user's program."""
@@ -650,7 +639,6 @@ def test_resilience_to_postprocess_output_errors(weave_active, log_collector):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_postprocess_output_errors_async(
@@ -671,7 +659,6 @@ async def test_resilience_to_postprocess_output_errors_async(
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_call_display_name_errors(weave_active, log_collector):
     """Test that errors in call_display_name callable don't crash the user's program."""
@@ -689,7 +676,6 @@ def test_resilience_to_call_display_name_errors(weave_active, log_collector):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_call_display_name_errors_async(
@@ -710,7 +696,6 @@ async def test_resilience_to_call_display_name_errors_async(
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_on_input_handler_errors(weave_active, log_collector):
     """Test that errors in _on_input_handler don't crash the user's program."""
@@ -730,7 +715,6 @@ def test_resilience_to_on_input_handler_errors(weave_active, log_collector):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_on_input_handler_errors_async(weave_active, log_collector):
@@ -751,7 +735,6 @@ async def test_resilience_to_on_input_handler_errors_async(weave_active, log_col
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_resilience_to_on_finish_handler_errors(weave_active, log_collector):
     """Test that errors in _on_finish_handler don't crash the user's program."""
@@ -771,7 +754,6 @@ def test_resilience_to_on_finish_handler_errors(weave_active, log_collector):
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
 async def test_resilience_to_on_finish_handler_errors_async(
@@ -889,7 +871,6 @@ async def test_create_call_leak_restores_call_stack_async_gen(
     assert_no_current_call()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.disable_logging_error_check
 def test_create_call_leak_preserves_parent_call(
     weave_active, monkeypatch, log_collector

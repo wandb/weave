@@ -1,0 +1,162 @@
+name: weave-trace-tests
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  # This duplicates core's Build and Test App / Weave Trace Tests job while
+  # trace-server still lives in core. Simplify this once trace-server moves into
+  # weave or the core workflow can be reused directly.
+  weave-trace-tests:
+    name: Weave Trace Tests
+    runs-on: ubuntu-latest-8-cores
+    timeout-minutes: 45
+
+    env:
+      CORE_DIR: core
+      COMPOSE_FILE: .github/compose/weave-trace-tests.yaml
+      COMPOSE_PROJECT_NAME: weave-trace-tests
+
+    steps:
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+          owner: wandb
+          repositories: core
+          permission-contents: read
+
+      - name: Checkout core
+        uses: actions/checkout@v6
+        with:
+          repository: wandb/core
+          ref: master
+          path: ${{ env.CORE_DIR }}
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
+
+      - name: Remove core Weave submodule placeholder
+        run: rm -rf "${CORE_DIR}/services/weave-python/weave-public"
+
+      - name: Checkout current weave commit into core
+        uses: actions/checkout@v6
+        with:
+          path: ${{ env.CORE_DIR }}/services/weave-python/weave-public
+          persist-credentials: false
+
+      - name: Verify overlaid Weave commit
+        run: |
+          set -euo pipefail
+
+          actual_sha="$(git -C "${CORE_DIR}/services/weave-python/weave-public" rev-parse HEAD)"
+          echo "core_sha=$(git -C "${CORE_DIR}" rev-parse HEAD)"
+          echo "weave_sha=${actual_sha}"
+          test "${actual_sha}" = "${GITHUB_SHA}"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.WORKLOAD_IDENTITY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Start service containers
+        working-directory: ${{ env.CORE_DIR }}
+        run: docker compose up --detach
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: core/services/weave-trace/uv.lock
+
+      - name: Install dependencies
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        run: uv sync --group dev --group test --frozen
+
+      - name: Pip freeze
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        run: uv pip freeze
+
+      - name: Wait for ClickHouse
+        run: |
+          set -euo pipefail
+          for _i in {1..60}; do
+            if curl --silent --fail --show-error http://localhost:8123/ping; then
+              echo "ClickHouse is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::ClickHouse did not become ready in time"
+          exit 1
+
+      - name: Wait for Gorilla
+        run: |
+          set -euo pipefail
+          for _i in {1..120}; do
+            if (curl --silent --fail --show-error http://localhost:8080/ready >/dev/null \
+                || curl --silent --fail --show-error http://localhost:8080/healthz >/dev/null) \
+              && curl --silent --fail --show-error http://localhost:9015/health >/dev/null; then
+              echo "Gorilla and fixture service are ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Gorilla did not become ready in time"
+          exit 1
+
+      - name: Wait for Bufstream
+        run: |
+          set -euo pipefail
+          for _i in {1..60}; do
+            if timeout 5 bash -c "</dev/tcp/localhost/9092"; then
+              echo "Bufstream is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Bufstream did not become ready in time"
+          exit 1
+
+      - name: Run Weave Trace tests
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        env:
+          DD_ENV: ci
+          WB_SERVER_HOST: http://localhost
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_TRACE_CLICKHOUSE_USE_ASYNC_INSERT: "false"
+          BUFSTREAM_KAFKA_HOST: localhost
+          KAFKA_BROKER_HOST: localhost
+          KAFKA_BROKER_PORT: "9092"
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/${CORE_DIR}/services/weave-python/weave-public${PYTHONPATH:+:${PYTHONPATH}}"
+          make test-cov
+
+      - name: Dump service logs
+        if: failure()
+        working-directory: ${{ env.CORE_DIR }}
+        run: |
+          docker compose ps || true
+          for service in wandb-local clickhouse bufstream; do
+            echo "::group::${service} logs"
+            docker compose logs --no-color "${service}" || true
+            echo "::endgroup::"
+          done
+
+      - name: Stop service containers
+        if: always()
+        working-directory: ${{ env.CORE_DIR }}
+        run: docker compose down --volumes --remove-orphans || true

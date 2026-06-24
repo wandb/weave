@@ -6,7 +6,6 @@ from weave import Evaluation
 from weave.trace_server.common_interface import SortBy
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_filter_calls_by_ref_properties(client, no_autoflush):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
     nested1 = {"nested key with spaces": {"one": "1"}}
@@ -344,7 +343,15 @@ def test_filter_calls_by_ref_properties(client, no_autoflush):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+# Kept on ClickHouse only: sorting/filtering calls by a table-row ref field is
+# intermittently flaky on the in-memory fake under the concurrent eval this test
+# runs — the target=16 row's `inputs.example` ref occasionally resolves to null at
+# query time and sorts into the NULLS-LAST group. Passes locally 50+x but fails
+# rarely in CI; re-gate rather than mask a real nondeterminism with reruns.
+@pytest.mark.skipif(
+    FAKE_NOT_IMPLEMENTED,
+    reason="fake: table-row ref-field sort/filter flaky under concurrent eval",
+)
 @pytest.mark.asyncio
 async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     client, no_autoflush
@@ -496,7 +503,6 @@ async def test_filter_calls_by_ref_properties_with_table_rows_simple(
     # assert calls[4].inputs["example"]["object"]["a"] == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_mixed_objects_and_refs(client):
     """Test filtering calls by values within objects stored as refs in inputs/outputs."""
 

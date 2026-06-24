@@ -13,6 +13,8 @@ gha-creds-*.json
 .hypothesis
 .env
 .ruff_cache
+.import_linter_cache
+.grimp_cache
 .pytest_cache
 .coverage
 .nox

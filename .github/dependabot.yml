@@ -51,12 +51,10 @@ updates:
           - "clickhouse_connect*"
           - "fastapi*"
           - "sqlparse*"
-          - "freezegun*"
           - "eval_type_backport*"
           - "vcrpy*"
           - "flask*"
           - "uvicorn*"
-          - "filelock*"
           - "httpx*"
           - "confluent-kafka*"
           - "moto*"
@@ -184,12 +182,6 @@ updates:
       bedrock:
         patterns:
           - "boto3*"
-
-      # Development dependencies
-      dev:
-        patterns:
-          - "tomlkit*"
-          - "python-multipart*"
 
       # Pandas testing
       pandas_test:

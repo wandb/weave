@@ -8,7 +8,6 @@ import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.weave_client import WeaveClient
 from weave.type_handlers.Video.video import VideoFormat, write_video
 
@@ -52,7 +51,6 @@ def test_save_invalid_clip(tmp_path: Path, test_video: VideoClip, filename: str)
         write_video(fp, test_video)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_with_no_ext_converted(
     weave_active, tmp_path: Path, test_video: VideoClip
 ):
@@ -97,7 +95,6 @@ def test_weave_op_video(tmp_path: Path, test_video: VideoClip):
     assert os.path.getsize(result) > 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_publish(weave_active, test_video: VideoClip) -> None:
     ref = weave.publish(test_video)
     assert ref is not None
@@ -127,7 +124,6 @@ class VideoWrapper(weave.Object):
     video: VideoClip
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_property"
 
@@ -157,7 +153,6 @@ def test_video_as_property(client: WeaveClient, test_video: VideoClip) -> None:
         gotten_video_wrapper.video.close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_dataset_cell(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_dataset_cell"
 
@@ -199,7 +194,6 @@ def video_as_input_and_output_part(in_video: VideoClip) -> dict:
     return {"out_video": in_video}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_call_io(weave_active, test_video: VideoClip) -> None:
     non_published_video = video_as_solo_output(publish_first=False, video=test_video)
     video_dict = video_as_input_and_output_part(non_published_video)
@@ -247,7 +241,6 @@ def test_video_as_call_io(weave_active, test_video: VideoClip) -> None:
             video_as_input_and_output_part_call.output["out_video"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> None:
     client.project = "test_video_as_call_io_refs"
 
@@ -294,7 +287,6 @@ def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> No
             video_as_input_and_output_part_call.output["out_video"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
     client.project = "test_video_as_file"
 
@@ -344,7 +336,6 @@ def dataset_ref(weave_active):
     return ref
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_videos_in_dataset_for_evaluation(weave_active, dataset_ref):
     dataset = dataset_ref.get()
@@ -368,7 +359,6 @@ async def test_videos_in_dataset_for_evaluation(weave_active, dataset_ref):
             row["video"].close()
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_videos_in_load_of_dataset(weave_active):
     n_rows = 3
     # Create smaller duration videos to avoid encoding issues
@@ -423,7 +413,6 @@ def test_video_format_from_filename():
     assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.skipif(
     sys.platform == "win32",
     reason="moviepy library uses /dev/null on Windows which doesn't exist",

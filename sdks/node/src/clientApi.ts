@@ -1,6 +1,7 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
+import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {makeSettings, Settings} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -43,7 +44,7 @@ export async function login(apiKey: string, host?: string) {
   });
   try {
     await testTraceServerApi.health.readRootHealthGet({});
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
     );
@@ -57,7 +58,7 @@ export async function login(apiKey: string, host?: string) {
       netrc.save();
       console.log(`Successfully logged in. Credentials saved for ${host}`);
     }
-  } catch (error) {
+  } catch (_error) {
     // Log warning but don't fail - the API key can still be used from environment
     console.warn(
       'Could not save credentials to netrc file. You may need to set WANDB_API_KEY environment variable for future sessions.'
@@ -121,6 +122,7 @@ export async function init(
       baseApiParams: {
         headers: {
           'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
+          [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
           Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
         },
       },

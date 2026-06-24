@@ -70,6 +70,22 @@ class TokenTotals:
     output_tokens: int
     reasoning_tokens: int
     reasoning_content: str | None
+    # Query-time costs (USD). None means no contributing span had a price, so
+    # the cost is unknown rather than 0 (mirrors AgentSpanSchema cost columns).
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    total_cost_usd: float | None = None
+
+
+def add_optional_cost(acc: float | None, value: float | None) -> float | None:
+    """Sum two optional costs, treating None as "no contribution".
+
+    Stays None until a non-None value appears, so a collection of entirely
+    unpriced spans reports None (unknown) rather than 0.0.
+    """
+    if value is None:
+        return acc
+    return (acc or 0.0) + value
 
 
 def _datetime_sort_seconds(dt: datetime | None) -> float:
@@ -156,6 +172,7 @@ def build_trace_chat(
     root_status_code: str | None = None
     provider: str | None = None
     total_duration_ms: int | None = None
+    total_cost_usd: float | None = None
 
     if spans:
         root = _select_root_span(spans)
@@ -170,6 +187,9 @@ def build_trace_chat(
         # whole turn — not a sum of child durations (which would double
         # count overlapping subagents / parallel tool calls).
         total_duration_ms = _compute_duration_ms(root.started_at, root.ended_at)
+        # Cost, unlike duration, IS a sum across every span in the trace.
+        for span in spans:
+            total_cost_usd = add_optional_cost(total_cost_usd, span.total_cost_usd)
 
     return AgentTraceChatRes(
         trace_id=trace_id,
@@ -179,6 +199,7 @@ def build_trace_chat(
         status_code=root_status_code,
         provider=provider,
         total_duration_ms=total_duration_ms,
+        total_cost_usd=total_cost_usd,
         messages=messages,
     )
 
@@ -328,7 +349,14 @@ class ChatTraversal:
     def _walk_content_span(
         self, node: SpanNode, nearest_agent: str | None, depth: int
     ) -> bool:
-        """Walk a regular content span and emit its assistant text if present."""
+        """Walk a regular content span and emit its assistant text if present.
+
+        A span that produced reasoning but no assistant text (an LLM step that
+        only emitted a tool call) still emits a reasoning-only message, so
+        thinking interleaved between tool calls is surfaced rather than dropped.
+        Such a step is not the turn's final assistant text, so it does not
+        suppress a mirrored final message on the enclosing `invoke_agent` span.
+        """
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
         subtree_emitted_assistant = self._walk_children(
@@ -336,10 +364,12 @@ class ChatTraversal:
         )
 
         msg = _emit_assistant_message(span, agent_name)
-        if msg:
-            self.messages.append(msg)
-            return True
-        return subtree_emitted_assistant
+        if msg is None:
+            return subtree_emitted_assistant
+        self.messages.append(msg)
+        assistant = msg.assistant_message
+        emitted_text = bool(assistant and assistant.text)
+        return emitted_text or subtree_emitted_assistant
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -408,8 +438,9 @@ def _display_text(content: str) -> str:
     """Extract human-readable text from a message content field.
 
     Content is either plain text (legacy) or a JSON-serialized parts array
-    (multimodal messages).  For parts arrays, concatenate text and reasoning
-    parts; for plain text, return as-is.
+    (multimodal messages).  For parts arrays, concatenate the text parts;
+    reasoning parts are excluded (they surface separately via
+    `reasoning_content`).  For plain text, return as-is.
     """
     if not content or not content.startswith("["):
         return content
@@ -422,6 +453,10 @@ def _display_text(content: str) -> str:
     texts: list[str] = []
     for p in parts:
         if isinstance(p, dict) and isinstance(p.get("content"), str):
+            # Reasoning is rendered separately via `reasoning_content`;
+            # concatenating it here would duplicate it in the message body.
+            if p.get("type") == "reasoning":
+                continue
             texts.append(p["content"])
         elif isinstance(p, str):
             texts.append(p)
@@ -604,11 +639,14 @@ def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
 
 
 def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
-    """Sum input, output, and reasoning tokens across a subtree."""
+    """Sum input, output, and reasoning tokens (and costs) across a subtree."""
     input_t = node.span.input_tokens or 0
     output_t = node.span.output_tokens or 0
     reasoning_t = node.span.reasoning_tokens or 0
     reasoning_text = node.span.reasoning_content
+    input_cost_usd = node.span.input_cost_usd
+    output_cost_usd = node.span.output_cost_usd
+    total_cost_usd = node.span.total_cost_usd
     for child in node.children:
         child_totals = _sum_descendant_tokens(child)
         input_t += child_totals.input_tokens
@@ -616,7 +654,20 @@ def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
         reasoning_t += child_totals.reasoning_tokens
         if child_totals.reasoning_content and not reasoning_text:
             reasoning_text = child_totals.reasoning_content
-    return TokenTotals(input_t, output_t, reasoning_t, reasoning_text)
+        input_cost_usd = add_optional_cost(input_cost_usd, child_totals.input_cost_usd)
+        output_cost_usd = add_optional_cost(
+            output_cost_usd, child_totals.output_cost_usd
+        )
+        total_cost_usd = add_optional_cost(total_cost_usd, child_totals.total_cost_usd)
+    return TokenTotals(
+        input_t,
+        output_t,
+        reasoning_t,
+        reasoning_text,
+        input_cost_usd=input_cost_usd,
+        output_cost_usd=output_cost_usd,
+        total_cost_usd=total_cost_usd,
+    )
 
 
 def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
@@ -666,12 +717,19 @@ def _emit_assistant_message(
     descendant LLM span. Callers pass `aggregate_node` only when the invoke span
     itself needs to emit because no descendant already did; in that case token
     usage is summed across the subtree so the emitted message reflects the
-    whole agent turn. Returns None when there is no non-user output text.
+    whole agent turn.
+
+    A span that produced reasoning but no assistant text (e.g. an LLM step that
+    only emitted a tool call) still yields a message carrying that reasoning, so
+    thinking interleaved between tool calls is surfaced rather than dropped.
+    Returns None only when there is neither output text nor reasoning content.
     """
-    if not span.output_messages:
-        return None
-    text = _extract_non_user_output_text(span.output_messages)
-    if not text:
+    text = (
+        _extract_non_user_output_text(span.output_messages)
+        if span.output_messages
+        else ""
+    )
+    if not text and not span.reasoning_content:
         return None
 
     if aggregate_node:
@@ -682,6 +740,9 @@ def _emit_assistant_message(
             output_tokens=span.output_tokens or 0,
             reasoning_tokens=span.reasoning_tokens or 0,
             reasoning_content=span.reasoning_content,
+            input_cost_usd=span.input_cost_usd,
+            output_cost_usd=span.output_cost_usd,
+            total_cost_usd=span.total_cost_usd,
         )
 
     return AgentChatMessage(
@@ -698,6 +759,9 @@ def _emit_assistant_message(
             reasoning_tokens=totals.reasoning_tokens,
             input_tokens=totals.input_tokens or span.input_tokens,
             output_tokens=totals.output_tokens or span.output_tokens,
+            input_cost_usd=totals.input_cost_usd,
+            output_cost_usd=totals.output_cost_usd,
+            total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
             content_refs=_directional_content_refs(
