@@ -2,6 +2,7 @@ import {uuidv7} from 'uuidv7';
 
 import {_getGenaiState} from './context';
 import {Turn, type TurnInit} from './turn';
+import type {SpanEndOptions} from './spanBase';
 
 export interface SessionInit {
   agentName?: string;
@@ -49,7 +50,7 @@ export class Session {
     });
   }
 
-  end(): void {
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -58,10 +59,10 @@ export class Session {
     // Cascade: end any active descendants innermost-first so each child span
     // closes before its parent.
     if (state.llm) {
-      state.llm.end();
+      state.llm.end(opts);
     }
     if (state.turn) {
-      state.turn.end();
+      state.turn.end(opts);
     }
     if (state.session === this) {
       state.session = null;

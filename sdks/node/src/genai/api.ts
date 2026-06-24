@@ -135,11 +135,14 @@ export function startSubagent(opts: SubAgentInit): SubAgent {
  *
  * @example
  * weave.endSession();
+ *
+ * @example
+ * weave.endSession({endTime: new Date('2026-05-29T10:00:01.700Z')});
  */
-export function endSession(): void {
+export function endSession(opts?: SpanEndOptions): void {
   const session = _getGenaiState().session;
   if (session) {
-    session.end();
+    session.end(opts);
   }
 }
 
