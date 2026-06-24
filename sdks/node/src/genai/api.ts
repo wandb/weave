@@ -1,7 +1,7 @@
 import {_getGenaiState} from './context';
 import {type LLM, type LLMInit} from './llm';
 import {Session, type SessionInit} from './session';
-import { SpanEndOptions } from './spanBase';
+import {SpanEndOptions} from './spanBase';
 import {type SubAgent, type SubAgentInit} from './subagent';
 import {type Tool, type ToolInit} from './tool';
 import {Turn, type TurnInit} from './turn';
