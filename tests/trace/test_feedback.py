@@ -1,10 +1,9 @@
 import datetime
 
 import pytest
-from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
@@ -12,7 +11,10 @@ from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    QueryIllegalTypeofArgumentError,
+)
 from weave.trace_server.feedback_agg_query_builder import (
     build_feedback_aggregate_query,
 )
@@ -212,6 +214,38 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "span_agent_version": "",
         "span_status_code": "UNSET",
     }
+
+
+@pytest.mark.parametrize(
+    "bad_spec",
+    [None, {"field_schema": None}, "not-a-spec"],
+    ids=["null_spec", "null_field_schema", "scalar"],
+)
+def test_annotation_feedback_malformed_spec_is_invalid_request(
+    client: WeaveClient, bad_spec: object
+) -> None:
+    """A malformed annotation spec yields InvalidRequest, not an unhandled 500 (WB-35940)."""
+    project_id = client.project_id
+    column_name = "malformed_spec"
+    digest = client.server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id, object_id=column_name, val=bad_spec
+            )
+        )
+    ).digest
+    annotation_ref = f"weave:///{project_id}/object/{column_name}:{digest}"
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/call_id_123",
+                feedback_type=f"wandb.annotation.{column_name}",
+                payload={"value": 1},
+                annotation_ref=annotation_ref,
+            )
+        )
 
 
 def test_runnable_feedback(client: WeaveClient) -> None:
@@ -553,7 +587,6 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["span_status_code"] == "UNSET"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_agent_user_feedback(client: WeaveClient) -> None:
     """A human agent score's value is a tag in scorer_tags (e.g. an emoji
     glyph), carrying no scorer refs. Non-emoji tags are allowed too.
@@ -1795,16 +1828,9 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
+@pytest.mark.disable_logging_error_check
 def test_feedback_query_contains_numeric_literal(client) -> None:
-    """Test that $contains works with numeric literals on JSON fields.
-
-    This test reproduces the ClickHouse error:
-    Illegal type Int64 of argument of function position
-
-    The issue occurs when using $contains with a numeric literal on a JSON field.
-    The query builder should convert the numeric literal to a string for the
-    position function, not cast it to an integer type.
-    """
+    """$contains with a numeric literal raises a guided error; string substr works."""
     project_id = client.project_id
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
 
@@ -1817,12 +1843,10 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     )
     client.server.feedback_create(feedback_req)
 
-    # Query for feedback where dataset_id contains the numeric literal 94
-    # This should work but currently fails with:
-    # "Illegal type Int64 of argument of function position"
+    # A numeric literal on a JSON field surfaces a guided error pointing at $convert.
     with pytest.raises(
-        DatabaseError,
-        match="Illegal type Int64 of argument of function position",
+        QueryIllegalTypeofArgumentError,
+        match="Illegal type of argument in query",
     ):
         client.server.feedback_query(
             FeedbackQueryReq(
@@ -1929,7 +1953,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     assert rows[0]["payload"] == {"is_positive": False, "score": 0.1, "rank": 2}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
     project_id = client.project_id
@@ -1981,7 +2004,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
     assert no_queue_feedback["queue_id"] is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
     project_id = client.project_id
@@ -2001,7 +2023,6 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
     project_id = client.project_id
@@ -2032,7 +2053,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
     project_id = client.project_id

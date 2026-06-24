@@ -127,7 +127,7 @@ function patchAnthropicMessagesCreate(exports: any) {
 
       let result: any;
 
-      let weaveOp = op(() => {
+      const weaveOp = op(() => {
         result = originalCreate.apply(thisArg, args);
         return result;
       }, weaveOpOptions);
@@ -202,7 +202,7 @@ const batchStreamReducer: StreamReducer<BatchChunk, ResultState> = {
     }
     return state;
   },
-  finalizeFn: state => {
+  finalizeFn: _state => {
     // no-op
   },
 };

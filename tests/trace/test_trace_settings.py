@@ -232,6 +232,9 @@ def slow_operation():
 
 
 def speed_test(client, count=5):
+    # Warm the pool so lazy worker-thread spawning isn't charged to queue_time.
+    for fut in [client.future_executor.defer(slow_operation) for _ in range(count)]:
+        fut.result()
     start = time.time()
     futs = [client.future_executor.defer(slow_operation) for _ in range(count)]
     queue_time = time.time()

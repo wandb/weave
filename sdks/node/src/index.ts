@@ -19,9 +19,18 @@ export type {
 export type {Settings} from './settings';
 export type {
   Agent,
+  AgentMessage,
+  AgentSpan,
+  AgentTurn,
   AgentVersion,
   GetAgentsOptions,
   GetAgentsResult,
+  GetAgentSpansOptions,
+  GetAgentSpansResult,
+  GetAgentTurnOptions,
+  GetAgentTurnResult,
+  GetAgentTurnsOptions,
+  GetAgentTurnsResult,
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,
@@ -92,6 +101,7 @@ export {MessagesPrompt, StringPrompt} from './prompt';
 // is emitted, the `require()` call here is dead code, and the typeof
 // check prevents the missing module from ever being requested.
 if (typeof require === 'function' && typeof module === 'object') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./utils/commonJSLoader');
 }
 

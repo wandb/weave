@@ -3135,6 +3135,14 @@ class EvalResultsQueryBody(BaseModelStrict):
         default=None,
         description="Filters applied to grouped rows. Multiple filters are AND'd together.",
     )
+    filter_logic_operator: Literal["and", "or"] = Field(
+        default="or",
+        description=(
+            "How to combine filters across evaluations: 'and' (Match All - row must "
+            "match in ALL evals) or 'or' (Match Any - row must match in ANY eval). "
+            "Defaults to 'or' (Match Any)."
+        ),
+    )
     limit: int | None = Field(
         default=None,
         description="Optional row-level page size applied after grouping and intersection.",
@@ -3220,6 +3228,14 @@ class EvalResultsEvaluationSummary(BaseModel):
     evaluation_call_id: str
     trial_count: int = 0
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+    predict_total_tokens: int | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only token usage for this evaluation "
+            "(the model's predict() tokens only, excluding LLM-as-a-judge "
+            "scorer usage); None when no trial reports usage."
+        ),
+    )
     evaluation_ref: str | None = None
     model_ref: str | None = None
     display_name: str | None = None

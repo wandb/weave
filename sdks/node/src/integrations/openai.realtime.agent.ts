@@ -366,7 +366,7 @@ export class WeaveRealtimeTracingAdapter {
     const toolName: string | undefined = tool?.name;
     if (!callId || !toolName) return;
 
-    let inputs: Record<string, any> = {};
+    let inputs: Record<string, any>;
     try {
       inputs = JSON.parse(details.toolCall.arguments ?? '{}');
     } catch {

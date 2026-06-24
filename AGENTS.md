@@ -94,6 +94,32 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### Assert on the complete payload (no substring / membership checks)
+
+Assert on the **full value**, not that a fragment appears somewhere inside a
+stringified payload. Substring (`in`) and membership checks pass on accidental
+matches and let the rest of the payload drift undetected, so prefer them only
+when membership in a collection is genuinely the contract under test.
+
+❌ **Never do this:**
+
+```python
+assert "short memo" in msg                 # substring of a serialized blob
+assert "error" in str(response)
+assert "note" in feedback.payload          # key-presence instead of value
+```
+
+✅ **Always do this:**
+
+```python
+assert feedback.payload == {"note": "short memo", "emoji": "👍"}  # whole object
+assert feedback.payload["note"] == "short memo"                   # exact field
+```
+
+If you only care about one field, pin that field with `==`; if you care about
+the shape, compare the whole dict/object. The same rule applies to SQL: assert
+the complete query string, never `assert "WHERE x" in sql`.
+
 ### VCR + ClickHouse isolation (integration tests)
 
 - Integration tests replay provider traffic from VCR cassettes while the weave

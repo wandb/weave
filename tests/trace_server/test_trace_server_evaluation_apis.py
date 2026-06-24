@@ -47,7 +47,6 @@ from weave.trace_server.workers.evaluate_model_worker import evaluate_model_work
 from weave.utils.project_id import from_project_id, to_project_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.asyncio
 async def test_evaluation_status(client):
     eval_call_id = generate_id()
@@ -278,7 +277,6 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
     return model_ref_uri, evaluation_ref_uri
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
     """Test the evaluate_model API endpoint with isolated execution.
@@ -546,7 +544,6 @@ def test_evaluate_model_rejects_op_ref_as_eval_or_model_ref(client, op_arg):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_basic(client):
     project_id = client.project_id
     entity, project = from_project_id(project_id)
@@ -608,7 +605,6 @@ def test_eval_results_query_basic(client):
     assert trial.scores["basic_scorer"] == 0.9
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_returns_genai_span_ref_without_children(client):
     project_id = client.project_id
     genai_span_ref = GenAISpanRef(
@@ -654,7 +650,6 @@ def test_eval_results_query_returns_genai_span_ref_without_children(client):
     assert trial.genai_span_ref == [genai_span_ref]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_nonexistent_eval_root(client):
     project_id = client.project_id
 
@@ -669,7 +664,6 @@ def test_eval_results_query_nonexistent_eval_root(client):
     assert res.rows == []
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_query_multiple_evals(client):
     project_id = client.project_id
 
@@ -720,7 +714,6 @@ def test_eval_results_query_multiple_evals(client):
     }
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_resolve_refs_only_for_paginated_rows(client):
     """Verify that resolve_row_refs only resolves refs for the paginated slice"""
     project_id = client.project_id
@@ -779,7 +772,6 @@ def test_eval_results_resolve_refs_only_for_paginated_rows(client):
         assert len(call.refs) <= 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_include_predict_and_score_children(client):
     """Verify include_predict_and_score_children controls child call data."""
     project_id = client.project_id
@@ -855,7 +847,214 @@ def test_eval_results_include_predict_and_score_children(client):
     assert trial_without.scores["children_test_scorer"] == 0.8
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+def test_eval_results_summary_predict_total_tokens(client):
+    """Summary predict_total_tokens sums per-trial model tokens, excluding scorer tokens."""
+    project_id = client.project_id
+    model_ref = "model://predict-tokens"
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://predict-tokens",
+            model=model_ref,
+        )
+    )
+
+    # Two trials. Each has a model predict child (30 tokens) and an LLM-judge
+    # scorer child (100 tokens); the predict_and_score rollup carries both (130).
+    for i in range(2):
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        pas_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={"example": {"idx": i}, "model": model_ref},
+                )
+            )
+        )
+        predict_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=pas_id,
+                    op_name="Model.predict",
+                    started_at=now,
+                    attributes={},
+                    inputs={"self": model_ref, "example": {"idx": i}},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_id,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    output=f"answer_{i}",
+                    summary={"usage": {"gpt-4o-mini": {"total_tokens": 30}}},
+                )
+            )
+        )
+        scorer_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=scorer_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=pas_id,
+                    op_name="my_scorer.score",
+                    started_at=now + datetime.timedelta(seconds=1),
+                    attributes={},
+                    inputs={"output": f"answer_{i}"},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=scorer_id,
+                    ended_at=now + datetime.timedelta(seconds=2),
+                    output={"score": 1},
+                    summary={"usage": {"judge": {"total_tokens": 100}}},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    ended_at=now + datetime.timedelta(seconds=3),
+                    output={"output": f"answer_{i}", "scores": {"my_scorer": 1}},
+                    summary={
+                        "usage": {
+                            "gpt-4o-mini": {"total_tokens": 30},
+                            "judge": {"total_tokens": 100},
+                        }
+                    },
+                )
+            )
+        )
+
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+        )
+    )
+    assert res.summary is not None
+    # 2 trials x 30 model tokens = 60; the 2 x 100 judge tokens are excluded.
+    assert res.summary.evaluations[0].predict_total_tokens == 60
+
+
+def test_eval_results_summary_predict_total_tokens_none_when_absent(client):
+    """predict_total_tokens is None when no trial carries token usage (caller falls back)."""
+    eval_id, _ = _create_eval_with_scores(
+        client, [{"accuracy": 0.5}], eval_name="no-tokens"
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_tokens is None
+
+
+def test_eval_results_summary_predict_total_tokens_counts_zero(client):
+    """A trial whose model usage is 0 still counts: the field is 0, not None."""
+    project_id = client.project_id
+    model_ref = "model://zero-tokens"
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://zero-tokens",
+            model=model_ref,
+        )
+    )
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    pas_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=pas_id,
+                trace_id=run.evaluation_run_id,
+                parent_id=run.evaluation_run_id,
+                op_name="Evaluation.predict_and_score",
+                started_at=now,
+                attributes={},
+                inputs={"example": {"idx": 0}, "model": model_ref},
+            )
+        )
+    )
+    predict_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_id,
+                trace_id=run.evaluation_run_id,
+                parent_id=pas_id,
+                op_name="Model.predict",
+                started_at=now,
+                attributes={},
+                inputs={"self": model_ref, "example": {"idx": 0}},
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                output="result",
+                summary={"usage": {"gpt-4o-mini": {"total_tokens": 0}}},
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=pas_id,
+                ended_at=now + datetime.timedelta(seconds=2),
+                output={"output": "result", "scores": {}},
+                summary={},
+            )
+        )
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_tokens == 0
+
+
 def test_eval_results_resolved_inputs_inline(client):
     """Inline inputs should be available as dicts in raw_data_row."""
     project_id = client.project_id
@@ -898,7 +1097,6 @@ def test_eval_results_resolved_inputs_inline(client):
     assert row.raw_data_row["question"] == "What is 2+2?"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize(
     "predict_and_score_op_name",
     [
@@ -1023,7 +1221,6 @@ def _create_eval_with_scores(client, scores_per_row, eval_name="eval"):
     return run.evaluation_run_id, predict_and_score_ids
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_row_order_is_stable(client):
     """Row order should be stable across repeated requests (default sort by row_digest)."""
     eval_id, _ = _create_eval_with_scores(
@@ -1046,7 +1243,6 @@ def test_eval_results_row_order_is_stable(client):
             assert digests == digests_first, "Row order changed between requests"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_excludes_deleted_calls(client):
     """Deleted PAS calls should not appear in eval results."""
     eval_id, predict_and_score_ids = _create_eval_with_scores(
@@ -1079,7 +1275,6 @@ def test_eval_results_excludes_deleted_calls(client):
     assert res.total_rows == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_desc(client):
     """Sort by scores.accuracy DESC should return highest-scoring row first."""
     eval_id, _ = _create_eval_with_scores(
@@ -1100,7 +1295,6 @@ def test_eval_results_sort_by_score_desc(client):
     assert accuracies == [0.9, 0.6, 0.3]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_score_asc(client):
     """Sort by scores.accuracy ASC should return lowest-scoring row first."""
     eval_id, _ = _create_eval_with_scores(
@@ -1120,7 +1314,6 @@ def test_eval_results_sort_by_score_asc(client):
     assert accuracies == [0.3, 0.6, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_score_gte(client):
     """Filter scores.accuracy >= 0.5 should exclude rows below threshold."""
     eval_id, _ = _create_eval_with_scores(
@@ -1161,7 +1354,6 @@ def test_eval_results_filter_score_gte(client):
     assert accuracies == [0.6, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_and_filter_combined(client):
     """Sort + filter together: filter first, then sort the remaining rows."""
     eval_id, _ = _create_eval_with_scores(
@@ -1201,7 +1393,6 @@ def test_eval_results_sort_and_filter_combined(client):
     assert accuracies == [0.9, 0.7, 0.5]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_filter_with_evaluation_call_id_scope(client):
     """Filter scoped to evaluation_call_id only tests that eval's scores."""
     eval_id, _ = _create_eval_with_scores(
@@ -1252,7 +1443,6 @@ def test_eval_results_filter_with_evaluation_call_id_scope(client):
     assert accuracies == [0.7, 0.9]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
     """Sorting on an unsupported field prefix returns InvalidRequest."""
     eval_id, _ = _create_eval_with_scores(
@@ -1268,7 +1458,6 @@ def test_eval_results_sort_unsupported_field_returns_invalid_request(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_eval_results_sort_by_output(client):
     """Sort by output.label orders rows by nested model output field."""
     project_id = client.project_id
@@ -1329,7 +1518,157 @@ def test_eval_results_sort_by_output(client):
     assert sorted_labels == ["apple", "banana", "cherry"]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+# TODO: remove the skip once the in-memory fake sorts output/input numerically
+# (it currently orders them lexicographically); ClickHouse already does.
+@pytest.mark.skipif(
+    FAKE_NOT_IMPLEMENTED,
+    reason="fake: output/input sort is lexicographic, not numeric, yet",
+)
+def test_eval_results_sort_by_numeric_output(client):
+    """Numeric output columns sort by value, not lexicographically.
+
+    Regression test for the ClickHouse ORDER BY: previously `output.*` fields
+    were ordered as the raw `JSON_VALUE` String, so e.g. 10 sorted before 2.
+    Executed against ClickHouse so we exercise the actual generated SQL.
+    """
+    project_id = client.project_id
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://numeric-output-sort",
+            model="model://numeric-output-sort",
+        )
+    )
+    # Chosen so lexicographic and numeric orderings differ:
+    # lexicographic asc -> [1, 10, 2]; numeric asc -> [1, 2, 10].
+    values = [2, 10, 1]
+    for i, value in enumerate(values):
+        call_id = generate_id()
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={
+                        "example": {"idx": i},
+                        "model": "model://numeric-output-sort",
+                    },
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    output={
+                        "output": {"predicted": value},
+                        "scores": {"accuracy": float(i)},
+                    },
+                    summary={},
+                )
+            )
+        )
+
+    def sorted_predictions(direction: str) -> list:
+        res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                include_raw_data_rows=True,
+                sort_by=[
+                    EvalResultsSortBy(
+                        field="output.output.predicted", direction=direction
+                    )
+                ],
+            )
+        )
+        return [
+            row.evaluations[0].trials[0].model_output["predicted"] for row in res.rows
+        ]
+
+    assert sorted_predictions("asc") == [1, 2, 10]
+    assert sorted_predictions("desc") == [10, 2, 1]
+
+
+# TODO: remove the skip once the in-memory fake sorts output/input numerically
+# (it currently orders them lexicographically); ClickHouse already does.
+@pytest.mark.skipif(
+    FAKE_NOT_IMPLEMENTED,
+    reason="fake: output/input sort is lexicographic, not numeric, yet",
+)
+def test_eval_results_sort_by_numeric_input(client):
+    """Numeric input columns sort by value, not lexicographically.
+
+    Inputs resolve via a different path than outputs (the `resolved_inputs`
+    CTE / inline `example` fallback), so cover them separately. Executed
+    against ClickHouse so we exercise the actual generated SQL.
+    """
+    project_id = client.project_id
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://numeric-input-sort",
+            model="model://numeric-input-sort",
+        )
+    )
+    # Chosen so lexicographic and numeric orderings differ:
+    # lexicographic asc -> [1, 10, 2]; numeric asc -> [1, 2, 10].
+    values = [2, 10, 1]
+    for value in values:
+        call_id = generate_id()
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={
+                        "example": {"x": value},
+                        "model": "model://numeric-input-sort",
+                    },
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    output={"output": {"label": "x"}, "scores": {"accuracy": 1.0}},
+                    summary={},
+                )
+            )
+        )
+
+    def sorted_inputs(direction: str) -> list:
+        res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=project_id,
+                evaluation_call_ids=[run.evaluation_run_id],
+                include_raw_data_rows=True,
+                sort_by=[EvalResultsSortBy(field="inputs.x", direction=direction)],
+            )
+        )
+        return [row.raw_data_row["x"] for row in res.rows]
+
+    assert sorted_inputs("asc") == [1, 2, 10]
+    assert sorted_inputs("desc") == [10, 2, 1]
+
+
 def test_eval_results_summary_with_filter(client):
     """Summary reflects filtered rows, not all rows."""
     eval_id, _ = _create_eval_with_scores(

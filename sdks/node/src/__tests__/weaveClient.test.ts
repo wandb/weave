@@ -2,7 +2,6 @@ import {ReadableStream} from 'stream/web';
 import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
-import {type WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
@@ -41,13 +40,15 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
     genaiAgentsQueryAgentsQueryPost: jest.Mock;
     genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
     genaiSearchAgentsSearchPost: jest.Mock;
+    genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
+    genaiTracesChatAgentsTracesChatPost: jest.Mock;
+    genaiConversationChatAgentsConversationsChatPost: jest.Mock;
   };
 };
 
 describe('WeaveClient', () => {
   let client: WeaveClient;
   let mockTraceServerApi: MockedTraceServer;
-  let mockWandbServerApi: jest.Mocked<WandbServerApi>;
 
   beforeEach(() => {
     mockTraceServerApi = {
@@ -58,9 +59,11 @@ describe('WeaveClient', () => {
         genaiAgentsQueryAgentsQueryPost: jest.fn(),
         genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
         genaiSearchAgentsSearchPost: jest.fn(),
+        genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
+        genaiTracesChatAgentsTracesChatPost: jest.fn(),
+        genaiConversationChatAgentsConversationsChatPost: jest.fn(),
       },
     } as any;
-    mockWandbServerApi = {} as any;
     client = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
@@ -203,7 +206,6 @@ describe('WeaveClient', () => {
   describe('Batch Processing', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
 
     beforeEach(() => {
       mockTraceServerApi = {
@@ -211,7 +213,6 @@ describe('WeaveClient', () => {
           callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
         },
       } as any;
-      mockWandbServerApi = {} as any;
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'test-project',
@@ -472,17 +473,208 @@ describe('WeaveClient', () => {
     });
   });
 
+  describe('getAgentSpans', () => {
+    it('gets agent spans from the server filtered by agent name', async () => {
+      const spans = [
+        {span_id: 's1', span_name: 'invoke_agent', input_tokens: 42},
+        {span_id: 's2', span_name: 'chat_completion', input_tokens: 99},
+      ];
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans, total_count: 2}} as any
+      );
+
+      const result = await client.getAgentSpans({
+        agentName: 'Assistant',
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'started_at', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: [{field: 'started_at', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: 'Assistant'}],
+          },
+        },
+      });
+
+      expect(result).toEqual({data: {spans, total_count: 2}});
+    });
+
+    it('omits the query when no agent name is provided', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      await client.getAgentSpans({limit: 5});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: undefined,
+        limit: 5,
+        offset: undefined,
+      });
+    });
+
+    it('defaults spans to an empty array when the server omits them', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {total_count: 0}} as any
+      );
+
+      const result = await client.getAgentSpans({});
+
+      expect(result.data.spans).toEqual([]);
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentSpans({})).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentTurn', () => {
+    it('gets turn data for a given trace id', async () => {
+      const chat = {
+        trace_id: 'trace-1',
+        root_span_name: 'my-op',
+        provider: 'openai',
+        total_duration_ms: 1234,
+        messages: [],
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentTurn({
+        traceId: 'trace-1',
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: {trace_id: 'trace-1'}} as any
+      );
+
+      await client.getAgentTurn({traceId: 'trace-1'});
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentTurn({traceId: 'trace-1'})).rejects.toThrow(
+        'boom'
+      );
+    });
+  });
+
+  describe('getAgentTurns', () => {
+    it('gets turn data for the given conversation id', async () => {
+      const chat = {
+        conversation_id: 'conv-1',
+        turns: [{trace_id: 'trace-1'}],
+        total_turns: 1,
+        has_more: false,
+        limit: 50,
+        offset: 0,
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentTurns({
+        conversationId: 'conv-1',
+        limit: 25,
+        offset: 5,
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: 25,
+        offset: 5,
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined limit/offset/includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: {conversation_id: 'conv-1'}} as any
+      );
+
+      await client.getAgentTurns({conversationId: 'conv-1'});
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: undefined,
+        offset: undefined,
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentTurns({conversationId: 'conv-1'})
+      ).rejects.toThrow('boom');
+    });
+  });
+
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
     let mockTransport: jest.SpyInstance;
 
     beforeEach(() => {
       mockTraceServerApi = {
         request: jest.fn(),
       } as any;
-      mockWandbServerApi = {} as any;
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'current-entity/current-project',
