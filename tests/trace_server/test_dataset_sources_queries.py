@@ -93,12 +93,12 @@ def _insert(ch_server: Any, rows: list[list[Any]]) -> None:
 
 def _run(ch_server: Any, query: str, pb: ParamBuilder) -> list[dict[str, Any]]:
     res = ch_server._query(query, parameters=pb.get_params())
-    return [
-        dict(zip(res.column_names, row, strict=True)) for row in res.result_rows
-    ]
+    return [dict(zip(res.column_names, row, strict=True)) for row in res.result_rows]
 
 
-def test_reverse_query_truncates_to_smallest_n_deterministically(ch_server: Any) -> None:
+def test_reverse_query_truncates_to_smallest_n_deterministically(
+    ch_server: Any,
+) -> None:
     """groupArraySorted(N) returns the N lexicographically-smallest digests."""
     project_id = make_project_id("ds_trunc")
     ds = "ds_obj"
