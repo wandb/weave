@@ -69,6 +69,7 @@ import type {
   Span as OtelSpan,
 } from '@opentelemetry/api';
 
+import type * as GoogleADK from '@google/adk';
 import type {
   BaseAgent as AdkBaseAgent,
   BaseTool as AdkBaseTool,
@@ -87,6 +88,7 @@ import type {
   ToolUnion as AdkToolUnion,
 } from '@google/genai';
 import {getGlobalClient} from '../clientApi';
+import state from '../state';
 import {getWeaveTracer} from '../genai/provider';
 import {
   ATTR_ERROR_TYPE,
@@ -121,23 +123,14 @@ import {
   ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
-import {globalSingleton} from '../utils/globalSingleton';
 import {warnOnce} from '../utils/warnOnce';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 
-/** The slice of ADK's `PluginManager` used for idempotent registration. */
-interface AdkPluginManager {
-  getPlugin(name: string): unknown;
-  registerPlugin(plugin: unknown): void;
-}
-
 /** The slice of ADK's `Runner` the instrumentation hook needs. */
-interface AdkRunnerLike {
-  pluginManager?: AdkPluginManager;
-}
+type AdkRunnerLike = Pick<GoogleADK.Runner, 'pluginManager'>;
 
 /** Name the plugin registers under in ADK's PluginManager (must be unique). */
-export const WEAVE_ADK_PLUGIN_NAME = 'weave';
+const WEAVE_ADK_PLUGIN_NAME = 'weave';
 
 const TRACER_NAME = 'weave.google_adk';
 const WEAVE_ATTR_PREFIX = 'weave.google_adk';
@@ -1293,32 +1286,23 @@ function errorMessageOf(error: Error): string {
 // Automatic instrumentation
 // ---------------------------------------------------------------------------
 
-// Shared across CJS/ESM module copies so both loaders see one plugin
-// instance and one patch state.
-const adkInstrumentationHolder = globalSingleton<{
-  plugin: WeaveAdkPlugin | null;
-}>('_weave_adk_instrumentation', () => ({plugin: null}));
-
 const weaveAdkRunnerPatched = Symbol.for('_weave_adk_runner_patched');
 
+// The plugin holder lives in the shared module state (see state.ts) so CJS and
+// ESM copies of this module resolve to one plugin instance.
 function getSharedPlugin(): WeaveAdkPlugin {
-  if (!adkInstrumentationHolder.plugin) {
-    adkInstrumentationHolder.plugin = new WeaveAdkPlugin();
+  if (!state.integrations.googleAdk.plugin) {
+    state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
   }
-  return adkInstrumentationHolder.plugin;
+  return state.integrations.googleAdk.plugin;
 }
 
-/** Registers the shared plugin on a runner's PluginManager, idempotently. */
+/** Registers the shared plugin on a runner's PluginManager, idempotently. The
+ *  try/catch is the boundary safety net (instrumentation must never break a
+ *  user run), so we lean on the `Runner` type rather than re-checking shape. */
 function ensurePluginRegistered(runner: AdkRunnerLike): void {
   try {
-    const pluginManager = runner?.pluginManager;
-    if (
-      !pluginManager ||
-      typeof pluginManager.getPlugin !== 'function' ||
-      typeof pluginManager.registerPlugin !== 'function'
-    ) {
-      return;
-    }
+    const {pluginManager} = runner;
     if (pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME)) {
       return;
     }
@@ -1326,6 +1310,19 @@ function ensurePluginRegistered(runner: AdkRunnerLike): void {
   } catch {
     // Never let instrumentation break a user run.
   }
+}
+
+/**
+ * Narrows a plugin resolved from ADK's PluginManager to our `WeaveAdkPlugin`.
+ * `getPlugin` hands back a foreign `BasePlugin`, and CJS/ESM module copies can
+ * defeat `instanceof`, so we duck-type the one method this path calls rather
+ * than assert the concrete class — which also matches a user-supplied instance.
+ */
+function isWeavePlugin(plugin: unknown): plugin is WeaveAdkPlugin {
+  return (
+    typeof (plugin as {finishInterruptedInvocation?: unknown})
+      ?.finishInterruptedInvocation === 'function'
+  );
 }
 
 /**
@@ -1345,17 +1342,12 @@ function finishInterruptedInvocations(
     return;
   }
   try {
-    const plugin = runner?.pluginManager?.getPlugin(WEAVE_ADK_PLUGIN_NAME);
-    // `getPlugin` returns the structurally-typed foreign plugin object; narrow
-    // to the one method we call rather than assume the concrete class (CJS/ESM
-    // module copies can defeat `instanceof`).
-    const finalize = (plugin as {finishInterruptedInvocation?: unknown})
-      ?.finishInterruptedInvocation;
-    if (typeof finalize !== 'function') {
+    const plugin = runner.pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME);
+    if (!isWeavePlugin(plugin)) {
       return;
     }
     for (const invocationId of invocationIds) {
-      finalize.call(plugin, invocationId);
+      plugin.finishInterruptedInvocation(invocationId);
     }
   } catch {
     // Cleanup must never surface into the user's run.
@@ -1368,8 +1360,12 @@ function finishInterruptedInvocations(
  * ADK reads the plugin list) and finalizes its invocation even when the
  * consumer abandons the event stream early.
  */
-function patchRunnerClass(RunnerClass: any): void {
-  const proto = RunnerClass?.prototype;
+function patchRunnerClass(RunnerClass: typeof GoogleADK.Runner): void {
+  // Swapping prototype methods is inherently dynamic, so view the prototype as
+  // an indexable bag for the patch below.
+  const proto = RunnerClass?.prototype as unknown as
+    | Record<string | symbol, unknown>
+    | undefined;
   if (!proto || proto[weaveAdkRunnerPatched]) {
     return;
   }
@@ -1406,7 +1402,7 @@ function patchRunnerClass(RunnerClass: any): void {
 }
 
 /** Module-load hook shared by the CJS and ESM paths. */
-export function commonPatchGoogleADK(exports: any) {
+export function commonPatchGoogleADK(exports: typeof GoogleADK) {
   try {
     if (exports?.Runner) {
       patchRunnerClass(exports.Runner);
