@@ -37,12 +37,12 @@ function stringifyToolResult(content: unknown): string {
   return typeof content === 'string' ? content : JSON.stringify(content);
 }
 
-interface TurnResult {
+type TurnResult = {
   sessionId?: string;
   costUsd: number;
   turns: number;
   toolCalls: number;
-}
+};
 
 /** Run one conversation turn, printing each streamed message, and return its stats. */
 async function runTurn(prompt: string, options: Options): Promise<TurnResult> {
