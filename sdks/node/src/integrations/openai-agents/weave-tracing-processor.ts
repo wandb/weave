@@ -220,9 +220,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       },
     };
 
-    // Queue the call start eagerly: agent traces/spans are open while the run
-    // streams, so their starts must be visible before they finish.
-    client.saveCallStart(callStart, {eager: true});
+    client.saveCallStart(callStart);
 
     // Store Weave call data in global map keyed by OpenAI Agent trace ID
     // This allows OpenAI SDK integration to look up parent call information
@@ -356,9 +354,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       },
     };
 
-    // Queue the call start eagerly: agent traces/spans are open while the run
-    // streams, so their starts must be visible before they finish.
-    client.saveCallStart(callStart, {eager: true});
+    client.saveCallStart(callStart);
 
     // Store Weave call data in global map keyed by OpenAI Agent span ID
     // This allows OpenAI SDK integration to look up parent call information

@@ -402,23 +402,20 @@ export class WeaveRealtimeTracingAdapter {
     const callId = uuidv7();
     const traceId = uuidv7();
 
-    client.saveCallStart(
-      {
-        project_id: client.projectId,
-        id: callId,
-        op_name: 'realtime.session',
-        display_name: 'Realtime Session',
-        trace_id: traceId,
-        parent_id: null,
-        started_at: new Date().toISOString(),
-        inputs: sessionData,
-        attributes: {
-          kind: 'agent',
-          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
-        },
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.session',
+      display_name: 'Realtime Session',
+      trace_id: traceId,
+      parent_id: null,
+      started_at: new Date().toISOString(),
+      inputs: sessionData,
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
       },
-      {eager: true}
-    );
+    });
 
     this.sessionCallId = callId;
     this.sessionTraceId = traceId;
@@ -482,23 +479,20 @@ export class WeaveRealtimeTracingAdapter {
 
     const callId = uuidv7();
 
-    client.saveCallStart(
-      {
-        project_id: client.projectId,
-        id: callId,
-        op_name: 'realtime.voice_input',
-        display_name: 'User Voice Input',
-        trace_id: this.sessionTraceId,
-        parent_id: this.sessionCallId,
-        started_at: new Date().toISOString(),
-        inputs: {},
-        attributes: {
-          kind: 'agent',
-          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
-        },
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.voice_input',
+      display_name: 'User Voice Input',
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: new Date().toISOString(),
+      inputs: {},
+      attributes: {
+        kind: 'agent',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
       },
-      {eager: true}
-    );
+    });
 
     this.voiceInputCalls.set(itemId, callId);
   }
@@ -582,23 +576,20 @@ export class WeaveRealtimeTracingAdapter {
 
     const callId = uuidv7();
 
-    client.saveCallStart(
-      {
-        project_id: client.projectId,
-        id: callId,
-        op_name: 'realtime.generation',
-        display_name: 'Generation',
-        trace_id: this.sessionTraceId,
-        parent_id: this.sessionCallId,
-        started_at: new Date().toISOString(),
-        inputs: {response_id: responseId},
-        attributes: {
-          kind: 'llm',
-          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
-        },
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.generation',
+      display_name: 'Generation',
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: new Date().toISOString(),
+      inputs: {response_id: responseId},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
       },
-      {eager: true}
-    );
+    });
 
     this.generationCalls.set(responseId, callId);
   }
@@ -640,23 +631,20 @@ export class WeaveRealtimeTracingAdapter {
 
     const callId = uuidv7();
 
-    client.saveCallStart(
-      {
-        project_id: client.projectId,
-        id: callId,
-        op_name: 'realtime.audio_output',
-        display_name: 'Audio Out',
-        trace_id: this.sessionTraceId,
-        parent_id: parentCallId,
-        started_at: new Date().toISOString(),
-        inputs: {},
-        attributes: {
-          kind: 'llm',
-          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
-        },
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: 'realtime.audio_output',
+      display_name: 'Audio Out',
+      trace_id: this.sessionTraceId,
+      parent_id: parentCallId,
+      started_at: new Date().toISOString(),
+      inputs: {},
+      attributes: {
+        kind: 'llm',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
       },
-      {eager: true}
-    );
+    });
 
     this.audioCallId = callId;
     this.audioResponseId = responseId;
@@ -710,23 +698,20 @@ export class WeaveRealtimeTracingAdapter {
 
     const callId = uuidv7();
 
-    client.saveCallStart(
-      {
-        project_id: client.projectId,
-        id: callId,
-        op_name: `realtime.tool.${toolName}`,
-        display_name: toolName,
-        trace_id: this.sessionTraceId,
-        parent_id: this.sessionCallId,
-        started_at: new Date().toISOString(),
-        inputs,
-        attributes: {
-          kind: 'tool',
-          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
-        },
+    client.saveCallStart({
+      project_id: client.projectId,
+      id: callId,
+      op_name: `realtime.tool.${toolName}`,
+      display_name: toolName,
+      trace_id: this.sessionTraceId,
+      parent_id: this.sessionCallId,
+      started_at: new Date().toISOString(),
+      inputs,
+      attributes: {
+        kind: 'tool',
+        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
       },
-      {eager: true}
-    );
+    });
 
     this.toolCalls.set(toolCallId, callId);
   }

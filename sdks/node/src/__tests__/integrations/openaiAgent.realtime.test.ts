@@ -1,4 +1,5 @@
 import {EventEmitter} from 'events';
+import {getGlobalClient} from '../../clientApi';
 import {WeaveRealtimeTracingAdapter} from '../../integrations/openai.realtime.agent';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
@@ -7,6 +8,16 @@ function makeMockSession() {
   const session = new EventEmitter() as any;
   session.transport = new EventEmitter();
   return session;
+}
+
+// Under calls_complete, an open span is held client-side until it pairs with
+// its end; flushing ships unpaired starts/ends so the server sees them.
+async function flush() {
+  const client = getGlobalClient();
+  if (!client) {
+    throw new Error('global client not initialized');
+  }
+  await client.waitForBatchProcessing();
 }
 
 function createAdapter() {
@@ -31,6 +42,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
       session: {model: 'gpt-4o-realtime'},
     });
 
+    await flush();
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toBe('realtime.session');
@@ -92,6 +104,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
     });
 
     // Call should be open (no ended_at yet)
+    await flush();
     let calls = await inMemoryTraceServer.getCalls(testProjectName);
     const voiceCall = calls.find(c => c.op_name === 'realtime.voice_input');
     expect(voiceCall).toBeDefined();
@@ -106,6 +119,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
       },
     ]);
 
+    await flush();
     calls = await inMemoryTraceServer.getCalls(testProjectName);
     const closedCall = calls.find(c => c.op_name === 'realtime.voice_input');
     expect(closedCall!.ended_at).toBeDefined();
@@ -121,6 +135,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
       providerData: {response: {id: 'resp-1'}},
     });
 
+    await flush();
     let calls = await inMemoryTraceServer.getCalls(testProjectName);
     const genCall = calls.find(c => c.op_name === 'realtime.generation');
     expect(genCall).toBeDefined();
@@ -128,6 +143,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
 
     session.transport.emit('turn_done', {response: {id: 'resp-1'}});
 
+    await flush();
     calls = await inMemoryTraceServer.getCalls(testProjectName);
     expect(
       calls.find(c => c.op_name === 'realtime.generation')!.ended_at
@@ -146,6 +162,7 @@ describe('WeaveRealtimeTracingAdapter', () => {
     });
     session.transport.emit('audio_done');
 
+    await flush();
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
     const genCall = calls.find(c => c.op_name === 'realtime.generation');
     const audioCall = calls.find(c => c.op_name === 'realtime.audio_output');
