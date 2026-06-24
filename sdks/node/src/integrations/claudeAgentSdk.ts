@@ -18,7 +18,8 @@
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
-import type {SDKMessage, SDKResultMessage} from './claude-agent-sdk/messages';
+import type {SDKResultMessage} from './claude-agent-sdk/messages';
+import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 
 // Idempotency marker stamped on each wrapped exports object. It is per-object
 // by design, not a single global flag in state.ts: the CJS and ESM hooks fire
@@ -32,7 +33,11 @@ const PATCHED = Symbol.for('weave.claudeAgentSdk.patched');
 /** Minimum `@anthropic-ai/claude-agent-sdk` version this integration supports. */
 const SUPPORTED_VERSION_RANGE = '>= 0.3.178';
 
-type QueryFn = (args: {prompt?: unknown; [k: string]: unknown}) => unknown;
+// The SDK's own `query` signature — `(args) => Query`, where `Query` is an
+// `AsyncGenerator<SDKMessage, void>`. Typing against it (rather than a
+// hand-rolled shape) lets the wrapper below drop its per-message/iterator casts.
+type QueryFn = (typeof ClaudeAgentSdk)['query'];
+type Query = ReturnType<QueryFn>;
 
 /** The async generator protocol members we serve from our traced wrapper. */
 const GENERATOR_MEMBERS = new Set<PropertyKey>([
@@ -63,14 +68,14 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
       let result: SDKResultMessage | undefined;
       let streamError: unknown;
       try {
-        for await (const msg of realQuery as AsyncIterable<SDKMessage>) {
-          if (msg && (msg as SDKMessage).type === 'result') {
-            result = msg as SDKResultMessage;
+        for await (const msg of realQuery) {
+          if (msg && msg.type === 'result') {
+            result = msg;
           } else {
             // Tracing must never break the caller's stream: swallow any
             // mapping error (the message is still yielded below).
             try {
-              tracer.processMessage(msg as SDKMessage);
+              tracer.processMessage(msg);
             } catch (err) {
               console.warn(
                 'weave: claude_agent_sdk tracing error (ignored)',
@@ -98,7 +103,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     }
 
     const wrapped = traced();
-    return new Proxy(wrapped as object, {
+    return new Proxy(wrapped, {
       get(target, prop, receiver) {
         if (GENERATOR_MEMBERS.has(prop)) {
           const value = Reflect.get(target, prop, receiver);
@@ -106,18 +111,16 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
         }
         // Forward Query control methods (interrupt, setModel, streamInput, …)
         // to the underlying query object.
-        const value = Reflect.get(realQuery as object, prop, realQuery);
-        return typeof value === 'function'
-          ? (value as (...a: unknown[]) => unknown).bind(realQuery)
-          : value;
+        const value = Reflect.get(realQuery, prop, realQuery);
+        return typeof value === 'function' ? value.bind(realQuery) : value;
       },
       // Keep membership checks (`'streamInput' in query`) consistent with what
       // `get` actually serves: generator protocol from the traced wrapper, every
       // other member from the underlying query.
       has(target, prop) {
-        return prop in target || prop in (realQuery as object);
+        return prop in target || prop in realQuery;
       },
-    });
+    }) as unknown as Query;
   };
 }
 
