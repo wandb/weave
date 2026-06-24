@@ -7,11 +7,13 @@ formatted SQL + param dict against an expected value, matching the style of
 """
 
 import datetime
+import re
 
 import pytest
 import sqlparse
 from pydantic import ValidationError
 
+from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
@@ -32,7 +34,10 @@ from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     CHAT_VIEW_COLS,
+    QUALIFIED_CHAT_VIEW_COLS,
+    QUALIFIED_SPANS_COST_COLS,
     SPAN_SORTABLE_COLS,
+    SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
     make_agent_versions_count_query,
@@ -51,6 +56,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_trace_detail_spans_query,
     resolve_group_by,
 )
+from weave.trace_server.query_builder.agent_trace_attribution import (
+    attributed_spans_source,
+)
 
 
 def assert_sql(
@@ -65,6 +73,40 @@ def assert_sql(
     assert expected_params == params, (
         f"\nExpected params: {expected_params}\n\nGot params: {params}"
     )
+
+
+class _AttrSrc:
+    """Expected FROM source + params for queries that read attributed spans.
+
+    Reuses the real `attributed_spans_source` so these tests assert the builder
+    wires it in (the source SQL itself is golden-tested in
+    `test_agent_trace_attribution.py`). The builder allocates the source params
+    *last*, so `offset` shifts the helper's `genai_0`-based slots to where they
+    land in the full query.
+    """
+
+    def __init__(
+        self,
+        offset: int,
+        *,
+        project_id: str = "p1",
+        started_after: datetime.datetime | None = None,
+        started_before: datetime.datetime | None = None,
+    ) -> None:
+        pb = ParamBuilder("genai")
+        sql = attributed_spans_source(
+            pb,
+            project_id=project_id,
+            started_after=started_after,
+            started_before=started_before,
+        )
+        self.sql = re.sub(
+            r"genai_(\d+)", lambda m: f"genai_{int(m.group(1)) + offset}", sql
+        )
+        self.params = {
+            f"genai_{int(k.split('_')[1]) + offset}": v
+            for k, v in pb.get_params().items()
+        }
 
 
 # ============================================================================
@@ -113,12 +155,14 @@ class TestMakeSpansCountQuery:
             ),
         )
 
-        expected = """
-            SELECT count() FROM spans s
-            WHERE s.project_id = {genai_0:String}
-              AND s.started_at >= {genai_1:DateTime64(6)}
-              AND s.started_at < {genai_2:DateTime64(6)}
-            AND ((s.agent_name = {genai_3:String}) AND (if(mapContains(s.custom_attrs_string, {genai_4:String}), s.custom_attrs_string[{genai_4:String}], NULL) = {genai_5:String}))
+        # Filtering on agent.name (identity) reads the attributed source.
+        src = _AttrSrc(6, started_after=start, started_before=end)
+        expected = f"""
+            SELECT count() FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.started_at >= {{genai_1:DateTime64(6)}}
+              AND s.started_at < {{genai_2:DateTime64(6)}}
+            AND ((s.agent_name = {{genai_3:String}}) AND (if(mapContains(s.custom_attrs_string, {{genai_4:String}}), s.custom_attrs_string[{{genai_4:String}}], NULL) = {{genai_5:String}}))
         """
         expected_params = {
             "genai_0": "p1",
@@ -127,6 +171,7 @@ class TestMakeSpansCountQuery:
             "genai_3": "bot",
             "genai_4": "env",
             "genai_5": "prod",
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -182,14 +227,15 @@ class TestMakeSpansListQuery:
         pb = ParamBuilder("genai")
         query = make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1"))
 
+        src = _AttrSrc(3)
         expected = f"""
             SELECT {SPANS_LIST_COLS}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY started_at DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_with_custom_sort(self) -> None:
@@ -202,14 +248,15 @@ class TestMakeSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(3)
         expected = f"""
             SELECT {SPANS_LIST_COLS}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY input_tokens asc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_projects_and_sorts_selected_custom_attr_columns(self) -> None:
@@ -227,9 +274,10 @@ class TestMakeSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(5)
         expected = f"""
             SELECT {SPANS_LIST_COLS}, mapFilter((k, v) -> has({{genai_4:Array(String)}}, k), s.custom_attrs_float) AS custom_attrs_float
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY if(mapContains(s.custom_attrs_float, {{genai_3:String}}), toFloat64(s.custom_attrs_float[{{genai_3:String}}]), NULL) desc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
@@ -240,6 +288,7 @@ class TestMakeSpansListQuery:
             "genai_2": 0,
             "genai_3": "score",
             "genai_4": ["score"],
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -286,14 +335,15 @@ class TestMakeSpansListQuery:
             pb, AgentSpansQueryReq(project_id="p1", include_details=True)
         )
 
+        src = _AttrSrc(3)
         expected = f"""
             SELECT {SPANS_LIST_COLS}, {SPANS_DETAILS_COLS}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY started_at DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_include_details_rejected_with_group_by(self) -> None:
@@ -443,16 +493,17 @@ class TestMakeGroupedSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(3)
         expected = f"""
             SELECT s.trace_id AS trace_id,
                    {_GROUPED_AGG_TAIL}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             GROUP BY trace_id
             ORDER BY last_seen DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_group_by_conversation_id_with_time(self) -> None:
@@ -471,10 +522,11 @@ class TestMakeGroupedSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(5, started_after=start, started_before=end)
         expected = f"""
             SELECT s.conversation_id AS conversation_id,
                    {_GROUPED_AGG_TAIL}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
               AND s.started_at >= {{genai_1:DateTime64(6)}}
               AND s.started_at < {{genai_2:DateTime64(6)}}
@@ -488,6 +540,7 @@ class TestMakeGroupedSpansListQuery:
             "genai_2": end,
             "genai_3": 100,
             "genai_4": 0,
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -503,10 +556,11 @@ class TestMakeGroupedSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(4)
         expected = f"""
             SELECT if(mapContains(s.custom_attrs_string, {{genai_3:String}}), s.custom_attrs_string[{{genai_3:String}}], NULL) AS env,
                    {_GROUPED_AGG_TAIL}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             GROUP BY env
             ORDER BY last_seen DESC
@@ -517,6 +571,7 @@ class TestMakeGroupedSpansListQuery:
             "genai_1": 100,
             "genai_2": 0,
             "genai_3": "env",
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -534,17 +589,18 @@ class TestMakeGroupedSpansListQuery:
             ),
         )
 
+        src = _AttrSrc(3)
         expected = f"""
             SELECT s.agent_name AS agent_name,
                    s.request_model AS request_model,
                    {_GROUPED_AGG_TAIL}
-            FROM spans s
+            FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
             GROUP BY agent_name, request_model
             ORDER BY agent_name asc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
-        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0}
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_group_by_with_dynamic_measures_filter_and_sort(self) -> None:
@@ -604,14 +660,17 @@ class TestMakeGroupedSpansListQuery:
                    count() AS spans,
                    countIf(((s.operation_name = {genai_3:String}))) AS tool_calls,
                    avgOrNull(if((mapContains(s.custom_attrs_float, {genai_4:String})), toFloat64(s.custom_attrs_float[{genai_4:String}]), NULL)) AS avg_score
-            FROM spans s
+            FROM {_ATTR_SRC} s
             WHERE s.project_id = {genai_0:String}
             GROUP BY conversation_id
             HAVING avgOrNull(if((mapContains(s.custom_attrs_float, {genai_5:String})), toFloat64(s.custom_attrs_float[{genai_5:String}]), NULL)) >= {genai_6:Float64}
             ORDER BY avg_score desc
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
-        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL)
+        src = _AttrSrc(7)
+        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL).replace(
+            "{_ATTR_SRC}", src.sql
+        )
         expected_params = {
             "genai_0": "p1",
             "genai_1": 100,
@@ -620,6 +679,7 @@ class TestMakeGroupedSpansListQuery:
             "genai_4": "score",
             "genai_5": "score",
             "genai_6": 0.5,
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -668,18 +728,22 @@ class TestMakeGroupedSpansListQuery:
             SELECT s.conversation_id AS conversation_id,
                    {_GROUPED_AGG_TAIL},
                    countIf((mapContains(s.custom_attrs_bool, {genai_3:String})) AND s.custom_attrs_bool[{genai_3:String}] = 1) AS flagged_count
-            FROM spans s
+            FROM {_ATTR_SRC} s
             WHERE s.project_id = {genai_0:String}
             GROUP BY conversation_id
             ORDER BY flagged_count DESC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
-        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL)
+        src = _AttrSrc(4)
+        expected = expected.replace("{_GROUPED_AGG_TAIL}", _GROUPED_AGG_TAIL).replace(
+            "{_ATTR_SRC}", src.sql
+        )
         expected_params = {
             "genai_0": "p1",
             "genai_1": 100,
             "genai_2": 0,
             "genai_3": "flagged",
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -809,7 +873,7 @@ class TestMakeSpanGroupDistributionQueries:
                          tupleElement(spec, 1) AS alias,
                          tupleElement(spec, 4) AS bins,
                          multiIf(tupleElement(spec, 2) = 'custom_attrs_int', toFloat64(s.custom_attrs_int[tupleElement(spec, 3)]), tupleElement(spec, 2) = 'custom_attrs_float', toFloat64(s.custom_attrs_float[tupleElement(spec, 3)]), NULL) AS value
-                  FROM spans s
+                  FROM {_ATTR_SRC} s
                   ARRAY JOIN array(tuple({genai_2:String}, {genai_3:String}, {genai_4:String}, {genai_5:UInt64}), tuple({genai_6:String}, {genai_7:String}, {genai_8:String}, {genai_9:UInt64})) AS spec
                   WHERE s.project_id = {genai_0:String}
                     AND toString(s.conversation_id) IN {genai_1:Array(String)}
@@ -869,6 +933,8 @@ class TestMakeSpanGroupDistributionQueries:
               )
             ORDER BY group_key ASC, alias ASC, bucket_index ASC
         """
+        src = _AttrSrc(10)
+        expected = expected.replace("{_ATTR_SRC}", src.sql)
         expected_params = {
             "genai_0": "p1",
             "genai_1": ["conv-a", "", "12"],
@@ -880,6 +946,7 @@ class TestMakeSpanGroupDistributionQueries:
             "genai_7": "custom_attrs_int",
             "genai_8": "latency",
             "genai_9": 3,
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -919,7 +986,7 @@ class TestMakeSpanGroupDistributionQueries:
                          tupleElement(spec, 1) AS alias,
                          tupleElement(spec, 4) AS top_n,
                          multiIf(tupleElement(spec, 2) = 'custom_attrs_bool', if(s.custom_attrs_bool[tupleElement(spec, 3)] = 1, 'true', 'false'), tupleElement(spec, 2) = 'custom_attrs_string', toString(s.custom_attrs_string[tupleElement(spec, 3)]), '') AS raw_value
-                  FROM spans s
+                  FROM {_ATTR_SRC} s
                   ARRAY JOIN array(tuple({genai_2:String}, {genai_3:String}, {genai_4:String}, {genai_5:UInt64}), tuple({genai_6:String}, {genai_7:String}, {genai_8:String}, {genai_9:UInt64})) AS spec
                   WHERE s.project_id = {genai_0:String}
                     AND toString(s.conversation_id) IN {genai_1:Array(String)}
@@ -951,6 +1018,8 @@ class TestMakeSpanGroupDistributionQueries:
             WHERE value_rank <= top_n
             ORDER BY group_key ASC, alias ASC, count DESC, raw_value ASC
         """
+        src = _AttrSrc(10)
+        expected = expected.replace("{_ATTR_SRC}", src.sql)
         expected_params = {
             "genai_0": "p1",
             "genai_1": ["conv-a"],
@@ -962,6 +1031,7 @@ class TestMakeSpanGroupDistributionQueries:
             "genai_7": "custom_attrs_bool",
             "genai_8": "cached",
             "genai_9": 2,
+            **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
@@ -1053,18 +1123,20 @@ class TestMakeTraceDetailSpansQuery:
         pb = ParamBuilder("genai")
         query = make_trace_detail_spans_query(pb, "p1", "t1")
 
+        # Always cost-augmented (the chat/detail views render per-message and
+        # per-trace cost). Compose the expected cost source from the same
+        # helper so the snapshot stays exact without copying the price-JOIN SQL.
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project filter
+        expected_pb.add("t1", param_type="String")  # genai_1: trace filter
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {CHAT_VIEW_COLS} FROM spans s
+            SELECT {CHAT_VIEW_COLS}, {SPANS_COST_COLS} FROM {source} s
             WHERE s.project_id = {{genai_0:String}}
             AND s.trace_id = {{genai_1:String}}
             ORDER BY s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "t1"},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
 
 # ============================================================================
@@ -1473,9 +1545,17 @@ class TestMakeConversationChatSpansQuery:
             AgentConversationChatReq(project_id="p1", conversation_id="c1"),
         )
 
+        # Always cost-augmented (per-message + per-turn cost in the multi-turn
+        # chat view). Compose the expected cost source from the same helper.
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project
+        expected_pb.add("c1", param_type="String")  # genai_1: conversation
+        expected_pb.add(50, param_type="UInt64")  # genai_2: limit (default)
+        expected_pb.add(0, param_type="UInt64")  # genai_3: offset
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
-            FROM spans s
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
@@ -1488,12 +1568,7 @@ class TestMakeConversationChatSpansQuery:
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "c1", "genai_2": 50, "genai_3": 0},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
     def test_with_pagination(self) -> None:
         pb = ParamBuilder("genai")
@@ -1504,9 +1579,15 @@ class TestMakeConversationChatSpansQuery:
             ),
         )
 
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: project
+        expected_pb.add("c1", param_type="String")  # genai_1: conversation
+        expected_pb.add(10, param_type="UInt64")  # genai_2: limit
+        expected_pb.add(20, param_type="UInt64")  # genai_3: offset
+        source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {", ".join(f"s.{c} AS {c}" for c in CHAT_VIEW_COLS.split(", "))}
-            FROM spans s
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
             INNER JOIN (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
@@ -1519,12 +1600,7 @@ class TestMakeConversationChatSpansQuery:
             WHERE s.project_id = {{genai_0:String}}
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
-        assert_sql(
-            expected,
-            {"genai_0": "p1", "genai_1": "c1", "genai_2": 10, "genai_3": 20},
-            query,
-            pb.get_params(),
-        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
     def test_limit_rejected_above_max_turns(self) -> None:
         with pytest.raises(ValidationError):

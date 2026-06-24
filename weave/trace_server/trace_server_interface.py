@@ -3228,6 +3228,14 @@ class EvalResultsEvaluationSummary(BaseModel):
     evaluation_call_id: str
     trial_count: int = 0
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+    predict_total_tokens: int | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only token usage for this evaluation "
+            "(the model's predict() tokens only, excluding LLM-as-a-judge "
+            "scorer usage); None when no trial reports usage."
+        ),
+    )
     evaluation_ref: str | None = None
     model_ref: str | None = None
     display_name: str | None = None

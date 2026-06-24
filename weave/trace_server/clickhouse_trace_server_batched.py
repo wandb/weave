@@ -59,6 +59,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
 from weave.trace_server.agents.completion_spans import build_completion_span
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -6513,18 +6514,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return CompletionPrepResult(initial_messages, completion_model_info)
 
-    def _log_completion_call(
+    def _build_completion_call_span(
         self,
         req: tsi.CompletionsCreateReq,
         prep: "CompletionPrepResult",
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
-    ) -> tsi.CompletionsCreateRes:
-        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
-        if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+    ) -> "BuiltCompletionSpan":
+        """Build the traced-call span and result without inserting it.
 
+        Split out from `_log_completion_call` so callers that score many calls
+        can batch the span write via `AgentWriteHandler.insert_spans`.
+        """
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         req.inputs.messages = prep.initial_messages
@@ -6553,17 +6555,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             error=error,
             source=req.source,
         )
-        AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
-            span
-        )
-
-        return tsi.CompletionsCreateRes(
+        result = tsi.CompletionsCreateRes(
             response=res.response,
             weave_call_id=span_id,
             span_id=span_id,
             trace_id=trace_id,
             conversation_id=conversation_id,
         )
+        return BuiltCompletionSpan(span=span, result=result)
+
+    def _log_completion_call(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: "CompletionPrepResult",
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+
+        built = self._build_completion_call_span(req, prep, res, start_time, end_time)
+        AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
+            built.span
+        )
+        return built.result
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -7804,6 +7821,16 @@ class CompletionPrepResult(NamedTuple):
 
     initial_messages: list[dict[str, Any]]
     completion_model_info: CompletionModelInfo
+
+
+class BuiltCompletionSpan(NamedTuple):
+    """Output of `_build_completion_call_span`: the span to write + the call result.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    span: AgentSpanCHInsertable
+    result: tsi.CompletionsCreateRes
 
 
 def _setup_completion_model_info(
