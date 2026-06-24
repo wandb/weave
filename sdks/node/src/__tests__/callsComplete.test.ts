@@ -272,3 +272,49 @@ describe('automatic upgrade to calls_complete', () => {
     expect(calls[0].output).toBe(101);
   });
 });
+
+describe('send error handling', () => {
+  let traceServer: InMemoryTraceServer;
+
+  beforeEach(() => {
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(projectId, traceServer);
+  });
+
+  test('a non-retryable 4xx drops the batch instead of retrying forever', async () => {
+    const requestSpy = jest
+      .spyOn(traceServer, 'request')
+      .mockRejectedValue({status: 400, error: {detail: 'invalid uuid'}});
+
+    const bad = op(function bad(x: number) {
+      return x;
+    });
+    await bad(1);
+    await client().waitForBatchProcessing();
+
+    // One attempt, then dropped: no requeue storm, no process.exit.
+    expect(requestSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('a retryable 5xx requeues and the call eventually lands', async () => {
+    const real = traceServer.request.bind(traceServer);
+    let attempts = 0;
+    jest.spyOn(traceServer, 'request').mockImplementation(async params => {
+      attempts++;
+      if (attempts === 1) {
+        throw {status: 503};
+      }
+      return real(params);
+    });
+
+    const flaky = op(function flaky(x: number) {
+      return x * 2;
+    });
+    await flaky(5);
+    await client().waitForBatchProcessing();
+
+    expect(attempts).toBeGreaterThanOrEqual(2);
+    const calls = await traceServer.getCalls(projectId);
+    expect(calls.find(c => c.op_name.includes('flaky'))?.output).toBe(10);
+  });
+});

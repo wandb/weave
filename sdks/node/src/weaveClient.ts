@@ -624,6 +624,14 @@ export class WeaveClient {
       // the failed legacy items instead of dropping them back as-is.
       if (!this.useCallsComplete && isCallsCompleteModeError(error)) {
         this.upgradeToCallsComplete(batchToProcess);
+      } else if (!isRetryableError(error)) {
+        // Non-retryable (4xx): drop these items so one rejected call can't
+        // wedge the queue and crash the process.
+        console.error('Dropping batch (non-retryable error):', error);
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Dropping ${batchToProcess.length} items (non-retryable): ${error}\n`
+        );
       } else {
         console.error('Error processing batch:', error);
         this.errorCount++;
@@ -1714,6 +1722,15 @@ function isCallsCompleteModeError(error: unknown): boolean {
   return (
     (body as {error_code?: unknown}).error_code === CALLS_COMPLETE_MODE_REQUIRED
   );
+}
+
+// Network/unknown and 5xx/408/429 are retryable; other 4xx are permanent.
+function isRetryableError(error: unknown): boolean {
+  const status = (error as {status?: unknown} | null)?.status;
+  if (typeof status !== 'number') {
+    return true;
+  }
+  return status === 408 || status === 429 || status >= 500;
 }
 
 /**
