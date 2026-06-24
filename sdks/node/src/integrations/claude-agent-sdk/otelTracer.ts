@@ -142,6 +142,9 @@ function toolResultText(content: ToolResultBlock['content']): string {
  * Map one model's SDK usage object to the scalar `gen_ai.usage.*` span
  * attributes. {@link toWeaveUsage} normalizes both the camelCase per-model
  * `modelUsage` values and the snake_case aggregate `usage`.
+ *
+ * `input_tokens` is emitted as the FULL prompt — fresh + cache-read +
+ * cache-creation — see the folding note below.
  */
 function usageAttributes(
   rawUsage: Record<string, unknown>
@@ -150,10 +153,25 @@ function usageAttributes(
   const attrs: Record<string, number> = {};
   // toWeaveUsage returns the typed WeaveUsage shape, so each field is already
   // `number | undefined` — a nullish check is enough (and keeps a real 0).
-  const input = usage.input_tokens;
+  const freshInput = usage.input_tokens;
   const output = usage.output_tokens;
   const cacheRead = usage.cache_read_input_tokens;
   const cacheCreation = usage.cache_creation_input_tokens;
+
+  // Anthropic reports `input_tokens` disjoint from the cache counts (fresh,
+  // uncached tokens only). Weave's canonical convention — matching OpenAI and
+  // the trace server's cost formula
+  // `(input_tokens - cache_read - cache_creation) * prompt_cost` — is that
+  // `input_tokens` is the FULL prompt, with cache_read/cache_creation as subsets
+  // of it. Fold the cache counts in so this integration's usage is comparable
+  // across providers: per-token cost stays correct and the cache-hit-rate
+  // denominator (`cache_read / input_tokens`) lands in [0, 1] instead of blowing
+  // up when the cached share dwarfs the fresh tokens.
+  const input =
+    freshInput != null
+      ? freshInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
+      : undefined;
+
   if (input != null) {
     attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = input;
   }

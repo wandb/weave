@@ -15,6 +15,7 @@ import {
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
@@ -147,12 +148,14 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(usageChat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
     expect(usageChat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(usageChat.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBe('claude-x');
-    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(10);
+    // input_tokens is the FULL prompt: fresh (10) + cache_read (3) folded in.
+    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(13);
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(5);
     expect(
       usageChat.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
     ).toBe(3);
-    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(15);
+    // total_tokens = inclusive input (13) + output (5).
+    expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(18);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe(
       'claude_agent_sdk'
@@ -196,6 +199,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
           inputTokens: 20,
           outputTokens: 8,
           cacheReadInputTokens: 5,
+          cacheCreationInputTokens: 3,
         },
       },
     } as any);
@@ -224,10 +228,18 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const haiku = spans.find(
       s => s.attributes[ATTR_GEN_AI_RESPONSE_MODEL] === 'claude-haiku'
     )!;
-    expect(haiku.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(20);
+    // input_tokens is the FULL prompt: Anthropic's disjoint fresh (20) +
+    // cache_read (5) + cache_creation (3) folded in, so it's comparable to
+    // OpenAI's already-inclusive input_tokens and the server's cost formula
+    // `(input - cache_read - cache_creation) * price` recovers the fresh 20.
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(28);
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(8);
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(5);
-    expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(28);
+    expect(
+      haiku.attributes[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+    ).toBe(3);
+    // total_tokens = inclusive input (28) + output (8).
+    expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(36);
     expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
   });
 
