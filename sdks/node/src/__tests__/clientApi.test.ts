@@ -3,6 +3,7 @@ import {getWandbConfigs} from '../wandb/settings';
 import {WandbServerApi} from '../wandb/wandbServerApi';
 import {Api as TraceServerApi} from '../generated/traceServerApi';
 import {Netrc} from '../utils/netrc';
+import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from '../constants';
 
 jest.mock('../wandb/wandbServerApi');
 jest.mock('../wandb/settings');
@@ -74,6 +75,20 @@ describe('Client API', () => {
         'mock-api-key'
       );
       expect(gottenClient.projectId).toBe('custom-entity/test-project');
+    });
+
+    test('sends the client-capability header on the ingest client', async () => {
+      await init('test-project');
+
+      expect(TraceServerApi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          baseApiParams: expect.objectContaining({
+            headers: expect.objectContaining({
+              [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
+            }),
+          }),
+        })
+      );
     });
   });
 
