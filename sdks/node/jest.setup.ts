@@ -1,4 +1,4 @@
-const path = require('path');
+import path from 'path';
 
 const liveTestTimeout = 20000; // 20 seconds
 

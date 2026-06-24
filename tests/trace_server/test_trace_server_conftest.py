@@ -43,6 +43,7 @@ KNOWN_SERVER_ATTRS = frozenset(
         "_table_routing_resolver",
         "_thread_local",
         "_use_async_insert",
+        "_use_replicated_tables",
         "_user",
     }
 )

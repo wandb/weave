@@ -56,6 +56,9 @@ from weave.trace_server.agents.types import (
     AgentSpansQueryRes,
 )
 from weave.trace_server.call_stats_helpers import validate_call_stats_range
+from weave.trace_server.calls_query_builder.monitor_query_validation import (
+    validate_monitor_query_fields,
+)
 from weave.trace_server.calls_query_builder.stats_query_base import (
     GRANULARITY_1H,
     auto_select_granularity_seconds,
@@ -81,7 +84,9 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     ObjectNameTypeCollision,
+    RefObjectsNotFoundError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -2806,6 +2811,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             actual=digest,
             label=f"obj {req.obj.object_id!r}",
         )
+        validate_monitor_query_fields(
+            digest_result.base_object_class,
+            digest_result.leaf_object_class,
+            processed_val,
+        )
         project_id, object_id, wb_user_id = (
             req.obj.project_id,
             req.obj.object_id,
@@ -3539,8 +3549,35 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             raise ValueError("Call refs not supported")
         parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
+        # Mirror ClickHouse: surface every missing base-object digest together
+        # rather than failing on the first. A soft-deleted object is found (it
+        # reads back as None), not missing.
+        missing_digests = sorted(
+            {r.version for r in parsed_obj_refs if not self._obj_ref_target_exists(r)}
+        )
+        if missing_digests:
+            raise RefObjectsNotFoundError(
+                f"Ref read contains {len(parsed_obj_refs)} refs; "
+                f"missing object digests: {missing_digests}",
+                missing_digests,
+            )
+
         return tsi.RefsReadBatchRes(
             vals=[self._read_internal_obj_ref(r) for r in parsed_obj_refs]
+        )
+
+    def _obj_ref_target_exists(self, r: ri.InternalObjectRef) -> bool:
+        """Whether the ref's base object exists (including soft-deleted), matching
+        _read_internal_obj_ref's lookup; a deleted object is found (reads as None).
+        """
+        return bool(
+            self._select_objs(
+                r.project_id,
+                predicate=lambda rec: (
+                    rec.object_id == r.name and rec.digest == r.version
+                ),
+                include_deleted=True,
+            )
         )
 
     def _read_internal_obj_ref(self, r: ri.InternalObjectRef) -> Any:
@@ -7154,11 +7191,14 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
             lhs = process_operand(input_operand)
             rhs = process_operand(operation.contains_.substr)
             if isinstance(rhs, (bool, int, float)):
-                # ClickHouse position() rejects non-string needles; surface
-                # the same driver error the real backend produces.
+                # Reproduce ClickHouse's position() type error, then convert it
+                # the same way the real backend's _query path does.
                 type_name = "Int64" if isinstance(rhs, int) else "Float64"
-                raise DatabaseError(
-                    f"Illegal type {type_name} of argument of function position"
+                handle_clickhouse_query_error(
+                    DatabaseError(
+                        f"Illegal type {type_name} of argument of function "
+                        "position (ILLEGAL_TYPE_OF_ARGUMENT)"
+                    )
                 )
             return _ch_position(lhs, rhs, bool(operation.contains_.case_insensitive))
         else:

@@ -94,10 +94,11 @@ function otelSpanName(span: Span<SpanData>): string {
     case 'generation':
       return `chat ${span.spanData.model ?? ''}`.trimEnd();
 
-    case 'handoff':
+    case 'handoff': {
       const from = span.spanData.from_agent || '?';
       const to = span.spanData.to_agent || '?';
       return `handoff ${from} -> ${to}`;
+    }
 
     case 'guardrail':
       return `guardrail ${span.spanData.name}`.trimEnd();
@@ -114,15 +115,17 @@ function otelSpanName(span: Span<SpanData>): string {
     case 'mcp_tools':
       return 'mcp_list_tools';
 
-    case 'custom':
+    case 'custom': {
       const name = span.spanData.name ?? '';
       return name || 'custom';
+    }
 
-    default:
+    default: {
       const spanData = span.spanData as {type: string; name?: string};
       return spanData.name
         ? `${spanData.type} ${spanData.name}`
         : spanData.type;
+    }
   }
 }
 

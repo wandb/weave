@@ -263,6 +263,25 @@ def _make_field_resolver(
     return partial(resolve_eval_field_to_sql, evaluation_call_id=evaluation_call_id)
 
 
+def _sort_numeric_scalar(
+    field_path: str,
+    pb: ParamBuilder,
+    evaluation_call_id: str | None,
+) -> str:
+    """Return a single numeric scalar for a field (no direction, no multi-term).
+
+    Safe to embed inside greatest()/least() for difference-mode sorting. Scores
+    carry their bool coercion via _build_json_field_inner; inputs/output are
+    coerced to float here so numeric values sort numerically rather than
+    lexicographically. (Only ever called for scores/inputs/output fields --
+    difference mode never targets row_digest.)
+    """
+    inner, _ = _build_json_field_inner(field_path, pb, evaluation_call_id)
+    if field_path.startswith("scores."):
+        return _score_sort_numeric(inner)
+    return f"toFloat64OrNull(any({inner}))"
+
+
 def build_sort_expression(
     sort_by: list[tsi.EvalResultsSortBy] | None,
     eval_root_ids: list[str],
@@ -280,10 +299,11 @@ def build_sort_expression(
     for s in sort_by:
         direction = "DESC" if s.direction == "desc" else "ASC"
         if s.mode == "difference" and len(eval_root_ids) > 1:
-            expr = _build_difference_sort(s.field, eval_root_ids, pb)
+            parts.append(_build_difference_sort(s.field, eval_root_ids, pb, direction))
         else:
-            expr = _build_sort_aggregate(s.field, pb, s.evaluation_call_id)
-        parts.append(f"{expr} {direction}")
+            parts.append(
+                _build_sort_aggregate(s.field, pb, s.evaluation_call_id, direction)
+            )
 
     parts.append("row_digest ASC")
     return ", ".join(parts)
@@ -293,31 +313,46 @@ def _build_sort_aggregate(
     field_path: str,
     pb: ParamBuilder,
     evaluation_call_id: str | None,
+    direction: str,
 ) -> str:
-    """Build the per-field sort expression, applying the right aggregate.
+    """Build the per-field ORDER BY fragment, including its direction(s).
 
-    Scores get numeric avg (with bool coercion); other fields get any().
-    row_digest is used bare (it's the GROUP BY key).
+    - row_digest: bare GROUP BY key.
+    - scores.*: numeric avg (with bool coercion), single term.
+    - inputs.*/output.*: a three-term existence -> numeric -> string fallback,
+      mirroring OrderField in the calls query
+      (calls_query_builder._build_standard_order_sql). The existence term is
+      fixed DESC so rows with a numeric value precede NULL/text rows in BOTH
+      sort directions -- ClickHouse places NULLs first on DESC by default and
+      these builders use no explicit NULLS clauses. The numeric term sorts
+      numeric values; the string term orders the remaining (text) rows.
     """
     inner, _ = _build_json_field_inner(field_path, pb, evaluation_call_id)
     if field_path == "row_digest":
-        return inner
+        return f"{inner} {direction}"
     if field_path.startswith("scores."):
-        return _score_sort_numeric(inner)
-    return f"any({inner})"
+        return f"{_score_sort_numeric(inner)} {direction}"
+    numeric = f"toFloat64OrNull(any({inner}))"
+    string = f"any({inner})"
+    return f"({numeric} IS NOT NULL) DESC, {numeric} {direction}, {string} {direction}"
 
 
 def _build_difference_sort(
     field_path: str,
     eval_root_ids: list[str],
     pb: ParamBuilder,
+    direction: str,
 ) -> str:
-    """Build greatest(...) - least(...) expression for difference mode sorting."""
+    """Build greatest(...) - least(...) expression for difference mode sorting.
+
+    Uses the numeric scalar per eval so the subtraction is numeric; sorting an
+    output column in difference mode previously subtracted raw strings.
+    """
     per_eval_exprs: list[str] = []
     for eval_id in eval_root_ids:
-        per_eval_exprs.append(_build_sort_aggregate(field_path, pb, eval_id))
+        per_eval_exprs.append(_sort_numeric_scalar(field_path, pb, eval_id))
     joined = ", ".join(per_eval_exprs)
-    return f"greatest({joined}) - least({joined})"
+    return f"greatest({joined}) - least({joined}) {direction}"
 
 
 def _build_having_clause(

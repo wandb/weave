@@ -44,7 +44,7 @@ export async function login(apiKey: string, host?: string) {
   });
   try {
     await testTraceServerApi.health.readRootHealthGet({});
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
     );
@@ -58,7 +58,7 @@ export async function login(apiKey: string, host?: string) {
       netrc.save();
       console.log(`Successfully logged in. Credentials saved for ${host}`);
     }
-  } catch (error) {
+  } catch (_error) {
     // Log warning but don't fail - the API key can still be used from environment
     console.warn(
       'Could not save credentials to netrc file. You may need to set WANDB_API_KEY environment variable for future sessions.'
