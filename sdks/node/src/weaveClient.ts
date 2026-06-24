@@ -328,6 +328,9 @@ export class WeaveClient {
   private pendingEnds: Map<string, CallEndParams> = new Map();
   private eagerCallIds: Set<string> = new Set();
   private useCallsComplete: boolean;
+  // Set after exhausting retries: tracing gives up gracefully rather than
+  // killing the host process.
+  private tracingDisabled = false;
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -531,6 +534,7 @@ export class WeaveClient {
   }
 
   private scheduleBatchProcessing() {
+    if (this.tracingDisabled) return;
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
     const promise = new Promise<void>(resolve => {
       this.batchProcessTimeout = setTimeout(
@@ -573,7 +577,11 @@ export class WeaveClient {
   }
 
   private async processBatch() {
-    if (this.isBatchProcessing || this.callQueue.length === 0) {
+    if (
+      this.tracingDisabled ||
+      this.isBatchProcessing ||
+      this.callQueue.length === 0
+    ) {
       this.batchProcessTimeout = null;
       return;
     }
@@ -643,10 +651,18 @@ export class WeaveClient {
         // Put failed items back at the front of the queue
         this.callQueue.unshift(...batchToProcess);
 
-        // Exit if we have too many errors
+        // Give up gracefully after too many errors. An SDK must never kill the
+        // host process; disable tracing and let the program continue. Buffered
+        // calls that could not be sent are dropped (the server is unreachable).
         if (this.errorCount > this.MAX_ERRORS) {
-          console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
-          process.exit(1);
+          console.error(
+            `Weave: exceeded ${this.MAX_ERRORS} consecutive send errors; ` +
+              `disabling tracing for this process. Buffered calls may be lost.`
+          );
+          this.tracingDisabled = true;
+          this.callQueue = [];
+          this.pendingStarts.clear();
+          this.pendingEnds.clear();
         }
       }
     } finally {
@@ -680,6 +696,8 @@ export class WeaveClient {
       return;
     }
 
+    // Completes are one request (all-or-nothing); a failure propagates to the
+    // caller's retry/drop handling.
     const completes: CompletedCallParams[] = [];
     for (const item of batch) {
       if (item.mode === 'complete') {
@@ -689,11 +707,28 @@ export class WeaveClient {
     if (completes.length > 0) {
       await this.sendCallsComplete(completes);
     }
+    // Eager start/end items are sent individually and isolated per item: a
+    // non-retryable failure drops just that item; a retryable one requeues it.
     for (const item of batch) {
-      if (item.mode === 'start') {
-        await this.sendCallStartV2(item.data.start);
-      } else if (item.mode === 'end') {
-        await this.sendCallEndV2(item.data.end);
+      if (item.mode !== 'start' && item.mode !== 'end') {
+        continue;
+      }
+      try {
+        if (item.mode === 'start') {
+          await this.sendCallStartV2(item.data.start);
+        } else {
+          await this.sendCallEndV2(item.data.end);
+        }
+      } catch (error) {
+        if (isRetryableError(error)) {
+          this.callQueue.unshift(item);
+        } else {
+          console.error('Dropping eager call (non-retryable error):', error);
+          fs.appendFileSync(
+            WEAVE_ERRORS_LOG_FNAME,
+            `Dropping eager ${item.mode} (non-retryable): ${error}\n`
+          );
+        }
       }
     }
   }
@@ -719,10 +754,13 @@ export class WeaveClient {
   }
 
   private async sendCallEndV2(end: CallEndParams) {
+    // The v2 end schema has no display_name (post-start renames go via
+    // updateCall, matching the Python client); strip it before sending.
+    const {display_name: _displayName, ...endReq} = end;
     await this.traceServerApi.request({
       path: `/v2/${this.projectId}/call/end`,
       method: 'POST',
-      body: {end},
+      body: {end: endReq},
       type: ContentType.Json,
       format: 'json',
     });
@@ -1333,6 +1371,7 @@ export class WeaveClient {
     callStart: CallStartParams,
     opts: {eager?: boolean} = {}
   ) {
+    if (this.tracingDisabled) return;
     const callId = callStart.id;
     if (!this.useCallsComplete || callId == null) {
       this.callQueue.push({mode: 'start', data: {start: callStart}});
@@ -1368,6 +1407,7 @@ export class WeaveClient {
   }
 
   public saveCallEnd(callEnd: CallEndParams) {
+    if (this.tracingDisabled) return;
     const callId = callEnd.id;
     if (!this.useCallsComplete) {
       this.callQueue.push({mode: 'end', data: {end: callEnd}});
@@ -1698,16 +1738,15 @@ function mergeToComplete(
       'Cannot create complete call: start missing id or trace_id'
     );
   }
+  // Spread both so any field added to the end payload flows through without
+  // editing this function; the start is authoritative for the identity/timing
+  // fields the two share.
   return {
     ...start,
+    ...end,
     id: start.id,
     trace_id: start.trace_id,
-    display_name: end.display_name ?? start.display_name,
-    ended_at: end.ended_at,
-    output: end.output,
-    summary: end.summary,
-    exception: end.exception ?? null,
-    wb_run_step_end: end.wb_run_step_end ?? null,
+    started_at: start.started_at,
   };
 }
 

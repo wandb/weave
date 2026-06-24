@@ -53,7 +53,7 @@ describe('calls_complete pairing (default path)', () => {
     expect(call.output).toBe(42);
     expect(call.started_at).toBeDefined();
     expect(call.ended_at).toBeDefined();
-    expect(call.exception).toBeNull();
+    expect(call.exception ?? null).toBeNull();
 
     // Exactly one complete write, and nothing on the legacy path.
     expect(pathsHit(requestSpy)).toEqual([`/v2/${projectId}/calls/complete`]);
@@ -314,5 +314,35 @@ describe('send error handling', () => {
     expect(attempts).toBeGreaterThanOrEqual(2);
     const calls = await traceServer.getCalls(projectId);
     expect(calls.find(c => c.op_name.includes('flaky'))?.output).toBe(10);
+  });
+
+  test('gives up gracefully after sustained errors without killing the process', async () => {
+    jest.spyOn(traceServer, 'request').mockRejectedValue({status: 503});
+    const c = client();
+    (c as unknown as {BATCH_INTERVAL: number}).BATCH_INTERVAL = 1;
+
+    const doomed = op(function doomed(x: number) {
+      return x;
+    });
+    await doomed(1);
+    await c.waitForBatchProcessing();
+
+    // Tracing disabled (not process.exit); the test process is still running.
+    expect((c as unknown as {tracingDisabled: boolean}).tracingDisabled).toBe(
+      true
+    );
+    // Further calls are no-ops rather than growing the queue unbounded.
+    const queue = c as unknown as {callQueue: unknown[]};
+    const before = queue.callQueue.length;
+    c.saveCallStart({
+      project_id: projectId,
+      id: 'after-disable',
+      trace_id: 'trace-after',
+      op_name: 'weave:///x/op/o:1',
+      started_at: new Date().toISOString(),
+      attributes: {},
+      inputs: {},
+    });
+    expect(queue.callQueue.length).toBe(before);
   });
 });
