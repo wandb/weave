@@ -2377,9 +2377,14 @@ def test_aggregated_data_size_field():
 
     # Test SQL generation
     sql = field.as_select_sql(pb, "calls_merged")
-    assert "CASE" in sql
-    assert "parent_id" in sql
-    assert "rolled_up_cms.total_storage_size_bytes" in sql
+    assert sql == (
+        "\n            CASE\n"
+        "                WHEN any(calls_merged.parent_id) IS NULL\n"
+        "                THEN any(rolled_up_cms.total_storage_size_bytes)\n"
+        "                ELSE NULL\n"
+        "            END\n"
+        "             AS total_storage_size_bytes"
+    )
 
 
 def test_datetime_optimization_simple() -> None:
@@ -4782,12 +4787,25 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
         project_id="project",
         include_total_storage_size=True,
     )
-    query, _columns, settings = build_calls_stats_query(
+    _query, _columns, settings = build_calls_stats_query(
         req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
     )
     assert settings == {}
-    assert "LIMIT" not in query
-    assert "toUInt8(0) AS has_more" in query
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+               toUInt8(0) AS has_more,
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
+                           FROM calls_merged_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
 
 
 # ---------------------------------------------------------------------------
