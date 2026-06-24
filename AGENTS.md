@@ -104,9 +104,8 @@ when membership in a collection is genuinely the contract under test.
 ❌ **Never do this:**
 
 ```python
-assert "short memo" in msg                 # substring of a serialized blob
-assert "error" in str(response)
-assert "note" in feedback.payload          # key-presence instead of value
+assert "short memo" in msg                 # substring of a serialized payload
+assert "abc123" in str(call.output)        # stringified payload, not the value
 ```
 
 ✅ **Always do this:**
@@ -119,6 +118,18 @@ assert feedback.payload["note"] == "short memo"                   # exact field
 If you only care about one field, pin that field with `==`; if you care about
 the shape, compare the whole dict/object. The same rule applies to SQL: assert
 the complete query string, never `assert "WHERE x" in sql`.
+
+**Substring / membership IS fine in these cases (they are not "payloads"):**
+
+- **Exception messages** (`assert "..." in str(exc.value)`): error text churns
+  and is often partly dynamic. Assert the structured exception fields instead
+  where they exist.
+- **Non-deterministic output**: LLM responses, rendered console/ANSI output, and
+  `op_name`/ref URIs that carry a per-run content digest cannot be pinned exactly.
+- **Key-presence** (`assert "key" in some_dict`): out of scope. This rule is
+  about asserting the value or the whole object, not key existence.
+- **Collection membership** that is genuinely the contract (`assert x in [A, B]`,
+  `assert returned_id in ids`).
 
 ### VCR + ClickHouse isolation (integration tests)
 
