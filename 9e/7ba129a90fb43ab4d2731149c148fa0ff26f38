@@ -201,3 +201,13 @@ with take-theirs conflict resolution per slice.
   jest alone would have missed it; always run typecheck, not just tests.
 - cast-mocks.mjs missed `const tool = {...}` variable mocks (it matched only
   `tool: {`); handled those by hand.
+
+## Slice-06-specific
+This slice's auto-instrument test has a SECOND intentional
+`commonPatchGoogleADK(require('@google/adk'))` (the "consumer breaks early"
+test). The cascade did not carry an eslint-disable onto it, so the tip failed
+eslint with no-require-imports on that line while the four lower slices were
+clean. Added `// eslint-disable-next-line @typescript-eslint/no-require-imports`
+above it (mirroring the first require's disable in this file) and amended this
+slice's commit (new SHA). Re-validated: eslint clean, typecheck clean, jest 26
+passing.
