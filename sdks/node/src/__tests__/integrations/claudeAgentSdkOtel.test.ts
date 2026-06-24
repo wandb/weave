@@ -154,7 +154,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toBe(3);
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(15);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
+    expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe(
+      'claude_agent_sdk'
+    );
     expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
 
     const tool = findSpan(spans, 'execute_tool Bash');
