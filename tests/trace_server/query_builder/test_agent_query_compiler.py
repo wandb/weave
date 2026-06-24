@@ -41,22 +41,22 @@ class TestFieldResolution:
         sql, _ = _compile(
             {"$eq": [{"$getField": "gen_ai.agent.name"}, {"$literal": "bot"}]}
         )
-        assert "s.agent_name" in sql
+        assert sql == "(s.agent_name = {genai_0:String})"
 
     def test_semconv_short_form(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "agent.name"}, {"$literal": "bot"}]})
-        assert "s.agent_name" in sql
+        assert sql == "(s.agent_name = {genai_0:String})"
 
     def test_direct_column_name(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "trace_id"}, {"$literal": "t1"}]})
-        assert "s.trace_id" in sql
+        assert sql == "(s.trace_id = {genai_0:String})"
 
     def test_semconv_target_column_by_name(self) -> None:
         # `input_tokens` isn't a semconv key — the canonical key is
         # `weave.usage.input_tokens` — but the column should still resolve
         # because the compiler accepts any column that's a semconv target.
         sql, _ = _compile({"$gt": [{"$getField": "input_tokens"}, {"$literal": 100}]})
-        assert "s.input_tokens" in sql
+        assert sql == "(s.input_tokens > {genai_0:Int64})"
 
     def test_custom_attr_explicit_prefix_string(self) -> None:
         sql, params = _compile(
@@ -105,11 +105,17 @@ class TestFieldResolution:
 
     def test_custom_attr_unprefixed_sibling_float(self) -> None:
         sql, _ = _compile({"$gt": [{"$getField": "latency_ms"}, {"$literal": 1.5}]})
-        assert "s.custom_attrs_float[" in sql
+        assert sql == (
+            "(if(mapContains(s.custom_attrs_float, {genai_0:String}), "
+            "s.custom_attrs_float[{genai_0:String}], NULL) > {genai_1:Float64})"
+        )
 
     def test_custom_attr_unprefixed_sibling_str(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "env"}, {"$literal": "prod"}]})
-        assert "s.custom_attrs_string[" in sql
+        assert sql == (
+            "(if(mapContains(s.custom_attrs_string, {genai_0:String}), "
+            "s.custom_attrs_string[{genai_0:String}], NULL) = {genai_1:String})"
+        )
 
     def test_custom_attr_explicit_prefix_bool(self) -> None:
         sql, params = _compile(
@@ -130,7 +136,10 @@ class TestFieldResolution:
         # Bool sibling -> custom_attrs_bool (not custom_attrs_int, which
         # Python's isinstance(True, int) would suggest if ordering were wrong).
         sql, _ = _compile({"$eq": [{"$getField": "is_cached"}, {"$literal": False}]})
-        assert "s.custom_attrs_bool[" in sql
+        assert sql == (
+            "(if(mapContains(s.custom_attrs_bool, {genai_0:String}), "
+            "s.custom_attrs_bool[{genai_0:String}], NULL) = {genai_1:Bool})"
+        )
 
     def test_custom_attr_rejected_field_vs_field(self) -> None:
         # No literal operand => no sibling hint => rejection.
@@ -181,7 +190,10 @@ class TestOperatorShapes:
                 ]
             }
         )
-        assert " AND " in sql
+        assert (
+            sql
+            == "((s.agent_name = {genai_0:String}) AND (s.input_tokens > {genai_1:Int64}))"
+        )
 
     def test_or_joins_with_or(self) -> None:
         sql, _ = _compile(
@@ -192,7 +204,10 @@ class TestOperatorShapes:
                 ]
             }
         )
-        assert " OR " in sql
+        assert (
+            sql
+            == "((s.agent_name = {genai_0:String}) OR (s.agent_name = {genai_1:String}))"
+        )
 
     def test_in_with_literal_list(self) -> None:
         sql, params = _compile(
@@ -203,7 +218,7 @@ class TestOperatorShapes:
                 ]
             }
         )
-        assert "s.status_code IN (" in sql
+        assert sql == "(s.status_code IN ({genai_0:String}, {genai_1:String}))"
         assert params == {"genai_0": "OK", "genai_1": "ERROR"}
 
     def test_rejects_null_non_eq_comparison(self) -> None:
@@ -242,8 +257,7 @@ class TestOperatorShapes:
                 }
             }
         )
-        assert "position(s.reasoning_content, " in sql
-        assert sql.endswith(") > 0")
+        assert sql == "position(s.reasoning_content, {genai_0:String}) > 0"
 
     def test_contains_case_insensitive(self) -> None:
         sql, _ = _compile(
@@ -255,7 +269,9 @@ class TestOperatorShapes:
                 }
             }
         )
-        assert "positionCaseInsensitive(" in sql
+        assert (
+            sql == "positionCaseInsensitive(s.reasoning_content, {genai_0:String}) > 0"
+        )
 
     def test_convert_forces_custom_attr_map(self) -> None:
         # ``to: "int"`` on a custom_attrs_string field routes to custom_attrs_int
@@ -273,5 +289,8 @@ class TestOperatorShapes:
                 ]
             }
         )
-        assert "toInt64OrNull(if(mapContains(s.custom_attrs_int" in sql
+        assert sql == (
+            "(toInt64OrNull(if(mapContains(s.custom_attrs_int, {genai_0:String}), "
+            "s.custom_attrs_int[{genai_0:String}], NULL)) > {genai_1:Int64})"
+        )
         assert params["genai_0"] == "retries"
