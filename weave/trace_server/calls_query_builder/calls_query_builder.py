@@ -3568,13 +3568,32 @@ def build_calls_complete_delete_query(
     table_name: str,
     project_id_param: str,
     call_ids_param: str,
+    started_at_min_param: str | None = None,
+    started_at_max_param: str | None = None,
     cluster_name: str | None = None,
 ) -> str:
-    """Build the calls_complete DELETE query for call end data."""
+    """Build the calls_complete DELETE query for call end data.
+
+    When started_at bounds are given they bracket the partition key
+    (PARTITION BY toYYYYMM(started_at)) and primary key prefix
+    (project_id, started_at, id), so the delete prunes partitions instead of
+    scanning every one. Bounds are Int64 microseconds since epoch.
+    """
     formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    conditions = [f"project_id = {{{project_id_param}:String}}"]
+    if started_at_min_param is not None:
+        conditions.append(
+            f"started_at >= fromUnixTimestamp64Micro({{{started_at_min_param}:Int64}}, 'UTC')"
+        )
+    if started_at_max_param is not None:
+        conditions.append(
+            f"started_at <= fromUnixTimestamp64Micro({{{started_at_max_param}:Int64}}, 'UTC')"
+        )
+    conditions.append(f"id IN {{{call_ids_param}:Array(String)}}")
+    where_clause = " AND ".join(conditions)
     raw_sql = f"""
         DELETE FROM {formatted_table}
-        WHERE project_id = {{{project_id_param}:String}} AND id IN {{{call_ids_param}:Array(String)}}
+        WHERE {where_clause}
         """
     return safely_format_sql(raw_sql, logger)
 
