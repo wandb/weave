@@ -58,4 +58,6 @@ def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
 def agent_conversation_path(
     entity_name: str, project_name: str, conversation_id: str
 ) -> str:
-    return f"{project_weave_root_url(entity_name, project_name)}/agents/conversations/{quote(conversation_id)}"
+    project_root_url = project_weave_root_url(entity_name, project_name)
+    quoted_conversation_id = quote(conversation_id)
+    return f"{project_root_url}/agents/conversations/{quoted_conversation_id}"

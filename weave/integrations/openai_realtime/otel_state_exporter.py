@@ -59,7 +59,9 @@ from weave.session.types import (
     Usage,
 )
 from weave.trace import urls
+from weave.trace.api import publish
 from weave.trace.context.weave_client_context import get_weave_client
+from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 
@@ -185,12 +187,9 @@ class OTelStateExporter(StateExporter):
         Returns None (and logs) on any failure so a publish error degrades to a
         span without the audio ref rather than dropping the whole span.
         """
-        if not pcm_bytes:
+        if pcm_bytes is None or len(pcm_bytes) == 0:
             return None
         try:
-            from weave.trace.api import publish
-            from weave.type_wrappers.Content.content import Content
-
             content: Content = Content.from_bytes(
                 pcm_to_wav(bytes(pcm_bytes)), mimetype=_AUDIO_MIME_TYPE
             )

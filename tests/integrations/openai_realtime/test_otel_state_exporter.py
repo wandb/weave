@@ -62,12 +62,14 @@ class _FakeRef:
 
 @pytest.fixture
 def fake_publish(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
-    """Stub ``weave.trace.api.publish`` so audio publishing needs no client.
+    """Stub ``publish`` so audio publishing needs no client.
 
-    Returns the list of published Content objects (for assertions) and hands
-    back a deterministic ``weave://`` ref per call.
+    The exporter imports ``publish`` into its own namespace, so patch the name
+    there (where it is looked up) rather than on ``weave.trace.api``. Returns
+    the list of published Content objects (for assertions) and hands back a
+    deterministic ``weave://`` ref per call.
     """
-    from weave.trace import api
+    from weave.integrations.openai_realtime import otel_state_exporter
 
     published: list[Any] = []
 
@@ -75,7 +77,7 @@ def fake_publish(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
         published.append(obj)
         return _FakeRef(f"weave:///entity/proj/object/content:{len(published)}")
 
-    monkeypatch.setattr(api, "publish", _publish)
+    monkeypatch.setattr(otel_state_exporter, "publish", _publish)
     return published
 
 
@@ -190,8 +192,8 @@ def part_types(msgs: list[dict[str, Any]]) -> set[str]:
 
 def test_conversation_manager_selects_exporter_by_flag() -> None:
     """The dispatcher flag picks the destination; legacy path is untouched."""
-    assert isinstance(ConversationManager(use_otel=True).state, OTelStateExporter)
-    legacy = ConversationManager(use_otel=False).state
+    assert isinstance(ConversationManager(use_otel=True).state_exporter, OTelStateExporter)
+    legacy = ConversationManager(use_otel=False).state_exporter
     assert isinstance(legacy, StateExporter)
     assert not isinstance(legacy, OTelStateExporter)
 
