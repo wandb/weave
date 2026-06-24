@@ -457,7 +457,8 @@ def _get_code_deps(
                         json_val = REDACTED_VALUE
                     else:
                         json_val = to_json(var_value, client.project_id, client)
-                        json_val = strip_memory_addresses(json_val)
+                        if isinstance(json_val, str):
+                            json_val = strip_memory_addresses(json_val)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
