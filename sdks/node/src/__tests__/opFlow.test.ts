@@ -4,29 +4,13 @@ import {op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {makeMockOpenAIChat} from './openaiMock';
 
-// Helper function to get calls
-async function getCalls(
-  traceServer: InMemoryTraceServer,
-  projectId: string,
-  limit?: number,
-  filters?: any
-) {
-  return traceServer.calls
-    .callsStreamQueryPost({
-      project_id: projectId,
-      limit,
-      filters,
-    })
-    .then(result => result.calls);
-}
-
 describe('Op Flow', () => {
-  let inMemoryTraceServer: InMemoryTraceServer;
+  let traceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
 
   beforeEach(() => {
-    inMemoryTraceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(testProjectName, inMemoryTraceServer);
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(testProjectName, traceServer);
   });
 
   test('end-to-end op flow', async () => {
@@ -51,7 +35,7 @@ describe('Op Flow', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Fetch the logged calls using the helper function
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
 
     // Assertions
     expect(calls).toHaveLength(6); // 2 outer calls + 4 inner calls
@@ -117,7 +101,7 @@ describe('Op Flow', () => {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Fetch the logged calls using the helper function
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
 
     // Assertions
     expect(calls).toHaveLength(6); // 2 outer calls + 4 inner calls
@@ -188,7 +172,7 @@ describe('Op Flow', () => {
     // Wait for any pending batch processing
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
 
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('customSummaryOp');
@@ -212,7 +196,7 @@ describe('Op Flow', () => {
     // Wait for any pending batch processing
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
 
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('testOpenAIChat');
@@ -289,7 +273,7 @@ describe('Op Flow', () => {
     // Wait for any pending batch processing
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    const calls = await traceServer.getCalls(testProjectName);
 
     expect(calls).toHaveLength(5); // 1 root + 1 mid + 3 leaf calls
 
@@ -350,5 +334,31 @@ describe('Op Flow', () => {
     calls.forEach(call => {
       expect(call.trace_id).toBe(traceId);
     });
+  });
+
+  test('call-end carries the same trace_id as the call-start', async () => {
+    // Inspect the raw upsert batch instead of reading calls back: the in-memory
+    // server merges end fields onto the start record, and the start already
+    // carries trace_id, so a merged read would pass even without the fix.
+    const batchSpy = jest.spyOn(
+      traceServer.call,
+      'callStartBatchCallUpsertBatchPost'
+    );
+
+    const myOp = op((x: number) => x * 2, {name: 'myOp'});
+    await myOp(21);
+
+    await traceServer.waitForPendingOperations();
+
+    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
+    const startItem = items.find(item => item.mode === 'start');
+    const endItem = items.find(item => item.mode === 'end');
+
+    expect(startItem).toBeDefined();
+    expect(endItem).toBeDefined();
+
+    const startTraceId = startItem!.req.start.trace_id;
+    expect(startTraceId).toBeTruthy();
+    expect(endItem!.req.end.trace_id).toBe(startTraceId);
   });
 });

@@ -3,6 +3,7 @@ from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseErro
 from gql.transport.exceptions import TransportServerError
 
 from weave.trace_server.errors import (
+    BadQueryParameterError,
     InvalidFieldError,
     InvalidRequest,
     ObjectNameTypeCollision,
@@ -43,6 +44,23 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
         handle_clickhouse_query_error(exc)
 
     result = handle_server_exception(InvalidRequest(error_msg))
+    assert result.status_code == 400
+
+
+def test_clickhouse_bad_query_parameter_returns_400_with_real_detail() -> None:
+    """A malformed query value is a client error -> 400 (not 403/Forbidden), and the
+    surfaced message must echo the real ClickHouse detail, not a canned example.
+    """
+    error_msg = (
+        "Code: 691. DB::Exception: Value -42 for parameter pb_3 cannot be parsed as "
+        "UInt64: while executing filter. (BAD_QUERY_PARAMETER)"
+    )
+    exc = CHDatabaseError(error_msg)
+
+    with pytest.raises(BadQueryParameterError, match="-42"):
+        handle_clickhouse_query_error(exc)
+
+    result = handle_server_exception(BadQueryParameterError(error_msg))
     assert result.status_code == 400
 
 

@@ -59,6 +59,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
 from weave.trace_server.agents.completion_spans import build_completion_span
 from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
@@ -395,6 +396,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._password = password
         self._database = database
         self._use_async_insert = use_async_insert
+        self._use_replicated_tables = wf_env.wf_clickhouse_replicated()
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._init_lock = threading.Lock()
         self._file_storage_client: FileStorageClient | None = None
@@ -2601,10 +2603,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.base_digest,
             pb=pb,
         )
-        row_digest_result_query = self.ch_client.query(
-            query,
-            parameters=pb.get_params(),
-        )
+        row_digest_result_query = self._query(query, pb.get_params())
 
         if len(row_digest_result_query.result_rows) == 0:
             raise NotFoundError(f"Table {req.project_id}:{req.base_digest} not found")
@@ -2843,7 +2842,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pb=pb,
             )
 
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._query(query, pb.get_params())
 
         tables = [
             ch_table_stats_to_table_stats_schema(row)
@@ -2897,7 +2896,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_files_storage_size=_default_true(req.include_file_storage_size),
             read_table=read_table,
         )
-        query_result = self.ch_client.query(query, parameters=pb.get_params())
+        query_result = self._query(query, pb.get_params())
 
         if len(query_result.result_rows) != 1:
             raise RuntimeError("Unexpected number of results", query_result)
@@ -2934,8 +2933,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         stored_days = (
             RETENTION_DAYS_NO_TTL if req.retention_days is None else req.retention_days
         )
-        insert_with_empty_query_retry(
-            self.ch_client,
+        self._insert(
             "project_ttl_settings",
             data=[
                 [
@@ -2947,8 +2945,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ],
             column_names=["project_id", "retention_days", "updated_at", "updated_by"],
         )
-        # Bypasses self._insert so we record the counter directly.
-        record_db_insert(table="project_ttl_settings", count=1)
         invalidate_ttl_cache(req.project_id)
         return tsi.ProjectTTLSettingsUpdateRes(retention_days=req.retention_days)
 
@@ -3116,7 +3112,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             pb=pb,
         )
 
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
         rows = result.named_results()
 
         try:
@@ -3155,7 +3151,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_id=req.queue_id,
             pb=pb,
         )
-        result = self.ch_client.query(read_query, parameters=pb.get_params())
+        result = self._query(read_query, pb.get_params())
         res = result.named_results()
         try:
             row = next(res)
@@ -3545,9 +3541,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             annotator_id=annotator_id,
             pb=check_pb,
         )
-        check_result = self.ch_client.query(
-            check_query, parameters=check_pb.get_params()
-        )
+        check_result = self._query(check_query, check_pb.get_params())
         current_state = None
         has_record = False
 
@@ -3589,9 +3583,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             queue_item_id=req.item_id,
             pb=existence_pb,
         )
-        item_check_result = self.ch_client.query(
-            item_check_query, parameters=existence_pb.get_params()
-        )
+        item_check_result = self._query(item_check_query, existence_pb.get_params())
         if not list(item_check_result.named_results()):
             raise ValueError(
                 f"Queue item '{req.item_id}' not found in queue '{req.queue_id}'"
@@ -5551,6 +5543,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_offset,
             pb,
             read_table,
+            req.filter_logic_operator,
         )
 
         result = self._query(page_query, pb.get_params())
@@ -6148,9 +6141,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=req.digest,
             pb=pb,
         )
-        query_result = self.ch_client.query(
+        query_result = self._query(
             query,
-            parameters=pb.get_params(),
+            pb.get_params(),
             column_formats={"val_bytes": "bytes"},
         )
 
@@ -6229,7 +6222,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         pb = ParamBuilder()
         query = make_files_stats_query(project_id=req.project_id, pb=pb)
-        result = self.ch_client.query(query, parameters=pb.get_params())
+        result = self._query(query, pb.get_params())
 
         if len(result.result_rows) == 0 or result.result_rows[0][0] is None:
             raise RuntimeError("No results found")
@@ -6301,7 +6294,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare()
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         results = LLM_TOKEN_PRICES_TABLE.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -6398,7 +6391,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare()
-        query_result = self.ch_client.query(prepared.sql, prepared.parameters)
+        query_result = self._query(prepared.sql, prepared.parameters)
         result = TABLE_FEEDBACK.tuples_to_rows(
             query_result.result_rows, prepared.fields
         )
@@ -6521,18 +6514,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return CompletionPrepResult(initial_messages, completion_model_info)
 
-    def _log_completion_call(
+    def _build_completion_call_span(
         self,
         req: tsi.CompletionsCreateReq,
         prep: "CompletionPrepResult",
         res: tsi.CompletionsCreateRes,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
-    ) -> tsi.CompletionsCreateRes:
-        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
-        if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+    ) -> "BuiltCompletionSpan":
+        """Build the traced-call span and result without inserting it.
 
+        Split out from `_log_completion_call` so callers that score many calls
+        can batch the span write via `AgentWriteHandler.insert_spans`.
+        """
         retention_days = get_project_retention_days(req.project_id, self.ch_client)
 
         req.inputs.messages = prep.initial_messages
@@ -6561,15 +6555,32 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             error=error,
             source=req.source,
         )
-        AgentWriteHandler(self.ch_client).insert_span(span)
-
-        return tsi.CompletionsCreateRes(
+        result = tsi.CompletionsCreateRes(
             response=res.response,
             weave_call_id=span_id,
             span_id=span_id,
             trace_id=trace_id,
             conversation_id=conversation_id,
         )
+        return BuiltCompletionSpan(span=span, result=result)
+
+    def _log_completion_call(
+        self,
+        req: tsi.CompletionsCreateReq,
+        prep: "CompletionPrepResult",
+        res: tsi.CompletionsCreateRes,
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ) -> tsi.CompletionsCreateRes:
+        """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
+        if not req.track_llm_call:
+            return tsi.CompletionsCreateRes(response=res.response)
+
+        built = self._build_completion_call_span(req, prep, res, start_time, end_time)
+        AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
+            built.span
+        )
+        return built.result
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -6659,7 +6670,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 retention_days=retention_days,
                 source=req.source,
             )
-            AgentWriteHandler(self.ch_client).insert_span(open_span)
+            AgentWriteHandler(
+                self.ch_client, self._async_insert_settings()
+            ).insert_span(open_span)
 
         req.inputs.messages = combined_messages
         api_inputs = req.inputs.model_copy()
@@ -6701,6 +6714,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=req.wb_user_id or "",
             retention_days=retention_days,
             source=req.source,
+            insert_settings=self._async_insert_settings(),
         )
 
     @tag_db_insert_path("image_create")
@@ -6939,7 +6953,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
-        res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
+        res, span_rows = AgentWriteHandler(
+            self.ch_client, self._async_insert_settings()
+        ).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled
         if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
@@ -7275,6 +7291,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 }
             )
 
+        # Replicated/distributed engines block-dedup byte-identical inserts;
+        # a unique token opts out (non-replicated CH Cloud is unaffected).
+        if self._use_replicated_tables:
+            settings = {**(settings or {}), "insert_deduplication_token": generate_id()}
+
         start = time.monotonic()
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
@@ -7314,6 +7335,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     },
                 )
                 return result
+
+    def _async_insert_settings(self) -> dict[str, Any] | None:
+        """Async insert settings when the server has async inserts enabled, else None."""
+        if not self._use_async_insert:
+            return None
+        return ch_settings.update_settings_for_async_insert()
 
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         self._call_batch.append(ch_call_to_row(ch_call))
@@ -7661,6 +7688,7 @@ def _create_tracked_span_stream_wrapper(
     wb_user_id: str,
     retention_days: int,
     source: str | None = None,
+    insert_settings: dict[str, Any] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Wrap a streaming completion iterator with agent span tracking.
 
@@ -7769,7 +7797,7 @@ def _create_tracked_span_stream_wrapper(
                 error=stream_error,
                 source=source,
             )
-            AgentWriteHandler(ch_client).insert_span(completed_span)
+            AgentWriteHandler(ch_client, insert_settings).insert_span(completed_span)
 
     return _stream_wrapper()
 
@@ -7793,6 +7821,16 @@ class CompletionPrepResult(NamedTuple):
 
     initial_messages: list[dict[str, Any]]
     completion_model_info: CompletionModelInfo
+
+
+class BuiltCompletionSpan(NamedTuple):
+    """Output of `_build_completion_call_span`: the span to write + the call result.
+
+    Named so a future field reorder is a type error, not a silent positional bug.
+    """
+
+    span: AgentSpanCHInsertable
+    result: tsi.CompletionsCreateRes
 
 
 def _setup_completion_model_info(

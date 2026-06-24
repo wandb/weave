@@ -1093,6 +1093,36 @@ def test_insert_retries_empty_query_error():
         assert mock_ch_client.insert.call_count == 2  # Retried once
 
 
+def test_insert_deduplication_token_gated_on_replicated():
+    """Replicated/distributed inserts carry a unique dedup-opt-out token; non-replicated is untouched."""
+
+    def capture_settings(replicated: bool) -> list[dict]:
+        mock_client = MagicMock()
+        with (
+            patch(
+                "weave.trace_server.environment.wf_clickhouse_replicated",
+                return_value=replicated,
+            ),
+            patch.object(
+                chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+            ),
+        ):
+            server = chts.ClickHouseTraceServer(host="h")
+            server._insert("t", data=[[1]], column_names=["a"])
+            server._insert("t", data=[[1]], column_names=["a"])
+        return [
+            c.kwargs.get("settings") or {} for c in mock_client.insert.call_args_list
+        ]
+
+    tokens = [s.get("insert_deduplication_token") for s in capture_settings(True)]
+    assert all(tokens), "replicated inserts must carry a dedup token"
+    assert tokens[0] != tokens[1], "each insert must get a unique token"
+
+    assert all(
+        "insert_deduplication_token" not in s for s in capture_settings(False)
+    ), "non-replicated inserts must be unchanged (SharedMergeTree/CH Cloud)"
+
+
 def test_insert_with_empty_query_retry_contract():
     """The shared direct-insert helper retries empty query, exhausts, and passes through."""
     summary = MagicMock()

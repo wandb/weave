@@ -8,8 +8,11 @@ These tests verify the queue filtering functionality added to calls_query_builde
 
 import datetime
 
+import pytest
+
 import weave
 from tests.trace.server_utils import TEST_ENTITY
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 
@@ -296,6 +299,9 @@ def test_filter_calls_by_nonexistent_queue(client):
     assert len(res.calls) == 0
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
+)
 def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
     """Integration test: queue filtering works correctly with calls_complete table.
 

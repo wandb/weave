@@ -7,6 +7,44 @@ import re
 import time
 from contextlib import contextmanager
 
+from tests.trace.server_utils import find_server_layer
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+
+# Condition string for `pytest.mark.skipif`: True when the selected
+# trace-server backend is not a real ClickHouse server (e.g. the in-memory
+# fake). skipif conditions evaluate at collection time, where only `config`
+# is available — fixture-based predicates like `client_is_clickhouse` cannot
+# run there. Mirrors conftest's get_trace_server_flag precedence
+# (--clickhouse beats --trace-server).
+NOT_CLICKHOUSE_BACKEND = (
+    "not (config.getoption('--clickhouse') "
+    "or config.getoption('--trace-server') == 'clickhouse')"
+)
+
+# Condition string for `pytest.mark.skipif`: True on the in-memory fake
+# backend, marking tests whose capability the fake has not implemented yet.
+# Same backend check as NOT_CLICKHOUSE_BACKEND, but a DISTINCT name because
+# these gates are TEMPORARY: each PR up the fake stack deletes the
+# `skipif(FAKE_NOT_IMPLEMENTED, ...)` decorators for the capability it
+# implements, so CI then runs those tests on the fake and verifies they match
+# ClickHouse. (NOT_CLICKHOUSE_BACKEND, by contrast, is permanent CH-only.)
+FAKE_NOT_IMPLEMENTED = NOT_CLICKHOUSE_BACKEND
+
+
+def client_is_clickhouse(client):
+    """True only for a real ClickHouse backend (NOT the in-memory fake).
+
+    The in-memory fake replicates ClickHouse at the interface level, so
+    behavioral tests run on it unmodified. Use this predicate to gate tests
+    that assert ClickHouse *internals* (raw SQL, table routing, batching,
+    bucket file storage), which the fake does not reproduce.
+    """
+    try:
+        find_server_layer(client.server, ClickHouseTraceServer)
+    except TypeError:
+        return False
+    return True
+
 
 class AnyStrMatcher:  # noqa: PLW1641
     """Matches any string."""

@@ -1,0 +1,65 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 23:00:21 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Wed, 17 Jun 2026 23:00:22 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 3e97f6afda8527633571517af893099e
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/conversations/chat
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+    body: '{"project_id":"drtangible-mocha/nonexistent-project","conversation_id":"trace_c50312356de3487fa90e381c9399b5b4"}'
+  response:
+    status: 403
+    statusText: Forbidden
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "30"
+      content-type: application/json
+      date: Wed, 17 Jun 2026 23:00:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"detail":"Project not found"}'

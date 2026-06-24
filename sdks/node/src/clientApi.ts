@@ -1,6 +1,6 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {makeSettings, type SettingsInit} from './settings';
+import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
 import {Netrc} from './utils/netrc';
@@ -8,15 +8,7 @@ import {createFetchWithRetry} from './utils/retry';
 import {getWandbConfigs} from './wandb/settings';
 import {WandbServerApi} from './wandb/wandbServerApi';
 import {type CallStackEntry, WeaveClient} from './weaveClient';
-import {globalSingleton} from './utils/globalSingleton';
-
-// Held behind a globalThis-backed container so that a dual-package-hazard load
-// (same module loaded as both CJS and ESM) resolves to a single shared client
-// across both copies.
-const _globalClientHolder = globalSingleton<{client: WeaveClient | null}>(
-  '_weave_global_client',
-  () => ({client: null})
-);
+import state from './state';
 
 /**
  * Log in to Weights & Biases (W&B) using the provided API key.
@@ -51,7 +43,7 @@ export async function login(apiKey: string, host?: string) {
   });
   try {
     await testTraceServerApi.health.readRootHealthGet({});
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
     );
@@ -65,7 +57,7 @@ export async function login(apiKey: string, host?: string) {
       netrc.save();
       console.log(`Successfully logged in. Credentials saved for ${host}`);
     }
-  } catch (error) {
+  } catch (_error) {
     // Log warning but don't fail - the API key can still be used from environment
     console.warn(
       'Could not save credentials to netrc file. You may need to set WANDB_API_KEY environment variable for future sessions.'
@@ -89,7 +81,7 @@ export async function login(apiKey: string, host?: string) {
  */
 export async function init(
   project: string,
-  settings?: SettingsInit
+  settings?: Partial<Settings>
 ): Promise<WeaveClient> {
   const {apiKey, baseUrl, traceBaseUrl, domain} = getWandbConfigs();
   try {
@@ -135,12 +127,11 @@ export async function init(
       customFetch: concurrencyLimitedFetch,
     });
 
-    const client = new WeaveClient(
+    const client = new WeaveClient({
       traceServerApi,
-      wandbServerApi,
       projectId,
-      resolvedSettings
-    );
+      settings: resolvedSettings,
+    });
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);
@@ -170,7 +161,7 @@ export function requireCurrentChildSummary(): {[key: string]: any} {
 }
 
 export function getGlobalClient(): WeaveClient | null {
-  return _globalClientHolder.client;
+  return state.client;
 }
 
 export function requireGlobalClient(): WeaveClient {
@@ -182,7 +173,7 @@ export function requireGlobalClient(): WeaveClient {
 }
 
 export function setGlobalClient(client: WeaveClient | null) {
-  _globalClientHolder.client = client;
+  state.client = client;
 }
 
 /**

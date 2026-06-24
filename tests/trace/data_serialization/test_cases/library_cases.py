@@ -2,7 +2,8 @@ import sys
 
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
-from weave.scorers import LLMAsAJudgeScorer
+from weave.scorers import LLMAsAJudgeScorer, RemoteScorer
+from weave.scorers.remote_scorer import OAuthClientCredentialsConfig
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     LLMStructuredCompletionModel,
 )
@@ -58,6 +59,23 @@ def make_model():
     return MyModel(prompt=weave.StringPrompt("Hello {user_input}"))
 
 
+def make_remote_scorer():
+    # RemoteScorer is scored by the Weave scoring worker (it POSTs to endpoint_url),
+    # so its score/summarize ops are excluded from the record. This case locks in
+    # that op-free shape, plus the nested auth_config discriminated union.
+    return RemoteScorer(
+        endpoint_url="https://scoring.example.com/v1/score",
+        config={"threshold": 0.9},
+        auth_config=OAuthClientCredentialsConfig(
+            mode="oauth_client_credentials",
+            token_endpoint_url="https://idp.example.com/oauth2/token",
+            client_id="weave-remote-scorer",
+            client_secret_name="REMOTE_SCORER_CLIENT_SECRET",
+            scope="remote-score",
+        ),
+    )
+
+
 def evaluation_equality_check(a, b):
     dataset_a = a.dataset.rows
     dataset_b = b.dataset.rows
@@ -79,10 +97,10 @@ def evaluation_equality_check(a, b):
 # When doing this, replace "llm_as_a_judge_scorer_digest" with the current value of llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python
 # Do this, rather than creating a new variable, because each new version of legacy test case will need a different value.
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python = (
-    "usU9eU7is5YeNlwmYcSOHYfjJB8xHGCXXUVpm6dBbfc"
+    "4U7vV5XKCkJ0uOdkflK1O2b6jU3vUY17ZJtoItgc0iA"
 )
 llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_old_python = (
-    "usU9eU7is5YeNlwmYcSOHYfjJB8xHGCXXUVpm6dBbfc"
+    "4U7vV5XKCkJ0uOdkflK1O2b6jU3vUY17ZJtoItgc0iA"
 )
 llm_as_a_judge_scorer_digest = (
     llm_as_a_judge_scorer_digest_for_current_non_legacy_test_on_current_python
@@ -105,6 +123,190 @@ library_cases = [
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:erh2OhYuvmiYF5MAHd2iNbtJkiAfvkHYn5l78CV6XrU",
                 f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
+            ],
+            "preprocess_model_input": None,
+            "trials": 1,
+            "metadata": None,
+            "evaluation_name": None,
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:cxDBvbYWzWkgNFoYzJogSAzxhSWzlL3wd4nnis0A2SE",
+            "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
+            "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
+            "_class_name": "Evaluation",
+            "_bases": ["Object", "BaseModel"],
+        },
+        exp_objects=[
+            {
+                "object_id": "Dataset",
+                "digest": "YLYVrBqCtlMOa770T1oPssqYnf9rgqdnY5hVCwRcrm8",
+                "exp_val": {
+                    "_type": "Dataset",
+                    "name": None,
+                    "description": None,
+                    "rows": "weave:///shawn/test-project/table/97126095885a61df726e0d1d6197db7c55784b083b33a2c10e6ca8e0a1d4889e",
+                    "_class_name": "Dataset",
+                    "_bases": ["Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "Evaluation.evaluate",
+                "digest": "cxDBvbYWzWkgNFoYzJogSAzxhSWzlL3wd4nnis0A2SE",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    # Regenerated: declarative evaluate now tags child calls with _weave_eval_meta
+                    "files": {"obj.py": "wjQ3fexYGMuUi1mJcXPkUnZO7t6govV8hOFkyE7wyYw"},
+                },
+            },
+            {
+                "object_id": "Evaluation.predict_and_score",
+                "digest": "jd4m1EJuNnrGmHeiGY1T2CUngsk9x7knOgRJ2sYpU2g",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "ZHD4K7uUDPT93NdVQO3I6F9Xah9AEceWYBSQXg1bZPM"},
+                },
+            },
+            {
+                "object_id": "MyScorer",
+                "digest": "erh2OhYuvmiYF5MAHd2iNbtJkiAfvkHYn5l78CV6XrU",
+                "exp_val": {
+                    "_type": "MyScorer",
+                    "name": None,
+                    "description": None,
+                    "column_map": None,
+                    "score": "weave:///shawn/test-project/op/MyScorer.score:lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:R9dPVXqD4IgSlmmGS5RA8uQPehMlvQ0CHRJMEMf1AMQ",
+                    "_class_name": "MyScorer",
+                    "_bases": ["Scorer", "Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "LLMAsAJudgeScorer",
+                "digest": llm_as_a_judge_scorer_digest,
+                "exp_val": {
+                    "_type": "LLMAsAJudgeScorer",
+                    "name": None,
+                    "description": None,
+                    "column_map": None,
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:pzXf4DUrjqEMPKQTP4mZnjUp2G7lEGocXS8J1Jk8dqg",
+                    "enable_image_input_scoring": True,
+                    "enable_audio_input_scoring": True,
+                    "enable_video_input_scoring": True,
+                    "media_scoring_json_paths": [
+                        "$.messages[0].content[1].input_audio"
+                    ],
+                    "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
+                    "_class_name": "LLMAsAJudgeScorer",
+                    "_bases": ["Scorer", "Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "LLMStructuredCompletionModel",
+                "digest": "pzXf4DUrjqEMPKQTP4mZnjUp2G7lEGocXS8J1Jk8dqg",
+                "exp_val": {
+                    "_type": "LLMStructuredCompletionModel",
+                    "name": None,
+                    "description": None,
+                    "llm_model_id": "gpt-4o-mini",
+                    "default_params": {
+                        "_type": "LLMStructuredCompletionModelDefaultParams",
+                        "messages_template": [
+                            {
+                                "_type": "Message",
+                                "role": "system",
+                                "content": "You are a judge, respond with json. 'score' (0-1), 'reasoning' (string)",
+                                "name": None,
+                                "function_call": None,
+                                "tool_call_id": None,
+                                "_class_name": "Message",
+                                "_bases": ["BaseModel"],
+                            }
+                        ],
+                        "prompt": None,
+                        "temperature": None,
+                        "top_p": None,
+                        "max_tokens": None,
+                        "presence_penalty": None,
+                        "frequency_penalty": None,
+                        "stop": None,
+                        "n_times": None,
+                        "functions": None,
+                        "response_format": "json_object",
+                        "_class_name": "LLMStructuredCompletionModelDefaultParams",
+                        "_bases": ["BaseModel"],
+                    },
+                    "_class_name": "LLMStructuredCompletionModel",
+                    "_bases": ["Model", "Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "Evaluation.summarize",
+                "digest": "Y0s05NYTuqlmXieehHPogfq2JXKl4Y1Xgy8CKumdmjI",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "vY6VtT9xBAKNfqhozgQdWEGuijncPtmZLYKrXexUERY"},
+                },
+            },
+            {
+                "object_id": "MyScorer.score",
+                "digest": "lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs"},
+                },
+            },
+            {
+                "object_id": "Scorer.summarize",
+                "digest": "R9dPVXqD4IgSlmmGS5RA8uQPehMlvQ0CHRJMEMf1AMQ",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "kxYDFAafHpBRX2O9hujrELhbFm3pGR6sAhzTfE1JdwA"},
+                },
+            },
+        ],
+        exp_files=[
+            {
+                "digest": "wjQ3fexYGMuUi1mJcXPkUnZO7t6govV8hOFkyE7wyYw",
+                "exp_content": b'from weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport weave.trace.context.call_context as call_context\nfrom weave.evaluation.eval_meta import EvalMeta\nfrom weave.trace.api import attributes\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\nEVAL_META_KEY = "_weave_eval_meta"\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@call_context.op\n@op(call_display_name=default_evaluation_display_name, eager_call_start=True)\nasync def evaluate(self, model: Op | Model) -> dict:\n    # Tag every eval child call (mirrors the imperative path); merge into any\n    # existing _weave_eval_meta (e.g. evaluate_model_worker), don\'t overwrite.\n    prev_eval_meta = call_context.call_attributes.get().get(EVAL_META_KEY, {})\n    declarative_meta: EvalMeta = {"declarative": True}\n    with attributes({EVAL_META_KEY: {**prev_eval_meta, **declarative_meta}}):\n        eval_results = await self.get_eval_results(model)\n        summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info("Evaluation summary %s", summary_str)\n\n    return summary\n',
+            },
+            {
+                "digest": "Y7lSNR7UXFYVtxWyD8GOE3CFXRWfdLX2n1mcYfbSErs",
+                "exp_content": b"import weave\n\n@weave.op\ndef score(self, user_input: str, output: str) -> str:\n    return user_input in output\n",
+            },
+            {
+                "digest": "kxYDFAafHpBRX2O9hujrELhbFm3pGR6sAhzTfE1JdwA",
+                "exp_content": b'import weave\nfrom numbers import Number\nfrom typing import Any\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\ndef _import_numpy() -> Any | None:\n    try:\n        import numpy\n    except ImportError:\n        return None\n    return numpy\n\ndef auto_summarize(data: list) -> dict[str, Any] | None:\n    """Automatically summarize a list of (potentially nested) dicts.\n\n    Computes:\n        - avg for numeric cols\n        - count and fraction for boolean cols\n        - other col types are ignored\n\n    If col is all None, result is None\n\n    Returns:\n      dict of summary stats, with structure matching input dict structure.\n    """\n    if not data:\n        return {}\n    data = [x for x in data if x is not None]\n\n    if not data:\n        return None\n\n    val = data[0]\n\n    if isinstance(val, bool):\n        return {\n            "true_count": (true_count := sum(1 for x in data if x)),\n            "true_fraction": true_count / len(data),\n        }\n    elif isinstance(val, Number):\n        if np := _import_numpy():\n            return {"mean": np.mean(data).item()}\n        else:\n            return {"mean": sum(data) / len(data)}\n    elif isinstance(val, dict):\n        result = {}\n        all_keys = list(\n            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])\n        )\n        for k in all_keys:\n            if (\n                summary := auto_summarize(\n                    [x.get(k) for x in data if isinstance(x, dict)]\n                )\n            ) is not None:\n                if k in summary:\n                    result.update(summary)\n                else:\n                    result[k] = summary\n        if not result:\n            return None\n        return result\n    elif isinstance(val, BaseModel):\n        return auto_summarize(\n            [x.model_dump() if isinstance(x, BaseModel) else x for x in data]\n        )\n    return None\n\n@weave.op\n@op\ndef summarize(self, score_rows: list) -> dict | None:\n    return auto_summarize(score_rows)\n',
+            },
+            {
+                "digest": "ZHD4K7uUDPT93NdVQO3I6F9Xah9AEceWYBSQXg1bZPM",
+                "exp_content": b'import weave\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nfrom weave.flow.model import apply_model_async\nfrom weave.flow.model import ApplyModelError\nimport asyncio\nfrom weave.flow.scorer import get_scorer_attributes\nfrom weave.trace.op import op\n\n@weave.op\n@op\nasync def predict_and_score(self, model: Op | Model, example: dict) -> dict:\n    apply_model_result = await apply_model_async(\n        model, example, self.preprocess_model_input\n    )\n\n    if isinstance(apply_model_result, ApplyModelError):\n        return {\n            self._output_key: None,\n            "scores": {},\n            "model_latency": apply_model_result.model_latency,\n        }\n\n    model_output = apply_model_result.model_output\n    model_call = apply_model_result.model_call\n    model_latency = apply_model_result.model_latency\n\n    scores = {}\n    if scorers := self.scorers:\n        # Run all scorer calls in parallel\n        scorer_tasks = [\n            model_call.apply_scorer(scorer, example) for scorer in scorers\n        ]\n        apply_scorer_results = await asyncio.gather(*scorer_tasks)\n\n        # Process results and build scores dict\n        for scorer, apply_scorer_result in zip(\n            scorers, apply_scorer_results, strict=False\n        ):\n            result = apply_scorer_result.result\n            scorer_attributes = get_scorer_attributes(scorer)\n            scorer_name = scorer_attributes.scorer_name\n            scores[scorer_name] = result\n\n    return {\n        self._output_key: model_output,\n        "scores": scores,\n        "model_latency": model_latency,\n    }\n',
+            },
+            {
+                "digest": "vY6VtT9xBAKNfqhozgQdWEGuijncPtmZLYKrXexUERY",
+                "exp_content": b'import weave\nfrom weave.object.obj import Object\nfrom weave.trace.table import Table\nfrom weave.flow.util import transpose\nfrom weave.flow.scorer import get_scorer_attributes\nfrom weave.flow.scorer import auto_summarize\nfrom weave.trace.op import op\n\nclass EvaluationResults(Object):\n    rows: Table\n\n@weave.op\n@op\nasync def summarize(self, eval_table: EvaluationResults) -> dict:\n    eval_table_rows = list(eval_table.rows)\n    cols = transpose(eval_table_rows)\n    summary = {}\n\n    for name, vals in cols.items():\n        if name == "scores":\n            if scorers := self.scorers:\n                for scorer in scorers:\n                    scorer_attributes = get_scorer_attributes(scorer)\n                    scorer_name = scorer_attributes.scorer_name\n                    summarize_fn = scorer_attributes.summarize_fn\n                    scorer_stats = transpose(vals)\n                    score_table = scorer_stats[scorer_name]\n                    scored = summarize_fn(score_table)\n                    summary[scorer_name] = scored\n        else:\n            model_output_summary = auto_summarize(vals)\n            if model_output_summary:\n                summary[name] = model_output_summary\n    return summary\n',
+            },
+        ],
+        # Sad ... equality is really a pain to assert here (and is broken)
+        # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+        python_version_code_capture=(3, 13),
+    ),
+    SerializationTestCase(
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel (legacy v6)",
+        runtime_object_factory=make_evaluation,
+        inline_call_param=False,
+        is_legacy=True,
+        exp_json={
+            "_type": "Evaluation",
+            "name": None,
+            "description": None,
+            "dataset": "weave:///shawn/test-project/object/Dataset:YLYVrBqCtlMOa770T1oPssqYnf9rgqdnY5hVCwRcrm8",
+            "scorers": [
+                "weave:///shawn/test-project/object/MyScorer:erh2OhYuvmiYF5MAHd2iNbtJkiAfvkHYn5l78CV6XrU",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:usU9eU7is5YeNlwmYcSOHYfjJB8xHGCXXUVpm6dBbfc",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -164,7 +366,7 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": llm_as_a_judge_scorer_digest,
+                "digest": "usU9eU7is5YeNlwmYcSOHYfjJB8xHGCXXUVpm6dBbfc",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
@@ -1397,6 +1599,39 @@ library_cases = [
         ],
         # Sad ... equality is really a pain to assert here (and is broken)
         # TODO: Write a good equality check and make it work
+        equality_check=lambda a, b: True,
+    ),
+    SerializationTestCase(
+        id="Library Objects - RemoteScorer",
+        runtime_object_factory=make_remote_scorer,
+        inline_call_param=False,
+        is_legacy=False,
+        # No score/summarize op refs: RemoteScorer sets _weave_exclude_ops_from_record,
+        # so the published shape carries no captured op code (hence no exp_objects/exp_files).
+        exp_json={
+            "_type": "RemoteScorer",
+            "name": None,
+            "description": None,
+            "column_map": None,
+            "endpoint_url": "https://scoring.example.com/v1/score",
+            "config": {"threshold": 0.9},
+            "auth_config": {
+                "_type": "OAuthClientCredentialsConfig",
+                "mode": "oauth_client_credentials",
+                "token_endpoint_url": "https://idp.example.com/oauth2/token",
+                "client_id": "weave-remote-scorer",
+                "client_secret_name": "REMOTE_SCORER_CLIENT_SECRET",
+                "scope": "remote-score",
+                "_class_name": "OAuthClientCredentialsConfig",
+                "_bases": ["BaseModel"],
+            },
+            "_class_name": "RemoteScorer",
+            "_bases": ["Scorer", "Object", "BaseModel"],
+        },
+        exp_objects=[],
+        exp_files=[],
+        # Round-trip correctness is covered by tests/scorers/test_remote_scorer.py;
+        # this case only pins the serialized format.
         equality_check=lambda a, b: True,
     ),
 ]

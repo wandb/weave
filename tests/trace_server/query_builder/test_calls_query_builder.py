@@ -12,12 +12,14 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
     ParamBuilder,
     QueryBuilderDynamicField,
+    _invalid_field_message,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
+    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -2419,6 +2421,71 @@ def test_datetime_optimization_simple() -> None:
     )
 
 
+def test_datetime_optimization_string_literal_window() -> None:
+    """ISO/string started_at bounds must still emit the sortable_datetime prefilter.
+
+    Regression (PR #6570): the HAVING path learned to parse ISO / string
+    datetime literals, but the WHERE prefilter stayed numeric-only, so a string
+    started_at range produced a valid HAVING with no granule prune. On
+    calls_merged that forces a full-project GROUP BY and OOMs. Mirrors the
+    scoring-worker "earliest call in window" probe.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gte": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T00:00:00Z"},
+                        ]
+                    },
+                    {
+                        "$lt": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T01:00:00Z"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "asc")
+    cq.set_limit(1)
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        WHERE (calls_merged.sortable_datetime >= {pb_2:String}
+            AND calls_merged.sortable_datetime < {pb_3:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) >= {pb_0:String}))
+            AND ((any(calls_merged.started_at) < {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        ORDER BY any(calls_merged.started_at) ASC
+        LIMIT 1
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 01:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-01 01:05:00.000000",
+            "pb_4": "project",
+        },
+    )
+
+
 def test_datetime_optimization_lt_simple() -> None:
     """Test basic datetime optimization with a single LT timestamp condition."""
     cq = CallsQuery(project_id="project")
@@ -3260,76 +3327,97 @@ def test_filter_length_validation():
 
 
 def test_disallowed_fields():
+    # the message lists filterable fields and never the rejected field itself
+    clause = (
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, summary, thread_id, trace_id, turn_id, wb_run_id, "
+        "wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
+    )
     cq = CallsQuery(project_id="test/project")
-    # allowed order field
-    cq.add_order("id", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("storage_size_bytes", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("total_storage_size_bytes", "DESC")
-    # with bogus direction
-    with pytest.raises(ValueError, match="not allowed"):
-        cq.add_order("storage_size_bytes", "ASCDESC")
-    # now try filtering with disallowed
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+    cq.add_order("id", "ASC")  # allowed order field
+    for field in ("storage_size_bytes", "total_storage_size_bytes"):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.add_order(field, "ASC")
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
         )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+    # bogus direction on an allowed field is a separate ValueError
+    with pytest.raises(ValueError, match="Direction ASCDESC is not allowed"):
+        cq.add_order("id", "ASCDESC")
+    # filtering on a disallowed field surfaces the same actionable message
+    for op_key, op_cls, field in (
+        ("$gt", tsi_query.GtOperation, "storage_size_bytes"),
+        ("$gte", tsi_query.GteOperation, "total_storage_size_bytes"),
+        ("$lt", tsi_query.LtOperation, "storage_size_bytes"),
+        ("$lte", tsi_query.LteOperation, "total_storage_size_bytes"),
+    ):
+        cq = CallsQuery(project_id="test/project")  # reset
+        cq.add_field("id")
+        cq.add_condition(
+            op_cls.model_validate({op_key: [{"$getField": field}, {"$literal": 1}]})
+        )
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.as_sql(ParamBuilder())
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
+        )
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GteOperation.model_validate(
-            {
-                "$gte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.LtOperation.model_validate(
-            {
-                "$lt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
+def test_invalid_field_message_lists_allowed_fields():
+    """An unknown filter/sort field surfaces the allowed-field list (read-path 422)."""
+    # Exact match is intentional: a new field forces a look at the user-facing
+    # message and at whether it should be advertised (see _HIDDEN_MESSAGE_FIELDS).
+    expected = (
+        "Field made_up_field is not allowed. "
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, storage_size_bytes, summary, thread_id, "
+        "total_storage_size_bytes, trace_id, turn_id, wb_run_id, wb_run_step, "
+        "wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+    assert _invalid_field_message("made_up_field") == expected
 
-    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(InvalidFieldError) as exc_info:
+        get_field_by_name("made_up_field")
+    assert str(exc_info.value) == expected
+
+    # filtering on an unknown field surfaces the same actionable message
+    cq = CallsQuery(project_id="test/project")
     cq.add_field("id")
     cq.add_condition(
-        tsi_query.LteOperation.model_validate(
-            {
-                "$lte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "made_up_field"}, {"$literal": 1}]}
         )
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
+    with pytest.raises(InvalidFieldError) as exc_info:
         cq.as_sql(ParamBuilder())
+    assert str(exc_info.value) == expected
+
+
+def test_advertised_fields_and_prefixes_all_resolve():
+    """Truthfulness: every field/prefix the 422 advertises must actually resolve."""
+    prefix_examples = {
+        "annotation_queue_items.*": "annotation_queue_items.queue_id",
+        "attributes.*": "attributes.x",
+        "feedback.*": "feedback.[my_type].payload.value",
+        "inputs.*": "inputs.x",
+        "output.*": "output.x",
+        "summary.*": "summary.x",
+        "summary.weave.*": "summary.weave.latency",
+    }
+    _, _, rest = _invalid_field_message("nope").partition("Allowed fields: ")
+    fields_csv, _, prefixes_csv = rest.partition(". Allowed dynamic prefixes: ")
+    for field in fields_csv.split(", "):
+        get_field_by_name(field)
+    for prefix in prefixes_csv.rstrip(".").split(", "):
+        get_field_by_name(prefix_examples[prefix])
 
 
 def test_thread_id_filter_eq():

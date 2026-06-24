@@ -11,7 +11,7 @@ import {
   getCallStackFromOpenAIAgents,
   isInOpenAIAgentsContext,
 } from './openai-agents/weave-tracing-processor';
-import {shouldUseOtelV2} from '../settings';
+import {defaultSettings} from '../settings';
 
 // Integration provenance stamped onto every call this integration produces.
 const OPENAI_INTEGRATION = libraryIntegration('openai');
@@ -35,7 +35,8 @@ function runWithOpenAIAgentsContext<T>(fn: () => T): T {
 }
 
 function shouldSkipTracingInAgentContext(): boolean {
-  return shouldUseOtelV2() && isInOpenAIAgentsContext();
+  const settings = getGlobalClient()?.settings ?? defaultSettings();
+  return settings.useOTelV2 && isInOpenAIAgentsContext();
 }
 
 // exported just for testing
@@ -826,7 +827,7 @@ function commonProxy(exports: any) {
   const OriginalOpenAIClass = exports.OpenAI;
 
   return new Proxy(OriginalOpenAIClass, {
-    construct(target, args, newTarget) {
+    construct(target, args, _newTarget) {
       const instance = new target(...args);
       return wrapOpenAI(instance);
     },
