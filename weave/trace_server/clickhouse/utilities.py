@@ -224,6 +224,24 @@ def datetime_to_microseconds(dt: datetime.datetime) -> int:
     return int(dt.timestamp() * 1_000_000)
 
 
+def started_at_gte_query(dt: datetime.datetime) -> tsi.Query:
+    """A calls query selecting calls with started_at >= dt.
+
+    The literal is unix seconds; the query builder converts it to a datetime
+    string so ClickHouse can prune on the started_at primary key / partition.
+    """
+    return tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [
+                    {"$getField": "started_at"},
+                    {"$literal": datetime_to_microseconds(dt) / 1_000_000},
+                ]
+            }
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # ClickHouse query helpers
 # ---------------------------------------------------------------------------

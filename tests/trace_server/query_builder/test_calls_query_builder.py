@@ -4073,6 +4073,31 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
 
 
+def test_build_calls_complete_delete_query_with_started_at_window() -> None:
+    """started_at bounds bracket the partition/primary key so the delete prunes."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        started_at_min_param="started_at_min",
+        started_at_max_param="started_at_max",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String}
+        AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
+        AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')
+        AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
 def test_build_calls_complete_update_query() -> None:
     """Ensure the update helper builds the expected query."""
     query = build_calls_complete_update_query(

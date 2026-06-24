@@ -139,6 +139,7 @@ from weave.trace_server.clickhouse.utilities import (
     num_bytes,
     process_parameters,
     sanitize_invalid_utf8_surrogates,
+    started_at_gte_query,
     string_to_int_in_range,
 )
 from weave.trace_server.clickhouse_schema import (
@@ -1854,11 +1855,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(
                         call_ids=req.call_ids,
                     ),
-                    columns=["id", "parent_id"],
+                    columns=["id", "parent_id", "started_at"],
                 )
             )
         )
+        if not parents:
+            return tsi.CallsDeleteRes(num_deleted=0)
         parent_trace_ids = [p.trace_id for p in parents]
+
+        # Descendants start at or after the calls they descend from, so every
+        # call we must delete has started_at >= the earliest requested call.
+        # Bounding the trace read by that floor lets ClickHouse prune
+        # partitions/granules instead of scanning the whole project.
+        started_at_floor = min(p.started_at for p in parents) - datetime.timedelta(
+            seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS
+        )
 
         # get first 10k calls with trace_ids matching parents
         all_calls = list(
@@ -1866,7 +1877,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
                     filter=tsi.CallsFilter(trace_ids=parent_trace_ids),
-                    columns=["id", "parent_id"],
+                    query=started_at_gte_query(started_at_floor),
+                    columns=["id", "parent_id", "started_at"],
                     limit=10_000,
                 )
             )
@@ -1881,7 +1893,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client,
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
-            self._delete_calls_complete(req.project_id, all_descendants)
+            started_at_by_id = {c.id: c.started_at for c in all_calls}
+            descendant_started_ats = [
+                started_at_by_id[cid]
+                for cid in all_descendants
+                if cid in started_at_by_id
+            ]
+            started_at_window = (
+                (min(descendant_started_ats), max(descendant_started_ats))
+                if descendant_started_ats
+                else None
+            )
+            self._delete_calls_complete(
+                req.project_id, all_descendants, started_at_window
+            )
             return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
         deleted_at = datetime.datetime.now()
@@ -1902,14 +1927,33 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._delete_calls_complete")
-    def _delete_calls_complete(self, project_id: str, call_ids: list[str]) -> None:
+    def _delete_calls_complete(
+        self,
+        project_id: str,
+        call_ids: list[str],
+        started_at_window: tuple[datetime.datetime, datetime.datetime] | None = None,
+    ) -> None:
         pb = ParamBuilder()
         project_id_param = pb.add_param(project_id)
         call_ids_param = pb.add_param(call_ids)
+        started_at_min_param: str | None = None
+        started_at_max_param: str | None = None
+        if started_at_window is not None:
+            pad = datetime.timedelta(
+                seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS
+            )
+            started_at_min_param = pb.add_param(
+                datetime_to_microseconds(started_at_window[0] - pad)
+            )
+            started_at_max_param = pb.add_param(
+                datetime_to_microseconds(started_at_window[1] + pad)
+            )
         delete_query = build_calls_complete_delete_query(
             self._get_calls_complete_table_name(),
             project_id_param,
             call_ids_param,
+            started_at_min_param=started_at_min_param,
+            started_at_max_param=started_at_max_param,
             cluster_name=self.clickhouse_cluster_name,
         )
         self._command(
