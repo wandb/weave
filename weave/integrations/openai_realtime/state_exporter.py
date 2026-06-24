@@ -6,6 +6,7 @@ import logging
 import threading
 from collections import defaultdict
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -342,6 +343,21 @@ class StateExporter(BaseModel):
                 self.next_by_item[previous_item_id] = item_id
                 self.prev_by_item[item_id] = previous_item_id
 
+    @staticmethod
+    def _resolve_thread_id(conv_id: str | None) -> str | None:
+        """Thread id for a realtime turn.
+
+        A user-set thread id (set via ``set_thread_id`` upstream) wins;
+        otherwise the realtime ``conversation_id`` groups the turn's calls.
+        Both the ``realtime.conversation`` call and its ``realtime.response``
+        children must be created under the same id, so both creation sites
+        resolve it here to stay in lockstep.
+        """
+        user_thread_id = get_thread_id()
+        if user_thread_id is not None and user_thread_id != "":
+            return user_thread_id
+        return conv_id
+
     def handle_response_created(self, msg: dict) -> None:
         self.pending_response = msg.get("response")
         response = self.pending_response or {}
@@ -360,12 +376,16 @@ class StateExporter(BaseModel):
                 self.session_span.get_root_call() if self.session_span else None
             )
             client = require_weave_client()
-            conv_call = client.create_call(
-                op="realtime.conversation",
-                inputs={"id": conv_id},
-                parent=session_call,
-                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-            )
+            # Thread the conversation call so it groups with its response
+            # children in the threads view (the response calls do the same).
+            thread_id = self._resolve_thread_id(conv_id)
+            with set_thread_id(thread_id) if thread_id else nullcontext():
+                conv_call = client.create_call(
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
+                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+                )
             self.conversation_calls[conv_id] = conv_call
 
     def handle_input_audio_append(self, msg: dict) -> None:
@@ -772,16 +792,23 @@ class StateExporter(BaseModel):
         elif conv_id and response_id:
             self.conversation_responses[conv_id] = [response_id]
 
+        # Thread the whole turn under one thread_id (see _resolve_thread_id).
+        # set_thread_id is a one-shot context manager, so build a fresh one (or
+        # a no-op) per call.
+        thread_id = self._resolve_thread_id(conv_id)
+        use_thread = thread_id is not None and conv_id != ""
+
         if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
             response_parent = conv_call
 
         elif conv_id:
-            conv_call = client.create_call(
-                op="realtime.conversation",
-                inputs={"id": conv_id},
-                parent=session_call,
-                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-            )
+            with set_thread_id(thread_id) if use_thread else nullcontext():
+                conv_call = client.create_call(
+                    op="realtime.conversation",
+                    inputs={"id": conv_id},
+                    parent=session_call,
+                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+                )
             self.conversation_calls[conv_id] = conv_call
             response_parent = conv_call
 
@@ -794,23 +821,7 @@ class StateExporter(BaseModel):
             response_parent = None
 
         # Latency = TTFT: started_at=response.created, ended_at=first content
-        # Use user-set thread_id if present, otherwise fall back to conv_id
-        user_thread_id = get_thread_id()
-        thread_id: str | None
-        if user_thread_id is not None and user_thread_id != "":
-            thread_id = user_thread_id
-        else:
-            thread_id = conv_id
-        if thread_id is not None and conv_id != "":
-            with set_thread_id(thread_id):
-                call = client.create_call(
-                    "realtime.response",
-                    inputs=inputs,
-                    parent=response_parent,
-                    started_at=created_at,
-                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-                )
-        else:
+        with set_thread_id(thread_id) if use_thread else nullcontext():
             call = client.create_call(
                 "realtime.response",
                 inputs=inputs,
