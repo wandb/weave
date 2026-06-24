@@ -4,29 +4,40 @@ import datetime
 import io
 import logging
 from collections.abc import Callable, Iterator
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
+from weave_server_sdk import APIStatusError
 from weave_server_sdk import Client as StainlessClient
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+    should_use_calls_complete,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    TRACE_ID_HEADER,
+    CallsCompleteModeRequired,
+    handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
     process_batch_with_retry,
 )
 from weave.trace_server_bindings.models import (
     Batch,
+    CompleteBatchItem,
     EndBatchItem,
+    EntityProjectInfo,
     StartBatchItem,
 )
 from weave.utils.project_id import from_project_id
@@ -60,7 +71,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     ):
         self.trace_server_url = trace_server_url.rstrip("/")
         self.should_batch = should_batch
-        self.call_processor: AsyncBatchProcessor | None = None
+        self.use_calls_complete = should_use_calls_complete() and should_batch
+        self.call_processor: AsyncBatchProcessor | CallBatchProcessor | None = None
         self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
@@ -77,15 +89,22 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             username=username,
             password=password,
             default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
         )
 
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
-                self._flush_calls,
-                max_queue_size=max_calls_queue_size(),
-                enable_disk_fallback=should_enable_disk_fallback(),
-            )
+            if self.use_calls_complete:
+                self.call_processor = CallBatchProcessor(
+                    complete_processor_fn=self._flush_calls_complete,
+                    eager_processor_fn=self._flush_calls_eager,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
+            else:
+                self.call_processor = AsyncBatchProcessor(
+                    self._flush_calls,
+                    max_queue_size=max_calls_queue_size(),
+                    enable_disk_fallback=should_enable_disk_fallback(),
+                )
             self.feedback_processor = AsyncBatchProcessor(
                 self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
@@ -122,7 +141,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             username=self._username,
             password=self._password,
             default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
         )
 
     def _update_client_headers(self) -> None:
@@ -289,7 +307,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         "req": item.req.model_dump(by_alias=True),
                     }
                 )
-        self._stainless_client.calls.upsert_batch(batch=stainless_batch)
+        try:
+            self._stainless_client.calls.upsert_batch(batch=stainless_batch)
+        except APIStatusError as e:
+            # Normalize SDK errors through handle_response_error so the
+            # calls_complete upgrade signal (CallsCompleteModeRequired) reaches
+            # _flush_calls instead of being swallowed as a generic SDK error.
+            handle_response_error(e.response, "/call/upsert_batch")
+            raise
 
     def _flush_calls(
         self,
@@ -318,11 +343,191 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             data = Batch(batch=batch).model_dump_json()
             return data.encode("utf-8")
 
+        try:
+            process_batch_with_retry(
+                batch_name="calls",
+                batch=batch,
+                remote_request_bytes_limit=self.remote_request_bytes_limit,
+                send_batch_fn=self._send_batch_to_server,
+                processor_obj=self.call_processor,
+                should_update_batch_size=_should_update_batch_size,
+                get_item_id_fn=get_item_id,
+                log_dropped_fn=log_dropped_call_batch,
+                encode_batch_fn=encode_batch,
+            )
+        except CallsCompleteModeRequired as e:
+            # Project requires calls_complete mode: swap in the CallBatchProcessor
+            # and re-enqueue this batch. No calls are dropped during the upgrade.
+            self._upgrade_to_calls_complete(batch, str(e))
+
+    def _raw_post(
+        self, url: str, encoded_data: bytes, *, trace_id: str | None = None
+    ) -> None:
+        """POST raw JSON bytes through the stainless client.
+
+        The calls_complete write-path endpoints
+        (``/v2/{entity}/{project}/{calls/complete,call/start,call/end}``) are
+        registered with ``include_in_schema=False`` on the server, so they have
+        no typed SDK method. Routing through the client still applies its auth,
+        base URL, default headers, and retries. SDK errors are funneled through
+        ``handle_response_error`` so the calls_complete upgrade signal
+        (``CallsCompleteModeRequired``) is preserved.
+        """
+        self._update_client_headers()
+        headers = {"Content-Type": "application/json"}
+        if trace_id is not None:
+            headers[TRACE_ID_HEADER] = trace_id
+        try:
+            self._stainless_client.post(
+                url,
+                cast_to=object,
+                content=encoded_data,
+                options={"headers": headers},
+            )
+        except APIStatusError as e:
+            handle_response_error(e.response, url)
+            raise
+
+    def _upgrade_to_calls_complete(
+        self, batch: list[StartBatchItem | EndBatchItem], error_message: str
+    ) -> None:
+        """Swap the legacy AsyncBatchProcessor for a CallBatchProcessor.
+
+        Triggered when the server reports a project requires calls_complete
+        mode. The current batch is re-enqueued onto the new processor so no
+        calls are dropped during the upgrade.
+        """
+        if self.use_calls_complete:
+            if isinstance(self.call_processor, CallBatchProcessor):
+                self.call_processor.enqueue(
+                    cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
+                )
+            return
+
+        logger.warning(
+            "Project has been previously written to with `use_calls_complete=True` "
+            "and requires 'calls_complete' mode. Automatically upgrading SDK to use "
+            "the more performant calls_complete processor. Server message: %s",
+            error_message,
+        )
+
+        old_processor = self.call_processor
+        self.use_calls_complete = True
+        self.call_processor = CallBatchProcessor(
+            complete_processor_fn=self._flush_calls_complete,
+            eager_processor_fn=self._flush_calls_eager,
+            max_queue_size=max_calls_queue_size(),
+            enable_disk_fallback=should_enable_disk_fallback(),
+        )
+        self.call_processor.enqueue(
+            cast(list[StartBatchItem | EndBatchItem | CompleteBatchItem], batch)
+        )
+        if old_processor is not None:
+            old_processor.stop_accepting_work_event.set()
+
+    @with_retry
+    def _send_call_start_v2(self, start: tsi.StartedCallSchemaForInsert) -> None:
+        """Send a single call start to the eager v2 endpoint."""
+        entity, project = from_project_id(start.project_id)
+        url = f"/v2/{entity}/{project}/call/start"
+        req = tsi.CallStartV2Req(start=start)
+        self._raw_post(
+            url, req.model_dump_json().encode("utf-8"), trace_id=start.trace_id
+        )
+
+    @with_retry
+    def _send_call_end_v2(self, end: tsi.EndedCallSchemaForInsertWithStartedAt) -> None:
+        """Send a single call end to the eager v2 endpoint."""
+        entity, project = from_project_id(end.project_id)
+        url = f"/v2/{entity}/{project}/call/end"
+        req = tsi.CallEndV2Req(end=end)
+        self._raw_post(
+            url, req.model_dump_json().encode("utf-8"), trace_id=end.trace_id
+        )
+
+    def _flush_calls_eager(
+        self,
+        batch: list[StartBatchItem | EndBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process eager start/end items via the single v2 call endpoints.
+
+        Used for ops (e.g. ``Evaluation.evaluate``) whose start must be visible
+        immediately, and for unpaired items at flush time. Each item is sent
+        individually; a failed item is logged and dropped so the rest proceed.
+        """
+        for item in batch:
+            try:
+                if isinstance(item, StartBatchItem):
+                    self._send_call_start_v2(item.req.start)
+                elif isinstance(item, EndBatchItem):
+                    self._send_call_end_v2(item.req.end)
+            except CallsCompleteModeRequired:
+                # Re-raise so the caller can upgrade to calls_complete mode.
+                raise
+            except Exception as e:
+                log_dropped_call_batch([item], e)
+
+    def _extract_entity_project(
+        self, batch: list[CompleteBatchItem]
+    ) -> EntityProjectInfo:
+        """Extract entity/project/project_id from the first batch item."""
+        if not batch:
+            raise ValueError("Cannot extract entity/project from empty batch")
+
+        project_id = batch[0].req.project_id
+        if not project_id or "/" not in project_id:
+            raise ValueError(
+                f"Invalid project_id format: {project_id}. Expected 'entity/project'"
+            )
+
+        entity, project = project_id.split("/", 1)
+        if not entity or not project:
+            raise ValueError(f"Invalid project_id: {project_id}")
+
+        return EntityProjectInfo(entity=entity, project=project, project_id=project_id)
+
+    @with_retry
+    def _send_calls_complete_to_server(
+        self, entity: str, project: str, encoded_data: bytes
+    ) -> None:
+        """Send a batch of completed calls to the calls_complete endpoint."""
+        url = f"/v2/{entity}/{project}/calls/complete"
+        self._raw_post(url, encoded_data)
+
+    def _flush_calls_complete(
+        self,
+        batch: list[CompleteBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process a batch of complete calls (start+end paired) and send them.
+
+        This is the default write path (``use_calls_complete=True``): complete
+        calls bundle start and end together for fewer, larger writes.
+        """
+        assert self.call_processor is not None
+        if not batch:
+            return
+
+        ep_info = self._extract_entity_project(batch)
+
+        def get_item_id(item: CompleteBatchItem) -> str:
+            return f"{item.req.id}-complete"
+
+        def encode_batch(batch: list[CompleteBatchItem]) -> bytes:
+            api_batch = [item.req for item in batch]
+            req = tsi.CallsUpsertCompleteReq(batch=api_batch)
+            return req.model_dump_json().encode("utf-8")
+
         process_batch_with_retry(
-            batch_name="calls",
+            batch_name="calls_complete",
             batch=batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_batch_to_server,
+            send_batch_fn=lambda data: self._send_calls_complete_to_server(
+                ep_info.entity, ep_info.project, data
+            ),
             processor_obj=self.call_processor,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
@@ -330,11 +535,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             encode_batch_fn=encode_batch,
         )
 
-    def get_call_processor(self) -> AsyncBatchProcessor | None:
+    def get_call_processor(self) -> AsyncBatchProcessor | CallBatchProcessor | None:
         """Get the call processor for batching.
 
         Returns:
-            AsyncBatchProcessor instance or None if batching is disabled.
+            The active call processor, or None if batching is disabled.
         """
         return self.call_processor
 

@@ -6,6 +6,8 @@ status codes, and error handling specific to StainlessRemoteHTTPTraceServer.
 
 from __future__ import annotations
 
+import datetime
+import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -16,6 +18,12 @@ from pydantic import ValidationError
 from tests.trace_server_bindings.conftest import generate_id, generate_start
 from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.http_utils import TRACE_ID_HEADER
+from weave.trace_server_bindings.models import (
+    CompleteBatchItem,
+    EndBatchItem,
+    StartBatchItem,
+)
 from weave.trace_server_bindings.stainless_remote_http_trace_server import (
     StainlessRemoteHTTPTraceServer,
 )
@@ -79,8 +87,13 @@ def test_invalid_no_retry(unbatched_server):
 
 
 @pytest.mark.disable_logging_error_check
-def test_timeout_retry_mechanism(success_response):
-    """Test that timeouts trigger the retry mechanism."""
+def test_timeout_retry_mechanism(success_response, monkeypatch):
+    """Test that timeouts trigger the retry mechanism on the legacy send path."""
+    # This test mocks _send_batch_to_server (the legacy AsyncBatchProcessor
+    # path). Force legacy mode so that path is exercised; the default
+    # calls_complete path uses _send_calls_complete_to_server and is covered by
+    # the calls_complete tests below.
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     # Mock _send_batch_to_server to raise errors twice, then succeed
@@ -108,8 +121,12 @@ def test_timeout_retry_mechanism(success_response):
 
 
 @pytest.fixture
-def fast_retrying_server():
+def fast_retrying_server(monkeypatch):
     """Create a StainlessRemoteHTTPTraceServer with fast retry settings for testing."""
+    # These tests mock the legacy _send_batch_to_server path; force legacy mode
+    # so the lone start enqueued below is sent (rather than held for pairing by
+    # the default CallBatchProcessor, which would block teardown).
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "false")
     server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
@@ -188,3 +205,102 @@ def test_post_timeout(success_response, fast_retrying_server, log_collector):
     response = new_server.call_start(start_req)
     assert response.id == "test_id"
     assert response.trace_id == "test_trace_id"
+
+
+@pytest.mark.disable_logging_error_check
+def test_calls_complete_batch_endpoint_and_payload(monkeypatch):
+    """calls_complete batches POST to the v2 endpoint with the correct payload.
+
+    Verifies the default write path: complete calls are sent through the SDK's
+    raw ``post()`` to ``/v2/{entity}/{project}/calls/complete`` (hidden from the
+    OpenAPI schema, so there is no typed method).
+    """
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    complete = tsi.CompletedCallSchemaForInsert(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-id",
+        op_name="test_op",
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        attributes={"a": 1},
+        inputs={"b": 2},
+        output={"c": 3},
+        summary={"result": "ok"},
+    )
+    batch = [CompleteBatchItem(req=complete)]
+
+    # _update_client_headers() would .copy() the client (dropping the mock) when
+    # a retry id is active; no-op it so the instance-level post mock is used.
+    server._update_client_headers = MagicMock()
+    post_mock = MagicMock()
+    server._stainless_client.post = post_mock
+
+    try:
+        server._flush_calls_complete(batch)
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert post_mock.call_count == 1
+    assert post_mock.call_args.args[0] == "/v2/entity/project/calls/complete"
+    payload = json.loads(post_mock.call_args.kwargs["content"].decode("utf-8"))
+    expected = tsi.CallsUpsertCompleteReq(batch=[complete]).model_dump(mode="json")
+    assert payload == expected
+
+
+@pytest.mark.disable_logging_error_check
+def test_eager_calls_use_v2_start_end_endpoints(monkeypatch):
+    """Eager start/end items POST to the single v2 endpoints with trace-id headers."""
+    monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
+    server = StainlessRemoteHTTPTraceServer("http://example.com", should_batch=True)
+
+    start = generate_start(id="call-id", project_id="entity/project")
+    start.trace_id = "trace-eager-start"
+    ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    end = tsi.EndedCallSchemaForInsertWithStartedAt(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-eager-end",
+        ended_at=ended_at,
+        started_at=ended_at - datetime.timedelta(seconds=1),
+        summary={"result": "Test summary"},
+    )
+
+    # _update_client_headers() would .copy() the client (dropping the mock) when
+    # a retry id is active; no-op it so the instance-level post mock is used.
+    server._update_client_headers = MagicMock()
+    post_mock = MagicMock()
+    server._stainless_client.post = post_mock
+
+    try:
+        server._flush_calls_eager(
+            [
+                StartBatchItem(req=tsi.CallStartReq(start=start)),
+                EndBatchItem(req=tsi.CallEndReq(end=end)),
+            ]
+        )
+
+        urls = [call.args[0] for call in post_mock.call_args_list]
+        assert urls == [
+            "/v2/entity/project/call/start",
+            "/v2/entity/project/call/end",
+        ]
+        start_headers = post_mock.call_args_list[0].kwargs["options"]["headers"]
+        end_headers = post_mock.call_args_list[1].kwargs["options"]["headers"]
+        assert start_headers[TRACE_ID_HEADER] == start.trace_id
+        assert end_headers[TRACE_ID_HEADER] == end.trace_id
+
+        end_payload = json.loads(
+            post_mock.call_args_list[1].kwargs["content"].decode("utf-8")
+        )
+        assert end_payload["end"]["id"] == "call-id"
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()

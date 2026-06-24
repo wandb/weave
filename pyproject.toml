@@ -59,6 +59,11 @@ dependencies = [
   # google-adk (which pins sdk<=1.41.1) an unsatisfiable install. The ADK
   # integration vendors the GenAI keys it needs in
   # weave/integrations/google_adk/_semconv.py instead of importing them.
+  # Generated Weave Trace API client; backs the remote trace server bindings.
+  # INTERIM: sourced from test PyPI via the [tool.uv] index config below until
+  # the SDK is published to real PyPI. Repoint (drop the testpypi index/source)
+  # before any weave release.
+  "weave_server_sdk==0.0.2",
 ]
 
 [project.optional-dependencies]
@@ -531,6 +536,19 @@ conflicts = [
     { extra = "gepa" },
   ],
 ]
+
+# INTERIM test-PyPI source for weave_server_sdk. `explicit = true` means this
+# index is consulted ONLY for packages that opt in via [tool.uv.sources] below,
+# so every other (transitive) dependency still resolves from the default PyPI —
+# this avoids dependency-confusion. Remove this index + the source mapping once
+# weave_server_sdk is published to real PyPI.
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+explicit = true
+
+[tool.uv.sources]
+weave_server_sdk = { index = "testpypi" }
 
 # uv workspace members. Each listed path is a sibling Python package that uv
 # manages alongside the root `weave` project. Members can depend on each
