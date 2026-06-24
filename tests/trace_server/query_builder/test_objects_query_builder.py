@@ -66,7 +66,13 @@ def test_make_object_id_conditions_part():
 
 def test_object_query_builder_basic():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    assert "project_id = {project_id: String}" in builder.make_metadata_query()
+    assert_sql(
+        builder.make_metadata_query(),
+        _expected_metadata_query(
+            "ov.project_id = {project_id: String}",
+            "WHERE deleted_at IS NULL\nORDER BY created_at ASC",
+        ),
+    )
     assert builder.parameters["project_id"] == "test_project"
 
 
@@ -75,12 +81,14 @@ def test_object_query_builder_add_digest_condition():
 
     # Test latest digest
     builder.add_digests_conditions("latest")
-    assert "is_latest = 1" in builder.conditions_part
+    assert builder.conditions_part == "WHERE ((is_latest = 1) AND (deleted_at IS NULL))"
 
     # Test specific digest
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_digests_conditions("abc123")
-    assert "digest = {version_digest_0: String}" in builder.conditions_part
+    assert builder.conditions_part == (
+        "WHERE ((digest = {version_digest_0: String}) AND (deleted_at IS NULL))"
+    )
     assert builder.parameters["version_digest_0"] == "abc123"
 
 
@@ -89,7 +97,7 @@ def test_object_query_builder_add_object_ids_condition():
 
     # Test single object ID
     builder.add_object_ids_condition(["obj1"])
-    assert "object_id = {object_id: String}" in builder.object_id_conditions_part
+    assert builder.object_id_conditions_part == " AND object_id = {object_id: String}"
     assert builder.parameters["object_id"] == "obj1"
 
     # Test multiple object IDs
@@ -104,7 +112,7 @@ def test_object_query_builder_add_object_ids_condition():
 def test_object_query_builder_add_is_op_condition():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
-    assert "is_op = 1" in builder.conditions_part
+    assert builder.conditions_part == "WHERE ((is_op = 1) AND (deleted_at IS NULL))"
 
 
 def test_object_query_builder_limit_offset():
