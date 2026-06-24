@@ -192,7 +192,9 @@ def part_types(msgs: list[dict[str, Any]]) -> set[str]:
 
 def test_conversation_manager_selects_exporter_by_flag() -> None:
     """The dispatcher flag picks the destination; legacy path is untouched."""
-    assert isinstance(ConversationManager(use_otel=True).state_exporter, OTelStateExporter)
+    assert isinstance(
+        ConversationManager(use_otel=True).state_exporter, OTelStateExporter
+    )
     legacy = ConversationManager(use_otel=False).state_exporter
     assert isinstance(legacy, StateExporter)
     assert not isinstance(legacy, OTelStateExporter)
