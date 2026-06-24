@@ -34,10 +34,10 @@ def bedrock_on_finish_converse(
             "total_tokens": output_usage["totalTokens"],
         }
         # Bedrock Converse API returns cache tokens when prompt caching is used
-        cache_read = output_usage.get("cacheReadInputTokenCount")
+        cache_read = output_usage.get("cacheReadInputTokens")
         if cache_read is not None:
             tokens_metrics["cache_read_input_tokens"] = cache_read
-        cache_write = output_usage.get("cacheWriteInputTokenCount")
+        cache_write = output_usage.get("cacheWriteInputTokens")
         if cache_write is not None:
             tokens_metrics["cache_creation_input_tokens"] = cache_write
         usage[model_name].update(tokens_metrics)
@@ -417,6 +417,17 @@ def bedrock_stream_accumulator(
             acc["usage"]["inputTokens"] = metadata["usage"].get("inputTokens", 0)
             acc["usage"]["outputTokens"] = metadata["usage"].get("outputTokens", 0)
             acc["usage"]["totalTokens"] = metadata["usage"].get("totalTokens", 0)
+            # Carry the prompt-caching token counts so the shared finish handler
+            # (bedrock_on_finish_converse) records them, matching the
+            # non-streaming converse path.
+            if "cacheReadInputTokens" in metadata["usage"]:
+                acc["usage"]["cacheReadInputTokens"] = metadata["usage"][
+                    "cacheReadInputTokens"
+                ]
+            if "cacheWriteInputTokens" in metadata["usage"]:
+                acc["usage"]["cacheWriteInputTokens"] = metadata["usage"][
+                    "cacheWriteInputTokens"
+                ]
         if "metrics" in metadata:
             acc["latency_ms"] = metadata["metrics"].get("latencyMs", 0)
 
