@@ -107,6 +107,22 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.trace_server.agents.types import (
+    DEFAULT_AGENT_QUERY_LIMIT,
+    MAX_CONVERSATION_CHAT_TURNS,
+    AgentConversationChatReq,
+    AgentConversationChatRes,
+    AgentSortBy,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+    AgentsQueryFilters,
+    AgentsQueryReq,
+    AgentsQueryRes,
+    AgentTraceChatReq,
+    AgentTraceChatRes,
+    AgentVersionsQueryReq,
+    AgentVersionsQueryRes,
+)
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
@@ -258,6 +274,22 @@ def _add_scored_by_to_calls_query(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
     return Query.model_validate({"$expr": {"$and": exprs}})
+
+
+def _agent_spans_query_filter(
+    agent_name: str | None, query: Query | None
+) -> Query | None:
+    """Build the ``get_agent_spans`` filter from the ``agent_name`` shortcut.
+
+    Mirrors the TS SDK: ``agent_name`` becomes an ``$eq`` on the ``agent_name``
+    field, AND-combined with any user-supplied ``query`` when both are present.
+    """
+    if agent_name is None:
+        return query
+    agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
+    if query is None:
+        return Query.model_validate({"$expr": agent_expr})
+    return Query.model_validate({"$expr": {"$and": [agent_expr, query.expr_]}})
 
 
 def get_obj_name(val: Any) -> str:
@@ -754,6 +786,209 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agents(
+        self,
+        *,
+        agent_name: str | None = None,
+        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        offset: int = 0,
+        sort_by: list[AgentSortBy] | None = None,
+    ) -> AgentsQueryRes:
+        """List agents in this project with aggregated stats.
+
+        Args:
+            agent_name: If set, restrict results to this agent.
+            limit: Maximum number of agents to return.
+            offset: Number of agents to skip (for pagination).
+            sort_by: Fields to sort the results by.
+
+        Returns:
+            An `AgentsQueryRes` with `agents` and `total_count`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agents(limit=20)
+            for agent in resp.agents:
+                print(agent.agent_name, agent.total_input_tokens)
+            ```
+        """
+        filters = (
+            AgentsQueryFilters(agent_name=agent_name)
+            if agent_name is not None
+            else None
+        )
+        return self.server.agent_agents_query(
+            AgentsQueryReq(
+                project_id=self.project_id,
+                filters=filters,
+                sort_by=sort_by,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_versions(
+        self,
+        *,
+        agent_name: str,
+        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        offset: int = 0,
+        sort_by: list[AgentSortBy] | None = None,
+    ) -> AgentVersionsQueryRes:
+        """List versions for a single agent, with aggregated stats.
+
+        Args:
+            agent_name: The agent whose versions to list.
+            limit: Maximum number of versions to return.
+            offset: Number of versions to skip (for pagination).
+            sort_by: Fields to sort the results by.
+
+        Returns:
+            An `AgentVersionsQueryRes` with `versions` and `total_count`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_versions(agent_name="my-agent")
+            for version in resp.versions:
+                print(version.agent_version, version.total_input_tokens)
+            ```
+        """
+        return self.server.agent_versions_query(
+            AgentVersionsQueryReq(
+                project_id=self.project_id,
+                agent_name=agent_name,
+                sort_by=sort_by,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_spans(
+        self,
+        *,
+        agent_name: str | None = None,
+        query: Query | None = None,
+        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        offset: int = 0,
+        sort_by: list[AgentSortBy] | None = None,
+    ) -> AgentSpansQueryRes:
+        """Query agent spans for this project, optionally filtered.
+
+        Args:
+            agent_name: If set, restrict results to this agent (a convenience
+                shortcut for a `query` on the `agent_name` field).
+            query: A mongo-style filter expression. Combined with `agent_name`
+                via `$and` when both are provided.
+            limit: Maximum number of spans to return.
+            offset: Number of spans to skip (for pagination).
+            sort_by: Fields to sort the results by.
+
+        Returns:
+            An `AgentSpansQueryRes` with `spans` and `total_count`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_spans(agent_name="my-agent", limit=20)
+            for span in resp.spans:
+                print(span.span_id, span.span_name, span.input_tokens)
+            ```
+        """
+        return self.server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=self.project_id,
+                query=_agent_spans_query_filter(agent_name, query),
+                sort_by=sort_by,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_turn(
+        self,
+        *,
+        trace_id: str,
+        include_feedback: bool = False,
+    ) -> AgentTraceChatRes:
+        """Get the structured chat view (messages) for a single turn.
+
+        A turn corresponds to one trace.
+
+        Args:
+            trace_id: The trace whose chat view to fetch.
+            include_feedback: If true, include feedback on the messages.
+
+        Returns:
+            An `AgentTraceChatRes` with the ordered `messages` for the turn.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_turn(trace_id="...", include_feedback=True)
+            for message in resp.messages:
+                print(message.type)
+            ```
+        """
+        return self.server.agent_traces_chat(
+            AgentTraceChatReq(
+                project_id=self.project_id,
+                trace_id=trace_id,
+                include_feedback=include_feedback,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_turns(
+        self,
+        *,
+        conversation_id: str,
+        limit: int = MAX_CONVERSATION_CHAT_TURNS,
+        offset: int = 0,
+        include_feedback: bool = False,
+    ) -> AgentConversationChatRes:
+        """Get the multi-turn chat view for a conversation.
+
+        Each turn corresponds to one trace.
+
+        Args:
+            conversation_id: The conversation whose turns to fetch.
+            limit: Maximum number of turns to return.
+            offset: Number of most-recent turns to skip (for pagination).
+            include_feedback: If true, include feedback on the messages.
+
+        Returns:
+            An `AgentConversationChatRes` with the ordered `turns`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_turns(conversation_id="...", limit=20)
+            for turn in resp.turns:
+                for message in turn.messages:
+                    print(message.type)
+            ```
+        """
+        return self.server.agent_conversation_chat(
+            AgentConversationChatReq(
+                project_id=self.project_id,
+                conversation_id=conversation_id,
+                limit=limit,
+                offset=offset,
+                include_feedback=include_feedback,
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def create_annotation_queue(
