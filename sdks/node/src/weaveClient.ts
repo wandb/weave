@@ -13,6 +13,7 @@ import {
   type CallSchema,
   type CallsQueryReq,
   type CallsFilter,
+  ContentType,
   type EndedCallSchemaForInsert,
   type Query,
   type SortBy,
@@ -71,7 +72,8 @@ interface SerializedFileBlob {
  */
 type BatchItem =
   | {mode: 'start'; data: {start: CallStartParams}}
-  | {mode: 'end'; data: {end: CallEndParams}};
+  | {mode: 'end'; data: {end: CallEndParams}}
+  | {mode: 'complete'; data: {complete: CompletedCallParams}};
 
 export type CallStackEntry = {
   callId: string;
@@ -302,7 +304,18 @@ export class CallStack {
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
-type CallEndParams = EndedCallSchemaForInsert;
+type CallEndParams = EndedCallSchemaForInsert & {display_name?: string | null};
+
+// Merged start + end payload for the `calls/complete` endpoint.
+type CompletedCallParams = StartedCallSchemaForInsert & {
+  id: string;
+  trace_id: string;
+  ended_at: string;
+  output?: any;
+  summary: EndedCallSchemaForInsert['summary'];
+  exception?: string | null;
+  wb_run_step_end?: number | null;
+};
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
@@ -310,6 +323,11 @@ export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
   private callQueue: BatchItem[] = [];
+  // calls_complete pairing state: starts/ends wait here for their counterpart.
+  private pendingStarts: Map<string, CallStartParams> = new Map();
+  private pendingEnds: Map<string, CallEndParams> = new Map();
+  private eagerCallIds: Set<string> = new Set();
+  private useCallsComplete: boolean;
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -332,6 +350,7 @@ export class WeaveClient {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
     this.settings = makeSettings(settings);
+    this.useCallsComplete = this.settings.useCallsComplete;
   }
 
   /**
@@ -526,9 +545,31 @@ export class WeaveClient {
   }
 
   public async waitForBatchProcessing() {
+    this.flushPendingCallsToQueue();
     while (this.batchProcessingPromises.size > 0) {
       await Promise.all(this.batchProcessingPromises);
+      this.flushPendingCallsToQueue();
+      if (this.callQueue.length > 0) {
+        this.scheduleBatchProcessing();
+      }
     }
+  }
+
+  // Unpaired starts/ends at flush time (interrupted calls) are sent via the v2
+  // single endpoints so nothing is dropped.
+  private flushPendingCallsToQueue() {
+    if (this.pendingStarts.size === 0 && this.pendingEnds.size === 0) {
+      return;
+    }
+    for (const start of this.pendingStarts.values()) {
+      this.callQueue.push({mode: 'start', data: {start}});
+    }
+    this.pendingStarts.clear();
+    for (const end of this.pendingEnds.values()) {
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
+    this.pendingEnds.clear();
+    this.scheduleBatchProcessing();
   }
 
   private async processBatch() {
@@ -576,40 +617,124 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    const batchReq = {
-      batch: batchToProcess.map(item => {
-        if (item.mode === 'start') {
-          return {mode: 'start' as const, req: item.data};
-        }
-        return {mode: 'end' as const, req: item.data};
-      }),
-    };
-
     try {
-      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
-        batchReq
-      );
+      await this.sendBatch(batchToProcess);
     } catch (error) {
-      console.error('Error processing batch:', error);
-      this.errorCount++;
-      fs.appendFileSync(
-        WEAVE_ERRORS_LOG_FNAME,
-        `Error processing batch: ${error}\n`
-      );
+      // The project is pinned to calls_complete mode: switch paths and re-pair
+      // the failed legacy items instead of dropping them back as-is.
+      if (!this.useCallsComplete && isCallsCompleteModeError(error)) {
+        this.upgradeToCallsComplete(batchToProcess);
+      } else {
+        console.error('Error processing batch:', error);
+        this.errorCount++;
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Error processing batch: ${error}\n`
+        );
 
-      // Put failed items back at the front of the queue
-      this.callQueue.unshift(...batchToProcess);
+        // Put failed items back at the front of the queue
+        this.callQueue.unshift(...batchToProcess);
 
-      // Exit if we have too many errors
-      if (this.errorCount > this.MAX_ERRORS) {
-        console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
-        process.exit(1);
+        // Exit if we have too many errors
+        if (this.errorCount > this.MAX_ERRORS) {
+          console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
+          process.exit(1);
+        }
       }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
       if (this.callQueue.length > 0) {
         this.scheduleBatchProcessing();
+      }
+    }
+  }
+
+  // Routes a drained batch to the right endpoint(s): in calls_complete mode,
+  // paired completes go to `calls/complete` and any queued (eager) starts/ends
+  // go to the v2 single endpoints; otherwise the legacy upsert_batch path.
+  private async sendBatch(batch: BatchItem[]) {
+    if (!this.useCallsComplete) {
+      const startEnds = batch.filter(
+        (i): i is Extract<BatchItem, {mode: 'start' | 'end'}> =>
+          i.mode === 'start' || i.mode === 'end'
+      );
+      const batchReq = {
+        batch: startEnds.map(item =>
+          item.mode === 'start'
+            ? {mode: 'start' as const, req: item.data}
+            : {mode: 'end' as const, req: item.data}
+        ),
+      };
+      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
+        batchReq
+      );
+      return;
+    }
+
+    const completes: CompletedCallParams[] = [];
+    for (const item of batch) {
+      if (item.mode === 'complete') {
+        completes.push(item.data.complete);
+      }
+    }
+    if (completes.length > 0) {
+      await this.sendCallsComplete(completes);
+    }
+    for (const item of batch) {
+      if (item.mode === 'start') {
+        await this.sendCallStartV2(item.data.start);
+      } else if (item.mode === 'end') {
+        await this.sendCallEndV2(item.data.end);
+      }
+    }
+  }
+
+  private async sendCallsComplete(batch: CompletedCallParams[]) {
+    await this.traceServerApi.request({
+      path: `/v2/${this.projectId}/calls/complete`,
+      method: 'POST',
+      body: {batch},
+      type: ContentType.Json,
+      format: 'json',
+    });
+  }
+
+  private async sendCallStartV2(start: CallStartParams) {
+    await this.traceServerApi.request({
+      path: `/v2/${this.projectId}/call/start`,
+      method: 'POST',
+      body: {start},
+      type: ContentType.Json,
+      format: 'json',
+    });
+  }
+
+  private async sendCallEndV2(end: CallEndParams) {
+    await this.traceServerApi.request({
+      path: `/v2/${this.projectId}/call/end`,
+      method: 'POST',
+      body: {end},
+      type: ContentType.Json,
+      format: 'json',
+    });
+  }
+
+  // Re-pair the failed legacy batch through the calls_complete path.
+  private upgradeToCallsComplete(batch: BatchItem[]) {
+    if (!this.useCallsComplete) {
+      console.warn(
+        'Project requires calls_complete mode; upgrading the SDK to the calls_complete path.'
+      );
+      this.useCallsComplete = true;
+    }
+    for (const item of batch) {
+      if (item.mode === 'start') {
+        this.saveCallStart(item.data.start);
+      } else if (item.mode === 'end') {
+        this.saveCallEnd(item.data.end);
+      } else {
+        this.callQueue.push(item);
       }
     }
   }
@@ -1196,14 +1321,70 @@ export class WeaveClient {
     }
   }
 
-  public saveCallStart(callStart: CallStartParams) {
-    this.callQueue.push({mode: 'start', data: {start: callStart}});
-    this.scheduleBatchProcessing();
+  public saveCallStart(
+    callStart: CallStartParams,
+    opts: {eager?: boolean} = {}
+  ) {
+    const callId = callStart.id;
+    if (!this.useCallsComplete || callId == null) {
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    // Eager: send the start now via the v2 single endpoint so long-running ops
+    // are visible before they finish; the end is routed the same way.
+    if (opts.eager) {
+      this.eagerCallIds.add(callId);
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      const racedEnd = this.pendingEnds.get(callId);
+      if (racedEnd) {
+        this.pendingEnds.delete(callId);
+        this.callQueue.push({mode: 'end', data: {end: racedEnd}});
+      }
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingEnd = this.pendingEnds.get(callId);
+    if (pendingEnd) {
+      this.pendingEnds.delete(callId);
+      this.callQueue.push({
+        mode: 'complete',
+        data: {complete: mergeToComplete(callStart, pendingEnd)},
+      });
+      this.scheduleBatchProcessing();
+    } else {
+      this.pendingStarts.set(callId, callStart);
+    }
   }
 
   public saveCallEnd(callEnd: CallEndParams) {
-    this.callQueue.push({mode: 'end', data: {end: callEnd}});
-    this.scheduleBatchProcessing();
+    const callId = callEnd.id;
+    if (!this.useCallsComplete) {
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    if (this.eagerCallIds.has(callId)) {
+      this.eagerCallIds.delete(callId);
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingStart = this.pendingStarts.get(callId);
+    if (pendingStart) {
+      this.pendingStarts.delete(callId);
+      this.callQueue.push({
+        mode: 'complete',
+        data: {complete: mergeToComplete(pendingStart, callEnd)},
+      });
+      this.scheduleBatchProcessing();
+    } else {
+      this.pendingEnds.set(callId, callEnd);
+    }
   }
 
   public getCallStack(): CallStack {
@@ -1304,7 +1485,8 @@ export class WeaveClient {
     parentCall: CallStackEntry | undefined,
     startTime: Date,
     displayName?: string,
-    attributes?: Record<string, any>
+    attributes?: Record<string, any>,
+    eagerCallStart: boolean = false
   ) {
     // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
     // the in-memory call stack. Store the short op name for stack lookup
@@ -1351,7 +1533,7 @@ export class WeaveClient {
     };
     internalCall.updateWithCallSchemaData(startReq);
     internalCall.state = CallState.pending;
-    return this.saveCallStart(startReq);
+    return this.saveCallStart(startReq, {eager: eagerCallStart});
   }
 
   public async finishCall(
@@ -1384,6 +1566,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      started_at: call.callSchema.started_at,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1421,6 +1604,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      started_at: call.callSchema.started_at,
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1491,6 +1675,45 @@ export class WeaveClient {
 
     return response.data.id;
   }
+}
+
+// Server error_code returned on the legacy path when a project is pinned to
+// calls_complete mode.
+const CALLS_COMPLETE_MODE_REQUIRED = 'CALLS_COMPLETE_MODE_REQUIRED';
+
+function mergeToComplete(
+  start: CallStartParams,
+  end: CallEndParams
+): CompletedCallParams {
+  if (start.id == null || start.trace_id == null) {
+    throw new Error(
+      'Cannot create complete call: start missing id or trace_id'
+    );
+  }
+  return {
+    ...start,
+    id: start.id,
+    trace_id: start.trace_id,
+    display_name: end.display_name ?? start.display_name,
+    ended_at: end.ended_at,
+    output: end.output,
+    summary: end.summary,
+    exception: end.exception ?? null,
+    wb_run_step_end: end.wb_run_step_end ?? null,
+  };
+}
+
+function isCallsCompleteModeError(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') {
+    return false;
+  }
+  const body = (error as {error?: unknown}).error;
+  if (body == null || typeof body !== 'object') {
+    return false;
+  }
+  return (
+    (body as {error_code?: unknown}).error_code === CALLS_COMPLETE_MODE_REQUIRED
+  );
 }
 
 /**

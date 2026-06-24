@@ -633,7 +633,8 @@ export class EvaluationLogger {
       undefined, // No parent (root call)
       startTime,
       undefined, // displayName
-      {...IMPERATIVE_EVAL_MARKER, ...this.evalAttributes} // Merge eval attributes
+      {...IMPERATIVE_EVAL_MARKER, ...this.evalAttributes}, // Merge eval attributes
+      true // eagerCallStart: eval root must be visible before it finishes
     );
     await evaluateStartPromise;
 

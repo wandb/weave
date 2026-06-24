@@ -216,6 +216,7 @@ describe('WeaveClient', () => {
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi,
         projectId: 'test-project',
+        settings: {useCallsComplete: false},
       });
       // Speed up tests by reducing batch interval
       (client as any).BATCH_INTERVAL = 10;

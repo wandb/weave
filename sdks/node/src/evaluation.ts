@@ -153,6 +153,7 @@ export class Evaluation<
     this.scorers = parameters.scorers;
     this.evaluate = op(this, this.evaluate, {
       parameterNames: 'useParam0Object',
+      eagerCallStart: true,
       callDisplayName: inputs =>
         `${this.name}_${weaveCallableName(inputs.model)}`,
     });

@@ -168,7 +168,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       parentCall,
       startTime,
       displayName,
-      Object.keys(attributes).length > 0 ? attributes : undefined
+      Object.keys(attributes).length > 0 ? attributes : undefined,
+      options?.eagerCallStart ?? false
     );
 
     try {
