@@ -248,3 +248,6 @@ grep), don't trust a clean restack.
 
 ## Addendum — googleGenAI.ts wrap-case comment
 Reviewer (re isAdkInternalClientOptions, googleGenAI.ts:256) asked to spell out the else/wrap case in a comment. Added at the call site: "// The user is using GoogleGenAI directly, not through ADK: wrap it." isAdkInternalClientOptions is true ONLY for ADK-internal clients (skipped — WeaveAdkPlugin already traces them as chat spans, so wrapping would double-count); the wrap branch is standalone GenAI use. Comment-only; slice 02 amended, 03/05/06 clean-restacked (notes re-copied).
+
+## Addendum — use existing semconv consts for gen_ai.request.* attrs
+Reviewer (googleAdk.ts:375) asked to pull the inline 'gen_ai.request.*' attribute-key string literals into the semconv file / use consts. Found all 8 (temperature, top_p, max_tokens, frequency_penalty, presence_penalty, seed, stop_sequences, choice.count) ALREADY exist as ATTR_GEN_AI_REQUEST_* consts in src/genai/semconv.ts with byte-identical values — setLlmRequestAttributes was just inlining the literals instead of importing them. Added the 8 imports + replaced the literals; no semconv changes needed. Matches how the rest of the file already uses ATTR_GEN_AI_* consts. Slice 02; jest 19/19.
