@@ -346,3 +346,36 @@ describe('send error handling', () => {
     expect(queue.callQueue.length).toBe(before);
   });
 });
+
+describe('flush + pendingCallCount (clean-shutdown surface)', () => {
+  let traceServer: InMemoryTraceServer;
+
+  beforeEach(() => {
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(projectId, traceServer);
+  });
+
+  test('pendingCallCount tracks buffered work and flush drains + delivers it', async () => {
+    const c = client();
+    expect(c.pendingCallCount()).toBe(0);
+
+    // A held start (its end has not arrived) is buffered, so it counts.
+    c.saveCallStart({
+      project_id: projectId,
+      id: 'pending-1',
+      trace_id: 'trace-1',
+      op_name: 'weave:///x/op/o:1',
+      started_at: new Date().toISOString(),
+      attributes: {},
+      inputs: {},
+    });
+    expect(c.pendingCallCount()).toBeGreaterThan(0);
+
+    await c.flush();
+
+    // Drained to zero and the buffered call actually reached the server.
+    expect(c.pendingCallCount()).toBe(0);
+    const calls = await traceServer.getCalls(projectId);
+    expect(calls.map(call => call.id)).toContain('pending-1');
+  });
+});

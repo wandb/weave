@@ -1,6 +1,7 @@
 export {
   init,
   login,
+  flush,
   withAttributes,
   requireCurrentCallStackEntry,
   requireCurrentChildSummary,

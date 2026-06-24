@@ -559,6 +559,18 @@ export class WeaveClient {
     }
   }
 
+  /** Deliver all buffered calls to the server. Await before `process.exit()`. */
+  public async flush(): Promise<void> {
+    await this.waitForBatchProcessing();
+  }
+
+  /** Calls buffered client-side but not yet delivered to the server. */
+  public pendingCallCount(): number {
+    return (
+      this.callQueue.length + this.pendingStarts.size + this.pendingEnds.size
+    );
+  }
+
   // Unpaired starts/ends at flush time (interrupted calls) are sent via the v2
   // single endpoints so nothing is dropped.
   private flushPendingCallsToQueue() {
