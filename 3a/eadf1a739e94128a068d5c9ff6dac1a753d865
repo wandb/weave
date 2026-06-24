@@ -1,0 +1,42 @@
+## Conversation
+User: "Continue removing the importlinter violations", then mid-way: "stage these
+changes in a stack of PRs so it's easy to review ... we can't factor things into a
+shared dir because the goal is to disentangle the dirs and move it out of the repo
+entirely. See the other PRs for examples." This is PR 1 of a 2-PR stack reducing
+Contract 2 (client must not import trace_server). Continues the decouple-01..04
+stack (#7357/#7359 merged, #7360 open).
+
+## Actions
+- Mapped Contract 2's 65 ignores into tiers (leaf utils / shared contract data /
+  wire-contract codegen / builtin-object knot). Consulted Codex on which leaves are
+  safe to hand-vendor.
+- ids: pure RFC9562 UUIDv7 generate_id, zero weave deps, used by BOTH client and
+  server (server: clickhouse/feedback/in_memory) -> can't move, must vendor.
+- Created weave/utils/ids.py (verbatim copy + header). Repointed 5 client importers:
+  trace/api.py, trace/weave_client.py, trace_server_bindings/{remote_http,stainless_
+  remote_http}_trace_server.py, utils/retry.py. ruff --fix for import order.
+- pyproject.toml: removed the 5 '-> weave.trace_server.ids' rows from Contract 2;
+  dropped 'ids' from the strategy comment.
+
+## Errors & mistakes
+- Initial Edits failed ('File has not been read yet') — had to Read each file first.
+- `prek run --hook-stage=pre-push` (full lint) got OOM-killed (exit 137) running
+  mypy+pyright+ty together. Did NOT re-run full prek; relied on targeted checks.
+
+## How this was split from the combined work
+Originally implemented ids+constants together on andrew/remove-importlinter-violations,
+then restructured into a stack per user request. Backup commit 0c900a3 holds the
+combined work. Branch built off origin/master (58285d4c6b); ids-only files recovered
+from backup via `git checkout 0c900a3 -- <file>`; weave_client.py (also touched by
+constants) + pyproject.toml hand-edited to ids-only state.
+
+## Verification
+lint-imports: 3 kept / 0 broken on this branch in isolation (constants imports still
+present + still ignored, so contract holds). `import weave` + generate_id() smoke OK.
+ruff clean.
+
+## Hints & warnings
+- Server keeps weave/trace_server/ids.py (it uses generate_id too) — do NOT delete it.
+- Next in stack: andrew/decouple-client-constants (vendor client-used constants +
+  parity test). Errors/common_interface/feedback_types are deferred (errors is a
+  cross-process raise/catch trap; wire models are codegen-territory).
