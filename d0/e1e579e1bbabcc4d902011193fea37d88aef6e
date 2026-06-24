@@ -43,3 +43,12 @@ pre-push OOM-killed earlier (mypy+pyright+ty), not re-run.
 
 ## Build mechanics
 Stacked on andrew/decouple-client-ids. Amended once to drop the parity test per user.
+
+## Update: cross-fence behavior test (added after user asked to confirm both impls match)
+Added a golden-value test on BOTH sides: tests/utils/test_constants.py (client) and
+tests/trace_server/test_constants.py (server), each loading a byte-identical
+constants_golden.jsonl (14 entries; tuple OP_NAMES stored as JSON list, normalized on
+compare). Client test asserts its module == the golden set exactly; server test asserts
+the server (a superset) contains each golden name with the matching value. Fixtures
+DUPLICATED per side (not shared) for move-safety. ruff rewrote the import to
+'from weave.{utils,trace_server} import constants' (PLR0402).
