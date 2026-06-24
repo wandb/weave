@@ -92,6 +92,23 @@ def _req(**kwargs) -> AgentSpanStatsReq:
     return AgentSpanStatsReq(**defaults)
 
 
+def test_time_bucket_epoch_bounds_are_whole_second_ints() -> None:
+    """Epoch bounds bind as whole-second ints; a `.0` float trips ClickHouse Int64 param parsing (400 on `/agents/spans/stats`)."""
+    start = datetime.datetime(
+        2026, 1, 1, 0, 0, 30, 500000, tzinfo=datetime.timezone.utc
+    )
+    end = datetime.datetime(2026, 1, 1, 1, 0, 0, 750000, tzinfo=datetime.timezone.utc)
+    params = build_agent_span_stats_query(
+        _req(start=start, end=end), ParamBuilder("genai")
+    ).parameters
+    start_epoch = int(start.timestamp())
+    end_epoch = int(end.timestamp())
+    assert start_epoch in params.values()
+    assert end_epoch in params.values()
+    epochs = [v for v in params.values() if v in {start_epoch, end_epoch}]
+    assert [type(v) for v in epochs] == [int, int]
+
+
 def test_ungrouped_stats_query_full_sql_shape() -> None:
     pb = ParamBuilder("genai")
     req = _req(
