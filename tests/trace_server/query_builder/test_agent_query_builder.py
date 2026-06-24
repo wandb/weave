@@ -415,8 +415,25 @@ class TestMakeConversationPreviewsQuery:
         )
         # Time bounds let ClickHouse prune partitions / primary-key ranges so the
         # wide message columns are read for an even smaller slice.
-        assert "s.started_at >= {genai_2:DateTime64(6)}" in query
-        assert "s.started_at < {genai_3:DateTime64(6)}" in query
+        expected = """
+            SELECT s.conversation_id AS conversation_id,
+                   argMinIf(s.input_messages, s.started_at, length(s.input_messages) > 0) AS first_input_messages,
+                   argMaxIf(s.output_messages, s.ended_at, length(s.output_messages) > 0) AS last_output_messages
+            FROM spans s
+            WHERE s.project_id = {genai_0:String} AND s.conversation_id IN {genai_1:Array(String)} AND s.started_at >= {genai_2:DateTime64(6)} AND s.started_at < {genai_3:DateTime64(6)}
+            GROUP BY conversation_id
+        """
+        assert_sql(
+            expected,
+            {
+                "genai_0": "p1",
+                "genai_1": ["conv-a"],
+                "genai_2": start,
+                "genai_3": end,
+            },
+            query,
+            pb.get_params(),
+        )
 
 
 class TestMakeGroupedSpansCountQuery:
