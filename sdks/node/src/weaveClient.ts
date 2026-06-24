@@ -311,7 +311,7 @@ type CompletedCallParams = StartedCallSchemaForInsert & {
   id: string;
   trace_id: string;
   ended_at: string;
-  output?: any;
+  output?: EndedCallSchemaForInsert['output'];
   summary: EndedCallSchemaForInsert['summary'];
   exception?: string | null;
   wb_run_step_end?: number | null;
@@ -627,6 +627,8 @@ export class WeaveClient {
 
     try {
       await this.sendBatch(batchToProcess);
+      // A clean send clears the streak: errorCount is consecutive, not lifetime.
+      this.errorCount = 0;
     } catch (error) {
       // The project is pinned to calls_complete mode: switch paths and re-pair
       // the failed legacy items instead of dropping them back as-is.
@@ -648,7 +650,9 @@ export class WeaveClient {
           `Error processing batch: ${error}\n`
         );
 
-        // Put failed items back at the front of the queue
+        // Put failed items back at the front of the queue.
+        // TODO: retry with exponential backoff (mirror the Python SDK's
+        // tenacity-based retry) instead of an immediate requeue at BATCH_INTERVAL.
         this.callQueue.unshift(...batchToProcess);
 
         // Give up gracefully after too many errors. An SDK must never kill the
@@ -663,6 +667,7 @@ export class WeaveClient {
           this.callQueue = [];
           this.pendingStarts.clear();
           this.pendingEnds.clear();
+          this.eagerCallIds.clear();
         }
       }
     } finally {
@@ -696,8 +701,6 @@ export class WeaveClient {
       return;
     }
 
-    // Completes are one request (all-or-nothing); a failure propagates to the
-    // caller's retry/drop handling.
     const completes: CompletedCallParams[] = [];
     for (const item of batch) {
       if (item.mode === 'complete') {
@@ -705,7 +708,7 @@ export class WeaveClient {
       }
     }
     if (completes.length > 0) {
-      await this.sendCallsComplete(completes);
+      await this.sendCompletes(completes);
     }
     // Eager start/end items are sent individually and isolated per item: a
     // non-retryable failure drops just that item; a retryable one requeues it.
@@ -720,16 +723,50 @@ export class WeaveClient {
           await this.sendCallEndV2(item.data.end);
         }
       } catch (error) {
-        if (isRetryableError(error)) {
-          this.callQueue.unshift(item);
-        } else {
-          console.error('Dropping eager call (non-retryable error):', error);
-          fs.appendFileSync(
-            WEAVE_ERRORS_LOG_FNAME,
-            `Dropping eager ${item.mode} (non-retryable): ${error}\n`
-          );
-        }
+        this.requeueOrDrop(item, error);
       }
+    }
+  }
+
+  // Send paired completes as one request. A retryable failure propagates so the
+  // whole batch requeues; a non-retryable batch rejection means at least one
+  // call is bad, so retry each alone (mirrors the Python SDK's per-item
+  // fallback) and one poison call cannot drop its batch-mates.
+  private async sendCompletes(completes: CompletedCallParams[]) {
+    try {
+      await this.sendCallsComplete(completes);
+      return;
+    } catch (error) {
+      if (isRetryableError(error)) {
+        throw error;
+      }
+      if (completes.length === 1) {
+        this.requeueOrDrop(
+          {mode: 'complete', data: {complete: completes[0]}},
+          error
+        );
+        return;
+      }
+    }
+    for (const complete of completes) {
+      try {
+        await this.sendCallsComplete([complete]);
+      } catch (itemError) {
+        this.requeueOrDrop({mode: 'complete', data: {complete}}, itemError);
+      }
+    }
+  }
+
+  // Requeue a failed item on a retryable error; drop it (with a log) otherwise.
+  private requeueOrDrop(item: BatchItem, error: unknown) {
+    if (isRetryableError(error)) {
+      this.callQueue.unshift(item);
+    } else {
+      console.error(`Dropping ${item.mode} (non-retryable error):`, error);
+      fs.appendFileSync(
+        WEAVE_ERRORS_LOG_FNAME,
+        `Dropping ${item.mode} (non-retryable): ${error}\n`
+      );
     }
   }
 
@@ -1396,11 +1433,7 @@ export class WeaveClient {
     const pendingEnd = this.pendingEnds.get(callId);
     if (pendingEnd) {
       this.pendingEnds.delete(callId);
-      this.callQueue.push({
-        mode: 'complete',
-        data: {complete: mergeToComplete(callStart, pendingEnd)},
-      });
-      this.scheduleBatchProcessing();
+      this.queueComplete(callStart, pendingEnd);
     } else {
       this.pendingStarts.set(callId, callStart);
     }
@@ -1425,14 +1458,23 @@ export class WeaveClient {
     const pendingStart = this.pendingStarts.get(callId);
     if (pendingStart) {
       this.pendingStarts.delete(callId);
-      this.callQueue.push({
-        mode: 'complete',
-        data: {complete: mergeToComplete(pendingStart, callEnd)},
-      });
-      this.scheduleBatchProcessing();
+      this.queueComplete(pendingStart, callEnd);
     } else {
       this.pendingEnds.set(callId, callEnd);
     }
+  }
+
+  // Pair a start with its end into one complete, or fall back to shipping them
+  // as separate start/end items when they cannot be merged.
+  private queueComplete(start: CallStartParams, end: CallEndParams) {
+    const complete = mergeToComplete(start, end);
+    if (complete) {
+      this.callQueue.push({mode: 'complete', data: {complete}});
+    } else {
+      this.callQueue.push({mode: 'start', data: {start}});
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
+    this.scheduleBatchProcessing();
   }
 
   public getCallStack(): CallStack {
@@ -1729,14 +1771,15 @@ export class WeaveClient {
 // calls_complete mode.
 const CALLS_COMPLETE_MODE_REQUIRED = 'CALLS_COMPLETE_MODE_REQUIRED';
 
+// Returns null (rather than throwing) when the start lacks id/trace_id so the
+// caller can fall back to separate start/end items: tracing must never throw
+// into user code (mirrors the Python SDK, which swallows logging errors).
 function mergeToComplete(
   start: CallStartParams,
   end: CallEndParams
-): CompletedCallParams {
+): CompletedCallParams | null {
   if (start.id == null || start.trace_id == null) {
-    throw new Error(
-      'Cannot create complete call: start missing id or trace_id'
-    );
+    return null;
   }
   // Spread both so any field added to the end payload flows through without
   // editing this function; the start is authoritative for the identity/timing

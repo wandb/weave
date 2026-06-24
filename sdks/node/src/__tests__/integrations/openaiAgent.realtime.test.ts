@@ -1,6 +1,9 @@
 import {EventEmitter} from 'events';
 import {getGlobalClient} from '../../clientApi';
-import {WeaveRealtimeTracingAdapter} from '../../integrations/openai.realtime.agent';
+import {
+  WeaveRealtimeTracingAdapter,
+  type WeaveRealtimeTracingAdapterOptions,
+} from '../../integrations/openai.realtime.agent';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
 
@@ -20,9 +23,9 @@ async function flush() {
   await client.waitForBatchProcessing();
 }
 
-function createAdapter() {
+function createAdapter(options?: WeaveRealtimeTracingAdapterOptions) {
   const session = makeMockSession();
-  const adapter = new WeaveRealtimeTracingAdapter(session);
+  const adapter = new WeaveRealtimeTracingAdapter(session, options);
   return {session, adapter};
 }
 
@@ -59,6 +62,44 @@ describe('WeaveRealtimeTracingAdapter', () => {
     expect(
       mine.every(i => i.meta?.package_name === '@openai/agents-realtime')
     ).toBe(true);
+  });
+
+  test('default session root is held pending, visible only after flush', async () => {
+    const requestSpy = jest.spyOn(inMemoryTraceServer, 'request');
+    const {session} = createAdapter();
+    session.emit('transport_event', {
+      type: 'session.created',
+      session: {model: 'gpt-4o-realtime'},
+    });
+
+    // No eager start: nothing reaches the server until the session pairs/flushes.
+    expect(requestSpy).not.toHaveBeenCalled();
+    await flush();
+    expect(
+      requestSpy.mock.calls.some(([p]) =>
+        (p as {path: string}).path.endsWith('/call/start')
+      )
+    ).toBe(true);
+  });
+
+  test('eagerSessionRoot sends the root start immediately, before close', async () => {
+    const requestSpy = jest.spyOn(inMemoryTraceServer, 'request');
+    const {session} = createAdapter({eagerSessionRoot: true});
+    session.emit('transport_event', {
+      type: 'session.created',
+      session: {model: 'gpt-4o-realtime'},
+    });
+    await getGlobalClient()!.waitForBatchProcessing();
+
+    // The root is visible while still open, sent via the eager v2 start endpoint.
+    const startPaths = requestSpy.mock.calls
+      .map(([p]) => (p as {path: string}).path)
+      .filter(path => path.endsWith('/call/start'));
+    expect(startPaths).toHaveLength(1);
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].op_name).toBe('realtime.session');
+    expect(calls[0].ended_at).toBeUndefined();
   });
 
   test('session.updated records an instantaneous session update call', async () => {
