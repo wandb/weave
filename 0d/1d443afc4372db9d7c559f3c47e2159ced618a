@@ -251,3 +251,6 @@ Reviewer (re isAdkInternalClientOptions, googleGenAI.ts:256) asked to spell out 
 
 ## Addendum — use existing semconv consts for gen_ai.request.* attrs
 Reviewer (googleAdk.ts:375) asked to pull the inline 'gen_ai.request.*' attribute-key string literals into the semconv file / use consts. Found all 8 (temperature, top_p, max_tokens, frequency_penalty, presence_penalty, seed, stop_sequences, choice.count) ALREADY exist as ATTR_GEN_AI_REQUEST_* consts in src/genai/semconv.ts with byte-identical values — setLlmRequestAttributes was just inlining the literals instead of importing them. Added the 8 imports + replaced the literals; no semconv changes needed. Matches how the rest of the file already uses ATTR_GEN_AI_* consts. Slice 02; jest 19/19.
+
+## Addendum — rebased onto origin/master 58285d4c6b
+Restacked the whole stack onto latest origin/master (was 841d7f879e). The 3 new commits are Python-only (eval predict-token-total #7364, trace-server owns AgentSpanOpName #7357, prompt/type_wrappers decouple) — zero sdks/node overlap, so the rebase was conflict-free and slice content is unchanged (re-parent only). Tip green: typecheck/eslint/jest 26/26.
