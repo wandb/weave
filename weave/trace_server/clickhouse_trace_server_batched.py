@@ -1143,16 +1143,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Raises:
             NotFoundError: If no start row exists for (project_id, id).
         """
-        table_name = self._get_calls_complete_table_name()
+        update_table_name = self._get_calls_complete_table_name()
+        # Reads hit the distributed `calls_complete` so the existence check sees
+        # rows on every shard; the local-table UPDATE fans out via ON CLUSTER.
+        read_table_name = "calls_complete"
 
         # Confirm the row exists before the UPDATE (full PK fast path, then a
         # (project_id, id) fallback) so a wrong started_at can't silently no-op.
         started_at = end_call.started_at
         if started_at is None or not self._calls_complete_call_exists(
-            table_name, end_call.project_id, end_call.id, started_at
+            read_table_name, end_call.project_id, end_call.id, started_at
         ):
             started_at = self._read_calls_complete_started_at(
-                table_name, end_call.project_id, end_call.id
+                read_table_name, end_call.project_id, end_call.id
             )
             if started_at is None:
                 raise NotFoundError(
@@ -1188,7 +1191,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         started_at_param = pb.add_param(started_at_us)
 
         query = build_calls_complete_update_end_query(
-            table_name=table_name,
+            table_name=update_table_name,
             project_id_param=project_id_param,
             id_param=id_param,
             ended_at_param=ended_at_param,
