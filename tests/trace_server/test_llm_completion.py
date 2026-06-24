@@ -1785,5 +1785,34 @@ def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
         get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
 
 
+@pytest.mark.parametrize(
+    ("aws_region_name", "expected_model"),
+    [
+        # Asia-Pacific regions use the "apac" cross-region inference prefix,
+        # not the bare first segment "ap" (which has no cost-table entry).
+        ("ap-southeast-1", "bedrock/apac.amazon.nova-lite-v1:0"),
+        ("ap-northeast-1", "bedrock/apac.amazon.nova-lite-v1:0"),
+        # US and EU regions already match their first segment.
+        ("us-east-1", "bedrock/us.amazon.nova-lite-v1:0"),
+        ("eu-west-1", "bedrock/eu.amazon.nova-lite-v1:0"),
+    ],
+)
+def test_setup_bedrock_nova_region_prefix(aws_region_name, expected_model):
+    """Nova models get the region's cross-region inference geography prefixed
+    onto the model id. Asia-Pacific regions must resolve to "apac." so the id
+    matches the cost table (which only carries apac.amazon.nova-* keys).
+    """
+    inputs = tsi.CompletionsCreateRequestInputs(model="amazon.nova-lite-v1:0")
+
+    with patch.object(
+        llm_mod,
+        "get_bedrock_credentials",
+        return_value=("access-key", "secret-key", aws_region_name),
+    ):
+        llm_mod._setup_provider_credentials_and_model(inputs, provider="bedrock")
+
+    assert inputs.model == expected_model
+
+
 if __name__ == "__main__":
     unittest.main()
