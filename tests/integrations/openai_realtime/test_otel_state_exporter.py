@@ -32,6 +32,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 from weave.integrations.openai_realtime.otel_state_exporter import OTelStateExporter
 from weave.integrations.openai_realtime.state_exporter import StateExporter
+from weave.session.agent_context import agent_name_override
 
 _MODEL = "gpt-4o-realtime-preview"
 _SESSION_ID = "sess_1"
@@ -264,6 +265,36 @@ def test_basic_response_emits_invoke_agent_chat_tree(
     # chat nests under the invoke_agent root, same trace.
     assert chat.parent.span_id == root.context.span_id
     assert chat.context.trace_id == root.context.trace_id
+
+
+def test_agent_name_override_captured_at_construction(
+    otel_spans: InMemorySpanExporter, fake_publish: list[Any]
+) -> None:
+    """A user's agent_name_override in scope at construction names the root span.
+
+    The override contextvar is invisible on the worker/FIFO threads that emit
+    spans, so the exporter must capture it when constructed on the user thread.
+    """
+    with agent_name_override("custom_agent"):
+        exp = OTelStateExporter()
+    exp.handle_session_updated({"type": "session.updated", "session": make_session()})
+
+    user = make_user_audio_item("item_u1", transcript="What's the weather?")
+    out = make_assistant_audio_item("item_a1", transcript="It's sunny.")
+    resp = make_response("resp_1", [out], conversation_id="conv_abc")
+    drive_response(
+        exp, resp, input_items=[user], response_audio={"item_a1": b"\x10\x20\x30\x40"}
+    )
+
+    time.sleep(0.12)
+    exp.on_exit()
+    spans = otel_spans.get_finished_spans()
+
+    agents = by_op(spans, "invoke_agent")
+    assert len(agents) == 1
+    root = agents[0]
+    assert root.name == "invoke_agent custom_agent"
+    assert get_attrs(root)["gen_ai.agent.name"] == "custom_agent"
 
 
 def test_input_audio_published_as_uri(

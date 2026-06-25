@@ -135,6 +135,14 @@ class OTelStateExporter(StateExporter):
     # Guards the two maps above; on_exit runs on a different thread than the
     # FIFO completion thread that emits responses.
     _otel_lock: Any = PrivateAttr(default_factory=threading.Lock)
+    # Agent name resolved once at construction. Spans are emitted on worker/FIFO
+    # threads where the user's agent_name_override contextvar is not visible, so
+    # we capture it here on the constructing (user) thread, not at emit time.
+    _agent_name: str = PrivateAttr(default=_DEFAULT_AGENT_NAME)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
 
     # ------------------------------------------------------------------
     # Session handlers — store config without creating any Weave calls.
@@ -316,7 +324,7 @@ class OTelStateExporter(StateExporter):
             existing = self._session_root_spans.get(group_key)
             if existing is not None:
                 return existing
-            agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
+            agent_name = self._agent_name
             attrs = invoke_agent_attributes(
                 agent_name=agent_name,
                 conversation_id=conversation_id,
