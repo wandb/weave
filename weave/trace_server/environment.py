@@ -365,6 +365,38 @@ def wf_clickhouse_max_estimated_execution_time() -> int | None:
         return None
 
 
+def wf_clickhouse_max_rows_to_read() -> int | None:
+    """Hard cap on rows a single read query may scan (ClickHouse max_rows_to_read).
+
+    Unset by default. When set, ClickHouse aborts a read that would exceed it
+    with TOO_MANY_ROWS (code 158), failing very large scans at planning time --
+    before (and independent of) the estimated-time projection guard.
+    """
+    rows = os.environ.get("WF_CLICKHOUSE_MAX_ROWS_TO_READ")
+    if rows is None:
+        return None
+    try:
+        return int(rows)
+    except ValueError:
+        logger.exception("WF_CLICKHOUSE_MAX_ROWS_TO_READ value '%s' is not valid", rows)
+        return None
+
+
+def wf_clickhouse_max_bytes_to_read() -> int | None:
+    """Hard cap on bytes a single read query may scan (ClickHouse max_bytes_to_read).
+
+    Unset by default; see wf_clickhouse_max_rows_to_read.
+    """
+    val = os.environ.get("WF_CLICKHOUSE_MAX_BYTES_TO_READ")
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception("WF_CLICKHOUSE_MAX_BYTES_TO_READ value '%s' is not valid", val)
+        return None
+
+
 def wf_clickhouse_disable_query_failure_prediction() -> bool:
     """Whether to disable ClickHouse estimated-time query failure prediction."""
     return (

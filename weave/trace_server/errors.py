@@ -137,7 +137,8 @@ class QueryTooExpensiveError(Error):
 
     Covers ClickHouse's pre-emptive scan guards: the estimated-time projection
     guard (code 160, TOO_SLOW) and, when configured, the row/byte read caps
-    (TOO_MANY_ROWS_OR_BYTES). The query is well-formed but would scan too much
+    (code 158 TOO_MANY_ROWS / code 307 TOO_MANY_BYTES). The query is well-formed
+    but would scan too much
     data; the outcome is deterministic for a given query + dataset, so it is a
     4xx the client must fix by narrowing scope -- never a 5xx the SDK retries.
 
@@ -472,6 +473,14 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         # won't retry), not a generic DatabaseError 502 it would retry in vain.
         raise QueryTooExpensiveError(
             "Query is too expensive to run on this dataset. " + limit_scope_message
+        ) from e
+    if "TOO_MANY_ROWS" in error_str or "TOO_MANY_BYTES" in error_str:
+        # ClickHouse's read-scan caps (max_rows_to_read / max_bytes_to_read) abort
+        # a query that would scan past the configured limit -- code 158 (TOO_MANY_ROWS)
+        # or 307 (TOO_MANY_BYTES). Same story as TOO_SLOW: deterministic for a given
+        # query + dataset, so a 4xx to fix by narrowing, not a retried 502.
+        raise QueryTooExpensiveError(
+            "Query would scan too much data to run. " + limit_scope_message
         ) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
