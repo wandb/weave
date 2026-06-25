@@ -32,6 +32,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-017773695720
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-017773695720\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -73,6 +74,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"primitive","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"6Moqwj0Ocp0Jx7FfEN8VcmmDDcu4l2K53xleNntSB34"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -92,6 +94,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-099944069085
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-099944069085\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -133,6 +136,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"json","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"8mDwaUAcA5C6TEdTHf5mjX2kAz6gAXKCmQnDiITXBHY"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -152,6 +156,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-8d23-7a49-9f3b-0ca26737be0a","op_name":"weave:///drtangible-mocha/test-project/op/primitive:uPPlRCCga9tsuTZwve2Z2gswUYhhX15gb2XS8il0z4s","trace_id":"019eae1b-8d23-7a49-9f3b-0ca31d2e406d","started_at":"2026-06-09T20:38:21.731Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{"arg0":"world"}}}},{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-8d23-7a49-9f3b-0ca26737be0a","ended_at":"2026-06-09T20:38:21.732Z","output":"Hi
       world!","summary":{}}}}]}'
   response:
@@ -172,6 +177,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-030139909131
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-030139909131\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -235,6 +241,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9082-7763-a9fc-81f5c50d955e","op_name":"weave:///drtangible-mocha/test-project/op/json:0NsakCX9GJYyeu65LdlWVO8azws33f39CeKNpidMc50","trace_id":"019eae1b-9082-7763-a9fc-81f6e378a1b6","started_at":"2026-06-09T20:38:22.594Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{"arg0":"Alice","arg1":10}}}},{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9082-7763-a9fc-81f5c50d955e","ended_at":"2026-06-09T20:38:22.594Z","output":{"name":"Alice","age":10},"summary":{}}}}]}'
   response:
     status: 200
@@ -254,6 +261,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"image","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"DsZ569GIUUuzvv3fnSnJprV5HvnpMGQtHuluMlNu2dc"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -273,6 +281,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-077152610145
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-077152610145\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -338,6 +347,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9479-7571-9dcb-e476a68c8439","op_name":"weave:///drtangible-mocha/test-project/op/image:JlZ8e9uewWsbOiMpUSopvdzZnZZTadb46dsjw3ZeIXc","trace_id":"019eae1b-9479-7571-9dcb-e4771f8dd1ec","started_at":"2026-06-09T20:38:23.609Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
   response:
     status: 200
@@ -357,6 +367,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-062550160634
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-062550160634\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -424,6 +435,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"audio","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"gdu5XikPEiCf2puYTg9i29aLBKMs6TehPZCknNYktkY"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -443,6 +455,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9479-7571-9dcb-e476a68c8439","ended_at":"2026-06-09T20:38:23.609Z","output":{"_type":"CustomWeaveType","weave_type":{"type":"PIL.Image.Image"},"files":{"image.png":"eFsHUfwsU9wUpM49gA5p75zhAJ6zJ8z0WKYgnCQsJsk"},"load_op":"NO_LOAD_OP"},"summary":{}}}}]}'
   response:
     status: 200
@@ -462,6 +475,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-010028348208
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-010028348208\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -673,6 +687,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-031012413932
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-031012413932\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -728,6 +743,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9916-769c-8bc2-c662375f522a","op_name":"weave:///drtangible-mocha/test-project/op/audio:IG9eXWbmObjYbKa2lC0s3mSBsQnu9BynXYieZ8DQdJ8","trace_id":"019eae1b-9916-769c-8bc2-c6633a9877b8","started_at":"2026-06-09T20:38:24.790Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
   response:
     status: 200
@@ -747,6 +763,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"dataset","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"2jp04xe7NEIAwPRPB3o92wung4iUf8JHjASelxMRrQM"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -766,6 +783,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"table":{"project_id":"drtangible-mocha/test-project","rows":[{"name":"Alice","age":10},{"name":"Bob","age":20},{"name":"Charlie","age":30}]}}'
   response:
     status: 200
@@ -785,6 +803,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9916-769c-8bc2-c662375f522a","ended_at":"2026-06-09T20:38:24.790Z","output":{"_type":"CustomWeaveType","weave_type":{"type":"wave.Wave_read"},"files":{"audio.wav":"Vo1nyi1S6gru0QMG9l2pZU2VoPFDDv0nDeYcb34oATI"},"load_op":"NO_LOAD_OP"},"summary":{}}}}]}'
   response:
     status: 200
@@ -804,6 +823,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/test-project","digest":"03649e929ba12f08d67e1a76de37177f4eced4190078c92cb6653fb56dcd3825"}'
   response:
     status: 200
@@ -823,6 +843,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"my-dataset","val":{"_type":"Dataset","_class_name":"Dataset","_bases":["Object","BaseModel"],"name":"my-dataset","rows":"weave:///drtangible-mocha/test-project/table/03649e929ba12f08d67e1a76de37177f4eced4190078c92cb6653fb56dcd3825"}}}'
   response:
     status: 200
@@ -842,6 +863,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9e41-7ccb-b4df-507fd0bf5f7c","op_name":"weave:///drtangible-mocha/test-project/op/dataset:zTkOm7AxQhch95UlLWYnYyibbIbWl2UlPF551Woh9LE","trace_id":"019eae1b-9e41-7ccb-b4df-508083e77e36","started_at":"2026-06-09T20:38:26.113Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
   response:
     status: 200
