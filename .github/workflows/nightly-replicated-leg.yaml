@@ -37,7 +37,7 @@ jobs:
     # mirror test.yaml's pattern and bump just that shard to 8-core. Other
     # shards stay on free 2-core. 8-core is billed at $0.022/min, so a
     # typical 30 min trace leg ~= $0.66.
-    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_complete_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
+    runs-on: ${{ (matrix.shard == 'trace' || matrix.shard == 'trace_calls_merged_only') && 'ubuntu-latest-8-cores' || 'ubuntu-latest' }}
     env:
       # MAX_ATTEMPTS=1 (no retry). Retries on replicated topologies amplify
       # failures: each attempt re-runs against the same docker-compose CH
