@@ -722,7 +722,8 @@ def span_measure_sql(
             aggregate_sql = f"maxOrNull(if({valid_sql}, {metric_sql}, NULL))"
             value_type = value_sql.value_type
         elif agg == _AGG_COUNT_DISTINCT:
-            aggregate_sql = f"uniqExactIf({metric_sql}, {valid_sql})"
+            # uniq (approx, memory-bounded); uniqExact OOMs on large projects.
+            aggregate_sql = f"uniqIf({metric_sql}, {valid_sql})"
             value_type = _VALUE_TYPE_NUMBER
         elif agg == _AGG_COUNT_TRUE:
             if value_sql.value_type != _VALUE_TYPE_BOOLEAN:
@@ -976,7 +977,7 @@ def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
 # same schema.
 _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
-               uniqExact(s.conversation_id) AS conversation_count,
+               uniq(s.conversation_id) AS conversation_count,
                sum(s.input_tokens) AS total_input_tokens,
                sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,
                sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,
