@@ -31,9 +31,9 @@ type State = {
      *
      * When the user calls `runIsolated(fn)`, this AsyncLocalStorage is `.run`-installed with
      * a fresh `GenAIState` container for that frame. Inside the frame,
-     * `_getGenaiState()` reads back that fresh container. When `runIsolated`
+     * `getGenaiState()` reads back that fresh container. When `runIsolated`
      * isn't on the call stack, `_genaiState.getStore()` returns `undefined`
-     * and `_getGenaiState()` falls back to `_defaultState`.
+     * and `getGenaiState()` falls back to `_defaultState`.
      *
      * The AsyncLocalStorage provides the isolation boundary for concurrent work — each
      * `runIsolated` frame has its own container object, so mutations inside

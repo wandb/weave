@@ -274,7 +274,13 @@ async function runAgentLoop(
 }
 
 async function run(agent: Agent, prompts: string[]): Promise<string[]> {
-  const session = weave.startSession({agentName: agent.name});
+  const session = weave.startSession({
+    agentName: agent.name,
+    attributes: {
+      'myagent.region': 'ORD',
+      'myagent.version': '4.21',
+    },
+  });
   try {
     const messages: Message[] = [{role: 'system', content: agent.instructions}];
     const answers: string[] = [];
@@ -350,6 +356,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -362,6 +370,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t1",
             "gen_ai.tool.call.result": "{"temp":28,"condition":"Humid"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -376,6 +386,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -385,6 +397,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -399,6 +413,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -411,6 +427,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_sf",
             "gen_ai.tool.call.result": "{"temp":18,"condition":"Foggy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -423,6 +441,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_ldn",
             "gen_ai.tool.call.result": "{"temp":12,"condition":"Cloudy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -437,6 +457,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -446,6 +468,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -460,6 +484,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -472,6 +498,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t3",
             "gen_ai.tool.call.result": ""28 - 18 = 10"",
             "gen_ai.tool.name": "calculate",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -486,6 +514,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "some-model",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -495,6 +525,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": "<timestamp>",
           "startTime": "<timestamp>",
@@ -537,6 +569,10 @@ describe('GenAI', () => {
     for (const recordedSession of AGENT_SESSIONS) {
       const session = weave.startSession({
         agentName: recordedSession.agentName,
+        attributes: {
+          'myagent.region': 'ORD',
+          'myagent.version': '4.21',
+        },
       });
 
       const messages: Message[] = [
@@ -633,6 +669,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -651,6 +689,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t1",
             "gen_ai.tool.call.result": "{"temp":28,"condition":"Humid"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -671,6 +711,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -686,6 +728,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -706,6 +750,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -724,6 +770,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_sf",
             "gen_ai.tool.call.result": "{"temp":18,"condition":"Foggy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -742,6 +790,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_ldn",
             "gen_ai.tool.call.result": "{"temp":12,"condition":"Cloudy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -762,6 +812,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -777,6 +829,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -797,6 +851,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -815,6 +871,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t3",
             "gen_ai.tool.call.result": ""28 - 18 = 10"",
             "gen_ai.tool.name": "calculate",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -835,6 +893,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -850,6 +910,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -874,6 +936,10 @@ describe('GenAI', () => {
     for (const recordedSession of AGENT_SESSIONS) {
       weave.startSession({
         agentName: recordedSession.agentName,
+        attributes: {
+          'myagent.region': 'ORD',
+          'myagent.version': '4.21',
+        },
       });
 
       const messages: Message[] = [
@@ -970,6 +1036,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -988,6 +1056,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t1",
             "gen_ai.tool.call.result": "{"temp":28,"condition":"Humid"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -1008,6 +1078,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -1023,6 +1095,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048800,
@@ -1043,6 +1117,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -1061,6 +1137,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_sf",
             "gen_ai.tool.call.result": "{"temp":18,"condition":"Foggy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -1079,6 +1157,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t2_ldn",
             "gen_ai.tool.call.result": "{"temp":12,"condition":"Cloudy"}",
             "gen_ai.tool.name": "get_weather",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -1099,6 +1179,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -1114,6 +1196,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048805,
@@ -1134,6 +1218,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -1152,6 +1238,8 @@ describe('GenAI', () => {
             "gen_ai.tool.call.id": "call_t3",
             "gen_ai.tool.call.result": ""28 - 18 = 10"",
             "gen_ai.tool.name": "calculate",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -1172,6 +1260,8 @@ describe('GenAI', () => {
             "gen_ai.request.model": "gpt-4o-mini",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,
@@ -1187,6 +1277,8 @@ describe('GenAI', () => {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.operation.name": "invoke_agent",
+            "myagent.region": "ORD",
+            "myagent.version": "4.21",
           },
           "endTime": [
             1780048810,

@@ -1,4 +1,4 @@
-import {_getGenaiState} from './context';
+import {getGenaiState} from './context';
 import {type LLM, type LLMInit} from './llm';
 import {Session, type SessionInit} from './session';
 import type {SpanEndOptions} from './spanBase';
@@ -10,6 +10,9 @@ import {Turn, type TurnInit} from './turn';
  * Start a new Session and install it as the current session.
  * Subsequent calls to `startTurn` will pick it up automatically.
  *
+ * Pass `attributes` to stamp custom (non-semconv) attributes on every
+ * span the session emits.
+ *
  * @example
  * weave.startSession({agentName: 'research-bot'});
  *
@@ -17,6 +20,7 @@ import {Turn, type TurnInit} from './turn';
  * weave.startSession({
  *   agentName: 'research-bot',
  *   sessionId: '019efa53-8a65-711c-b4c1-7c1cb72c0bb7',
+ *   attributes: {'myagent.version': '1.23'},
  * });
  */
 export function startSession(opts: SessionInit = {}): Session {
@@ -37,7 +41,7 @@ export function startSession(opts: SessionInit = {}): Session {
  * });
  */
 export function startTurn(opts: TurnInit = {}): Turn {
-  const session = _getGenaiState().session;
+  const session = getGenaiState().session;
   if (session) {
     return session.startTurn(opts);
   }
@@ -59,7 +63,7 @@ export function startTurn(opts: TurnInit = {}): Turn {
  * });
  */
 export function startLLM(opts: LLMInit): LLM {
-  const turn = _getGenaiState().turn;
+  const turn = getGenaiState().turn;
   if (!turn) {
     throw new Error(
       'weave.startLLM() called without an active Turn. Call weave.startTurn() first.'
@@ -92,7 +96,7 @@ export function startLLM(opts: LLMInit): LLM {
  * });
  */
 export function startTool(opts: ToolInit): Tool {
-  const state = _getGenaiState();
+  const state = getGenaiState();
   if (state.llm) {
     return state.llm.startTool(opts);
   }
@@ -118,7 +122,7 @@ export function startTool(opts: ToolInit): Tool {
  * });
  */
 export function startSubagent(opts: SubAgentInit): SubAgent {
-  const state = _getGenaiState();
+  const state = getGenaiState();
   if (state.llm) {
     return state.llm.startSubagent(opts);
   }
@@ -140,7 +144,7 @@ export function startSubagent(opts: SubAgentInit): SubAgent {
  * weave.endSession({endTime: new Date('2026-05-29T10:00:01.700Z')});
  */
 export function endSession(opts?: SpanEndOptions): void {
-  const session = _getGenaiState().session;
+  const session = getGenaiState().session;
   if (session) {
     session.end(opts);
   }
@@ -159,7 +163,7 @@ export function endSession(opts?: SpanEndOptions): void {
  * weave.endTurn({error: new Error('agent loop diverged')});
  */
 export function endTurn(opts?: SpanEndOptions): void {
-  const turn = _getGenaiState().turn;
+  const turn = getGenaiState().turn;
   if (turn) {
     turn.end(opts);
   }
@@ -178,7 +182,7 @@ export function endTurn(opts?: SpanEndOptions): void {
  * weave.endLLM({error: new Error('llm call failed')});
  */
 export function endLLM(opts?: SpanEndOptions): void {
-  const llm = _getGenaiState().llm;
+  const llm = getGenaiState().llm;
   if (llm) {
     llm.end(opts);
   }
