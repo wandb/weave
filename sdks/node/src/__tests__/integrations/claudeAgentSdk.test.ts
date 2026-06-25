@@ -12,20 +12,25 @@ import {
   setupExporterPerTest,
   setupGenAITestEnvironment,
 } from '../genai/common';
+import type {NonNullableUsage} from '@anthropic-ai/claude-agent-sdk';
 
 const INVOKE = 'invoke_agent claude_agent_sdk';
 
 describe('Claude Agent SDK — toWeaveUsage', () => {
-  test('maps the SDK camelCase ModelUsage shape to snake_case usage keys', () => {
+  test('maps the camelCase ModelUsage shape, dropping non-token fields', () => {
+    // A complete ModelUsage: the four token fields map to snake_case, and the
+    // non-token fields (web search, cost, context window, max output) are
+    // dropped — the usage/cost rollup keys only on the token counts.
     expect(
       toWeaveUsage({
         inputTokens: 10,
         outputTokens: 5,
         cacheReadInputTokens: 3,
         cacheCreationInputTokens: 2,
-        // Non-token fields the rollup does not consume are dropped.
+        webSearchRequests: 1,
         costUSD: 0.01,
         contextWindow: 200000,
+        maxOutputTokens: 8192,
       })
     ).toEqual({
       input_tokens: 10,
@@ -35,15 +40,23 @@ describe('Claude Agent SDK — toWeaveUsage', () => {
     });
   });
 
-  test('passes through fields already in snake_case (aggregate usage)', () => {
-    expect(toWeaveUsage({input_tokens: 7, output_tokens: 9})).toEqual({
+  test('passes through the snake_case aggregate (NonNullableUsage) token keys', () => {
+    // NonNullableUsage carries ~11 fields, several nested (cache_creation,
+    // iterations, …); cast a token-only literal since the rest are irrelevant
+    // to the mapping. The `in` check takes the snake_case branch (no camelCase
+    // key present), so the four token counts pass through unchanged.
+    const aggregate = {
       input_tokens: 7,
       output_tokens: 9,
+      cache_read_input_tokens: 4,
+      cache_creation_input_tokens: 2,
+    } as NonNullableUsage;
+    expect(toWeaveUsage(aggregate)).toEqual({
+      input_tokens: 7,
+      output_tokens: 9,
+      cache_read_input_tokens: 4,
+      cache_creation_input_tokens: 2,
     });
-  });
-
-  test('omits absent token fields rather than emitting nulls', () => {
-    expect(toWeaveUsage({inputTokens: 4})).toEqual({input_tokens: 4});
   });
 });
 
@@ -84,7 +97,14 @@ describe('Claude Agent SDK — query() patch', () => {
         session_id: 'sess-1',
         is_error: false,
         result: 'done',
-        modelUsage: {'claude-x': {inputTokens: 1, outputTokens: 2}},
+        modelUsage: {
+          'claude-x': {
+            inputTokens: 1,
+            outputTokens: 2,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+          },
+        },
       },
     ]);
     patchClaudeAgentSdk(sdk);

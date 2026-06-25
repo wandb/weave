@@ -146,14 +146,9 @@ function toolResultText(content: ToolResultBlock['content']): string {
 function usageAttributes(
   rawUsage: ModelUsage | NonNullableUsage
 ): Record<string, number> {
+  // toWeaveUsage returns the typed WeaveUsage shape, where every token field is
+  // a required number on both SDK casings — no nullish guards needed.
   const usage = toWeaveUsage(rawUsage);
-  const attrs: Record<string, number> = {};
-  // toWeaveUsage returns the typed WeaveUsage shape, so each field is already
-  // `number | undefined` — a nullish check is enough (and keeps a real 0).
-  const freshInput = usage.input_tokens;
-  const output = usage.output_tokens;
-  const cacheRead = usage.cache_read_input_tokens;
-  const cacheCreation = usage.cache_creation_input_tokens;
 
   // Anthropic reports `input_tokens` disjoint from the cache counts (fresh,
   // uncached tokens only). Weave's canonical convention — matching OpenAI and
@@ -165,26 +160,19 @@ function usageAttributes(
   // denominator (`cache_read / input_tokens`) lands in [0, 1] instead of blowing
   // up when the cached share dwarfs the fresh tokens.
   const input =
-    freshInput != null
-      ? freshInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
-      : undefined;
+    usage.input_tokens +
+    usage.cache_read_input_tokens +
+    usage.cache_creation_input_tokens;
+  const output = usage.output_tokens;
 
-  if (input != null) {
-    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = input;
-  }
-  if (output != null) {
-    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = output;
-  }
-  if (cacheRead != null) {
-    attrs[ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] = cacheRead;
-  }
-  if (cacheCreation != null) {
-    attrs[ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS] = cacheCreation;
-  }
-  if (input != null && output != null) {
-    attrs[ATTR_GEN_AI_USAGE_TOTAL_TOKENS] = input + output;
-  }
-  return attrs;
+  return {
+    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: input,
+    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: output,
+    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cache_read_input_tokens,
+    [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
+      usage.cache_creation_input_tokens,
+    [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: input + output,
+  };
 }
 
 /**

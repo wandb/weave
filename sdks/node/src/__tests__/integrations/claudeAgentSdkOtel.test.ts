@@ -79,7 +79,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
       total_cost_usd: 0.01,
       num_turns: 1,
       modelUsage: {
-        'claude-x': {inputTokens: 10, outputTokens: 5, cacheReadInputTokens: 3},
+        'claude-x': {
+          inputTokens: 10,
+          outputTokens: 5,
+          cacheReadInputTokens: 3,
+          cacheCreationInputTokens: 0,
+        },
       },
     } as any);
 
@@ -194,7 +199,12 @@ describe('Claude Agent SDK — OTel tracer', () => {
       // Multi-model session: a fast model handled an internal step and never
       // surfaced an assistant message of its own.
       modelUsage: {
-        'claude-opus': {inputTokens: 100, outputTokens: 40},
+        'claude-opus': {
+          inputTokens: 100,
+          outputTokens: 40,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+        },
         'claude-haiku': {
           inputTokens: 20,
           outputTokens: 8,
