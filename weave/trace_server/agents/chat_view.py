@@ -18,13 +18,17 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import NamedTuple
 
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
     OP_INVOKE_AGENT,
 )
-from weave.trace_server.agents.schema import NormalizedMessage
+from weave.trace_server.agents.schema import (
+    MULTIMODAL_PART_SEPARATOR,
+    NormalizedMessage,
+)
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -434,79 +438,187 @@ def _select_root_span(spans: list[AgentSpanSchema]) -> AgentSpanSchema:
     return max(spans, key=_root_sort_key)
 
 
-def _display_text(content: str) -> str:
-    """Extract human-readable text from a message content field.
+# Bare base64 image payloads start with a recognizable magic-byte prefix; the
+# UI renders the recovered ``data:`` URL inline. WEBP shares RIFF with WAV/AVI,
+# so it is intentionally not sniffed bare.
+_BASE64_IMAGE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("iVBORw0KGgo", "image/png"),
+    ("/9j/", "image/jpeg"),
+    ("R0lGOD", "image/gif"),
+)
 
-    Content is either plain text (legacy) or a JSON-serialized parts array
-    (multimodal messages).  For parts arrays, concatenate the text parts;
-    reasoning parts are excluded (they surface separately via
-    `reasoning_content`).  For plain text, return as-is.
-    """
+
+def _parse_parts_list(content: str) -> list[object] | None:
+    """Parse a JSON-serialized parts array, or None if content is not one."""
     if not content or not content.startswith("["):
-        return content
+        return None
     try:
-        parts = json.loads(content)
+        parsed = json.loads(content)
     except (json.JSONDecodeError, TypeError):
-        return content
-    if not isinstance(parts, list):
-        return content
-    texts: list[str] = []
-    for p in parts:
-        if isinstance(p, dict) and isinstance(p.get("content"), str):
-            # Reasoning is rendered separately via `reasoning_content`;
-            # concatenating it here would duplicate it in the message body.
-            if p.get("type") == "reasoning":
-                continue
-            texts.append(p["content"])
-        elif isinstance(p, str):
-            texts.append(p)
-    return "\n".join(texts)
+        return None
+    return parsed if isinstance(parsed, list) else None
 
 
-def _filter_message_texts(
+def _inline_image_from_string(value: str) -> str | None:
+    """A ``data:image`` URL or a bare base64 image payload -> a ``data:`` URL."""
+    stripped = value.strip()
+    if stripped.startswith("data:image/"):
+        return stripped
+    for prefix, media_type in _BASE64_IMAGE_PREFIXES:
+        if stripped.startswith(prefix):
+            return f"data:{media_type};base64,{stripped}"
+    return None
+
+
+def _inline_image_from_part(part: dict) -> str | None:
+    """Inline image from an OpenAI/Anthropic-style content part."""
+    part_type = part.get("type")
+    if part_type in {"image_url", "input_image"}:
+        image_url = part.get("image_url")
+        if isinstance(image_url, dict):
+            image_url = image_url.get("url")
+        if isinstance(image_url, str):
+            if image_url.startswith("data:"):
+                return image_url
+            return _inline_image_from_string(image_url)
+        return None
+    if part_type == "image":
+        source = part.get("source")
+        if isinstance(source, dict) and source.get("type") == "base64":
+            data = source.get("data")
+            media_type = source.get("media_type")
+            if isinstance(data, str) and isinstance(media_type, str):
+                return (
+                    data
+                    if data.startswith("data:")
+                    else (f"data:{media_type};base64,{data}")
+                )
+    return None
+
+
+class MessageContent(NamedTuple):
+    """A message's display text and the inline images extracted out of it."""
+
+    text: str
+    images: list[str]
+
+
+# Joins messages (not parts) when several are collapsed into one bubble.
+_MESSAGE_SEPARATOR = "\n\n"
+
+
+def _split_text_and_images(content: str) -> MessageContent:
+    """Separate display text from inline images in a message ``content`` field.
+
+    Inline images (``data:`` URLs, bare base64, or OpenAI/Anthropic image parts)
+    are returned as ``data:`` URLs so the UI renders them as media rather than
+    dumping the payload into the message body. ``uri``/``blob``/``file`` parts
+    are left in place: those are digest-backed and surfaced through
+    ``content_refs``.
+
+    The stored content model flattens multimodal structure into a single string
+    (see `NormalizedMessage`), so two forms arrive here: a JSON parts array
+    (handled structurally) and an already-flattened string (recovered by
+    splitting on the shared `MULTIMODAL_PART_SEPARATOR`).
+    """
+    images: list[str] = []
+    parts = _parse_parts_list(content)
+    if parts is not None:
+        texts: list[str] = []
+        for part in parts:
+            if isinstance(part, str):
+                image = _inline_image_from_string(part)
+                if image:
+                    images.append(image)
+                else:
+                    texts.append(part)
+            elif isinstance(part, dict):
+                image = _inline_image_from_part(part)
+                if image:
+                    images.append(image)
+                # Reasoning surfaces separately via `reasoning_content`.
+                elif part.get("type") != "reasoning" and isinstance(
+                    part.get("content"), str
+                ):
+                    texts.append(part["content"])
+        return MessageContent(MULTIMODAL_PART_SEPARATOR.join(texts), images)
+    if not content:
+        return MessageContent(content, images)
+    kept: list[str] = []
+    for line in content.split(MULTIMODAL_PART_SEPARATOR):
+        image = _inline_image_from_string(line)
+        if image:
+            images.append(image)
+        else:
+            kept.append(line)
+    return MessageContent(MULTIMODAL_PART_SEPARATOR.join(kept), images)
+
+
+def _display_text(content: str) -> str:
+    """Human-readable text from a message content field, sans inline images."""
+    return _split_text_and_images(content).text
+
+
+def _filtered_message_contents(
     messages: list[NormalizedMessage],
     *,
     include_roles: set[str] | None = None,
     exclude_roles: set[str] | None = None,
-) -> list[str]:
-    """Return non-empty message content matching role include/exclude filters."""
-    texts: list[str] = []
+) -> list[MessageContent]:
+    """Per-message `MessageContent` matching the role filters.
+
+    A message is kept when it has display text or inline images.
+    """
+    out: list[MessageContent] = []
     for message in messages:
-        role = message.role
-        text = _display_text(message.content)
-        if not text:
+        if include_roles is not None and message.role not in include_roles:
             continue
-        if include_roles is not None and role not in include_roles:
+        if exclude_roles is not None and message.role in exclude_roles:
             continue
-        if exclude_roles is not None and role in exclude_roles:
-            continue
-        texts.append(text)
-    return texts
+        content = _split_text_and_images(message.content)
+        if content.text or content.images:
+            out.append(content)
+    return out
+
+
+def _join_contents(items: list[MessageContent]) -> MessageContent:
+    """Collapse several messages into one text blob plus a flat image list."""
+    texts = [item.text for item in items if item.text]
+    images = [image for item in items for image in item.images]
+    return MessageContent(_MESSAGE_SEPARATOR.join(texts), images)
+
+
+def _extract_user_content(
+    messages: list[NormalizedMessage], *, last_only: bool = False
+) -> MessageContent:
+    """User text and inline images from normalized input_messages.
+
+    First pass: entries tagged `role == "user"`. Fallback pass: entries that
+    could plausibly be the user prompt (provider-specific or empty-role). We
+    exclude assistant, system, and tool roles so those do not render as a user
+    prompt.
+    """
+    if not messages:
+        return MessageContent("", [])
+    items = _filtered_message_contents(messages, include_roles={_USER_ROLE})
+    if not items:
+        items = _filtered_message_contents(
+            messages, exclude_roles=_NON_USER_PROMPT_ROLES
+        )
+        if items:
+            logger.debug(
+                "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
+                [m.role for m in messages],
+            )
+    if not items:
+        return MessageContent("", [])
+    return items[-1] if last_only else _join_contents(items)
 
 
 def _extract_user_text(
     messages: list[NormalizedMessage], *, last_only: bool = False
 ) -> str:
-    """Extract user text from normalized input_messages.
-
-    First pass: entries tagged `role == "user"`. Fallback pass: entries
-    that could plausibly be the user prompt: provider-specific or empty-role
-    messages. We intentionally exclude assistant, system, and tool roles so
-    those do not render as a user prompt.
-    """
-    if not messages:
-        return ""
-    texts = _filter_message_texts(messages, include_roles={_USER_ROLE})
-    if not texts:
-        texts = _filter_message_texts(messages, exclude_roles=_NON_USER_PROMPT_ROLES)
-        if texts:
-            logger.debug(
-                "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
-                [m.role for m in messages],
-            )
-    if last_only and texts:
-        return texts[-1]
-    return "\n\n".join(texts)
+    return _extract_user_content(messages, last_only=last_only).text
 
 
 def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
@@ -524,17 +636,24 @@ def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
     return _extract_non_user_output_text(messages)
 
 
-def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
-    """Extract renderable output text from normalized output_messages.
+def _extract_assistant_content(
+    messages: list[NormalizedMessage],
+) -> MessageContent:
+    """Output text and inline images from normalized output_messages.
 
     Output arrays are expected to contain assistant messages, but some SDKs
     include provider-specific roles. The only role we deliberately exclude is
     `user`, which should not be rendered as an assistant response.
     """
     if not messages:
-        return ""
-    texts = _filter_message_texts(messages, exclude_roles={_USER_ROLE})
-    return "\n\n".join(texts)
+        return MessageContent("", [])
+    return _join_contents(
+        _filtered_message_contents(messages, exclude_roles={_USER_ROLE})
+    )
+
+
+def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
+    return _extract_assistant_content(messages).text
 
 
 def _compute_duration_ms(started_at: datetime | None, ended_at: datetime | None) -> int:
@@ -558,21 +677,9 @@ _MEDIA_PART_TYPES = {"uri", "blob", "file"}
 
 
 def _parse_content_parts(content: str) -> list[dict]:
-    """Parse a message ``content`` field into its parts array.
-
-    Multimodal content is a JSON-serialized parts array (see
-    genai_extraction._normalize_single_message); plain-text/legacy content is
-    not a JSON list and yields nothing.
-    """
-    if not content or not content.startswith("["):
-        return []
-    try:
-        parsed = json.loads(content)
-    except (json.JSONDecodeError, TypeError):
-        return []
-    if not isinstance(parsed, list):
-        return []
-    return [p for p in parsed if isinstance(p, dict)]
+    """Dict parts of a message ``content`` field (plain/legacy yields nothing)."""
+    parts = _parse_parts_list(content)
+    return [p for p in parts if isinstance(p, dict)] if parts else []
 
 
 def _ref_digest(ref: str) -> str:
@@ -691,15 +798,18 @@ def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
         msgs = s.input_messages or []
         if not msgs:
             continue
-        text = _extract_user_text(msgs, last_only=True)
-        if text:
+        content = _extract_user_content(msgs, last_only=True)
+        if content.text or content.images:
             return AgentChatMessage(
                 type="user_message",
                 agent_name="User",
                 started_at=s.started_at,
                 user_message=AgentChatUserMessage(
-                    text=text,
-                    content_refs=user_media_refs,
+                    text=content.text,
+                    # content_refs is heterogeneous: digest-backed media in
+                    # internal-ref form (resolved client-side) plus inline
+                    # images as ready-to-render `data:` URLs.
+                    content_refs=user_media_refs + content.images,
                 ),
             )
     return None
@@ -724,12 +834,12 @@ def _emit_assistant_message(
     thinking interleaved between tool calls is surfaced rather than dropped.
     Returns None only when there is neither output text nor reasoning content.
     """
-    text = (
-        _extract_non_user_output_text(span.output_messages)
+    content = (
+        _extract_assistant_content(span.output_messages)
         if span.output_messages
-        else ""
+        else MessageContent("", [])
     )
-    if not text and not span.reasoning_content:
+    if not content.text and not content.images and not span.reasoning_content:
         return None
 
     if aggregate_node:
@@ -754,7 +864,7 @@ def _emit_assistant_message(
         started_at=span.started_at,
         assistant_message=AgentChatAssistantMessage(
             model=span.response_model or span.request_model,
-            text=text,
+            text=content.text,
             reasoning_content=totals.reasoning_content,
             reasoning_tokens=totals.reasoning_tokens,
             input_tokens=totals.input_tokens or span.input_tokens,
@@ -764,8 +874,11 @@ def _emit_assistant_message(
             total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
-            content_refs=_directional_content_refs(
-                span, _media_part_digests(span.output_messages)
+            content_refs=(
+                _directional_content_refs(
+                    span, _media_part_digests(span.output_messages)
+                )
+                + content.images
             ),
         ),
     )

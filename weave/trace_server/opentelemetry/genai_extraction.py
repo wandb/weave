@@ -21,6 +21,7 @@ from weave.trace_server.agents.constants import (
     MAX_CUSTOM_ATTRS_PER_SPAN,
 )
 from weave.trace_server.agents.schema import (
+    MULTIMODAL_PART_SEPARATOR,
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
@@ -242,7 +243,7 @@ def _text_from_parts(parts: list[Any]) -> str:
                 texts.append(p["content"])
             elif "text" in p and isinstance(p["text"], str):
                 texts.append(p["text"])
-    return "\n".join(texts)
+    return MULTIMODAL_PART_SEPARATOR.join(texts)
 
 
 def _normalize_single_message(

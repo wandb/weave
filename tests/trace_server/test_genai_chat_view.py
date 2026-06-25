@@ -697,6 +697,89 @@ def test_interleaved_reasoning_before_tool_call_is_surfaced() -> None:
     assert final.reasoning_content == final_reasoning
 
 
+_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAABPg"
+_PNG_DATA_URL = f"data:image/png;base64,{_PNG_B64}"
+
+
+@pytest.mark.parametrize(
+    "image_part",
+    [
+        _PNG_B64,
+        _PNG_DATA_URL,
+        {"type": "input_image", "image_url": {"url": _PNG_DATA_URL}},
+        {"type": "image_url", "image_url": _PNG_DATA_URL},
+        {
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/png", "data": _PNG_B64},
+        },
+    ],
+)
+def test_inline_user_image_surfaced_as_content_ref(image_part: object) -> None:
+    """Inline images (no digest) ride `content_refs` as `data:` URLs and are
+    kept out of the rendered text, so the UI renders them instead of dumping the
+    base64 into the message body. Covers bare base64, `data:` URLs, and the
+    OpenAI/Anthropic part shapes.
+    """
+    spans = [
+        _span(
+            operation_name="invoke_agent",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("look"), image_part)}
+            ],
+        )
+    ]
+    user = _user_payload(
+        next(m for m in build_chat_messages(spans) if m.type == "user_message")
+    )
+    assert user.text == "look"
+    assert user.content_refs == [_PNG_DATA_URL]
+
+
+def test_inline_image_in_flattened_string_content() -> None:
+    """A pre-flattened content string (agent metadata + a bare base64 payload
+    joined by newlines, as `_text_from_parts` stores list-of-strings content)
+    still yields the image as a `content_ref`, with the base64 stripped from
+    the text and the non-image metadata preserved.
+    """
+    meta = '{"type": "wandb_web_page_state", "url": "https://app/x"}'
+    spans = [
+        _span(
+            operation_name="invoke_agent",
+            input_messages=[{"role": "user", "content": "\n".join([meta, _PNG_B64])}],
+        )
+    ]
+    user = _user_payload(
+        next(m for m in build_chat_messages(spans) if m.type == "user_message")
+    )
+    assert user.text == meta
+    assert user.content_refs == [_PNG_DATA_URL]
+
+
+def test_inline_assistant_image_surfaced_as_content_ref() -> None:
+    """Model-generated inline images surface on the assistant bubble, mirroring
+    the user-side inline path.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-gen",
+            input_messages=[{"role": "user", "content": "draw"}],
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(_text_part("here"), _PNG_DATA_URL),
+                }
+            ],
+        )
+    ]
+    assistant = _assistant_payload(
+        next(m for m in build_chat_messages(spans) if m.type == "assistant_message")
+    )
+    assert assistant.text == "here"
+    assert assistant.content_refs == [_PNG_DATA_URL]
+
+
 def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
     """A tool-calling LLM step that carries neither assistant text nor
     reasoning must not produce an empty assistant bubble.
