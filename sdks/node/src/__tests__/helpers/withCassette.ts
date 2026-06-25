@@ -51,10 +51,10 @@ function normalizeMultipartBoundary(req: HttpRequest): HttpRequest {
 }
 
 function normalizeRequest(req: HttpRequest): HttpRequest {
-  return [
-    normalizeMultipartBoundary,
-    normalizeVolatileBodyFields,
-  ].reduce((req, normalizer) => normalizer(req), req);
+  return [normalizeMultipartBoundary, normalizeVolatileBodyFields].reduce(
+    (req, normalizer) => normalizer(req),
+    req
+  );
 }
 
 class Matcher extends DefaultRequestMatcher {
