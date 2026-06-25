@@ -1,0 +1,28 @@
+## Conversation
+Investigating a Datadog page (monitor 19065158, the WB-33068 "unexpected error - investigate" catch-all for customer wandb-t-mobile). Root cause: POST /traces/calls/stream_query on a ~455M-row calls_merged scan trips ClickHouse's estimated-time guard -> "Code: 160 ... Estimated query execution time too long ... (TOO_SLOW)". One user (andrew-holmes53, project tmo-ova-611-prd) issued dozens of these; the SDK retried each (~2.3x amplification, 56 retry_ids / 128 spans). User asked to (1) handle TOO_SLOW client+server and (2) kill expensive queries faster, as a stack of PRs. This is PR1 (server classify).
+
+## Actions
+- errors.py: added ErrorCode.QUERY_TOO_EXPENSIVE; QueryTooExpensiveError(Error) carrying that error_code; a `if "TOO_SLOW" in error_str` branch in handle_clickhouse_query_error (right after TIMEOUT_EXCEEDED) raising it with the existing limit_scope_message; registered it at 400 in the 400 block; added it to the docstring Raises list.
+- tests/trace_server/test_errors.py: test_clickhouse_too_slow_returns_400_with_error_code (real CH 160 message string -> raises QueryTooExpensiveError; handle_server_exception -> 400 + full body {"reason","error_code":"QUERY_TOO_EXPENSIVE"}).
+- Ran: pytest tests/trace_server/test_errors.py (14 pass); uvx ruff check + format --check (clean).
+
+## Errors & mistakes
+None. First Bash grep used `--include=*.py` which zsh glob-expanded (no matches) and ripgrep highlighting rendered matched tokens as "n"; switched to `rg --color never`.
+
+## Why 400 (not 5xx)
+The client retry predicate weave/utils/retry.py:_is_retryable_exception skips 4xx (except 429) but retries 5xx. TOO_SLOW is deterministic for a given query+dataset, so retrying is pure waste -> 4xx stops it with zero client retry-code change AND drops it off the @http.status_code:50* SRE monitors (correctly labeling it user-error, the WB-33068 goal). 400 over 422 because 422 is reserved here for "unsupported field/value"; this is a valid query that's too broad. Memory/timeout siblings stay 502/504 (can be transient); deliberately diverging.
+
+## Hints & warnings
+- Registry matches by EXACT type (errors.py handle_exception: type(exc)), default formatter _format_error_to_json_with_extra adds error_code iff the exc has the attr -- so the explicit register() call is required and the body carries error_code automatically.
+- handle_clickhouse_query_error branches are substring checks on str(e); ordering is fine because the TOO_SLOW message contains neither MEMORY_LIMIT_EXCEEDED nor TIMEOUT_EXCEEDED.
+
+## Codebase discoveries
+- The guard is intentional: WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME (environment.py, "estimated-time (TOO_SLOW) projection guard"), added #6709, decoupled from the runtime cap in #7336. Default DEFAULT_MAX_EXECUTION_TIME=60s; T-Mobile overrides to 36000s, so the guard fires only after ~16-20min of scanning.
+- error_code precedent: CallsCompleteModeRequired (ErrorCode.CALLS_COMPLETE_MODE_REQUIRED) -> client http_utils.handle_response_error recognizes it. PR2 mirrors this for QUERY_TOO_EXPENSIVE.
+
+## Dead ends
+None.
+
+## Open questions
+- Whether memory/timeout should also become non-retryable 4xx (out of scope; flagged to user).
+- Item-2 highest-leverage lever is a core/helm config (lower the estimate guard); not in this repo. PR3 adds the weave-side row/byte cap mechanism.
