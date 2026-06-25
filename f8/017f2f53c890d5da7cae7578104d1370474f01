@@ -1,0 +1,89 @@
+## Conversation
+User on slice 06 (PR #7306) working tree: "I'm not sure why state.ts changed in
+this PR. Is it required? We were addressing comments from Dan. Please land the
+relevant changes and push them up." The two uncommitted files (googleAdk.ts +
+state.ts) were edits responding to @drtangible's (Dan's) inline review on #7306.
+User's real question: is the state.ts edit load-bearing or stray? Answer: it is
+required — it is the direct response to one of Dan's comments.
+
+## Mapping of each change to Dan's comment (all on PR #7306)
+- googleAdk.ts:1310 "We've hoisted all of the other state that's aware of this
+  CJS/ESM dual-hazard thing into state.ts. Thoughts on doing that here?"
+  -> Moved the plugin holder from globalSingleton('_weave_adk_instrumentation')
+     to state.integrations.googleAdk.plugin. THIS is why state.ts changed:
+     added googleAdk.plugin slot to the State type + defaultState(). The two
+     files are one coupled change.
+- googleAdk.ts:1419 "Thoughts on us starting to try to type these? import type
+  * as GoogleADK ... commonPatchGoogleADK(exports: typeof GoogleADK)"
+  -> Added `import type * as GoogleADK from '@google/adk'`; typed
+     commonPatchGoogleADK(exports: typeof GoogleADK) and
+     patchRunnerClass(RunnerClass: typeof GoogleADK.Runner). patchRunnerClass
+     still views proto as an indexable bag (prototype swap is inherently
+     dynamic) via a localized cast.
+- googleAdk.ts:141 "Are we able to pick the fields from PluginManager ...
+  Pick<PluginManager,...>" + :146 "use the Runner type directly, or pick from
+  it?"  -> Deleted both hand-rolled interfaces (AdkPluginManager, AdkRunnerLike
+     shape) and set `type AdkRunnerLike = Pick<GoogleADK.Runner,'pluginManager'>`
+     which pulls the real PluginManager type transitively.
+- googleAdk.ts:149 "Looks like this isn't used externally." -> Unexported
+  WEAVE_ADK_PLUGIN_NAME. Verified: grep across src+test finds zero external
+  importers.
+- googleAdk.ts:1324 + :1358 "Do we need to guard against null?" -> Removed the
+  runtime `!pluginManager || typeof getPlugin !== 'function'` guards and the
+  `runner?.pluginManager?.` optional chaining; lean on the Runner type and the
+  existing try/catch boundary (instrumentation must never break a user run).
+  Documented that reasoning in the ensurePluginRegistered docstring.
+- googleAdk.ts:1360 "What were we trying to do via instanceof? ... could throw
+  this sort of property checking into an isWeavePlugin guard." -> Added
+  isWeavePlugin(plugin): plugin is WeaveAdkPlugin, duck-typing
+  finishInterruptedInvocation; used in finishInterruptedInvocations.
+
+## Actions
+- gh api: pulled all of Dan's inline comments + reviews on #7306 (he APPROVED).
+- git diff e27e64a603..HEAD on googleAdk.ts: confirmed AdkPluginManager,
+  AdkRunnerLike, adkInstrumentationHolder, commonPatchGoogleADK, patchRunnerClass
+  are all slice-06-introduced. WEAVE_ADK_PLUGIN_NAME is slice-01-introduced
+  (9fd09d33e8) and only USED in slice 06.
+- Verified WeaveAdkPlugin is exported (class at line ~592) so state.ts's
+  `import {type WeaveAdkPlugin}` resolves; it is type-only (erased at runtime)
+  so no runtime circular import (googleAdk imports runtime `state` default;
+  state imports only the TYPE back). Matches the existing GenAIState/WeaveClient
+  type-only import pattern in state.ts.
+- Validation (nvm node v20.19.4, ./node_modules/.bin/*): typecheck:esm clean,
+  typecheck:cjs clean, eslint on both files clean, jest
+  src/__tests__/integrations/googleAdk.test.ts 26/26 pass.
+- Committed both files as ONE new commit on the slice-06 tip (not an amend).
+
+## Errors & mistakes
+- First grepped/ran the test at src/integrations/googleAdk.test.ts — WRONG path,
+  returned 'No tests found'. The test lives at
+  src/__tests__/integrations/googleAdk.test.ts. An earlier grep for state refs
+  in the test was therefore a false negative; re-ran at the right path (test
+  imports WeaveAdkPlugin + commonPatchGoogleADK, never WEAVE_ADK_PLUGIN_NAME).
+
+## Dead ends / decisions not taken
+- Did NOT amend be5bf0c4ce (the auto-instrument commit) to fold this in: amend
+  rewrites its SHA + the two commits above it and risks dropping their git notes
+  (known hazard on this stack). A new commit on the tip preserves all notes and
+  is clearer for a reviewer who left comments. Net diff for #7306 is unchanged.
+- Did NOT move the WEAVE_ADK_PLUGIN_NAME unexport down to slice 01 (where the
+  `export const` is introduced). Doing so = restacking 6 branches = more churn +
+  the gt-notes-drop hazard, for a one-line cosmetic cross-slice difference. Dan
+  commented on it IN #7306 and approved #7306, so the fix belongs in #7306's
+  view. Flagged to the user as an optional follow-up.
+
+## Hints & warnings
+- state.ts <-> googleAdk.ts type-only import cycle is fine ONLY while it stays
+  `import {type WeaveAdkPlugin}`. If anyone makes it a runtime import it becomes
+  a real cycle (googleAdk runtime-imports state).
+- The plugin holder MUST live in state.ts (shared singleton), not module scope,
+  or CJS and ESM copies of googleAdk.ts each get their own plugin instance and
+  double-register / mis-finalize. Same dual-package reasoning as the rest of
+  state.integrations.
+- This commit only appends to the slice-06 tip; lower slices (01-05) are
+  untouched and at origin HEAD, so no restack was needed.
+
+## Open questions
+- Dan also noted "Tokens 0 in / 0 out" on the googleAdkAgent.ts example (line 34)
+  — a possible token-accounting gap, NOT addressed here (separate concern; he
+  approved anyway). Left for a follow-up if the user wants it.
