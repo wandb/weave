@@ -3,10 +3,13 @@
  *
  * The SDK has no trace-processor hook (unlike `@openai/agents`) and runs the
  * model inside a spawned Claude Code subprocess, so the `@anthropic-ai/sdk`
- * patch never sees those calls. We therefore wrap the SDK's exported `query()`
- * and emit GenAI agent spans from the streamed messages through the shared
- * Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool` spans to the
- * `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
+ * patch never sees those calls. The SDK's lifecycle hooks
+ * (https://code.claude.com/docs/en/agent-sdk/hooks) don't suffice either: a
+ * hook callback only sees tool name/input/session_id — never the assistant
+ * message content, model, token usage, or total_cost_usd. We therefore wrap the
+ * SDK's exported `query()` and emit GenAI agent spans from the streamed messages
+ * through the shared Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool`
+ * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
@@ -18,7 +21,6 @@
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
-import type {SDKResultMessage} from './claude-agent-sdk/messages';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 
 // Idempotency marker stamped on each wrapped exports object. It is per-object
@@ -62,10 +64,12 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     }
 
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
-    const tracer = new ClaudeAgentOtelTracer({prompt});
+    // gen_ai.agent.name follows the caller's main-thread agent when named.
+    const agent = args?.options?.agent;
+    const tracer = new ClaudeAgentOtelTracer({prompt, agent});
 
     async function* traced(): AsyncGenerator<unknown, void> {
-      let result: SDKResultMessage | undefined;
+      let result: ClaudeAgentSdk.SDKResultMessage | undefined;
       let streamError: unknown;
       try {
         for await (const msg of realQuery) {

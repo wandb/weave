@@ -57,14 +57,16 @@ import {
 } from '../../genai/semconv';
 import type {Message, MessagePart} from '../../genai';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
-import {
-  toWeaveUsage,
-  type SDKAssistantMessage,
-  type SDKMessage,
-  type SDKResultMessage,
-  type SDKUserMessage,
-  type SDKUserMessageReplay,
-} from './messages';
+import type {
+  ModelUsage,
+  NonNullableUsage,
+  SDKAssistantMessage,
+  SDKMessage,
+  SDKResultMessage,
+  SDKUserMessage,
+  SDKUserMessageReplay,
+} from '@anthropic-ai/claude-agent-sdk';
+import {toWeaveUsage} from './messages';
 
 const TRACER_NAME = 'claude-agent-sdk';
 const AGENT_NAME = 'claude_agent_sdk';
@@ -117,25 +119,20 @@ type ToolResultBlock = Extract<
   {type: 'tool_result'}
 >;
 
-/** Stringify tool-result content (string, content-block array, or other). */
+/** Stringify tool-result content (string or content-block array). */
 function toolResultText(content: ToolResultBlock['content']): string {
+  if (!content) {
+    return '';
+  }
   if (typeof content === 'string') {
     return content;
   }
-  if (Array.isArray(content)) {
-    const text = content
-      .map(block => ('text' in block ? String(block.text) : ''))
-      .filter(Boolean)
-      .join('\n');
-    if (text) {
-      return text;
-    }
-  }
-  try {
-    return JSON.stringify(content);
-  } catch {
-    return String(content);
-  }
+  // `content` is an array of content blocks here; keep the text parts.
+  const text = content
+    .map(block => (block.type === 'text' ? block.text : ''))
+    .filter(Boolean)
+    .join('\n');
+  return text || JSON.stringify(content);
 }
 
 /**
@@ -147,7 +144,7 @@ function toolResultText(content: ToolResultBlock['content']): string {
  * cache-creation — see the folding note below.
  */
 function usageAttributes(
-  rawUsage: Record<string, unknown>
+  rawUsage: ModelUsage | NonNullableUsage
 ): Record<string, number> {
   const usage = toWeaveUsage(rawUsage);
   const attrs: Record<string, number> = {};
@@ -190,13 +187,49 @@ function usageAttributes(
   return attrs;
 }
 
+/**
+ * The error message for a finished run, or undefined if it succeeded. A thrown
+ * stream error wins; then a non-success terminal subtype surfaces its `errors`,
+ * then a result flagged `is_error` surfaces its text. Returns a string (possibly
+ * empty) exactly when the run errored, so callers branch on `!= null`. This
+ * broadens the Python integration's `is_error`-only check so failed runs
+ * (error_max_turns, error_during_execution, …) also surface as errors.
+ */
+function runErrorMessage(
+  error: unknown,
+  result?: SDKResultMessage
+): string | undefined {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (error != null) {
+    return String(error);
+  }
+  // `result` and `errors` live on opposite members of the union; narrow on
+  // `subtype` to read either.
+  if (result && result.subtype !== 'success') {
+    return result.errors.join('; ');
+  }
+  if (result?.is_error) {
+    return result.result;
+  }
+  return undefined;
+}
+
 type ClaudeAgentOtelTracerOptions = {
   /** The user prompt, when invoked as a string (recorded as input on the root). */
   prompt?: string;
+  /**
+   * The main-thread agent name (`options.agent`), used as `gen_ai.agent.name` —
+   * the key the Agents-tab usage rollup groups on. Falls back to the integration
+   * name `claude_agent_sdk` when the caller didn't name an agent.
+   */
+  agent?: string;
 };
 
 export class ClaudeAgentOtelTracer {
   private readonly tracer: Tracer;
+  private readonly agentName: string;
   private readonly invokeAgentSpan: Span;
   private readonly invokeAgentCtx: Context;
   private readonly openToolSpans = new Map<string, Span>();
@@ -210,6 +243,11 @@ export class ClaudeAgentOtelTracer {
     // returned when weave.init() hasn't run, so every span call stays safe.
     this.tracer = getWeaveTracer(TRACER_NAME);
 
+    // gen_ai.agent.name follows the caller's main-thread `options.agent` when
+    // set (the Agents-tab usage rollup groups on it), falling back to the
+    // integration name. The span name and integration.name stay the constant.
+    this.agentName = opts.agent || AGENT_NAME;
+
     // Root span under ROOT_CONTEXT so each query() is its own trace; sibling
     // prompts in one session are linked via gen_ai.conversation.id, not a
     // shared parent.
@@ -220,7 +258,7 @@ export class ClaudeAgentOtelTracer {
         attributes: {
           ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
           [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
-          [ATTR_GEN_AI_AGENT_NAME]: AGENT_NAME,
+          [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
           [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
         },
       },
@@ -247,12 +285,9 @@ export class ClaudeAgentOtelTracer {
 
     switch (msg.type) {
       case 'assistant':
-        // `type: 'assistant'` already narrows msg to SDKAssistantMessage.
         this.processAssistant(msg);
         break;
       case 'user':
-        // `type: 'user'` narrows to SDKUserMessage | SDKUserMessageReplay; both
-        // carry `message: MessageParam`, so processUser reads either.
         this.processUser(msg);
         break;
       default:
@@ -314,31 +349,15 @@ export class ClaudeAgentOtelTracer {
       }
     }
 
-    // A thrown stream error, or a non-success terminal subtype, marks the root
-    // as failed — broadening the Python integration's `is_error`-only check so
-    // failed runs (error_max_turns, error_during_execution, …) surface as errors.
-    const errored =
-      error != null ||
-      (result != null && (result.is_error || result.subtype !== 'success'));
-    if (errored) {
-      // `result` and `errors` live on opposite members of the union; narrow on
-      // `subtype` to read either.
-      const resultText =
-        result?.subtype === 'success' ? result.result : undefined;
-      const errorsText =
-        result && result.subtype !== 'success'
-          ? result.errors.join('; ')
-          : undefined;
-      const message =
-        error != null
-          ? error instanceof Error
-            ? error.message
-            : String(error)
-          : resultText || errorsText || 'Conversation ended with error';
+    // Mark the root failed on a thrown stream error, a non-success terminal
+    // subtype, or an is_error result. runErrorMessage returns a string exactly
+    // when the run errored.
+    const errorMessage = runErrorMessage(error, result);
+    if (errorMessage != null) {
       this.invokeAgentSpan.setAttribute(ATTR_ERROR_TYPE, 'agent_error');
       this.invokeAgentSpan.setStatus({
         code: SpanStatusCode.ERROR,
-        message,
+        message: errorMessage || 'Conversation ended with error',
       });
     }
 
@@ -369,7 +388,7 @@ export class ClaudeAgentOtelTracer {
           // Stamp the agent name on children, not just the root: the per-agent
           // usage rollup groups by `gen_ai.agent.name`, so a usage-bearing
           // `chat` span without it would drop out of the agent's token totals.
-          [ATTR_GEN_AI_AGENT_NAME]: AGENT_NAME,
+          [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
           [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
           ...(model
             ? {
@@ -404,7 +423,7 @@ export class ClaudeAgentOtelTracer {
   private emitModelUsageSpans(result: SDKResultMessage): void {
     // Prefer the per-model breakdown; fall back to the flat aggregate keyed by
     // the session's primary model when the SDK reports no `modelUsage`.
-    const perModel: Array<[string | undefined, Record<string, unknown>]> =
+    const perModel: Array<[string | undefined, ModelUsage | NonNullableUsage]> =
       result.modelUsage && Object.keys(result.modelUsage).length > 0
         ? Object.entries(result.modelUsage)
         : result.usage
@@ -464,7 +483,7 @@ export class ClaudeAgentOtelTracer {
             [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
             // Carry the agent name too (see startChatSpan) so tool spans group
             // with their agent in the per-agent rollups.
-            [ATTR_GEN_AI_AGENT_NAME]: AGENT_NAME,
+            [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
             [ATTR_GEN_AI_TOOL_NAME]: block.name,
             [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
             [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(

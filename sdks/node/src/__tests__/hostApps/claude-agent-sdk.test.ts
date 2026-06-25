@@ -5,14 +5,14 @@ import * as path from 'path';
 
 import {fixturePath, genProjectId, launchAppFrom} from './utils';
 
-interface CapturedSpan {
+type CapturedSpan = {
   name: string;
   spanId: string;
   parentSpanId?: string;
   traceId: string;
   attributes: Record<string, unknown>;
   statusCode: number;
-}
+};
 
 describe('hostApps — claude-agent-sdk', () => {
   test('auto-instruments the real @anthropic-ai/claude-agent-sdk query() and emits a GenAI agent span tree', async () => {
