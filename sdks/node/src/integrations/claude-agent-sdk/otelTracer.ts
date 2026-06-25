@@ -419,6 +419,15 @@ export class ClaudeAgentOtelTracer {
    * `modelUsage` (rather than per-assistant-message usage) also captures models
    * the SDK used without emitting an assistant message — e.g. a fast model for
    * an internal step.
+   *
+   * These usage spans intentionally reuse the `chat <model>` name of the
+   * per-message content spans from {@link processAssistant}: the SDK reports
+   * usage only in the aggregate result, never per message, so a model that also
+   * emitted content ends up with two same-named siblings (one with content and
+   * no tokens, one with tokens and no content). They don't double-count — only
+   * the usage span carries tokens — but name-based span lookup sees duplicates,
+   * so distinguish them by attribute (`gen_ai.output.messages` vs
+   * `gen_ai.usage.*`).
    */
   private emitModelUsageSpans(result: SDKResultMessage): void {
     // Prefer the per-model breakdown; fall back to the flat aggregate keyed by
