@@ -83,7 +83,7 @@ function textResponse(
           },
         }
       : {}),
-  } as LlmResponse;
+  };
 }
 
 function functionCallResponse(
@@ -101,7 +101,7 @@ function functionCallResponse(
       candidatesTokenCount: usage.completion,
       totalTokenCount: usage.prompt + usage.completion,
     },
-  } as LlmResponse;
+  };
 }
 
 async function runToCompletion(
