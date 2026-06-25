@@ -10,10 +10,12 @@ from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server_bindings import http_utils
 from weave.trace_server_bindings.http_utils import (
     CallsCompleteModeRequired,
+    QueryTooExpensive,
     handle_response_error,
     process_batch_with_retry,
     retry_on_not_found,
 )
+from weave.utils.retry import _is_retryable_exception
 
 
 def test_413_splits_batch_and_retries():
@@ -55,6 +57,34 @@ def test_calls_complete_mode_required_raises():
 
     with pytest.raises(CallsCompleteModeRequired, match="calls_complete mode required"):
         handle_response_error(response, "/call/upsert_batch")
+
+
+def test_query_too_expensive_raises():
+    """Map a QUERY_TOO_EXPENSIVE error_code to the dedicated QueryTooExpensive error,
+    carrying the server's scope-narrowing guidance.
+    """
+    response = httpx.Response(
+        400,
+        json={
+            "error_code": "QUERY_TOO_EXPENSIVE",
+            "reason": (
+                "Query is too expensive to run on this dataset. Please limit the "
+                "scope of the query by including a date range and/or additional "
+                "filter criteria. "
+            ),
+        },
+        request=httpx.Request("POST", "http://example.com"),
+    )
+
+    with pytest.raises(QueryTooExpensive, match="limit the scope"):
+        handle_response_error(response, "/traces/calls/stream_query")
+
+
+def test_query_too_expensive_is_not_retryable():
+    """A too-expensive query is deterministically doomed, so the SDK must not retry it
+    (it is not an HTTPStatusError, which would otherwise default to retryable).
+    """
+    assert _is_retryable_exception(QueryTooExpensive("too expensive")) is False
 
 
 def _make_404(body: dict) -> httpx.HTTPStatusError:

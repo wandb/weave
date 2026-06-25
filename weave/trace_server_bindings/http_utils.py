@@ -297,6 +297,14 @@ def handle_response_error(response: httpx.Response, url: str) -> None:
         message = extracted_message or default_message or "Calls complete mode required"
         raise CallsCompleteModeRequired(message)
 
+    # A query the backend predicts is too expensive will fail again on retry, so
+    # surface it as a dedicated, non-retryable error carrying the server's guidance.
+    if error_code == ERROR_CODE_QUERY_TOO_EXPENSIVE:
+        message = (
+            extracted_message or default_message or "Query is too expensive to run"
+        )
+        raise QueryTooExpensive(message)
+
     # Combine messages
     if default_message and extracted_message:
         message = f"{default_message}:\n{extracted_message}"
@@ -410,11 +418,28 @@ def retry_on_not_found(func: Callable[P, R]) -> Callable[P, R]:
 # This matches the ErrorCode.CALLS_COMPLETE_MODE_REQUIRED from weave.trace_server.errors
 ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
 
+# Error code from server when a read query is too expensive to run (ClickHouse
+# TOO_SLOW projection guard / read caps). Matches ErrorCode.QUERY_TOO_EXPENSIVE.
+ERROR_CODE_QUERY_TOO_EXPENSIVE = "QUERY_TOO_EXPENSIVE"
+
 
 class CallsCompleteModeRequired(Exception):
     """Raised when a project requires calls_complete mode but SDK is using legacy mode.
 
     This exception triggers automatic mode switching in the SDK.
+    """
+
+    pass
+
+
+class QueryTooExpensive(Exception):
+    """Raised when the server rejects a read query as too expensive to run.
+
+    The server (ClickHouse TOO_SLOW projection guard / read caps) returns a 4xx
+    with error_code QUERY_TOO_EXPENSIVE. The query is deterministically doomed
+    for this dataset, so it is surfaced as a dedicated, non-retryable error
+    (weave.utils.retry._is_retryable_exception) carrying the server's
+    scope-narrowing guidance, rather than a raw HTTPStatusError.
     """
 
     pass
