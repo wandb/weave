@@ -40,13 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          fetch-depth: 100
+          fetch-tags: false
           ref: ${{ github.head_ref }}
       - name: Get changed files
         run: |
-          # Fetch all branches
-          git fetch --all
+          set -euo pipefail
 
           # Determine the base branch and current commit
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -60,11 +59,19 @@ jobs:
           fi
           echo "Base branch is $BASE_BRANCH"
 
-          # Find the common ancestor
-          MERGE_BASE=$(git merge-base origin/$BASE_BRANCH $CURRENT_COMMIT)
+          # Fetch only the base branch history needed for merge-base. If the
+          # merge base is older than the bounded history, fail open below.
+          git fetch --no-tags --depth=100 origin "$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
 
-          # Get changed files
-          changed_files=$(git diff --name-only $MERGE_BASE $CURRENT_COMMIT)
+          # Find the common ancestor
+          if MERGE_BASE=$(git merge-base "origin/$BASE_BRANCH" "$CURRENT_COMMIT"); then
+            # Get changed files
+            changed_files=$(git diff --name-only "$MERGE_BASE" "$CURRENT_COMMIT")
+          else
+            echo "::warning::Could not find merge base in shallow checkout; running gated tests"
+            changed_files=$(printf "%s\n" $TRACE_SERVER_PATHS $WEAVE_TS_SDK_PATHS $TRACE_SERVER_MIGRATOR_PATHS $TRACE_SERVER_DISTRIBUTED_PATHS)
+          fi
+
           echo "Changed files:"
           echo "$changed_files"
           echo "changed_files<<EOF" >> $GITHUB_ENV
