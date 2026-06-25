@@ -7,6 +7,7 @@ specific setup requirements.
 
 import base64
 import os
+import socket
 from unittest import mock
 
 import boto3
@@ -290,6 +291,23 @@ def test_keepalive_gcs_client_scopes_credentials_for_session():
     prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
     passthrough = file_storage._build_keepalive_gcs_client(prescoped)
     assert passthrough._http.credentials.scopes == ["existing-scope"]
+
+
+def test_keepalive_adapter_sets_tcp_user_timeout():
+    """In-flight stalls need TCP_USER_TIMEOUT; keep-alive only covers idle sockets."""
+    adapter = file_storage._KeepAliveHTTPAdapter(
+        pool_maxsize=file_storage.GCS_POOL_MAXSIZE
+    )
+    socket_options = adapter.poolmanager.connection_pool_kw["socket_options"]
+
+    assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in socket_options
+    # Linux-only knob (skipped on macOS/BSD where the constant is absent).
+    if hasattr(socket, "TCP_USER_TIMEOUT"):
+        assert (
+            socket.IPPROTO_TCP,
+            socket.TCP_USER_TIMEOUT,
+            file_storage.GCS_TCP_USER_TIMEOUT_MS,
+        ) in socket_options
 
 
 class TestAzureStorage:

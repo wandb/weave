@@ -106,6 +106,11 @@ GCS_TCP_KEEPALIVE_COUNT = 5
 # uploads reuse warm keep-alive connections instead of churning new ones.
 GCS_POOL_MAXSIZE = 40
 
+# Keep-alive only probes IDLE sockets; an in-flight request whose peer goes silent
+# rides TCP retransmit backoff (~23s, under the read timeout). TCP_USER_TIMEOUT caps
+# unacked data so the socket errors fast and the retry decorator hits a fresh conn.
+GCS_TCP_USER_TIMEOUT_MS = 8000
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -425,11 +430,13 @@ class _KeepAliveHTTPAdapter(HTTPAdapter):
         ]
         # TCP_KEEPIDLE (Linux) and TCP_KEEPALIVE (macOS/BSD) are the same idle knob;
         # only the platform's own constant exists, so getattr-guard each.
+        # TCP_USER_TIMEOUT (Linux, milliseconds) bounds in-flight unacked data.
         for opt_name, value in (
             ("TCP_KEEPIDLE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPALIVE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPINTVL", GCS_TCP_KEEPALIVE_INTERVAL),
             ("TCP_KEEPCNT", GCS_TCP_KEEPALIVE_COUNT),
+            ("TCP_USER_TIMEOUT", GCS_TCP_USER_TIMEOUT_MS),
         ):
             opt: int | None = getattr(socket, opt_name, None)
             if opt is not None:
