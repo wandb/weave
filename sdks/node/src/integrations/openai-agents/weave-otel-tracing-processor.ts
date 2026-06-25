@@ -36,6 +36,7 @@ import {
   ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
   ATTR_GEN_AI_REQUEST_TEMPERATURE,
   ATTR_GEN_AI_REQUEST_TOP_P,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
   ATTR_GEN_AI_RESPONSE_ID,
   ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
@@ -197,6 +198,62 @@ function generationSpanUsageAttrs(
   };
 }
 
+type FinishReason =
+  | 'stop'
+  | 'tool_calls'
+  | 'length'
+  | 'content_filter'
+  | 'error'
+  | undefined;
+
+function finishReasonFromResponse(
+  response: OpenAI.Responses.Response
+): FinishReason {
+  switch (response.status) {
+    case 'completed': {
+      for (let i = response.output.length - 1; i >= 0; i--) {
+        switch (response.output[i].type) {
+          case 'reasoning': {
+            continue;
+          }
+
+          case 'function_call': {
+            return 'tool_calls';
+          }
+
+          default: {
+            return 'stop';
+          }
+        }
+      }
+
+      return 'stop';
+    }
+
+    case 'incomplete': {
+      switch (response.incomplete_details?.reason) {
+        case 'max_output_tokens': {
+          return 'length';
+        }
+
+        case 'content_filter': {
+          return 'content_filter';
+        }
+
+        default: {
+          return undefined;
+        }
+      }
+    }
+
+    case 'failed':
+      return 'error';
+
+    default:
+      return undefined;
+  }
+}
+
 /**
  * `chat` attrs for a ResponseSpan. Pulls data from Agents-SDK populated `_response`
  * attribute when present.
@@ -224,6 +281,7 @@ function responseChatAttrs(spanData: ResponseSpanData): Attributes {
   if (hasResponsesOutput(spanData)) {
     const {messages, reasoning} = outputFromResponseSpan(spanData);
     const response = spanData._response;
+    const finishReason = finishReasonFromResponse(response);
 
     attrs = {
       ...attrs,
@@ -234,6 +292,9 @@ function responseChatAttrs(spanData: ResponseSpanData): Attributes {
         messages,
         reasoning
       ),
+      ...(finishReason
+        ? {[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]: [finishReason]}
+        : {}),
       ...responseUsageAttrs(response.usage),
     };
   }
