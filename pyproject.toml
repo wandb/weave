@@ -183,6 +183,7 @@ bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 verdict = [
   "verdict>=0.2.3; platform_python_implementation != 'PyPy' and python_version < '3.13'",
 ]
+ag2 = ["ag2[openai]>=0.11.0; python_version >= '3.10'"]
 autogen = ["autogen-agentchat>=0.5.7; python_version >= '3.10'"]
 claude_agent_sdk = ["claude-agent-sdk>=0.1.0"]
 verifiers = ["verifiers>=0.1.3.post0,<0.1.13; python_version >= '3.11'"]
@@ -439,6 +440,9 @@ trace_server = [
 trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
+]
+ag2_tests = [
+  "ag2[openai]>=0.11.0; python_version >= '3.10'",
 ]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
