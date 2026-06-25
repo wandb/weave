@@ -20,6 +20,7 @@ from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
+from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -625,6 +626,96 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
+
+    # === GenAI / Agent Observability API (read) ===
+
+    @validate_call
+    def agent_spans_query(
+        self, req: agent_types.AgentSpansQueryReq
+    ) -> agent_types.AgentSpansQueryRes:
+        return self._generic_request(
+            "/agents/spans/query",
+            req,
+            agent_types.AgentSpansQueryReq,
+            agent_types.AgentSpansQueryRes,
+        )
+
+    @validate_call
+    def agent_traces_chat(
+        self, req: agent_types.AgentTraceChatReq
+    ) -> agent_types.AgentTraceChatRes:
+        return self._generic_request(
+            "/agents/traces/chat",
+            req,
+            agent_types.AgentTraceChatReq,
+            agent_types.AgentTraceChatRes,
+        )
+
+    @validate_call
+    def agent_conversation_chat(
+        self, req: agent_types.AgentConversationChatReq
+    ) -> agent_types.AgentConversationChatRes:
+        return self._generic_request(
+            "/agents/conversations/chat",
+            req,
+            agent_types.AgentConversationChatReq,
+            agent_types.AgentConversationChatRes,
+        )
+
+    @validate_call
+    def agent_agents_query(
+        self, req: agent_types.AgentsQueryReq
+    ) -> agent_types.AgentsQueryRes:
+        return self._generic_request(
+            "/agents/query",
+            req,
+            agent_types.AgentsQueryReq,
+            agent_types.AgentsQueryRes,
+        )
+
+    @validate_call
+    def agent_versions_query(
+        self, req: agent_types.AgentVersionsQueryReq
+    ) -> agent_types.AgentVersionsQueryRes:
+        return self._generic_request(
+            "/agents/agent-versions/query",
+            req,
+            agent_types.AgentVersionsQueryReq,
+            agent_types.AgentVersionsQueryRes,
+        )
+
+    @validate_call
+    def agent_spans_stats(
+        self, req: agent_types.AgentSpanStatsReq
+    ) -> agent_types.AgentSpanStatsRes:
+        return self._generic_request(
+            "/agents/spans/stats",
+            req,
+            agent_types.AgentSpanStatsReq,
+            agent_types.AgentSpanStatsRes,
+        )
+
+    @validate_call
+    def agent_custom_attrs_schema(
+        self, req: agent_types.AgentCustomAttrsSchemaReq
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        return self._generic_request(
+            "/agents/spans/custom-attrs/schema",
+            req,
+            agent_types.AgentCustomAttrsSchemaReq,
+            agent_types.AgentCustomAttrsSchemaRes,
+        )
+
+    @validate_call
+    def agent_search(
+        self, req: agent_types.AgentSearchReq
+    ) -> agent_types.AgentSearchRes:
+        return self._generic_request(
+            "/agents/search",
+            req,
+            agent_types.AgentSearchReq,
+            agent_types.AgentSearchRes,
+        )
 
     # Call API
     @validate_call
