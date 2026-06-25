@@ -29,7 +29,7 @@ function freshState(): GenAIState {
  *
  * Internal helper, not part of the public API.
  */
-export function _getGenaiState(): GenAIState {
+export function getGenaiState(): GenAIState {
   return state.genAi.state.getStore() ?? state.genAi.defaultState;
 }
 
@@ -57,15 +57,15 @@ export function runIsolated<T>(fn: () => T): T {
 
 /** Returns the current Session, or undefined. */
 export function getCurrentSession(): Session | undefined {
-  return _getGenaiState().session ?? undefined;
+  return getGenaiState().session ?? undefined;
 }
 
 /** Returns the current Turn, or undefined. */
 export function getCurrentTurn(): Turn | undefined {
-  return _getGenaiState().turn ?? undefined;
+  return getGenaiState().turn ?? undefined;
 }
 
 /** Returns the current LLM, or undefined. */
 export function getCurrentLLM(): LLM | undefined {
-  return _getGenaiState().llm ?? undefined;
+  return getGenaiState().llm ?? undefined;
 }

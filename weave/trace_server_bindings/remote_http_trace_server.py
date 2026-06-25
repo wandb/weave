@@ -24,6 +24,8 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     REMOTE_REQUEST_BYTES_LIMIT,
     TRACE_ID_HEADER,
     CallsCompleteModeRequired,
@@ -113,13 +115,16 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def _build_dynamic_request_headers(
         self, trace_id: str | None = None
     ) -> dict[str, str]:
-        """Build headers for HTTP requests, including extra headers and retry ID.
+        """Build headers for HTTP requests: extra headers, capabilities, IDs.
 
-        When ``trace_id`` is provided (single-call ingest requests), it is
-        attached as ``X-Weave-Trace-Id`` so a server-side ingest sampler can
-        decide keep/drop per trace without parsing the body.
+        Every request carries ``X-Weave-Client-Capabilities`` (the capabilities
+        this SDK build guarantees) so a future server-side ingest sampler can
+        recognize a sampling-safe client. When ``trace_id`` is provided
+        (single-call ingest requests) it is also attached as ``X-Weave-Trace-Id``
+        so the sampler can decide keep/drop per trace without parsing the body.
         """
         headers = dict(self._extra_headers) if self._extra_headers else {}
+        headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
         if trace_id is not None:

@@ -41,6 +41,7 @@ export {
   wrapOpenAI,
   wrapGoogleGenAI,
   wrapClaudeAgentSdk,
+  WeaveAdkPlugin,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
   patchRealtimeSession,

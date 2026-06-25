@@ -80,8 +80,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Install Libmagic dependency package
-        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -195,8 +193,6 @@ jobs:
           exit 1
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install Libmagic dependency package
-        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -250,8 +246,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Install Libmagic dependency package
-        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:

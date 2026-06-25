@@ -319,8 +319,9 @@ def build_agent_span_stats_query(
         )
 
     granularity_seconds = _resolve_granularity(req, start, end)
-    start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
-    end_epoch = end.replace(tzinfo=datetime.timezone.utc).timestamp()
+    # Whole unix seconds: a fractional float trips ClickHouse Int64 param parsing.
+    start_epoch = int(start.replace(tzinfo=datetime.timezone.utc).timestamp())
+    end_epoch = int(end.replace(tzinfo=datetime.timezone.utc).timestamp())
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)

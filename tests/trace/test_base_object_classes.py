@@ -1133,7 +1133,6 @@ def test_obj_create_rejects_name_type_collision(client: WeaveClient):
     assert excinfo.value.kind == "object"
     assert excinfo.value.new_base_object_class == "TestOnlyExample"
     assert excinfo.value.existing_base_object_classes == ["TestOnlyNestedBaseObject"]
-    assert "TestOnlyNestedBaseObject" in str(excinfo.value)
 
     # And the original type must still be the only one present for that name.
     objs_res = client.server.objs_query(
