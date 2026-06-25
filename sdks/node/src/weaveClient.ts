@@ -310,6 +310,17 @@ type CallEndParams = EndedCallSchemaForInsert;
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
+
+// Whether the call is part of an evaluation: root by op-name substring (op_name
+// is a ref URI), children by the attribute marker.
+function isEvalCall(call: InternalCall): boolean {
+  const {attributes, op_name} = call.callSchema;
+  return (
+    attributes?.[EVAL_META_KEY] != null ||
+    (op_name?.includes(EVALUATION_RUN_OP_NAME) ?? false)
+  );
+}
+
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
@@ -1358,16 +1369,6 @@ export class WeaveClient {
     return this.saveCallStart(startReq);
   }
 
-  // The eval root is matched by op-name substring (op_name is a ref URI); eval
-  // children carry the marker in their attributes.
-  private isEvalCall(call: InternalCall): boolean {
-    const {attributes, op_name} = call.callSchema;
-    return (
-      (attributes != null && EVAL_META_KEY in attributes) ||
-      (op_name?.includes(EVALUATION_RUN_OP_NAME) ?? false)
-    );
-  }
-
   public async finishCall(
     call: InternalCall,
     result: any,
@@ -1398,7 +1399,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
-      is_eval: this.isEvalCall(call),
+      is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1436,7 +1437,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
-      is_eval: this.isEvalCall(call),
+      is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
