@@ -1,5 +1,5 @@
 import {
-  Attributes,
+  type Attributes,
   type Context as OtelContext,
   type Span as OtelSpan,
   SpanStatusCode,
@@ -9,19 +9,42 @@ import {
 
 import {getWeaveTracer} from '../../genai/provider';
 import {
+  serializeInputMessages,
+  serializeOutputMessages,
+  messagesFromChatCompletions,
+  outputFromResponseSpan,
+  inputFromResponseSpan,
+  hasChatCompletionInput,
+  hasChatCompletionOutput,
+  hasResponsesOutput,
+  hasResponsesInput,
+} from './messages';
+import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_OUTPUT_TYPE,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+  ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+  ATTR_GEN_AI_REQUEST_MAX_TOKENS,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+  ATTR_GEN_AI_REQUEST_SEED,
+  ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
+  ATTR_GEN_AI_REQUEST_TEMPERATURE,
+  ATTR_GEN_AI_REQUEST_TOP_P,
   ATTR_GEN_AI_RESPONSE_ID,
   ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
+  ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS,
 } from '../../genai/semconv';
 import type {
   AgentSpanData,
@@ -33,82 +56,29 @@ import type {
   MCPListToolsSpanData,
   ResponseSpanData,
   Span,
+  SpanData,
   SpeechGroupSpanData,
   SpeechSpanData,
   Trace,
   TracingProcessor,
   TranscriptionSpanData,
-} from '../openai.agent.types';
+} from '@openai/agents';
+import type OpenAI from 'openai';
+import type {GenerationUsageData} from '@openai/agents';
+import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 
 const TRACER_NAME = 'weave.openai_agents';
 const WEAVE_ATTR_PREFIX = 'weave.openai_agents';
 const PROVIDER_NAME = 'openai';
 const DEFAULT_CHAT_OUTPUT_TYPE = 'text';
 
-function hasModel(resp: Record<string, any>): resp is {model: string} {
-  return typeof resp.model === 'string';
-}
+const OPENAI_AGENTS_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
+  libraryIntegration('openai_agents', {
+    packageName: '@openai/agents',
+  })
+);
 
-function hasId(resp: Record<string, any>): resp is {id: string} {
-  return typeof resp.id === 'string';
-}
-
-function hasUsage(
-  resp: Record<string, any>
-): resp is {usage: ResponseSpanDataUsage} {
-  return (
-    typeof resp.usage !== 'undefined' &&
-    typeof resp.usage.input_tokens !== 'undefined'
-  );
-}
-
-/**
- * Extract the model string from a ResponseSpanData. The Agents SDK exposes
- * the raw openai response under `_response`.
- */
-function modelFromResponseSpan(spanData: ResponseSpanData): string | undefined {
-  if (spanData._response && hasModel(spanData._response)) {
-    return spanData._response.model;
-  }
-}
-
-/**
- * Extract the openai response id from a ResponseSpanData. Prefer the
- * top-level `response_id` (which the Agents SDK populates directly) and
- * fall back to `_response.id`.
- */
-function responseIdFromResponseSpan(
-  spanData: ResponseSpanData
-): string | undefined {
-  if (spanData.response_id) {
-    return spanData.response_id;
-  }
-
-  if (spanData._response && hasId(spanData._response)) {
-    return spanData._response.id;
-  }
-}
-
-type ResponseSpanDataUsage = {
-  input_tokens?: number;
-  output_tokens?: number;
-};
-
-function usageFromResponseSpan(
-  spanData: ResponseSpanData
-): ResponseSpanDataUsage | undefined {
-  if (spanData._response && hasUsage(spanData._response)) {
-    return spanData._response.usage;
-  }
-}
-
-/**
- * Descriptive OTel span name. AgentSpan uses the conventional
- * `invoke_agent <subject>` shape; other types fall back to a basic
- * `<kind> <subject>` for trace-viewer readability until later increments
- * add proper semconv mappings.
- */
-function otelSpanName(span: Span): string {
+function otelSpanName(span: Span<SpanData>): string {
   switch (span.spanData.type) {
     case 'agent':
       return `invoke_agent ${span.spanData.name}`;
@@ -117,15 +87,18 @@ function otelSpanName(span: Span): string {
       return `execute_tool ${span.spanData.name}`;
 
     case 'response':
-      return `chat ${modelFromResponseSpan(span.spanData) ?? ''}`.trimEnd();
+      return hasResponsesOutput(span.spanData)
+        ? `chat ${span.spanData._response.model}`
+        : `chat`;
 
     case 'generation':
       return `chat ${span.spanData.model ?? ''}`.trimEnd();
 
-    case 'handoff':
+    case 'handoff': {
       const from = span.spanData.from_agent || '?';
       const to = span.spanData.to_agent || '?';
       return `handoff ${from} -> ${to}`;
+    }
 
     case 'guardrail':
       return `guardrail ${span.spanData.name}`.trimEnd();
@@ -142,15 +115,17 @@ function otelSpanName(span: Span): string {
     case 'mcp_tools':
       return 'mcp_list_tools';
 
-    case 'custom':
+    case 'custom': {
       const name = span.spanData.name ?? '';
       return name || 'custom';
+    }
 
-    default:
+    default: {
       const spanData = span.spanData as {type: string; name?: string};
       return spanData.name
         ? `${spanData.type} ${spanData.name}`
         : spanData.type;
+    }
   }
 }
 
@@ -160,18 +135,12 @@ function isoToMs(iso: string | null): number | undefined {
   return Number.isFinite(ms) ? ms : undefined;
 }
 
-function invokeAgentAttrs(
-  spanData: AgentSpanData,
-  conversationId: string
-): Attributes {
+function invokeAgentAttrs(spanData: AgentSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     [ATTR_GEN_AI_AGENT_NAME]: spanData.name ?? '',
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
-  }
   if (spanData.tools && spanData.tools.length > 0) {
     attrs[`${WEAVE_ATTR_PREFIX}.agent.tools`] = spanData.tools;
   }
@@ -184,17 +153,11 @@ function invokeAgentAttrs(
   return attrs;
 }
 
-function executeToolAttrs(
-  spanData: FunctionSpanData,
-  conversationId: string
-): Attributes {
+function executeToolAttrs(spanData: FunctionSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
     [ATTR_GEN_AI_TOOL_NAME]: spanData.name ?? '',
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
-  }
   if (spanData.input) {
     attrs[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = spanData.input;
   }
@@ -204,35 +167,75 @@ function executeToolAttrs(
   return attrs;
 }
 
+function responseUsageAttrs(
+  usage: OpenAI.Responses.ResponseUsage | undefined
+): Attributes | undefined {
+  if (!usage) return;
+
+  return {
+    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input_tokens,
+    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output_tokens,
+    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]:
+      usage.input_tokens_details?.cached_tokens,
+    [ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]:
+      usage.output_tokens_details?.reasoning_tokens,
+  };
+}
+
+function generationSpanUsageAttrs(
+  usage: GenerationUsageData | undefined
+): Attributes | undefined {
+  if (!usage) return;
+
+  return {
+    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: usage.input_tokens,
+    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: usage.output_tokens,
+    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.details
+      ?.cached_tokens as number,
+    [ATTR_GEN_AI_USAGE_REASONING_OUTPUT_TOKENS]: usage.details
+      ?.reasoning_tokens as number,
+  };
+}
+
 /**
  * `chat` attrs for a ResponseSpan. Pulls data from Agents-SDK populated `_response`
- * attribute when present. Input/output message serialization is not yet implemented.
+ * attribute when present.
  */
-function responseChatAttrs(
-  spanData: ResponseSpanData,
-  conversationId: string
-): Attributes {
-  const model = modelFromResponseSpan(spanData);
-  const attrs: Attributes = {
+function responseChatAttrs(spanData: ResponseSpanData): Attributes {
+  let attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
+    [ATTR_GEN_AI_RESPONSE_ID]: spanData.response_id,
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+
+  if (hasResponsesInput(spanData)) {
+    const {messages, attachments} = inputFromResponseSpan(spanData);
+
+    attrs = {
+      ...attrs,
+      [ATTR_GEN_AI_INPUT_MESSAGES]: serializeInputMessages(
+        messages,
+        attachments
+      ),
+    };
   }
-  if (model) {
-    attrs[ATTR_GEN_AI_REQUEST_MODEL] = model;
-    attrs[ATTR_GEN_AI_RESPONSE_MODEL] = model;
-  }
-  const respId = responseIdFromResponseSpan(spanData);
-  if (respId) {
-    attrs[ATTR_GEN_AI_RESPONSE_ID] = respId;
-  }
-  const usage = usageFromResponseSpan(spanData);
-  if (usage) {
-    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = usage.input_tokens;
-    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = usage.output_tokens;
+
+  if (hasResponsesOutput(spanData)) {
+    const {messages, reasoning} = outputFromResponseSpan(spanData);
+    const response = spanData._response;
+
+    attrs = {
+      ...attrs,
+      [ATTR_GEN_AI_REQUEST_MODEL]: response.model,
+      [ATTR_GEN_AI_RESPONSE_MODEL]: response.model,
+      [ATTR_GEN_AI_RESPONSE_ID]: attrs[ATTR_GEN_AI_RESPONSE_ID] ?? response.id,
+      [ATTR_GEN_AI_OUTPUT_MESSAGES]: serializeOutputMessages(
+        messages,
+        reasoning
+      ),
+      ...responseUsageAttrs(response.usage),
+    };
   }
 
   return attrs;
@@ -241,26 +244,83 @@ function responseChatAttrs(
 /**
  * `chat` attrs for a GenerationSpan.
  */
-function generationChatAttrs(
-  spanData: GenerationSpanData,
-  conversationId: string
-): Attributes {
+function generationChatAttrs(spanData: GenerationSpanData): Attributes {
   const attrs: Attributes = {
     [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
     [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     [ATTR_GEN_AI_OUTPUT_TYPE]: DEFAULT_CHAT_OUTPUT_TYPE,
+    [ATTR_GEN_AI_REQUEST_MODEL]: spanData.model,
   };
-  if (conversationId) {
-    attrs[ATTR_GEN_AI_CONVERSATION_ID] = conversationId;
+
+  if (hasChatCompletionInput(spanData) && spanData.input.length > 0) {
+    const messages = messagesFromChatCompletions(spanData.input);
+    attrs[ATTR_GEN_AI_INPUT_MESSAGES] = serializeInputMessages(messages, []);
   }
-  if (spanData.model) {
-    attrs[ATTR_GEN_AI_REQUEST_MODEL] = spanData.model;
+
+  if (hasChatCompletionOutput(spanData) && spanData.output.length > 0) {
+    const messages = messagesFromChatCompletions(spanData.output);
+    attrs[ATTR_GEN_AI_OUTPUT_MESSAGES] = serializeOutputMessages(messages, '');
   }
-  if (spanData.usage) {
-    attrs[ATTR_GEN_AI_USAGE_INPUT_TOKENS] = spanData.usage.input_tokens;
-    attrs[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS] = spanData.usage.output_tokens;
+
+  return {
+    ...attrs,
+    ...generationSpanUsageAttrs(spanData.usage),
+    ...modelConfigAttrs(spanData.model_config),
+  };
+}
+
+/**
+ * Allowlist of `GenerationSpanData.model_config` keys mapped to their
+ * GenAI semconv attribute names. Only these keys are forwarded; everything
+ * else on `model_config` is openai-specific and doesn't map cleanly to
+ * GenAI semconv.
+ */
+const MODEL_CONFIG_KEY_MAP = {
+  temperature: ATTR_GEN_AI_REQUEST_TEMPERATURE,
+  top_p: ATTR_GEN_AI_REQUEST_TOP_P,
+  frequency_penalty: ATTR_GEN_AI_REQUEST_FREQUENCY_PENALTY,
+  presence_penalty: ATTR_GEN_AI_REQUEST_PRESENCE_PENALTY,
+  max_tokens: ATTR_GEN_AI_REQUEST_MAX_TOKENS,
+  seed: ATTR_GEN_AI_REQUEST_SEED,
+  stop: ATTR_GEN_AI_REQUEST_STOP_SEQUENCES,
+  n: ATTR_GEN_AI_REQUEST_CHOICE_COUNT,
+};
+
+/**
+ * Extract `gen_ai.request.*` attrs from a GenerationSpanData.model_config.
+ *
+ * Keys not in the allowlist are dropped. Null/undefined values are dropped.
+ * `stop` is normalized to an array (openai accepts a single string OR a
+ * list); semconv requires `stop_sequences` to be a list of strings, so a
+ * bare string becomes a single-element array and anything that's neither
+ * string nor array is dropped.
+ */
+function modelConfigAttrs(
+  modelConfig: GenerationSpanData['model_config']
+): Attributes {
+  if (!modelConfig) {
+    return {};
   }
-  return attrs;
+
+  const out: Attributes = {};
+  for (const [key, attr] of Object.entries(MODEL_CONFIG_KEY_MAP)) {
+    const value = modelConfig[key];
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    if (attr === ATTR_GEN_AI_REQUEST_STOP_SEQUENCES) {
+      if (typeof value === 'string') {
+        out[attr] = [value];
+      } else if (Array.isArray(value)) {
+        out[attr] = value;
+      }
+      continue;
+    }
+
+    out[attr] = value;
+  }
+  return out;
 }
 
 function handoffAttrs(spanData: HandoffSpanData): Attributes {
@@ -325,19 +385,19 @@ function customAttrs(spanData: CustomSpanData): Attributes {
   return out;
 }
 
-function attrsForSpan(span: Span, conversationId: string): Attributes {
+function attrsForSpan(span: Span<SpanData>): Attributes {
   switch (span.spanData.type) {
     case 'agent':
-      return invokeAgentAttrs(span.spanData, conversationId);
+      return invokeAgentAttrs(span.spanData);
 
     case 'function':
-      return executeToolAttrs(span.spanData, conversationId);
+      return executeToolAttrs(span.spanData);
 
     case 'response':
-      return responseChatAttrs(span.spanData, conversationId);
+      return responseChatAttrs(span.spanData);
 
     case 'generation':
-      return generationChatAttrs(span.spanData, conversationId);
+      return generationChatAttrs(span.spanData);
 
     case 'handoff':
       return handoffAttrs(span.spanData);
@@ -369,6 +429,19 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
   }
 }
 
+type TraceInfo = {
+  conversationId: string;
+
+  // Used to sweep through opened spans `onTraceEnd` so we don't leak when
+  // the SDK ends a trace without closing every span.
+  openSpanIds: string[];
+};
+
+type SpanInfo = {
+  otelSpan: OtelSpan;
+  agentName: string | undefined;
+};
+
 /**
  * OTel-emitting TracingProcessor for the OpenAI Agents SDK.
  *
@@ -391,11 +464,19 @@ function attrsForSpan(span: Span, conversationId: string): Attributes {
  * - `{custom}`
  */
 export class WeaveOtelTracingProcessor implements TracingProcessor {
-  private spansById = new Map<string, OtelSpan>();
-  private conversationIdsByTraceId = new Map<string, string>();
-  // Used to sweep through opened spans `onTraceEnd` so we don't leak when
-  // the SDK ends a trace without closing every span.
-  private openSpanIdsByTraceId = new Map<string, string[]>();
+  private spansById = new Map<string, SpanInfo>();
+  private tracesById = new Map<string, TraceInfo>();
+
+  private getTraceInfo(traceId: string): TraceInfo {
+    let traceInfo = this.tracesById.get(traceId);
+
+    if (!traceInfo) {
+      traceInfo = {conversationId: traceId, openSpanIds: []};
+      this.tracesById.set(traceId, traceInfo);
+    }
+
+    return traceInfo;
+  }
 
   private tracer() {
     return getWeaveTracer(TRACER_NAME);
@@ -406,40 +487,35 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
    * when no parent OTel span exists — the new span then becomes the OTel
    * root for the trace.
    */
-  private parentContext(span: Span): OtelContext | undefined {
+  private parentContext(span: Span<SpanData>): OtelContext | undefined {
     if (!span.parentId) return undefined;
     const parent = this.spansById.get(span.parentId);
     if (!parent) return undefined;
-    return otelTrace.setSpan(otelContext.active(), parent);
+    return otelTrace.setSpan(otelContext.active(), parent.otelSpan);
   }
 
   async onTraceStart(trace: Trace): Promise<void> {
-    this.conversationIdsByTraceId.set(
-      trace.traceId,
-      trace.groupId ?? trace.traceId
-    );
-    if (!this.openSpanIdsByTraceId.has(trace.traceId)) {
-      this.openSpanIdsByTraceId.set(trace.traceId, []);
-    }
+    const traceInfo = this.getTraceInfo(trace.traceId);
+    traceInfo.conversationId = trace.groupId ?? trace.traceId;
   }
 
   async onTraceEnd(trace: Trace): Promise<void> {
-    const openSpanIds = this.openSpanIdsByTraceId.get(trace.traceId) ?? [];
-    this.openSpanIdsByTraceId.delete(trace.traceId);
+    const traceInfo = this.getTraceInfo(trace.traceId);
+    const openSpanIds = traceInfo.openSpanIds;
     // Sweep in LIFO order so child spans end before their parents.
     for (const spanId of openSpanIds.reverse()) {
-      const otelSpan = this.spansById.get(spanId);
-      if (!otelSpan) continue;
+      const span = this.spansById.get(spanId);
+      if (!span) continue;
 
       this.spansById.delete(spanId);
-      if (otelSpan.isRecording()) {
-        otelSpan.end();
+      if (span.otelSpan.isRecording()) {
+        span.otelSpan.end();
       }
     }
-    this.conversationIdsByTraceId.delete(trace.traceId);
+    this.tracesById.delete(trace.traceId);
   }
 
-  async onSpanStart(span: Span): Promise<void> {
+  async onSpanStart(span: Span<SpanData>): Promise<void> {
     const parentCtx = this.parentContext(span);
     const otelSpan = this.tracer().startSpan(
       otelSpanName(span),
@@ -448,26 +524,41 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
     );
     otelSpan.setAttribute(`${WEAVE_ATTR_PREFIX}.span_id`, span.spanId);
     otelSpan.setAttribute(`${WEAVE_ATTR_PREFIX}.trace_id`, span.traceId);
-    this.spansById.set(span.spanId, otelSpan);
 
-    const openSpanIds = this.openSpanIdsByTraceId.get(span.traceId);
-    if (openSpanIds) {
-      openSpanIds.push(span.spanId);
-    } else {
-      this.openSpanIdsByTraceId.set(span.traceId, [span.spanId]);
+    this.spansById.set(span.spanId, {
+      otelSpan,
+      agentName: this.resolveAgentName(span),
+    });
+
+    const traceInfo = this.getTraceInfo(span.traceId);
+    traceInfo.openSpanIds.push(span.spanId);
+  }
+
+  private resolveAgentName(span: Span<SpanData>): string | undefined {
+    if (span.spanData.type === 'agent') {
+      return span.spanData.name;
+    }
+
+    if (span.parentId) {
+      const parentSpanInfo = this.spansById.get(span.parentId);
+      if (parentSpanInfo) {
+        return parentSpanInfo.agentName;
+      }
     }
   }
 
-  async onSpanEnd(span: Span): Promise<void> {
-    const otelSpan = this.spansById.get(span.spanId);
-    this.spansById.delete(span.spanId);
-    if (!otelSpan) return;
+  async onSpanEnd(span: Span<SpanData>): Promise<void> {
+    const spanInfo = this.spansById.get(span.spanId);
+    if (!spanInfo) return;
+    const {otelSpan, agentName} = spanInfo;
 
-    const openSpanIds = this.openSpanIdsByTraceId.get(span.traceId);
-    if (openSpanIds) {
-      const idx = openSpanIds.indexOf(span.spanId);
-      if (idx >= 0) openSpanIds.splice(idx, 1);
-    }
+    this.spansById.delete(span.spanId);
+
+    const traceInfo = this.getTraceInfo(span.traceId);
+
+    traceInfo.openSpanIds = traceInfo.openSpanIds.filter(
+      id => id != span.spanId
+    );
 
     // Enrich-then-end. The enrichment block dispatches on span-data type
     // and may touch SDK payloads that could throw on unexpected shapes. End
@@ -480,10 +571,12 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
       // "chat" and gains the model suffix here).
       otelSpan.updateName(otelSpanName(span));
 
-      const conversationId =
-        this.conversationIdsByTraceId.get(span.traceId) ?? '';
-      const attrs = attrsForSpan(span, conversationId);
-      otelSpan.setAttributes(attrs);
+      otelSpan.setAttributes({
+        ...attrsForSpan(span),
+        ...OPENAI_AGENTS_INTEGRATION_OTEL_ATTRS,
+        [ATTR_GEN_AI_CONVERSATION_ID]: traceInfo.conversationId,
+        [ATTR_GEN_AI_AGENT_NAME]: agentName,
+      });
 
       if (span.error) {
         otelSpan.setStatus({
@@ -516,13 +609,12 @@ export class WeaveOtelTracingProcessor implements TracingProcessor {
   }
 
   private endOpenSpans(): void {
-    for (const otelSpan of this.spansById.values()) {
+    for (const {otelSpan} of this.spansById.values()) {
       if (otelSpan.isRecording()) {
         otelSpan.end();
       }
     }
     this.spansById.clear();
-    this.conversationIdsByTraceId.clear();
-    this.openSpanIdsByTraceId.clear();
+    this.tracesById.clear();
   }
 }

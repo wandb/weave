@@ -1,0 +1,67 @@
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Tue, 09 Jun 2026 20:38:21 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/table/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"table":{"project_id":"drtangible-mocha/test-project","rows":[{"a":1,"b":2},{"a":3,"b":4},{"a":5,"b":6}]}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "231"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:21 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"d2e5de0d792d9f5636b67ab5c8baf8a7749b4703e89c625303b32405e0b17e77","row_digests":["2El9nYJ3CnBykmEJWqmPfvUVTXr0mfgDe2yiUClnhaY","sPyqicZSNerizfVt6DyxLHL8qEmPTfTyiXbx9OhVhDM","XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA"]}'
+- request:
+    url: https://trace.wandb.ai/table/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/test-project","digest":"d2e5de0d792d9f5636b67ab5c8baf8a7749b4703e89c625303b32405e0b17e77"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "298"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"rows":[{"digest":"2El9nYJ3CnBykmEJWqmPfvUVTXr0mfgDe2yiUClnhaY","val":{"a":1,"b":2},"original_index":0},{"digest":"sPyqicZSNerizfVt6DyxLHL8qEmPTfTyiXbx9OhVhDM","val":{"a":3,"b":4},"original_index":1},{"digest":"XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA","val":{"a":5,"b":6},"original_index":2}]}'

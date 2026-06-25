@@ -37,6 +37,16 @@ describe('WeaveRealtimeTracingAdapter', () => {
     expect(calls[0].display_name).toBe('Realtime Session');
     expect(calls[0].parent_id).toBeNull();
     expect(calls[0].ended_at).toBeUndefined();
+
+    // Integration-tracking metadata is stamped on calls this adapter
+    // produces. Match by name rather than by index, since a realtime trace
+    // can contain other calls.
+    const stamped = calls.map(c => c.attributes.integration).filter(Boolean);
+    const mine = stamped.filter(i => i.name === 'openai_agents_realtime');
+    expect(mine.length).toBeGreaterThan(0);
+    expect(
+      mine.every(i => i.meta?.package_name === '@openai/agents-realtime')
+    ).toBe(true);
   });
 
   test('session.updated records an instantaneous session update call', async () => {

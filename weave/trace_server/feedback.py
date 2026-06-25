@@ -23,6 +23,7 @@ from weave.trace_server.interface.feedback_types import (
     AnnotationPayloadSchema,
     RunnablePayloadSchema,
     feedback_type_is_agent_monitor,
+    feedback_type_is_agent_user_feedback,
     feedback_type_is_annotation,
     feedback_type_is_runnable,
 )
@@ -55,6 +56,9 @@ TABLE_FEEDBACK = Table(
         Column("scorer_ratings", "map_string_float"),
         Column("scorer_rating_reasons", "map_string_string"),
         Column("scorer_rating_confidences", "map_string_float"),
+        Column("span_agent_name", "string"),
+        Column("span_agent_version", "string"),
+        Column("span_status_code", "string"),
     ],
 )
 
@@ -184,14 +188,20 @@ def validate_feedback_create_req(
 
     is_runnable = feedback_type_is_runnable(req.feedback_type)
     is_agent_monitor = feedback_type_is_agent_monitor(req.feedback_type)
-    scorer_fields_allowed = is_runnable or is_agent_monitor
+    is_agent_user_feedback = feedback_type_is_agent_user_feedback(req.feedback_type)
+    scorer_fields_allowed = is_runnable or is_agent_monitor or is_agent_user_feedback
 
     if scorer_fields_set and not scorer_fields_allowed:
         raise InvalidRequest(
             "scorer_tags, scorer_tag_reasons, scorer_tag_confidences, "
             "scorer_ratings, scorer_rating_reasons, and scorer_rating_confidences "
-            "are only allowed on wandb.agent_monitor or wandb.runnable feedback"
+            "are only allowed on wandb.agent_monitor, wandb.agent_user_feedback, or "
+            "wandb.runnable feedback"
         )
+
+    # An agent user feedback's value is the tag in scorer_tags; an empty one is noise.
+    if is_agent_user_feedback and not req.scorer_tags:
+        raise InvalidRequest("scorer_tags is required for agent user feedback")
 
     # Validate the ref formats (we could even query the DB to ensure they exist and are valid)
     if req.annotation_ref:
@@ -211,8 +221,13 @@ def validate_feedback_create_req(
         # 3. Validate the payload against the annotation spec
         value = req.payload["value"]
         spec = data.vals[0]
-        is_valid = AnnotationSpec.model_validate(spec).value_is_valid(value)
-        if not is_valid:
+        try:
+            annotation_spec = AnnotationSpec.model_validate(spec)
+        except ValidationError as e:
+            raise InvalidRequest(
+                f"Annotation ref {req.annotation_ref} is not a valid annotation spec"
+            ) from e
+        if not annotation_spec.value_is_valid(value):
             raise InvalidRequest("Feedback payload does not match annotation spec")
     if req.runnable_ref:
         ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))
@@ -301,6 +316,9 @@ def format_feedback_to_row(
         "scorer_ratings": feedback_req.scorer_ratings,
         "scorer_rating_reasons": feedback_req.scorer_rating_reasons,
         "scorer_rating_confidences": feedback_req.scorer_rating_confidences,
+        "span_agent_name": feedback_req.span_agent_name,
+        "span_agent_version": feedback_req.span_agent_version,
+        "span_status_code": feedback_req.span_status_code,
     }
 
 

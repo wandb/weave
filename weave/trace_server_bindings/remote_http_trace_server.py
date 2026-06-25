@@ -24,7 +24,10 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     REMOTE_REQUEST_BYTES_LIMIT,
+    TRACE_ID_HEADER,
     CallsCompleteModeRequired,
     handle_response_error,
     log_dropped_call_batch,
@@ -109,11 +112,23 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
-    def _build_dynamic_request_headers(self) -> dict[str, str]:
-        """Build headers for HTTP requests, including extra headers and retry ID."""
+    def _build_dynamic_request_headers(
+        self, trace_id: str | None = None
+    ) -> dict[str, str]:
+        """Build headers for HTTP requests: extra headers, capabilities, IDs.
+
+        Every request carries ``X-Weave-Client-Capabilities`` (the capabilities
+        this SDK build guarantees) so a future server-side ingest sampler can
+        recognize a sampling-safe client. When ``trace_id`` is provided
+        (single-call ingest requests) it is also attached as ``X-Weave-Trace-Id``
+        so the sampler can decide keep/drop per trace without parsing the body.
+        """
         headers = dict(self._extra_headers) if self._extra_headers else {}
+        headers[CLIENT_CAPABILITIES_HEADER] = CLIENT_CAPABILITIES
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
+        if trace_id is not None:
+            headers[TRACE_ID_HEADER] = trace_id
         return headers
 
     def get(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
@@ -127,8 +142,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             **kwargs,
         )
 
-    def post(self, url: str, *args: Any, **kwargs: Any) -> httpx.Response:
-        headers = self._build_dynamic_request_headers()
+    def post(
+        self, url: str, *args: Any, trace_id: str | None = None, **kwargs: Any
+    ) -> httpx.Response:
+        headers = self._build_dynamic_request_headers(trace_id=trace_id)
 
         return http_requests.post(
             self.trace_server_url + url,
@@ -300,7 +317,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/start"
         req = tsi.CallStartV2Req(start=start)
-        r = self.post(url, data=req.model_dump_json().encode("utf-8"))
+        r = self.post(
+            url,
+            data=req.model_dump_json().encode("utf-8"),
+            trace_id=start.trace_id,
+        )
         handle_response_error(r, url)
 
     @with_retry
@@ -310,7 +331,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         entity, project = project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/call/end"
         req = tsi.CallEndV2Req(end=end)
-        r = self.post(url, data=req.model_dump_json().encode("utf-8"))
+        r = self.post(
+            url,
+            data=req.model_dump_json().encode("utf-8"),
+            trace_id=end.trace_id,
+        )
         handle_response_error(r, url)
 
     def _extract_entity_project(
@@ -484,6 +509,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         url: str,
         req: BaseModel,
         stream: bool = False,
+        trace_id: str | None = None,
     ) -> httpx.Response:
         r = self.post(
             url,
@@ -493,6 +519,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             stream=stream,
+            trace_id=trace_id,
         )
         handle_response_error(r, url)
         return r
@@ -541,9 +568,10 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         res_model: type[BaseModel],
         method: str = "POST",
         params: dict[str, Any] | None = None,
+        trace_id: str | None = None,
     ) -> BaseModel:
         if method == "POST":
-            r = self._post_request_executor(url, req)
+            r = self._post_request_executor(url, req, trace_id=trace_id)
         elif method == "PUT":
             r = self._put_request_executor(url, req)
         elif method == "GET":
@@ -611,7 +639,11 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             self.call_processor.enqueue_start(StartBatchItem(req=req))
             return tsi.CallStartRes(id=req.start.id, trace_id=req.start.trace_id)
         return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
+            "/call/start",
+            req,
+            tsi.CallStartReq,
+            tsi.CallStartRes,
+            trace_id=req.start.trace_id,
         )
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
@@ -626,7 +658,13 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
             self.call_processor.enqueue([EndBatchItem(req=req)])
             return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+        return self._generic_request(
+            "/call/end",
+            req,
+            tsi.CallEndReq,
+            tsi.CallEndRes,
+            trace_id=req.end.trace_id,
+        )
 
     @validate_call
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
@@ -931,6 +969,18 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def feedback_stats(self, req: tsi.FeedbackStatsReq) -> tsi.FeedbackStatsRes:
         return self._generic_request(
             "/feedback/stats", req, tsi.FeedbackStatsReq, tsi.FeedbackStatsRes
+        )
+
+    @validate_call
+    def feedback_aggregate(
+        self, req: tsi.FeedbackAggregateReq
+    ) -> tsi.FeedbackAggregateRes:
+        """Query the feedback table for aggregate scores over time."""
+        return self._generic_request(
+            "/feedback/aggregate",
+            req,
+            tsi.FeedbackAggregateReq,
+            tsi.FeedbackAggregateRes,
         )
 
     @validate_call
@@ -1768,6 +1818,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.CallStartV2Req,
             tsi.CallStartV2Res,
+            trace_id=req.start.trace_id,
         )
 
     def call_end_v2(self, req: tsi.CallEndV2Req) -> tsi.CallEndV2Res:
@@ -1784,4 +1835,5 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             tsi.CallEndV2Req,
             tsi.CallEndV2Res,
+            trace_id=req.end.trace_id,
         )

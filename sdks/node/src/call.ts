@@ -1,5 +1,5 @@
 import {getGlobalClient} from './clientApi';
-import {CallSchema} from './generated/traceServerApi';
+import {type CallSchema} from './generated/traceServerApi';
 
 const MAX_DISPLAY_NAME_LENGTH = 1000;
 
@@ -71,7 +71,7 @@ function buildProxyHandlers(
 
       return undefined;
     },
-    set(target: Partial<CallSchema>, prop: string, value: any) {
+    set(_target: Partial<CallSchema>, _prop: string, _value: any) {
       // Disallow setting properties on the call schema
       return false;
     },

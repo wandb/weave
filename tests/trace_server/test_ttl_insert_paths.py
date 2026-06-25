@@ -6,8 +6,8 @@ Covers the four insert paths that compute expire_at:
   3. calls_complete                  (v2 upsert)
   4. call_start_v2 + call_end_v2     (v2 start + end)
 
-Each test runs against whichever backend the test session is configured for
-(ClickHouse or SQLite) via the shared `trace_server` fixture.
+Each test runs against the ClickHouse backend via the shared `trace_server`
+fixture.
 """
 
 from __future__ import annotations
@@ -17,16 +17,20 @@ import uuid
 
 import pytest
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.project_version.types import CallsStorageServerMode
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer, get_conn_cursor
 from weave.trace_server.ttl_settings import reset_ttl_cache
 
 TEST_ENTITY = "ttl_entity"
+
+# Raw-read targets for the v1 and v2 insert paths.
+V1_READ_TABLE = "call_parts"
+V2_READ_TABLE = "calls_complete"
 
 # Retention policy → expected timedelta applied to the anchor.
 # 0 sentinel is handled separately (far-future 2100-01-01).
@@ -47,86 +51,49 @@ def _clear_ttl_cache():
 @pytest.fixture
 def internal_server(trace_server):
     server = trace_server._internal_trace_server
-    if isinstance(server, ClickHouseTraceServer):
-        server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+    assert isinstance(server, ClickHouseTraceServer)
+    server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return server
 
 
 def _set_retention_days(
-    server: ClickHouseTraceServer | SqliteTraceServer,
+    server: ClickHouseTraceServer,
     internal_project_id: str,
     retention_days: int,
 ) -> None:
     """Persist a retention_days row for the project in the backend."""
-    if isinstance(server, ClickHouseTraceServer):
-        server.ch_client.insert(
-            "project_ttl_settings",
-            [[internal_project_id, retention_days]],
-            column_names=["project_id", "retention_days"],
-        )
-    elif isinstance(server, SqliteTraceServer):
-        conn, cursor = get_conn_cursor(server.db_path)
-        cursor.execute(
-            "INSERT INTO project_ttl_settings (project_id, retention_days) "
-            "VALUES (?, ?)",
-            (internal_project_id, retention_days),
-        )
-        conn.commit()
-    else:
-        raise TypeError(f"Unsupported server type: {type(server).__name__}")
+    server.ch_client.insert(
+        "project_ttl_settings",
+        [[internal_project_id, retention_days]],
+        column_names=["project_id", "retention_days"],
+    )
 
 
 def _read_expire_at(
-    server: ClickHouseTraceServer | SqliteTraceServer,
+    server: ClickHouseTraceServer,
     internal_project_id: str,
     call_id: str,
     table: str,
 ) -> list[datetime.datetime]:
     """Raw-read expire_at value(s) for a call.
 
-    `table` selects the CH table (`call_parts`, `calls_merged`, `calls_complete`)
-    and is ignored for SQLite, which only has a single `calls` table.
-    Returns a list so CH v1 call_parts (which stores one row per start/end) can
-    return multiple rows; SQLite and CH calls_complete always return a single entry.
+    `table` selects the CH table (`call_parts`, `calls_merged`, `calls_complete`).
+    Returns a list so v1 call_parts (which stores one row per start/end) can
+    return multiple rows; calls_complete always returns a single entry.
     """
-    if isinstance(server, ClickHouseTraceServer):
-        result = server.ch_client.query(
-            f"SELECT expire_at FROM {table} "
-            "WHERE project_id = {project_id:String} AND id = {call_id:String} "
-            "ORDER BY expire_at",
-            parameters={"project_id": internal_project_id, "call_id": call_id},
-        )
-        return [row[0] for row in result.result_rows]
-    if isinstance(server, SqliteTraceServer):
-        _, cursor = get_conn_cursor(server.db_path)
-        cursor.execute(
-            "SELECT expire_at FROM calls WHERE project_id = ? AND id = ?",
-            (internal_project_id, call_id),
-        )
-        return [_parse_sqlite_datetime(row[0]) for row in cursor.fetchall()]
-    raise TypeError(f"Unsupported server type: {type(server).__name__}")
-
-
-def _parse_sqlite_datetime(raw: str) -> datetime.datetime:
-    parsed = datetime.datetime.fromisoformat(raw)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=datetime.timezone.utc)
-    return parsed
-
-
-def _v1_read_table(server: ClickHouseTraceServer | SqliteTraceServer) -> str:
-    return "call_parts" if isinstance(server, ClickHouseTraceServer) else "calls"
-
-
-def _v2_read_table(server: ClickHouseTraceServer | SqliteTraceServer) -> str:
-    return "calls_complete" if isinstance(server, ClickHouseTraceServer) else "calls"
+    result = server.ch_client.query(
+        f"SELECT expire_at FROM {table} "
+        "WHERE project_id = {project_id:String} AND id = {call_id:String} "
+        "ORDER BY expire_at",
+        parameters={"project_id": internal_project_id, "call_id": call_id},
+    )
+    return [row[0] for row in result.result_rows]
 
 
 def _as_utc(value: datetime.datetime) -> datetime.datetime:
     """Tag naive datetimes as UTC without shifting wall-clock; normalize aware to UTC.
 
-    Both backends store expire_at as UTC but differ in whether the driver returns
-    a naive or aware datetime (CH returns naive, SQLite strings come back naive).
+    expire_at is stored as UTC but the CH driver returns naive datetimes.
     """
     if value.tzinfo is None:
         return value.replace(tzinfo=datetime.timezone.utc)
@@ -161,14 +128,15 @@ def _now_utc() -> datetime.datetime:
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_end_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
     """call_start + call_end: expire_at populated on v1 insert paths.
 
-    For ClickHouse this asserts on the two call_parts rows (start and end). For
-    SQLite this asserts on the single `calls` row (call_end is an UPDATE and
-    must leave expire_at from call_start untouched).
+    Asserts on the two call_parts rows (start and end).
     """
     external_project_id, internal_project_id = _make_project("start_end")
     _set_retention_days(internal_server, internal_project_id, retention_days)
@@ -204,22 +172,18 @@ def test_ttl_call_start_end_sets_expire_at(
     )
 
     values = _read_expire_at(
-        internal_server, internal_project_id, call_id, _v1_read_table(internal_server)
+        internal_server, internal_project_id, call_id, V1_READ_TABLE
     )
-    if isinstance(internal_server, ClickHouseTraceServer):
-        # Two rows: start (anchor=started_at) and end (anchor=ended_at).
-        assert len(values) == 2
-        _assert_expire_at_matches(
-            [values[0]], started_at, retention_days, expected_delta
-        )
-        _assert_expire_at_matches([values[1]], ended_at, retention_days, expected_delta)
-    else:
-        # SQLite is a single row seeded by call_start, call_end leaves it alone.
-        assert len(values) == 1
-        _assert_expire_at_matches(values, started_at, retention_days, expected_delta)
+    # Two rows: start (anchor=started_at) and end (anchor=ended_at).
+    assert len(values) == 2
+    _assert_expire_at_matches([values[0]], started_at, retention_days, expected_delta)
+    _assert_expire_at_matches([values[1]], ended_at, retention_days, expected_delta)
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_batch_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -268,20 +232,17 @@ def test_ttl_call_start_batch_sets_expire_at(
     )
 
     values = _read_expire_at(
-        internal_server, internal_project_id, call_id, _v1_read_table(internal_server)
+        internal_server, internal_project_id, call_id, V1_READ_TABLE
     )
-    if isinstance(internal_server, ClickHouseTraceServer):
-        assert len(values) == 2
-        _assert_expire_at_matches(
-            [values[0]], started_at, retention_days, expected_delta
-        )
-        _assert_expire_at_matches([values[1]], ended_at, retention_days, expected_delta)
-    else:
-        assert len(values) == 1
-        _assert_expire_at_matches(values, started_at, retention_days, expected_delta)
+    assert len(values) == 2
+    _assert_expire_at_matches([values[0]], started_at, retention_days, expected_delta)
+    _assert_expire_at_matches([values[1]], ended_at, retention_days, expected_delta)
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_calls_complete_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -314,13 +275,16 @@ def test_ttl_calls_complete_sets_expire_at(
     )
 
     values = _read_expire_at(
-        internal_server, internal_project_id, call_id, _v2_read_table(internal_server)
+        internal_server, internal_project_id, call_id, V2_READ_TABLE
     )
     assert len(values) == 1
     _assert_expire_at_matches(values, started_at, retention_days, expected_delta)
 
 
 @pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
 def test_ttl_call_start_v2_end_v2_sets_expire_at(
     trace_server, internal_server, retention_days, expected_delta
 ):
@@ -360,7 +324,7 @@ def test_ttl_call_start_v2_end_v2_sets_expire_at(
     )
 
     values = _read_expire_at(
-        internal_server, internal_project_id, call_id, _v2_read_table(internal_server)
+        internal_server, internal_project_id, call_id, V2_READ_TABLE
     )
     assert len(values) == 1
     _assert_expire_at_matches(values, started_at, retention_days, expected_delta)

@@ -1,7 +1,7 @@
 """Integration tests for the rescore evaluation feature at the trace-server layer.
 
 These tests exercise evaluation_run_create/read with source_evaluation_run_id, and
-the rescore() method on the trace server (SQLite + ClickHouse via client fixture).
+the rescore() method on the trace server (ClickHouse via client fixture).
 
 Tests do NOT invoke the Kafka worker or real scorer objects — the rescore() path is
 tested only up to dispatcher dispatch, which is mocked out.
@@ -13,7 +13,7 @@ import pytest
 
 from tests.trace.server_utils import find_server_layer
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+from weave.trace_server.in_memory_trace_server import InMemoryTraceServer
 from weave.trace_server.trace_server_interface import (
     CallReadReq,
     EvaluationRunCreateReq,
@@ -90,20 +90,23 @@ def test_evaluation_run_without_source_has_none(client):
 
 
 def _setup_server_with_dispatcher(server):
-    """Replace the dispatcher on the underlying SQLite/ClickHouse server with a mock.
+    """Replace the dispatcher on the underlying ClickHouse server with a mock.
 
-    Uses find_server_layer to locate the concrete server (SqliteTraceServer or
-    ClickHouseTraceServer) that owns _evaluate_model_dispatcher, then swaps it
-    for a MagicMock so rescore() can be tested without real worker invocation.
+    Uses find_server_layer to locate the ClickHouseTraceServer that owns
+    _evaluate_model_dispatcher, then swaps it for a MagicMock so rescore()
+    can be tested without real worker invocation.
     """
-    try:
-        target = find_server_layer(server, SqliteTraceServer)
-    except TypeError as sqlite_err:
+    target = None
+    last_err: TypeError | None = None
+    for server_type in (InMemoryTraceServer, ClickHouseTraceServer):
         try:
-            target = find_server_layer(server, ClickHouseTraceServer)
-        except TypeError:
-            # Neither SQLite nor ClickHouse found — re-raise the original error
-            raise sqlite_err from None
+            target = find_server_layer(server, server_type)
+            break
+        except TypeError as err:
+            last_err = err
+    if target is None:
+        # No known concrete server found — re-raise the last lookup error
+        raise last_err from None
     mock_dispatcher = MagicMock()
     target._evaluate_model_dispatcher = mock_dispatcher
     return mock_dispatcher

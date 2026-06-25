@@ -24,6 +24,12 @@ from weave.trace_server.agents.constants import (
     SPAN_GROUP_AGGREGATE_COLS,
     SPAN_GROUP_RESULT_COLS,
 )
+from weave.trace_server.agents.span_costs import (
+    COST_COLUMN_NAMES,
+    COST_DERIVED_METRIC_NAMES,
+    GROUPED_COST_ALIASES,
+    cost_augmented_source_sql,
+)
 from weave.trace_server.agents.types import (
     AGENT_CUSTOM_ATTR_SOURCE_VALUE_TYPES,
     AgentConversationChatReq,
@@ -46,6 +52,7 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
@@ -172,7 +179,6 @@ _DERIVED_DURATION_MS: AgentSpanStatsDerivedMetric = "duration_ms"
 _DERIVED_TOTAL_TOKENS: AgentSpanStatsDerivedMetric = "total_tokens"
 _DERIVED_IS_ERROR: AgentSpanStatsDerivedMetric = "is_error"
 _DERIVED_IS_INVOCATION: AgentSpanStatsDerivedMetric = "is_invocation"
-
 _STATUS_CODE_ERROR = "ERROR"
 
 _CUSTOM_ATTR_VALUE_TYPES: dict[str, AgentSpanStatsValueType] = {
@@ -317,6 +323,12 @@ _SPANS_LIST_FIELD_NAMES = [
     "wb_run_step_end",
 ]
 SPANS_LIST_COLS: str = _projection(_SPANS_LIST_FIELD_NAMES)
+
+# Per-span cost columns, projected only when the caller sets `include_costs`.
+# These are computed by the cost-augmented spans source, not stored columns.
+SPANS_COST_COLS: str = _projection(list(COST_COLUMN_NAMES))
+QUALIFIED_SPANS_COST_COLS: str = _projection(list(COST_COLUMN_NAMES), table_alias="s")
+_SPAN_COST_SORTABLE_COLS: frozenset[str] = frozenset(COST_COLUMN_NAMES)
 
 # Detail-only fields: heavy text/array payloads. Included only when the
 # caller sets `include_details` (the span detail panel does this; the main
@@ -641,6 +653,15 @@ def _derived_value_sql(
             valid_sql="1",
             value_type=_VALUE_TYPE_BOOLEAN,
         )
+    if metric in COST_DERIVED_METRIC_NAMES:
+        # The cost column (same name as the metric) is supplied by the
+        # cost-augmented span source. NULL means the span's model had no
+        # matching price, so guard it out of aggregates rather than scoring 0.
+        return SpanValueSQL(
+            value_sql=f"toFloat64({table_alias}.{metric})",
+            valid_sql=f"isNotNull({table_alias}.{metric})",
+            value_type=_VALUE_TYPE_NUMBER,
+        )
     raise ValueError(f"unknown derived metric: {metric!r}")
 
 
@@ -839,6 +860,49 @@ def _spans_filter_sql(
     return _FilterSQL(where=" AND ".join(where_conditions))
 
 
+def _group_by_references_identity(group_by: list[AgentGroupByRef] | None) -> bool:
+    """Whether any field/column group-by ref targets an identity column."""
+    if not group_by:
+        return False
+    field_keys = [ref.key for ref in group_by if ref.source in _FIELD_GROUP_BY_SOURCES]
+    return agent_trace_attribution.fields_reference_identity(field_keys)
+
+
+def _spans_query_references_identity(req: AgentSpansQueryReq) -> bool:
+    """Whether a spans query filters or groups by a trace-attributed column."""
+    return agent_trace_attribution.query_references_identity(
+        req.query
+    ) or _group_by_references_identity(req.group_by)
+
+
+def _spans_source(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    *,
+    attribute: bool,
+    include_costs: bool = False,
+) -> str:
+    """Return the FROM source for a spans query.
+
+    The base relation is the raw `spans` table, or the cost-augmented source
+    (per-span price JOIN) when `include_costs` is set so cost columns are
+    available downstream. When `attribute` is set, that base is wrapped so the
+    four identity columns inherit from their trace when unset (see
+    `agent_trace_attribution`); otherwise the base is used directly so
+    non-identity queries skip the extra trace scan.
+    """
+    base = cost_augmented_source_sql(pb, req.project_id) if include_costs else "spans"
+    if not attribute:
+        return base
+    return agent_trace_attribution.attributed_spans_source(
+        pb,
+        project_id=req.project_id,
+        started_after=req.started_after,
+        started_before=req.started_before,
+        base_relation=base,
+    )
+
+
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
     conditions: list[str] = []
     if req.filters and req.filters.agent_name:
@@ -865,11 +929,15 @@ def _escape_like_pattern(value: str) -> str:
 def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
     """Build WHERE filters for a search against the messages table."""
     pid_slot = pb.add(req.project_id, param_type="String")
-    content_slot = pb.add(f"%{_escape_like_pattern(req.query)}%", param_type="String")
-    conditions = [
-        _project_filter_sql("project_id", pid_slot),
-        f"content LIKE {content_slot}",
-    ]
+    conditions = [_project_filter_sql("project_id", pid_slot)]
+    if req.query:
+        content_slot = pb.add(
+            f"%{_escape_like_pattern(req.query)}%", param_type="String"
+        )
+        conditions.append(f"content LIKE {content_slot}")
+    if req.trace_id:
+        trace_slot = pb.add(req.trace_id, param_type="String")
+        conditions.append(f"trace_id = {trace_slot}")
     if req.roles:
         roles_slot = pb.add(
             _normalize_search_roles(req.roles), param_type="Array(String)"
@@ -927,9 +995,15 @@ _GROUPED_SPAN_AGGREGATES: str = """count() AS span_count,
 
 def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """Count spans matching the request, or count of distinct groups if grouped."""
+    # Count only needs trace attribution when identity participates in matching
+    # or grouping; otherwise the raw table avoids the extra trace scan. The
+    # attributed source is allocated last (see `_spans_source`) so it never
+    # renumbers the filter / group params.
+    attribute = _spans_query_references_identity(req)
     span_filters = _spans_filter_sql(pb, req)
     if not req.group_by:
-        return f"SELECT count() FROM spans s WHERE {span_filters.where}"
+        source = _spans_source(pb, req, attribute=attribute)
+        return f"SELECT count() FROM {source} s WHERE {span_filters.where}"
     resolved = resolve_group_by(pb, req.group_by)
     aliases = [alias for _, alias in resolved]
     _ensure_group_measure_aliases_do_not_collide(aliases, req.measures)
@@ -941,9 +1015,10 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans count")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f" HAVING {having}" if having else ""
+    source = _spans_source(pb, req, attribute=attribute)
     return (
         f"SELECT count() FROM ("
-        f"SELECT {group_exprs} FROM spans s WHERE {span_filters.where} "
+        f"SELECT {group_exprs} FROM {source} s WHERE {span_filters.where} "
         f"GROUP BY {group_exprs}"
         f"{having_sql}"
         f")"
@@ -952,14 +1027,21 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
+    # Always attribute: the spans table and its grouped rollups exist to show
+    # each span's agent / conversation identity, which child spans only have via
+    # their trace. The attributed source is allocated last (see `_spans_source`)
+    # so it never renumbers the filter / projection params.
     span_filters = _spans_filter_sql(pb, req)
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
 
     if not req.group_by:
         custom_sort_exprs = _custom_attr_sort_exprs(pb, req.custom_attr_columns)
+        sortable = SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys()))
+        if req.include_costs:
+            sortable = sortable.union(_SPAN_COST_SORTABLE_COLS)
         order_by = build_order_by(
             req.sort_by,
-            SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys())),
+            sortable,
             "started_at DESC",
             column_exprs=custom_sort_exprs,
         )
@@ -967,9 +1049,11 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
             pb, req.custom_attr_columns
         )
         details_projection = f", {SPANS_DETAILS_COLS}" if req.include_details else ""
+        cost_projection = f", {SPANS_COST_COLS}" if req.include_costs else ""
+        source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
         return f"""
-            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}
-            FROM spans s
+            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}{cost_projection}
+            FROM {source} s
             WHERE {span_filters.where}
             ORDER BY {order_by}
             LIMIT {limit_slot} OFFSET {offset_slot}
@@ -990,9 +1074,18 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         aggregate_selects = (
             f"{aggregate_selects},\n               {dynamic_aggregate_selects}"
         )
+    if req.include_costs:
+        aggregate_selects = (
+            f"{aggregate_selects},\n"
+            "               sum(s.total_cost_usd) AS total_cost_usd,\n"
+            "               sum(s.input_cost_usd) AS total_input_cost_usd,\n"
+            "               sum(s.output_cost_usd) AS total_output_cost_usd"
+        )
     sortable = SPAN_GROUP_AGGREGATE_COLS.union(frozenset(aliases)).union(
         measure.alias for measure in measure_sqls
     )
+    if req.include_costs:
+        sortable = sortable.union(frozenset(GROUPED_COST_ALIASES))
     default_order_by = (
         f"{measure_sqls[0].alias} DESC" if measure_sqls else "last_seen DESC"
     )
@@ -1004,11 +1097,12 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
+    source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
         SELECT {select_group_cols},
                {aggregate_selects}
-        FROM spans s
+        FROM {source} s
         WHERE {span_filters.where}
         GROUP BY {group_by_clause}
         {having_sql}
@@ -1157,10 +1251,11 @@ def make_span_group_distribution_counts_query(
     """Count filtered spans per returned group row."""
     span_filters = _spans_filter_sql(pb, req)
     context = _span_group_distribution_context(pb, req, group_values)
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     return f"""
         SELECT {context.group_key_sql} AS group_key,
                count() AS total_count
-        FROM spans s
+        FROM {source} s
         WHERE {span_filters.where}
           AND {context.group_key_sql} IN {context.group_values_slot}
         GROUP BY group_key
@@ -1186,6 +1281,7 @@ def make_span_group_numeric_distributions_query(
         numeric_specs,
         get_limit=lambda spec: spec.bins,
     )
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1237,7 +1333,7 @@ def make_span_group_numeric_distributions_query(
                      {spec_alias_sql} AS alias,
                      {spec_bins_sql} AS bins,
                      {value_sql} AS value
-              FROM spans s
+              FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
               WHERE {span_filters.where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
@@ -1320,6 +1416,7 @@ def make_span_group_categorical_distributions_query(
         categorical_specs,
         get_limit=lambda spec: spec.top_n,
     )
+    source = _spans_source(pb, req, attribute=_spans_query_references_identity(req))
     spec_alias_sql = "tupleElement(spec, 1)"
     spec_source_sql = "tupleElement(spec, 2)"
     spec_key_sql = "tupleElement(spec, 3)"
@@ -1352,7 +1449,7 @@ def make_span_group_categorical_distributions_query(
                      {spec_alias_sql} AS alias,
                      {spec_top_n_sql} AS top_n,
                      {value_sql} AS raw_value
-              FROM spans s
+              FROM {source} s
               ARRAY JOIN {specs_sql} AS spec
               WHERE {span_filters.where}
                 AND {context.group_key_sql} IN {context.group_values_slot}
@@ -1397,11 +1494,55 @@ def make_trace_detail_spans_query(
     """
     pid = pb.add(project_id, param_type="String")
     tid = pb.add(trace_id, param_type="String")
+    # Always cost-augmented: the chat/detail views render per-message and
+    # per-trace cost, and this is a single-trace fetch so the price JOIN is cheap.
+    source = cost_augmented_source_sql(pb, project_id)
     return f"""
-        SELECT {CHAT_VIEW_COLS} FROM spans s
+        SELECT {CHAT_VIEW_COLS}, {SPANS_COST_COLS} FROM {source} s
         WHERE {_project_filter_sql("s.project_id", pid)}
           AND s.trace_id = {tid}
         ORDER BY s.started_at ASC
+    """
+
+
+def make_spans_existence_query(
+    pb: ParamBuilder,
+    project_id: str,
+    span_keys: Sequence[tuple[str, str]],
+) -> str:
+    """Batch existence + cached-field fetch for spans by (trace_id, span_id).
+
+    Returns ``trace_id, span_id, span_name, started_at`` for each span that
+    exists in the project. The ``spans`` table is ``ReplacingMergeTree(created_at)``
+    so we collapse versions with ``GROUP BY (project_id, trace_id, span_id)`` +
+    ``argMax(col, created_at)`` (never FINAL).
+
+    ``span_keys`` is a list of ``(trace_id, span_id)`` tuples. We filter on the
+    ``trace_id IN (...)`` and ``span_id IN (...)`` supersets (both bloom-indexed)
+    and let the caller match exact pairs — the candidate set is bounded by the
+    request size.
+
+    Aggregate column references are qualified with the ``spans`` table name so
+    the ``AS span_name`` / ``AS started_at`` output aliases cannot shadow the
+    raw columns inside the aggregate arguments (ClickHouse would otherwise risk
+    ILLEGAL_AGGREGATION) — same defensive pattern as the dataset_sources reads.
+    """
+    pid = pb.add(project_id, param_type="String")
+    trace_ids = sorted({tid for tid, _ in span_keys})
+    span_ids = sorted({sid for _, sid in span_keys})
+    trace_ids_slot = pb.add(trace_ids, param_type="Array(String)")
+    span_ids_slot = pb.add(span_ids, param_type="Array(String)")
+    return f"""
+        SELECT
+            trace_id,
+            span_id,
+            argMax(spans.span_name, spans.created_at) AS span_name,
+            argMax(spans.started_at, spans.created_at) AS started_at
+        FROM spans
+        WHERE project_id = {pid}
+          AND trace_id IN {trace_ids_slot}
+          AND span_id IN {span_ids_slot}
+        GROUP BY project_id, trace_id, span_id
     """
 
 
@@ -1506,13 +1647,20 @@ def make_message_search_query(pb: ParamBuilder, req: AgentSearchReq) -> str:
     # enforced on AgentSearchReq.
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    # Truncated preview keeps search-UI payloads small by default; full content
+    # is for structured retrieval (e.g. agent scoring).
+    content_expr = (
+        f"substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS})"
+        if req.truncate_content
+        else "content"
+    )
     # content_digest is stored raw as FixedString(16); hex-encode here so
     # the Python API surface (AgentSearchMatchedMessage.content_digest: str)
     # keeps a portable text representation.
     return f"""
         SELECT conversation_id, conversation_name, agent_name,
                span_id, trace_id, role,
-               substring(content, 1, {SEARCH_CONTENT_PREVIEW_CHARS}) AS content,
+               {content_expr} AS content,
                lower(hex(content_digest)) AS content_digest, started_at
         FROM messages
         WHERE {filters.where}
@@ -1528,9 +1676,12 @@ def make_conversation_chat_spans_query(
     cid = pb.add(req.conversation_id, param_type="String")
     limit_slot = pb.add(req.limit, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    # Always cost-augmented so the multi-turn chat view can render per-message
+    # and per-turn cost; bounded to one conversation's turns, so cheap.
+    source = cost_augmented_source_sql(pb, req.project_id)
     return f"""
-        SELECT {QUALIFIED_CHAT_VIEW_COLS}
-        FROM spans s
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+        FROM {source} s
         INNER JOIN (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans

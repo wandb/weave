@@ -39,7 +39,6 @@ const HEALTH_TIMEOUT_MS = 10_000;
 const HEALTH_POLL_INTERVAL_MS = 50;
 
 function log(msg) {
-  // eslint-disable-next-line no-console
   console.log(`[hostApps:setup] ${msg}`);
 }
 

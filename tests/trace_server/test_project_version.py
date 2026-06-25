@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -91,6 +91,9 @@ def count_queries(ch_client):
     ],
 )
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_version_resolution_by_table_contents(
     client,
     trace_server,
@@ -102,9 +105,6 @@ def test_version_resolution_by_table_contents(
     log_collector,
 ):
     """Test routing resolution for different project data residency states."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
     # manually set this to auto so we can test the switching
@@ -142,9 +142,10 @@ def test_version_resolution_by_table_contents(
         )
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_caching_behavior(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
@@ -173,9 +174,10 @@ def test_caching_behavior(client, trace_server):
         assert get_count() == 2
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_mode_off_and_force_legacy(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
@@ -201,9 +203,10 @@ def test_mode_off_and_force_legacy(client, trace_server):
     assert table == ReadTable.CALLS_COMPLETE
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_clickhouse_provider_directly(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     project_id = make_project_id("provider_direct")
@@ -214,11 +217,11 @@ def test_clickhouse_provider_directly(client, trace_server):
     assert residence == ProjectDataResidence.MERGED_ONLY
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_resolver_as_trace_server_member(client, trace_server):
     """Test that the resolver is properly integrated as a trace server member."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
 
     # Test that the resolver is lazily initialized

@@ -1,6 +1,8 @@
 import {init, login} from '../../clientApi';
 import {op} from '../../op';
 import {WeaveObject} from '../../weaveObject';
+import {getWandbConfigs} from '../../wandb/settings';
+import {vcrTest} from '../helpers/vcrTest';
 
 class ExampleObject extends WeaveObject {
   constructor(
@@ -17,9 +19,10 @@ class ExampleObject extends WeaveObject {
   }
 }
 
-describe.skip('WeaveObject', () => {
+describe('WeaveObject', () => {
   beforeEach(async () => {
-    await login(process.env.WANDB_API_KEY ?? '');
+    const {apiKey} = getWandbConfigs();
+    await login(apiKey ?? '');
   });
 
   test('basic-example', async () => {
@@ -31,7 +34,7 @@ describe.skip('WeaveObject', () => {
     // console.log(ref);
   });
 
-  test('class-example', async () => {
+  vcrTest('class-example', async () => {
     const client = await init('test-project');
     const obj = new ExampleObject('test', 1);
 
@@ -39,7 +42,7 @@ describe.skip('WeaveObject', () => {
     client.publish(obj);
 
     const ref = await obj.__savedRef;
-    const [entity, project] = ref?.projectId.split('/') ?? [];
+    const [_entity, project] = ref?.projectId.split('/') ?? [];
     expect(project).toBe('test-project');
     console.log(ref);
 

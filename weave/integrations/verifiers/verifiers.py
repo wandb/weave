@@ -11,12 +11,17 @@ from openai.types.completion import Completion
 from pydantic import BaseModel
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 ModelResponse = Completion | ChatCompletion
 
 _verifiers_patcher: MultiPatcher | None = None
+VERIFIERS_INTEGRATION = library_integration("verifiers")
 
 
 def _verifiers_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -201,7 +206,9 @@ def get_verifiers_patcher(
     if _verifiers_patcher is not None:
         return _verifiers_patcher
 
-    base: OpSettings = settings.op_settings
+    base: OpSettings = with_integration_metadata(
+        settings.op_settings, VERIFIERS_INTEGRATION
+    )
     get_model_response_settings = base.model_copy(
         update={"name": base.name or "verifiers.Environment.get_model_response"}
     )

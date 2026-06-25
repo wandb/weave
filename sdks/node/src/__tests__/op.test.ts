@@ -10,7 +10,7 @@ const createFreshMockClient = () => ({
     parentCall: null,
     newStack: [],
   })),
-  createCall: jest.fn((...args: any[]) => {
+  createCall: jest.fn((..._args: any[]) => {
     // We still need a way to capture this if tests rely on it.
     // Maybe pass a shared object or use a different mechanism?
     // For now, let's remove the direct capture here.
@@ -20,7 +20,7 @@ const createFreshMockClient = () => ({
   runWithCallStack: jest.fn(async (stack: any, fn: () => any) => fn()),
   finishCall: jest.fn(() => Promise.resolve()),
   finishCallWithException: jest.fn(() => Promise.resolve()),
-  settings: {shouldPrintCallLink: false},
+  settings: {printCallLink: false},
   waitForBatchProcessing: jest.fn(() => Promise.resolve()),
 });
 

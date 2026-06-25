@@ -5,28 +5,24 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {setGlobalClient} from '../../clientApi';
-import {DEFAULT_STATE_SYMBOL_NAME} from '../../genai/context';
-import {Api as TraceServerApi} from '../../generated/traceServerApi';
-import {PROVIDER_HOLDER_SYMBOL_NAME} from '../../genai/provider';
-import {Settings, type SettingsInit} from '../../settings';
-import {WandbServerApi} from '../../wandb/wandbServerApi';
+import {type Api as TraceServerApi} from '../../generated/traceServerApi';
+import {makeSettings, type Settings} from '../../settings';
 import {WeaveClient} from '../../weaveClient';
+import state from 'weave/state';
+import {ATTR_GEN_AI_CONVERSATION_ID} from 'weave/genai/semconv';
 
 export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
 
-export function installFakeClient(settings: SettingsInit = {}): WeaveClient {
+export function installFakeClient(
+  settings: Partial<Settings> = {}
+): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
-  const client = new WeaveClient(
+  const client = new WeaveClient({
     traceServerApi,
-    {} as WandbServerApi,
-    TEST_PROJECT,
-    new Settings(
-      settings.printCallLink ?? true,
-      settings.globalAttributes ?? {},
-      settings.genai ?? {}
-    )
-  );
+    projectId: TEST_PROJECT,
+    settings: makeSettings(settings),
+  });
   setGlobalClient(client);
   return client;
 }
@@ -40,26 +36,16 @@ export function clearGlobalClient(): void {
 
 // Reach into the global singleton's holder directly to reset its state.
 export function resetProviderSingleton(): void {
-  const holder = (globalThis as Record<symbol, unknown>)[
-    Symbol.for(PROVIDER_HOLDER_SYMBOL_NAME)
-  ] as {provider: unknown; beforeExitRegistered: boolean} | undefined;
-  if (holder) {
-    holder.provider = null;
-    holder.beforeExitRegistered = false;
-  }
+  state.genAi.provider = null;
+  state.genAi.providerRegistered = false;
 }
 
 // Reach into the GenAI default-state singleton and null out its slots so each
 // test body starts clean even when prior tests in the same worker mutated it.
 export function resetGenaiDefaultState(): void {
-  const state = (globalThis as Record<symbol, unknown>)[
-    Symbol.for(DEFAULT_STATE_SYMBOL_NAME)
-  ] as {session: unknown; turn: unknown; llm: unknown} | undefined;
-  if (state) {
-    state.session = null;
-    state.turn = null;
-    state.llm = null;
-  }
+  state.genAi.defaultState.session = null;
+  state.genAi.defaultState.turn = null;
+  state.genAi.defaultState.llm = null;
 }
 
 /**
@@ -99,6 +85,44 @@ export function findSpan(spans: ReadableSpan[], name: string): ReadableSpan {
     );
   }
   return span;
+}
+
+export type SpanSnapshotOpts = {
+  maskConversationId?: boolean;
+  maskTimestamps?: boolean;
+};
+
+export function spanSnapshot(
+  span: ReadableSpan,
+  {maskConversationId = true, maskTimestamps = true}: SpanSnapshotOpts = {}
+) {
+  if (maskConversationId && span.attributes[ATTR_GEN_AI_CONVERSATION_ID]) {
+    span.attributes[ATTR_GEN_AI_CONVERSATION_ID] = '<uuid>';
+  }
+
+  return {
+    attributes: span.attributes,
+    endTime: maskTimestamps ? '<timestamp>' : span.endTime,
+    startTime: maskTimestamps ? '<timestamp>' : span.startTime,
+  };
+}
+
+/**
+ * Assert that a span's exported start/end times match the given dates to
+ * second precision. OTel records times as HrTime `[seconds, nanos]`, so we
+ * compare the seconds component. Used to verify that post-hoc
+ * `startTime`/`endTime` backdating flows through to the exported span.
+ */
+export function expectSpanTimesToMatch(
+  span: ReadableSpan,
+  startedAt: Date,
+  endedAt: Date
+): void {
+  const MS_PER_SECOND = 1000;
+  expect(span.startTime[0]).toBe(
+    Math.floor(startedAt.getTime() / MS_PER_SECOND)
+  );
+  expect(span.endTime[0]).toBe(Math.floor(endedAt.getTime() / MS_PER_SECOND));
 }
 
 /**

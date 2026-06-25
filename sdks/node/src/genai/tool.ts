@@ -1,7 +1,9 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -12,7 +14,7 @@ import {
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
-export interface ToolInit {
+export interface ToolInit extends SpanInitBase {
   name: string;
   args?: string;
   toolCallId?: string;
@@ -38,24 +40,26 @@ export interface ToolInit {
  *   tool.end();
  * }
  */
-export class Tool {
+export class Tool extends SpanBase {
   /**
    * Tool output as a string. Recorded on `gen_ai.tool.call.result` at `end()`.
    */
   result?: string;
 
-  private _ended = false;
-
   private constructor(
-    private readonly span: Span,
+    span: Span,
     public readonly name: string,
     public readonly args: string,
     public readonly toolCallId: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: ToolInit & ChildSpanContext): Tool {
+    const state = getGenaiState();
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: opts.name,
     };
@@ -70,17 +74,17 @@ export class Tool {
     }
     const span = tracer.startSpan(
       'execute_tool',
-      {kind: SpanKind.INTERNAL, attributes},
+      {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
   }
 
   /**
-   * Flush `result` to the span and close it. Idempotent. Pass `error` to
-   * mark the span as failed.
+   * Flush `result` to the span and close it. Idempotent. Pass `error` to mark
+   * the span as failed; pass `endTime` to backdate the close.
    */
-  end(opts?: {error?: Error}): void {
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -88,13 +92,6 @@ export class Tool {
     if (this.result !== undefined) {
       this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, this.result);
     }
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
   }
 }

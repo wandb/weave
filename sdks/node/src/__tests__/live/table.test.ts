@@ -1,12 +1,15 @@
 import {init, login} from '../../clientApi';
 import {Table} from '../../table';
+import {getWandbConfigs} from '../../wandb/settings';
+import {vcrTest} from '../helpers/vcrTest';
 
-describe.skip('Table', () => {
+describe('Table', () => {
   beforeEach(async () => {
-    await login(process.env.WANDB_API_KEY ?? '');
+    const {apiKey} = getWandbConfigs();
+    await login(apiKey ?? '');
   });
 
-  test('example', async () => {
+  vcrTest('example', async () => {
     // Table behaves like a container of rows
     const rows = [
       {a: 1, b: 2},
@@ -30,13 +33,13 @@ describe.skip('Table', () => {
 
     // not sure how to test entity here
     // test that the ref is for the right entity, project
-    const [entity, project] = ref?.projectId.split('/') ?? [];
+    const [_entity, project] = ref?.projectId.split('/') ?? [];
     expect(project).toEqual('test-project');
     expect(ref?.uri()).toContain('test-project');
 
     const row = table.row(0);
     const ref2 = await (row as any).__savedRef; // TODO: This seems wrong... you have to cast to get the ref?  I guess users would rarely do this...
-    const [entity2, project2, digest2] = ref2?.projectId.split('/') ?? [];
+    const [_entity2, project2, _digest2] = ref2?.projectId.split('/') ?? [];
     expect(project2).toEqual('test-project');
     expect(ref2?.uri()).toContain('test-project');
   });

@@ -24,6 +24,20 @@ _ENDPOINT_CACHE: set[str] = set()
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
 ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
+# Request header carrying the call's trace_id on single-call ingest requests
+# (/call/start, /call/end and their v2 variants). Lets a server-side ingest
+# sampler make a consistent keep/drop decision per trace before the body is
+# parsed, the same cheap-header pattern RequestSizeLimitMiddleware already uses.
+TRACE_ID_HEADER = "X-Weave-Trace-Id"
+
+# Request header advertising the sampling-relevant capabilities this SDK build
+# guarantees, so a future server-side ingest sampler can tell a sampling-safe
+# client from an older one and leave unsupported traffic unsampled. Sent on
+# every request (it describes the client, not one trace); a comma-separated,
+# forward-compatible token list.
+CLIENT_CAPABILITIES_HEADER = "X-Weave-Client-Capabilities"
+CLIENT_CAPABILITIES = "trace_id_on_end,eval_child_meta"
+
 # Fixed wait between 404 retries. Short, because eventual-consistency windows
 # on reads-after-write are typically sub-second; longer waits just pad latency
 # when the object is genuinely missing.

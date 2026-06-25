@@ -32,7 +32,7 @@
 #   docker compose -f 1s3r.yaml down -v
 
 x-ch-node: &ch-node
-  image: clickhouse/clickhouse-server:25.11.2.24
+  image: clickhouse/clickhouse-server:26.4
   environment:
     CLICKHOUSE_DB: default
     CLICKHOUSE_USER: default
@@ -72,6 +72,7 @@ services:
       - "9000:9000"     # native TCP
     volumes:
       - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s1_r1.xml:/etc/clickhouse-server/config.d/macros.xml:ro
 
   ch-s1-r2:
@@ -80,6 +81,7 @@ services:
     hostname: ch-s1-r2
     volumes:
       - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s1_r2.xml:/etc/clickhouse-server/config.d/macros.xml:ro
     depends_on:
       ch-s1-r1:
@@ -91,6 +93,7 @@ services:
     hostname: ch-s1-r3
     volumes:
       - ../keeper_1s3r.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ../test_overrides.xml:/etc/clickhouse-server/users.d/test_overrides.xml:ro
       - ./macros_s1_r3.xml:/etc/clickhouse-server/config.d/macros.xml:ro
     depends_on:
       ch-s1-r1:

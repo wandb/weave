@@ -3,8 +3,8 @@ import path from 'path';
 import semifies from 'semifies';
 
 import instrumentations, {
-  CacheEntry,
-  CJSInstrumentation,
+  type CacheEntry,
+  type CJSInstrumentation,
 } from '../integrations/instrumentations';
 import {requirePackageJson} from './npmModuleUtils';
 
@@ -12,17 +12,19 @@ const parse: (filePath: string) => {
   name: string;
   basedir: string;
   path: string;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
 } = require('module-details-from-path');
 
 export let reset = () => {};
 
-let patching = Object.create(null);
+const patching = Object.create(null);
 
 const cachedModules = new Map<string, CacheEntry>();
 const passThroughModules = new Set<string>();
 
 if (typeof module !== 'undefined' && module.exports) {
   // CommonJS environment
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Module = require('module');
   const originalRequire = Module.prototype.require;
 
@@ -30,7 +32,7 @@ if (typeof module !== 'undefined' && module.exports) {
     let filename;
     try {
       filename = Module._resolveFilename(request, this);
-    } catch (resolveErr) {
+    } catch (_resolveErr) {
       return originalRequire.apply(this, arguments as any);
     }
 
@@ -77,7 +79,7 @@ if (typeof module !== 'undefined' && module.exports) {
       let packageJson: any;
       try {
         packageJson = requirePackageJson(basedir, module.paths);
-      } catch (e) {
+      } catch (_e) {
         console.log('Cannot find package.json for', name, basedir);
         return originalExports;
       }

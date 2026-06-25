@@ -15,7 +15,7 @@ jest.mock('weave/clientApi', () => ({
     runWithCallStack: async (stack: any, fn: () => any) => fn(),
     finishCall: () => Promise.resolve(),
     finishCallWithException: () => Promise.resolve(),
-    settings: {shouldPrintCallLink: false},
+    settings: {printCallLink: false},
     waitForBatchProcessing: () => Promise.resolve(),
   })),
 }));
@@ -164,7 +164,7 @@ describe('op modern decorators', () => {
       }
     }
 
-    const instance = new TestClass();
+    const _instance = new TestClass();
     const descriptor = Object.getOwnPropertyDescriptor(
       TestClass.prototype,
       'method'

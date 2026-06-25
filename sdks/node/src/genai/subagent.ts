@@ -1,7 +1,9 @@
-import {type Span, SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
@@ -10,7 +12,7 @@ import {
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
-export interface SubAgentInit {
+export interface SubAgentInit extends SpanInitBase {
   name: string;
   model?: string;
 }
@@ -32,18 +34,20 @@ export interface SubAgentInit {
  *   sub.end();
  * }
  */
-export class SubAgent {
-  private _ended = false;
-
+export class SubAgent extends SpanBase {
   private constructor(
-    private readonly span: Span,
+    span: Span,
     public readonly name: string,
     public readonly model: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
+    const state = getGenaiState();
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
       [ATTR_GEN_AI_AGENT_NAME]: opts.name,
     };
@@ -55,25 +59,21 @@ export class SubAgent {
     }
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes},
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     return new SubAgent(span, opts.name, opts.model ?? '');
   }
 
-  /** Close the SubAgent span. Idempotent. Pass `error` to mark it as failed. */
-  end(opts?: {error?: Error}): void {
+  /**
+   * Close the SubAgent span. Idempotent. Pass `error` to mark it as failed;
+   * pass `endTime` to backdate the close.
+   */
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
+    this._closeSpan(opts);
   }
 }

@@ -1,6 +1,6 @@
 import * as weave from 'weave';
 import {getGlobalClient} from 'weave/clientApi';
-import {Op} from 'weave/opType';
+import {type Op} from 'weave/opType';
 
 // Mock the client to capture callDisplayName
 let capturedDisplayName: string | undefined;
@@ -14,7 +14,7 @@ jest.mock('weave/clientApi', () => ({
     runWithCallStack: async (stack: any, fn: () => any) => fn(),
     finishCall: () => Promise.resolve(),
     finishCallWithException: () => Promise.resolve(),
-    settings: {shouldPrintCallLink: false},
+    settings: {printCallLink: false},
     waitForBatchProcessing: () => Promise.resolve(),
   })),
 }));

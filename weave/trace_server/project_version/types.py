@@ -81,6 +81,8 @@ class TableConfig:
             False for calls_complete (single-row per call, no aggregation needed).
         datetime_filter_field: Column name for datetime-based optimizations.
             "sortable_datetime" for calls_merged, "started_at" for calls_complete.
+        otel_size_column: Stats-table column holding OTel dump bytes.
+            "otel_dump_size_bytes" for calls_merged, "otel_size_bytes" for calls_complete.
     """
 
     read_table: ReadTable
@@ -88,6 +90,7 @@ class TableConfig:
     stats_table_name: str
     use_aggregation: bool
     datetime_filter_field: str
+    otel_size_column: str
 
     @classmethod
     def from_read_table(cls, read_table: ReadTable) -> "TableConfig":
@@ -111,6 +114,7 @@ class TableConfig:
                 stats_table_name="calls_merged_stats",
                 use_aggregation=True,
                 datetime_filter_field="sortable_datetime",
+                otel_size_column="otel_dump_size_bytes",
             )
         elif read_table == ReadTable.CALLS_COMPLETE:
             return cls(
@@ -119,6 +123,20 @@ class TableConfig:
                 stats_table_name="calls_complete_stats",
                 use_aggregation=False,
                 datetime_filter_field="started_at",
+                otel_size_column="otel_size_bytes",
             )
         else:
             raise ValueError(f"Invalid read table: {read_table}")
+
+    @property
+    def storage_size_bytes_sum(self) -> str:
+        """Per-row payload size sum behind every storage_size_bytes figure.
+
+        Single source so per-call, per-trace, and project totals can't desync on
+        which size columns (including OTel dump bytes) they count.
+        """
+        return (
+            "COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) "
+            "+ COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) "
+            f"+ COALESCE({self.otel_size_column}, 0)"
+        )

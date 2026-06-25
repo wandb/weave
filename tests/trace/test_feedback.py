@@ -1,17 +1,29 @@
 import datetime
 
 import pytest
-from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
+)
 from weave import AnnotationSpec
 from weave.trace.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import (
+    InvalidRequest,
+    QueryIllegalTypeofArgumentError,
+)
+from weave.trace_server.feedback_agg_query_builder import (
+    build_feedback_aggregate_query,
+)
 from weave.trace_server.interface.query import Query
+from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import (
+    FeedbackAggregateBucket,
+    FeedbackAggregateReq,
+    FeedbackAggregateRes,
     FeedbackCreateReq,
     FeedbackQueryReq,
     FeedbackReplaceReq,
@@ -184,12 +196,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
-        ),
+        "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": annotation_ref,
@@ -203,7 +210,42 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "scorer_ratings": {},
         "scorer_rating_reasons": {},
         "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
     }
+
+
+@pytest.mark.parametrize(
+    "bad_spec",
+    [None, {"field_schema": None}, "not-a-spec"],
+    ids=["null_spec", "null_field_schema", "scalar"],
+)
+def test_annotation_feedback_malformed_spec_is_invalid_request(
+    client: WeaveClient, bad_spec: object
+) -> None:
+    """A malformed annotation spec yields InvalidRequest, not an unhandled 500 (WB-35940)."""
+    project_id = client.project_id
+    column_name = "malformed_spec"
+    digest = client.server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id, object_id=column_name, val=bad_spec
+            )
+        )
+    ).digest
+    annotation_ref = f"weave:///{project_id}/object/{column_name}:{digest}"
+
+    with pytest.raises(InvalidRequest):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/call_id_123",
+                feedback_type=f"wandb.annotation.{column_name}",
+                payload={"value": 1},
+                annotation_ref=annotation_ref,
+            )
+        )
 
 
 def test_runnable_feedback(client: WeaveClient) -> None:
@@ -341,12 +383,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "weave_ref": weave_ref,
         "wb_user_id": "shawn",
         "creator": None,
-        # Sad - seems like sqlite and clickhouse remote different types here
-        "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
-        ),
+        "created_at": MatchAnyDatetime(),
         "feedback_type": feedback_type,
         "payload": payload,
         "annotation_ref": None,
@@ -360,6 +397,9 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "scorer_ratings": {},
         "scorer_rating_reasons": {},
         "scorer_rating_confidences": {},
+        "span_agent_name": "",
+        "span_agent_version": "",
+        "span_status_code": "UNSET",
     }
 
     # Runnable scorer feedback may also populate typed scorer columns while
@@ -487,6 +527,9 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
             scorer_ratings={"_rating_": 0.87},
             scorer_rating_reasons={"_rating_": "very confident response"},
             scorer_rating_confidences={"_rating_": 0.92},
+            span_agent_name="midi-generator",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
         )
     )
     assert create_res.id is not None
@@ -504,6 +547,9 @@ def test_agent_monitor_feedback(client: WeaveClient) -> None:
     assert row["scorer_ratings"] == {"_rating_": 0.87}
     assert row["scorer_rating_reasons"] == {"_rating_": "very confident response"}
     assert row["scorer_rating_confidences"] == {"_rating_": 0.92}
+    assert row["span_agent_name"] == "midi-generator"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
 
 
 def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
@@ -536,6 +582,47 @@ def test_agent_monitor_feedback_empty_defaults(client: WeaveClient) -> None:
     assert query_res.result[0]["scorer_ratings"] == {}
     assert query_res.result[0]["scorer_rating_reasons"] == {}
     assert query_res.result[0]["scorer_rating_confidences"] == {}
+    assert query_res.result[0]["span_agent_name"] == ""
+    assert query_res.result[0]["span_agent_version"] == ""
+    assert query_res.result[0]["span_status_code"] == "UNSET"
+
+
+def test_agent_user_feedback(client: WeaveClient) -> None:
+    """A human agent score's value is a tag in scorer_tags (e.g. an emoji
+    glyph), carrying no scorer refs. Non-emoji tags are allowed too.
+    """
+    project_id = client.project_id
+    feedback_type = "wandb.agent_user_feedback"
+    weave_ref = f"weave:///{project_id}/object/agent_turn:turn_id_123"
+
+    create_res = client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload={"emoji": "👍", "scorer_tags": ["👍"]},
+            scorer_tags=["👍"],
+            # Denormalized agent metadata the UI attaches for dashboard filtering.
+            span_agent_name="support-bot",
+            span_agent_version="1.2.0",
+            span_status_code="OK",
+        )
+    )
+    assert create_res.id is not None
+
+    query_res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id)
+    )
+    assert len(query_res.result) == 1
+    row = query_res.result[0]
+    assert row["feedback_type"] == feedback_type
+    assert row["scorer_tags"] == ["👍"]
+    assert row["runnable_ref"] is None
+    assert row["trigger_ref"] is None
+    assert row["scorer_ratings"] == {}
+    assert row["span_agent_name"] == "support-bot"
+    assert row["span_agent_version"] == "1.2.0"
+    assert row["span_status_code"] == "OK"
 
 
 def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
@@ -679,6 +766,322 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
         }
     )
     assert matches == []
+
+
+def test_feedback_aggregate(client: WeaveClient) -> None:
+    """Aggregate scorer feedback, asserting the entire FeedbackAggregateRes shape.
+
+    Uses sumMap / toStartOfInterval. Ratings are
+    exact binary fractions (0.75, 0.5) so the summed Float64 (1.25) compares
+    exactly without approx. Covers both a time-bucketed query and several
+    unbucketed (whole-range rollup) queries.
+    """
+    project_id = client.project_id
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    after_ms = now_ms - 3_600_000
+    before_ms = now_ms + 3_600_000
+
+    scorer_a = f"weave:///{project_id}/object/scorer_a:obj_id_a"
+    scorer_b = f"weave:///{project_id}/object/scorer_b:obj_id_b"
+    call_ref = f"weave:///{project_id}/call/call_id_123"
+    trigger_ref = f"weave:///{project_id}/object/my_scorer:trigger_id_123"
+
+    def _create(suffix: str, runnable_ref: str, **scorer_kwargs):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{suffix}",
+                feedback_type="wandb.agent_monitor",
+                payload={"value": scorer_kwargs.get("scorer_tags", [])},
+                runnable_ref=runnable_ref,
+                call_ref=call_ref,
+                trigger_ref=trigger_ref,
+                **scorer_kwargs,
+            )
+        )
+
+    # Scorer A: two rated rows (one also tagged) + one row that scored nothing
+    # (so total_count > scored_count). Scorer B: one tagged row, no rating.
+    _create(
+        "a1",
+        scorer_a,
+        scorer_ratings={"_rating_": 0.75},
+        scorer_tags=["good"],
+        span_status_code="OK",
+    )
+    _create("a2", scorer_a, scorer_ratings={"_rating_": 0.5}, span_status_code="OK")
+    _create("a3", scorer_a)  # no tags, no rating; span_status_code defaults to UNSET
+    _create("b1", scorer_b, scorer_tags=["nsfw", "slow"], span_status_code="ERROR")
+    # A non-agent-monitor row that must be excluded by the feedback_type filter.
+    client.server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=f"weave:///{project_id}/call/note",
+            feedback_type="wandb.note.1",
+            payload={"note": "ignore me"},
+        )
+    )
+
+    # Per-scorer rollups, reused as the expected buckets across the cases below.
+    # Grouping by scorer_id returns the scorer's object id (the name), not a ref.
+    scorer_a_bucket = FeedbackAggregateBucket(
+        time_bucket_start_ms=None,
+        group={"scorer_id": "scorer_a"},
+        total_count=3,  # a1, a2, a3
+        scored_count=2,  # a3 emitted no tag/rating
+        tag_counts={"good": 1},
+        rating_counts={"_rating_": 2},
+        rating_sums={"_rating_": 1.25},  # 0.75 + 0.5
+    )
+    scorer_b_bucket = FeedbackAggregateBucket(
+        time_bucket_start_ms=None,
+        group={"scorer_id": "scorer_b"},
+        total_count=1,
+        scored_count=1,
+        tag_counts={"nsfw": 1, "slow": 1},
+        rating_counts={},
+        rating_sums={},
+    )
+
+    # --- Time-bucketed, grouped by scorer ---
+    # All rows are written ~now, so they share one epoch-aligned 1h bucket.
+    bucket_ms = 3600 * 1000
+    expected_bucket_start = (now_ms // bucket_ms) * bucket_ms
+    bucketed = client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            time_bucket_seconds=3600,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["scorer_id"],
+        )
+    )
+    # ORDER BY bucket leaves rows in the same bucket unordered; sort by scorer for
+    # a stable shape. (A rare run straddling the hour boundary fails loudly here.)
+    bucketed.buckets.sort(key=lambda b: b.group["scorer_id"])
+    assert bucketed == FeedbackAggregateRes(
+        time_bucket_seconds=3600,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            scorer_a_bucket.model_copy(
+                update={"time_bucket_start_ms": expected_bucket_start}
+            ),
+            scorer_b_bucket.model_copy(
+                update={"time_bucket_start_ms": expected_bucket_start}
+            ),
+        ],
+    )
+
+    # --- Unbucketed, grouped by scorer (ORDER BY scorer_id is deterministic) ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["scorer_id"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[scorer_a_bucket, scorer_b_bucket],
+    )
+
+    # --- Unbucketed, grouped by the span_status_code Enum8 column ---
+    # Enum8 ORDER BY is by numeric value, not name, so sort by status for a
+    # stable shape. UNSET (a3) scored nothing -> scored_count 0.
+    by_status = client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            group_by=["span_status_code"],
+        )
+    )
+    by_status.buckets.sort(key=lambda b: b.group["span_status_code"])
+    assert by_status == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "ERROR"},
+                total_count=1,
+                scored_count=1,
+                tag_counts={"nsfw": 1, "slow": 1},
+                rating_counts={},
+                rating_sums={},
+            ),
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "OK"},
+                total_count=2,
+                scored_count=2,
+                tag_counts={"good": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={"span_status_code": "UNSET"},
+                total_count=1,
+                scored_count=0,
+                tag_counts={},
+                rating_counts={},
+                rating_sums={},
+            ),
+        ],
+    )
+
+    # --- Unbucketed, no group_by: one global rollup row over all matched rows ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=4,  # a1, a2, a3, b1
+                scored_count=3,  # a3 emitted nothing
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
+    # --- Time-bucketed, no group_by: the same global rollup, but one row per time
+    # bucket carrying its timestamp (group stays empty). All rows share one 1h
+    # bucket, so a single row comes back. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            time_bucket_seconds=3600,
+            feedback_types=["wandb.agent_monitor"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=3600,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=expected_bucket_start,
+                group={},
+                total_count=4,
+                scored_count=3,
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
+    # --- All-time total: a from-the-epoch range that exceeds the usual 31-day cap.
+    # Past the cap only a bare project-wide total is allowed (no bucket, no
+    # group_by, no filters), so this rolls up EVERY feedback row in the project --
+    # including the non-agent-monitor note (total 5, not 4). ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=0,
+            before_ms=before_ms,
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=0,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=5,  # 4 agent_monitor rows + the note
+                scored_count=3,  # a3 and the note emitted nothing
+                tag_counts={"good": 1, "nsfw": 1, "slow": 1},
+                rating_counts={"_rating_": 2},
+                rating_sums={"_rating_": 1.25},
+            ),
+        ],
+    )
+
+    # --- Filter: scorer_ids match the scorer's id exactly, so "scorer_a" selects
+    # only scorer A. A trailing "*" opts into prefix matching, which here yields
+    # the same single scorer.
+    for scorer_filter in ("scorer_a", "scorer_a*"):
+        assert client.server.feedback_aggregate(
+            FeedbackAggregateReq(
+                project_id=project_id,
+                after_ms=after_ms,
+                before_ms=before_ms,
+                feedback_types=["wandb.agent_monitor"],
+                scorer_ids=[scorer_filter],
+                group_by=["scorer_id"],
+            )
+        ) == FeedbackAggregateRes(
+            time_bucket_seconds=None,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            buckets=[scorer_a_bucket],
+        ), scorer_filter
+
+    # --- Filter: tags keeps rows whose scorer_tags include "nsfw" (just b1); the
+    # rollup still counts all of that row's tags. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            tags=["nsfw"],
+            group_by=["scorer_id"],
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[scorer_b_bucket],
+    )
+
+    # --- Filter: rating_min keeps rows whose _rating_ >= 0.7 (just a1 at 0.75);
+    # a2 (0.5) and the rating-less rows drop out. ---
+    assert client.server.feedback_aggregate(
+        FeedbackAggregateReq(
+            project_id=project_id,
+            after_ms=after_ms,
+            before_ms=before_ms,
+            feedback_types=["wandb.agent_monitor"],
+            rating_min=0.7,
+        )
+    ) == FeedbackAggregateRes(
+        time_bucket_seconds=None,
+        after_ms=after_ms,
+        before_ms=before_ms,
+        buckets=[
+            FeedbackAggregateBucket(
+                time_bucket_start_ms=None,
+                group={},
+                total_count=1,
+                scored_count=1,
+                tag_counts={"good": 1},
+                rating_counts={"_rating_": 1},
+                rating_sums={"_rating_": 0.75},
+            ),
+        ],
+    )
 
 
 def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
@@ -976,6 +1379,80 @@ async def test_filter_by_feedback(client: WeaveClient, no_autoflush) -> None:
             f"Filtering by {model_output_field} $contains '{substr}' failed, "
             f"expected {expected_ids}, got {found_ids}"
         )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: executes the built SQL directly via server._query",
+)
+def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> None:
+    """Functional checks (ClickHouse-only) that the WHERE filters match precisely.
+
+    The aggregate endpoint lands separately, so this executes the built query
+    directly. Guards against over-broad matching that string assertions miss:
+    object-id filters match the id exactly (a trailing '*' opts into prefix), and
+    span_types matches the ref's span-type segment, not an arbitrary substring.
+    """
+    project_id = client.project_id
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    after_ms = now_ms - 3_600_000
+    before_ms = now_ms + 3_600_000
+
+    def _monitor(suffix: str, monitor_id: str, weave_ref: str) -> None:
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=weave_ref,
+                feedback_type="wandb.agent_monitor",
+                payload={"value": []},
+                runnable_ref=f"weave:///{project_id}/object/scorer_{suffix}:obj_{suffix}",
+                call_ref=f"weave:///{project_id}/call/{suffix}",
+                trigger_ref=f"weave:///{project_id}/object/{monitor_id}:trig_{suffix}",
+            )
+        )
+
+    # Two monitors whose ids share a prefix ("mon" vs "monday"), one scoring an
+    # agent_turn ref and one an agent_conversation ref.
+    _monitor("t1", "mon", f"weave:///{project_id}/agent_turn/trace_t1")
+    _monitor("c1", "monday", f"weave:///{project_id}/agent_conversation/conv_c1")
+
+    # feedback_create (via the external adapter) stores the internal project_id and
+    # internalized refs; query against that internal id, not the external one.
+    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
+
+    def _total(**filters) -> int:
+        """Run the aggregate (global rollup) and return the total matched rows."""
+        pb = ParamBuilder()
+        built = build_feedback_aggregate_query(
+            FeedbackAggregateReq(
+                project_id=internal_project_id,
+                after_ms=after_ms,
+                before_ms=before_ms,
+                feedback_types=["wandb.agent_monitor"],
+                **filters,
+            ),
+            pb,
+        )
+        result = client.server._query(built.sql, built.parameters)
+        rows = [
+            dict(zip(built.columns, row, strict=True)) for row in result.result_rows
+        ]
+        return sum(int(r["total_count"]) for r in rows)
+
+    # Sanity: both rows are present absent any id/type filter.
+    assert _total() == 2
+
+    # monitor_ids: exact by default, so "mon" must NOT match "monday".
+    assert _total(monitor_ids=["mon"]) == 1
+    assert _total(monitor_ids=["monday"]) == 1
+    assert _total(monitor_ids=["mond"]) == 0  # no partial match without '*'
+    # A trailing '*' opts into prefix matching -> matches both ids.
+    assert _total(monitor_ids=["mon*"]) == 2
+
+    # span_types: matches the exact span-type segment of the ref, not a substring.
+    assert _total(span_types=["agent_turn"]) == 1
+    assert _total(span_types=["agent_conversation"]) == 1
+    assert _total(span_types=["agent_turn", "agent_conversation"]) == 2
 
 
 class MatchAnyDatetime:  # noqa: PLW1641
@@ -1351,16 +1828,9 @@ def test_feedback_query_bad_json_path(client) -> None:
         )
 
 
+@pytest.mark.disable_logging_error_check
 def test_feedback_query_contains_numeric_literal(client) -> None:
-    """Test that $contains works with numeric literals on JSON fields.
-
-    This test reproduces the ClickHouse error:
-    Illegal type Int64 of argument of function position
-
-    The issue occurs when using $contains with a numeric literal on a JSON field.
-    The query builder should convert the numeric literal to a string for the
-    position function, not cast it to an integer type.
-    """
+    """$contains with a numeric literal raises a guided error; string substr works."""
     project_id = client.project_id
     call_ref_uri = f"weave:///{project_id}/call/call_id_456"
 
@@ -1373,31 +1843,28 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     )
     client.server.feedback_create(feedback_req)
 
-    # Query for feedback where dataset_id contains the numeric literal 94
-    # This should work but currently fails with:
-    # "Illegal type Int64 of argument of function position"
-    if not client_is_sqlite(client):
-        with pytest.raises(
-            DatabaseError,
-            match="Illegal type Int64 of argument of function position",
-        ):
-            client.server.feedback_query(
-                FeedbackQueryReq(
-                    project_id=project_id,
-                    query=Query(
-                        **{
-                            "$expr": {
-                                "$contains": {
-                                    "input": {"$getField": "payload.dataset_id"},
-                                    "substr": {
-                                        "$literal": 94
-                                    },  # Numeric literal, not string
-                                }
+    # A numeric literal on a JSON field surfaces a guided error pointing at $convert.
+    with pytest.raises(
+        QueryIllegalTypeofArgumentError,
+        match="Illegal type of argument in query",
+    ):
+        client.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "payload.dataset_id"},
+                                "substr": {
+                                    "$literal": 94
+                                },  # Numeric literal, not string
                             }
                         }
-                    ),
-                )
+                    }
+                ),
             )
+        )
 
     res = client.server.feedback_query(
         FeedbackQueryReq(
@@ -1427,9 +1894,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
     literal string `'true'` / `'false'`, so the bool path must coerce
     those before any numeric fallback.
 
-    Asserts on both backends so the same query shape works through sqlite
-    too (where the cast is silently dropped and sqlite's loose typing
-    handles the comparison).
     """
     project_id = client.project_id
     call_ref = f"weave:///{project_id}/call/call_id_typed_payload"
@@ -1491,10 +1955,6 @@ def test_feedback_query_typed_payload_filters(client: WeaveClient) -> None:
 
 def test_feedback_with_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with queue_id field."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_789"
 
@@ -1546,10 +2006,6 @@ def test_feedback_with_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
     """Test feedback creation with invalid queue_id."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     weave_ref = f"weave:///{project_id}/call/call_id_invalid"
     invalid_queue_id = "00000000-0000-0000-0000-000000000000"
@@ -1569,10 +2025,6 @@ def test_feedback_with_invalid_queue_id(client: WeaveClient) -> None:
 
 def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> None:
     """Test feedback creation with queue_id from a different project."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
     other_project_id = f"{project_id}_other"
 
@@ -1603,10 +2055,6 @@ def test_feedback_with_queue_id_from_different_project(client: WeaveClient) -> N
 
 def test_feedback_query_by_queue_id(client: WeaveClient) -> None:
     """Test querying feedback filtered by queue_id."""
-    if client_is_sqlite(client):
-        # Skip for SQLite - annotation queues not implemented
-        return pytest.skip()
-
     project_id = client.project_id
 
     # Create two queues
@@ -1744,10 +2192,7 @@ def _seed_numeric_feedback(
 
 
 def test_feedback_stats(client: WeaveClient) -> None:
-    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats.
-
-    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
-    """
+    """End-to-end: seed feedback, query aggregated stats, verify buckets and window_stats."""
     project_id = client.project_id
     trigger = f"weave:///{project_id}/object/test-scorer:trig_1"
     scores = [0.5, 0.8, 1.0]
@@ -1839,10 +2284,7 @@ def test_feedback_payload_schema(client: WeaveClient) -> None:
 
 
 def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
-    """Empty metrics list returns empty buckets without error.
-
-    Runs with both SQLite and ClickHouse backends (controlled by --trace-server).
-    """
+    """Empty metrics list returns empty buckets without error."""
     project_id = client.project_id
     now = datetime.datetime.now(datetime.timezone.utc)
     res = client.server.feedback_stats(
@@ -1860,9 +2302,6 @@ def test_feedback_stats_empty_metrics(client: WeaveClient) -> None:
 
 def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None:
     """Ensure `feedback_query` returns tz-aware `created_at`."""
-    if client_is_sqlite(client):
-        pytest.skip("created_at is a string on sqlite; tz semantics only apply to CH")
-
     project_id = client.project_id
     client.server.feedback_create(
         tsi.FeedbackCreateReq(

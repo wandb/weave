@@ -1,0 +1,878 @@
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Tue, 09 Jun 2026 20:38:21 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-017773695720
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-017773695720\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-017773695720\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: application/octet-stream\r
+
+      \r
+
+      async function primitive(input) {
+
+      \        return `Hi ${input}!`;
+
+      \    }\r
+
+      ------formdata-undici-017773695720--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:21 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"6Moqwj0Ocp0Jx7FfEN8VcmmDDcu4l2K53xleNntSB34"}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"primitive","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"6Moqwj0Ocp0Jx7FfEN8VcmmDDcu4l2K53xleNntSB34"},"load_op":"NO_LOAD_OP"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "80"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"uPPlRCCga9tsuTZwve2Z2gswUYhhX15gb2XS8il0z4s","object_id":"primitive"}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-099944069085
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-099944069085\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-099944069085\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: application/octet-stream\r
+
+      \r
+
+      async function json(name, age) {
+
+      \        return { name, age };
+
+      \    }\r
+
+      ------formdata-undici-099944069085--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"8mDwaUAcA5C6TEdTHf5mjX2kAz6gAXKCmQnDiITXBHY"}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"json","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"8mDwaUAcA5C6TEdTHf5mjX2kAz6gAXKCmQnDiITXBHY"},"load_op":"NO_LOAD_OP"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "75"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"0NsakCX9GJYyeu65LdlWVO8azws33f39CeKNpidMc50","object_id":"json"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-8d23-7a49-9f3b-0ca26737be0a","op_name":"weave:///drtangible-mocha/test-project/op/primitive:uPPlRCCga9tsuTZwve2Z2gswUYhhX15gb2XS8il0z4s","trace_id":"019eae1b-8d23-7a49-9f3b-0ca31d2e406d","started_at":"2026-06-09T20:38:21.731Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{"arg0":"world"}}}},{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-8d23-7a49-9f3b-0ca26737be0a","ended_at":"2026-06-09T20:38:21.732Z","output":"Hi
+      world!","summary":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "108"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{"id":"019eae1b-8d23-7a49-9f3b-0ca26737be0a","trace_id":"019eae1b-8d23-7a49-9f3b-0ca31d2e406d"},{}]}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-030139909131
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-030139909131\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-030139909131\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: application/octet-stream\r
+
+      \r
+
+      async function image() {
+
+      \        const width = 16;
+
+      \        const height = 16;
+
+      \        const buffer = Buffer.alloc(width * height * 4); // 4 bytes per
+      pixel (RGBA)
+
+      \        // Deterministic pattern so VCR cassette replays match across
+      runs.
+
+      \        for (let i = 0; i < buffer.length; i++) {
+
+      \            buffer[i] = i % 256;
+
+      \        }
+
+      \        return (0, index_1.weaveImage)({
+
+      \            data: buffer,
+
+      \            imageType: 'png',
+
+      \        });
+
+      \    }\r
+
+      ------formdata-undici-030139909131--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"DsZ569GIUUuzvv3fnSnJprV5HvnpMGQtHuluMlNu2dc"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9082-7763-a9fc-81f5c50d955e","op_name":"weave:///drtangible-mocha/test-project/op/json:0NsakCX9GJYyeu65LdlWVO8azws33f39CeKNpidMc50","trace_id":"019eae1b-9082-7763-a9fc-81f6e378a1b6","started_at":"2026-06-09T20:38:22.594Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{"arg0":"Alice","arg1":10}}}},{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9082-7763-a9fc-81f5c50d955e","ended_at":"2026-06-09T20:38:22.594Z","output":{"name":"Alice","age":10},"summary":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "108"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:23 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{"id":"019eae1b-9082-7763-a9fc-81f5c50d955e","trace_id":"019eae1b-9082-7763-a9fc-81f6e378a1b6"},{}]}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"image","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"DsZ569GIUUuzvv3fnSnJprV5HvnpMGQtHuluMlNu2dc"},"load_op":"NO_LOAD_OP"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "76"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:23 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"JlZ8e9uewWsbOiMpUSopvdzZnZZTadb46dsjw3ZeIXc","object_id":"image"}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-077152610145
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-077152610145\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-077152610145\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: image/png\r
+
+      \r
+
+      \0\x01\x02\x03\x04\x05\x06\a\b\t
+
+      \v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\e\x1c\x1d\x1e\
+      \x1f
+      !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefg\
+      hijklmnopqrstuvwxyz{|}~�������������������������������������������������\
+      �������������������������������������������������������������������������\
+      ������\0\x01\x02\x03\x04\x05\x06\a\b\t
+
+      \v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\e\x1c\x1d\x1e\
+      \x1f
+      !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefg\
+      hijklmnopqrstuvwxyz{|}~�������������������������������������������������\
+      �������������������������������������������������������������������������\
+      ������\0\x01\x02\x03\x04\x05\x06\a\b\t
+
+      \v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\e\x1c\x1d\x1e\
+      \x1f
+      !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefg\
+      hijklmnopqrstuvwxyz{|}~�������������������������������������������������\
+      �������������������������������������������������������������������������\
+      ������\0\x01\x02\x03\x04\x05\x06\a\b\t
+
+      \v\f\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\e\x1c\x1d\x1e\
+      \x1f
+      !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefg\
+      hijklmnopqrstuvwxyz{|}~�������������������������������������������������\
+      �������������������������������������������������������������������������\
+      ������\r
+
+      ------formdata-undici-077152610145--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:24 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"eFsHUfwsU9wUpM49gA5p75zhAJ6zJ8z0WKYgnCQsJsk"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9479-7571-9dcb-e476a68c8439","op_name":"weave:///drtangible-mocha/test-project/op/image:JlZ8e9uewWsbOiMpUSopvdzZnZZTadb46dsjw3ZeIXc","trace_id":"019eae1b-9479-7571-9dcb-e4771f8dd1ec","started_at":"2026-06-09T20:38:23.609Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "105"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:24 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{"id":"019eae1b-9479-7571-9dcb-e476a68c8439","trace_id":"019eae1b-9479-7571-9dcb-e4771f8dd1ec"}]}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-062550160634
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-062550160634\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-062550160634\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: application/octet-stream\r
+
+      \r
+
+      async function audio() {
+
+      \        const sampleRate = 44100; // Standard CD quality
+
+      \        const duration = 0.1; // 100ms
+
+      \        const numSamples = Math.floor(sampleRate * duration);
+
+      \        const buffer = Buffer.alloc(numSamples * 2); // 2 bytes per
+      sample for 16-bit audio
+
+      \        // Deterministic sawtooth so VCR cassette replays match across
+      runs.
+
+      \        for (let i = 0; i < buffer.length; i += 2) {
+
+      \            const sample = ((i / 2) % 65536) - 32768;
+
+      \            buffer.writeInt16LE(sample, i);
+
+      \        }
+
+      \        return (0, index_1.weaveAudio)({
+
+      \            data: buffer,
+
+      \            audioType: 'wav',
+
+      \        });
+
+      \    }\r
+
+      ------formdata-undici-062550160634--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:24 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"gdu5XikPEiCf2puYTg9i29aLBKMs6TehPZCknNYktkY"}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"audio","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"gdu5XikPEiCf2puYTg9i29aLBKMs6TehPZCknNYktkY"},"load_op":"NO_LOAD_OP"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "76"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:24 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"IG9eXWbmObjYbKa2lC0s3mSBsQnu9BynXYieZ8DQdJ8","object_id":"audio"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9479-7571-9dcb-e476a68c8439","ended_at":"2026-06-09T20:38:23.609Z","output":{"_type":"CustomWeaveType","weave_type":{"type":"PIL.Image.Image"},"files":{"image.png":"eFsHUfwsU9wUpM49gA5p75zhAJ6zJ8z0WKYgnCQsJsk"},"load_op":"NO_LOAD_OP"},"summary":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "12"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:24 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{}]}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-010028348208
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-010028348208\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-010028348208\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: audio/wav\r
+
+      \r
+
+      \0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÀĀŀƀǀȀɀʀˀ̀̀΀πЀрҀӀԀՀր׀؀ـڀۀ܀݀ހ߀����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÁāŁƁǁȁɁʁˁ́́΁ρЁсҁӁԁՁցׁ؁فځہ܁݁ށ߁����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÂĂłƂǂȂɂʂ˂̂͂΂ςЂт҂ӂԂՂւׂ؂قڂۂ܂݂ނ߂����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÃăŃƃǃȃɃʃ˃̃̓΃σЃу҃ӃԃՃփ׃؃كڃۃ܃݃ރ߃����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÄĄńƄǄȄɄʄ˄̄̈́΄τЄф҄ӄԄՄքׄ؄لڄۄ܄݄ބ߄����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÅąŅƅǅȅɅʅ˅̅ͅ΅υЅх҅ӅԅՅօׅ؅مڅۅ܅݅ޅ߅����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÆĆņƆǆȆɆʆˆ̆͆ΆφІц҆ӆԆՆֆ׆؆نچۆ܆݆ކ߆����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÇćŇƇǇȇɇʇˇ͇̇·χЇч҇ӇԇՇևׇ؇هڇۇ܇݇އ߇����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÈĈňƈǈȈɈʈˈ͈̈ΈψЈш҈ӈԈՈֈ׈؈وڈۈ܈݈ވ߈����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÉĉŉƉǉȉɉʉˉ͉̉ΉωЉщ҉ӉԉՉ։׉؉ىډۉ܉݉މ߉����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÊĊŊƊǊȊɊʊˊ̊͊ΊϊЊъҊӊԊՊ֊׊؊يڊۊ܊݊ފߊ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ËċŋƋǋȋɋʋˋ̋͋΋ϋЋыҋӋԋՋ֋׋؋ًڋۋ܋݋ދߋ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÌČŌƌǌȌɌʌˌ̌͌ΌόЌьҌӌԌՌ֌׌،ٌڌی܌݌ތߌ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÍčōƍǍȍɍʍˍ͍̍΍ύЍэҍӍԍՍ֍׍؍ٍڍۍ܍ݍލߍ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÎĎŎƎǎȎɎʎˎ͎̎ΎώЎюҎӎԎՎ֎׎؎َڎێ܎ݎގߎ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÏďŏƏǏȏɏʏˏ̏͏ΏϏЏяҏӏԏՏ֏׏؏ُڏۏ܏ݏޏߏ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�:�;�<�=�>�?�@�A�B�C�D\
+      �E�F�G�H�I�J�K�L�M�N�O�P�Q�R�S�T�U�V�W�X�Y�Z�[�\\�]�^�_�`�a�b�c�d�e�f�g�h\
+      �i�j�k�l�m�n�o�p�q�r�s�t�u�v�w�x�y�z�{�|�}�~����������������������������\
+      �������������������������������������������������������������������������\
+      ���������������������������������ÐĐŐƐǐȐɐʐː̐͐ΐϐАѐҐӐԐՐ֐אِؐڐېܐݐސߐ����������\
+      �����������������������������������\0�\x01�\x02�\x03�\x04�\x05�\x06�\a�\b�\
+      \t�
+
+      �\v�\f�\r�\x0e�\x0f�\x10�\x11�\x12�\x13�\x14�\x15�\x16�\x17�\x18�\x19�\
+      \x1a�\e�\x1c�\x1d�\x1e�\x1f�
+      �!�\"�#�$�%�&�'�(�)�*�+�,�-�.�/�0�1�2�3�4�5�6�7�8�9�\r
+
+      ------formdata-undici-010028348208--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:25 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"Vo1nyi1S6gru0QMG9l2pZU2VoPFDDv0nDeYcb34oATI"}'
+- request:
+    url: https://trace.wandb.ai/file/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: multipart/form-data; boundary=----formdata-undici-031012413932
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: "------formdata-undici-031012413932\r
+
+      Content-Disposition: form-data; name=\"project_id\"\r
+
+      \r
+
+      drtangible-mocha/test-project\r
+
+      ------formdata-undici-031012413932\r
+
+      Content-Disposition: form-data; name=\"file\"; filename=\"blob\"\r
+
+      Content-Type: application/octet-stream\r
+
+      \r
+
+      async function dataset() {
+
+      \        return new index_1.Dataset({
+
+      \            name: 'my-dataset',
+
+      \            rows: [
+
+      \                { name: 'Alice', age: 10 },
+
+      \                { name: 'Bob', age: 20 },
+
+      \                { name: 'Charlie', age: 30 },
+
+      \            ],
+
+      \        });
+
+      \    }\r
+
+      ------formdata-undici-031012413932--\r\n"
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "56"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"2jp04xe7NEIAwPRPB3o92wung4iUf8JHjASelxMRrQM"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9916-769c-8bc2-c662375f522a","op_name":"weave:///drtangible-mocha/test-project/op/audio:IG9eXWbmObjYbKa2lC0s3mSBsQnu9BynXYieZ8DQdJ8","trace_id":"019eae1b-9916-769c-8bc2-c6633a9877b8","started_at":"2026-06-09T20:38:24.790Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "105"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:25 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{"id":"019eae1b-9916-769c-8bc2-c662375f522a","trace_id":"019eae1b-9916-769c-8bc2-c6633a9877b8"}]}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"dataset","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"2jp04xe7NEIAwPRPB3o92wung4iUf8JHjASelxMRrQM"},"load_op":"NO_LOAD_OP"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "78"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:25 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"zTkOm7AxQhch95UlLWYnYyibbIbWl2UlPF551Woh9LE","object_id":"dataset"}'
+- request:
+    url: https://trace.wandb.ai/table/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"table":{"project_id":"drtangible-mocha/test-project","rows":[{"name":"Alice","age":10},{"name":"Bob","age":20},{"name":"Charlie","age":30}]}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "231"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"03649e929ba12f08d67e1a76de37177f4eced4190078c92cb6653fb56dcd3825","row_digests":["aMkVu8hYRa5Wvwor5RJfZYTXNa1nYwfn4P7MhSgtKUs","K8wEDqYPFXiHcBAZ4j6YEcYg434Xn7hdsaSvnbQakG0","NQ8XBhd5m0rukJ7rKgqf7IvXU3KdQF2anCFbFqS8WFE"]}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"end","req":{"end":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9916-769c-8bc2-c662375f522a","ended_at":"2026-06-09T20:38:24.790Z","output":{"_type":"CustomWeaveType","weave_type":{"type":"wave.Wave_read"},"files":{"audio.wav":"Vo1nyi1S6gru0QMG9l2pZU2VoPFDDv0nDeYcb34oATI"},"load_op":"NO_LOAD_OP"},"summary":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "12"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{}]}'
+- request:
+    url: https://trace.wandb.ai/table/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/test-project","digest":"03649e929ba12f08d67e1a76de37177f4eced4190078c92cb6653fb56dcd3825"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "334"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"rows":[{"digest":"aMkVu8hYRa5Wvwor5RJfZYTXNa1nYwfn4P7MhSgtKUs","val":{"name":"Alice","age":10},"original_index":0},{"digest":"K8wEDqYPFXiHcBAZ4j6YEcYg434Xn7hdsaSvnbQakG0","val":{"name":"Bob","age":20},"original_index":1},{"digest":"NQ8XBhd5m0rukJ7rKgqf7IvXU3KdQF2anCFbFqS8WFE","val":{"name":"Charlie","age":30},"original_index":2}]}'
+- request:
+    url: https://trace.wandb.ai/obj/create
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"my-dataset","val":{"_type":"Dataset","_class_name":"Dataset","_bases":["Object","BaseModel"],"name":"my-dataset","rows":"weave:///drtangible-mocha/test-project/table/03649e929ba12f08d67e1a76de37177f4eced4190078c92cb6653fb56dcd3825"}}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "81"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"digest":"dpw7LBwphpZwuNG5Xxl6Y7D7x0LlxBdlj87GNifayO4","object_id":"my-dataset"}'
+- request:
+    url: https://trace.wandb.ai/call/upsert_batch
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"batch":[{"mode":"start","req":{"start":{"project_id":"drtangible-mocha/test-project","id":"019eae1b-9e41-7ccb-b4df-507fd0bf5f7c","op_name":"weave:///drtangible-mocha/test-project/op/dataset:zTkOm7AxQhch95UlLWYnYyibbIbWl2UlPF551Woh9LE","trace_id":"019eae1b-9e41-7ccb-b4df-508083e77e36","started_at":"2026-06-09T20:38:26.113Z","attributes":{"weave":{"client_version":"0.15.1","source":"js-sdk"}},"inputs":{}}}}]}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "105"
+      content-type: application/json
+      date: Tue, 09 Jun 2026 20:38:26 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"res":[{"id":"019eae1b-9e41-7ccb-b4df-507fd0bf5f7c","trace_id":"019eae1b-9e41-7ccb-b4df-508083e77e36"}]}'

@@ -1,7 +1,7 @@
 import datetime
 from collections.abc import Iterator
 from enum import Enum
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Protocol, TypeAlias, get_args
 
 from pydantic import (
     BaseModel,
@@ -221,6 +221,13 @@ class StartedCallSchemaForInsert(BaseModel):
 class EndedCallSchemaForInsert(BaseModel):
     project_id: str
     id: str
+
+    # Trace ID. Optional for backward compatibility: older clients omit it and
+    # the server derives it from the matching call-start. Carried here so a
+    # server-side ingest sampler can make a consistent keep/drop decision on the
+    # call-end message too. One field covers /call/end, the end-parts of
+    # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
+    trace_id: str | None = None
 
     # End time is required
     ended_at: datetime.datetime
@@ -1235,6 +1242,24 @@ class FeedbackCreateReq(BaseModelStrict):
         examples=[{"_rating_": 0.92}],
     )
 
+    # Denormalized columns from the `spans` table so we can filter without joining.
+    # Keeping these tables synced is best-effort: spans table remains the source of truth
+    span_agent_name: str = Field(
+        default="",
+        description="Display name of the scored agent (from spans.agent_name)",
+        examples=["midi-generator"],
+    )
+    span_agent_version: str = Field(
+        default="",
+        description="Version of the scored agent (from spans.agent_version)",
+        examples=["1.2.0"],
+    )
+    span_status_code: str = Field(
+        default="UNSET",
+        description="Status of the scored turn (from spans.status_code)",
+        examples=["SUCCESS"],
+    )
+
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -1440,6 +1465,165 @@ class FeedbackStatsRes(BaseModel):
             "(e.g. 'output_score'). Each value maps agg name to result."
         ),
     )
+
+
+# --- Feedback aggregate schema (for scores grouped by time bucket) ---
+
+FeedbackAggregateGroupByColumn: TypeAlias = Literal[
+    "scorer_id", "span_agent_name", "span_agent_version", "span_status_code"
+]
+
+# Valid GROUP BY columns for aggregate feedback requests.
+FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS: frozenset[FeedbackAggregateGroupByColumn] = (
+    frozenset(get_args(FeedbackAggregateGroupByColumn))
+)
+
+# Span types, matched on the feedback's weave_ref path segment
+FeedbackSpanType: TypeAlias = Literal["agent_turn", "agent_conversation"]
+
+# Limit aggregate feedback request time range and time bucket count
+MAX_FEEDBACK_AGG_TIME_RANGE_DAYS = 31
+MAX_FEEDBACK_AGG_TIME_BUCKETS = 256
+DAY_IN_MS = datetime.timedelta(days=1).total_seconds() * 1000
+
+
+class FeedbackAggregateReq(BaseModelStrict):
+    """Query for aggregate scores by time bucket and dimension."""
+
+    project_id: str = Field(examples=["entity/project"])
+    after_ms: int = Field(
+        description="Inclusive lower bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    before_ms: int = Field(
+        description="Exclusive upper bound on created_at (milliseconds since epoch).",
+        ge=0,
+    )
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size in seconds, e.g. 3600 for 1h buckets",
+        gt=0,
+    )
+    feedback_types: list[str] = Field(
+        default_factory=list,
+        description="Filter on feedback_type by prefix",
+    )
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback that includes any of the given tags",
+    )
+    rating_min: float | None = Field(
+        default=None,
+        description="Include only rows with a rating >= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    rating_max: float | None = Field(
+        default=None,
+        description="Include only rows with a rating <= this value",
+        ge=0.0,
+        le=1.0,
+    )
+    monitor_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter to these monitor ids (exact match; suffix with '*' for prefix match).",
+    )
+    scorer_ids: list[str] = Field(
+        default_factory=list,
+        description="Filter to these scorer ids (exact match; suffix with '*' for prefix match).",
+    )
+    span_agent_names: list[str] = Field(
+        default_factory=list,
+        description="Filter to feedback whose span_agent_name matches any of these (exact).",
+    )
+    span_types: list[FeedbackSpanType] = Field(
+        default_factory=list,
+        description="Filter by span type (turn vs conversation).",
+    )
+    group_by: list[FeedbackAggregateGroupByColumn] = Field(
+        default_factory=list,
+        description=(f"Allowed: {sorted(FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS)}."),
+    )
+
+    @model_validator(mode="after")
+    def _validate(self) -> "FeedbackAggregateReq":
+        time_range_ms = self.before_ms - self.after_ms
+        if time_range_ms <= 0:
+            raise ValueError("before_ms must be greater than after_ms")
+        # Limit the time range for this query EXCEPT to fetch an ungrouped, unfiltered, all-time total
+        if time_range_ms > MAX_FEEDBACK_AGG_TIME_RANGE_DAYS * DAY_IN_MS:
+            has_filter = bool(
+                self.feedback_types
+                or self.tags
+                or self.monitor_ids
+                or self.scorer_ids
+                or self.span_agent_names
+                or self.span_types
+                or self.rating_min is not None
+                or self.rating_max is not None
+            )
+            if self.time_bucket_seconds is not None or self.group_by or has_filter:
+                raise ValueError(
+                    f"Feedback requests over {MAX_FEEDBACK_AGG_TIME_RANGE_DAYS} days must be a "
+                    "project-wide total: no time_bucket_seconds, no group_by, and no filters."
+                )
+        # Only cap the bucket count when bucketing; None means a single rollup row.
+        if self.time_bucket_seconds is not None:
+            n_buckets = (time_range_ms / 1000) / self.time_bucket_seconds
+            if n_buckets > MAX_FEEDBACK_AGG_TIME_BUCKETS:
+                raise ValueError(
+                    f"Feedback request range cannot exceed {MAX_FEEDBACK_AGG_TIME_BUCKETS} buckets"
+                )
+        return self
+
+
+class FeedbackAggregateBucket(BaseModel):
+    """One (time bucket, group) row of aggregated scorer feedback."""
+
+    time_bucket_start_ms: int | None = Field(
+        default=None,
+        description="Time bucket start, unix epoch ms (UTC). None when unbucketed.",
+    )
+    group: dict[str, str] = Field(
+        default_factory=dict,
+        description="Group-by dimension values for this row (e.g. {'scorer_id': '...'}).",
+    )
+    total_count: int = Field(
+        description="Number of feedback rows in this bucket/group."
+    )
+    scored_count: int = Field(
+        description=(
+            "Rows that emitted a score (at least one tag or rating). Excludes "
+            "agent-monitor rows that scored nothing — use this for score volume."
+        ),
+    )
+    tag_counts: dict[str, int] = Field(
+        default_factory=dict, description="Count of each scorer tag."
+    )
+    rating_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of rows carrying each rating key (e.g. '_rating_').",
+    )
+    rating_sums: dict[str, float] = Field(
+        default_factory=dict,
+        description="Sum of each rating key's values; client derives avg = sum/count.",
+    )
+
+
+class FeedbackAggregateRes(BaseModel):
+    """Sparse time-series of aggregated scorer feedback (empty buckets omitted)."""
+
+    time_bucket_seconds: int | None = Field(
+        default=None,
+        description="Time bucket size used (seconds). None when unbucketed.",
+    )
+    after_ms: int = Field(
+        description="Resolved inclusive lower bound, unix epoch ms (UTC)."
+    )
+    before_ms: int = Field(
+        description="Resolved exclusive upper bound, unix epoch ms (UTC)."
+    )
+    buckets: list[FeedbackAggregateBucket] = Field(default_factory=list)
 
 
 # --- Feedback payload schema (discovered paths for stats) ---
@@ -1876,6 +2060,170 @@ class AnnotatorQueueItemsProgressUpdateRes(BaseModel):
     """Response from updating annotation state."""
 
     item: AnnotationQueueItemSchema
+
+
+# ============================================================================
+# Dataset Sources API
+#
+# `dataset_sources` links dataset rows to their provenance sources (a "source"
+# is either a Weave call or an agent span). This is the second instance of the
+# membership pattern (see annotation_queue_items, migration 023/034).
+# ============================================================================
+
+# Maximum number of (row_digest, source) tuples that may be linked in a single
+# dataset_sources_link request (after flattening DatasetSourceLinkPayload.sources).
+MAX_DATASET_SOURCE_LINKS_PER_REQUEST = 1000
+
+# Maximum number of row_digests returned per SourceDatasetMembership; beyond
+# this the list is truncated and row_digests_truncated is set True.
+MAX_ROW_DIGESTS_PER_RESULT = 100
+
+
+class SourceKind(str, Enum):
+    CALL = "call"
+    SPAN = "span"
+    CONVERSATION = "conversation"
+
+
+class SourceRef(BaseModel):
+    """Reference to a provenance source (a call, an agent span, or a
+    conversation).
+    """
+
+    source_kind: SourceKind
+    # call_id for calls, span_id for spans, conversation_id for conversations.
+    source_id: str
+    # Part of the logical key: lookup key for spans, cached display field for
+    # calls. Conversations span traces, so this is "" for conversation refs
+    # (conversation_id is self-sufficient identity).
+    source_trace_id: str
+
+
+class DatasetSourceLinkPayload(BaseModel):
+    """A single dataset row and the sources to link to it."""
+
+    row_digest: str
+    sources: list[SourceRef]
+    link_metadata: dict[str, Any] | None = None
+
+
+class DatasetSourcesLinkReq(BaseModelStrict):
+    """Request to link dataset rows to their provenance sources."""
+
+    project_id: str = Field(examples=["entity/project"])
+    dataset_object_id: str
+    # Audit-log only, not stored on the dataset_sources rows.
+    dataset_digest: str
+    links: list[DatasetSourceLinkPayload]
+    # When False, skip the pre-insert lookup; entries return created=None
+    # (strictly meaning "not requested").
+    include_created_status: bool = False
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesLinkResEntry(BaseModel):
+    """Result for a single flattened (row_digest, source) link."""
+
+    link_id: str
+    # None strictly means include_created_status was False on the request.
+    created: bool | None = None
+
+
+class DatasetSourcesLinkRes(BaseModel):
+    """Response from linking dataset rows to sources.
+
+    One entry per flattened (row_digest, source) tuple, in input order.
+    """
+
+    entries: list[DatasetSourcesLinkResEntry]
+
+
+class DatasetSourcesLinkDeleteReq(BaseModelStrict):
+    """Request to soft-delete dataset source links by id."""
+
+    project_id: str = Field(examples=["entity/project"])
+    link_ids: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesLinkDeleteResEntry(BaseModel):
+    """Result for a single link deletion."""
+
+    link_id: str
+    deleted: bool  # False = was already soft-deleted
+
+
+class DatasetSourcesLinkDeleteRes(BaseModel):
+    """Response from deleting dataset source links."""
+
+    entries: list[DatasetSourcesLinkDeleteResEntry]
+
+
+class DatasetSourceLinkSchema(BaseModel):
+    """Schema for a single dataset source link row."""
+
+    id: str
+    row_digest: str
+    source_kind: SourceKind
+    source_id: str
+    source_trace_id: str
+    source_started_at: datetime.datetime
+    source_display_name: str
+    link_metadata: dict[str, Any] | None = None
+    added_by: str | None = None  # wb_user_id (nullable)
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+
+
+class DatasetSourcesQueryReq(BaseModelStrict):
+    """Forward query: dataset -> sources."""
+
+    project_id: str = Field(examples=["entity/project"])
+    dataset_object_id: str
+    row_digests: list[str] | None = None
+    source_kinds: list[SourceKind] | None = None
+    include_deleted: bool = False
+    limit: int | None = None
+    offset: int | None = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesQueryRes(BaseModel):
+    """Response from the forward dataset -> sources query."""
+
+    links: list[DatasetSourceLinkSchema]
+
+
+class SourceDatasetsQueryReq(BaseModelStrict):
+    """Reverse query: sources -> datasets."""
+
+    project_id: str = Field(examples=["entity/project"])
+    sources: list[SourceRef]
+    include_deleted: bool = False
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class SourceDatasetMembership(BaseModel):
+    """Membership of a single (source, dataset) pair in the reverse query."""
+
+    source_kind: SourceKind
+    source_id: str
+    source_trace_id: str
+    dataset_object_id: str
+    # Capped at MAX_ROW_DIGESTS_PER_RESULT. When truncated, this is the
+    # deterministic lexicographically-smallest N digests, not an arbitrary subset.
+    row_digests: list[str]
+    row_digests_truncated: bool
+    row_digests_total_count: int
+    # Earliest created_at across non-deleted links for this (source, dataset) pair.
+    first_seen_at: datetime.datetime
+
+
+class SourceDatasetsQueryRes(BaseModel):
+    """Response from the reverse sources -> datasets query."""
+
+    memberships: list[SourceDatasetMembership]
 
 
 # Thread API
@@ -2951,6 +3299,14 @@ class EvalResultsQueryBody(BaseModelStrict):
         default=None,
         description="Filters applied to grouped rows. Multiple filters are AND'd together.",
     )
+    filter_logic_operator: Literal["and", "or"] = Field(
+        default="or",
+        description=(
+            "How to combine filters across evaluations: 'and' (Match All - row must "
+            "match in ALL evals) or 'or' (Match Any - row must match in ANY eval). "
+            "Defaults to 'or' (Match Any)."
+        ),
+    )
     limit: int | None = Field(
         default=None,
         description="Optional row-level page size applied after grouping and intersection.",
@@ -3036,6 +3392,14 @@ class EvalResultsEvaluationSummary(BaseModel):
     evaluation_call_id: str
     trial_count: int = 0
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+    predict_total_tokens: int | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only token usage for this evaluation "
+            "(the model's predict() tokens only, excluding LLM-as-a-judge "
+            "scorer usage); None when no trial reports usage."
+        ),
+    )
     evaluation_ref: str | None = None
     model_ref: str | None = None
     display_name: str | None = None
@@ -3146,6 +3510,7 @@ class TraceServerInterface(Protocol):
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
     def feedback_stats(self, req: FeedbackStatsReq) -> FeedbackStatsRes: ...
+    def feedback_aggregate(self, req: FeedbackAggregateReq) -> FeedbackAggregateRes: ...
     def feedback_payload_schema(
         self, req: FeedbackPayloadSchemaReq
     ) -> FeedbackPayloadSchemaRes: ...
@@ -3217,6 +3582,23 @@ class TraceServerInterface(Protocol):
     def annotator_queue_items_progress_update(
         self, req: AnnotatorQueueItemsProgressUpdateReq
     ) -> AnnotatorQueueItemsProgressUpdateRes: ...
+
+    # Dataset Sources API
+    def dataset_sources_link(
+        self, req: DatasetSourcesLinkReq
+    ) -> DatasetSourcesLinkRes: ...
+
+    def dataset_sources_link_delete(
+        self, req: DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes: ...
+
+    def dataset_sources_query(
+        self, req: DatasetSourcesQueryReq
+    ) -> DatasetSourcesQueryRes: ...
+
+    def source_datasets_query(
+        self, req: SourceDatasetsQueryReq
+    ) -> SourceDatasetsQueryRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...

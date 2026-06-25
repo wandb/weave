@@ -156,6 +156,14 @@ class NotFoundError(Error):
     pass
 
 
+class RefObjectsNotFoundError(NotFoundError):
+    """Raised when reference objects are not found."""
+
+    def __init__(self, message: str, missing_object_digests: list[str]):
+        self.missing_object_digests = missing_object_digests
+        super().__init__(message)
+
+
 class MissingLLMApiKeyError(Error):
     """Raised when a LLM API key is missing for completion."""
 
@@ -312,13 +320,21 @@ class ErrorRegistry:
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidIdFormat, 400)
+        # A malformed query value is a client request error, not an authz failure.
+        self.register(BadQueryParameterError, 400)
 
         # 403
         self.register(QueryIllegalTypeofArgumentError, 403)
-        self.register(BadQueryParameterError, 403)
 
         # 404
         self.register(NotFoundError, 404)
+        # Exact-type registration (the registry matches by exact type), so the
+        # missing-digest field is surfaced in the response body.
+        self.register(
+            RefObjectsNotFoundError,
+            404,
+            _format_ref_objects_not_found_error,
+        )
         self.register(ProjectNotFound, 404)
         self.register(RunNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
@@ -446,10 +462,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         ) from e
     if "BAD_QUERY_PARAMETER" in error_str:
         raise BadQueryParameterError(
-            "Bad query parameter. "
-            "Example: A query like inputs.integer_value = -10000000000, when the parameter "
-            "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
-            "To resolve, ensure all query parameters are of the correct type and within valid ranges."
+            "Bad query parameter: a value in the query could not be parsed to its "
+            "expected type (for example a negative or non-integer value where an "
+            "unsigned integer is required). Ensure filter values match the field type. "
+            + error_str
         ) from e
     if "SUPPORT_IS_DISABLED" in error_str and "Lightweight updates" in error_str:
         raise LightweightUpdateNotAllowedError(
@@ -491,6 +507,14 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     extra = {}
     if isinstance(exc, ObjectDeletedError):
         extra["deleted_at"] = exc.deleted_at.isoformat()
+    return _format_error_to_json_with_extra(exc, extra)
+
+
+def _format_ref_objects_not_found_error(exc: Exception) -> dict[str, Any]:
+    """Format RefObjectsNotFoundError with the missing object digests."""
+    extra = {}
+    if isinstance(exc, RefObjectsNotFoundError):
+        extra["missing_object_digests"] = exc.missing_object_digests
     return _format_error_to_json_with_extra(exc, extra)
 
 

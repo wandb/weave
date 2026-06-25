@@ -54,10 +54,11 @@ dependencies = [
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
-  # The ADK integration imports GenAI semconv keys
-  # (gen_ai.tool.call.arguments, cache token names,
-  # gen_ai.usage.reasoning.output_tokens) added in 0.63b0.
-  "opentelemetry-semantic-conventions>=0.63b0",
+  # NOTE: do not pin opentelemetry-semantic-conventions. It ships transitively
+  # via opentelemetry-sdk, and pinning >=0.63b0 (sdk>=1.42) makes weave +
+  # google-adk (which pins sdk<=1.41.1) an unsatisfiable install. The ADK
+  # integration vendors the GenAI keys it needs in
+  # weave/integrations/google_adk/_semconv.py instead of importing them.
 ]
 
 [project.optional-dependencies]
@@ -225,7 +226,6 @@ filterwarnings = [
 ]
 addopts = "-v"
 markers = [
-  "skip_clickhouse_client: marks tests as requiring clickhouse client to be skipped",
   "trace_server: alias for `trace_server` fixture used for CI dispatching. Do not use directly in code.",
   "disable_logging_error_check: means that the test expects logging errors (and the default assertion for no logging errors will fail)",
   "timeout: marks tests with a timeout in seconds (via pytest-timeout)",
@@ -366,7 +366,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.43-dev0"
+current_version = "0.52.44-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -412,13 +412,11 @@ disable = ["fixit.rules"]
 
 [dependency-groups]
 dev = [
-  # codegen
-  "tomlkit",
-  "python-multipart",
   # linting
   "prek",
   "jupyter",
   "ty>=0.0.2",
+  "import-linter>=2.0",
 ]
 trace_server = [
   # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
@@ -465,7 +463,6 @@ test = [
   "clickhouse_connect==0.11.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
-  "freezegun",
   "rich",
 
   # Integration Tests
@@ -477,7 +474,6 @@ test = [
   "uvicorn>=0.27.0",
   "pillow",
   "moviepy<=1.0.3",
-  "filelock",
 
   # Media Generation
   "opencv-python", # Video generation
@@ -491,7 +487,6 @@ test = [
 
   "weave[trace_server]",
   "moto[s3]>=5.0.0",
-  "respx",
 ]
 
 [tool.uv]
@@ -577,3 +572,208 @@ no-matching-overload = "ignore"
 possibly-missing-import = "ignore"
 too-many-positional-arguments = "ignore"
 not-iterable = "ignore"
+
+# ---------------------------------------------------------------------------
+# import-linter: enforce the trace-server / client / workers import boundaries.
+#
+# Goal: the trace server (`weave.trace_server`) and the Weave client SDK
+# (everything else under `weave`) must not import each other, and workers must
+# additionally not reach into the client SDK. `weave.shared` is the intentional
+# neutral zone that both sides may import.
+#
+# The repo is currently entangled, so every existing cross-boundary import is
+# listed under each contract's `ignore_imports` as a TEMPORARY allowance. Those
+# lists ARE the untangling backlog: as we decouple the repo we delete entries
+# (and fix the code), never add. `unmatched_ignore_imports_alerting` is left at
+# its default (error), so a stale ignore that no longer matches a real import
+# fails the linter and forces the list to stay honest.
+#
+# `allow_indirect_imports = true` keeps each contract focused on *direct*
+# imports, so every ignored entry maps to a concrete `import` statement to fix.
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "weave"
+
+[[tool.importlinter.contracts]]
+name = "Trace server must not import the Weave client SDK"
+type = "forbidden"
+source_modules = ["weave.trace_server"]
+forbidden_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+]
+allow_indirect_imports = true
+# TEMPORARY: existing trace_server -> client imports to untangle. Do not add.
+# NOTE: bare `from weave import ...` / `import weave` (the root package) is not
+# listed here because the root cannot be a forbidden module without also
+# forbidding trace_server's internal imports; every file that does so also
+# leaks via a client subpackage below, so none escape the contract.
+ignore_imports = [
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.prompt.prompt",
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.context.weave_client_context",
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.trace.vals",
+  "weave.trace_server.interface.builtin_object_classes.llm_structured_model -> weave.utils.project_id",
+  "weave.trace_server.isolated_client_executor -> weave.trace.context.weave_client_context",
+  "weave.trace_server.isolated_client_executor -> weave.trace.weave_client",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
+]
+
+[[tool.importlinter.contracts]]
+name = "Weave client SDK must not import the trace server"
+type = "forbidden"
+source_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+]
+forbidden_modules = ["weave.trace_server"]
+allow_indirect_imports = true
+# TEMPORARY: existing client -> trace_server imports to untangle. Do not add.
+# Most of these reach for the server's interface/contract surface
+# (trace_server_interface, service_interface, common_interface, interface.*,
+# constants, errors, ids) — the natural target to extract into a neutral
+# contract package as untangling proceeds.
+ignore_imports = [
+  "weave.chat.completions -> weave.trace_server.constants",
+  "weave.chat.inference_models -> weave.trace_server.constants",
+  "weave.durability.wal_sender -> weave.trace_server.trace_server_interface",
+  "weave.evaluation.eval -> weave.trace_server.constants",
+  "weave.evaluation.eval -> weave.trace_server.trace_server_interface",
+  "weave.evaluation.otel_eval_linker -> weave.trace_server.constants",
+  "weave.evaluation.otel_eval_linker -> weave.trace_server.trace_server_interface",
+  "weave.flow.annotation_spec -> weave.trace_server.interface.builtin_object_classes.annotation_spec",
+  "weave.flow.leaderboard -> weave.trace_server.interface.builtin_object_classes.leaderboard",
+  "weave.flow.leaderboard -> weave.trace_server.trace_server_interface",
+  "weave.flow.monitor -> weave.trace_server.interface.query",
+  "weave.flow.saved_view -> weave.trace_server.common_interface",
+  "weave.flow.saved_view -> weave.trace_server.interface.builtin_object_classes.saved_view",
+  "weave.flow.saved_view -> weave.trace_server.interface.query",
+  "weave.flow.saved_view -> weave.trace_server.trace_server_interface",
+  "weave.integrations.integration_utilities -> weave.trace_server.constants",
+  "weave.scorers.llm_as_a_judge_scorer -> weave.trace_server.interface.builtin_object_classes.llm_structured_model",
+  "weave.trace.api -> weave.trace_server.ids",
+  "weave.trace.api -> weave.trace_server.interface.builtin_object_classes.leaderboard",
+  "weave.trace.base_objects -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
+  "weave.trace.call -> weave.trace_server.common_interface",
+  "weave.trace.call -> weave.trace_server.constants",
+  "weave.trace.call -> weave.trace_server.interface.query",
+  "weave.trace.call -> weave.trace_server.trace_server_interface",
+  "weave.trace.casting -> weave.trace_server.common_interface",
+  "weave.trace.casting -> weave.trace_server.interface.query",
+  "weave.trace.casting -> weave.trace_server.trace_server_interface",
+  "weave.trace.feedback -> weave.trace_server.interface.query",
+  "weave.trace.feedback -> weave.trace_server.trace_server_interface",
+  "weave.trace.interface_query_builder -> weave.trace_server.interface.query",
+  "weave.trace.project_id_resolver -> weave.trace_server.errors",
+  "weave.trace.project_id_resolver -> weave.trace_server.trace_server_interface",
+  "weave.trace.refs -> weave.trace_server.errors",
+  "weave.trace.serialization.custom_objs -> weave.trace_server.trace_server_interface",
+  "weave.trace.serialization.serialize -> weave.trace_server.interface.builtin_object_classes.builtin_object_registry",
+  "weave.trace.serialization.serialize -> weave.trace_server.trace_server_interface",
+  "weave.trace.vals -> weave.trace_server.errors",
+  "weave.trace.vals -> weave.trace_server.trace_server_interface",
+  "weave.trace.weave_client -> weave.trace_server.common_interface",
+  "weave.trace.weave_client -> weave.trace_server.constants",
+  "weave.trace.weave_client -> weave.trace_server.errors",
+  "weave.trace.weave_client -> weave.trace_server.ids",
+  "weave.trace.weave_client -> weave.trace_server.interface.feedback_types",
+  "weave.trace.weave_client -> weave.trace_server.trace_server_converter",
+  "weave.trace.weave_client -> weave.trace_server.trace_server_interface",
+  "weave.trace.weave_client_send_file_cache -> weave.trace_server.trace_server_interface",
+  "weave.trace.weave_init -> weave.trace_server.service_interface",
+  "weave.trace_server_bindings.caching_middleware_trace_server -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.call_batch_processor -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.client_interface -> weave.trace_server.service_interface",
+  "weave.trace_server_bindings.client_interface -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.delegating_trace_server -> weave.trace_server.service_interface",
+  "weave.trace_server_bindings.delegating_trace_server -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.http_utils -> weave.trace_server.errors",
+  "weave.trace_server_bindings.http_utils -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.link_asset_to_registry -> weave.trace_server.common_interface",
+  "weave.trace_server_bindings.models -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.http_service_interface",
+  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.ids",
+  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.service_interface",
+  "weave.trace_server_bindings.remote_http_trace_server -> weave.trace_server.trace_server_interface",
+  "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.ids",
+  "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.service_interface",
+  "weave.trace_server_bindings.stainless_remote_http_trace_server -> weave.trace_server.trace_server_interface",
+  "weave.utils.retry -> weave.trace_server.ids",
+]
+
+[[tool.importlinter.contracts]]
+name = "Workers must not import the Weave client SDK"
+type = "forbidden"
+source_modules = ["weave.trace_server.workers"]
+forbidden_modules = [
+  "weave.agent",
+  "weave.chat",
+  "weave.compat",
+  "weave.dataset",
+  "weave.durability",
+  "weave.evaluation",
+  "weave.flow",
+  "weave.initialization",
+  "weave.integrations",
+  "weave.object",
+  "weave.prompt",
+  "weave.scorers",
+  "weave.session",
+  "weave.telemetry",
+  "weave.trace",
+  "weave.trace_server_bindings",
+  "weave.type_handlers",
+  "weave.type_wrappers",
+  "weave.utils",
+  "weave.wandb_interface",
+]
+allow_indirect_imports = true
+# TEMPORARY: existing workers -> client imports to untangle. Do not add.
+# These also appear in the trace_server -> client contract above (workers are a
+# subpackage of trace_server); both must clear before either ignore is removed.
+ignore_imports = [
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.evaluation.eval",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.scorers.llm_as_a_judge_scorer",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.context.weave_client_context",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.refs",
+  "weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker -> weave.trace.weave_client",
+]

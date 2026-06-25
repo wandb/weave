@@ -1,10 +1,7 @@
-import {AsyncLocalStorage} from 'node:async_hooks';
-
-import {globalSingleton} from '../utils/globalSingleton';
-
 import type {LLM} from './llm';
 import type {Session} from './session';
 import type {Turn} from './turn';
+import state from '../state';
 
 /**
  * Mutable container holding the SDK's "current" instances.
@@ -25,39 +22,6 @@ function freshState(): GenAIState {
 }
 
 /**
- * The AsyncLocalStorage that holds the per-frame state container.
- *
- * When the user calls `runIsolated(fn)`, this AsyncLocalStorage is `.run`-installed with
- * a fresh `GenAIState` container for that frame. Inside the frame,
- * `_getGenaiState()` reads back that fresh container. When `runIsolated`
- * isn't on the call stack, `_genaiState.getStore()` returns `undefined`
- * and `_getGenaiState()` falls back to `_defaultState`.
- *
- * The AsyncLocalStorage provides the isolation boundary for concurrent work — each
- * `runIsolated` frame has its own container object, so mutations inside
- * one frame do not affect siblings or the outer chain.
- */
-const _genaiState = globalSingleton<AsyncLocalStorage<GenAIState>>(
-  '_weave_genai_state_async_local_storage',
-  () => new AsyncLocalStorage<GenAIState>()
-);
-
-/** Symbol-registry key for the process-wide default `GenAIState` container. */
-export const DEFAULT_STATE_SYMBOL_NAME = '_weave_genai_state_default';
-
-/**
- * Process-wide fallback container used when no `runIsolated()` frame is
- * active. Lets users call `weave.startSession(...)` etc. directly without
- * any wrapper — the casual, sequential single-flight path. Shared across
- * the whole process, so it is NOT safe for concurrent independent
- * sessions; those need `runIsolated()`.
- */
-const _defaultState = globalSingleton<GenAIState>(
-  DEFAULT_STATE_SYMBOL_NAME,
-  freshState
-);
-
-/**
  * Return the GenAI state in effect on the current async chain.
  *
  * If we're inside a `runIsolated()` frame, that frame's container is
@@ -65,8 +29,8 @@ const _defaultState = globalSingleton<GenAIState>(
  *
  * Internal helper, not part of the public API.
  */
-export function _getGenaiState(): GenAIState {
-  return _genaiState.getStore() ?? _defaultState;
+export function getGenaiState(): GenAIState {
+  return state.genAi.state.getStore() ?? state.genAi.defaultState;
 }
 
 /**
@@ -88,20 +52,20 @@ export function _getGenaiState(): GenAIState {
  * process-wide default state handles it.
  */
 export function runIsolated<T>(fn: () => T): T {
-  return _genaiState.run(freshState(), fn);
+  return state.genAi.state.run(freshState(), fn);
 }
 
 /** Returns the current Session, or undefined. */
 export function getCurrentSession(): Session | undefined {
-  return _getGenaiState().session ?? undefined;
+  return getGenaiState().session ?? undefined;
 }
 
 /** Returns the current Turn, or undefined. */
 export function getCurrentTurn(): Turn | undefined {
-  return _getGenaiState().turn ?? undefined;
+  return getGenaiState().turn ?? undefined;
 }
 
 /** Returns the current LLM, or undefined. */
 export function getCurrentLLM(): LLM | undefined {
-  return _getGenaiState().llm ?? undefined;
+  return getGenaiState().llm ?? undefined;
 }

@@ -1,6 +1,12 @@
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {op} from '../op';
-import {OpOptions, StreamReducer} from '../opType';
+import {type OpOptions, type StreamReducer} from '../opType';
+
+// Integration provenance stamped onto every call this integration produces.
+const ANTHROPIC_INTEGRATION = libraryIntegration('anthropic', {
+  packageName: '@anthropic-ai/sdk',
+});
 
 type Message = {
   id: string;
@@ -115,12 +121,13 @@ function patchAnthropicMessagesCreate(exports: any) {
         shouldAdoptThis: true,
         originalFunction: originalCreate,
         summarize: summarizer,
+        attributes: asAttributes(ANTHROPIC_INTEGRATION),
         ...(isStream ? {streamReducer} : null),
       };
 
       let result: any;
 
-      let weaveOp = op(() => {
+      const weaveOp = op(() => {
         result = originalCreate.apply(thisArg, args);
         return result;
       }, weaveOpOptions);
@@ -166,6 +173,7 @@ function patchStreamHelper(exports: any) {
     shouldAdoptThis: true,
     summarize: summarizer,
     originalFunction: originalStream,
+    attributes: asAttributes(ANTHROPIC_INTEGRATION),
   };
 
   const weaveOp = op(StreamWrapper, options);
@@ -194,7 +202,7 @@ const batchStreamReducer: StreamReducer<BatchChunk, ResultState> = {
     }
     return state;
   },
-  finalizeFn: state => {
+  finalizeFn: _state => {
     // no-op
   },
 };

@@ -40,16 +40,45 @@ The endpoint must return HTTP 200 with a JSON object. The required top-level
 contract fields are:
 
 - `schema_version`: required integer; must be `1`.
-- `result`: required; can be any JSON-serializable shape you choose.
+- `result`: required structured scorer output.
 
-For example:
+The simplest structured result is one score object:
+
+- `value`: required; either a tag string, max 36 characters, or a numeric rating
+  from `0.0` to `1.0`.
+- `reason`: optional string explaining the score.
+- `confidence`: optional numeric confidence from `0.0` to `1.0`.
+
+For a single-score response:
 
 ```json
 {
   "schema_version": 1,
   "result": {
-    "message_length": 32
+    "value": 1.0,
+    "reason": "The response is clear and concise.",
+    "confidence": 0.9
   }
+}
+```
+
+This sample returns one numeric rating and one tag:
+
+```json
+{
+  "schema_version": 1,
+  "result": [
+    {
+      "value": 1.0,
+      "reason": "Message is 32 characters; concise messages score best.",
+      "confidence": 1.0
+    },
+    {
+      "value": "concise",
+      "reason": "Message length category is concise.",
+      "confidence": 0.9
+    }
+  ]
 }
 ```
 
@@ -191,5 +220,6 @@ adopting this exact FastAPI app. The important production requirements are:
 - HTTPS endpoint reachable from Weave.
 - Host allowlist configured if the Weave deployment requires it.
 - Bearer-token validation implemented with your identity/security standards.
-- HTTP 200 response body shaped as `{"schema_version": 1, "result": ...}`.
+- HTTP 200 response body shaped as
+  `{"schema_version": 1, "result": {"value": 0.9, "reason": "...", "confidence": 1.0}}`.
 - Optional dedupe uses `Idempotency-Key`.

@@ -1,14 +1,15 @@
 import {
+  type Attributes,
   type Context,
   type Span,
   SpanKind,
-  SpanStatusCode,
   trace,
 } from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
-import {_getGenaiState} from './context';
+import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -27,7 +28,7 @@ import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
 import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 
-export interface LLMInit {
+export interface LLMInit extends SpanInitBase {
   model: string;
   providerName?: string;
 }
@@ -68,7 +69,7 @@ export interface LLMRecordOpts {
  *   llm.end();
  * }
  */
-export class LLM {
+export class LLM extends SpanBase {
   /** Mutable data populated between `create()` and `end()`. */
 
   /**
@@ -89,25 +90,26 @@ export class LLM {
    */
   reasoning?: Reasoning;
 
-  private _ended = false;
-
   private constructor(
-    private readonly span: Span,
+    span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly model: string,
     public readonly providerName: string
-  ) {}
+  ) {
+    super(span);
+  }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.llm !== null) {
       throw new Error(
         'An LLM is already active in this async chain. End it before starting a new one.'
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
       [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
     };
@@ -119,7 +121,7 @@ export class LLM {
     }
     const span = tracer.startSpan(
       'chat',
-      {kind: SpanKind.CLIENT, attributes},
+      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     const llm = new LLM(
@@ -239,11 +241,8 @@ export class LLM {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Flush accumulated state to the span and close it. Idempotent. Pass
-   * `error` to mark the span as failed.
-   */
-  end(opts?: {error?: Error}): void {
+  /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
+  end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
@@ -296,15 +295,8 @@ export class LLM {
       );
     }
 
-    if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
-    }
-    this.span.end();
-    const state = _getGenaiState();
+    this._closeSpan(opts);
+    const state = getGenaiState();
     if (state.llm === this) {
       state.llm = null;
     }
@@ -336,19 +328,6 @@ export class LLM {
       this.inputMessages.push(last);
     }
     return ensureParts(last);
-  }
-
-  /** Warn if called after `end()`. Returns `true` if the caller should
-   *  short-circuit; the span is already closed, so any further mutation can
-   *  no longer reach the trace. */
-  private _warnIfEnded(method: string): boolean {
-    if (this._ended) {
-      console.warn(
-        `weave.LLM.${method}() called after end() — data will not be recorded on the span.`
-      );
-      return true;
-    }
-    return false;
   }
 }
 

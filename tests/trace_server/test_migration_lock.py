@@ -5,6 +5,7 @@ import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import OperationalError
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server.migration_lock import (
     MigrationLockError,
     _active_owner,
@@ -327,7 +328,7 @@ def test_holder_validation():
 
 
 @pytest.fixture
-def real_ch_lock(require_clickhouse, ensure_clickhouse_db):
+def real_ch_lock(ensure_clickhouse_db):
     """Real ClickHouse client + lock table for integration tests."""
     host, port = next(ensure_clickhouse_db())
     client = clickhouse_connect.get_client(host=host, port=port)
@@ -342,6 +343,7 @@ def real_ch_lock(require_clickhouse, ensure_clickhouse_db):
     client.close()
 
 
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="requires a real ClickHouse")
 def test_lock_acquire_release_real_clickhouse(real_ch_lock):
     """Two holders race on a real ClickHouse — only one wins at a time."""
     client, mgmt_db = real_ch_lock

@@ -1,4 +1,4 @@
-import {Buffer} from 'buffer';
+import type {Buffer} from 'buffer';
 import crypto from 'crypto';
 
 export function computeDigest(data: Buffer): string {

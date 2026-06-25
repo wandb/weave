@@ -5,11 +5,14 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import weave_client_context
 
 _verdict_patcher: MultiPatcher | None = None
+
+VERDICT_INTEGRATION = library_integration("verdict")
 
 
 try:
@@ -59,7 +62,11 @@ if not _import_failed:
                 op=name,
                 inputs=inputs,
                 parent=parent_call,
-                attributes={"trace_id": trace_id, "parent_id": parent_id},
+                attributes={
+                    "trace_id": trace_id,
+                    "parent_id": parent_id,
+                    **VERDICT_INTEGRATION.as_attributes(),
+                },
             )
 
             verdict_call = Call(

@@ -12,12 +12,14 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
     ParamBuilder,
     QueryBuilderDynamicField,
+    _invalid_field_message,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
+    get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -2225,7 +2227,40 @@ def test_storage_size_fields():
         FROM calls_merged
         LEFT JOIN
         (SELECT id,
-                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) AS storage_size_bytes
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0)) AS storage_size_bytes
+        FROM calls_merged_stats
+        WHERE project_id = {pb_0:String}
+        GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        GROUP BY (calls_merged.project_id,
+                calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {"pb_0": "test/project"},
+    )
+
+
+def test_storage_size_includes_otel_dump_bytes():
+    """Per-call storage_size_bytes must include OTel dump bytes, like project stats do.
+
+    project_query_builder sums the same stats table WITH `+ COALESCE(otel_dump_size_bytes, 0)`,
+    so a call's storage_size_bytes and the project trace_storage_size_bytes (derived from the
+    same rows) disagree for any OTel-ingesting project. This pins the reconciled sum.
+    """
+    cq = CallsQuery(project_id="test/project", include_storage_size=True)
+    cq.add_field("id")
+    cq.add_field("storage_size_bytes")
+
+    assert_sql(
+        cq,
+        """
+        SELECT calls_merged.id AS id,
+           any(storage_size_tbl.storage_size_bytes) AS storage_size_bytes
+        FROM calls_merged
+        LEFT JOIN
+        (SELECT id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0)) AS storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
         GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
@@ -2285,7 +2320,7 @@ def test_total_storage_size(with_filter: bool):
             FROM calls_merged
             LEFT JOIN (SELECT
                 trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_dump_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_merged_stats
             WHERE project_id = {pb_1:String}
             AND trace_id IN (
@@ -2317,7 +2352,7 @@ def test_total_storage_size(with_filter: bool):
             FROM calls_merged
             LEFT JOIN (SELECT
                 trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_dump_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_merged_stats
             WHERE project_id = {pb_0:String}
             GROUP BY trace_id) AS rolled_up_cms
@@ -2342,9 +2377,14 @@ def test_aggregated_data_size_field():
 
     # Test SQL generation
     sql = field.as_select_sql(pb, "calls_merged")
-    assert "CASE" in sql
-    assert "parent_id" in sql
-    assert "rolled_up_cms.total_storage_size_bytes" in sql
+    assert sql == (
+        "\n            CASE\n"
+        "                WHEN any(calls_merged.parent_id) IS NULL\n"
+        "                THEN any(rolled_up_cms.total_storage_size_bytes)\n"
+        "                ELSE NULL\n"
+        "            END\n"
+        "             AS total_storage_size_bytes"
+    )
 
 
 def test_datetime_optimization_simple() -> None:
@@ -2382,6 +2422,71 @@ def test_datetime_optimization_simple() -> None:
             "pb_0": "2024-03-01 00:00:00.000000",
             "pb_2": "project",
             "pb_1": "2024-02-29 23:55:00.000000",
+        },
+    )
+
+
+def test_datetime_optimization_string_literal_window() -> None:
+    """ISO/string started_at bounds must still emit the sortable_datetime prefilter.
+
+    Regression (PR #6570): the HAVING path learned to parse ISO / string
+    datetime literals, but the WHERE prefilter stayed numeric-only, so a string
+    started_at range produced a valid HAVING with no granule prune. On
+    calls_merged that forces a full-project GROUP BY and OOMs. Mirrors the
+    scoring-worker "earliest call in window" probe.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("started_at")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$gte": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T00:00:00Z"},
+                        ]
+                    },
+                    {
+                        "$lt": [
+                            {"$getField": "started_at"},
+                            {"$literal": "2024-03-01T01:00:00Z"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+    cq.add_order("started_at", "asc")
+    cq.set_limit(1)
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.started_at) AS started_at
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        WHERE (calls_merged.sortable_datetime >= {pb_2:String}
+            AND calls_merged.sortable_datetime < {pb_3:String})
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            ((any(calls_merged.started_at) >= {pb_0:String}))
+            AND ((any(calls_merged.started_at) < {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        ORDER BY any(calls_merged.started_at) ASC
+        LIMIT 1
+        """,
+        {
+            "pb_0": "2024-03-01 00:00:00.000000",
+            "pb_1": "2024-03-01 01:00:00.000000",
+            "pb_2": "2024-02-29 23:55:00.000000",
+            "pb_3": "2024-03-01 01:05:00.000000",
+            "pb_4": "project",
         },
     )
 
@@ -3227,76 +3332,97 @@ def test_filter_length_validation():
 
 
 def test_disallowed_fields():
+    # the message lists filterable fields and never the rejected field itself
+    clause = (
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, summary, thread_id, trace_id, turn_id, wb_run_id, "
+        "wb_run_step, wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
+    )
     cq = CallsQuery(project_id="test/project")
-    # allowed order field
-    cq.add_order("id", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("storage_size_bytes", "ASC")
-    with pytest.raises(ValueError, match="not allowed in ORDER BY"):
-        cq.add_order("total_storage_size_bytes", "DESC")
-    # with bogus direction
-    with pytest.raises(ValueError, match="not allowed"):
-        cq.add_order("storage_size_bytes", "ASCDESC")
-    # now try filtering with disallowed
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+    cq.add_order("id", "ASC")  # allowed order field
+    for field in ("storage_size_bytes", "total_storage_size_bytes"):
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.add_order(field, "ASC")
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
         )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+    # bogus direction on an allowed field is a separate ValueError
+    with pytest.raises(ValueError, match="Direction ASCDESC is not allowed"):
+        cq.add_order("id", "ASCDESC")
+    # filtering on a disallowed field surfaces the same actionable message
+    for op_key, op_cls, field in (
+        ("$gt", tsi_query.GtOperation, "storage_size_bytes"),
+        ("$gte", tsi_query.GteOperation, "total_storage_size_bytes"),
+        ("$lt", tsi_query.LtOperation, "storage_size_bytes"),
+        ("$lte", tsi_query.LteOperation, "total_storage_size_bytes"),
+    ):
+        cq = CallsQuery(project_id="test/project")  # reset
+        cq.add_field("id")
+        cq.add_condition(
+            op_cls.model_validate({op_key: [{"$getField": field}, {"$literal": 1}]})
+        )
+        with pytest.raises(InvalidFieldError) as exc_info:
+            cq.as_sql(ParamBuilder())
+        assert (
+            str(exc_info.value)
+            == f"Field {field} cannot be used for filtering or sorting. {clause}"
+        )
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.GteOperation.model_validate(
-            {
-                "$gte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
-    )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
 
-    cq = CallsQuery(project_id="test/project")  # reset
-    cq.add_field("id")
-    cq.add_condition(
-        tsi_query.LtOperation.model_validate(
-            {
-                "$lt": [
-                    {"$getField": "storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
-        )
+def test_invalid_field_message_lists_allowed_fields():
+    """An unknown filter/sort field surfaces the allowed-field list (read-path 422)."""
+    # Exact match is intentional: a new field forces a look at the user-facing
+    # message and at whether it should be advertised (see _HIDDEN_MESSAGE_FIELDS).
+    expected = (
+        "Field made_up_field is not allowed. "
+        "Allowed fields: attributes, display_name, ended_at, exception, id, "
+        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
+        "started_at, storage_size_bytes, summary, thread_id, "
+        "total_storage_size_bytes, trace_id, turn_id, wb_run_id, wb_run_step, "
+        "wb_run_step_end, wb_user_id. "
+        "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
+        "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
-        cq.as_sql(ParamBuilder())
+    assert _invalid_field_message("made_up_field") == expected
 
-    cq = CallsQuery(project_id="test/project")  # reset
+    with pytest.raises(InvalidFieldError) as exc_info:
+        get_field_by_name("made_up_field")
+    assert str(exc_info.value) == expected
+
+    # filtering on an unknown field surfaces the same actionable message
+    cq = CallsQuery(project_id="test/project")
     cq.add_field("id")
     cq.add_condition(
-        tsi_query.LteOperation.model_validate(
-            {
-                "$lte": [
-                    {"$getField": "total_storage_size_bytes"},
-                    {"$literal": 1},
-                ]
-            }
+        tsi_query.EqOperation.model_validate(
+            {"$eq": [{"$getField": "made_up_field"}, {"$literal": 1}]}
         )
     )
-    with pytest.raises(InvalidFieldError, match="not allowed"):
+    with pytest.raises(InvalidFieldError) as exc_info:
         cq.as_sql(ParamBuilder())
+    assert str(exc_info.value) == expected
+
+
+def test_advertised_fields_and_prefixes_all_resolve():
+    """Truthfulness: every field/prefix the 422 advertises must actually resolve."""
+    prefix_examples = {
+        "annotation_queue_items.*": "annotation_queue_items.queue_id",
+        "attributes.*": "attributes.x",
+        "feedback.*": "feedback.[my_type].payload.value",
+        "inputs.*": "inputs.x",
+        "output.*": "output.x",
+        "summary.*": "summary.x",
+        "summary.weave.*": "summary.weave.latency",
+    }
+    _, _, rest = _invalid_field_message("nope").partition("Allowed fields: ")
+    fields_csv, _, prefixes_csv = rest.partition(". Allowed dynamic prefixes: ")
+    for field in fields_csv.split(", "):
+        get_field_by_name(field)
+    for prefix in prefixes_csv.rstrip(".").split(", "):
+        get_field_by_name(prefix_examples[prefix])
 
 
 def test_thread_id_filter_eq():
@@ -3947,6 +4073,31 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
 
 
+def test_build_calls_complete_delete_query_with_started_at_window() -> None:
+    """started_at bounds bracket the partition/primary key so the delete prunes."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        started_at_min_param="started_at_min",
+        started_at_max_param="started_at_max",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String}
+        AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
+        AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')
+        AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
 def test_build_calls_complete_update_query() -> None:
     """Ensure the update helper builds the expected query."""
     query = build_calls_complete_update_query(
@@ -4213,7 +4364,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
 
 
 def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
-    """Stats query on calls_complete with total_storage_size should be flat with JOIN."""
+    """Unfiltered calls_complete storage stats: flat count() + flat stats sum, no JOIN."""
     req = tsi.CallsQueryStatsReq(
         project_id="project",
         include_total_storage_size=True,
@@ -4223,27 +4374,17 @@ def test_stats_query_calls_complete_flat_with_total_storage_size() -> None:
         """
         SELECT count() AS count,
                toUInt8(0) AS has_more,
-               sum(coalesce(CASE
-                   WHEN calls_complete.parent_id = {pb_2:String}
-                        THEN rolled_up_cms.total_storage_size_bytes
-                   ELSE NULL
-               END, 0)) AS total_storage_size_bytes
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_size_bytes, 0))
+                           FROM calls_complete_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
         FROM calls_complete
-        LEFT JOIN (
-            SELECT trace_id,
-                   sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-            FROM calls_complete_stats
-            WHERE project_id = {pb_1:String}
-            GROUP BY trace_id
-        ) AS rolled_up_cms ON calls_complete.trace_id = rolled_up_cms.trace_id
-        PREWHERE calls_complete.project_id = {pb_1:String}
-        WHERE 1
-          AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        PREWHERE calls_complete.project_id = {pb_0:String}
+        WHERE calls_complete.deleted_at = {pb_1:DateTime64(3)}
         """,
         {
-            "pb_0": SENTINEL_EPOCH,
-            "pb_1": "project",
-            "pb_2": "",
+            "pb_0": "project",
+            "pb_1": SENTINEL_EPOCH,
         },
         read_table=ReadTable.CALLS_COMPLETE,
     )
@@ -4342,7 +4483,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4367,9 +4508,34 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
+
+
+def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
+    """Unfiltered storage stats avoid the per-id GROUP BY + calls_merged_stats JOIN."""
+    req = tsi.CallsQueryStatsReq(project_id="project", include_total_storage_size=True)
+    pb = ParamBuilder("pb")
+    _query, columns, settings = build_calls_stats_query(req, pb, ReadTable.CALLS_MERGED)
+    assert settings == {}
+    assert list(columns) == ["count", "has_more", "total_storage_size_bytes"]
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+               toUInt8(0) AS has_more,
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
+                           FROM calls_merged_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
         """,
         {"pb_0": "project"},
         read_table=ReadTable.CALLS_MERGED,
@@ -4441,7 +4607,7 @@ def _started_at_query(expr: dict) -> tsi.Query:
 def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> None:
     """A started_at-only window takes the distinct-id fast path (Pattern 4).
 
-    uniqExact counts start rows in the window -- the exact `started_at`
+    uniq counts start rows in the window -- the exact `started_at`
     predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
     drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
     orphaned-call-end exclusion (since #6933 end rows carry started_at too).
@@ -4468,7 +4634,7 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) AS raw_count
+            SELECT uniq(calls_merged.id) AS raw_count
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_0:String}
             WHERE calls_merged.sortable_datetime > {pb_2:String}
@@ -4646,12 +4812,25 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
         project_id="project",
         include_total_storage_size=True,
     )
-    query, _columns, settings = build_calls_stats_query(
+    _query, _columns, settings = build_calls_stats_query(
         req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
     )
     assert settings == {}
-    assert "LIMIT" not in query
-    assert "toUInt8(0) AS has_more" in query
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+               toUInt8(0) AS has_more,
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
+                           FROM calls_merged_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,6 @@ from weave.integrations.integration_utilities import op_name_from_ref
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -29,6 +28,11 @@ def test_huggingface_chat_completion(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "huggingface"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "huggingface-hub"
     assert (
         op_name_from_ref(call.op_name)
         == "huggingface_hub.InferenceClient.chat_completion"
@@ -43,7 +47,6 @@ def test_huggingface_chat_completion(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -69,6 +72,11 @@ def test_huggingface_chat_completion_stream(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
+    # Integration-tracking metadata is stamped on every patched call.
+    integration = call.attributes["integration"]
+    assert integration["name"] == "huggingface"
+    assert integration["version"]  # weave SDK version
+    assert integration["meta"]["package_name"] == "huggingface-hub"
     assert (
         op_name_from_ref(call.op_name)
         == "huggingface_hub.InferenceClient.chat_completion"
@@ -81,7 +89,6 @@ def test_huggingface_chat_completion_stream(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -118,7 +125,6 @@ async def test_huggingface_chat_completion_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -148,7 +154,6 @@ def test_huggingface_document_question_answering(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -179,7 +184,6 @@ async def test_huggingface_document_question_answering_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -202,7 +206,6 @@ def test_huggingface_fill_mask(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -229,7 +232,6 @@ async def test_huggingface_fill_mask_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -256,7 +258,6 @@ def test_huggingface_question_answering(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -285,7 +286,6 @@ async def test_huggingface_question_answering_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -315,7 +315,6 @@ def test_huggingface_table_question_answering(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -346,7 +345,6 @@ async def test_huggingface_table_question_answering_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -372,7 +370,6 @@ def test_huggingface_text_classification(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -399,7 +396,6 @@ async def test_huggingface_text_classification_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -427,7 +423,6 @@ def test_huggingface_token_classification(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -456,7 +451,6 @@ async def test_huggingface_token_classification_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -482,7 +476,6 @@ def test_huggingface_translation(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -511,7 +504,6 @@ async def test_huggingface_translation_async(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -540,7 +532,6 @@ def test_huggingface_text_to_image(client):
 
 
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

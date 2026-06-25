@@ -41,6 +41,7 @@ There are two ways to authenticate with Azure Blob Storage:
 """
 
 import logging
+import socket
 from abc import abstractmethod
 from collections.abc import Callable
 from typing import TypeVar, cast
@@ -51,8 +52,12 @@ from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from google.api_core import exceptions as gcp_exceptions
+from google.auth import default as google_auth_default
+from google.auth.credentials import with_scopes_if_required
+from google.auth.transport.requests import AuthorizedSession
 from google.cloud import storage
 from google.oauth2.credentials import Credentials as GCPCredentials
+from requests.adapters import HTTPAdapter
 from tenacity import (
     RetryCallState,
     before_sleep_log,
@@ -62,6 +67,8 @@ from tenacity import (
     wait_random_exponential,
 )
 from typing_extensions import ParamSpec
+from urllib3.connection import HTTPConnection
+from urllib3.poolmanager import PoolManager
 
 from weave.trace_server.environment import wf_file_storage_uri
 from weave.trace_server.file_storage_credentials import (
@@ -88,6 +95,16 @@ DEFAULT_READ_TIMEOUT = 30
 RETRY_MAX_ATTEMPTS = 3
 RETRY_MIN_WAIT = 1  # seconds
 RETRY_MAX_WAIT = 10  # seconds
+
+# TCP keep-alive keeps the long-lived GCS pool's idle sockets warm so GCP's VPC
+# connection tracking (10 min idle) cannot silently reap them into 30s stalls.
+GCS_TCP_KEEPALIVE_IDLE = 60
+GCS_TCP_KEEPALIVE_INTERVAL = 15
+GCS_TCP_KEEPALIVE_COUNT = 5
+
+# Matches the default anyio to_thread limiter so the ~40 concurrent file_create
+# uploads reuse warm keep-alive connections instead of churning new ones.
+GCS_POOL_MAXSIZE = 40
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -295,9 +312,7 @@ class GCSStorageClient(FileStorageClient):
         """Initialize GCS client with credentials and default timeout configuration."""
         assert isinstance(base_uri, GCSFileStorageURI)
         super().__init__(base_uri)
-        self.client = storage.Client(
-            credentials=credentials,
-        )
+        self.client = _build_keepalive_gcs_client(credentials)
 
     @create_retry_decorator("gcs_storage")
     def store(self, uri: FileStorageURI, data: bytes) -> None:
@@ -315,7 +330,7 @@ class GCSStorageClient(FileStorageClient):
             # https://cloud.google.com/storage/docs/request-preconditions
             blob.upload_from_string(
                 data,
-                timeout=DEFAULT_READ_TIMEOUT,
+                timeout=(DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT),
                 if_generation_match=0,
                 retry=None,
             )
@@ -329,7 +344,9 @@ class GCSStorageClient(FileStorageClient):
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
-        return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT, retry=None)
+        return blob.download_as_bytes(
+            timeout=(DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT), retry=None
+        )
 
 
 class AzureStorageClient(FileStorageClient):
@@ -395,6 +412,56 @@ class AzureStorageClient(FileStorageClient):
         blob_client = container_client.get_blob_client(uri.path)
         stream = blob_client.download_blob()
         return stream.readall()
+
+
+class _KeepAliveHTTPAdapter(HTTPAdapter):
+    """requests adapter that enables TCP keep-alive on pooled connections."""
+
+    def init_poolmanager(
+        self, connections: int, maxsize: int, block: bool = False, **pool_kwargs: object
+    ) -> None:
+        socket_options = list(HTTPConnection.default_socket_options) + [
+            (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        ]
+        # TCP_KEEPIDLE (Linux) and TCP_KEEPALIVE (macOS/BSD) are the same idle knob;
+        # only the platform's own constant exists, so getattr-guard each.
+        for opt_name, value in (
+            ("TCP_KEEPIDLE", GCS_TCP_KEEPALIVE_IDLE),
+            ("TCP_KEEPALIVE", GCS_TCP_KEEPALIVE_IDLE),
+            ("TCP_KEEPINTVL", GCS_TCP_KEEPALIVE_INTERVAL),
+            ("TCP_KEEPCNT", GCS_TCP_KEEPALIVE_COUNT),
+        ):
+            opt: int | None = getattr(socket, opt_name, None)
+            if opt is not None:
+                socket_options.append((socket.IPPROTO_TCP, opt, value))
+        self.poolmanager = PoolManager(
+            num_pools=connections,
+            maxsize=maxsize,
+            block=block,
+            socket_options=socket_options,
+        )
+        self.poolmanager.connection_pool_kw.update(pool_kwargs)
+
+
+def _build_keepalive_gcs_client(credentials: GCPCredentials | None) -> storage.Client:
+    """Build a GCS client whose connection pool uses TCP keep-alive."""
+    project: str | None = None
+    if credentials is None:
+        resolved_credentials, project = google_auth_default()
+    else:
+        resolved_credentials = credentials
+    # A custom _http session bypasses storage.Client's built-in credential
+    # scoping, so scope here or service-account token refresh hits invalid_scope.
+    scoped_credentials = with_scopes_if_required(
+        resolved_credentials, list(storage.Client.SCOPE)
+    )
+    session = AuthorizedSession(scoped_credentials)
+    adapter = _KeepAliveHTTPAdapter(pool_maxsize=GCS_POOL_MAXSIZE)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return storage.Client(
+        credentials=scoped_credentials, project=project, _http=session
+    )
 
 
 def maybe_get_storage_client_from_env() -> FileStorageClient | None:
