@@ -17,6 +17,7 @@ import {
 import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -269,5 +270,28 @@ describe('genai api (top-level functions)', () => {
     expect(getCurrentLLM()).toBeUndefined();
     // Turn + LLM spans were closed by the cascade.
     expect(getExporter().getFinishedSpans()).toHaveLength(2);
+  });
+
+  it('startTurn and endTurn respect given times', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:01.700Z');
+
+    startTurn({startTime: startedAt});
+    endTurn({endTime: endedAt});
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expectSpanTimesToMatch(turnSpan, startedAt, endedAt);
+  });
+
+  it('startLLM and endLLM respect given times', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:00.800Z');
+
+    startTurn({});
+    startLLM({model: 'gpt-4o', startTime: startedAt});
+    endLLM({endTime: endedAt});
+
+    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+    expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
   });
 });

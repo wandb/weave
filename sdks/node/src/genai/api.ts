@@ -1,6 +1,7 @@
 import {_getGenaiState} from './context';
 import {type LLM, type LLMInit} from './llm';
 import {Session, type SessionInit} from './session';
+import type {SpanEndOptions} from './spanBase';
 import {type SubAgent, type SubAgentInit} from './subagent';
 import {type Tool, type ToolInit} from './tool';
 import {Turn, type TurnInit} from './turn';
@@ -89,19 +90,19 @@ export function endSession(): void {
 /**
  * End the current Turn. No-op if no Turn is active.
  */
-export function endTurn(): void {
+export function endTurn(opts?: SpanEndOptions): void {
   const turn = _getGenaiState().turn;
   if (turn) {
-    turn.end();
+    turn.end(opts);
   }
 }
 
 /**
  * End the current LLM. No-op if no LLM is active.
  */
-export function endLLM(): void {
+export function endLLM(opts?: SpanEndOptions): void {
   const llm = _getGenaiState().llm;
   if (llm) {
-    llm.end();
+    llm.end(opts);
   }
 }

@@ -863,4 +863,341 @@ describe('GenAI', () => {
       ]
     `);
   });
+
+  // tests backfilling data via our top-level context-based APIs, eg:
+  //
+  // const turn = weave.startTurn({startTime: '...' });
+  // // ...
+  // weave.endTurn({endTime: '...'});
+  //
+  test('allows backfilling data (via top-level context-based APIs)', async () => {
+    for (const recordedSession of AGENT_SESSIONS) {
+      weave.startSession({
+        agentName: recordedSession.agentName,
+      });
+
+      const messages: Message[] = [
+        {role: 'system', content: recordedSession.instructions},
+      ];
+      for (const recordedTurn of recordedSession.turns) {
+        const responses = recordedTurn.responses;
+
+        messages.push({role: 'user', content: recordedTurn.prompt});
+
+        weave.startTurn({
+          agentName: recordedSession.agentName,
+          startTime: recordedTurn.startedAt,
+        });
+
+        for (let i = 0; i < responses.length; i++) {
+          const resp = responses[i];
+          const next = responses[i + 1];
+
+          const llm = weave.startLLM({
+            model: resp.model,
+            providerName: 'some-provider',
+            startTime: toDate(resp),
+          });
+          llm.inputMessages = [...messages];
+
+          const choice = resp.choices[0];
+          const toolCalls = (choice.message.tool_calls ?? []).filter(
+            (tc): tc is ChatCompletionMessageFunctionToolCall =>
+              tc.type === 'function'
+          );
+          const parts: MessagePart[] = [];
+          if (choice.message.content) {
+            parts.push({type: 'text', content: choice.message.content});
+          }
+          for (const tc of toolCalls) {
+            parts.push({
+              type: 'tool_call',
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              arguments: tc.function.arguments,
+            });
+          }
+          const assistantMessage: Message = {role: 'assistant', parts};
+          llm.outputMessages = [assistantMessage];
+          llm.record({
+            usage: {
+              inputTokens: resp.usage?.prompt_tokens,
+              outputTokens: resp.usage?.completion_tokens,
+            },
+          });
+          weave.endLLM({endTime: toDate(resp)});
+          messages.push(assistantMessage);
+
+          for (const tc of toolCalls) {
+            const toolDef = agent.tools.find(t => t.name === tc.function.name);
+            if (!toolDef) {
+              throw new Error(`unknown tool: ${tc.function.name}`);
+            }
+            const tool = weave.startTool({
+              name: tc.function.name,
+              args: tc.function.arguments,
+              toolCallId: tc.id,
+              startTime: toDate(resp),
+            });
+            const result = await toolDef.execute(
+              JSON.parse(tc.function.arguments)
+            );
+            tool.result = JSON.stringify(result);
+            tool.end({endTime: toDate(next)});
+            messages.push({
+              role: 'tool',
+              toolCallId: tc.id,
+              content: tool.result,
+            });
+          }
+        }
+
+        weave.endTurn({endTime: toDate(responses[responses.length - 1])});
+      }
+      weave.endSession();
+    }
+
+    const spans = await emittedSpans({maskTimestamps: false});
+    expect(spans).toMatchInlineSnapshot(`
+      [
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 42,
+            "gen_ai.usage.output_tokens": 10,
+          },
+          "endTime": [
+            1780048800,
+            0,
+          ],
+          "startTime": [
+            1780048800,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.call.arguments": "{"city":"Tokyo"}",
+            "gen_ai.tool.call.id": "call_t1",
+            "gen_ai.tool.call.result": "{"temp":28,"condition":"Humid"}",
+            "gen_ai.tool.name": "get_weather",
+          },
+          "endTime": [
+            1780048800,
+            0,
+          ],
+          "startTime": [
+            1780048800,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","toolCallId":"call_t1","content":"{\\"temp\\":28,\\"condition\\":\\"Humid\\"}"}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 70,
+            "gen_ai.usage.output_tokens": 9,
+          },
+          "endTime": [
+            1780048800,
+            0,
+          ],
+          "startTime": [
+            1780048800,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "invoke_agent",
+          },
+          "endTime": [
+            1780048800,
+            0,
+          ],
+          "startTime": [
+            1780048799,
+            500000000,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","toolCallId":"call_t1","content":"{\\"temp\\":28,\\"condition\\":\\"Humid\\"}"},{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]},{"role":"user","content":"What about San Francisco and London?"}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 90,
+            "gen_ai.usage.output_tokens": 16,
+          },
+          "endTime": [
+            1780048805,
+            0,
+          ],
+          "startTime": [
+            1780048805,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.call.arguments": "{"city":"San Francisco"}",
+            "gen_ai.tool.call.id": "call_t2_sf",
+            "gen_ai.tool.call.result": "{"temp":18,"condition":"Foggy"}",
+            "gen_ai.tool.name": "get_weather",
+          },
+          "endTime": [
+            1780048805,
+            0,
+          ],
+          "startTime": [
+            1780048805,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.call.arguments": "{"city":"London"}",
+            "gen_ai.tool.call.id": "call_t2_ldn",
+            "gen_ai.tool.call.result": "{"temp":12,"condition":"Cloudy"}",
+            "gen_ai.tool.name": "get_weather",
+          },
+          "endTime": [
+            1780048805,
+            0,
+          ],
+          "startTime": [
+            1780048805,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","toolCallId":"call_t1","content":"{\\"temp\\":28,\\"condition\\":\\"Humid\\"}"},{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]},{"role":"user","content":"What about San Francisco and London?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]},{"role":"tool","toolCallId":"call_t2_sf","content":"{\\"temp\\":18,\\"condition\\":\\"Foggy\\"}"},{"role":"tool","toolCallId":"call_t2_ldn","content":"{\\"temp\\":12,\\"condition\\":\\"Cloudy\\"}"}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 140,
+            "gen_ai.usage.output_tokens": 18,
+          },
+          "endTime": [
+            1780048805,
+            0,
+          ],
+          "startTime": [
+            1780048805,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "invoke_agent",
+          },
+          "endTime": [
+            1780048805,
+            0,
+          ],
+          "startTime": [
+            1780048804,
+            500000000,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","toolCallId":"call_t1","content":"{\\"temp\\":28,\\"condition\\":\\"Humid\\"}"},{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]},{"role":"user","content":"What about San Francisco and London?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]},{"role":"tool","toolCallId":"call_t2_sf","content":"{\\"temp\\":18,\\"condition\\":\\"Foggy\\"}"},{"role":"tool","toolCallId":"call_t2_ldn","content":"{\\"temp\\":12,\\"condition\\":\\"Cloudy\\"}"},{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]},{"role":"user","content":"How much warmer is Tokyo than San Francisco?"}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t3","toolName":"calculate","arguments":"{\\"expression\\":\\"28 - 18\\"}"}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 170,
+            "gen_ai.usage.output_tokens": 12,
+          },
+          "endTime": [
+            1780048810,
+            0,
+          ],
+          "startTime": [
+            1780048810,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.call.arguments": "{"expression":"28 - 18"}",
+            "gen_ai.tool.call.id": "call_t3",
+            "gen_ai.tool.call.result": ""28 - 18 = 10"",
+            "gen_ai.tool.name": "calculate",
+          },
+          "endTime": [
+            1780048810,
+            0,
+          ],
+          "startTime": [
+            1780048810,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"system","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."},{"role":"user","content":"How warm is Tokyo?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]},{"role":"tool","toolCallId":"call_t1","content":"{\\"temp\\":28,\\"condition\\":\\"Humid\\"}"},{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]},{"role":"user","content":"What about San Francisco and London?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]},{"role":"tool","toolCallId":"call_t2_sf","content":"{\\"temp\\":18,\\"condition\\":\\"Foggy\\"}"},{"role":"tool","toolCallId":"call_t2_ldn","content":"{\\"temp\\":12,\\"condition\\":\\"Cloudy\\"}"},{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]},{"role":"user","content":"How much warmer is Tokyo than San Francisco?"},{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t3","toolName":"calculate","arguments":"{\\"expression\\":\\"28 - 18\\"}"}]},{"role":"tool","toolCallId":"call_t3","content":"\\"28 - 18 = 10\\""}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 10°C warmer than San Francisco."}]}]",
+            "gen_ai.provider.name": "some-provider",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.usage.input_tokens": 200,
+            "gen_ai.usage.output_tokens": 12,
+          },
+          "endTime": [
+            1780048810,
+            0,
+          ],
+          "startTime": [
+            1780048810,
+            0,
+          ],
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "invoke_agent",
+          },
+          "endTime": [
+            1780048810,
+            0,
+          ],
+          "startTime": [
+            1780048809,
+            500000000,
+          ],
+        },
+      ]
+    `);
+  });
 });
