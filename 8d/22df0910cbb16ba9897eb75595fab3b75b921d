@@ -1,0 +1,9 @@
+## Comment 3 resolution (Dan #7301 :291 "can this class implements BasePlugin?")
+Added `implements AdkBasePlugin` (import {BasePlugin as AdkBasePlugin}) to the
+WeaveAdkPlugin class HERE on slice 06, not on slice 01 where Dan asked, because
+BasePlugin is an abstract class with 12 non-optional callbacks and the plugin
+only defines them all at the tip. Verified: typecheck esm+cjs clean (so the 12
+callbacks DO satisfy BasePlugin's signatures), eslint clean, jest 26/26.
+Type-only import => no runtime coupling, no instanceof/dual-package hazard (the
+reason the plugin historically avoided `extends BasePlugin`). New commit on the
+slice-06 tip after the slice-01 interface->type cascade.
