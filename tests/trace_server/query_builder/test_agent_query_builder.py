@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from weave.trace_server.agents.span_costs import cost_augmented_source_sql
 from weave.trace_server.agents.types import (
+    MAX_TRACE_MESSAGES_LIMIT,
     AgentConversationChatReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
@@ -27,6 +28,7 @@ from weave.trace_server.agents.types import (
     AgentSpanValueRef,
     AgentsQueryFilters,
     AgentsQueryReq,
+    AgentTraceMessagesReq,
     AgentVersionsQueryReq,
 )
 from weave.trace_server.interface import query as tsi_query
@@ -54,6 +56,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_count_query,
     make_spans_list_query,
     make_trace_detail_spans_query,
+    make_trace_messages_query,
     resolve_group_by,
 )
 from weave.trace_server.query_builder.agent_trace_attribution import (
@@ -1137,6 +1140,45 @@ class TestMakeTraceDetailSpansQuery:
             ORDER BY s.started_at ASC
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
+
+
+# ============================================================================
+# make_trace_messages_query
+# ============================================================================
+
+
+class TestMakeTraceMessagesQuery:
+    def test_basic(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_trace_messages_query(pb, "p1", "t1", 100)
+
+        expected = """
+            SELECT role,
+                   any(content) AS content,
+                   min(started_at) AS min_started_at
+            FROM messages
+            WHERE project_id = {genai_0:String}
+              AND trace_id = {genai_1:String}
+              AND role IN ('assistant', 'system', 'user')
+            GROUP BY role, content_digest
+            ORDER BY min_started_at ASC
+            LIMIT {genai_2:UInt64}
+        """
+        assert_sql(
+            expected,
+            {"genai_0": "p1", "genai_1": "t1", "genai_2": 100},
+            query,
+            pb.get_params(),
+        )
+
+    def test_limit_is_bounded(self) -> None:
+        AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=1)
+        AgentTraceMessagesReq(
+            project_id="p1", trace_id="t1", limit=MAX_TRACE_MESSAGES_LIMIT
+        )
+        for bad in (0, MAX_TRACE_MESSAGES_LIMIT + 1):
+            with pytest.raises(ValidationError):
+                AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=bad)
 
 
 # ============================================================================

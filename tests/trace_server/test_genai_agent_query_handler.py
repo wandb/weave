@@ -4,11 +4,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from weave.trace_server.agents.clickhouse import AgentQueryHandler
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSpanGroupDistributionSpec,
     AgentSpansQueryReq,
     AgentSpanValueRef,
+    AgentTraceMessagesReq,
+    AgentTraceMessagesRes,
 )
 from weave.trace_server.trace_server_interface import FeedbackQueryRes
 
@@ -294,3 +297,35 @@ def test_grouped_rows_hydrate_message_previews() -> None:
     # No renderable text → no preview, so the UI falls back to the conversation id.
     assert empty.first_message is None
     assert empty.last_message is None
+
+
+def test_trace_messages_maps_rows_to_normalized_messages() -> None:
+    result = _FakeQueryResult(
+        column_names=["role", "content", "min_created_at"],
+        result_rows=[
+            ("system", "be helpful", None),
+            ("user", "hi", None),
+            ("assistant", "hello", None),
+        ],
+    )
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+        calls.append((sql, params))
+        return result
+
+    handler = AgentQueryHandler(query, lambda req: FeedbackQueryRes(result=[]))
+
+    res = handler.trace_messages(
+        AgentTraceMessagesReq(project_id="p1", trace_id="t1", limit=100)
+    )
+
+    assert res == AgentTraceMessagesRes(
+        messages=[
+            NormalizedMessage(role="system", content="be helpful"),
+            NormalizedMessage(role="user", content="hi"),
+            NormalizedMessage(role="assistant", content="hello"),
+        ]
+    )
+    assert len(calls) == 1
+    assert "t1" in calls[0][1].values()

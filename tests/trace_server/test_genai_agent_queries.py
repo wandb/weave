@@ -32,6 +32,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+    AgentTraceMessagesReq,
 )
 from weave.trace_server.interface.query import Query
 
@@ -575,6 +576,60 @@ def test_group_by_conversation_id_message_previews(ch_server):
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
     assert row.last_message.text == "final reply"
+
+
+def test_trace_messages_reads_and_dedups_child_span_messages(ch_server):
+    """`agent_trace_messages` reads role-tagged messages across a trace's spans.
+
+    Validates the real `messages`-table behavior the query depends on: content
+    repeated across spans is deduped (`GROUP BY role, content_digest`), the three
+    scoring roles are returned, and tool/unknown roles are filtered out. This is
+    the fallback source for agent scoring when a root span carries no messages.
+    """
+    project_id = _make_project_id("trace-messages")
+    trace_id = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        # First LLM call in the turn: system + user input, assistant output.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="chat",
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=1),
+            system_instructions=["be helpful"],
+            input_messages=[NormalizedMessage(role="user", content="hi")],
+            output_messages=[NormalizedMessage(role="assistant", content="hello")],
+        ),
+        # A later span echoes the same user turn (history) and carries a tool
+        # result: the echo must dedup away, the tool row must be filtered out.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="execute_tool",
+            started_at=now + datetime.timedelta(seconds=2),
+            ended_at=now + datetime.timedelta(seconds=3),
+            input_messages=[NormalizedMessage(role="user", content="hi")],
+            tool_call_result="some tool output",
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_trace_messages(
+        AgentTraceMessagesReq(project_id=project_id, trace_id=trace_id, limit=100)
+    )
+
+    # Entire payload: the user echo is deduped to one, tool_result is excluded,
+    # and the three scoring roles come back. Sorted by (role, content) because
+    # ordering is by ingest time, which ties within a single insert batch.
+    assert sorted(res.messages, key=lambda m: (m.role, m.content)) == [
+        NormalizedMessage(role="assistant", content="hello"),
+        NormalizedMessage(role="system", content="be helpful"),
+        NormalizedMessage(role="user", content="hi"),
+    ]
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):

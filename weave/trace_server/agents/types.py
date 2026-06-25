@@ -1029,6 +1029,25 @@ class AgentTraceChatRes(BaseModel):
     feedback: list[dict[str, Any]] | None = None
 
 
+MAX_TRACE_MESSAGES_LIMIT = 100
+
+
+class AgentTraceMessagesReq(BaseModel):
+    """Request for the messages of a single trace."""
+
+    project_id: str
+    trace_id: str
+    limit: int = Field(
+        default=MAX_TRACE_MESSAGES_LIMIT, gt=0, le=MAX_TRACE_MESSAGES_LIMIT
+    )
+
+
+class AgentTraceMessagesRes(BaseModel):
+    """The messages of a single trace."""
+
+    messages: list[NormalizedMessage] = Field(default_factory=list)
+
+
 class AgentConversationChatReq(BaseModel):
     """Request to get the multi-turn chat view for a conversation."""
 
