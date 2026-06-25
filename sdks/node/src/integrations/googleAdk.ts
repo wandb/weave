@@ -109,7 +109,7 @@ const WARN_KEY_PLUGIN_ERROR = 'weave-adk-plugin-error';
 const BEFORE_EXIT_CLEANUPS = new Set<() => void>();
 let beforeExitHookRegistered = false;
 
-interface InvocationState {
+type InvocationState = {
   invocationId: string;
   rootSpan: OtelSpan;
   conversationId: string | undefined;
@@ -117,7 +117,7 @@ interface InvocationState {
   finalContent: AdkContent | null;
   rootErrorType: string | undefined;
   rootErrorMessage: string | undefined;
-}
+};
 
 // ---------------------------------------------------------------------------
 // GenAI semconv extractors (mirroring the Python google_adk integration)
