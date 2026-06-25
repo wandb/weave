@@ -1,4 +1,12 @@
+import {randomUUID} from 'crypto';
+
 import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import type {
+  ModelUsage,
+  SDKAssistantMessage,
+  SDKResultMessage,
+  SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 
 import {
   ATTR_ERROR_TYPE,
@@ -20,15 +28,201 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
-} from '../../genai/semconv';
-import {ClaudeAgentOtelTracer} from '../../integrations/claude-agent-sdk/otelTracer';
+} from '../../../genai/semconv';
+import {ClaudeAgentOtelTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
 import {
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
-} from '../genai/common';
+} from '../../genai/common';
 
 const INVOKE = 'invoke_agent claude_agent_sdk';
+
+// ---------------------------------------------------------------------------
+// Typed SDK-message fixtures.
+//
+// The tracer consumes `SDKMessage`/`SDKResultMessage`, so the fixtures are built
+// as those real types (every shape derived from `@anthropic-ai/claude-agent-sdk`)
+// rather than `as any` blobs — the compiler now catches a fixture that drifts
+// from the SDK contract. The tracer only reads a handful of fields, so the
+// builders fill the rest from defaults and expose the meaningful bits as args.
+// ---------------------------------------------------------------------------
+
+type AssistantContent = SDKAssistantMessage['message']['content'][number];
+
+const thinkingBlock = (
+  thinking: string
+): Extract<AssistantContent, {type: 'thinking'}> => ({
+  type: 'thinking',
+  thinking,
+  signature: '',
+});
+
+const textBlock = (
+  text: string
+): Extract<AssistantContent, {type: 'text'}> => ({
+  type: 'text',
+  text,
+  citations: null,
+});
+
+const toolUseBlock = (
+  id: string,
+  name: string,
+  input: unknown
+): Extract<AssistantContent, {type: 'tool_use'}> => ({
+  type: 'tool_use',
+  id,
+  name,
+  input,
+});
+
+// The tracer reads `model`, `stop_reason`, and `content` off an assistant
+// message; the rest of the BetaMessage envelope is filled with neutral defaults.
+const DEFAULT_BETA_USAGE: SDKAssistantMessage['message']['usage'] = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_creation_input_tokens: null,
+  cache_read_input_tokens: null,
+  cache_creation: null,
+  output_tokens_details: null,
+  server_tool_use: null,
+  inference_geo: null,
+  iterations: null,
+  service_tier: null,
+  speed: null,
+};
+
+function assistantMessage(opts: {
+  sessionId: string;
+  model: string;
+  content: AssistantContent[];
+  stopReason?: SDKAssistantMessage['message']['stop_reason'];
+}): SDKAssistantMessage {
+  return {
+    type: 'assistant',
+    session_id: opts.sessionId,
+    parent_tool_use_id: null,
+    uuid: randomUUID(),
+    message: {
+      id: 'msg-1',
+      type: 'message',
+      role: 'assistant',
+      model: opts.model,
+      content: opts.content,
+      stop_reason: opts.stopReason ?? null,
+      stop_sequence: null,
+      stop_details: null,
+      container: null,
+      context_management: null,
+      diagnostics: null,
+      usage: DEFAULT_BETA_USAGE,
+    },
+  };
+}
+
+type ToolResultBlock = Extract<
+  Exclude<SDKUserMessage['message']['content'], string>[number],
+  {type: 'tool_result'}
+>;
+
+function userToolResult(opts: {
+  sessionId: string;
+  toolUseId: string;
+  content: string;
+  isError?: boolean;
+}): SDKUserMessage {
+  const block: ToolResultBlock = {
+    type: 'tool_result',
+    tool_use_id: opts.toolUseId,
+    content: opts.content,
+    is_error: opts.isError ?? false,
+  };
+  return {
+    type: 'user',
+    session_id: opts.sessionId,
+    parent_tool_use_id: null,
+    message: {role: 'user', content: [block]},
+  };
+}
+
+// Build one model's usage; the tracer only reads the four token fields, so the
+// rest (cost, context window, …) default to 0.
+const modelUsage = (u: Partial<ModelUsage>): ModelUsage => ({
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadInputTokens: 0,
+  cacheCreationInputTokens: 0,
+  webSearchRequests: 0,
+  costUSD: 0,
+  contextWindow: 0,
+  maxOutputTokens: 0,
+  ...u,
+});
+
+// The tracer sources tokens from `modelUsage`, never `result.usage`, but the
+// SDK result type still requires a (non-null) aggregate usage object.
+const DEFAULT_RESULT_USAGE: SDKResultMessage['usage'] = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_creation_input_tokens: 0,
+  cache_read_input_tokens: 0,
+  cache_creation: {ephemeral_1h_input_tokens: 0, ephemeral_5m_input_tokens: 0},
+  output_tokens_details: {thinking_tokens: 0},
+  server_tool_use: {web_fetch_requests: 0, web_search_requests: 0},
+  inference_geo: '',
+  iterations: [],
+  service_tier: 'standard',
+  speed: 'standard',
+};
+
+function resultSuccess(opts: {
+  result?: string;
+  totalCostUsd?: number;
+  numTurns?: number;
+  modelUsage?: Record<string, ModelUsage>;
+  sessionId?: string;
+}): SDKResultMessage {
+  return {
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    duration_ms: 0,
+    duration_api_ms: 0,
+    num_turns: opts.numTurns ?? 0,
+    result: opts.result ?? '',
+    stop_reason: null,
+    total_cost_usd: opts.totalCostUsd ?? 0,
+    usage: DEFAULT_RESULT_USAGE,
+    modelUsage: opts.modelUsage ?? {},
+    permission_denials: [],
+    uuid: randomUUID(),
+    session_id: opts.sessionId ?? 'sess',
+  };
+}
+
+function resultError(opts: {
+  subtype?: Exclude<SDKResultMessage['subtype'], 'success'>;
+  errors?: string[];
+  sessionId?: string;
+}): SDKResultMessage {
+  return {
+    type: 'result',
+    subtype: opts.subtype ?? 'error_max_turns',
+    is_error: true,
+    duration_ms: 0,
+    duration_api_ms: 0,
+    num_turns: 0,
+    stop_reason: null,
+    total_cost_usd: 0,
+    usage: DEFAULT_RESULT_USAGE,
+    modelUsage: {},
+    permission_denials: [],
+    errors: opts.errors ?? [],
+    uuid: randomUUID(),
+    session_id: opts.sessionId ?? 'sess',
+  };
+}
 
 describe('Claude Agent SDK — OTel tracer', () => {
   setupGenAITestEnvironment();
@@ -38,55 +232,41 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const tracer = new ClaudeAgentOtelTracer({
       prompt: 'What is the weather in Tokyo?',
     });
-    tracer.processMessage({
-      type: 'system',
-      subtype: 'init',
-      session_id: 'sess-1',
-      model: 'claude-x',
-    } as any);
-    tracer.processMessage({
-      type: 'assistant',
-      session_id: 'sess-1',
-      message: {
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-1',
         model: 'claude-x',
-        stop_reason: 'tool_use',
+        stopReason: 'tool_use',
         content: [
-          {type: 'thinking', thinking: 'I should check the weather.'},
-          {type: 'text', text: 'Let me check.'},
-          {type: 'tool_use', id: 't1', name: 'Bash', input: {command: 'ls'}},
+          thinkingBlock('I should check the weather.'),
+          textBlock('Let me check.'),
+          toolUseBlock('t1', 'Bash', {command: 'ls'}),
         ],
-      },
-    } as any);
-    tracer.processMessage({
-      type: 'user',
-      session_id: 'sess-1',
-      message: {
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 't1',
-            content: 'Sunny',
-            is_error: false,
-          },
-        ],
-      },
-    } as any);
-    tracer.finalize({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-      result: 'It is sunny.',
-      total_cost_usd: 0.01,
-      num_turns: 1,
-      modelUsage: {
-        'claude-x': {
-          inputTokens: 10,
-          outputTokens: 5,
-          cacheReadInputTokens: 3,
-          cacheCreationInputTokens: 0,
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-1',
+        toolUseId: 't1',
+        content: 'Sunny',
+        isError: false,
+      })
+    );
+    tracer.finalize(
+      resultSuccess({
+        sessionId: 'sess-1',
+        result: 'It is sunny.',
+        totalCostUsd: 0.01,
+        numTurns: 1,
+        modelUsage: {
+          'claude-x': modelUsage({
+            inputTokens: 10,
+            outputTokens: 5,
+            cacheReadInputTokens: 3,
+          }),
         },
-      },
-    } as any);
+      })
+    );
 
     const spans = getExporter().getFinishedSpans();
 
@@ -186,33 +366,29 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
   test('emits one usage chat span per model, preserving the per-model split', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
-    tracer.processMessage({
-      type: 'assistant',
-      session_id: 'sess-2',
-      message: {model: 'claude-opus', content: [{type: 'text', text: 'hi'}]},
-    } as any);
-    tracer.finalize({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-      total_cost_usd: 0.05,
-      // Multi-model session: a fast model handled an internal step and never
-      // surfaced an assistant message of its own.
-      modelUsage: {
-        'claude-opus': {
-          inputTokens: 100,
-          outputTokens: 40,
-          cacheReadInputTokens: 0,
-          cacheCreationInputTokens: 0,
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-2',
+        model: 'claude-opus',
+        content: [textBlock('hi')],
+      })
+    );
+    tracer.finalize(
+      resultSuccess({
+        totalCostUsd: 0.05,
+        // Multi-model session: a fast model handled an internal step and never
+        // surfaced an assistant message of its own.
+        modelUsage: {
+          'claude-opus': modelUsage({inputTokens: 100, outputTokens: 40}),
+          'claude-haiku': modelUsage({
+            inputTokens: 20,
+            outputTokens: 8,
+            cacheReadInputTokens: 5,
+            cacheCreationInputTokens: 3,
+          }),
         },
-        'claude-haiku': {
-          inputTokens: 20,
-          outputTokens: 8,
-          cacheReadInputTokens: 5,
-          cacheCreationInputTokens: 3,
-        },
-      },
-    } as any);
+      })
+    );
 
     const spans = getExporter().getFinishedSpans();
     const invoke = findSpan(spans, INVOKE);
@@ -255,35 +431,22 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
-    tracer.processMessage({
-      type: 'assistant',
-      session_id: 's',
-      message: {
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 's',
         model: 'm',
-        content: [
-          {type: 'tool_use', id: 't9', name: 'Bash', input: {command: 'boom'}},
-        ],
-      },
-    } as any);
-    tracer.processMessage({
-      type: 'user',
-      session_id: 's',
-      message: {
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: 't9',
-            content: 'command not found',
-            is_error: true,
-          },
-        ],
-      },
-    } as any);
-    tracer.finalize({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-    } as any);
+        content: [toolUseBlock('t9', 'Bash', {command: 'boom'})],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 's',
+        toolUseId: 't9',
+        content: 'command not found',
+        isError: true,
+      })
+    );
+    tracer.finalize(resultSuccess({}));
 
     const tool = findSpan(
       getExporter().getFinishedSpans(),
@@ -298,14 +461,13 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
   test('a stream error fails the root and sweeps open tool spans as aborted', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
-    tracer.processMessage({
-      type: 'assistant',
-      session_id: 's',
-      message: {
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 's',
         model: 'm',
-        content: [{type: 'tool_use', id: 'tX', name: 'Bash', input: {}}],
-      },
-    } as any);
+        content: [toolUseBlock('tX', 'Bash', {})],
+      })
+    );
     tracer.finalize(undefined, new Error('subprocess crashed'));
 
     const spans = getExporter().getFinishedSpans();
@@ -321,17 +483,16 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
   test('a non-success result subtype fails the root span', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
-    tracer.processMessage({
-      type: 'assistant',
-      session_id: 's',
-      message: {model: 'm', content: [{type: 'text', text: 'trying'}]},
-    } as any);
-    tracer.finalize({
-      type: 'result',
-      subtype: 'error_max_turns',
-      is_error: true,
-      errors: ['boom'],
-    } as any);
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 's',
+        model: 'm',
+        content: [textBlock('trying')],
+      })
+    );
+    tracer.finalize(
+      resultError({subtype: 'error_max_turns', errors: ['boom']})
+    );
 
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
@@ -342,13 +503,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     // A result-only stream (no system/assistant turn) still groups into its
     // session: finalize reads session_id off the result.
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
-    tracer.finalize({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-      session_id: 'sess-late',
-      result: 'ok',
-    } as any);
+    tracer.finalize(resultSuccess({sessionId: 'sess-late', result: 'ok'}));
 
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-late');

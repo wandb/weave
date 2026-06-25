@@ -20,14 +20,9 @@ type WeaveUsage = {
 };
 
 /**
- * Translate a Claude Agent SDK usage object into Weave's snake_case usage shape.
- *
- * The two SDK shapes are disjoint by casing — the per-model `result.modelUsage`
- * values ({@link ModelUsage}, camelCase) and the aggregate `result.usage`
- * ({@link NonNullableUsage}, snake_case) — so an `in` check on a camelCase key
- * proves which one we hold and narrows the union. Both shapes type every token
- * field as a required number (`NonNullableUsage` strips the `| null` off
- * `BetaUsage`), so the result is fully populated; no field can be absent.
+ * Translate a Claude Agent SDK usage object — the per-model camelCase
+ * {@link ModelUsage} or the snake_case aggregate {@link NonNullableUsage} — into
+ * Weave's snake_case usage shape.
  */
 export function toWeaveUsage(usage: ModelUsage | NonNullableUsage): WeaveUsage {
   if ('inputTokens' in usage) {
