@@ -3246,30 +3246,30 @@ class TraceServerInterface(Protocol):
 
     # GenAI / Agent Observability API
     #
-    # Contract every backend (ClickHouse, in-memory fake, remote HTTP)
-    # implements for the Agents view. Workflow:
+    # The API behind the Agents view. A typical workflow:
     #
-    # 1. Ingest spans via `genai_otel_export`.
-    # 2. List agents with `agent_agents_query`, drill into one agent's
-    #    versions with `agent_versions_query`, and into its conversations
-    #    by calling `agent_spans_query` in group mode with
-    #    `group_by=[conversation_id]`.
-    # 3. Open a conversation with `agent_conversation_chat`; open a single
-    #    turn with `agent_traces_chat`.
-    # 4. Side queries: `agent_spans_stats` for charts,
-    #    `agent_custom_attrs_schema` for filter builders, `agent_search`
-    #    for content or structured retrieval over messages.
+    # 1. Ingest spans with `genai_otel_export`.
+    # 2. List agents with `agent_agents_query`. Drill into one agent's
+    #    versions with `agent_versions_query`, or into its conversations
+    #    with `agent_spans_query` in group mode (group by
+    #    `conversation_id`).
+    # 3. Open a conversation with `agent_conversation_chat`, or a single
+    #    turn within it with `agent_traces_chat`.
+    # 4. Supporting queries: `agent_spans_stats` (charts),
+    #    `agent_custom_attrs_schema` (filter builders), and
+    #    `agent_search` (search messages by content and/or filters).
     #
     # User-facing concepts: https://docs.wandb.ai/weave/guides/tracking/trace-agents
     def genai_otel_export(
         self, req: agent_types.GenAIOTelExportReq
     ) -> agent_types.GenAIOTelExportRes:
-        """Ingest GenAI OTel spans into the agent observability store.
+        """Receives OpenTelemetry GenAI/agent spans exported to Weave and
+        ingests them.
 
-        The single write-side entry point. Spans land in the agent
-        spans table and refresh the downstream materialized views
-        (agents, agent_versions, messages) that the read-side
-        endpoints query.
+        Spans are written to the spans table; ClickHouse materialized
+        views defined on that table then populate the downstream summary
+        tables (agents, agent_versions, and messages) which back the
+        corresponding read-side query endpoints.
 
         Note:
             Rejected spans don't block the rest of the batch. Inspect
@@ -3306,13 +3306,13 @@ class TraceServerInterface(Protocol):
            list (group by `conversation_id`), per-agent rollups, and
            any other grouped view.
 
-        Opt-ins:
+        Optional flags (all off by default; each adds data and cost):
 
         * `req.include_costs=True` attaches query-time USD costs.
         * `req.include_details=True` (list mode only) includes large
           fields like messages and `raw_span_dump`.
-        * `req.custom_attr_columns` projects extra typed custom
-          attributes alongside the standard columns.
+        * `req.custom_attr_columns` (list mode only) projects extra
+          typed custom attributes alongside the standard columns.
 
         Args:
             req: Filter, grouping, sort, and pagination parameters.
@@ -3339,9 +3339,16 @@ class TraceServerInterface(Protocol):
     ) -> agent_types.AgentSpanStatsRes:
         """Chart-ready aggregation over agent spans.
 
-        Pipeline: filter spans, bucket (time or numeric, per
-        `req.bucket_by`), group within bucket (per `req.group_by`),
-        compute metrics, drop groups failing `req.group_filters`. The
+        Aggregates spans into chart-ready rows. The server filters
+        spans to the requested window and `req.query`, then buckets
+        them: numeric when `req.bucket_by` is a numeric spec, otherwise
+        by an auto-selected (and capped) time granularity. For time
+        buckets it splits each bucket by `req.group_by`, keeping only
+        the highest-traffic groups up to `req.group_limit` (caller-set,
+        default 50); numeric buckets don't support `req.group_by`. It
+        then computes `req.metrics` per group and keeps only groups
+        whose aggregated values fall in the ranges set by
+        `req.group_filters` (e.g. error count between 5 and 100). The
         response carries a column schema so clients render axes and
         legends without re-deriving them.
 
@@ -3432,7 +3439,7 @@ class TraceServerInterface(Protocol):
 
         Run after `agent_agents_query` to diff behavior across
         releases of one agent. Returns one `AgentVersionSchema` per
-        `(agent_name, agent_version)` pair.
+        distinct `agent_version` of the requested agent.
 
         Args:
             req: Project, target `agent_name`, sort, pagination, and
@@ -3453,14 +3460,19 @@ class TraceServerInterface(Protocol):
     def agent_search(
         self, req: agent_types.AgentSearchReq
     ) -> agent_types.AgentSearchRes:
-        """Search agent messages by content or structured filters.
+        """Search agent messages by content and/or structured filters.
 
-        Backed by the messages MV. Two modes:
+        Backed by the messages table (populated from spans). All
+        supplied filters combine with AND, so content and structured
+        filters can be used together:
 
-        1. **Full-text search** — set `req.query` to a substring.
-        2. **Structured retrieval** — leave `req.query` empty and
-           use the structured filters (e.g. `req.trace_id` to fetch
-           every message in a trace).
+        1. **Content match** — set `req.query` for a case-sensitive
+           substring match on message text (`content LIKE '%query%'`).
+        2. **Structured filters** — narrow by `req.trace_id`,
+           `req.roles`, `req.agent_name`, etc. (e.g. `req.trace_id`
+           to fetch every message in a trace).
+
+        With no filters set, it scans all messages in the project.
 
         Args:
             req: Content query, structured filters,
