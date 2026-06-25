@@ -3,6 +3,12 @@
  * implemented as an ADK plugin that mirrors agent runs into OpenTelemetry
  * spans and exports them to Weave's agents OTel endpoint.
  *
+ * Agent nesting: ADK 1.2.0 never calls the plugin's agent callbacks, so each
+ * agent's span is created on demand — the first time its name appears in a
+ * model or tool callback — and nested using the agent tree captured at the
+ * start of the run. The agent callbacks are still implemented, so nesting
+ * improves automatically if a later ADK version starts calling them.
+ *
  * Usage:
  * ```typescript
  * import {init, WeaveAdkPlugin} from 'weave';
@@ -125,6 +131,8 @@ const ATTR_ADK_INTERRUPTED = `${WEAVE_ATTR_PREFIX}.interrupted`;
 const ATTR_ADK_INVOCATION_ID = `${WEAVE_ATTR_PREFIX}.invocation_id`;
 const ATTR_ADK_APP_NAME = `${WEAVE_ATTR_PREFIX}.app_name`;
 const ATTR_ADK_USER_ID = `${WEAVE_ATTR_PREFIX}.user_id`;
+// Defensive bound when walking `parentAgent` chains.
+const MAX_AGENT_ANCESTRY_DEPTH = 100;
 
 // ADK's own opt-out env var for message-content capture: regulated users set
 // it to keep message bodies, system instructions and tool payloads off spans.
@@ -149,7 +157,10 @@ let beforeExitHookRegistered = false;
 type InvocationState = {
   invocationId: string;
   rootSpan: OtelSpan;
+  rootAgent: AdkBaseAgent;
   conversationId: string | undefined;
+  /** agentName → synthesized invoke_agent span. */
+  agentSpans: Map<string, OtelSpan>;
   /** agentName → in-flight chat span. */
   modelSpans: Map<string, OtelSpan>;
   /** functionCallId (or synthetic key) → in-flight execute_tool span. */
@@ -504,6 +515,42 @@ function setLlmResponseAttributes(
 }
 
 // ---------------------------------------------------------------------------
+// Agent tree helpers
+// ---------------------------------------------------------------------------
+
+/** Finds `name` in the agent tree under `root`, preferring ADK's own
+ *  `findAgent` and falling back to a cycle-safe manual walk. */
+function findAgentInTree(
+  root: AdkBaseAgent,
+  name: string
+): AdkBaseAgent | undefined {
+  try {
+    const found = root.findAgent(name);
+    if (found) {
+      return found;
+    }
+  } catch {
+    // ADK's `findAgent` recurses through `subAgents` with no cycle
+    // detection, so a cyclic agent graph overflows the stack. Fall back to
+    // the manual walk below, which is cycle-safe via `visited`.
+  }
+  const queue: AdkBaseAgent[] = [root];
+  const visited = new Set<AdkBaseAgent>();
+  while (queue.length > 0) {
+    const agent = queue.shift()!;
+    if (visited.has(agent)) {
+      continue;
+    }
+    visited.add(agent);
+    if (agent.name === name) {
+      return agent;
+    }
+    queue.push(...agent.subAgents);
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
 
@@ -605,7 +652,9 @@ export class WeaveAdkPlugin {
       this.invocations.set(invocationId, {
         invocationId,
         rootSpan,
+        rootAgent,
         conversationId,
+        agentSpans: new Map(),
         modelSpans: new Map(),
         toolSpans: new Map(),
         syntheticToolKeys: new Map(),
@@ -667,17 +716,38 @@ export class WeaveAdkPlugin {
   // PluginManager call sites)
   // -------------------------------------------------------------------------
 
-  async beforeAgentCallback(_params: {
+  async beforeAgentCallback(params: {
     agent: AdkBaseAgent;
     callbackContext: AdkCallbackContext;
   }): Promise<undefined> {
+    this.guard(() => {
+      const state = this.invocations.get(params.callbackContext.invocationId);
+      if (!state || !params.agent.name) {
+        return;
+      }
+      this.ensureAgentSpan(state, params.agent.name);
+    });
     return undefined;
   }
 
-  async afterAgentCallback(_params: {
+  async afterAgentCallback(params: {
     agent: AdkBaseAgent;
     callbackContext: AdkCallbackContext;
   }): Promise<undefined> {
+    this.guard(() => {
+      const state = this.invocations.get(params.callbackContext.invocationId);
+      const agentName = params.agent.name;
+      if (!state || !agentName) {
+        return;
+      }
+      const span = state.agentSpans.get(agentName);
+      if (!span) {
+        return;
+      }
+      span.end();
+      // Remove so a LoopAgent re-run of the same agent opens a fresh span.
+      state.agentSpans.delete(agentName);
+    });
     return undefined;
   }
 
@@ -700,6 +770,7 @@ export class WeaveAdkPlugin {
       if (state.modelSpans.has(ctx.agentName)) {
         return;
       }
+      const agentSpan = this.ensureAgentSpan(state, ctx.agentName);
       const model = params.llmRequest.model ?? UNKNOWN_MODEL;
       const attributes: Attributes = {
         [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_CHAT,
@@ -713,7 +784,7 @@ export class WeaveAdkPlugin {
       const span = this.tracer().startSpan(
         `${OPERATION_CHAT} ${model}`,
         {attributes},
-        this.childContext(state.rootSpan)
+        this.childContext(agentSpan)
       );
       setLlmRequestAttributes(span, params.llmRequest);
       state.modelSpans.set(ctx.agentName, span);
@@ -809,6 +880,7 @@ export class WeaveAdkPlugin {
       if (!state || !ctx.agentName || !params.tool.name) {
         return;
       }
+      const agentSpan = this.ensureAgentSpan(state, ctx.agentName);
       let key = ctx.functionCallId;
       if (!key || state.toolSpans.has(key)) {
         // Missing/duplicate functionCallId: mint a synthetic key, recovered
@@ -837,7 +909,7 @@ export class WeaveAdkPlugin {
       const span = this.tracer().startSpan(
         `${OPERATION_EXECUTE_TOOL} ${params.tool.name}`,
         {attributes},
-        this.childContext(state.rootSpan)
+        this.childContext(agentSpan)
       );
       state.toolSpans.set(key, span);
     });
@@ -898,6 +970,78 @@ export class WeaveAdkPlugin {
           `(further occurrences suppressed): ${error}`
       );
     }
+  }
+
+  /**
+   * Returns the invoke_agent span for `agentName`, creating it and any
+   * missing ancestors on first activity.
+   */
+  private ensureAgentSpan(
+    state: InvocationState,
+    agentName: string,
+    depth: number = 0
+  ): OtelSpan {
+    const existing = state.agentSpans.get(agentName);
+    if (existing) {
+      return existing;
+    }
+
+    let parentSpan: OtelSpan;
+    const agent = findAgentInTree(state.rootAgent, agentName);
+    if (!agent || depth >= MAX_AGENT_ANCESTRY_DEPTH) {
+      // Out-of-tree agent (e.g. AgentTool): nest under the innermost open
+      // tool span, else the root.
+      parentSpan = this.innermostOpenToolSpan(state) ?? state.rootSpan;
+    } else if (
+      agent === state.rootAgent ||
+      !agent.parentAgent ||
+      agent.parentAgent.name === agentName
+    ) {
+      parentSpan = state.rootSpan;
+    } else {
+      parentSpan = this.ensureAgentSpan(
+        state,
+        agent.parentAgent.name,
+        depth + 1
+      );
+    }
+
+    const attributes: Attributes = {
+      [ATTR_GEN_AI_OPERATION_NAME]: OPERATION_INVOKE_AGENT,
+      [ATTR_GEN_AI_PROVIDER_NAME]: providerName(),
+      [ATTR_GEN_AI_AGENT_NAME]: agentName,
+      [ATTR_GEN_AI_AGENT_ID]: state.invocationId,
+    };
+    if (agent?.description) {
+      attributes[ATTR_GEN_AI_AGENT_DESCRIPTION] = agent.description;
+    }
+    // `model` is an `LlmAgent` field (a model-name string or a BaseLlm
+    // instance), not on the `BaseAgent` base type; only the string form is the
+    // OTel request.model (Python-integration parity).
+    const agentModel = (agent as {model?: unknown} | undefined)?.model;
+    if (typeof agentModel === 'string' && agentModel) {
+      attributes[ATTR_GEN_AI_REQUEST_MODEL] = agentModel;
+    }
+    if (state.conversationId) {
+      attributes[ATTR_GEN_AI_CONVERSATION_ID] = state.conversationId;
+    }
+    const span = this.tracer().startSpan(
+      `${OPERATION_INVOKE_AGENT} ${agentName}`,
+      {attributes},
+      this.childContext(parentSpan)
+    );
+    state.agentSpans.set(agentName, span);
+    return span;
+  }
+
+  private innermostOpenToolSpan(state: InvocationState): OtelSpan | null {
+    // toolSpans is insertion-ordered and pruned on close, so the last open
+    // span is the innermost.
+    let innermost: OtelSpan | null = null;
+    for (const span of state.toolSpans.values()) {
+      innermost = span;
+    }
+    return innermost;
   }
 
   private endToolSpan(
@@ -1028,6 +1172,12 @@ export class WeaveAdkPlugin {
       span.end();
     }
     state.toolSpans.clear();
+
+    // End agent spans children-first (reverse of creation order).
+    for (const span of [...state.agentSpans.values()].reverse()) {
+      span.end();
+    }
+    state.agentSpans.clear();
 
     if (options.interrupted) {
       state.rootSpan.setAttribute(ATTR_ADK_INTERRUPTED, true);
