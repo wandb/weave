@@ -5,7 +5,6 @@ import {
 import type {
   Response,
   ResponseFunctionToolCall,
-  ResponseOutputItem,
 } from 'openai/resources/responses/responses';
 import * as weave from '../../../src';
 import {type Turn, type Message, type MessagePart} from '../../../src';
@@ -13,6 +12,7 @@ import {clearWeaveTracerProvider} from '../../../src/genai/provider';
 import {spanSnapshot, type SpanSnapshotOpts} from './common';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
+import {openAIResponse} from 'helpers/openaiHelpers';
 
 let mockResponses: Response[] = [];
 
@@ -135,81 +135,9 @@ const agent: Agent = {
   tools: [calculateTool, getWeatherTool],
 };
 
-/**
- * Build an OpenAI Responses-API `Response` from the bits of data a mock
- * actually cares about. Fills in the long tail of required-but-irrelevant
- * fields (tool_choice, parallel_tool_calls, etc.) with safe defaults so
- * the mocks stay readable.
- */
-function response(opts: {
-  id: string;
-  text?: string;
-  reasoning?: string;
-  toolCalls?: Array<{callId: string; name: string; args: object; id?: string}>;
-  usage: {input: number; output: number; reasoning?: number; cached?: number};
-  createdAt: Date;
-}): Response {
-  const output: ResponseOutputItem[] = [];
-
-  if (opts.reasoning !== undefined) {
-    output.push({
-      type: 'reasoning',
-      id: `${opts.id}-reasoning`,
-      summary: [{type: 'summary_text', text: opts.reasoning}],
-    });
-  }
-
-  if (opts.text !== undefined) {
-    output.push({
-      type: 'message',
-      id: `${opts.id}-msg`,
-      role: 'assistant',
-      status: 'completed',
-      content: [{type: 'output_text', text: opts.text, annotations: []}],
-    });
-  }
-
-  for (const tc of opts.toolCalls ?? []) {
-    output.push({
-      type: 'function_call',
-      id: tc.id ?? `${opts.id}-${tc.callId}`,
-      call_id: tc.callId,
-      name: tc.name,
-      arguments: JSON.stringify(tc.args),
-      status: 'completed',
-    });
-  }
-
-  return {
-    id: opts.id,
-    object: 'response',
-    created_at: Math.floor(opts.createdAt.getTime() / 1000),
-    model: 'gpt-4o-mini',
-    output,
-    output_text: opts.text ?? '',
-    error: null,
-    incomplete_details: null,
-    instructions: null,
-    metadata: null,
-    parallel_tool_calls: true,
-    temperature: null,
-    tool_choice: 'auto',
-    tools: [],
-    top_p: null,
-    status: 'completed',
-    usage: {
-      input_tokens: opts.usage.input,
-      output_tokens: opts.usage.output,
-      total_tokens: opts.usage.input + opts.usage.output,
-      input_tokens_details: {cached_tokens: opts.usage.cached ?? 0},
-      output_tokens_details: {reasoning_tokens: opts.usage.reasoning ?? 0},
-    },
-  };
-}
-
 // Turn 1 — "How warm is Tokyo?"
 
-const TURN1_PLAN_MOCK = response({
+const TURN1_PLAN_MOCK = openAIResponse({
   id: 'resp-t1-plan',
   reasoning:
     "The user wants Tokyo's current temperature. I have a `get_weather` " +
@@ -219,7 +147,7 @@ const TURN1_PLAN_MOCK = response({
   createdAt: new Date('2026-05-29T10:00:00.000Z'),
 });
 
-const TURN1_ANSWER_MOCK = response({
+const TURN1_ANSWER_MOCK = openAIResponse({
   id: 'resp-t1-answer',
   text: 'Tokyo is 28°C and humid.',
   reasoning:
@@ -231,7 +159,7 @@ const TURN1_ANSWER_MOCK = response({
 
 // Turn 2 — "What about San Francisco and London?"
 
-const TURN2_PLAN_MOCK = response({
+const TURN2_PLAN_MOCK = openAIResponse({
   id: 'resp-t2-plan',
   reasoning:
     'Two independent cities to look up. Issue both `get_weather` calls in ' +
@@ -244,7 +172,7 @@ const TURN2_PLAN_MOCK = response({
   createdAt: new Date('2026-05-29T10:00:05.000Z'),
 });
 
-const TURN2_ANSWER_MOCK = response({
+const TURN2_ANSWER_MOCK = openAIResponse({
   id: 'resp-t2-answer',
   text: 'San Francisco is 18°C and foggy. London is 12°C and cloudy.',
   reasoning:
@@ -256,7 +184,7 @@ const TURN2_ANSWER_MOCK = response({
 
 // Turn 3 — "How much warmer is Tokyo than San Francisco?"
 
-const TURN3_PLAN_MOCK = response({
+const TURN3_PLAN_MOCK = openAIResponse({
   id: 'resp-t3-plan',
   reasoning:
     'Conversation history has Tokyo at 28°C (turn 1) and San Francisco at ' +
@@ -269,7 +197,7 @@ const TURN3_PLAN_MOCK = response({
   createdAt: new Date('2026-05-29T10:00:10.000Z'),
 });
 
-const TURN3_ANSWER_MOCK = response({
+const TURN3_ANSWER_MOCK = openAIResponse({
   id: 'resp-t3-answer',
   text: 'Tokyo is 10°C warmer than San Francisco.',
   reasoning:

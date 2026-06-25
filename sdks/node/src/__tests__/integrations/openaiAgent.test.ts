@@ -1,11 +1,11 @@
 import {
   Agent,
+  OpenAIResponsesModel,
   run,
   Runner,
   setTraceProcessors,
   setTracingDisabled,
   tool,
-  Usage,
   withAgentSpan,
   withCustomSpan,
   withFunctionSpan,
@@ -19,7 +19,8 @@ import {
   withTrace,
   withTranscriptionSpan,
 } from '@openai/agents';
-import type {Model, ModelRequest, ModelResponse} from '@openai/agents';
+import type {ModelRequest} from '@openai/agents';
+import OpenAI from 'openai';
 import {
   InMemorySpanExporter,
   type ReadableSpan,
@@ -32,6 +33,7 @@ import {initWithCustomTraceServer} from '../clientMock';
 import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
 import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
+import {openAIResponse} from '../helpers/openaiHelpers';
 import state from 'weave/state';
 import {packageVersion} from 'weave/utils/packageVersion';
 
@@ -743,18 +745,23 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 /**
  * Returns canned responses in sequence.
  */
-class MockAgent implements Model {
+class MockAgent extends OpenAIResponsesModel {
   private turn = 0;
 
-  constructor(private readonly responses: ModelResponse[]) {}
+  constructor(private readonly turns: OpenAI.Responses.Response[]) {
+    super(new OpenAI({apiKey: 'mock'}), 'mock-model');
+  }
 
-  async getResponse(_req: ModelRequest): Promise<ModelResponse> {
-    const response = this.responses[this.turn];
-    if (!response) {
+  protected async _fetchResponse(
+    _request: ModelRequest,
+    _stream: false
+  ): Promise<OpenAI.Responses.Response> {
+    const turn = this.turns[this.turn];
+    if (!turn) {
       throw new Error(`MockAgent: no response for turn ${this.turn}`);
     }
     this.turn += 1;
-    return response;
+    return turn;
   }
 
   getStreamedResponse(): AsyncIterable<never> {
@@ -773,41 +780,26 @@ function callData(call: Call) {
   };
 }
 
-function assistantMessage(text: string, id = 'msg'): ModelResponse {
-  return {
-    output: [
-      {
-        id,
-        type: 'message',
-        role: 'assistant',
-        status: 'completed',
-        content: [{type: 'output_text', text}],
-      },
-    ],
-    usage: new Usage({inputTokens: 3, outputTokens: 4, totalTokens: 7}),
-    responseId: `resp-${id}`,
-  };
+function assistantMessage(text: string, id = 'msg'): OpenAI.Responses.Response {
+  return openAIResponse({
+    id: `resp-${id}`,
+    text,
+    usage: {input: 3, output: 4},
+    createdAt: new Date(0),
+  });
 }
 
 function toolCall(
   name: string,
   args: Record<string, unknown>,
   callId = 'call-1'
-): ModelResponse {
-  return {
-    output: [
-      {
-        id: `fcall-${callId}`,
-        type: 'function_call',
-        callId,
-        name,
-        status: 'completed',
-        arguments: JSON.stringify(args),
-      },
-    ],
-    usage: new Usage({inputTokens: 5, outputTokens: 6, totalTokens: 11}),
-    responseId: `resp-${callId}`,
-  };
+): OpenAI.Responses.Response {
+  return openAIResponse({
+    id: `resp-${callId}`,
+    toolCalls: [{callId, name, args, id: `fcall-${callId}`}],
+    usage: {input: 5, output: 6},
+    createdAt: new Date(0),
+  });
 }
 
 function withOpenAITracingEnabled() {
