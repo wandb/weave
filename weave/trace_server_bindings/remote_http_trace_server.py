@@ -684,6 +684,39 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             agent_types.AgentVersionsQueryRes,
         )
 
+    @validate_call
+    def agent_spans_stats(
+        self, req: agent_types.AgentSpanStatsReq
+    ) -> agent_types.AgentSpanStatsRes:
+        return self._generic_request(
+            "/agents/spans/stats",
+            req,
+            agent_types.AgentSpanStatsReq,
+            agent_types.AgentSpanStatsRes,
+        )
+
+    @validate_call
+    def agent_custom_attrs_schema(
+        self, req: agent_types.AgentCustomAttrsSchemaReq
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        return self._generic_request(
+            "/agents/spans/custom-attrs/schema",
+            req,
+            agent_types.AgentCustomAttrsSchemaReq,
+            agent_types.AgentCustomAttrsSchemaRes,
+        )
+
+    @validate_call
+    def agent_search(
+        self, req: agent_types.AgentSearchReq
+    ) -> agent_types.AgentSearchRes:
+        return self._generic_request(
+            "/agents/search",
+            req,
+            agent_types.AgentSearchReq,
+            agent_types.AgentSearchRes,
+        )
+
     # Call API
     @validate_call
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:

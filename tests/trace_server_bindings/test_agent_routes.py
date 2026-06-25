@@ -7,6 +7,7 @@ the response is parsed back into the correct typed model.
 
 from __future__ import annotations
 
+import datetime
 import json
 from unittest.mock import MagicMock, patch
 
@@ -96,6 +97,48 @@ def _mock_response(json_data: dict | None = None) -> MagicMock:
             agent_types.AgentVersionsQueryRes,
             {"versions": [], "total_count": 0},
             id="agent_versions_query",
+        ),
+        pytest.param(
+            "agent_spans_stats",
+            agent_types.AgentSpanStatsReq(
+                project_id="entity/project",
+                start=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+                end=datetime.datetime(2024, 1, 1, 1, tzinfo=datetime.timezone.utc),
+                metrics=[
+                    agent_types.AgentSpanStatsMetricSpec(
+                        alias="input_tokens",
+                        value_type="number",
+                        value=agent_types.AgentSpanValueRef(
+                            source="field", key="usage.input_tokens"
+                        ),
+                        aggregations=["sum"],
+                    )
+                ],
+            ),
+            "/agents/spans/stats",
+            agent_types.AgentSpanStatsRes,
+            {
+                "start": "2024-01-01T00:00:00+00:00",
+                "end": "2024-01-01T01:00:00+00:00",
+                "timezone": "UTC",
+            },
+            id="agent_spans_stats",
+        ),
+        pytest.param(
+            "agent_custom_attrs_schema",
+            agent_types.AgentCustomAttrsSchemaReq(project_id="entity/project"),
+            "/agents/spans/custom-attrs/schema",
+            agent_types.AgentCustomAttrsSchemaRes,
+            {"attributes": []},
+            id="agent_custom_attrs_schema",
+        ),
+        pytest.param(
+            "agent_search",
+            agent_types.AgentSearchReq(project_id="entity/project", query="error"),
+            "/agents/search",
+            agent_types.AgentSearchRes,
+            {"results": [], "total_conversations": 0},
+            id="agent_search",
         ),
     ],
 )
