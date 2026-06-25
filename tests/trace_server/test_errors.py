@@ -7,6 +7,7 @@ from weave.trace_server.errors import (
     InvalidFieldError,
     InvalidRequest,
     ObjectNameTypeCollision,
+    QueryTooExpensiveError,
     handle_clickhouse_query_error,
     handle_server_exception,
 )
@@ -62,6 +63,32 @@ def test_clickhouse_bad_query_parameter_returns_400_with_real_detail() -> None:
 
     result = handle_server_exception(BadQueryParameterError(error_msg))
     assert result.status_code == 400
+
+
+def test_clickhouse_too_slow_returns_400_with_error_code() -> None:
+    """TOO_SLOW (ClickHouse code 160 estimated-time guard) is a too-broad query: a
+    fixable client error -> 400 with scope guidance and a machine-readable error_code,
+    not a 502 the SDK then retries against a deterministically doomed query.
+    """
+    error_msg = (
+        "Code: 160. DB::Exception: Estimated query execution time (36000.4 seconds) "
+        "is too long. Maximum: 36000. Estimated rows to process: 455326771 "
+        "(15287934 read in 1208.7 seconds): While executing MergeTreeSelect. "
+        "(TOO_SLOW) (version 26.2.1.413 (official build))"
+    )
+    exc = CHDatabaseError(error_msg)
+
+    with pytest.raises(QueryTooExpensiveError, match="limit the scope"):
+        handle_clickhouse_query_error(exc)
+
+    result = handle_server_exception(
+        QueryTooExpensiveError("Query is too expensive to run on this dataset.")
+    )
+    assert result.status_code == 400
+    assert result.message == {
+        "reason": "Query is too expensive to run on this dataset.",
+        "error_code": "QUERY_TOO_EXPENSIVE",
+    }
 
 
 def test_invalid_field_error_maps_to_422() -> None:
