@@ -15,10 +15,11 @@ import datetime
 import re
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
-from typing import Any, NamedTuple, TypeAlias
+from typing import Any, NamedTuple, TypeAlias, TypeVar
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
+    MAX_CONVERSATION_SPANS,
     OP_INVOKE_AGENT,
     SEARCH_CONTENT_PREVIEW_CHARS,
     SPAN_GROUP_AGGREGATE_COLS,
@@ -1122,15 +1123,15 @@ def make_conversation_previews_query(
 ) -> str:
     """First/last message previews for an explicit set of conversations.
 
-    Deliberately scoped to ``conversation_id IN (...)`` — the page's already
-    computed conversation_ids — so the wide ``input_messages`` / ``output_messages``
+    Deliberately scoped to `conversation_id IN (...)` — the page's already
+    computed conversation_ids — so the wide `input_messages` / `output_messages`
     columns are only read for the conversations actually shown, not for every
-    span matching the list filters. (A grouped ``argMin``/``argMax`` folded into
+    span matching the list filters. (A grouped `argMin`/`argMax` folded into
     the main list query would read those columns for the entire filter match
-    before LIMIT.) The bloom-filter skip index on ``conversation_id`` plus the
+    before LIMIT.) The bloom-filter skip index on `conversation_id` plus the
     optional time range bound the scan further.
 
-    ``argMinIf``/``argMaxIf`` pick the earliest input and latest output span that
+    `argMinIf`/`argMaxIf` pick the earliest input and latest output span that
     actually carries messages; the handler turns the arrays into preview text.
     """
     pid_slot = pb.add(project_id, param_type="String")
@@ -1150,6 +1151,66 @@ def make_conversation_previews_query(
         SELECT s.conversation_id AS conversation_id,
                argMinIf(s.input_messages, s.started_at, length(s.input_messages) > 0) AS first_input_messages,
                argMaxIf(s.output_messages, s.ended_at, length(s.output_messages) > 0) AS last_output_messages
+        FROM spans s
+        WHERE {where}
+        GROUP BY conversation_id
+    """
+
+
+def make_conversation_spans_query(
+    pb: ParamBuilder,
+    project_id: str,
+    conversation_ids: Collection[str],
+    *,
+    started_after: datetime.datetime | None = None,
+    started_before: datetime.datetime | None = None,
+    max_spans: int = MAX_CONVERSATION_SPANS,
+) -> str:
+    """Per-conversation span sequence for an explicit set of conversations.
+
+    Scoped to `conversation_id IN (...)` and reads only scalar columns (no
+    message bodies). Returns one row per conversation with a `spans` array of
+    `(started_at, operation_name, trace_id, span_id, status_code, duration_ms)` tuples,
+    sorted by `(started_at, span_id)` and capped at `max_spans` keeping the most
+    recent; `started_at` is only the sort key and is dropped by the handler.
+    """
+    pid_slot = pb.add(project_id, param_type="String")
+    ids_slot = pb.add(list(conversation_ids), param_type="Array(String)")
+    where_conditions = [
+        _project_filter_sql("s.project_id", pid_slot),
+        f"s.conversation_id IN {ids_slot}",
+    ]
+    add_time_filters(
+        where_conditions,
+        pb,
+        started_after=started_after,
+        started_before=started_before,
+    )
+    where = " AND ".join(where_conditions)
+    cap = int(max_spans)
+    duration_ms = (
+        "if(s.ended_at > s.started_at, "
+        "toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at), "
+        "0)"
+    )
+    return f"""
+        SELECT s.conversation_id AS conversation_id,
+               arraySlice(
+                   arraySort(
+                       x -> (x.1, x.4),
+                       groupArray(
+                           tuple(
+                               s.started_at,
+                               s.operation_name,
+                               s.trace_id,
+                               s.span_id,
+                               s.status_code,
+                               {duration_ms}
+                           )
+                       )
+                   ),
+                   -{cap}
+               ) AS spans
         FROM spans s
         WHERE {where}
         GROUP BY conversation_id
@@ -1744,3 +1805,24 @@ def safe_str(val: Any) -> str:
     if val is None:
         return ""
     return str(val)
+
+
+_LiteralT = TypeVar("_LiteralT", bound=str)
+
+
+def coerce_literal(
+    val: Any, allowed: frozenset[_LiteralT], default: _LiteralT
+) -> _LiteralT:
+    """Narrow an untyped value to one of `allowed`, falling back to `default`.
+
+    Turns a raw ClickHouse scalar into a Literal-typed value without letting an
+    unexpected input raise downstream: anything not in `allowed` becomes
+    `default`. `allowed` is typically `frozenset(get_args(SomeLiteral))`.
+
+    Returns the matching member of `allowed` (already typed `_LiteralT`) rather
+    than `val` itself, so no cast is needed.
+    """
+    for candidate in allowed:
+        if candidate == val:
+            return candidate
+    return default
