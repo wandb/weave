@@ -38,7 +38,7 @@ jobs:
       trace_server_migrator_tests: ${{ steps.trace_server_migrator.outputs.run_tests }}
       trace_server_distributed_tests: ${{ steps.trace_server_distributed.outputs.run_tests }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 100
           fetch-tags: false
