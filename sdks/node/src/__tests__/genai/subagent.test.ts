@@ -106,4 +106,23 @@ describe('SubAgent', () => {
       endedAt
     );
   });
+
+  it('nests child LLM and Tool spans under the subagent span', () => {
+    const turn = Turn.create({agentName: 'parent'});
+    const sub = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
+    sub.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
+    sub.startTool({name: 'search'}).end();
+    sub.end();
+    turn.end();
+
+    const spans = getExporter().getFinishedSpans();
+    const subSpan = findSub(spans);
+    const chatSpan = spans.find(s => s.name === 'chat');
+    const toolSpan = spans.find(s => s.name === 'execute_tool');
+    expect(chatSpan).toBeDefined();
+    expect(toolSpan).toBeDefined();
+    // Both children parent to the sub-agent, not the enclosing Turn.
+    expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+    expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+  });
 });
