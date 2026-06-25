@@ -1,6 +1,8 @@
+import contextlib
 import dataclasses
 import random
 from collections import defaultdict
+from collections.abc import Iterator
 from typing import Any
 
 import pydantic
@@ -11,6 +13,7 @@ import weave
 from tests.conftest import LATENCY_TOL
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
+from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
@@ -1263,3 +1266,94 @@ def test_get_scores(client, make_evals):
         "second_score": [56, 5656],
         "second_score2": [78, 7878],
     }
+
+
+# is_eval is write-only (the server doesn't echo it on reads), so these tests
+# assert on the outgoing call-end.
+
+
+@contextlib.contextmanager
+def _capture_call_ends(client) -> Iterator[dict[str, tsi.EndedCallSchemaForInsert]]:
+    """Record outgoing call-ends by id, delegating every call to the real server."""
+    inner = client.server
+    ends: dict[str, tsi.EndedCallSchemaForInsert] = {}
+
+    class _Recorder:
+        def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+            ends[req.end.id] = req.end
+            return inner.call_end(req)
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(inner, name)
+
+    client.server = _Recorder()
+    try:
+        yield ends
+    finally:
+        client.server = inner
+
+
+@pytest.mark.asyncio
+async def test_declarative_eval_sets_is_eval_on_call_ends(client):
+    examples = [
+        {"question": "What is the capital of France?", "expected": "Paris"},
+        {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+    ]
+
+    @weave.op
+    def match_score(expected: str, output: dict) -> dict:
+        return {"match": expected == output["generated_text"]}
+
+    @weave.op
+    def plain_op(x: int) -> int:
+        return x + 1
+
+    model = MyModel(prompt="World")
+    evaluation = Evaluation(dataset=examples, scorers=[match_score], trials=2)
+
+    with _capture_call_ends(client) as ends:
+        await evaluation.evaluate(model)
+        plain_op(1)
+        client.flush()
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id)
+    ).calls
+    op_by_id = {c.id: op_name_from_ref(c.op_name) for c in calls}
+
+    is_eval_by_op: dict[str, list] = defaultdict(list)
+    for call_id, end in ends.items():
+        is_eval_by_op[op_by_id[call_id]].append(end.is_eval)
+
+    # Root is matched by op_name (it carries no _weave_eval_meta) — the case a
+    # naive attrs-only formula would miss. Children are matched by attributes.
+    # 2 examples * 2 trials -> 4 of each per-example op; summarize once.
+    assert is_eval_by_op["Evaluation.evaluate"] == [True]
+    assert is_eval_by_op["Evaluation.predict_and_score"] == [True] * 4
+    assert is_eval_by_op["MyModel.predict"] == [True] * 4
+    assert is_eval_by_op["match_score"] == [True] * 4
+    assert is_eval_by_op["Evaluation.summarize"] == [True]
+    # Plain op: explicit False, never None.
+    assert is_eval_by_op["plain_op"] == [False]
+
+
+def test_imperative_eval_sets_is_eval_on_call_ends(client):
+    with _capture_call_ends(client) as ends:
+        ev = EvaluationLogger()
+        pred = ev.log_prediction(inputs={"a": 1}, output=2)
+        pred.log_score(scorer="my_scorer", score=True)
+        pred.finish()
+        ev.log_summary({"avg_score": 1.0})
+        client.flush()
+
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client.project_id)
+    ).calls
+    root_id = next(
+        c.id for c in calls if op_name_from_ref(c.op_name) == "Evaluation.evaluate"
+    )
+
+    # Every imperative call carries _weave_eval_meta, so every end is is_eval,
+    # including the root.
+    assert ends[root_id].is_eval is True
+    assert all(end.is_eval is True for end in ends.values())

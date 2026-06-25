@@ -33,6 +33,7 @@ from weave.trace.call import (
     CallsIter,
     _make_calls_iterator,
     elide_display_name,
+    is_eval_call,
     make_client_call,
 )
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
@@ -1259,6 +1260,7 @@ class WeaveClient:
                     project_id=project_id,
                     id=call.id,
                     trace_id=call.trace_id,
+                    is_eval=is_eval_call(call),
                     started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,

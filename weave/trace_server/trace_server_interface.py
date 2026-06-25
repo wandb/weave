@@ -229,6 +229,11 @@ class EndedCallSchemaForInsert(BaseModel):
     # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
     trace_id: str | None = None
 
+    # Eval marker the SDK sets on the call-end so a server-side ingest sampler
+    # can keep/drop eval calls whose end arrives bare. Optional for backward
+    # compatibility: None/absent means "client did not say" (server keeps).
+    is_eval: bool | None = None
+
     # End time is required
     ended_at: datetime.datetime
 
