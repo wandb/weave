@@ -72,6 +72,7 @@ import type {
 import type * as GoogleADK from '@google/adk';
 import type {
   BaseAgent as AdkBaseAgent,
+  BasePlugin as AdkBasePlugin,
   BaseTool as AdkBaseTool,
   Context as AdkCallbackContext,
   Event as AdkEvent,
@@ -585,7 +586,7 @@ function findAgentInTree(
  * ADK treats any non-`undefined` return as a short-circuit, so every callback
  * swallows its own errors and returns `undefined`.
  */
-export class WeaveAdkPlugin {
+export class WeaveAdkPlugin implements AdkBasePlugin {
   readonly name = WEAVE_ADK_PLUGIN_NAME;
 
   private readonly invocations = new Map<string, InvocationState>();
