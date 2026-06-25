@@ -976,6 +976,152 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_span_stats(
+        self,
+        *,
+        start: datetime.datetime,
+        metrics: list[agent_types.AgentSpanStatsMetricSpec],
+        end: datetime.datetime | None = None,
+        query: Query | None = None,
+        group_by: list[agent_types.AgentGroupByRef] | None = None,
+        granularity: int | None = None,
+        timezone: str = "UTC",
+    ) -> agent_types.AgentSpanStatsRes:
+        """Compute chart-ready aggregations over agent spans.
+
+        Covers the common time-series / grouped-metric case. For numeric-bucket
+        stats or other advanced options, call ``server.agent_spans_stats``
+        directly.
+
+        Args:
+            start: Start of the time range (inclusive).
+            metrics: One or more metrics to aggregate (e.g. token sums).
+            end: End of the time range. Defaults to now when omitted.
+            query: A mongo-style filter expression to restrict the spans.
+            group_by: Span fields to group the aggregations by.
+            granularity: Time-bucket width in seconds for time-series stats.
+            timezone: IANA timezone used to align time buckets.
+
+        Returns:
+            An ``AgentSpanStatsRes`` with `columns` and `rows`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_span_stats(start=start, metrics=metrics)
+            for row in resp.rows:
+                print(row)
+            ```
+        """
+        return self.server.agent_spans_stats(
+            agent_types.AgentSpanStatsReq(
+                project_id=self.project_id,
+                start=start,
+                end=end,
+                metrics=metrics,
+                query=query,
+                group_by=group_by or [],
+                granularity=granularity,
+                timezone=timezone,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_custom_attrs_schema(
+        self,
+        *,
+        query: Query | None = None,
+        started_after: datetime.datetime | None = None,
+        started_before: datetime.datetime | None = None,
+        limit: int = agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        offset: int = 0,
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        """Discover typed custom-attribute keys on matching agent spans.
+
+        Useful for populating filter/column pickers: returns the custom
+        attribute keys (and their value types) seen on the selected spans.
+
+        Args:
+            query: A mongo-style filter expression to restrict the spans.
+            started_after: Only consider spans started at/after this time.
+            started_before: Only consider spans started before this time.
+            limit: Maximum number of attribute keys to return.
+            offset: Number of keys to skip (for pagination).
+
+        Returns:
+            An ``AgentCustomAttrsSchemaRes`` with `attributes` and `has_more`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_custom_attrs_schema()
+            for attr in resp.attributes:
+                print(attr.key, attr.value_type, attr.span_count)
+            ```
+        """
+        return self.server.agent_custom_attrs_schema(
+            agent_types.AgentCustomAttrsSchemaReq(
+                project_id=self.project_id,
+                query=query,
+                started_after=started_after,
+                started_before=started_before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def search_agents(
+        self,
+        *,
+        query: str = "",
+        agent_name: str | None = None,
+        conversation_id: str | None = None,
+        trace_id: str | None = None,
+        limit: int = agent_types.DEFAULT_SEARCH_LIMIT,
+        offset: int = 0,
+    ) -> agent_types.AgentSearchRes:
+        """Search agent messages by content, grouped by conversation.
+
+        Searches message content (and/or the structured filters below) and
+        returns matching conversations with their matched messages. An empty
+        ``query`` turns this into structured retrieval over the filters.
+
+        Args:
+            query: Substring to match in message content. Empty matches all.
+            agent_name: Restrict to messages from this agent.
+            conversation_id: Restrict to a single conversation.
+            trace_id: Restrict to a single trace.
+            limit: Maximum number of matching messages to consider.
+            offset: Number of matches to skip (for pagination).
+
+        Returns:
+            An ``AgentSearchRes`` with `results` (matched conversations).
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.search_agents(query="timeout", agent_name="my-agent")
+            for conversation in resp.results:
+                print(conversation.conversation_id, conversation.matched_messages)
+            ```
+        """
+        return self.server.agent_search(
+            agent_types.AgentSearchReq(
+                project_id=self.project_id,
+                query=query,
+                agent_name=agent_name,
+                conversation_id=conversation_id,
+                trace_id=trace_id,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
     def create_annotation_queue(
         self,
         *,

@@ -9,14 +9,23 @@ fake server captures the request the client sends, which is client-side logic
 
 from __future__ import annotations
 
+import datetime
+
 import pytest
 
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.agents.types import (
+    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
     DEFAULT_AGENT_QUERY_LIMIT,
+    DEFAULT_SEARCH_LIMIT,
     AgentConversationChatRes,
+    AgentCustomAttrsSchemaRes,
+    AgentSearchRes,
     AgentSortBy,
     AgentSpansQueryRes,
+    AgentSpanStatsMetricSpec,
+    AgentSpanStatsRes,
+    AgentSpanValueRef,
     AgentsQueryRes,
     AgentTraceChatRes,
     AgentVersionsQueryRes,
@@ -37,6 +46,13 @@ class FakeAgentReadServer:
         self.spans_res = AgentSpansQueryRes(spans=[], groups=[], total_count=0)
         self.turn_res = AgentTraceChatRes(trace_id="trace-123")
         self.turns_res = AgentConversationChatRes(conversation_id="conv-123")
+        self.stats_res = AgentSpanStatsRes(
+            start=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
+            end=datetime.datetime(2024, 1, 1, 1, tzinfo=datetime.timezone.utc),
+            timezone="UTC",
+        )
+        self.schema_res = AgentCustomAttrsSchemaRes()
+        self.search_res = AgentSearchRes(results=[])
 
     def agent_agents_query(self, req):
         self.requests["agents"] = req
@@ -57,6 +73,18 @@ class FakeAgentReadServer:
     def agent_conversation_chat(self, req):
         self.requests["turns"] = req
         return self.turns_res
+
+    def agent_spans_stats(self, req):
+        self.requests["stats"] = req
+        return self.stats_res
+
+    def agent_custom_attrs_schema(self, req):
+        self.requests["schema"] = req
+        return self.schema_res
+
+    def agent_search(self, req):
+        self.requests["search"] = req
+        return self.search_res
 
 
 def _make_client(server: FakeAgentReadServer) -> WeaveClient:
@@ -161,3 +189,59 @@ def test_get_agent_spans_query_translation(agent_name, query, expected_query):
     req = server.requests["spans"]
     assert req.project_id == "entity/project"
     assert req.query == expected_query
+
+
+def test_agent_read_sdk_stats_schema_search_build_requests():
+    server = FakeAgentReadServer()
+    client = _make_client(server)
+
+    metric = AgentSpanStatsMetricSpec(
+        alias="input_tokens",
+        value_type="number",
+        value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
+        aggregations=["sum"],
+    )
+    start = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+    stats_res = client.get_agent_span_stats(
+        start=start, metrics=[metric], granularity=3600
+    )
+    assert stats_res is server.stats_res
+    req = server.requests["stats"]
+    assert req.project_id == "entity/project"
+    assert req.start == start
+    assert req.metrics == [metric]
+    assert req.granularity == 3600
+    assert req.timezone == "UTC"
+
+    schema_res = client.get_agent_custom_attrs_schema(limit=25, offset=5)
+    assert schema_res is server.schema_res
+    req = server.requests["schema"]
+    assert req.project_id == "entity/project"
+    assert req.limit == 25
+    assert req.offset == 5
+
+    search_res = client.search_agents(query="boom", agent_name="my-agent", limit=10)
+    assert search_res is server.search_res
+    req = server.requests["search"]
+    assert req.project_id == "entity/project"
+    assert req.query == "boom"
+    assert req.agent_name == "my-agent"
+    assert req.limit == 10
+
+
+def test_agent_read_sdk_search_and_schema_defaults():
+    server = FakeAgentReadServer()
+    client = _make_client(server)
+
+    client.search_agents()
+    req = server.requests["search"]
+    assert req.project_id == "entity/project"
+    assert req.query == ""
+    assert req.limit == DEFAULT_SEARCH_LIMIT
+    assert req.offset == 0
+
+    client.get_agent_custom_attrs_schema()
+    req = server.requests["schema"]
+    assert req.project_id == "entity/project"
+    assert req.limit == DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT
+    assert req.offset == 0
