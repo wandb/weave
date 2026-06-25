@@ -76,6 +76,50 @@ export class InMemoryTraceServer {
     },
   };
 
+  // Handles the hand-rolled v2 ingest endpoints (calls_complete + eager
+  // start/end). Mirrors the gorilla routes the SDK posts to directly.
+  request = async (params: {
+    path: string;
+    method?: string;
+    body?: {
+      batch?: Call[];
+      start?: Call;
+      end?: (Partial<Call> & {id: string}) | undefined;
+    };
+  }) => {
+    const {path, body} = params;
+    if (path.endsWith('/calls/complete')) {
+      for (const complete of body?.batch ?? []) {
+        const existing = this._calls.find(c => c.id === complete.id);
+        if (existing) {
+          Object.assign(existing, complete);
+        } else {
+          this._calls.push(complete);
+        }
+        this._updateChangeTime();
+      }
+      return {data: {}};
+    }
+    if (path.endsWith('/call/start')) {
+      const start = body?.start;
+      if (start) {
+        this._calls.push(start);
+        this._updateChangeTime();
+      }
+      return {data: {id: start?.id, trace_id: start?.trace_id}};
+    }
+    if (path.endsWith('/call/end')) {
+      const end = body?.end;
+      const call = end && this._calls.find(c => c.id === end.id);
+      if (call && end) {
+        Object.assign(call, end);
+        this._updateChangeTime();
+      }
+      return {data: {}};
+    }
+    throw new Error(`InMemoryTraceServer: unhandled request to ${path}`);
+  };
+
   calls = {
     callsStreamQueryPost: async (queryParams: QueryParams) => {
       let filteredCalls = this._calls.filter(

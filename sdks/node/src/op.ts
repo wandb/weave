@@ -5,6 +5,16 @@ import {type Op, type OpOptions, type OpRef, type CallMethod} from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 
+// Internal registry of ops whose call start should be sent eagerly (immediately
+// via the v2 single endpoints) instead of paired into a calls_complete write.
+// Reserved for SDK integrations with long-running spans that must be visible
+// before they finish (evaluations, streaming tracers). Not a public op option.
+const eagerOps = new WeakSet<object>();
+
+export function markOpEager(opFn: Op<any>): void {
+  eagerOps.add(opFn);
+}
+
 export interface MethodDecoratorContext {
   kind: 'method';
   name: string | symbol;
@@ -168,7 +178,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       parentCall,
       startTime,
       displayName,
-      Object.keys(attributes).length > 0 ? attributes : undefined
+      Object.keys(attributes).length > 0 ? attributes : undefined,
+      eagerOps.has(opWrapper)
     );
 
     try {
