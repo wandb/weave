@@ -428,11 +428,7 @@ export class ClaudeAgentOtelTracer {
           : [];
 
     for (const [model, rawUsage] of perModel) {
-      const attrs = usageAttributes(rawUsage);
-      if (Object.keys(attrs).length === 0) {
-        continue;
-      }
-      this.startChatSpan(model, attrs).end();
+      this.startChatSpan(model, usageAttributes(rawUsage)).end();
     }
   }
 
