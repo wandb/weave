@@ -10,6 +10,9 @@ import {Turn, type TurnInit} from './turn';
  * Start a new Session and install it as the current session.
  * Subsequent calls to `startTurn` will pick it up automatically.
  *
+ * Pass `attributes` to stamp custom (non-semconv) attributes on every
+ * span the session emits.
+ *
  * @example
  * weave.startSession({agentName: 'research-bot'});
  *
@@ -17,6 +20,7 @@ import {Turn, type TurnInit} from './turn';
  * weave.startSession({
  *   agentName: 'research-bot',
  *   sessionId: '019efa53-8a65-711c-b4c1-7c1cb72c0bb7',
+ *   attributes: {'myagent.version': '1.23'},
  * });
  */
 export function startSession(opts: SessionInit = {}): Session {

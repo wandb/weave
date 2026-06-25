@@ -1,4 +1,10 @@
-import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
+import {
+  type Attributes,
+  type Context,
+  type Span,
+  SpanKind,
+  trace,
+} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {_getGenaiState} from './context';
@@ -102,7 +108,8 @@ export class LLM extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
       [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
     };

@@ -1,5 +1,6 @@
 import {
   type AttributeValue,
+  type Attributes,
   type Context,
   ROOT_CONTEXT,
   type Span,
@@ -67,7 +68,8 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
     if (opts.agentName) {

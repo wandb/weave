@@ -1,6 +1,7 @@
-import {type Span, SpanKind} from '@opentelemetry/api';
+import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
+import {_getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
@@ -43,8 +44,10 @@ export class SubAgent extends SpanBase {
   }
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
+    const state = _getGenaiState();
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
       [ATTR_GEN_AI_AGENT_NAME]: opts.name,
     };

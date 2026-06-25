@@ -311,4 +311,42 @@ describe('genai api (top-level functions)', () => {
     const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
     expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
   });
+
+  test('startSession stamps custom attributes on every emitted span', () => {
+    startSession({
+      attributes: {
+        'weave.integration.name': 'wb-agent',
+        'weave.custom.run_id': 42,
+      },
+    });
+    startTurn({});
+    startLLM({model: 'gpt-4o'});
+    const tool = startTool({name: 'get_weather'});
+    tool.end();
+    endLLM();
+    endSession();
+
+    const spans = getExporter().getFinishedSpans();
+    expect(spans.map(s => s.name).sort()).toEqual([
+      'chat',
+      'execute_tool',
+      'invoke_agent',
+    ]);
+    for (const s of spans) {
+      expect(s.attributes['weave.integration.name']).toBe('wb-agent');
+      expect(s.attributes['weave.custom.run_id']).toBe(42);
+    }
+  });
+
+  test('custom attributes do not override the emitter`s own semconv keys', () => {
+    startSession({
+      attributes: {'gen_ai.operation.name': 'custom-loses'},
+    });
+    startTurn({});
+    endTurn();
+    endSession();
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(turnSpan.attributes['gen_ai.operation.name']).toBe('invoke_agent');
+  });
 });

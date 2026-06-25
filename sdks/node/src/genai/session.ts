@@ -1,3 +1,4 @@
+import type {Attributes} from '@opentelemetry/api';
 import {uuidv7} from 'uuidv7';
 
 import {_getGenaiState} from './context';
@@ -10,6 +11,13 @@ export interface SessionInit {
   /** Conversation ID propagated to every span under this session as
    *  `gen_ai.conversation.id`. Auto-generated if omitted. */
   sessionId?: string;
+  /**
+   * Custom attributes stamped on every span the session emits.
+   *
+   * A key here that collides with a span's own `gen_ai.*` / `weave.*`
+   * attribute is unsupported; the span's value wins.
+   */
+  attributes?: Attributes;
 }
 
 /**
@@ -22,7 +30,8 @@ export class Session {
   private constructor(
     public readonly agentName: string,
     public readonly model: string,
-    public readonly sessionId: string
+    public readonly sessionId: string,
+    public readonly attributes: Attributes
   ) {}
 
   static create(opts: SessionInit = {}): Session {
@@ -35,7 +44,8 @@ export class Session {
     const session = new Session(
       opts.agentName ?? '',
       opts.model ?? '',
-      opts.sessionId ?? uuidv7()
+      opts.sessionId ?? uuidv7(),
+      opts.attributes ?? {}
     );
     state.session = session;
     return session;
