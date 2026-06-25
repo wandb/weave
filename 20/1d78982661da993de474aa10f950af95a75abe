@@ -1,0 +1,24 @@
+## Conversation
+PR3 of the TOO_SLOW stack -- the weave-side of item 2 ("be more aggressive in killing expensive queries"). NOTE: the highest-leverage item-2 lever is NOT code -- it's lowering WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME for managed installs in core/helm (T-Mobile currently 36000s -> the guard fires only after ~16-20min of scanning). This PR adds a complementary, faster-acting mechanism.
+
+## Actions
+- environment.py: wf_clickhouse_max_rows_to_read() / wf_clickhouse_max_bytes_to_read() (int|None, unset=off), mirroring wf_clickhouse_max_estimated_execution_time.
+- clickhouse_trace_server_settings.py: read both; build CLICKHOUSE_READ_SCAN_CAP_SETTINGS (max_rows_to_read/max_bytes_to_read + read_overflow_mode='throw') only when set; merge into CLICKHOUSE_DEFAULT_QUERY_SETTINGS (read paths). Command settings stay base-only.
+- errors.py: handle_clickhouse_query_error branch `if "TOO_MANY_ROWS_OR_BYTES" in error_str` -> QueryTooExpensiveError (reuses PR1's class -> 400 + QUERY_TOO_EXPENSIVE error_code, so PR2's client handling covers it too).
+- tests: test_read_scan_caps_apply_to_reads_not_commands (settings, via the importlib.reload fixture; added the two env keys to ENV_KEYS); test_clickhouse_too_many_rows_or_bytes_returns_400 (errors). 18 pass; ruff clean (env file reformatted).
+
+## Errors & mistakes
+ruff format collapsed my wrapped logger.exception(...) calls back to one line in environment.py (they fit). No logic issues.
+
+## Hints & warnings
+- ClickHouse error code for read-scan overflow is 396 TOO_MANY_ROWS_OR_BYTES; the message text is "Limit for rows or bytes to read exceeded ... (TOO_MANY_ROWS_OR_BYTES)". I matched the name suffix (consistent with the other substring branches). I did NOT verify against a live ClickHouse with a tiny cap -- worth a quick integration check, but the suffix-match mirrors how MEMORY_LIMIT_EXCEEDED/TIMEOUT_EXCEEDED/TOO_SLOW are matched.
+- Default OFF on purpose: a row cap affects ALL read queries and could break legit large scans, so it's operator opt-in (same posture as the other CH guards). The weave PR provides the mechanism; core config activates it.
+- read_overflow_mode='throw' is the CH default but set explicitly so a future default change can't silently turn this into truncation (which would return wrong/partial results).
+
+## Codebase discoveries
+- Settings are module-level constants computed at import; the test suite reloads via importlib.reload (reload_settings fixture) with monkeypatched env.
+- merge_default_command_settings / CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = base only -> guards never touch mutations.
+
+## Open questions
+- Confirm the exact CH 396 message string against the deployed CH version (26.2.1.413) in an integration test before relying on the suffix match.
+- Pick concrete cap values for T-Mobile in core (needs their legit query-scan distribution).
