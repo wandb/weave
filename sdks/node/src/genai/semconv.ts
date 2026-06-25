@@ -21,6 +21,8 @@
 // Upstream attribute keys (verbatim copies)
 // ---------------------------------------------------------------------------
 
+export const ATTR_GEN_AI_AGENT_DESCRIPTION = 'gen_ai.agent.description';
+export const ATTR_GEN_AI_AGENT_ID = 'gen_ai.agent.id';
 export const ATTR_GEN_AI_AGENT_NAME = 'gen_ai.agent.name';
 export const ATTR_GEN_AI_CONVERSATION_ID = 'gen_ai.conversation.id';
 export const ATTR_GEN_AI_INPUT_MESSAGES = 'gen_ai.input.messages';

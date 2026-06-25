@@ -1,5 +1,6 @@
 export {wrapOpenAI} from './openai';
 export {wrapGoogleGenAI} from './googleGenAI';
+export {WeaveAdkPlugin} from './googleAdk';
 export {
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
