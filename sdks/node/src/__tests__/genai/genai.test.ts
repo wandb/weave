@@ -7,9 +7,8 @@ import type {
   ChatCompletionMessageFunctionToolCall,
 } from 'openai/resources/chat/completions';
 import * as weave from '../../../src';
-import {login, type Turn, type Message, type MessagePart} from '../../../src';
+import {type Turn, type Message, type MessagePart} from '../../../src';
 import {clearWeaveTracerProvider} from '../../../src/genai/provider';
-import {getWandbConfigs} from '../../wandb/settings';
 import {spanSnapshot, type SpanSnapshotOpts} from './common';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
@@ -302,9 +301,10 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
 describe('GenAI', () => {
   let exporter: InMemorySpanExporter;
 
-  beforeEach(async () => {
-    const {apiKey} = getWandbConfigs();
-    await login(apiKey ?? '');
+  beforeEach(() => {
+    // Stub the key the OTel exporter reads; tracing runs through the
+    // in-memory server below, so no real backend connection is needed.
+    process.env.WANDB_API_KEY = 'test-api-key';
 
     exporter = new InMemorySpanExporter();
 
