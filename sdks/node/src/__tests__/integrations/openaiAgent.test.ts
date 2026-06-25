@@ -36,6 +36,7 @@ import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import {openAIResponse} from '../helpers/openaiHelpers';
 import state from 'weave/state';
 import {packageVersion} from 'weave/utils/packageVersion';
+import {spanSnapshot} from '../genai/common';
 
 describe('OpenAI Agents Integration', () => {
   withEnv({WEAVE_USE_OTEL_V2: false});
@@ -654,36 +655,101 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     const spans = await emittedSpans();
 
-    const agentSpan = spans.find(s => s.name === 'invoke_agent Assistant');
-    expect(agentSpan).toBeDefined();
-    expect(agentSpan!.attributes).toMatchObject({
-      'gen_ai.operation.name': 'invoke_agent',
-      'gen_ai.agent.name': 'Assistant',
-      'gen_ai.conversation.id': 'some-conversation-id',
-      'gen_ai.provider.name': 'openai',
-      'weave.openai_agents.agent.tools': ['get_weather'],
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
-    });
+    expect(spans.map(s => spanSnapshot(s))).toMatchInlineSnapshot(`
+      [
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.provider.name": "openai",
+            "integration.meta.package_name": "@openai/agents",
+            "integration.name": "openai_agents",
+            "integration.version": "0.15.1",
+            "weave.openai_agents.agent.output_type": "text",
+            "weave.openai_agents.agent.tools": [
+              "get_weather",
+            ],
+            "weave.openai_agents.span_id": "<span_id>",
+            "weave.openai_agents.trace_id": "<trace_id>",
+          },
+          "endTime": "<timestamp>",
+          "startTime": "<timestamp>",
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What is the weather in Tokyo?"}]}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call-tokyo","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
+            "gen_ai.output.type": "text",
+            "gen_ai.provider.name": "openai",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.response.id": "resp-call-tokyo",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.usage.cache_read.input_tokens": 0,
+            "gen_ai.usage.input_tokens": 5,
+            "gen_ai.usage.output_tokens": 6,
+            "gen_ai.usage.reasoning.output_tokens": 0,
+            "integration.meta.package_name": "@openai/agents",
+            "integration.name": "openai_agents",
+            "integration.version": "0.15.1",
+            "weave.openai_agents.span_id": "<span_id>",
+            "weave.openai_agents.trace_id": "<trace_id>",
+          },
+          "endTime": "<timestamp>",
+          "startTime": "<timestamp>",
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.call.arguments": "{"city":"Tokyo"}",
+            "gen_ai.tool.call.result": "Tokyo: Sunny, 22°C",
+            "gen_ai.tool.name": "get_weather",
+            "integration.meta.package_name": "@openai/agents",
+            "integration.name": "openai_agents",
+            "integration.version": "0.15.1",
+            "weave.openai_agents.span_id": "<span_id>",
+            "weave.openai_agents.trace_id": "<trace_id>",
+          },
+          "endTime": "<timestamp>",
+          "startTime": "<timestamp>",
+        },
+        {
+          "attributes": {
+            "gen_ai.agent.name": "Assistant",
+            "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What is the weather in Tokyo?"}]},{"role":"assistant","parts":[{"type":"tool_call","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is sunny."}]}]",
+            "gen_ai.output.type": "text",
+            "gen_ai.provider.name": "openai",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.response.id": "resp-msg-final",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.usage.cache_read.input_tokens": 0,
+            "gen_ai.usage.input_tokens": 3,
+            "gen_ai.usage.output_tokens": 4,
+            "gen_ai.usage.reasoning.output_tokens": 0,
+            "integration.meta.package_name": "@openai/agents",
+            "integration.name": "openai_agents",
+            "integration.version": "0.15.1",
+            "weave.openai_agents.span_id": "<span_id>",
+            "weave.openai_agents.trace_id": "<trace_id>",
+          },
+          "endTime": "<timestamp>",
+          "startTime": "<timestamp>",
+        },
+      ]
+    `);
 
+    const agentSpan = spans.find(s => s.name === 'invoke_agent Assistant');
     const executeToolSpan = spans.find(
       s => s.name === 'execute_tool get_weather'
     )!;
-    expect(executeToolSpan).toBeDefined();
-    expect(executeToolSpan.attributes).toMatchObject({
-      'gen_ai.operation.name': 'execute_tool',
-      'gen_ai.agent.name': 'Assistant',
-      'gen_ai.conversation.id': 'some-conversation-id',
-      'gen_ai.tool.name': 'get_weather',
-      // The Agents SDK serializes the tool's JSON args/result as strings
-      // on the FunctionSpanData, which we lift straight to semconv.
-      'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
-      'gen_ai.tool.call.result': 'Tokyo: Sunny, 22°C',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
-    });
     // Span is a child of the agent span.
     expect(executeToolSpan.parentSpanId).toBe(agentSpan!.spanContext().spanId);
     expect(executeToolSpan.spanContext().traceId).toBe(
@@ -729,7 +795,12 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
   async function emittedSpans(): Promise<ReadableSpan[]> {
     await weave.flushOTel();
-    return exporter.getFinishedSpans();
+    const spans = exporter.getFinishedSpans();
+    const sorted = [...spans].sort((a, b) => {
+      const sec = a.startTime[0] - b.startTime[0];
+      return sec !== 0 ? sec : a.startTime[1] - b.startTime[1];
+    });
+    return sorted;
   }
 
   function findBySpanId(
