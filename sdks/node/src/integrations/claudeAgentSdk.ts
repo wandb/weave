@@ -21,16 +21,8 @@
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
+import state from '../state';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
-
-// Idempotency marker stamped on each wrapped exports object. It is per-object
-// by design, not a single global flag in state.ts: the CJS and ESM hooks fire
-// on distinct exports views and wrapClaudeAgentSdk() can wrap a user's own
-// import — each needs its `query` wrapped exactly once, so the marker must
-// travel with the object rather than gate all of them on one boolean. Using
-// Symbol.for keeps the marker identical across duplicate CJS/ESM copies of this
-// module (the dual-package hazard state.ts otherwise handles via globalSingleton).
-const PATCHED = Symbol.for('weave.claudeAgentSdk.patched');
 
 /** Minimum `@anthropic-ai/claude-agent-sdk` version this integration supports. */
 const SUPPORTED_VERSION_RANGE = '>= 0.3.178';
@@ -134,36 +126,35 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
  * directly from tests.
  *
  * `exports` is `any` by the module-loader `HookFn` contract: it's an opaque
- * third-party module namespace we probe (`query`), mutate in place, mark with a
- * symbol, and wrap in a `Proxy` — its keys are both string and symbol, and its
- * members may be getter-only or frozen. A precise type would only push casts
- * back to every access here and to the `wrapClaudeAgentSdk<T>` boundary, so we
- * keep the contract's `any`.
+ * third-party module namespace we probe (`query`), mutate in place, and wrap in
+ * a `Proxy` — its keys are both string and symbol, and its members may be
+ * getter-only or frozen. A precise type would only push casts back to every
+ * access here and to the `wrapClaudeAgentSdk<T>` boundary, so we keep the
+ * contract's `any`.
  */
 export function patchClaudeAgentSdk(exports: any): any {
-  if (
-    exports == null ||
-    typeof exports.query !== 'function' ||
-    exports[PATCHED]
-  ) {
+  if (exports == null || typeof exports.query !== 'function') {
     return exports;
   }
+
+  // Idempotency without mutating the (often getter-only/frozen) exports object:
+  // a WeakMap maps each object we've patched to the view to hand back. See
+  // {@link state.integrations.claudeAgents.patchedExports}.
+  const {patchedExports} = state.integrations.claudeAgents;
+  const alreadyPatched = patchedExports.get(exports);
+  if (alreadyPatched) {
+    return alreadyPatched;
+  }
+
   const wrapped = wrapQuery(exports.query);
 
   // Fast path: a writable `query` data property (the SDK's own bundled build
   // and the plain test doubles). Mutate in place so callers already holding the
-  // module object observe the wrapped query, then mark it to avoid double-wrap.
+  // module object observe the wrapped query, then record it to avoid double-wrap.
   try {
     exports.query = wrapped;
     if (exports.query === wrapped) {
-      try {
-        Object.defineProperty(exports, PATCHED, {
-          value: true,
-          enumerable: false,
-        });
-      } catch {
-        // Frozen module namespace — wrapping above still applied; skip the marker.
-      }
+      patchedExports.set(exports, exports);
       return exports;
     }
   } catch {
@@ -176,18 +167,19 @@ export function patchClaudeAgentSdk(exports: any): any {
   // wrapped `query` and forwards every other member (including `__esModule` and
   // the remaining named exports) to the original. The require()/import hooks
   // use this return value, so callers receive the wrapped query.
-  return new Proxy(exports, {
+  const proxy = new Proxy(exports, {
     get(target, prop, receiver) {
       if (prop === 'query') {
         return wrapped;
       }
-      // Report as patched so a second hook invocation on this view is a no-op.
-      if (prop === PATCHED) {
-        return true;
-      }
       return Reflect.get(target, prop, receiver);
     },
   });
+  // Record both the original and the proxy, so re-patching whichever the loader
+  // feeds back is a no-op that returns the same wrapped view.
+  patchedExports.set(exports, proxy);
+  patchedExports.set(proxy, proxy);
+  return proxy;
 }
 
 /**
