@@ -19,6 +19,7 @@ from httpx import HTTPStatusError as HTTPError
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.durability.wal_manager import WALManager
+from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.shared.digest import (
     compute_file_digest,
     compute_object_digest,
@@ -107,7 +108,7 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -1254,11 +1255,23 @@ class WeaveClient:
                 wb_run_context_end.step if wb_run_context_end else None
             )
 
+            # Mark eval calls (root by op_name substring, children by attribute).
+            # op_name can raise if the op never saved, so fall back to attrs only.
+            try:
+                op_name = call.op_name
+            except Exception:
+                op_name = ""
+            is_eval = (
+                EVAL_META_KEY in (call.attributes or {})
+                or EVALUATION_RUN_OP_NAME in op_name
+            )
+
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
                     id=call.id,
                     trace_id=call.trace_id,
+                    is_eval=is_eval,
                     started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,
