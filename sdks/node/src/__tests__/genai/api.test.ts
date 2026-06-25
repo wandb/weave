@@ -272,6 +272,23 @@ describe('genai api (top-level functions)', () => {
     expect(getExporter().getFinishedSpans()).toHaveLength(2);
   });
 
+  it('endSession passes options when implicitly ending LLM and Turn', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:01.700Z');
+
+    startSession({});
+    startTurn({startTime: startedAt});
+    startLLM({model: 'gpt-4o', startTime: startedAt});
+
+    endSession({endTime: endedAt});
+
+    const spans = getExporter().getFinishedSpans();
+    const turnSpan = findSpan(spans, 'invoke_agent');
+    const llmSpan = findSpan(spans, 'chat');
+    expectSpanTimesToMatch(turnSpan, startedAt, endedAt);
+    expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
+  });
+
   it('startTurn and endTurn respect given times', () => {
     const startedAt = new Date('2026-05-29T10:00:00.000Z');
     const endedAt = new Date('2026-05-29T10:00:01.700Z');
