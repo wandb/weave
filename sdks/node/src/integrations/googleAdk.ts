@@ -9,7 +9,17 @@
  * start of the run. The agent callbacks are still implemented, so nesting
  * improves automatically if a later ADK version starts calling them.
  *
- * Usage:
+ * Implicit: once `weave.init()` runs, ADK runners are traced automatically.
+ * CJS apps must `require('weave')` before `@google/adk`.
+ * ```typescript
+ * import * as weave from 'weave';
+ * import {InMemoryRunner} from '@google/adk';
+ *
+ * await weave.init('my-project');
+ * const runner = new InMemoryRunner(myAgent); // auto-traced
+ * ```
+ *
+ * Explicit (no module hooks, e.g. bundlers):
  * ```typescript
  * import {init, WeaveAdkPlugin} from 'weave';
  * import {InMemorySessionService, LlmAgent, Runner} from '@google/adk';
@@ -59,8 +69,10 @@ import type {
   Span as OtelSpan,
 } from '@opentelemetry/api';
 
+import type * as GoogleADK from '@google/adk';
 import type {
   BaseAgent as AdkBaseAgent,
+  BasePlugin as AdkBasePlugin,
   BaseTool as AdkBaseTool,
   Context as AdkCallbackContext,
   Event as AdkEvent,
@@ -77,6 +89,7 @@ import type {
   ToolUnion as AdkToolUnion,
 } from '@google/genai';
 import {getGlobalClient} from '../clientApi';
+import state from '../state';
 import {getWeaveTracer} from '../genai/provider';
 import {
   ATTR_ERROR_TYPE,
@@ -112,9 +125,13 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
+import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
+
+/** The slice of ADK's `Runner` the instrumentation hook needs. */
+type AdkRunnerLike = Pick<GoogleADK.Runner, 'pluginManager'>;
 
 /** Name the plugin registers under in ADK's PluginManager (must be unique). */
-export const WEAVE_ADK_PLUGIN_NAME = 'weave';
+const WEAVE_ADK_PLUGIN_NAME = 'weave';
 
 const TRACER_NAME = 'weave.google_adk';
 const WEAVE_ATTR_PREFIX = 'weave.google_adk';
@@ -148,6 +165,12 @@ const ADK_TO_GENAI_ROLE: Record<string, string> = {
   user: 'user',
   model: 'assistant',
 };
+
+// Tested version range. Every patched surface is typeof-guarded, so minor
+// bumps that keep the plugin API intact keep working.
+const ADK_VERSION_RANGE = '>= 1.0.0';
+// `@google/adk` is `"type": "module"`; its `require` condition resolves here.
+const ADK_CJS_SUBPATH = 'dist/cjs/index.js';
 
 const WARN_KEY_PLUGIN_ERROR = 'weave-adk-plugin-error';
 
@@ -563,7 +586,7 @@ function findAgentInTree(
  * ADK treats any non-`undefined` return as a short-circuit, so every callback
  * swallows its own errors and returns `undefined`.
  */
-export class WeaveAdkPlugin {
+export class WeaveAdkPlugin implements AdkBasePlugin {
   readonly name = WEAVE_ADK_PLUGIN_NAME;
 
   private readonly invocations = new Map<string, InvocationState>();
@@ -691,24 +714,47 @@ export class WeaveAdkPlugin {
     invocationContext: AdkInvocationContext;
   }): Promise<undefined> {
     this.guard(() => {
-      const invocationId = params.invocationContext.invocationId;
-      const state = this.invocations.get(invocationId);
-      if (!state) {
-        return;
-      }
-      if (captureMessageContent() && state.finalContent) {
-        state.rootSpan.setAttribute(
-          ATTR_GEN_AI_OUTPUT_MESSAGES,
-          jsonAttr([contentToOutputMessage(state.finalContent, null)])
-        );
-        state.rootSpan.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
-      }
-      this.applyRootError(state);
-      this.finishInvocation(state, {interrupted: false});
-      this.invocations.delete(invocationId);
-      this.unregisterBeforeExitHookIfIdle();
+      this.endInvocation(params.invocationContext.invocationId, {
+        interrupted: false,
+      });
     });
     return undefined;
+  }
+
+  /**
+   * Finalizes a run that never reached `afterRunCallback`. ADK only dispatches
+   * `afterRunCallback` after the event loop drains normally, so a consumer that
+   * breaks out of `runAsync` early — or an aborted run — leaves the invocation
+   * (and its spans) open. The auto-instrument runner wrapper calls this from a
+   * `finally` to close them as interrupted. Idempotent: a no-op once the run
+   * has already finished (the common, fully-consumed case).
+   */
+  finishInterruptedInvocation(invocationId: string): void {
+    this.guard(() => {
+      this.endInvocation(invocationId, {interrupted: true});
+    });
+  }
+
+  /** Shared teardown for normal completion and interrupted finalization. */
+  private endInvocation(
+    invocationId: string,
+    options: {interrupted: boolean}
+  ): void {
+    const state = this.invocations.get(invocationId);
+    if (!state) {
+      return;
+    }
+    if (captureMessageContent() && state.finalContent) {
+      state.rootSpan.setAttribute(
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
+        jsonAttr([contentToOutputMessage(state.finalContent, null)])
+      );
+      state.rootSpan.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, OUTPUT_TYPE_TEXT);
+    }
+    this.applyRootError(state);
+    this.finishInvocation(state, {interrupted: options.interrupted});
+    this.invocations.delete(invocationId);
+    this.unregisterBeforeExitHookIfIdle();
   }
 
   // -------------------------------------------------------------------------
@@ -1235,4 +1281,152 @@ function errorTypeOf(error: Error): string {
 
 function errorMessageOf(error: Error): string {
   return error.message;
+}
+
+// ---------------------------------------------------------------------------
+// Automatic instrumentation
+// ---------------------------------------------------------------------------
+
+const weaveAdkRunnerPatched = Symbol.for('_weave_adk_runner_patched');
+
+// The plugin holder lives in the shared module state (see state.ts) so CJS and
+// ESM copies of this module resolve to one plugin instance.
+function getSharedPlugin(): WeaveAdkPlugin {
+  if (!state.integrations.googleAdk.plugin) {
+    state.integrations.googleAdk.plugin = new WeaveAdkPlugin();
+  }
+  return state.integrations.googleAdk.plugin;
+}
+
+/** Registers the shared plugin on a runner's PluginManager, idempotently. The
+ *  try/catch is the boundary safety net (instrumentation must never break a
+ *  user run), so we lean on the `Runner` type rather than re-checking shape. */
+function ensurePluginRegistered(runner: AdkRunnerLike): void {
+  try {
+    const {pluginManager} = runner;
+    if (pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME)) {
+      return;
+    }
+    pluginManager.registerPlugin(getSharedPlugin());
+  } catch {
+    // Never let instrumentation break a user run.
+  }
+}
+
+/**
+ * Narrows a plugin resolved from ADK's PluginManager to our `WeaveAdkPlugin`.
+ * `getPlugin` hands back a foreign `BasePlugin`, and CJS/ESM module copies can
+ * defeat `instanceof`, so we duck-type the one method this path calls rather
+ * than assert the concrete class — which also matches a user-supplied instance.
+ */
+function isWeavePlugin(plugin: unknown): plugin is WeaveAdkPlugin {
+  return (
+    typeof (plugin as {finishInterruptedInvocation?: unknown})
+      ?.finishInterruptedInvocation === 'function'
+  );
+}
+
+/**
+ * Finalizes invocations left open because the consumer abandoned the runner's
+ * event generator (early `break`/`return`) or the run aborted — ADK skips
+ * `afterRunCallback` on those paths, so without this their spans never end and
+ * the invocation state leaks. Resolves the plugin from the runner's own
+ * PluginManager so it finalizes whichever instance is registered (the shared
+ * auto-instrument plugin or a user-supplied one). A no-op on normal completion,
+ * where `afterRunCallback` already finalized the invocation.
+ */
+function finishInterruptedInvocations(
+  runner: AdkRunnerLike,
+  invocationIds: Set<string>
+): void {
+  if (invocationIds.size === 0) {
+    return;
+  }
+  try {
+    const plugin = runner.pluginManager.getPlugin(WEAVE_ADK_PLUGIN_NAME);
+    if (!isWeavePlugin(plugin)) {
+      return;
+    }
+    for (const invocationId of invocationIds) {
+      plugin.finishInterruptedInvocation(invocationId);
+    }
+  } catch {
+    // Cleanup must never surface into the user's run.
+  }
+}
+
+/**
+ * Patches `Runner.prototype.runAsync` / `runEphemeral` so every runner
+ * (including subclasses) self-registers the Weave plugin on first use (before
+ * ADK reads the plugin list) and finalizes its invocation even when the
+ * consumer abandons the event stream early.
+ */
+function patchRunnerClass(RunnerClass: typeof GoogleADK.Runner): void {
+  // Swapping prototype methods is inherently dynamic, so view the prototype as
+  // an indexable bag for the patch below.
+  const proto = RunnerClass?.prototype as unknown as
+    | Record<string | symbol, unknown>
+    | undefined;
+  if (!proto || proto[weaveAdkRunnerPatched]) {
+    return;
+  }
+  for (const method of ['runAsync', 'runEphemeral']) {
+    const original = proto[method];
+    if (typeof original !== 'function') {
+      continue;
+    }
+    proto[method] = async function* (
+      this: AdkRunnerLike,
+      ...args: unknown[]
+    ): AsyncGenerator<AdkEvent, void> {
+      ensurePluginRegistered(this);
+      const invocationIds = new Set<string>();
+      const events = original.apply(this, args) as AsyncIterable<AdkEvent>;
+      try {
+        for await (const event of events) {
+          if (event?.invocationId) {
+            invocationIds.add(event.invocationId);
+          }
+          yield event;
+        }
+      } finally {
+        // Runs on normal completion, early `break`/`return`, throw, or abort.
+        finishInterruptedInvocations(this, invocationIds);
+      }
+    };
+  }
+  Object.defineProperty(proto, weaveAdkRunnerPatched, {
+    value: true,
+    enumerable: false,
+    configurable: true,
+  });
+}
+
+/** Module-load hook shared by the CJS and ESM paths. */
+export function commonPatchGoogleADK(exports: typeof GoogleADK) {
+  try {
+    if (exports?.Runner) {
+      patchRunnerClass(exports.Runner);
+    }
+  } catch (error) {
+    warnOnce(
+      WARN_KEY_PLUGIN_ERROR,
+      `Weave: failed to instrument @google/adk: ${error}`
+    );
+  }
+  return exports;
+}
+
+export function instrumentGoogleADK() {
+  addCJSInstrumentation({
+    moduleName: '@google/adk',
+    subPath: ADK_CJS_SUBPATH,
+    version: ADK_VERSION_RANGE,
+    hook: commonPatchGoogleADK,
+  });
+  addESMInstrumentation({
+    moduleName: '@google/adk',
+    version: ADK_VERSION_RANGE,
+    hook: commonPatchGoogleADK,
+  });
 }
