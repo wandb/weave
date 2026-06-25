@@ -2,7 +2,11 @@ import {AsyncLocalStorage} from 'async_hooks';
 import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
-import {MAX_OBJECT_NAME_LENGTH} from './constants';
+import {
+  EVAL_META_KEY,
+  EVALUATION_RUN_OP_NAME,
+  MAX_OBJECT_NAME_LENGTH,
+} from './constants';
 import {computeDigest} from './digest';
 import {
   type AgentChatMessage as AgentChatMessageSchema,
@@ -1354,6 +1358,16 @@ export class WeaveClient {
     return this.saveCallStart(startReq);
   }
 
+  // The eval root is matched by op-name substring (op_name is a ref URI); eval
+  // children carry the marker in their attributes.
+  private isEvalCall(call: InternalCall): boolean {
+    const {attributes, op_name} = call.callSchema;
+    return (
+      (attributes != null && EVAL_META_KEY in attributes) ||
+      (op_name?.includes(EVALUATION_RUN_OP_NAME) ?? false)
+    );
+  }
+
   public async finishCall(
     call: InternalCall,
     result: any,
@@ -1384,6 +1398,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      is_eval: this.isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1421,6 +1436,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      is_eval: this.isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.

@@ -11249,6 +11249,17 @@
             ],
             "title": "Trace Id"
           },
+          "is_eval": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Eval"
+          },
           "ended_at": {
             "type": "string",
             "format": "date-time",
