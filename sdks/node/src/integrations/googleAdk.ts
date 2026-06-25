@@ -55,6 +55,7 @@ import type {
 
 import type {
   BaseAgent as AdkBaseAgent,
+  Context as AdkCallbackContext,
   Event as AdkEvent,
   InvocationContext as AdkInvocationContext,
   LlmRequest as AdkLlmRequest,
@@ -62,9 +63,11 @@ import type {
 } from '@google/adk';
 import type {
   Content as AdkContent,
-  FunctionDeclaration as AdkFunctionDeclaration,
+  ContentUnion as AdkContentUnion,
   GenerateContentConfig as AdkGenerateContentConfig,
   Part as AdkPart,
+  Tool as AdkTool,
+  ToolUnion as AdkToolUnion,
 } from '@google/genai';
 import {getGlobalClient} from '../clientApi';
 import {getWeaveTracer} from '../genai/provider';
@@ -98,13 +101,6 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 import {warnOnce} from '../utils/warnOnce';
-
-/** Model/tool callback context; `invocationId`/`agentName` are getters on
- *  ADK's `ReadonlyContext`, which `@google/adk` does not export as this shape. */
-interface AdkCallbackContext {
-  invocationId: string;
-  agentName: string;
-}
 
 /** Name the plugin registers under in ADK's PluginManager (must be unique). */
 export const WEAVE_ADK_PLUGIN_NAME = 'weave';
@@ -317,11 +313,19 @@ function contentToOutputMessage(
   };
 }
 
+/** True when an ADK system-instruction element is a `Content` (has `parts`)
+ *  rather than a lone `Part`. */
+function isAdkContent(value: AdkContent | AdkPart): value is AdkContent {
+  return 'parts' in value && Array.isArray(value.parts);
+}
+
 /**
  * Normalizes ADK's polymorphic `config.systemInstruction` (string, Content,
  * Part, or a list of those) into the parts-model wire shape.
  */
-function systemInstructionParts(systemInstruction: unknown): WirePart[] {
+function systemInstructionParts(
+  systemInstruction: AdkContentUnion | undefined
+): WirePart[] {
   if (systemInstruction == null) {
     return [];
   }
@@ -333,16 +337,18 @@ function systemInstructionParts(systemInstruction: unknown): WirePart[] {
   if (Array.isArray(systemInstruction)) {
     return systemInstruction.flatMap(item => systemInstructionParts(item));
   }
-  if (typeof systemInstruction === 'object') {
-    const content = systemInstruction as AdkContent;
-    // A Content (has `parts`) vs. a lone Part — distinguished by `parts`.
-    if (Array.isArray(content.parts)) {
-      return contentToParts(content);
-    }
-    const part = partToWire(systemInstruction as AdkPart);
-    return part ? [part] : [];
+  // What remains is a `Content` or a lone `Part`.
+  if (isAdkContent(systemInstruction)) {
+    return contentToParts(systemInstruction);
   }
-  return [];
+  const part = partToWire(systemInstruction);
+  return part ? [part] : [];
+}
+
+/** True when an ADK tool is a function-declaration `Tool` rather than a
+ *  `CallableTool` (only the former carries `functionDeclarations`). */
+function isAdkTool(tool: AdkToolUnion): tool is AdkTool {
+  return 'functionDeclarations' in tool;
 }
 
 /** Tool definitions from `config.tools[].functionDeclarations` (schema, not
@@ -352,18 +358,15 @@ function toolDefinitions(
 ): Array<Record<string, unknown>> {
   const definitions: Array<Record<string, unknown>> = [];
   for (const tool of config.tools ?? []) {
-    const declarations = (
-      tool as {functionDeclarations?: AdkFunctionDeclaration[]} | null
-    )?.functionDeclarations;
-    if (!Array.isArray(declarations)) {
+    if (!isAdkTool(tool) || !tool.functionDeclarations) {
       continue;
     }
-    for (const declaration of declarations) {
+    for (const declaration of tool.functionDeclarations) {
       definitions.push({
-        name: declaration?.name ?? '',
-        description: declaration?.description ?? '',
+        name: declaration.name ?? '',
+        description: declaration.description ?? '',
         parameters: toJsonSafe(
-          declaration?.parameters ?? declaration?.parametersJsonSchema ?? null
+          declaration.parameters ?? declaration.parametersJsonSchema ?? null
         ),
         type: TOOL_DEFINITION_TYPE,
       });
@@ -942,16 +945,10 @@ function unregisterBeforeExitHookIfUnused(): void {
   beforeExitHookRegistered = false;
 }
 
-function errorTypeOf(error: unknown): string {
-  if (error instanceof Error && error.name) {
-    return error.name;
-  }
-  return 'Error';
+function errorTypeOf(error: Error): string {
+  return error.name || 'Error';
 }
 
-function errorMessageOf(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+function errorMessageOf(error: Error): string {
+  return error.message;
 }
