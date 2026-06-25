@@ -58,6 +58,14 @@ def wf_enable_online_eval() -> bool:
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
+def wf_enable_agent_scoring() -> bool:
+    """Whether to emit ScoreAgentSpansEvent triggers from the OTel ingest path.
+
+    In addition to `wf_enable_online_eval` so agent scoring can be toggled independently.
+    """
+    return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(
