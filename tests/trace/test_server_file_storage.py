@@ -313,14 +313,14 @@ def test_keepalive_adapter_sets_tcp_user_timeout():
 class _CountingStorageClient(file_storage.FileStorageClient):
     """Records store() calls so a test can assert the dedup cache skips repeats."""
 
-    def __init__(self, base_uri):
+    def __init__(self, base_uri: file_storage.FileStorageURI):
         super().__init__(base_uri)
         self.store_calls = 0
 
-    def store(self, uri, data) -> None:
+    def store(self, uri: file_storage.FileStorageURI, data: bytes) -> None:
         self.store_calls += 1
 
-    def read(self, uri) -> bytes:
+    def read(self, uri: file_storage.FileStorageURI) -> bytes:
         raise NotImplementedError
 
 

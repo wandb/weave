@@ -32,10 +32,10 @@ Partial-failure semantics: if a worker raises something other than
 re-raises it and `flush()` logs a warning and re-raises. Peer workers
 still complete via the `ThreadPoolExecutor.__exit__` join, so their
 bucket objects may land without a corresponding `files` row. On retry,
-the same `(project_id, digest)` triggers
-`if_generation_match=0 -> PreconditionFailed`, which `store_in_bucket`
-wraps as `FileStorageWriteError`, which falls back to inline-CH chunks.
-End state is content-addressable and consistent.
+the repeat write is an idempotent no-op (served from the per-pod
+stored-key cache, or GCS `if_generation_match=0` swallows the duplicate)
+and the worker re-inserts the missing `files` row. End state is
+content-addressable and consistent.
 """
 
 from __future__ import annotations
