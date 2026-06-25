@@ -107,22 +107,6 @@ from weave.trace.wandb_run_context import (
     get_global_wb_run_context,
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.agents.types import (
-    DEFAULT_AGENT_QUERY_LIMIT,
-    MAX_CONVERSATION_CHAT_TURNS,
-    AgentConversationChatReq,
-    AgentConversationChatRes,
-    AgentSortBy,
-    AgentSpansQueryReq,
-    AgentSpansQueryRes,
-    AgentsQueryFilters,
-    AgentsQueryReq,
-    AgentsQueryRes,
-    AgentTraceChatReq,
-    AgentTraceChatRes,
-    AgentVersionsQueryReq,
-    AgentVersionsQueryRes,
-)
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
@@ -187,6 +171,7 @@ from weave.trace_server.trace_server_interface import (
     TableUpdateReq,
     TagsListReq,
     TraceStatus,
+    agent_types,
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
@@ -793,10 +778,10 @@ class WeaveClient:
         self,
         *,
         agent_name: str | None = None,
-        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        limit: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
         offset: int = 0,
-        sort_by: list[AgentSortBy] | None = None,
-    ) -> AgentsQueryRes:
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+    ) -> agent_types.AgentsQueryRes:
         """List agents in this project with aggregated stats.
 
         Args:
@@ -817,12 +802,12 @@ class WeaveClient:
             ```
         """
         filters = (
-            AgentsQueryFilters(agent_name=agent_name)
+            agent_types.AgentsQueryFilters(agent_name=agent_name)
             if agent_name is not None
             else None
         )
         return self.server.agent_agents_query(
-            AgentsQueryReq(
+            agent_types.AgentsQueryReq(
                 project_id=self.project_id,
                 filters=filters,
                 sort_by=sort_by,
@@ -837,10 +822,10 @@ class WeaveClient:
         self,
         *,
         agent_name: str,
-        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        limit: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
         offset: int = 0,
-        sort_by: list[AgentSortBy] | None = None,
-    ) -> AgentVersionsQueryRes:
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+    ) -> agent_types.AgentVersionsQueryRes:
         """List versions for a single agent, with aggregated stats.
 
         Args:
@@ -861,7 +846,7 @@ class WeaveClient:
             ```
         """
         return self.server.agent_versions_query(
-            AgentVersionsQueryReq(
+            agent_types.AgentVersionsQueryReq(
                 project_id=self.project_id,
                 agent_name=agent_name,
                 sort_by=sort_by,
@@ -877,10 +862,10 @@ class WeaveClient:
         *,
         agent_name: str | None = None,
         query: Query | None = None,
-        limit: int = DEFAULT_AGENT_QUERY_LIMIT,
+        limit: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
         offset: int = 0,
-        sort_by: list[AgentSortBy] | None = None,
-    ) -> AgentSpansQueryRes:
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+    ) -> agent_types.AgentSpansQueryRes:
         """Query agent spans for this project, optionally filtered.
 
         Args:
@@ -904,7 +889,7 @@ class WeaveClient:
             ```
         """
         return self.server.agent_spans_query(
-            AgentSpansQueryReq(
+            agent_types.AgentSpansQueryReq(
                 project_id=self.project_id,
                 query=_agent_spans_query_filter(agent_name, query),
                 sort_by=sort_by,
@@ -920,7 +905,7 @@ class WeaveClient:
         *,
         trace_id: str,
         include_feedback: bool = False,
-    ) -> AgentTraceChatRes:
+    ) -> agent_types.AgentTraceChatRes:
         """Get the structured chat view (messages) for a single turn.
 
         A turn corresponds to one trace.
@@ -941,7 +926,7 @@ class WeaveClient:
             ```
         """
         return self.server.agent_traces_chat(
-            AgentTraceChatReq(
+            agent_types.AgentTraceChatReq(
                 project_id=self.project_id,
                 trace_id=trace_id,
                 include_feedback=include_feedback,
@@ -954,10 +939,10 @@ class WeaveClient:
         self,
         *,
         conversation_id: str,
-        limit: int = MAX_CONVERSATION_CHAT_TURNS,
+        limit: int = agent_types.MAX_CONVERSATION_CHAT_TURNS,
         offset: int = 0,
         include_feedback: bool = False,
-    ) -> AgentConversationChatRes:
+    ) -> agent_types.AgentConversationChatRes:
         """Get the multi-turn chat view for a conversation.
 
         Each turn corresponds to one trace.
@@ -981,7 +966,7 @@ class WeaveClient:
             ```
         """
         return self.server.agent_conversation_chat(
-            AgentConversationChatReq(
+            agent_types.AgentConversationChatReq(
                 project_id=self.project_id,
                 conversation_id=conversation_id,
                 limit=limit,
