@@ -78,6 +78,21 @@ type State = {
       patched: boolean;
     };
 
+    claudeAgents: {
+      /**
+       * Exports objects whose `query` export has been wrapped, each mapped to
+       * the view to hand back (the mutated module, or our forwarding proxy when
+       * `query` is a getter-only/frozen export that can't be patched in place).
+       *
+       * A `WeakMap` keyed by the objects, rather than a marker stamped on them:
+       * the SDK ships `query` as a non-writable getter (under CJS↔ESM interop),
+       * so we can't mark that namespace, and `wrapClaudeAgentSdk()` plus the
+       * CJS/ESM hooks each present distinct exports views that must wrap exactly
+       * once. Living on the `globalSingleton` state makes it dual-package-safe.
+       */
+      patchedExports: WeakMap<object, object>;
+    };
+
     googleAdk: {
       /**
        * The shared `WeaveAdkPlugin`, created lazily on first runner use. Held
@@ -122,6 +137,10 @@ function defaultState(): State {
 
       openaiAgentsRealtime: {
         patched: false,
+      },
+
+      claudeAgents: {
+        patchedExports: new WeakMap(),
       },
 
       googleAdk: {
