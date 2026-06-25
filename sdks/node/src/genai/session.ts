@@ -42,6 +42,7 @@ export class Session {
 
   startTurn(opts: TurnInit = {}): Turn {
     return Turn.create({
+      ...opts,
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
       conversationId: this.sessionId,
