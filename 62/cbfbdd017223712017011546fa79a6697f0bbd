@@ -1,0 +1,77 @@
+## Conversation
+User attached 6 of @drtangible's (Dan's) review comments on PR #7302 (slice 02,
+andrew/google-adk-02-plugin-model — the model/chat span slice), "read before
+proceeding". Same resolve-Dan's-comments workflow as slices 03/05/06. Dan
+APPROVED #7302 (non-blocking). HEAD was already on slice 02 (external positioning,
+as in prior rounds).
+
+## Dan's 6 comments + resolutions (all sdks/node/src/integrations/googleAdk.ts)
+1. lines 102-103 (AdkCallbackContext interface): "I'm seeing `Context` exported
+   from the library, which seems to match this." (with screenshots)
+   -> RESOLVED: import `Context as AdkCallbackContext` from '@google/adk', delete
+      the hand-rolled interface. ** This CORRECTS my earlier WRONG conclusion on
+      slice 03 (#7303), where I told the user this was "not feasible" because
+      Context wasn't exported. I WAS WRONG. ** See correction below.
+2. line 324 (`systemInstruction: unknown`): "Can `systemInstruction` be typed as
+   `ContentUnion | undefined`?" -> RESOLVED: param now
+   `AdkContentUnion | undefined` (config.systemInstruction IS ContentUnion).
+3. line 336 (`typeof === 'object'` guard): "if we type the argument, by this
+   point it's guaranteed to be an `object`." -> RESOLVED: with ContentUnion
+   typing, after the null/string/array checks the remainder narrows to
+   `Content | Part` by elimination, so the object guard is dead; removed it (and
+   the now-unreachable trailing `return []`).
+4. lines 337-339: "Could have an `isAdkContent` type guard." -> RESOLVED: added
+   `isAdkContent(value: Content|Part): value is Content` =
+   `'parts' in value && Array.isArray(value.parts)`.
+5. lines 355-357 (toolDefinitions cast/guard): suggested `isTool` guard ->
+   RESOLVED: added `isAdkTool(tool: ToolUnion): tool is Tool` =
+   `'functionDeclarations' in tool` (config.tools is ToolListUnion = ToolUnion[],
+   ToolUnion = Tool | CallableTool; only Tool has functionDeclarations). Dropped
+   the inline `(tool as {...})` cast. Removed the now-unused AdkFunctionDeclaration
+   import.
+6. lines 363-367 (`declaration?.` guards): "I don't believe these are
+   necessary?" -> RESOLVED: after isAdkTool narrows tool to Tool,
+   tool.functionDeclarations is FunctionDeclaration[], so iterating gives a
+   non-null FunctionDeclaration; dropped all `declaration?.` to `declaration.`.
+
+## CORRECTION on the slice-03 Context claim (important)
+Last round I told the user the slice-03 AdkCallbackContext comment was "not
+feasible" because Context/ReadonlyContext "aren't exported" — I had grepped
+@google/adk's index.d.ts for explicit `export {Context}` / `export * ...context`
+and found none. THAT GREP WAS TOO NARROW. The index has
+`export * from './common.js'`, and the common barrel re-exports the agents
+(including Context). EMPIRICAL PROOF: a throwaway
+`import type { Context } from '@google/adk'` typechecks clean under tsconfig.esm.
+Lesson (already in my notes): verify exports empirically with tsc, not grep.
+This slice-02 change resolves comment 1 here AND, once cascaded, resolves the
+slice-03 AdkCallbackContext thread too.
+
+## Stacking / cascade (PENDING user "restack and push")
+Slice 02 is the DEEPEST slice with open comments; landing cascades restacks to
+03, 05, 06. KNOWN non-trivial cascade step on slice 03:
+- Slice 03 adds `interface AdkToolContext extends AdkCallbackContext {
+  functionCallId?: string }` (used at its lines ~806/852/864). After restack,
+  AdkCallbackContext = ADK's `Context` class, which ALREADY has
+  `readonly functionCallId?: string` AND a `private readonly _state`. So
+  `interface AdkToolContext extends Context { functionCallId?: string }` will
+  FAIL: re-declaring functionCallId with a different (non-readonly) modifier
+  (TS2687), plus extending a class-with-privates is brittle.
+- PLAN when restacking slice 03: expect a merge conflict at the
+  AdkCallbackContext/AdkToolContext region (slice 02 removed the interface that
+  slice 03's diff sits beside). Resolve by DROPPING AdkToolContext entirely and
+  using AdkCallbackContext (= Context) for the toolContext params — Context
+  already carries functionCallId. Then validate slice 03 (typecheck + jest)
+  before continuing to 05/06.
+- Notes to preserve across the cascade restack (gt clean-restack drops them):
+  slice 03 tip 327d0576f1 (cast-removal), slice 05 has 2, slice 06 has 2 — plus
+  this new commit. Restore via `git notes copy -f <old> <new>` matched by subject.
+
+## Validation (slice 02, this commit)
+typecheck:esm clean, typecheck:cjs clean, eslint googleAdk.ts exit 0, jest 19/19.
+
+## Errors / false alarms
+- Briefly thought a parallel agent was deleting node_modules (find/grep on
+  node_modules/@google/* failed "No such file or directory"). FALSE ALARM: I ran
+  those from the repo root (kelowna) but node_modules lives at sdks/node/. The
+  symlinks resolve fine. (There IS a stray node_modules/@google/.ignored_adk dir
+  next to the live `adk` symlink — leftover from some other session, harmless.)
