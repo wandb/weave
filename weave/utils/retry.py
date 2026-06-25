@@ -101,11 +101,16 @@ def _is_retryable_exception(e: BaseException) -> bool:
     if isinstance(e, ValidationError):
         return False
 
-    # Don't retry CallsCompleteModeRequired - should trigger immediate mode switch
+    # Don't retry deterministic domain errors: a calls_complete mode switch should
+    # trigger an immediate mode change, and a query the backend rejected as too
+    # expensive will fail again on retry.
     # Lazy import to avoid circular dependency (http_utils imports from this module)
-    from weave.trace_server_bindings.http_utils import CallsCompleteModeRequired
+    from weave.trace_server_bindings.http_utils import (
+        CallsCompleteModeRequired,
+        QueryTooExpensive,
+    )
 
-    if isinstance(e, CallsCompleteModeRequired):
+    if isinstance(e, (CallsCompleteModeRequired, QueryTooExpensive)):
         return False
 
     # Don't retry on HTTP 4xx (except 429)
