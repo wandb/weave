@@ -518,21 +518,21 @@ function setLlmResponseAttributes(
 // Agent tree helpers
 // ---------------------------------------------------------------------------
 
-/** Finds `name` in the agent tree under `root`, using ADK's own `findAgent`
- *  when present and falling back to a manual walk otherwise. */
+/** Finds `name` in the agent tree under `root`, preferring ADK's own
+ *  `findAgent` and falling back to a cycle-safe manual walk. */
 function findAgentInTree(
   root: AdkBaseAgent,
   name: string
 ): AdkBaseAgent | undefined {
-  if (typeof root.findAgent === 'function') {
-    try {
-      const found = root.findAgent(name);
-      if (found) {
-        return found;
-      }
-    } catch {
-      // fall through to the manual walk
+  try {
+    const found = root.findAgent(name);
+    if (found) {
+      return found;
     }
+  } catch {
+    // ADK's `findAgent` recurses through `subAgents` with no cycle
+    // detection, so a cyclic agent graph overflows the stack. Fall back to
+    // the manual walk below, which is cycle-safe via `visited`.
   }
   const queue: AdkBaseAgent[] = [root];
   const visited = new Set<AdkBaseAgent>();
@@ -545,9 +545,7 @@ function findAgentInTree(
     if (agent.name === name) {
       return agent;
     }
-    if (Array.isArray(agent.subAgents)) {
-      queue.push(...agent.subAgents);
-    }
+    queue.push(...agent.subAgents);
   }
   return undefined;
 }

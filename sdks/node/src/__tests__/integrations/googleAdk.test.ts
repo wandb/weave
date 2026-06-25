@@ -179,9 +179,18 @@ describe('Google ADK integration', () => {
   });
 
   function invocationContext(overrides: Record<string, unknown> = {}) {
+    // A real ADK agent always exposes `subAgents` (its constructor defaults
+    // the field to `[]`) and a `findAgent` method; mirror both so agent-tree
+    // lookup exercises its real path instead of the cyclic-tree fallback.
+    const agent = {
+      name: 'agent_a',
+      description: 'test agent',
+      subAgents: [],
+      findAgent: (name: string) => (name === 'agent_a' ? agent : undefined),
+    };
     return {
       invocationId: INVOCATION_ID,
-      agent: {name: 'agent_a', description: 'test agent'},
+      agent,
       session: {id: 'sess-1', appName: 'app', userId: 'user-1'},
       userContent: userMessage('hello'),
       ...overrides,
