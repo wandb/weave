@@ -50,6 +50,7 @@ export const ATTR_GEN_AI_SYSTEM_INSTRUCTIONS = 'gen_ai.system_instructions';
 export const ATTR_GEN_AI_TOOL_CALL_ARGUMENTS = 'gen_ai.tool.call.arguments';
 export const ATTR_GEN_AI_TOOL_CALL_ID = 'gen_ai.tool.call.id';
 export const ATTR_GEN_AI_TOOL_CALL_RESULT = 'gen_ai.tool.call.result';
+export const ATTR_GEN_AI_TOOL_DEFINITIONS = 'gen_ai.tool.definitions';
 export const ATTR_GEN_AI_TOOL_NAME = 'gen_ai.tool.name';
 export const ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS =
   'gen_ai.usage.cache_creation.input_tokens';
