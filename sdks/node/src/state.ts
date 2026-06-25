@@ -3,6 +3,7 @@ import type OpenAIAgents from '@openai/agents';
 import {type BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {globalSingleton} from './utils/globalSingleton';
 import {type GenAIState} from './genai/context';
+import {type WeaveAdkPlugin} from './integrations/googleAdk';
 import {type WeaveClient} from './weaveClient';
 import {type TracerProvider} from '@opentelemetry/api';
 
@@ -31,9 +32,9 @@ type State = {
      *
      * When the user calls `runIsolated(fn)`, this AsyncLocalStorage is `.run`-installed with
      * a fresh `GenAIState` container for that frame. Inside the frame,
-     * `_getGenaiState()` reads back that fresh container. When `runIsolated`
+     * `getGenaiState()` reads back that fresh container. When `runIsolated`
      * isn't on the call stack, `_genaiState.getStore()` returns `undefined`
-     * and `_getGenaiState()` falls back to `_defaultState`.
+     * and `getGenaiState()` falls back to `_defaultState`.
      *
      * The AsyncLocalStorage provides the isolation boundary for concurrent work — each
      * `runIsolated` frame has its own container object, so mutations inside
@@ -76,6 +77,16 @@ type State = {
     openaiAgentsRealtime: {
       patched: boolean;
     };
+
+    googleAdk: {
+      /**
+       * The shared `WeaveAdkPlugin`, created lazily on first runner use. Held
+       * here (not in `googleAdk.ts` module scope) so CJS and ESM copies of the
+       * integration register one plugin instance across the module boundary —
+       * the same dual-package-hazard reasoning as the doc comment above.
+       */
+      plugin: WeaveAdkPlugin | null;
+    };
   };
 
   evalLink: {
@@ -111,6 +122,10 @@ function defaultState(): State {
 
       openaiAgentsRealtime: {
         patched: false,
+      },
+
+      googleAdk: {
+        plugin: null,
       },
     },
   };
