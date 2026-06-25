@@ -7,7 +7,7 @@ run-name: Notify wandb/core - push to ${{ github.event.ref }}
 on:
   push:
     branches:
-      - "**"
+      - "master"
   workflow_dispatch:
 
 permissions:
