@@ -361,4 +361,22 @@ describe('Op Flow', () => {
     expect(startTraceId).toBeTruthy();
     expect(endItem!.req.end.trace_id).toBe(startTraceId);
   });
+
+  test('call-end carries is_eval=false for a non-eval op', async () => {
+    const batchSpy = jest.spyOn(
+      traceServer.call,
+      'callStartBatchCallUpsertBatchPost'
+    );
+
+    const myOp = op((x: number) => x * 2, {name: 'myOp'});
+    await myOp(21);
+
+    await traceServer.waitForPendingOperations();
+
+    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
+    const endItem = items.find(item => item.mode === 'end');
+
+    expect(endItem).toBeDefined();
+    expect(endItem!.req.end.is_eval).toBe(false);
+  });
 });

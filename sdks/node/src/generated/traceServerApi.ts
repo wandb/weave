@@ -2546,6 +2546,8 @@ export interface EndedCallSchemaForInsert {
   id: string;
   /** Trace Id */
   trace_id?: string | null;
+  /** Is Eval */
+  is_eval?: boolean | null;
   /**
    * Ended At
    * @format date-time
