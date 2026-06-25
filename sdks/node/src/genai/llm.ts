@@ -7,7 +7,7 @@ import {
 } from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
-import {_getGenaiState} from './context';
+import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
@@ -101,7 +101,7 @@ export class LLM extends SpanBase {
   }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.llm !== null) {
       throw new Error(
         'An LLM is already active in this async chain. End it before starting a new one.'
@@ -296,7 +296,7 @@ export class LLM extends SpanBase {
     }
 
     this._closeSpan(opts);
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.llm === this) {
       state.llm = null;
     }
