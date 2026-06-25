@@ -6902,11 +6902,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(self.ch_client).insert_otel_spans(req)
 
-        # Skip the kafka emit unless online eval is on and at least one consumer
-        # (agent scoring or spans alerting) wants the turn-ended events.
-        if not wf_env.wf_enable_online_eval() or not (
-            wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_alerting()
-        ):
+        # Online eval gates the shared kafka producer; skip the emit when it is off.
+        if not wf_env.wf_enable_online_eval():
             return res
 
         # Emit for each row that produces a valid event type
