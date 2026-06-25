@@ -370,7 +370,7 @@ class TestMakeSpansListQuery:
 #: readable without duplicating the bundle across every test.
 _GROUPED_AGG_TAIL = """count() AS span_count,
                countIf(s.operation_name = 'invoke_agent') AS invocation_count,
-               uniqExact(s.conversation_id) AS conversation_count,
+               uniq(s.conversation_id) AS conversation_count,
                sum(s.input_tokens) AS total_input_tokens,
                sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,
                sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,
