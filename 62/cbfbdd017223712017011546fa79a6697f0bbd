@@ -75,3 +75,14 @@ typecheck:esm clean, typecheck:cjs clean, eslint googleAdk.ts exit 0, jest 19/19
   those from the repo root (kelowna) but node_modules lives at sdks/node/. The
   symlinks resolve fine. (There IS a stray node_modules/@google/.ignored_adk dir
   next to the live `adk` symlink — leftover from some other session, harmless.)
+
+## Addendum — comment 7 (error param typing), folded in via amend
+Dan (lines 945-956): "Are these functions ever called with anything but an
+`Error`?" -> NO. errorTypeOf/errorMessageOf are called only from
+onModelErrorCallback (and, up-stack, onToolErrorCallback), whose `error` param
+ADK's BasePlugin types as `Error` (base_plugin.d.ts:254 and :366). Retyped both
+helpers `(error: Error)` and dropped the `instanceof Error`/`unknown` narrowing:
+errorTypeOf -> `error.name || 'Error'`, errorMessageOf -> `error.message`.
+Amended into the slice-02 commit (was c0eb38d8d6 -> now 62cbfbdd01; unpushed, so
+no force-push of public history). Re-validated: typecheck esm+cjs, eslint, jest
+19/19.
