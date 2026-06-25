@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -381,6 +382,44 @@ class TestWeaveContent:
         assert retrieved.extension == content.extension
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
+
+    def test_content_from_reference(self, weave_active):
+        """Reference content records a URI, stores no bytes, and round-trips."""
+        uri = "s3://canva-media-prod/agent-outputs/polar-bear.png"
+        expected_digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+
+        # mimetype + extension + filename inferred from the URI path
+        content = Content.from_reference(uri)
+        assert content.content_type == "reference"
+        assert content.reference_uri == uri
+        assert content.data == b""
+        assert content.size == 0
+        assert content.digest == expected_digest
+        assert content.mimetype == "image/png"
+        assert content.extension == ".png"
+        assert content.filename == "polar-bear.png"
+        assert content.input_type == "str"
+
+        # caller-asserted mimetype wins even when the URI has no extension
+        typed = Content.from_reference("s3://bucket/object", mimetype="video/mp4")
+        assert typed.mimetype == "video/mp4"
+        assert typed.extension == ".mp4"
+        assert typed.reference_uri == "s3://bucket/object"
+
+        # empty URI is rejected
+        with pytest.raises(ValueError, match="non-empty uri"):
+            Content.from_reference("")
+
+        # publish/get round-trips with no bytes stored: a reference object loads
+        # without reading a content blob (it is resolved later via signed URL)
+        ref = weave.publish(content, name="test_content_reference")
+        retrieved = ref.get()
+        assert isinstance(retrieved, Content)
+        assert retrieved.content_type == "reference"
+        assert retrieved.reference_uri == uri
+        assert retrieved.data == b""
+        assert retrieved.digest == expected_digest
+        assert retrieved.mimetype == "image/png"
 
     def test_content_in_dataset(
         self, image_file, audio_file, video_file, pdf_file, weave_active
