@@ -266,10 +266,23 @@ nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langch
 
 ## Typescript Testing Guidelines
 
+The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
+and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
+`npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
+(`TypeError: Cannot read properties of null (reading 'matches')`).
+
 ```
 cd sdks/node
-npm i
-npm run test
+pnpm install
+pnpm test
+```
+
+To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
+(`import 'weave'` self-resolves via the package `exports` to `dist/index.mjs`);
+`pnpm install` builds it via the `prepare` script. Then:
+
+```
+pnpm exec tsx examples/claudeAgents.ts
 ```
 
 ## Code Review & PR Guidelines
