@@ -137,6 +137,12 @@ jobs:
           echo "::error::Bufstream did not become ready in time"
           exit 1
 
+      - name: Export API schema
+        working-directory: ${{ env.CORE_DIR }}/services/weave-trace
+        run: |
+          export PYTHONPATH="${GITHUB_WORKSPACE}/${CORE_DIR}/services/weave-python/weave-public${PYTHONPATH:+:${PYTHONPATH}}"
+          make export-api-schema
+
       - name: Run Weave Trace tests
         working-directory: ${{ env.CORE_DIR }}/services/weave-trace
         env:
