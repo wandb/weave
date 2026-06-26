@@ -12,7 +12,7 @@
       alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length: "15"
       content-type: application/json
-      date: Mon, 22 Jun 2026 15:04:00 GMT
+      date: Fri, 26 Jun 2026 16:17:18 GMT
       server: uvicorn
       via: 1.1 google
     body: '{"status":"ok"}'
@@ -34,7 +34,7 @@
       content-encoding: br
       content-length: "69"
       content-type: application/json; charset=utf-8
-      date: Mon, 22 Jun 2026 15:04:00 GMT
+      date: Fri, 26 Jun 2026 16:17:19 GMT
       ratelimit-limit: "1000"
       ratelimit-remaining: "1000"
       vary: Origin
@@ -42,7 +42,7 @@
       x-content-type-options: nosniff
       x-ratelimit-limit: "1000"
       x-ratelimit-remaining: "1000"
-      x-wandb-trace-id: 69ea6a59d0f221dc7b3b004af21b36aa
+      x-wandb-trace-id: b3b19f0ee3d38257287858195aa26b2e
     body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
 - request:
     url: https://trace.wandb.ai/agents/spans/query
@@ -58,11 +58,11 @@
     statusText: OK
     headers:
       alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
-      content-length: "3313"
+      content-length: "3577"
       content-type: application/json
-      date: Mon, 22 Jun 2026 15:04:00 GMT
+      date: Fri, 26 Jun 2026 16:17:19 GMT
       server: uvicorn
       via: 1.1 google
-    body: '{"spans":[{"project_id":"drtangible-mocha/example","trace_id":"1383ebb8471a2224318fcacadc9a2554","span_id":"9a7891fab09a59cb","parent_span_id":"8965f27f46ec6f92","span_name":"chat
-      gpt-5.4-mini-2026-03-17","span_kind":"INTERNAL","started_at":"2026-06-22T14:26:12.825000","ended_at":"2026-06-22T14:26:13.581000","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"openai","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"gpt-5.4-mini-2026-03-17","response_model":"gpt-5.4-mini-2026-03-17","response_id":"resp_015daafad2bb2ddb006a394604edd481968554c54515495287","input_tokens":317,"output_tokens":5,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_12de069f688c4095ab61bf21480e58b0","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"text","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"1383ebb8471a2224318fcacadc9a2554","span_id":"a86ca153cf785f21","parent_span_id":"8965f27f46ec6f92","span_name":"execute_tool
-      calculate","span_kind":"INTERNAL","started_at":"2026-06-22T14:26:12.824000","ended_at":"2026-06-22T14:26:12.824000","status_code":"UNSET","status_message":"","operation_name":"execute_tool","provider_name":"","agent_name":"","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"trace_12de069f688c4095ab61bf21480e58b0","conversation_name":"","tool_name":"calculate","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null}],"groups":[],"total_count":164}'
+    body: '{"spans":[{"project_id":"drtangible-mocha/example","trace_id":"4a816ff61e80c6389ce60f9167e259cb","span_id":"e6f45933e15cccf5","parent_span_id":"f9d0f97f484a9b2c","span_name":"chat
+      claude-sonnet-4-5","span_kind":"CLIENT","started_at":"2026-06-25T17:35:03.105000","ended_at":"2026-06-25T17:35:03.105031","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"anthropic","agent_name":"claude_agent_sdk","agent_id":"","agent_description":"","agent_version":"","request_model":"claude-sonnet-4-5","response_model":"claude-sonnet-4-5","response_id":"","input_tokens":32717,"output_tokens":289,"reasoning_tokens":0,"cache_creation_input_tokens":3495,"cache_read_input_tokens":29212,"input_cost_usd":null,"output_cost_usd":null,"cache_read_cost_usd":null,"cache_creation_cost_usd":null,"total_cost_usd":null,"reasoning_content":null,"conversation_id":"bf0914f2-a124-4da7-927d-61e463a70cba","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"4a816ff61e80c6389ce60f9167e259cb","span_id":"025fb68b7d6a1a1b","parent_span_id":"f9d0f97f484a9b2c","span_name":"chat
+      claude-sonnet-4-5-20250929","span_kind":"CLIENT","started_at":"2026-06-25T17:35:02.387000","ended_at":"2026-06-25T17:35:02.387052","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"anthropic","agent_name":"claude_agent_sdk","agent_id":"","agent_description":"","agent_version":"","request_model":"claude-sonnet-4-5-20250929","response_model":"claude-sonnet-4-5-20250929","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_cost_usd":null,"output_cost_usd":null,"cache_read_cost_usd":null,"cache_creation_cost_usd":null,"total_cost_usd":null,"reasoning_content":null,"conversation_id":"bf0914f2-a124-4da7-927d-61e463a70cba","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null}],"groups":[],"total_count":516}'
