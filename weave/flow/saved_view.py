@@ -133,6 +133,8 @@ DEFAULT_PIN = Pin(left=["CustomCheckbox", "op_name"], right=[])
 OPERATOR_MAP = {
     "contains": "(string): contains",
     "does not contain": "(string): notContains",
+    "contains word": "(string): containsWord",
+    "does not contain word": "(string): notContainsWord",
     "equals": "(string): equals",
     "does not equal": "(string): notEquals",
     "in": "(string): in",
@@ -201,6 +203,24 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
             "$not": [
                 {
                     "$contains": {
+                        "input": {"$getField": item.field},
+                        "substr": {"$literal": item.value},
+                    },
+                }
+            ],
+        }
+    elif item.operator == "(string): containsWord":
+        return {
+            "$containsToken": {
+                "input": {"$getField": item.field},
+                "substr": {"$literal": item.value},
+            },
+        }
+    elif item.operator == "(string): notContainsWord":
+        return {
+            "$not": [
+                {
+                    "$containsToken": {
                         "input": {"$getField": item.field},
                         "substr": {"$literal": item.value},
                     },
@@ -334,6 +354,24 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
+def operand_to_filter_contains_token(
+    operand: tsi_query.ContainsTokenOperation,
+) -> Filter:
+    input = operand.contains_token_.input
+    substr = operand.contains_token_.substr
+    if isinstance(input, tsi_query.GetFieldOperator) and isinstance(
+        substr, tsi_query.LiteralOperation
+    ):
+        value = substr.literal_
+        if isinstance(value, str):
+            operator = "(string): containsWord"
+        else:
+            raise QueryTranslationException(f"Could not parse {operand}")
+        field = input.get_field_
+        return Filter(field=field, operator=operator, value=value)
+    raise QueryTranslationException(f"Could not parse {operand}")
+
+
 def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
     first = operand.gt_[0]
     second = operand.gt_[1]
@@ -384,6 +422,8 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         return operand_to_filter_eq(operand)
     if isinstance(operand, tsi_query.ContainsOperation):
         return operand_to_filter_contains(operand)
+    if isinstance(operand, tsi_query.ContainsTokenOperation):
+        return operand_to_filter_contains_token(operand)
     if isinstance(operand, tsi_query.GtOperation):
         return operand_to_filter_gt(operand)
     if isinstance(operand, tsi_query.GteOperation):
@@ -404,6 +444,10 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
             filter.operator = "(string): notContains"
         elif filter.operator == "(string): notContains":
             filter.operator = "(string): contains"
+        elif filter.operator == "(string): containsWord":
+            filter.operator = "(string): notContainsWord"
+        elif filter.operator == "(string): notContainsWord":
+            filter.operator = "(string): containsWord"
         elif filter.operator == "(date): after":
             filter.operator = "(date): before"
         elif filter.operator == "(date): before":
@@ -445,6 +489,7 @@ def query_to_filters(query: tsi.Query | None) -> Filters | None:
             tsi_query.GteOperation,
             tsi_query.NotOperation,
             tsi_query.ContainsOperation,
+            tsi_query.ContainsTokenOperation,
         ),
     ):
         return [operand_to_filter(query.expr_)]

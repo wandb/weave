@@ -6,13 +6,17 @@ import weave
 from weave.flow.saved_view import (
     Filter,
     Filters,
+    QueryTranslationException,
     filter_to_clause,
     filters_to_query,
+    operand_to_filter,
+    operand_to_filter_contains_token,
     query_to_filters,
     to_seconds,
 )
 from weave.trace.api import ObjectRef
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.interface import query as tsi_query
 
 
 def test_to_seconds():
@@ -99,6 +103,8 @@ def test_query_to_filters_multiple_filters():
 def test_roundtrip_operators():
     cases: Filters = [
         Filter(field="test", operator="(string): contains", value="foo"),
+        Filter(field="test", operator="(string): containsWord", value="foo"),
+        Filter(field="test", operator="(string): notContainsWord", value="foo"),
         Filter(field="test", operator="(string): equals", value="foo"),
         Filter(field="test", operator="(string): in", value=["A", "B", "C"]),
         Filter(field="test", operator="(number): =", value=42),
@@ -123,6 +129,85 @@ def test_roundtrip_operators():
         query = filters_to_query(filters)
         filters2 = query_to_filters(query)
         assert filters == filters2
+
+
+def test_contains_token_operand_filter_round_trip():
+    """$containsToken maps to the locked frontend grid operator and back."""
+    operand = tsi_query.ContainsTokenOperation.model_validate(
+        {
+            "$containsToken": {
+                "input": {"$getField": "inputs.model"},
+                "substr": {"$literal": "gpt"},
+                "case_insensitive": False,
+            }
+        }
+    )
+
+    filter = operand_to_filter(operand)
+    assert filter == Filter(
+        field="inputs.model", operator="(string): containsWord", value="gpt"
+    )
+
+    assert filter_to_clause(filter) == {
+        "$containsToken": {
+            "input": {"$getField": "inputs.model"},
+            "substr": {"$literal": "gpt"},
+        },
+    }
+
+    round_tripped = tsi_query.ContainsTokenOperation.model_validate(
+        filter_to_clause(filter)
+    )
+    assert round_tripped == operand
+
+
+def test_contains_token_negation_round_trip():
+    """$not over $containsToken maps to notContainsWord and double-negation back."""
+    not_operand = tsi_query.NotOperation.model_validate(
+        {
+            "$not": [
+                {
+                    "$containsToken": {
+                        "input": {"$getField": "inputs.model"},
+                        "substr": {"$literal": "gpt"},
+                    }
+                }
+            ]
+        }
+    )
+    assert operand_to_filter(not_operand) == Filter(
+        field="inputs.model", operator="(string): notContainsWord", value="gpt"
+    )
+
+    double_not = tsi_query.NotOperation.model_validate({"$not": [not_operand]})
+    assert operand_to_filter(double_not) == Filter(
+        field="inputs.model", operator="(string): containsWord", value="gpt"
+    )
+
+
+def test_contains_token_non_string_value_rejected():
+    """A non-string token needle and a non-field input both fail to parse."""
+    non_string = tsi_query.ContainsTokenOperation.model_validate(
+        {
+            "$containsToken": {
+                "input": {"$getField": "inputs.model"},
+                "substr": {"$literal": 5},
+            }
+        }
+    )
+    with pytest.raises(QueryTranslationException):
+        operand_to_filter_contains_token(non_string)
+
+    non_field = tsi_query.ContainsTokenOperation.model_validate(
+        {
+            "$containsToken": {
+                "input": {"$literal": "x"},
+                "substr": {"$literal": "gpt"},
+            }
+        }
+    )
+    with pytest.raises(QueryTranslationException):
+        operand_to_filter_contains_token(non_field)
 
 
 def test_number_filter_skips_float_convert_for_typed_columns():
