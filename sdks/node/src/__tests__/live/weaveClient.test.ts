@@ -1292,4 +1292,251 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('searchAgents', () => {
+    vcrTest('searches messages by query', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgents({query: 'Liverpool', limit: 2});
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+                {
+                  "content_digest": "95fbc841becb3025395d9f997712ad53",
+                  "content_preview": "[{"type": "text", "content": "Liverpool last won the English Premier League in the **2019\\u201320 season**, clinching the title on **25 June 2020**."}]",
+                  "role": "assistant",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('filters by agent name', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgents({
+        query: '',
+        agentName: 'Assistant',
+        limit: 2,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "Assistant",
+              "conversation_id": "trace_1f21f184e99b4448bb6ac166e0a7191a",
+              "conversation_name": "",
+              "last_activity": "2026-06-18T20:52:22.517000",
+              "matched_messages": [
+                {
+                  "content_digest": "6eeb22f6a15d0bde7701fb1788261ed9",
+                  "content_preview": "[{"type": "tool_call", "toolName": "calculate", "arguments": "{\\"expression\\":\\"(17 * 4) + 93\\"}"}]",
+                  "role": "assistant",
+                  "span_id": "6f2673e3edec2637",
+                  "started_at": "2026-06-18T20:52:22.517000",
+                  "trace_id": "7aa79afa1e0427550fcaaed601089221",
+                },
+                {
+                  "content_digest": "47023b151742ce5a5875efc8bba23ca4",
+                  "content_preview": "[{"type": "text", "content": "What is (17 * 4) + 93?"}]",
+                  "role": "user",
+                  "span_id": "6f2673e3edec2637",
+                  "started_at": "2026-06-18T20:52:22.517000",
+                  "trace_id": "7aa79afa1e0427550fcaaed601089221",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('filters by conversation id', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgents({
+        query: '',
+        conversationId: 'trace_c50312356de3487fa90e381c9399b5b4',
+        limit: 2,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+                {
+                  "content_digest": "95fbc841becb3025395d9f997712ad53",
+                  "content_preview": "[{"type": "text", "content": "Liverpool last won the English Premier League in the **2019\\u201320 season**, clinching the title on **25 June 2020**."}]",
+                  "role": "assistant",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('filters by trace id', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgents({
+        query: '',
+        traceId: '86cc8e5a64b3bb1fbbf80cb377155950',
+        limit: 2,
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "",
+              "conversation_id": "trace_c50312356de3487fa90e381c9399b5b4",
+              "conversation_name": "",
+              "last_activity": "2026-06-16T22:10:34.631000",
+              "matched_messages": [
+                {
+                  "content_digest": "32cce4db16007e3f5c876c1a4b91e930",
+                  "content_preview": "[{"type": "text", "content": "When was the last time Liverpool won the EPL?"}]",
+                  "role": "user",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+                {
+                  "content_digest": "95fbc841becb3025395d9f997712ad53",
+                  "content_preview": "[{"type": "text", "content": "Liverpool last won the English Premier League in the **2019\\u201320 season**, clinching the title on **25 June 2020**."}]",
+                  "role": "assistant",
+                  "span_id": "53fc733e2f6b3417",
+                  "started_at": "2026-06-16T22:10:34.631000",
+                  "trace_id": "86cc8e5a64b3bb1fbbf80cb377155950",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('supports limit and offset', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const first = await client.searchAgents({query: '', limit: 1});
+      expect(first.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "claude_agent_sdk",
+              "conversation_id": "bf0914f2-a124-4da7-927d-61e463a70cba",
+              "conversation_name": "",
+              "last_activity": "2026-06-25T17:35:02.387000",
+              "matched_messages": [
+                {
+                  "content_digest": "e37f4a8d973198d2a9c83918a3ee2712",
+                  "content_preview": "[{"type": "text", "content": "Weave is an observability and tracing SDK for LLM applications with Python and TypeScript/Node implementations that automatically instruments AI integrations (OpenAI, Anthropic, etc.) and stores trace data in a ClickHouse-backed trace server."}]",
+                  "role": "assistant",
+                  "span_id": "025fb68b7d6a1a1b",
+                  "started_at": "2026-06-25T17:35:02.387000",
+                  "trace_id": "4a816ff61e80c6389ce60f9167e259cb",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+
+      const second = await client.searchAgents({
+        query: '',
+        limit: 1,
+        offset: 1,
+      });
+      expect(second.data).toMatchInlineSnapshot(`
+        {
+          "results": [
+            {
+              "agent_name": "claude_agent_sdk",
+              "conversation_id": "bf0914f2-a124-4da7-927d-61e463a70cba",
+              "conversation_name": "",
+              "last_activity": "2026-06-25T17:35:00.987000",
+              "matched_messages": [
+                {
+                  "content_digest": "f050523d075a22a6c93dc28715ee4e91",
+                  "content_preview": "[{"type": "reasoning", "content": "The user is asking me to summarize what I learned about the project in one sentence. Let me think about what I've learned:\\n\\n1. This is the Weave repository - a tracing/observability SDK for AI/LLM applications\\n2. It has both Python and TypeScript/Node implementations\\n3. The Node SDK is in \`sdks/node\` and uses pnpm for package management\\n4. The largest TypeScript file is a generated API client (8,225 lines) for the trace server\\n5. It supports automatic int",
+                  "role": "assistant",
+                  "span_id": "35494d9c72f42040",
+                  "started_at": "2026-06-25T17:35:00.987000",
+                  "trace_id": "4a816ff61e80c6389ce60f9167e259cb",
+                },
+              ],
+            },
+          ],
+          "total_conversations": 1,
+        }
+      `);
+    });
+
+    vcrTest('returns no results for nonexistent query', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.searchAgents({
+        query: 'zzz-no-such-text-anywhere-in-this-project-zzz',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "results": [],
+          "total_conversations": 0,
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(client.searchAgents({query: ''})).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });

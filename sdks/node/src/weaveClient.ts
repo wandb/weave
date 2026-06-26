@@ -8,22 +8,23 @@ import {
   MAX_OBJECT_NAME_LENGTH,
 } from './constants';
 import {computeDigest} from './digest';
-import {
-  type AgentChatMessage as AgentChatMessageSchema,
-  type AgentTraceChatRes,
-  type AgentSchema,
-  type AgentSpanSchema,
-  type AgentVersionSchema,
-  type CallSchema,
-  type CallsQueryReq,
-  type CallsFilter,
-  type EndedCallSchemaForInsert,
-  type Query,
-  type SortBy,
-  type StartedCallSchemaForInsert,
-  type Api as TraceServerApi,
-  type HttpResponse,
-  type HTTPValidationError,
+import type {
+  AgentChatMessage as AgentChatMessageSchema,
+  AgentSearchConversationResult,
+  AgentTraceChatRes,
+  AgentSchema,
+  AgentSpanSchema,
+  AgentVersionSchema,
+  CallSchema,
+  CallsQueryReq,
+  CallsFilter,
+  EndedCallSchemaForInsert,
+  Query,
+  SortBy,
+  StartedCallSchemaForInsert,
+  Api as TraceServerApi,
+  HttpResponse,
+  HTTPValidationError,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -57,7 +58,7 @@ import type {Prompt} from './prompt';
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
 
-export type Response<T extends unknown> = HttpResponse<T, HTTPValidationError>;
+export type Response<T> = HttpResponse<T, HTTPValidationError>;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -98,6 +99,7 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentConversationSearchResult = AgentSearchConversationResult;
 export type AgentMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
 export type AgentTurn = AgentTraceChatRes;
@@ -218,6 +220,37 @@ export type GetAgentTurnsResult = {
   limit?: number;
   offset?: number;
   feedback?: Record<string, any>[] | null;
+};
+
+/**
+ * Options for {@link WeaveClient.searchAgents}.
+ */
+export interface SearchAgentsOptions {
+  query: string;
+  agentName?: string | null;
+  conversationId?: string | null;
+  traceId?: string | null;
+  /**
+   * Limit
+   * @min 0
+   * @max 1000
+   * @default 20
+   */
+  limit?: number;
+  /**
+   * Offset
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.searchAgents}.
+ */
+export type SearchAgentsResult = {
+  results: AgentSearchConversationResult[];
+  total_conversations?: number;
 };
 
 /**
@@ -524,6 +557,48 @@ export class WeaveClient {
         include_feedback: options.includeFeedback,
       }
     );
+  }
+
+  /**
+   * Full-text search across agent messages in the project. Returns hits
+   * grouped by conversation, with a preview of each matched message.
+   *
+   * `query` is the full-text search term. Pass an empty string to retrieve
+   * all messages matching the structured filters (`agentName`,
+   * `conversationId`, `traceId`) without text matching. Use `limit` /
+   * `offset` to page through results.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.searchAgents({
+   *   query: 'Liverpool',
+   *   agentName: 'Assistant',
+   *   limit: 20,
+   * });
+   *
+   * for (const conversation of resp.data.results ?? []) {
+   *   console.log(`${conversation.conversation_id} (${conversation.agent_name})`);
+   *   for (const match of conversation.matched_messages) {
+   *     console.log(`  [${match.role}] ${match.content_preview}`);
+   *   }
+   * }
+   *
+   * console.log(`total conversations: ${resp.data.total_conversations}`);
+   * ```
+   */
+  public searchAgents(
+    options: SearchAgentsOptions
+  ): Promise<Response<SearchAgentsResult>> {
+    return this.traceServerApi.agents.genaiSearchAgentsSearchPost({
+      project_id: this.projectId,
+      query: options.query,
+      agent_name: options.agentName,
+      conversation_id: options.conversationId,
+      trace_id: options.traceId,
+      limit: options.limit,
+      offset: options.offset,
+    });
   }
 
   private scheduleBatchProcessing() {
