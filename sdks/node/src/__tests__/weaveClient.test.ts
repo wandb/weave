@@ -563,7 +563,9 @@ describe('WeaveClient', () => {
             aggregation: 'sum',
           },
         ],
-        rows: [{started_at_bucket: '2026-06-10T00:00:00Z', total_input_tokens: 450}],
+        rows: [
+          {started_at_bucket: '2026-06-10T00:00:00Z', total_input_tokens: 450},
+        ],
       };
       mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
         {data: stats} as any
