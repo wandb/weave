@@ -753,6 +753,31 @@
         "x-exclude": true
       }
     },
+    "/inference/modelsdev/models": {
+      "get": {
+        "tags": ["Inference"],
+        "summary": "Inference Modelsdev Models",
+        "description": "Returns the available models in the models.dev `api.json` schema.\n\nThis API is available without authentication.",
+        "operationId": "inference_modelsdev_models_inference_modelsdev_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/ModelsDevProvider"
+                  },
+                  "type": "object",
+                  "title": "Response Inference Modelsdev Models Inference Modelsdev Models Get"
+                }
+              }
+            }
+          }
+        },
+        "x-exclude": true
+      }
+    },
     "/inference/nvidia/v2/hardware": {
       "get": {
         "tags": ["Inference"],
@@ -2174,6 +2199,46 @@
         }
       }
     },
+    "/feedback/aggregate": {
+      "post": {
+        "tags": ["Feedback"],
+        "summary": "Feedback Aggregate",
+        "description": "Aggregate typed scorer feedback (tags, ratings) over time buckets.",
+        "operationId": "feedback_aggregate_feedback_aggregate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackAggregateReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackAggregateRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/feedback/payload_schema": {
       "post": {
         "tags": ["Feedback"],
@@ -2978,6 +3043,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CreateAndLinkWeaveAssetRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/{entity}/{project}/calls/complete": {
+      "post": {
+        "tags": ["Calls"],
+        "summary": "Calls Complete",
+        "description": "Upsert a batch of completed calls directly to the calls_complete table.\n\nEach call in the batch contains both start and end information.\nThis endpoint is used when calls are buffered client-side and sent as complete records.",
+        "operationId": "calls_complete_v2__entity___project__calls_complete_post",
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallsUpsertCompleteReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallsUpsertCompleteRes"
                 }
               }
             }
@@ -5598,6 +5723,39 @@
             ],
             "title": "Output Tokens"
           },
+          "input_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Cost Usd"
+          },
+          "output_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Cost Usd"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
           "duration_ms": {
             "anyOf": [
               {
@@ -5709,6 +5867,29 @@
               }
             ],
             "title": "Agent Name"
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["UNSET", "OK", "ERROR"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
           },
           "started_at": {
             "anyOf": [
@@ -5961,6 +6142,17 @@
             "title": "Offset",
             "default": 0
           },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
           "feedback": {
             "anyOf": [
               {
@@ -6211,6 +6403,17 @@
               }
             ],
             "title": "Last Seen"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
           }
         },
         "type": "object",
@@ -6324,7 +6527,19 @@
           },
           "query": {
             "type": "string",
-            "title": "Query"
+            "title": "Query",
+            "default": ""
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
           },
           "roles": {
             "anyOf": [
@@ -6393,6 +6608,11 @@
             ],
             "title": "Request Model"
           },
+          "truncate_content": {
+            "type": "boolean",
+            "title": "Truncate Content",
+            "default": true
+          },
           "started_after": {
             "anyOf": [
               {
@@ -6432,9 +6652,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "query"],
+        "required": ["project_id"],
         "title": "AgentSearchReq",
-        "description": "Full-text search across message content and span metadata.\n\nScans the `messages` table (one row per message occurrence, populated\nby an MV from spans) and returns matching span-level hits. The caller\ngroups by conversation for the response shape."
+        "description": "Query the `messages` table by content and/or span-level filters.\n\nScans the `messages` table (one row per message occurrence, populated by an\nMV from spans) and returns matching span-level hits. Full-text search sets\n`query`; structured retrieval (e.g. all messages in a trace) leaves `query`\nempty and uses the filters below. The caller groups by conversation for the\nresponse shape."
       },
       "AgentSearchRes": {
         "properties": {
@@ -6731,6 +6951,39 @@
             "type": "integer",
             "title": "Error Count",
             "default": 0
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
+          "total_input_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Input Cost Usd"
+          },
+          "total_output_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Output Cost Usd"
           },
           "agent_names": {
             "items": {
@@ -7164,6 +7417,61 @@
               }
             ],
             "title": "Cache Read Input Tokens"
+          },
+          "input_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Cost Usd"
+          },
+          "output_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Cost Usd"
+          },
+          "cache_read_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Cost Usd"
+          },
+          "cache_creation_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Creation Cost Usd"
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
           },
           "reasoning_content": {
             "anyOf": [
@@ -8025,6 +8333,11 @@
             "title": "Include Details",
             "default": false
           },
+          "include_costs": {
+            "type": "boolean",
+            "title": "Include Costs",
+            "default": false
+          },
           "sort_by": {
             "anyOf": [
               {
@@ -8146,6 +8459,40 @@
             ],
             "title": "Root Span Name"
           },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "agent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Version"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["UNSET", "OK", "ERROR"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
           "provider": {
             "anyOf": [
               {
@@ -8168,6 +8515,17 @@
             ],
             "title": "Total Duration Ms",
             "description": "Wall-clock duration of the trace root span in milliseconds. This is not a sum of child span durations."
+          },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
           },
           "messages": {
             "items": {
@@ -8255,6 +8613,17 @@
             ],
             "title": "Last Seen"
           },
+          "total_cost_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost Usd"
+          },
           "agent_version": {
             "type": "string",
             "title": "Agent Version"
@@ -8313,6 +8682,11 @@
             "minimum": 0.0,
             "title": "Offset",
             "default": 0
+          },
+          "include_costs": {
+            "type": "boolean",
+            "title": "Include Costs",
+            "default": false
           }
         },
         "type": "object",
@@ -8400,6 +8774,11 @@
             "minimum": 0.0,
             "title": "Offset",
             "default": 0
+          },
+          "include_costs": {
+            "type": "boolean",
+            "title": "Include Costs",
+            "default": false
           }
         },
         "type": "object",
@@ -9252,6 +9631,17 @@
             "type": "string",
             "format": "binary",
             "title": "File"
+          },
+          "expected_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Digest"
           }
         },
         "type": "object",
@@ -10408,6 +10798,27 @@
         "title": "CallsScoreRes",
         "description": "Empty response for calls_score.\n\nDefined as a model (rather than returning None) to follow the convention\nused throughout this interface and to allow fields to be added later\nwithout a breaking change."
       },
+      "CallsUpsertCompleteReq": {
+        "properties": {
+          "batch": {
+            "items": {
+              "$ref": "#/components/schemas/CompletedCallSchemaForInsert"
+            },
+            "type": "array",
+            "title": "Batch"
+          }
+        },
+        "type": "object",
+        "required": ["batch"],
+        "title": "CallsUpsertCompleteReq",
+        "description": "Request for upserting a batch of completed calls."
+      },
+      "CallsUpsertCompleteRes": {
+        "properties": {},
+        "type": "object",
+        "title": "CallsUpsertCompleteRes",
+        "description": "Response for upserting a batch of completed calls."
+      },
       "CallsUsageReq": {
         "properties": {
           "project_id": {
@@ -10478,6 +10889,184 @@
         "type": "object",
         "required": ["models"],
         "title": "CatalogModelsRes"
+      },
+      "CompletedCallSchemaForInsert": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "op_name": {
+            "type": "string",
+            "title": "Op Name"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ended At"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          },
+          "output": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SummaryInsertMap"
+          },
+          "otel_dump": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Otel Dump"
+          },
+          "exception": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exception"
+          },
+          "wb_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb User Id",
+            "description": "Do not set directly. Server will automatically populate this field."
+          },
+          "wb_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Id"
+          },
+          "wb_run_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step"
+          },
+          "wb_run_step_end": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "id",
+          "trace_id",
+          "op_name",
+          "started_at",
+          "ended_at",
+          "attributes",
+          "inputs",
+          "summary"
+        ],
+        "title": "CompletedCallSchemaForInsert",
+        "description": "Schema for inserting a completed call directly.\n\nThis represents a call that is already finished at insertion time, with both\nstart and end information provided together. Used by the calls_complete endpoint."
       },
       "ContainsOperation": {
         "properties": {
@@ -10665,6 +11254,84 @@
         "required": ["input", "to"],
         "title": "ConvertSpec",
         "description": "Specifies conversion details for `$convert`.\n\n- `input`: The operand to convert.\n- `to`: The type to convert to."
+      },
+      "Cost": {
+        "properties": {
+          "input": {
+            "type": "number",
+            "title": "Input",
+            "description": "Cost per million input tokens (USD)."
+          },
+          "output": {
+            "type": "number",
+            "title": "Output",
+            "description": "Cost per million output tokens (USD)."
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning",
+            "description": "Cost per million reasoning tokens (USD)."
+          },
+          "cache_read": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read",
+            "description": "Cost per million cached read tokens (USD)."
+          },
+          "cache_write": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write",
+            "description": "Cost per million cached write tokens (USD)."
+          },
+          "input_audio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Audio",
+            "description": "Cost per million audio input tokens (USD)."
+          },
+          "output_audio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Audio",
+            "description": "Cost per million audio output tokens (USD)."
+          }
+        },
+        "type": "object",
+        "required": ["input", "output"],
+        "title": "Cost",
+        "description": "Costs are expressed in USD per million tokens."
       },
       "CostCreateInput": {
         "properties": {
@@ -11436,6 +12103,18 @@
             "type": "array",
             "title": "Scorer Stats"
           },
+          "predict_total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predict Total Tokens",
+            "description": "Sum of per-trial predict-only token usage for this evaluation (the model's predict() tokens only, excluding LLM-as-a-judge scorer usage); None when no trial reports usage."
+          },
           "evaluation_ref": {
             "anyOf": [
               {
@@ -11630,6 +12309,13 @@
             ],
             "title": "Filters",
             "description": "Filters applied to grouped rows. Multiple filters are AND'd together."
+          },
+          "filter_logic_operator": {
+            "type": "string",
+            "enum": ["and", "or"],
+            "title": "Filter Logic Operator",
+            "description": "How to combine filters across evaluations: 'and' (Match All - row must match in ALL evals) or 'or' (Match Any - row must match in ANY eval). Defaults to 'or' (Match Any).",
+            "default": "or"
           },
           "limit": {
             "anyOf": [
@@ -12258,7 +12944,7 @@
               }
             ],
             "title": "Source Evaluation Run Id",
-            "description": "Source evaluation run ID if this run was created by rescoring \u2014 provenance link"
+            "description": "Source evaluation run ID if this run was created by rescoring — provenance link"
           }
         },
         "type": "object",
@@ -12523,6 +13209,235 @@
         "type": "object",
         "required": ["completed_rows", "total_rows"],
         "title": "EvaluationStatusRunning"
+      },
+      "FeedbackAggregateBucket": {
+        "properties": {
+          "time_bucket_start_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Bucket Start Ms",
+            "description": "Time bucket start, unix epoch ms (UTC). None when unbucketed."
+          },
+          "group": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Group",
+            "description": "Group-by dimension values for this row (e.g. {'scorer_id': '...'})."
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Number of feedback rows in this bucket/group."
+          },
+          "scored_count": {
+            "type": "integer",
+            "title": "Scored Count",
+            "description": "Rows that emitted a score (at least one tag or rating). Excludes agent-monitor rows that scored nothing — use this for score volume."
+          },
+          "tag_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Tag Counts",
+            "description": "Count of each scorer tag."
+          },
+          "rating_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Rating Counts",
+            "description": "Number of rows carrying each rating key (e.g. '_rating_')."
+          },
+          "rating_sums": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Rating Sums",
+            "description": "Sum of each rating key's values; client derives avg = sum/count."
+          }
+        },
+        "type": "object",
+        "required": ["total_count", "scored_count"],
+        "title": "FeedbackAggregateBucket",
+        "description": "One (time bucket, group) row of aggregated scorer feedback."
+      },
+      "FeedbackAggregateReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "examples": ["entity/project"]
+          },
+          "after_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "After Ms",
+            "description": "Inclusive lower bound on created_at (milliseconds since epoch)."
+          },
+          "before_ms": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Before Ms",
+            "description": "Exclusive upper bound on created_at (milliseconds since epoch)."
+          },
+          "time_bucket_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Bucket Seconds",
+            "description": "Time bucket size in seconds, e.g. 3600 for 1h buckets"
+          },
+          "feedback_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feedback Types",
+            "description": "Filter on feedback_type by prefix"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Filter to feedback that includes any of the given tags"
+          },
+          "rating_min": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Min",
+            "description": "Include only rows with a rating >= this value"
+          },
+          "rating_max": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Max",
+            "description": "Include only rows with a rating <= this value"
+          },
+          "monitor_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Monitor Ids",
+            "description": "Filter to these monitor ids (exact match; suffix with '*' for prefix match)."
+          },
+          "scorer_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Scorer Ids",
+            "description": "Filter to these scorer ids (exact match; suffix with '*' for prefix match)."
+          },
+          "span_agent_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Span Agent Names",
+            "description": "Filter to feedback whose span_agent_name matches any of these (exact)."
+          },
+          "span_types": {
+            "items": {
+              "type": "string",
+              "enum": ["agent_turn", "agent_conversation"]
+            },
+            "type": "array",
+            "title": "Span Types",
+            "description": "Filter by span type (turn vs conversation)."
+          },
+          "group_by": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "scorer_id",
+                "span_agent_name",
+                "span_agent_version",
+                "span_status_code"
+              ]
+            },
+            "type": "array",
+            "title": "Group By",
+            "description": "Allowed: ['scorer_id', 'span_agent_name', 'span_agent_version', 'span_status_code']."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["project_id", "after_ms", "before_ms"],
+        "title": "FeedbackAggregateReq",
+        "description": "Query for aggregate scores by time bucket and dimension."
+      },
+      "FeedbackAggregateRes": {
+        "properties": {
+          "time_bucket_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Bucket Seconds",
+            "description": "Time bucket size used (seconds). None when unbucketed."
+          },
+          "after_ms": {
+            "type": "integer",
+            "title": "After Ms",
+            "description": "Resolved inclusive lower bound, unix epoch ms (UTC)."
+          },
+          "before_ms": {
+            "type": "integer",
+            "title": "Before Ms",
+            "description": "Resolved exclusive upper bound, unix epoch ms (UTC)."
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackAggregateBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          }
+        },
+        "type": "object",
+        "required": ["after_ms", "before_ms"],
+        "title": "FeedbackAggregateRes",
+        "description": "Sparse time-series of aggregated scorer feedback (empty buckets omitted)."
       },
       "FeedbackCreateBatchReq": {
         "properties": {
@@ -12832,7 +13747,7 @@
             },
             "type": "array",
             "title": "Percentiles",
-            "description": "Percentile values to compute (0\u2013100), e.g. [5, 50, 95]. Only applicable for numeric value_type fields; ignored for boolean/categorical."
+            "description": "Percentile values to compute (0–100), e.g. [5, 50, 95]. Only applicable for numeric value_type fields; ignored for boolean/categorical."
           }
         },
         "additionalProperties": false,
@@ -14032,6 +14947,20 @@
         "title": "InOperation",
         "description": "Membership check.\n\nReturns true if the left operand is in the list provided as the second operand.\n\nExample:\n    ```\n    {\n        \"$in\": [\n            {\"$getField\": \"op_name\"},\n            [{\"$literal\": \"predict\"}, {\"$literal\": \"generate\"}]\n        ]\n    }\n    ```"
       },
+      "Interleaved": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": ["reasoning_content", "reasoning_details"],
+            "title": "Field",
+            "description": "Format identifier for interleaved reasoning."
+          }
+        },
+        "type": "object",
+        "required": ["field"],
+        "title": "Interleaved",
+        "description": "Reasoning interleaving support details."
+      },
       "LLMAggregatedUsage": {
         "properties": {
           "requests": {
@@ -14417,6 +15346,29 @@
         "type": "object",
         "title": "LLMUsageSchema"
       },
+      "Limit": {
+        "properties": {
+          "context": {
+            "type": "integer",
+            "title": "Context",
+            "description": "Maximum context window in tokens."
+          },
+          "input": {
+            "type": "integer",
+            "title": "Input",
+            "description": "Maximum input tokens."
+          },
+          "output": {
+            "type": "integer",
+            "title": "Output",
+            "description": "Maximum output tokens."
+          }
+        },
+        "type": "object",
+        "required": ["context", "input", "output"],
+        "title": "Limit",
+        "description": "Token limits for a model."
+      },
       "LiteralOperation": {
         "properties": {
           "$literal": {
@@ -14661,6 +15613,30 @@
         "title": "LteOperation",
         "description": "Less than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$lte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
+      "Modalities": {
+        "properties": {
+          "input": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input",
+            "description": "Supported input types (e.g. text, image, audio, video, pdf)."
+          },
+          "output": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Output",
+            "description": "Supported output types."
+          }
+        },
+        "type": "object",
+        "required": ["input", "output"],
+        "title": "Modalities",
+        "description": "Supported input and output modalities."
+      },
       "ModelCreateBody": {
         "properties": {
           "name": {
@@ -14811,6 +15787,216 @@
           "source_code"
         ],
         "title": "ModelReadRes"
+      },
+      "ModelsDevModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Model identifier used by the AI SDK."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name."
+          },
+          "attachment": {
+            "type": "boolean",
+            "title": "Attachment",
+            "description": "File attachment support."
+          },
+          "reasoning": {
+            "type": "boolean",
+            "title": "Reasoning",
+            "description": "Chain-of-thought reasoning support."
+          },
+          "tool_call": {
+            "type": "boolean",
+            "title": "Tool Call",
+            "description": "Tool calling support."
+          },
+          "structured_output": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structured Output",
+            "description": "Dedicated structured output feature."
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature",
+            "description": "Temperature control support."
+          },
+          "knowledge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge",
+            "description": "Knowledge cutoff in YYYY-MM or YYYY-MM-DD format."
+          },
+          "release_date": {
+            "type": "string",
+            "title": "Release Date",
+            "description": "First public release date (YYYY-MM-DD)."
+          },
+          "last_updated": {
+            "type": "string",
+            "title": "Last Updated",
+            "description": "Most recent update date (YYYY-MM-DD)."
+          },
+          "open_weights": {
+            "type": "boolean",
+            "title": "Open Weights",
+            "description": "Public weights availability."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["alpha", "beta", "deprecated"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Lifecycle status of the model."
+          },
+          "interleaved": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/components/schemas/Interleaved"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interleaved",
+            "description": "Reasoning interleaving support."
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Cost"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pricing information."
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Limit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token limits."
+          },
+          "modalities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Modalities"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Supported input and output modalities."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "attachment",
+          "reasoning",
+          "tool_call",
+          "release_date",
+          "last_updated",
+          "open_weights"
+        ],
+        "title": "ModelsDevModel",
+        "description": "A single model entry in the models.dev schema."
+      },
+      "ModelsDevProvider": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Provider identifier, derived from the folder name."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name of the provider."
+          },
+          "npm": {
+            "type": "string",
+            "title": "Npm",
+            "description": "AI SDK package name."
+          },
+          "env": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Env",
+            "description": "Environment variable keys for authentication."
+          },
+          "doc": {
+            "type": "string",
+            "title": "Doc",
+            "description": "Link to provider documentation."
+          },
+          "api": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api",
+            "description": "OpenAI-compatible API endpoint. Required only when using @ai-sdk/openai-compatible."
+          },
+          "models": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ModelsDevModel"
+            },
+            "type": "object",
+            "title": "Models",
+            "description": "Mapping of model id -> model."
+          }
+        },
+        "type": "object",
+        "required": ["id", "name", "npm", "env", "doc"],
+        "title": "ModelsDevProvider",
+        "description": "A provider entry in the models.dev schema."
       },
       "NormalizedMessage": {
         "properties": {
@@ -16983,7 +18169,7 @@
             "default": [],
             "examples": [
               "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
-              "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmi\u0435\u0440\u0430noa"
+              "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiераnoa"
             ]
           },
           "include_storage_size": {
