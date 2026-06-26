@@ -511,7 +511,7 @@ describe('WeaveClient', () => {
       expect(result).toEqual({data: {spans, total_count: 2}});
     });
 
-    it('omits the query when no agent name is provided', async () => {
+    it('omits the query when neither agentName nor query is provided', async () => {
       mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
         {data: {spans: [], total_count: 0}} as any
       );
@@ -522,8 +522,61 @@ describe('WeaveClient', () => {
         mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
+        query: undefined,
         sort_by: undefined,
         limit: 5,
+        offset: undefined,
+      });
+    });
+
+    it('passes through a caller-supplied query when agentName is not set', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      const userQuery = {
+        $expr: {$gt: [{$getField: 'input_tokens'}, {$literal: 100}]},
+      };
+      await client.getAgentSpans({query: userQuery});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: userQuery,
+        sort_by: undefined,
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('combines agentName with caller-supplied query', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      const userExpr = {
+        $gt: [{$getField: 'input_tokens'}, {$literal: 100}],
+      };
+      await client.getAgentSpans({
+        agentName: 'Assistant',
+        query: {$expr: userExpr},
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: {
+          $expr: {
+            $and: [
+              {$eq: [{$getField: 'agent_name'}, {$literal: 'Assistant'}]},
+              userExpr,
+            ],
+          },
+        },
+        sort_by: undefined,
+        limit: undefined,
         offset: undefined,
       });
     });
@@ -629,6 +682,7 @@ describe('WeaveClient', () => {
       ).toHaveBeenCalledWith({
         project_id: 'test-project',
         start: '2026-06-10T00:00:00Z',
+        metrics: [],
       });
     });
 
