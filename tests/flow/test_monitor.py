@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 from pydantic import ValidationError
 
@@ -108,6 +110,47 @@ def test_preserves_full_refs_and_agent_spans(weave_active):
 
     stored = monitor.activate().get()
     assert stored.op_names == [full_ref, "weave.genai.turn_ended"]
+
+
+def test_health_fields(weave_active):
+    """Health fields default to None, accept the ok/error literals, reject others, and survive a publish round-trip."""
+    error_at = datetime(2026, 6, 11, 12, 0, 0, tzinfo=timezone.utc)
+
+    default = Monitor(name="test_monitor", scorers=[], op_names=[])
+    assert (default.status, default.last_error, default.last_error_at) == (
+        None,
+        None,
+        None,
+    )
+    stored_default = publish(default).get()
+    assert (
+        stored_default.status,
+        stored_default.last_error,
+        stored_default.last_error_at,
+    ) == (None, None, None)
+
+    monitor = Monitor(
+        name="test_monitor",
+        scorers=[],
+        op_names=[],
+        status="error",
+        last_error="scorer raised TimeoutError",
+        last_error_at=error_at,
+    )
+    assert (monitor.status, monitor.last_error, monitor.last_error_at) == (
+        "error",
+        "scorer raised TimeoutError",
+        error_at,
+    )
+    stored = publish(monitor).get()
+    assert (stored.status, stored.last_error, stored.last_error_at) == (
+        "error",
+        "scorer raised TimeoutError",
+        error_at,
+    )
+
+    with pytest.raises(ValidationError):
+        Monitor(name="test_monitor", scorers=[], op_names=[], status="degraded")
 
 
 def test_rejects_ambiguous_slashed_op_name(weave_active):
