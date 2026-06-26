@@ -1539,4 +1539,336 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('getAgentSpanStats', () => {
+    vcrTest('gets span stats over a time window', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        metrics: [
+          {
+            alias: 'total_input_tokens',
+            value_type: 'number',
+            aggregations: ['sum'],
+            value: {source: 'field', key: 'input_tokens'},
+          },
+        ],
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "bucket_type": "time",
+          "columns": [
+            {
+              "aggregation": null,
+              "metric": null,
+              "name": "timestamp",
+              "role": "time",
+              "value_type": "datetime",
+            },
+            {
+              "aggregation": "sum",
+              "metric": "total_input_tokens",
+              "name": "sum_total_input_tokens",
+              "role": "metric",
+              "value_type": "number",
+            },
+          ],
+          "end": "2026-06-23T00:00:00Z",
+          "granularity": 43200,
+          "rows": [
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-10T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-10T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-11T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-11T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-12T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-12T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-13T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-13T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-14T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-14T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-15T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-15T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-16T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 2030,
+              "timestamp": "2026-06-16T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-17T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-17T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-18T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 951,
+              "timestamp": "2026-06-18T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-19T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-19T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-20T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-20T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-21T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-21T12:00:00",
+            },
+            {
+              "sum_total_input_tokens": 0,
+              "timestamp": "2026-06-22T00:00:00",
+            },
+            {
+              "sum_total_input_tokens": 2853,
+              "timestamp": "2026-06-22T12:00:00",
+            },
+          ],
+          "start": "2026-06-10T00:00:00Z",
+          "timezone": "UTC",
+        }
+      `);
+    });
+
+    vcrTest('bucketed by time granularity', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        granularity: 86400,
+        metrics: [
+          {
+            alias: 'span_count',
+            value_type: 'string',
+            aggregations: ['count'],
+            value: {source: 'field', key: 'span_id'},
+          },
+        ],
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "bucket_type": "time",
+          "columns": [
+            {
+              "aggregation": null,
+              "metric": null,
+              "name": "timestamp",
+              "role": "time",
+              "value_type": "datetime",
+            },
+            {
+              "aggregation": "count",
+              "metric": "span_count",
+              "name": "count_span_count",
+              "role": "metric",
+              "value_type": "number",
+            },
+          ],
+          "end": "2026-06-23T00:00:00Z",
+          "granularity": 86400,
+          "rows": [
+            {
+              "count_span_count": 15,
+              "timestamp": "2026-06-10T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-11T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-12T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-13T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-14T00:00:00",
+            },
+            {
+              "count_span_count": 111,
+              "timestamp": "2026-06-15T00:00:00",
+            },
+            {
+              "count_span_count": 20,
+              "timestamp": "2026-06-16T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-17T00:00:00",
+            },
+            {
+              "count_span_count": 9,
+              "timestamp": "2026-06-18T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-19T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-20T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2026-06-21T00:00:00",
+            },
+            {
+              "count_span_count": 27,
+              "timestamp": "2026-06-22T00:00:00",
+            },
+          ],
+          "start": "2026-06-10T00:00:00Z",
+          "timezone": "UTC",
+        }
+      `);
+    });
+
+    vcrTest('returns empty rows for a window with no data', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentSpanStats({
+        start: '2000-01-01T00:00:00Z',
+        end: '2000-01-02T00:00:00Z',
+        metrics: [
+          {
+            alias: 'span_count',
+            value_type: 'string',
+            aggregations: ['count'],
+            value: {source: 'field', key: 'span_id'},
+          },
+        ],
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "bucket_type": "time",
+          "columns": [
+            {
+              "aggregation": null,
+              "metric": null,
+              "name": "timestamp",
+              "role": "time",
+              "value_type": "datetime",
+            },
+            {
+              "aggregation": "count",
+              "metric": "span_count",
+              "name": "count_span_count",
+              "role": "metric",
+              "value_type": "number",
+            },
+          ],
+          "end": "2000-01-02T00:00:00Z",
+          "granularity": 21600,
+          "rows": [
+            {
+              "count_span_count": 0,
+              "timestamp": "2000-01-01T00:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2000-01-01T06:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2000-01-01T12:00:00",
+            },
+            {
+              "count_span_count": 0,
+              "timestamp": "2000-01-01T18:00:00",
+            },
+          ],
+          "start": "2000-01-01T00:00:00Z",
+          "timezone": "UTC",
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(
+        client.getAgentSpanStats({
+          start: '2026-06-10T00:00:00Z',
+          end: '2026-06-23T00:00:00Z',
+          metrics: [
+            {
+              alias: 'total_input_tokens',
+              value_type: 'number',
+              aggregations: ['sum'],
+              value: {source: 'field', key: 'input_tokens'},
+            },
+          ],
+        })
+      ).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });

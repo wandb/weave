@@ -41,6 +41,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
     genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
     genaiSearchAgentsSearchPost: jest.Mock;
     genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
+    genaiSpansStatsAgentsSpansStatsPost: jest.Mock;
     genaiTracesChatAgentsTracesChatPost: jest.Mock;
     genaiConversationChatAgentsConversationsChatPost: jest.Mock;
   };
@@ -60,6 +61,7 @@ describe('WeaveClient', () => {
         genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
         genaiSearchAgentsSearchPost: jest.fn(),
         genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
+        genaiSpansStatsAgentsSpansStatsPost: jest.fn(),
         genaiTracesChatAgentsTracesChatPost: jest.fn(),
         genaiConversationChatAgentsConversationsChatPost: jest.fn(),
       },
@@ -540,6 +542,97 @@ describe('WeaveClient', () => {
       );
 
       await expect(client.getAgentSpans({})).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentSpanStats', () => {
+    it('gets agent span stats from the server', async () => {
+      const stats = {
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        granularity: 86400,
+        timezone: 'UTC',
+        bucket_type: 'time',
+        columns: [
+          {name: 'started_at_bucket', role: 'time', value_type: 'datetime'},
+          {
+            name: 'total_input_tokens',
+            role: 'metric',
+            value_type: 'number',
+            metric: 'total_input_tokens',
+            aggregation: 'sum',
+          },
+        ],
+        rows: [{started_at_bucket: '2026-06-10T00:00:00Z', total_input_tokens: 450}],
+      };
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
+        {data: stats} as any
+      );
+
+      const metrics = [
+        {
+          alias: 'total_input_tokens',
+          value_type: 'number' as const,
+          aggregations: ['sum' as const],
+          value: {source: 'field' as const, key: 'input_tokens'},
+        },
+      ];
+      const groupBy = [{key: 'agent_name'}];
+      const query = {
+        $expr: {
+          $eq: [{$getField: 'provider_name'}, {$literal: 'openai'}],
+        },
+      };
+
+      const result = await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        metrics,
+        groupBy,
+        query,
+        granularity: 86400,
+        timezone: 'America/Los_Angeles',
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        metrics,
+        group_by: groupBy,
+        query,
+        granularity: 86400,
+        timezone: 'America/Los_Angeles',
+      });
+
+      expect(result).toEqual({data: stats});
+    });
+
+    it('fetches without optional fields', async () => {
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
+        {data: {start: '', end: '', timezone: 'UTC'}} as any
+      );
+
+      await client.getAgentSpanStats({start: '2026-06-10T00:00:00Z'});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        start: '2026-06-10T00:00:00Z',
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentSpanStats({start: '2026-06-10T00:00:00Z'})
+      ).rejects.toThrow('boom');
     });
   });
 

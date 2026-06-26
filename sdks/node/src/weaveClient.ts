@@ -25,6 +25,9 @@ import type {
   Api as TraceServerApi,
   HttpResponse,
   HTTPValidationError,
+  AgentGroupByRef,
+  AgentSpanStatsMetricSpec,
+  AgentSpanStatsColumn,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -175,6 +178,35 @@ export interface GetAgentSpansOptions {
 export type GetAgentSpansResult = {
   spans: AgentSpan[];
   total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpanStats}.
+ */
+export interface GetAgentSpanStatsOptions {
+  start: string;
+  end?: string | null;
+  metrics?: AgentSpanStatsMetricSpec[];
+  query?: Query | null;
+  groupBy?: AgentGroupByRef[];
+  granularity?: number | null;
+  /**
+   * @default "UTC"
+   */
+  timezone?: string;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpanStats}.
+ */
+export type GetAgentSpanStatsResult = {
+  start: string;
+  end: string;
+  granularity?: number | null;
+  timezone: string;
+  bucket_type?: 'time' | 'number';
+  columns?: AgentSpanStatsColumn[];
+  rows?: Record<string, string | number | boolean | null>[];
 };
 
 /**
@@ -491,6 +523,55 @@ export class WeaveClient {
         spans: resp.data.spans ?? [],
       },
     };
+  }
+
+  /**
+   * Agregations over agent spans in the project, returned as rows + column
+   * metadata suitable for time-series / bucketed visualizations.
+   *
+   * `start` (required) and `end` define the time window. Each entry in
+   * `metrics` declares a field to extract and how to aggregate it (`sum`,
+   * `avg`, `count`, percentiles, etc.). Pass `granularity` (seconds) to
+   * bucket rows by time, or `groupBy` to break results out per agent /
+   * provider / model / etc. `query` filters the underlying spans before
+   * aggregation.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpanStats({
+   *   start: '2026-06-10T00:00:00Z',
+   *   end: '2026-06-23T00:00:00Z',
+   *   granularity: 86400, // one row per day
+   *   metrics: [
+   *     {
+   *       alias: 'total_input_tokens',
+   *       value_type: 'number',
+   *       aggregations: ['sum'],
+   *       value: {source: 'field', key: 'input_tokens'},
+   *     },
+   *   ],
+   *   groupBy: [{key: 'agent_name'}],
+   * });
+   *
+   * for (const row of resp.data.rows ?? []) {
+   *   console.log(row.started_at_bucket, row.agent_name, row.total_input_tokens);
+   * }
+   * ```
+   */
+  public async getAgentSpanStats(
+    options: GetAgentSpanStatsOptions
+  ): Promise<Response<GetAgentSpanStatsResult>> {
+    return this.traceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost({
+      project_id: this.projectId,
+      start: options.start,
+      end: options.end,
+      metrics: options.metrics,
+      query: options.query,
+      group_by: options.groupBy,
+      granularity: options.granularity,
+      timezone: options.timezone,
+    });
   }
 
   /**
