@@ -1,4 +1,3 @@
-import re
 from collections.abc import Callable
 from typing import TypedDict
 
@@ -519,7 +518,7 @@ def test_op_no_repeats(client):
 
 EXPECTED_INSTANCE_CODE = """import weave
 
-instance = "<test_op_versioning.test_op_instance.<locals>.MyClass object at 0x000000000>"
+instance = "<test_op_versioning.test_op_instance.<locals>.MyClass object>"
 
 @weave.op
 def t(text: str):
@@ -554,10 +553,8 @@ def test_op_instance(client):
     print("SAVED CODE")
     print(saved_code)
 
-    # Instance address expected to change each run
-    clean_saved_code = re.sub(r"0x[0-9a-fA-F]+", "0x000000000", saved_code)
-
-    assert clean_saved_code == EXPECTED_INSTANCE_CODE
+    # stable_repr strips the instance's volatile memory address, so the code is deterministic.
+    assert saved_code == EXPECTED_INSTANCE_CODE
 
 
 EXPECTED_IMPORT_AS_CODE = """import json as js
