@@ -1,0 +1,66 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:04:11 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Fri, 26 Jun 2026 15:04:12 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 23d9088f538720ee133349250535dd1f
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/spans/stats
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","start":"2026-06-10T00:00:00Z","end":"2026-06-23T00:00:00Z","metrics":[{"alias":"span_count","value_type":"string","aggregations":["count"],"value":{"source":"field","key":"span_id"}}],"granularity":86400}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "1088"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:04:11 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"start":"2026-06-10T00:00:00Z","end":"2026-06-23T00:00:00Z","granularity":86400,"timezone":"UTC","bucket_type":"time","columns":[{"name":"timestamp","role":"time","value_type":"datetime","metric":null,"aggregation":null},{"name":"count_span_count","role":"metric","value_type":"number","metric":"span_count","aggregation":"count"}],"rows":[{"timestamp":"2026-06-10T00:00:00","count_span_count":15},{"timestamp":"2026-06-11T00:00:00","count_span_count":0},{"timestamp":"2026-06-12T00:00:00","count_span_count":0},{"timestamp":"2026-06-13T00:00:00","count_span_count":0},{"timestamp":"2026-06-14T00:00:00","count_span_count":0},{"timestamp":"2026-06-15T00:00:00","count_span_count":111},{"timestamp":"2026-06-16T00:00:00","count_span_count":20},{"timestamp":"2026-06-17T00:00:00","count_span_count":0},{"timestamp":"2026-06-18T00:00:00","count_span_count":9},{"timestamp":"2026-06-19T00:00:00","count_span_count":0},{"timestamp":"2026-06-20T00:00:00","count_span_count":0},{"timestamp":"2026-06-21T00:00:00","count_span_count":0},{"timestamp":"2026-06-22T00:00:00","count_span_count":27}]}'
