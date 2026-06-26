@@ -22,7 +22,7 @@
     headers:
       authorization: masked
       content-type: application/json
-      user-agent: Weave JS Client 0.15.1
+      user-agent: Weave JS Client 0.16.0
     body: '{"query":"\nquery DefaultEntity {\n    viewer
       {\n        username\n        defaultEntity
       {\n            name\n        }\n    }\n}\n","variables":{}}'
