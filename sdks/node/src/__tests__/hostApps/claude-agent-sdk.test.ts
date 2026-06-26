@@ -7,18 +7,22 @@ import {fixturePath, genProjectId, launchAppFrom} from './utils';
 
 type CapturedSpan = {
   name: string;
-  spanId: string;
-  parentSpanId?: string;
-  traceId: string;
-  attributes: Record<string, unknown>;
-  statusCode: number;
 };
 
+// Smoke test for the Claude Agent SDK integration's packaging + module-loading.
+// Like the other hostApps tests, its job is narrow: confirm that launching a
+// real ESM host app under `node --import=weave/instrument` actually patches
+// `@anthropic-ai/claude-agent-sdk`'s `query()` and emits the integration's root
+// agent span through the real OTel pipeline. The detailed span-tree, usage, and
+// tool-call shape are asserted one layer down in the tracer unit test
+// (src/__tests__/integrations/claude-agent-sdk/otelTracer.test.ts), which drives
+// the tracer directly against mocked SDK messages — cheaper and more exhaustive
+// than re-asserting shape inside a spawned host app.
 describe('hostApps — claude-agent-sdk', () => {
-  test('auto-instruments the real @anthropic-ai/claude-agent-sdk query() and emits a GenAI agent span tree', async () => {
+  test('auto-instruments the real @anthropic-ai/claude-agent-sdk query() and emits the agent root span', async () => {
     const projectId = genProjectId();
     // The fixture writes its captured OTel spans here (it installs a capturing
-    // span processor via weave.init), so we assert the real emission path
+    // span processor via weave.init), so we observe the real emission path
     // without standing up an OTLP receiver.
     const spanFile = path.join(os.tmpdir(), `cas-otel-${randomUUID()}.json`);
 
@@ -39,56 +43,13 @@ describe('hostApps — claude-agent-sdk', () => {
     ) as CapturedSpan[];
     fs.rmSync(spanFile, {force: true});
 
-    const findSpan = (name: string): CapturedSpan => {
-      const span = spans.find(s => s.name === name);
-      if (!span) {
-        throw new Error(
-          `no span named '${name}' (saw: ${spans.map(s => s.name).join(', ')})`
-        );
-      }
-      return span;
-    };
-
-    // Root invoke_agent span, stamped with this integration's provenance.
-    const invoke = findSpan('invoke_agent claude_agent_sdk');
-    expect(invoke.parentSpanId).toBeFalsy();
-    expect(invoke.attributes['gen_ai.operation.name']).toBe('invoke_agent');
-    expect(invoke.attributes['gen_ai.agent.name']).toBe('claude_agent_sdk');
-    expect(invoke.attributes['integration.name']).toBe('claude_agent_sdk');
-    // The fake CLI reports a session_id; it becomes the conversation id.
-    const conversationId = invoke.attributes['gen_ai.conversation.id'];
-    expect(conversationId).toBe('fake-session');
-    // The root carries no token usage — per-model usage rides on child `chat`
-    // spans so the trace server costs and rolls it up per model.
-    expect(invoke.attributes['gen_ai.usage.input_tokens']).toBeUndefined();
-
-    // chat spans hang off the root and share its trace + conversation id: one
-    // per assistant message (carrying content) plus a per-model usage span.
-    const chats = spans.filter(s => s.name === 'chat claude-fake');
-    expect(chats.length).toBeGreaterThanOrEqual(1);
-    expect(chats.every(c => c.parentSpanId === invoke.spanId)).toBe(true);
-
-    // Usage from the result's modelUsage rides on a per-model chat span, keyed
-    // by model so the server costs it at that model's price.
-    const usageChat = chats.find(
-      c => c.attributes['gen_ai.usage.input_tokens'] != null
+    // The integration fired end-to-end: launching under
+    // `--import=weave/instrument` patched query() and the tracer emitted its
+    // root agent span through the real OTel pipeline. That's the entire
+    // packaging / module-loading contract this layer protects.
+    const emittedAgentRoot = spans.some(
+      s => s.name === 'invoke_agent claude_agent_sdk'
     );
-    expect(usageChat).toBeDefined();
-    expect(usageChat!.attributes['gen_ai.usage.input_tokens']).toBe(8);
-    expect(usageChat!.attributes['gen_ai.usage.output_tokens']).toBe(12);
-    expect(usageChat!.attributes['gen_ai.response.model']).toBe('claude-fake');
-
-    const tool = findSpan('execute_tool Bash');
-    expect(tool.attributes['gen_ai.operation.name']).toBe('execute_tool');
-    expect(tool.attributes['gen_ai.tool.name']).toBe('Bash');
-    expect(tool.attributes['gen_ai.tool.call.result']).toBe(
-      'main.mjs\npackage.json'
-    );
-    expect(tool.parentSpanId).toBe(invoke.spanId);
-
-    for (const span of spans) {
-      expect(span.traceId).toBe(invoke.traceId);
-      expect(span.attributes['gen_ai.conversation.id']).toBe(conversationId);
-    }
+    expect(emittedAgentRoot).toBe(true);
   }, 60_000);
 });
