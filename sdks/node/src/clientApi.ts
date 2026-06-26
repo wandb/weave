@@ -137,7 +137,7 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);
-    console.log(`Initializing project: ${projectId}`);
+    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
