@@ -666,6 +666,80 @@ describe('WeaveClient', () => {
     });
   });
 
+  describe('searchAgents', () => {
+    it('searches agent conversation messages', async () => {
+      const results = [
+        {
+          conversation_id: 'conv-1',
+          conversation_name: '',
+          agent_name: 'Assistant',
+          matched_messages: [
+            {
+              span_id: 'span-1',
+              trace_id: 'trace-1',
+              role: 'user',
+              content_preview: 'When was the last time Liverpool won?',
+              content_digest: 'digest-1',
+              started_at: '2026-06-16T22:10:34.631000',
+            },
+          ],
+          last_activity: '2026-06-16T22:10:34.631000',
+        },
+      ];
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results, total_conversations: 1},
+      } as any);
+
+      const result = await client.searchAgents({
+        query: 'Liverpool',
+        agentName: 'Assistant',
+        conversationId: 'conv-1',
+        traceId: 'trace-1',
+        limit: 25,
+        offset: 5,
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'Liverpool',
+        agent_name: 'Assistant',
+        conversation_id: 'conv-1',
+        trace_id: 'trace-1',
+        limit: 25,
+        offset: 5,
+      });
+
+      expect(result).toEqual({data: {results, total_conversations: 1}});
+    });
+
+    it('searches without optional fields', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results: [], total_conversations: 0},
+      } as any);
+
+      await client.searchAgents({query: 'Liverpool'});
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'Liverpool',
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.searchAgents({query: 'Liverpool'})).rejects.toThrow(
+        'boom'
+      );
+    });
+  });
+
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
