@@ -126,7 +126,9 @@ from weave.trace_server.clickhouse.schema_converters import (
     start_end_calls_to_ch_complete_insertable,
 )
 from weave.trace_server.clickhouse.utilities import (
+    CallDeleteChunk,
     any_value_to_dump,
+    chunk_calls_by_started_at,
     convert_to_insert_too_large,
     datetime_to_microseconds,
     dict_value_to_dump,
@@ -1894,19 +1896,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             started_at_by_id = {c.id: c.started_at for c in all_calls}
-            descendant_started_ats = [
-                started_at_by_id[cid]
+            descendants_with_started_at = [
+                (cid, started_at_by_id[cid])
                 for cid in all_descendants
                 if cid in started_at_by_id
             ]
-            started_at_window = (
-                (min(descendant_started_ats), max(descendant_started_ats))
-                if descendant_started_ats
-                else None
-            )
-            self._delete_calls_complete(
-                req.project_id, all_descendants, started_at_window
-            )
+            self._delete_calls_complete(req.project_id, descendants_with_started_at)
             return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
 
         deleted_at = datetime.datetime.now()
@@ -1930,24 +1925,36 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _delete_calls_complete(
         self,
         project_id: str,
-        call_ids: list[str],
-        started_at_window: tuple[datetime.datetime, datetime.datetime] | None = None,
+        call_started_ats: list[tuple[str, datetime.datetime]],
+    ) -> None:
+        """Delete calls_complete rows in started_at-ordered chunks.
+
+        One lightweight DELETE per chunk keeps each command tightly windowed (so
+        it prunes partitions instead of rescanning the full span) and under the
+        query time ceiling, rather than one statement over the whole subtree.
+        """
+        chunks = chunk_calls_by_started_at(
+            call_started_ats, ch_settings.DELETE_CALLS_COMPLETE_CHUNK_SIZE
+        )
+        for chunk in chunks:
+            self._delete_calls_complete_chunk(project_id, chunk)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._delete_calls_complete_chunk"
+    )
+    def _delete_calls_complete_chunk(
+        self, project_id: str, chunk: CallDeleteChunk
     ) -> None:
         pb = ParamBuilder()
         project_id_param = pb.add_param(project_id)
-        call_ids_param = pb.add_param(call_ids)
-        started_at_min_param: str | None = None
-        started_at_max_param: str | None = None
-        if started_at_window is not None:
-            pad = datetime.timedelta(
-                seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS
-            )
-            started_at_min_param = pb.add_param(
-                datetime_to_microseconds(started_at_window[0] - pad)
-            )
-            started_at_max_param = pb.add_param(
-                datetime_to_microseconds(started_at_window[1] + pad)
-            )
+        call_ids_param = pb.add_param(chunk.ids)
+        pad = datetime.timedelta(seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS)
+        started_at_min_param = pb.add_param(
+            datetime_to_microseconds(chunk.min_started_at - pad)
+        )
+        started_at_max_param = pb.add_param(
+            datetime_to_microseconds(chunk.max_started_at + pad)
+        )
         delete_query = build_calls_complete_delete_query(
             self._get_calls_complete_table_name(),
             project_id_param,

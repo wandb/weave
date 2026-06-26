@@ -1579,6 +1579,64 @@ def test_calls_delete_cascade_spans_started_at_window(
     assert remaining == {other}
 
 
+def test_calls_delete_cascade_chunks_by_started_at(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """A subtree larger than the chunk size is deleted across multiple windowed
+    DELETEs, each bracketing only its own chunk's started_at span.
+
+    Forcing a chunk size of 2 splits the three-call subtree into two
+    started_at-ordered chunks; every chunk must run so the whole subtree is gone
+    while an unrelated call in another trace survives.
+    """
+    monkeypatch.setattr(ch_settings, "DELETE_CALLS_COMPLETE_CHUNK_SIZE", 2)
+
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_chunked"
+    trace_id = str(uuid.uuid4())
+    base = datetime.datetime.now(datetime.timezone.utc)
+    root, child, grandchild = (str(uuid.uuid4()) for _ in range(3))
+    other = str(uuid.uuid4())
+
+    calls = [
+        _make_completed_call(
+            project_id, root, trace_id, base, base + datetime.timedelta(seconds=1)
+        ),
+        _make_completed_call(
+            project_id,
+            child,
+            trace_id,
+            base + datetime.timedelta(minutes=5),
+            base + datetime.timedelta(minutes=5, seconds=1),
+            parent_id=root,
+        ),
+        _make_completed_call(
+            project_id,
+            grandchild,
+            trace_id,
+            base + datetime.timedelta(minutes=10),
+            base + datetime.timedelta(minutes=10, seconds=1),
+            parent_id=child,
+        ),
+        # Unrelated call in a different trace, started an hour earlier.
+        _make_completed_call(
+            project_id,
+            other,
+            str(uuid.uuid4()),
+            base - datetime.timedelta(hours=1),
+            base - datetime.timedelta(hours=1) + datetime.timedelta(seconds=1),
+        ),
+    ]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+    assert len(_fetch_calls_stream(trace_server, project_id)) == 4
+
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[root])
+    )
+    assert res.num_deleted == 3
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project_id)}
+    assert remaining == {other}
+
+
 def test_calls_delete_cascade_started_at_window_merged_residence(
     trace_server, clickhouse_trace_server
 ):

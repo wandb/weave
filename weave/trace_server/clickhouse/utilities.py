@@ -10,6 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
 import ddtrace
@@ -240,6 +241,39 @@ def started_at_gte_query(dt: datetime.datetime) -> tsi.Query:
             }
         }
     )
+
+
+@dataclass(frozen=True)
+class CallDeleteChunk:
+    """Call ids batched for one windowed calls_complete delete.
+
+    The ids share the inclusive [min_started_at, max_started_at] window, which
+    brackets the partition/primary key so the DELETE prunes to a thin slice.
+    """
+
+    ids: list[str]
+    min_started_at: datetime.datetime
+    max_started_at: datetime.datetime
+
+
+def chunk_calls_by_started_at(
+    call_started_ats: list[tuple[str, datetime.datetime]],
+    chunk_size: int,
+) -> list[CallDeleteChunk]:
+    """Group calls into started_at-ordered chunks for windowed deletes.
+
+    Sorting by started_at keeps each chunk's window tight, so the DELETE for a
+    chunk prunes to a thin partition/primary-key slice instead of rescanning the
+    full span on every batch.
+    """
+    ordered = sorted(call_started_ats, key=lambda c: c[1])
+    chunks: list[CallDeleteChunk] = []
+    for start in range(0, len(ordered), chunk_size):
+        batch = ordered[start : start + chunk_size]
+        ids = [call_id for call_id, _ in batch]
+        # batch is sorted by started_at, so the ends are the window bounds.
+        chunks.append(CallDeleteChunk(ids, batch[0][1], batch[-1][1]))
+    return chunks
 
 
 # ---------------------------------------------------------------------------

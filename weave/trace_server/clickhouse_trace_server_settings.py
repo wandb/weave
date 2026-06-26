@@ -12,6 +12,10 @@ MAX_DELETE_CALLS_COUNT = 1000
 # Pad the started_at window used to prune partitions on the calls/delete path,
 # absorbing cross-process clock skew between a call and its descendants.
 DELETE_STARTED_AT_PADDING_SECONDS = 1
+# calls/delete on calls_complete issues one lightweight DELETE per chunk of this
+# many calls, ordered by started_at so each chunk's window prunes tightly and
+# stays under the query time ceiling.
+DELETE_CALLS_COMPLETE_CHUNK_SIZE = 1000
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits

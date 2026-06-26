@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 import sqlparse
 
@@ -22,6 +24,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     get_field_by_name,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
+from weave.trace_server.clickhouse.utilities import (
+    CallDeleteChunk,
+    chunk_calls_by_started_at,
+)
 from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
@@ -4096,6 +4102,27 @@ def test_build_calls_complete_delete_query_with_started_at_window() -> None:
     )
 
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_chunk_calls_by_started_at_orders_and_windows() -> None:
+    """Chunks are started_at-ordered and each window brackets only its own ids."""
+    t0 = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
+
+    def at(seconds: int) -> datetime.datetime:
+        return t0 + datetime.timedelta(seconds=seconds)
+
+    # Deliberately unsorted input spanning a wide range.
+    calls = [("e", at(40)), ("a", at(0)), ("c", at(20)), ("d", at(30)), ("b", at(10))]
+
+    assert chunk_calls_by_started_at([], 2) == []
+    assert chunk_calls_by_started_at(calls, 10) == [
+        CallDeleteChunk(["a", "b", "c", "d", "e"], at(0), at(40))
+    ]
+    assert chunk_calls_by_started_at(calls, 2) == [
+        CallDeleteChunk(["a", "b"], at(0), at(10)),
+        CallDeleteChunk(["c", "d"], at(20), at(30)),
+        CallDeleteChunk(["e"], at(40), at(40)),
+    ]
 
 
 def test_build_calls_complete_update_query() -> None:
