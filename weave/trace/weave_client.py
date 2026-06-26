@@ -839,7 +839,7 @@ class WeaveClient:
 
         Returns a `PaginatedIterator` (like `get_calls`) that transparently
         fetches pages as you consume it; `len(...)` reports the total agent
-        count, and indexing/slicing and `.to_pandas()` are supported.
+        count, and indexing/slicing are supported.
 
         Args:
             agent_name: If set, restrict results to this agent.
