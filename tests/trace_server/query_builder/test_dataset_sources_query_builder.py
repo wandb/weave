@@ -304,7 +304,7 @@ def test_make_source_datasets_select_sql_is_two_level_aggregation() -> None:
                 ds.source_kind,
                 ds.source_id,
                 ds.source_trace_id,
-                argMax(ds.created_at, ds.updated_at) AS created_at,
+                min(ds.created_at) AS created_at,
                 argMax(ds.deleted_at, ds.updated_at) AS deleted_at
             FROM dataset_sources AS ds
             WHERE ds.project_id = {pb_0:String}

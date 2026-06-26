@@ -317,8 +317,12 @@ def make_source_datasets_select(
     (source_kind, source_id, source_trace_id) tuples.
 
     Two-level aggregation:
-      - inner: collapse versions per logical key (argMax deleted_at, carry
-        created_at). include_deleted=False drops collapsed-deleted rows here.
+      - inner: collapse versions per logical key (argMax deleted_at so the
+        tombstone state reflects the latest version, but min(created_at) so the
+        earliest write wins). created_at is the earliest write (first_seen), not
+        the latest version's value, so blind relinks — which refresh created_at
+        to now when include_created_status=False — don't reset it.
+        include_deleted=False drops collapsed-deleted rows here.
       - outer: group by (source_kind, source_id, source_trace_id,
         dataset_object_id), capping row_digests at ``row_digests_cap`` and
         reporting the true total + earliest first_seen_at.
@@ -380,7 +384,7 @@ def make_source_datasets_select(
                 ds.source_kind,
                 ds.source_id,
                 ds.source_trace_id,
-                argMax(ds.created_at, ds.updated_at) AS created_at,
+                min(ds.created_at) AS created_at,
                 argMax(ds.deleted_at, ds.updated_at) AS deleted_at
             FROM dataset_sources AS ds
             WHERE ds.project_id = {project_param}

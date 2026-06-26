@@ -30,13 +30,14 @@ Notes on test data:
 from __future__ import annotations
 
 import datetime
+import logging
 import uuid
 from typing import NamedTuple
 
 import pytest
 
 import weave
-from tests.trace.server_utils import find_server_layer
+from tests.trace.server_utils import TEST_ENTITY, find_server_layer
 from tests.trace.util import client_is_clickhouse
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.helpers import genai_span_to_row
@@ -174,6 +175,92 @@ def reverse_query(
 
 def new_digest(prefix: str = "row") -> str:
     return f"{prefix}_{uuid.uuid4().hex}"
+
+
+# ---------------------------------------------------------------------------
+# link_metadata round trip
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_sources_link_metadata_empty_dict_round_trips(client):
+    """An explicitly-supplied empty-dict link_metadata must survive the round
+    trip (falsy {} must not be coerced to None).
+    """
+    calls = create_test_calls(client, 1)
+    ds_obj = "link_metadata_empty_dict_dataset"
+    digest = new_digest()
+    client.server.dataset_sources_link(
+        link_req(
+            client,
+            dataset_object_id=ds_obj,
+            links=[
+                tsi.DatasetSourceLinkPayload(
+                    row_digest=digest,
+                    sources=[call_source(calls.calls[0])],
+                    link_metadata={},
+                )
+            ],
+        )
+    )
+    res = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest])
+    assert len(res.links) == 1
+    assert res.links[0].link_metadata == {}
+
+
+def test_dataset_sources_call_link_uses_authoritative_trace_id(client):
+    """For CALL links the server derives trace_id from the call record and
+    ignores whatever the client supplied (wrong or empty).
+    """
+    calls = create_test_calls(client, 1)
+    real_source = call_source(calls.calls[0])
+    real_trace_id = real_source.source_trace_id
+    assert real_trace_id  # sanity: the real call has a trace
+
+    ds_obj = "authoritative_trace_id_dataset"
+
+    # (a) client sends a WRONG trace_id -> server overrides with the real one.
+    wrong = real_source.model_copy(update={"source_trace_id": "deadbeef-wrong"})
+    digest_a = new_digest("a")
+    link_a = client.server.dataset_sources_link(
+        link_req(
+            client,
+            dataset_object_id=ds_obj,
+            links=[tsi.DatasetSourceLinkPayload(row_digest=digest_a, sources=[wrong])],
+        )
+    )
+    res_a = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest_a])
+    assert [l.source_trace_id for l in res_a.links] == [real_trace_id]
+
+    # Relinking the SAME (call, digest) with the CORRECT trace is idempotent:
+    # since the trace is derived authoritatively, both relinks resolve to the
+    # same link_id -> one row, no duplicate from the differing client input.
+    relink_a = client.server.dataset_sources_link(
+        link_req(
+            client,
+            dataset_object_id=ds_obj,
+            links=[
+                tsi.DatasetSourceLinkPayload(row_digest=digest_a, sources=[real_source])
+            ],
+        )
+    )
+    assert relink_a.entries[0].link_id == link_a.entries[0].link_id
+    res_a_relink = forward_query(
+        client, dataset_object_id=ds_obj, row_digests=[digest_a]
+    )
+    assert len(res_a_relink.links) == 1
+
+    # (b) client sends an EMPTY trace_id for a call -> accepted, real one stored.
+    empty = real_source.model_copy(update={"source_trace_id": ""})
+    digest_b = new_digest("b")
+    client.server.dataset_sources_link(
+        link_req(
+            client,
+            dataset_object_id=ds_obj,
+            links=[tsi.DatasetSourceLinkPayload(row_digest=digest_b, sources=[empty])],
+        )
+    )
+    res_b = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest_b])
+    assert [l.source_trace_id for l in res_b.links] == [real_trace_id]
 
 
 # ---------------------------------------------------------------------------
@@ -403,43 +490,18 @@ def test_dataset_sources_soft_delete_removes_from_forward_and_reverse(client):
     assert fq_del.links[0].deleted_at is not None
 
 
-def test_dataset_sources_delete_unknown_id_errors_and_deletes_nothing(client):
+@pytest.mark.parametrize("scenario", ["unknown_id", "already_deleted"])
+def test_dataset_sources_delete_edge_cases(client, scenario):
+    """Delete edge cases that share the same single-call/single-link setup:
+
+    - unknown_id: a batch mixing one real id with one unknown id errors and
+      deletes nothing (the real link must survive -- no partial deletes).
+    - already_deleted: deleting an already-soft-deleted id is idempotent-ish
+      (the first delete reports deleted=True, the second deleted=False).
+    """
     calls = create_test_calls(client, 1)
     call = calls.calls[0]
-    ds_obj = "delete_unknown_dataset"
-    digest = new_digest()
-
-    link_res = client.server.dataset_sources_link(
-        link_req(
-            client,
-            dataset_object_id=ds_obj,
-            links=[
-                tsi.DatasetSourceLinkPayload(
-                    row_digest=digest, sources=[call_source(call)]
-                )
-            ],
-        )
-    )
-    real_link_id = link_res.entries[0].link_id
-
-    # Batch with one real id and one unknown id -> error, no partial deletes.
-    with pytest.raises(TraceServerError):
-        client.server.dataset_sources_link_delete(
-            tsi.DatasetSourcesLinkDeleteReq(
-                project_id=client.project_id,
-                link_ids=[real_link_id, "unknown-link-" + uuid.uuid4().hex],
-                wb_user_id="test_user",
-            )
-        )
-
-    # The real link must still be present (not partially deleted).
-    assert len(forward_query(client, dataset_object_id=ds_obj).links) == 1
-
-
-def test_dataset_sources_delete_already_deleted_is_idempotent_returns_false(client):
-    calls = create_test_calls(client, 1)
-    call = calls.calls[0]
-    ds_obj = "double_delete_dataset"
+    ds_obj = f"delete_edge_{scenario}_dataset"
     digest = new_digest()
 
     link_res = client.server.dataset_sources_link(
@@ -455,21 +517,35 @@ def test_dataset_sources_delete_already_deleted_is_idempotent_returns_false(clie
     )
     link_id = link_res.entries[0].link_id
 
-    first = client.server.dataset_sources_link_delete(
-        tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
-        )
-    )
-    assert first.entries[0].deleted is True
+    if scenario == "unknown_id":
+        # Batch with one real id and one unknown id -> error, no partial deletes.
+        with pytest.raises(TraceServerError):
+            client.server.dataset_sources_link_delete(
+                tsi.DatasetSourcesLinkDeleteReq(
+                    project_id=client.project_id,
+                    link_ids=[link_id, "unknown-link-" + uuid.uuid4().hex],
+                    wb_user_id="test_user",
+                )
+            )
 
-    # Deleting an already-soft-deleted id is idempotent-ish: deleted=False.
-    second = client.server.dataset_sources_link_delete(
-        tsi.DatasetSourcesLinkDeleteReq(
-            project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+        # The real link must still be present (not partially deleted).
+        assert len(forward_query(client, dataset_object_id=ds_obj).links) == 1
+    else:
+        first = client.server.dataset_sources_link_delete(
+            tsi.DatasetSourcesLinkDeleteReq(
+                project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+            )
         )
-    )
-    assert second.entries[0].link_id == link_id
-    assert second.entries[0].deleted is False
+        assert first.entries[0].deleted is True
+
+        # Deleting an already-soft-deleted id is idempotent-ish: deleted=False.
+        second = client.server.dataset_sources_link_delete(
+            tsi.DatasetSourcesLinkDeleteReq(
+                project_id=client.project_id, link_ids=[link_id], wb_user_id="test_user"
+            )
+        )
+        assert second.entries[0].link_id == link_id
+        assert second.entries[0].deleted is False
 
 
 def test_dataset_sources_relink_after_delete_restores_with_same_id(client):
@@ -1077,3 +1153,66 @@ def test_dataset_sources_conversation_subset_add_freezes_sampled_spans(client):
     # Plus the coarse-grain conversation link.
     assert len(conv_links) == 1
     assert conv_links[0].source_id == conv_id
+
+
+# ---------------------------------------------------------------------------
+# added_by user id translation (external <-> internal)
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_sources_forward_query_added_by_is_external(client):
+    """added_by must be returned as the external user id, not the internal
+    (base64) one the adapter stored.
+
+    The link is written with an external wb_user_id (TEST_ENTITY); the adapter
+    stores its internal (base64) form as added_by. The forward query must
+    translate that back to the external id on read -- without the fix it leaks
+    the raw base64 internal id.
+    """
+    calls = create_test_calls(client, 1)
+    ds_obj = "added_by_external_dataset"
+    digest = new_digest()
+    req = link_req(
+        client,
+        dataset_object_id=ds_obj,
+        links=[
+            tsi.DatasetSourceLinkPayload(
+                row_digest=digest, sources=[call_source(calls.calls[0])]
+            )
+        ],
+    )
+    req.wb_user_id = TEST_ENTITY
+    client.server.dataset_sources_link(req)
+    res = forward_query(client, dataset_object_id=ds_obj, row_digests=[digest])
+    assert len(res.links) == 1
+    assert res.links[0].added_by == TEST_ENTITY
+
+
+# ---------------------------------------------------------------------------
+# Audit log: dataset_digest is audit-log-only (never stored on the rows)
+# ---------------------------------------------------------------------------
+
+
+def test_dataset_sources_link_emits_audit_log_with_dataset_digest(client, caplog):
+    """dataset_digest is audit-log-only; a link write must emit it."""
+    calls = create_test_calls(client, 1)
+    digest = new_digest()
+    with caplog.at_level(
+        logging.INFO, logger="weave.trace_server.dataset_sources.clickhouse"
+    ):
+        client.server.dataset_sources_link(
+            link_req(
+                client,
+                dataset_object_id="audit_log_dataset",
+                dataset_digest="ds-digest-xyz",
+                links=[
+                    tsi.DatasetSourceLinkPayload(
+                        row_digest=digest, sources=[call_source(calls.calls[0])]
+                    )
+                ],
+            )
+        )
+    audit = [r for r in caplog.records if "dataset_sources_link" in r.getMessage()]
+    assert len(audit) == 1
+    assert getattr(audit[0], "dataset_digest", None) == "ds-digest-xyz"
+    assert getattr(audit[0], "link_count", None) == 1

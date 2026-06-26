@@ -25,6 +25,7 @@ from typing import Any
 
 from tests.trace_server.helpers import make_project_id
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
+from weave.trace_server.clickhouse.utilities import ensure_datetimes_have_tz
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.dataset_sources_query_builder import (
     DATASET_SOURCES_INSERT_COLUMNS,
@@ -236,6 +237,46 @@ def test_reverse_query_excludes_soft_deleted(ch_server: Any) -> None:
     assert len(out) == 1
     assert list(out[0]["row_digests"]) == ["row_1"]
     assert out[0]["row_digests_total_count"] == 1
+
+
+def test_source_datasets_first_seen_at_survives_blind_relink(ch_server: Any) -> None:
+    """first_seen_at must reflect the earliest created_at across versions, not
+    the latest version's refreshed created_at (blind relink).
+
+    On the write path with include_created_status=False, a relink ("blind
+    write") refreshes created_at to now. The reverse query must still report the
+    earliest write as first_seen_at, so inner aggregation uses min(created_at).
+    """
+    project_id = make_project_id("ds_first_seen")
+    ds = "ds_obj"
+    src = ("call", "call_fs", "trace_fs")
+    common = {
+        "project_id": project_id,
+        "dataset_object_id": ds,
+        "row_digest": "row_fs",
+        "source_kind": src[0],
+        "source_id": src[1],
+        "source_trace_id": src[2],
+    }
+    early = _ts(0)
+    late = _ts(100)
+    # Two SEPARATE inserts: a single ReplacingMergeTree insert block dedups rows
+    # sharing the sorting key (keeping max updated_at) before the query ever
+    # runs, which would silently discard the early version. Distinct blocks form
+    # distinct parts, so both versions survive to the (no-FINAL) read.
+    # v1: original write (earliest created_at).
+    _insert(ch_server, [_row(**common, updated_at=early, created_at=early)])
+    # v2: blind relink with a later updated_at AND a refreshed (later)
+    # created_at. argMax(created_at, updated_at) would pick this value.
+    _insert(ch_server, [_row(**common, updated_at=late, created_at=late)])
+
+    pb = ParamBuilder()
+    query = make_source_datasets_select(
+        project_id, [src], pb, include_deleted=False, row_digests_cap=100
+    )
+    out = _run(ch_server, query, pb)
+    assert len(out) == 1
+    assert ensure_datetimes_have_tz(out[0]["first_seen_at"]) == early
 
 
 def test_forward_query_collapses_versions_latest_payload_wins(ch_server: Any) -> None:
