@@ -64,7 +64,7 @@ class DatasetSourcesHandler:
     def link(self, req: tsi.DatasetSourcesLinkReq) -> tsi.DatasetSourcesLinkRes:
         """Link dataset rows to provenance sources (calls/spans).
 
-        Insert-only write: link, relink, and restore are all INSERTs of a new
+        Insert-only write: link, relink, and restore are all INSERTTs of a new
         ReplacingMergeTree version with a fresh updated_at. The deterministic id
         keeps relink idempotent.
         """

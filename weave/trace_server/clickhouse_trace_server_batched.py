@@ -175,7 +175,7 @@ from weave.trace_server.datadog import (
     set_root_span_dd_tags,
     tag_db_insert_path,
 )
-from weave.trace_server.dataset_sources.clickhouse import DatasetSourcesHandler
+from weave.trace_server.dataset_sources import DatasetSourcesHandler
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,

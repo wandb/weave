@@ -1197,9 +1197,7 @@ def test_dataset_sources_link_emits_audit_log_with_dataset_digest(client, caplog
     """dataset_digest is audit-log-only; a link write must emit it."""
     calls = create_test_calls(client, 1)
     digest = new_digest()
-    with caplog.at_level(
-        logging.INFO, logger="weave.trace_server.dataset_sources.clickhouse"
-    ):
+    with caplog.at_level(logging.INFO, logger="weave.trace_server.dataset_sources"):
         client.server.dataset_sources_link(
             link_req(
                 client,
