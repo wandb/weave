@@ -1601,6 +1601,53 @@ def test_trace_call_filter(client):
         )
 
 
+def test_trace_call_filter_contains_token(client):
+    @weave.op
+    def token_op(in_val: dict) -> dict:
+        return in_val
+
+    for text in ["the example row", "examples", "Example"]:
+        token_op({"str": text})
+
+    def count(query):
+        res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
+            )
+        )
+        return len(res.calls)
+
+    # Whole-token match: "example" is a token of "the example row" only.
+    # "examples" is a different token, "Example" differs by case.
+    assert (
+        count(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "example"},
+                }
+            }
+        )
+        == 1
+    )
+    # Case-insensitive also matches "Example".
+    assert (
+        count(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "inputs.in_val.str"},
+                    "substr": {"$literal": "example"},
+                    "case_insensitive": True,
+                }
+            }
+        )
+        == 2
+    )
+
+
 def test_ops_with_default_params(client):
     @weave.op
     def op_with_default(a: int, b: int = 10) -> int:

@@ -11,6 +11,7 @@ from typing import Any, Literal, TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
@@ -840,6 +841,25 @@ def _operand_array_string_column(
     return None
 
 
+_TOKEN_SEPARATOR_RE = re.compile(r"[^a-zA-Z0-9]")
+
+
+def assert_single_token(operand: tsi_query.Operand) -> None:
+    """Reject a literal hasToken needle that spans token separators.
+
+    ClickHouse `hasToken` errors on needles containing non-alphanumeric
+    characters. Non-literal needles pass through unchecked.
+    """
+    if isinstance(operand, tsi_query.LiteralOperation):
+        assert_single_token_value(operand.literal_)
+
+
+def assert_single_token_value(value: object) -> None:
+    """Reject a raw hasToken needle that spans token separators."""
+    if isinstance(value, str) and _TOKEN_SEPARATOR_RE.search(value):
+        raise InvalidRequest(f"$containsToken needle must be a single token: {value!r}")
+
+
 def _process_query_to_conditions(
     query: tsi.Query,
     *,
@@ -933,6 +953,30 @@ def _process_query_to_conditions(
                 if operation.contains_.case_insensitive:
                     position_operation = "positionCaseInsensitive"
                 cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+        elif isinstance(operation, tsi_query.ContainsTokenOperation):
+            # Array(String) columns reuse the array-membership branch identical
+            # to $contains; everything else compiles to hasToken whole-token match.
+            array_col = _operand_array_string_column(
+                operation.contains_token_.input, array_string_columns
+            )
+            if array_col is not None:
+                rhs_part = process_operand(operation.contains_token_.substr)
+                raw_fields_used.add(array_col)
+                if operation.contains_token_.case_insensitive:
+                    cond = (
+                        f"arrayExists(x -> lower(x) = lower({rhs_part}), {array_col})"
+                    )
+                else:
+                    cond = f"has({array_col}, {rhs_part})"
+            else:
+                assert_single_token(operation.contains_token_.substr)
+                lhs_part = process_operand(operation.contains_token_.input)
+                rhs_part = process_operand(operation.contains_token_.substr)
+                # hasTokenCaseInsensitive cannot use the tokenbf skip index.
+                has_token = "hasToken"
+                if operation.contains_token_.case_insensitive:
+                    has_token = "hasTokenCaseInsensitive"
+                cond = f"{has_token}({lhs_part}, {rhs_part})"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 

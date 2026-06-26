@@ -273,6 +273,30 @@ class TestOperatorShapes:
             sql == "positionCaseInsensitive(s.reasoning_content, {genai_0:String}) > 0"
         )
 
+    def test_contains_token_emits_has_token(self) -> None:
+        sql, _ = _compile(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "reasoning_content"},
+                    "substr": {"$literal": "thought"},
+                    "case_insensitive": False,
+                }
+            }
+        )
+        assert sql == "hasToken(s.reasoning_content, {genai_0:String})"
+
+    def test_contains_token_case_insensitive(self) -> None:
+        sql, _ = _compile(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "reasoning_content"},
+                    "substr": {"$literal": "thought"},
+                    "case_insensitive": True,
+                }
+            }
+        )
+        assert sql == "hasTokenCaseInsensitive(s.reasoning_content, {genai_0:String})"
+
     def test_convert_forces_custom_attr_map(self) -> None:
         # ``to: "int"`` on a custom_attrs_string field routes to custom_attrs_int
         # and wraps in toInt64OrNull.

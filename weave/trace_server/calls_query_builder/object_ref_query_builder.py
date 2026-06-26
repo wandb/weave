@@ -63,6 +63,7 @@ from weave.trace_server.calls_query_builder.utils import (
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
+    assert_single_token_value,
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
@@ -412,6 +413,27 @@ class ObjectRefConditionHandler:
         else:
             return f"{json_extract} LIKE {param_slot(filter_param, 'String')}"
 
+    def handle_contains_token_operation(
+        self, condition: ObjectRefFilterCondition
+    ) -> str:
+        """Handle contains-token operations for object references.
+
+        Args:
+            condition: The object reference filter condition
+
+        Returns:
+            str: SQL condition for whole-token match
+        """
+        assert_single_token_value(condition.value)
+        filter_param = self.pb.add_param(condition.value)
+        json_extract = self._create_json_extract_expression()
+
+        # hasTokenCaseInsensitive cannot use the tokenbf skip index.
+        has_token = (
+            "hasTokenCaseInsensitive" if condition.case_insensitive else "hasToken"
+        )
+        return f"{has_token}({json_extract}, {param_slot(filter_param, 'String')})"
+
     def handle_in_operation(self, condition: ObjectRefFilterCondition) -> str:
         """Handle IN operations for object references.
 
@@ -623,6 +645,26 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 self.object_ref_conditions.append(obj_condition)
         return None
 
+    def process_contains_token(
+        self, operation: tsi_query.ContainsTokenOperation
+    ) -> str | None:
+        """Process contains-token operation for object refs."""
+        if isinstance(operation.contains_token_.input, tsi_query.GetFieldOperator):
+            field_path = operation.contains_token_.input.get_field_
+            if self._is_object_ref_field(field_path) and isinstance(
+                operation.contains_token_.substr, tsi_query.LiteralOperation
+            ):
+                obj_condition = ObjectRefFilterCondition(
+                    field_path=field_path,
+                    operation_type="contains_token",
+                    value=operation.contains_token_.substr.literal_,
+                    expand_columns=self.expand_columns,
+                    case_insensitive=operation.contains_token_.case_insensitive
+                    or False,
+                )
+                self.object_ref_conditions.append(obj_condition)
+        return None
+
     def process_gt(self, operation: tsi_query.GtOperation) -> str | None:
         """Process greater than operation for object refs."""
         self._process_binary_operation(operation.gt_, "gt")
@@ -749,6 +791,8 @@ def build_object_ref_ctes(
                 val_condition = handler.handle_comparison_operation(condition, "=")
             elif condition.operation_type == "contains":
                 val_condition = handler.handle_contains_operation(condition)
+            elif condition.operation_type == "contains_token":
+                val_condition = handler.handle_contains_token_operation(condition)
             elif condition.operation_type == "gt":
                 val_condition = handler.handle_comparison_operation(condition, ">")
             elif condition.operation_type == "gte":
@@ -918,6 +962,8 @@ def is_object_ref_operand(
             )  # Only check the field being compared
         elif isinstance(op, tsi_query.ContainsOperation):
             return check_operand_recursive(op.contains_.input)
+        elif isinstance(op, tsi_query.ContainsTokenOperation):
+            return check_operand_recursive(op.contains_token_.input)
         elif isinstance(op, tsi_query.ConvertOperation):
             return check_operand_recursive(op.convert_.input)
         return False

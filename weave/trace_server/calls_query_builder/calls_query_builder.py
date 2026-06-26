@@ -74,6 +74,7 @@ from weave.trace_server.interface.query import (
 from weave.trace_server.orm import (
     ParamBuilder,
     _format_table_name_with_cluster,
+    assert_single_token,
     clickhouse_cast,
     combine_conditions,
     maybe_convert_datetime_operands,
@@ -2342,6 +2343,30 @@ def process_query_to_conditions(
                 if operation.contains_.case_insensitive:
                     position_operation = "positionCaseInsensitive"
                 cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+        elif isinstance(operation, tsi_query.ContainsTokenOperation):
+            mv_field = (
+                _get_multi_value_feedback_field(operation.contains_token_.input)
+                if use_agg_fn
+                else None
+            )
+            if mv_field is not None:
+                assert_single_token(operation.contains_token_.substr)
+                array_expr = mv_field.as_array_sql(param_builder)
+                rhs_part = process_operand(operation.contains_token_.substr)
+                raw_fields_used[mv_field.feedback_type] = mv_field
+                has_token = "hasToken"
+                if operation.contains_token_.case_insensitive:
+                    has_token = "hasTokenCaseInsensitive"
+                cond = f"arrayExists(x -> {has_token}(x, {rhs_part}), {array_expr})"
+            else:
+                assert_single_token(operation.contains_token_.substr)
+                lhs_part = process_operand(operation.contains_token_.input)
+                rhs_part = process_operand(operation.contains_token_.substr)
+                # hasTokenCaseInsensitive cannot use the tokenbf skip index.
+                has_token = "hasToken"
+                if operation.contains_token_.case_insensitive:
+                    has_token = "hasTokenCaseInsensitive"
+                cond = f"{has_token}({lhs_part}, {rhs_part})"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
@@ -2398,6 +2423,7 @@ def process_query_to_conditions(
                 tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
+                tsi_query.ContainsTokenOperation,
             ),
         ):
             return process_operation(operand)

@@ -31,6 +31,7 @@ from weave.trace_server.agents.semconv import FILTERABLE_KEY_TO_COLUMN
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     ParamBuilder,
+    assert_single_token,
     clickhouse_cast,
     python_value_to_ch_type,
 )
@@ -187,6 +188,21 @@ def _compile_operation(
         fn = "positionCaseInsensitive" if op.contains_.case_insensitive else "position"
         return f"{fn}({lhs_sql}, {rhs_sql}) > 0"
 
+    if isinstance(op, tsi_query.ContainsTokenOperation):
+        # $containsToken always compares strings — force sibling hint to str.
+        assert_single_token(op.contains_token_.substr)
+        lhs_sql = _compile_operand(
+            op.contains_token_.input, pb, alias, sibling_hint=str
+        )
+        rhs_sql = _compile_operand(op.contains_token_.substr, pb, alias)
+        # hasTokenCaseInsensitive cannot use the tokenbf skip index.
+        fn = (
+            "hasTokenCaseInsensitive"
+            if op.contains_token_.case_insensitive
+            else "hasToken"
+        )
+        return f"{fn}({lhs_sql}, {rhs_sql})"
+
     raise TypeError(f"Unknown operation type: {type(op).__name__}")
 
 
@@ -232,6 +248,7 @@ def _compile_operand(
             tsi_query.LteOperation,
             tsi_query.InOperation,
             tsi_query.ContainsOperation,
+            tsi_query.ContainsTokenOperation,
         ),
     ):
         return _compile_operation(operand, pb, alias)

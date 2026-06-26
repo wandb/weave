@@ -171,6 +171,13 @@ class QueryOptimizationProcessor(ABC):
         pass
 
     @abstractmethod
+    def process_contains_token(
+        self, operation: tsi_query.ContainsTokenOperation
+    ) -> str | None:
+        """Process contains-token operation."""
+        pass
+
+    @abstractmethod
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
         """Process in operation."""
         pass
@@ -248,6 +255,19 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
             operation, self.pb, self.table_alias, self.use_null_check
         )
 
+    def process_contains_token(
+        self, operation: tsi_query.ContainsTokenOperation
+    ) -> str | None:
+        """Process contains-token operation on heavy fields.
+
+        Creates a hasToken prefilter on the raw JSON dump, a superset of the
+        post-aggregation hasToken on the extracted value (any token of the
+        extracted value is also a token of the dump).
+        """
+        return _create_hastoken_optimized_contains_token_condition(
+            operation, self.pb, self.table_alias, self.use_null_check
+        )
+
     def process_in(self, operation: tsi_query.InOperation) -> str | None:
         """Process IN operation on heavy fields.
 
@@ -290,6 +310,12 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
         return None
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> str | None:
+        """Not implemented for sortable_datetime optimization."""
+        return None
+
+    def process_contains_token(
+        self, operation: tsi_query.ContainsTokenOperation
+    ) -> str | None:
         """Not implemented for sortable_datetime optimization."""
         return None
 
@@ -347,6 +373,8 @@ def apply_processor(
         return processor.process_eq(operation)
     elif isinstance(operation, tsi_query.ContainsOperation):
         return processor.process_contains(operation)
+    elif isinstance(operation, tsi_query.ContainsTokenOperation):
+        return processor.process_contains_token(operation)
     elif isinstance(operation, tsi_query.InOperation):
         return processor.process_in(operation)
     elif isinstance(operation, tsi_query.GtOperation):
@@ -601,6 +629,56 @@ def _create_like_optimized_contains_condition(
         field, like_pattern, pb, table_alias, case_insensitive
     )
     return _maybe_use_null_check(like_condition, field, table_alias, use_null_check)
+
+
+def _create_hastoken_optimized_contains_token_condition(
+    operation: tsi_query.ContainsTokenOperation,
+    pb: "ParamBuilder",
+    table_alias: str,
+    use_null_check: bool = True,
+) -> str | None:
+    """Creates a hasToken-optimized prefilter for contains-token operations.
+
+    Args:
+        operation: The contains-token operation to optimize.
+        pb: Parameter builder for query parameterization.
+        table_alias: The table alias to use in SQL.
+        use_null_check: Whether to add OR IS NULL for start/end fields.
+            True for calls_merged (unmerged parts may have NULL fields).
+            False for calls_complete (every row is a complete call).
+    """
+    if not isinstance(operation.contains_token_.input, tsi_query.GetFieldOperator):
+        return None
+    if not isinstance(
+        operation.contains_token_.substr, tsi_query.LiteralOperation
+    ) or not isinstance(operation.contains_token_.substr.literal_, str):
+        return None
+
+    from weave.trace_server.calls_query_builder.calls_query_builder import (
+        get_field_by_name,
+    )
+
+    field = get_field_by_name(operation.contains_token_.input.get_field_).field
+    substr_value = operation.contains_token_.substr.literal_
+    if not substr_value:
+        return None
+    if not _can_optimize_heavy_field(field):
+        return None
+
+    field_name = f"{table_alias}.{field}"
+    # hasTokenCaseInsensitive cannot use the tokenbf skip index.
+    has_token = (
+        "hasTokenCaseInsensitive"
+        if operation.contains_token_.case_insensitive
+        else "hasToken"
+    )
+    param_name = pb.add_param(substr_value)
+    has_token_condition = (
+        f"{has_token}({field_name}, {param_slot(param_name, 'String')})"
+    )
+    return _maybe_use_null_check(
+        has_token_condition, field, table_alias, use_null_check
+    )
 
 
 def _create_like_optimized_in_condition(

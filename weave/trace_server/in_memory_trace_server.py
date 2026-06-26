@@ -475,6 +475,24 @@ def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
     return needle in haystack
 
 
+def _ch_has_token(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
+    """ClickHouse hasToken()/hasTokenCaseInsensitive() over strings.
+
+    Matches when needle equals one of haystack's tokens (split on
+    non-alphanumeric runs).
+    """
+    if not isinstance(haystack, str) or not isinstance(needle, str):
+        return False
+    tokens = _TOKEN_SEPARATOR_RE.split(haystack)
+    if case_insensitive:
+        needle = needle.lower()
+        return any(token.lower() == needle for token in tokens if token)
+    return any(token == needle for token in tokens if token)
+
+
+_TOKEN_SEPARATOR_RE = re.compile(r"[^a-zA-Z0-9]+")
+
+
 def _ch_sorted_by_terms(
     rows: list[Any],
     terms: Sequence[tuple[Any, str]],
@@ -1063,6 +1081,12 @@ class _QueryFilterEvaluator:
                 self._operand_value(operation.contains_.input),
                 self._operand_value(operation.contains_.substr),
                 bool(operation.contains_.case_insensitive),
+            )
+        if isinstance(operation, tsi_query.ContainsTokenOperation):
+            return _ch_has_token(
+                self._operand_value(operation.contains_token_.input),
+                self._operand_value(operation.contains_token_.substr),
+                bool(operation.contains_token_.case_insensitive),
             )
         raise TypeError(f"Unknown operation type: {operation}")
 
@@ -1941,6 +1965,25 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 return lambda rec: _ch_position(
                     input_fn(rec), substr_fn(rec), case_insensitive
                 )
+            elif isinstance(operation, tsi_query.ContainsTokenOperation):
+                case_insensitive = bool(operation.contains_token_.case_insensitive)
+                if is_multi_value_feedback(operation.contains_token_.input):
+                    field_path = operation.contains_token_.input.get_field_
+                    substr_fn = compile_operand(operation.contains_token_.substr)
+
+                    def evaluate_array_contains_token(rec: _CallRec) -> bool:
+                        needle = substr_fn(rec)
+                        return any(
+                            _ch_has_token(value, needle, case_insensitive)
+                            for value in self._feedback_values_array(rec, field_path)
+                        )
+
+                    return evaluate_array_contains_token
+                input_fn = compile_operand(operation.contains_token_.input)
+                substr_fn = compile_operand(operation.contains_token_.substr)
+                return lambda rec: _ch_has_token(
+                    input_fn(rec), substr_fn(rec), case_insensitive
+                )
             else:
                 raise TypeError(f"Unknown operation type: {operation}")
 
@@ -2071,6 +2114,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     tsi_query.LteOperation,
                     tsi_query.InOperation,
                     tsi_query.ContainsOperation,
+                    tsi_query.ContainsTokenOperation,
                 ),
             ):
                 return compile_operation(operand)
@@ -7201,6 +7245,27 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
                     )
                 )
             return _ch_position(lhs, rhs, bool(operation.contains_.case_insensitive))
+        elif isinstance(operation, tsi_query.ContainsTokenOperation):
+            input_operand = operation.contains_token_.input
+            if (
+                isinstance(input_operand, tsi_query.GetFieldOperator)
+                and input_operand.get_field_ in table.array_string_cols
+            ):
+                # Array membership semantics for Array(String) columns.
+                rhs = process_operand(operation.contains_token_.substr)
+                values = row.get(input_operand.get_field_) or []
+                if operation.contains_token_.case_insensitive:
+                    rhs_text = _to_sql_text(rhs)
+                    rhs_lower = rhs_text.lower() if rhs_text is not None else None
+                    return any(
+                        isinstance(v, str) and v.lower() == rhs_lower for v in values
+                    )
+                return rhs in values
+            lhs = process_operand(input_operand)
+            rhs = process_operand(operation.contains_token_.substr)
+            return _ch_has_token(
+                lhs, rhs, bool(operation.contains_token_.case_insensitive)
+            )
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 
@@ -7249,6 +7314,7 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
                 tsi_query.LteOperation,
                 tsi_query.InOperation,
                 tsi_query.ContainsOperation,
+                tsi_query.ContainsTokenOperation,
             ),
         ):
             return process_operation(operand)

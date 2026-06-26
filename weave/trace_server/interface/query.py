@@ -335,6 +335,43 @@ class ContainsSpec(BaseModel):
     case_insensitive: bool | None = False
 
 
+class ContainsTokenOperation(BaseModel):
+    """Whole-token match. Compiles to ClickHouse `hasToken`.
+
+    Not part of MongoDB. Weave-specific addition. Matches when `substr` equals
+    one of the tokens in `input` (tokens split on non-alphanumeric runs),
+    unlike `$contains` which does a substring search.
+
+    Example:
+        ```
+        {
+            "$containsToken": {
+                "input": {"$getField": "display_name"},
+                "substr": {"$literal": "llm"},
+                "case_insensitive": true
+            }
+        }
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    contains_token_: "ContainsTokenSpec" = Field(alias="$containsToken")
+
+
+class ContainsTokenSpec(BaseModel):
+    """Specification for the `$containsToken` operation.
+
+    - `input`: The string to search.
+    - `substr`: The whole token to search for.
+    - `case_insensitive`: If true, match is case-insensitive.
+    """
+
+    input: "Operand"
+    substr: "Operand"
+    case_insensitive: bool | None = False
+
+
 # Convenience type for all Operands and Operations
 Operation = (
     AndOperation
@@ -347,6 +384,7 @@ Operation = (
     | LteOperation
     | InOperation
     | ContainsOperation
+    | ContainsTokenOperation
 )
 Operand = LiteralOperation | GetFieldOperator | ConvertOperation | Operation
 
@@ -363,6 +401,7 @@ GteOperation.model_rebuild()
 LteOperation.model_rebuild()
 InOperation.model_rebuild()
 ContainsOperation.model_rebuild()
+ContainsTokenOperation.model_rebuild()
 
 
 def infer_literal_filter_cast(operand: Operand) -> CastTo | None:
