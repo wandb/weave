@@ -1871,4 +1871,350 @@ describe('WeaveClient', () => {
       });
     });
   });
+
+  describe('getAgentCustomAttrsSchema', () => {
+    vcrTest('gets the custom attrs schema for the project', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentCustomAttrsSchema({});
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [
+            {
+              "key": "gen_ai.tool.call.arguments.city",
+              "source": "custom_attrs_string",
+              "span_count": 84,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.result.condition",
+              "source": "custom_attrs_string",
+              "span_count": 72,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.result.temp",
+              "source": "custom_attrs_int",
+              "span_count": 72,
+              "value_type": "int",
+            },
+            {
+              "key": "weave.openai_agents.span_id",
+              "source": "custom_attrs_string",
+              "span_count": 56,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.trace_id",
+              "source": "custom_attrs_string",
+              "span_count": 56,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.expression",
+              "source": "custom_attrs_string",
+              "span_count": 30,
+              "value_type": "string",
+            },
+            {
+              "key": "integration.meta.package_name",
+              "source": "custom_attrs_string",
+              "span_count": 22,
+              "value_type": "string",
+            },
+            {
+              "key": "integration.name",
+              "source": "custom_attrs_string",
+              "span_count": 22,
+              "value_type": "string",
+            },
+            {
+              "key": "integration.version",
+              "source": "custom_attrs_string",
+              "span_count": 22,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.agent.output_type",
+              "source": "custom_attrs_string",
+              "span_count": 13,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.agent.tools",
+              "source": "custom_attrs_string",
+              "span_count": 13,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.unit",
+              "source": "custom_attrs_string",
+              "span_count": 12,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.another",
+              "source": "custom_attrs_int",
+              "span_count": 6,
+              "value_type": "int",
+            },
+            {
+              "key": "weave.something",
+              "source": "custom_attrs_string",
+              "span_count": 6,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.tag",
+              "source": "custom_attrs_string",
+              "span_count": 6,
+              "value_type": "string",
+            },
+            {
+              "key": "claude_agent_sdk.num_turns",
+              "source": "custom_attrs_int",
+              "span_count": 3,
+              "value_type": "int",
+            },
+            {
+              "key": "claude_agent_sdk.usage.cost_usd",
+              "source": "custom_attrs_float",
+              "span_count": 3,
+              "value_type": "float",
+            },
+            {
+              "key": "gen_ai.usage.total_tokens",
+              "source": "custom_attrs_int",
+              "span_count": 3,
+              "value_type": "int",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.pattern",
+              "source": "custom_attrs_string",
+              "span_count": 2,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.command",
+              "source": "custom_attrs_string",
+              "span_count": 1,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.description",
+              "source": "custom_attrs_string",
+              "span_count": 1,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.file_path",
+              "source": "custom_attrs_string",
+              "span_count": 1,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.limit",
+              "source": "custom_attrs_int",
+              "span_count": 1,
+              "value_type": "int",
+            },
+          ],
+          "has_more": false,
+          "limit": 200,
+          "offset": 0,
+        }
+      `);
+    });
+
+    vcrTest('filters by time window', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentCustomAttrsSchema({
+        startedAfter: '2026-06-15T00:00:00Z',
+        startedBefore: '2026-06-23T00:00:00Z',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [
+            {
+              "key": "weave.openai_agents.span_id",
+              "source": "custom_attrs_string",
+              "span_count": 56,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.trace_id",
+              "source": "custom_attrs_string",
+              "span_count": 56,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.agent.output_type",
+              "source": "custom_attrs_string",
+              "span_count": 13,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.openai_agents.agent.tools",
+              "source": "custom_attrs_string",
+              "span_count": 13,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.city",
+              "source": "custom_attrs_string",
+              "span_count": 12,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.unit",
+              "source": "custom_attrs_string",
+              "span_count": 12,
+              "value_type": "string",
+            },
+            {
+              "key": "gen_ai.tool.call.arguments.expression",
+              "source": "custom_attrs_string",
+              "span_count": 6,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.another",
+              "source": "custom_attrs_int",
+              "span_count": 6,
+              "value_type": "int",
+            },
+            {
+              "key": "weave.something",
+              "source": "custom_attrs_string",
+              "span_count": 6,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.tag",
+              "source": "custom_attrs_string",
+              "span_count": 6,
+              "value_type": "string",
+            },
+          ],
+          "has_more": false,
+          "limit": 200,
+          "offset": 0,
+        }
+      `);
+    });
+
+    vcrTest('filters by query', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentCustomAttrsSchema({
+        query: {
+          $expr: {
+            $eq: [
+              {$getField: 'agent_name'},
+              {$literal: 'my-cool-agent-with-attributes'},
+            ],
+          },
+        },
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [
+            {
+              "key": "weave.another",
+              "source": "custom_attrs_int",
+              "span_count": 2,
+              "value_type": "int",
+            },
+            {
+              "key": "weave.something",
+              "source": "custom_attrs_string",
+              "span_count": 2,
+              "value_type": "string",
+            },
+            {
+              "key": "weave.tag",
+              "source": "custom_attrs_string",
+              "span_count": 2,
+              "value_type": "string",
+            },
+          ],
+          "has_more": false,
+          "limit": 200,
+          "offset": 0,
+        }
+      `);
+    });
+
+    vcrTest('supports limit and offset', async () => {
+      await authenticate();
+      const client = await init('example');
+
+      const first = await client.getAgentCustomAttrsSchema({limit: 1});
+      expect(first.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [
+            {
+              "key": "gen_ai.tool.call.arguments.city",
+              "source": "custom_attrs_string",
+              "span_count": 84,
+              "value_type": "string",
+            },
+          ],
+          "has_more": true,
+          "limit": 1,
+          "offset": 0,
+        }
+      `);
+
+      const second = await client.getAgentCustomAttrsSchema({
+        limit: 1,
+        offset: 1,
+      });
+      expect(second.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [
+            {
+              "key": "gen_ai.tool.call.result.condition",
+              "source": "custom_attrs_string",
+              "span_count": 72,
+              "value_type": "string",
+            },
+          ],
+          "has_more": true,
+          "limit": 1,
+          "offset": 1,
+        }
+      `);
+    });
+
+    vcrTest('returns no attributes for a window with no data', async () => {
+      await authenticate();
+      const client = await init('example');
+      const resp = await client.getAgentCustomAttrsSchema({
+        startedAfter: '2000-01-01T00:00:00Z',
+        startedBefore: '2000-01-02T00:00:00Z',
+      });
+      expect(resp.data).toMatchInlineSnapshot(`
+        {
+          "attributes": [],
+          "has_more": false,
+          "limit": 200,
+          "offset": 0,
+        }
+      `);
+    });
+
+    vcrTest('errors with invalid project id', async () => {
+      await authenticate();
+      const client = await init('nonexistent-project');
+
+      expect(client.getAgentCustomAttrsSchema({})).rejects.toMatchObject({
+        data: null,
+        error: {
+          detail: 'Project not found',
+        },
+      });
+    });
+  });
 });

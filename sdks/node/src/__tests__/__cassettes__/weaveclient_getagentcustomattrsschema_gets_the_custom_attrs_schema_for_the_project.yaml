@@ -1,0 +1,66 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:20:21 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.15.1
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Fri, 26 Jun 2026 15:20:22 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: cb8b0902561e0c821061fd68da9d4479
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/spans/custom-attrs/schema
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "2493"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:20:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"attributes":[{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.city","value_type":"string","span_count":84},{"source":"custom_attrs_string","key":"gen_ai.tool.call.result.condition","value_type":"string","span_count":72},{"source":"custom_attrs_int","key":"gen_ai.tool.call.result.temp","value_type":"int","span_count":72},{"source":"custom_attrs_string","key":"weave.openai_agents.span_id","value_type":"string","span_count":56},{"source":"custom_attrs_string","key":"weave.openai_agents.trace_id","value_type":"string","span_count":56},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.expression","value_type":"string","span_count":30},{"source":"custom_attrs_string","key":"integration.meta.package_name","value_type":"string","span_count":22},{"source":"custom_attrs_string","key":"integration.name","value_type":"string","span_count":22},{"source":"custom_attrs_string","key":"integration.version","value_type":"string","span_count":22},{"source":"custom_attrs_string","key":"weave.openai_agents.agent.output_type","value_type":"string","span_count":13},{"source":"custom_attrs_string","key":"weave.openai_agents.agent.tools","value_type":"string","span_count":13},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.unit","value_type":"string","span_count":12},{"source":"custom_attrs_int","key":"weave.another","value_type":"int","span_count":6},{"source":"custom_attrs_string","key":"weave.something","value_type":"string","span_count":6},{"source":"custom_attrs_string","key":"weave.tag","value_type":"string","span_count":6},{"source":"custom_attrs_int","key":"claude_agent_sdk.num_turns","value_type":"int","span_count":3},{"source":"custom_attrs_float","key":"claude_agent_sdk.usage.cost_usd","value_type":"float","span_count":3},{"source":"custom_attrs_int","key":"gen_ai.usage.total_tokens","value_type":"int","span_count":3},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.pattern","value_type":"string","span_count":2},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.command","value_type":"string","span_count":1},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.description","value_type":"string","span_count":1},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.file_path","value_type":"string","span_count":1},{"source":"custom_attrs_int","key":"gen_ai.tool.call.arguments.limit","value_type":"int","span_count":1}],"limit":200,"offset":0,"has_more":false}'
