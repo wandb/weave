@@ -70,6 +70,12 @@ export interface AgentChatAssistantMessage {
   input_tokens?: number | null;
   /** Output Tokens */
   output_tokens?: number | null;
+  /** Input Cost Usd */
+  input_cost_usd?: number | null;
+  /** Output Cost Usd */
+  output_cost_usd?: number | null;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
   /** Duration Ms */
   duration_ms?: number | null;
   /** Status */
@@ -113,6 +119,10 @@ export interface AgentChatMessage {
   span_id?: string | null;
   /** Agent Name */
   agent_name?: string | null;
+  /** Agent Version */
+  agent_version?: string | null;
+  /** Status Code */
+  status_code?: 'UNSET' | 'OK' | 'ERROR' | null;
   /** Started At */
   started_at?: string | null;
   user_message?: AgentChatUserMessage | null;
@@ -221,6 +231,8 @@ export interface AgentConversationChatRes {
    * @default 0
    */
   offset?: number;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
   /** Feedback */
   feedback?: Record<string, any>[] | null;
 }
@@ -369,6 +381,8 @@ export interface AgentSchema {
   first_seen: string | null;
   /** Last Seen */
   last_seen: string | null;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
 }
 
 /**
@@ -422,17 +436,24 @@ export interface AgentSearchMatchedMessage {
 
 /**
  * AgentSearchReq
- * Full-text search across message content and span metadata.
+ * Query the `messages` table by content and/or span-level filters.
  *
- * Scans the `messages` table (one row per message occurrence, populated
- * by an MV from spans) and returns matching span-level hits. The caller
- * groups by conversation for the response shape.
+ * Scans the `messages` table (one row per message occurrence, populated by an
+ * MV from spans) and returns matching span-level hits. Full-text search sets
+ * `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
+ * empty and uses the filters below. The caller groups by conversation for the
+ * response shape.
  */
 export interface AgentSearchReq {
   /** Project Id */
   project_id: string;
-  /** Query */
-  query: string;
+  /**
+   * Query
+   * @default ""
+   */
+  query?: string;
+  /** Trace Id */
+  trace_id?: string | null;
   /** Roles */
   roles?:
     | (
@@ -453,6 +474,11 @@ export interface AgentSearchReq {
   provider_name?: string | null;
   /** Request Model */
   request_model?: string | null;
+  /**
+   * Truncate Content
+   * @default true
+   */
+  truncate_content?: boolean;
   /** Started After */
   started_after?: string | null;
   /** Started Before */
@@ -672,6 +698,12 @@ export interface AgentSpanGroupRow {
    * @default 0
    */
   error_count?: number;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
+  /** Total Input Cost Usd */
+  total_input_cost_usd?: number | null;
+  /** Total Output Cost Usd */
+  total_output_cost_usd?: number | null;
   /** Agent Names */
   agent_names?: string[];
   /** Agent Versions */
@@ -780,6 +812,16 @@ export interface AgentSpanSchema {
   cache_creation_input_tokens?: number | null;
   /** Cache Read Input Tokens */
   cache_read_input_tokens?: number | null;
+  /** Input Cost Usd */
+  input_cost_usd?: number | null;
+  /** Output Cost Usd */
+  output_cost_usd?: number | null;
+  /** Cache Read Cost Usd */
+  cache_read_cost_usd?: number | null;
+  /** Cache Creation Cost Usd */
+  cache_creation_cost_usd?: number | null;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
   /** Reasoning Content */
   reasoning_content?: string | null;
   /** Conversation Id */
@@ -1083,6 +1125,11 @@ export interface AgentSpansQueryReq {
    * @default false
    */
   include_details?: boolean;
+  /**
+   * Include Costs
+   * @default false
+   */
+  include_costs?: boolean;
   /** Sort By */
   sort_by?: AgentSortBy[] | null;
   /**
@@ -1149,6 +1196,12 @@ export interface AgentTraceChatRes {
   trace_id: string;
   /** Root Span Name */
   root_span_name?: string | null;
+  /** Agent Name */
+  agent_name?: string | null;
+  /** Agent Version */
+  agent_version?: string | null;
+  /** Status Code */
+  status_code?: 'UNSET' | 'OK' | 'ERROR' | null;
   /** Provider */
   provider?: string | null;
   /**
@@ -1156,6 +1209,8 @@ export interface AgentTraceChatRes {
    * Wall-clock duration of the trace root span in milliseconds. This is not a sum of child span durations.
    */
   total_duration_ms?: number | null;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
   /** Messages */
   messages?: AgentChatMessage[];
   /** Feedback */
@@ -1187,6 +1242,8 @@ export interface AgentVersionSchema {
   first_seen: string | null;
   /** Last Seen */
   last_seen: string | null;
+  /** Total Cost Usd */
+  total_cost_usd?: number | null;
   /** Agent Version */
   agent_version: string;
 }
@@ -1215,6 +1272,11 @@ export interface AgentVersionsQueryReq {
    * @default 0
    */
   offset?: number;
+  /**
+   * Include Costs
+   * @default false
+   */
+  include_costs?: boolean;
 }
 
 /**
@@ -1263,6 +1325,11 @@ export interface AgentsQueryReq {
    * @default 0
    */
   offset?: number;
+  /**
+   * Include Costs
+   * @default false
+   */
+  include_costs?: boolean;
 }
 
 /**
@@ -1680,6 +1747,8 @@ export interface BodyFileCreateFileCreatePost {
    * @format binary
    */
   file: File;
+  /** Expected Digest */
+  expected_digest?: string | null;
 }
 
 /** CallBatchEndMode */
@@ -2121,6 +2190,21 @@ export interface CallsScoreReq {
 export type CallsScoreRes = object;
 
 /**
+ * CallsUpsertCompleteReq
+ * Request for upserting a batch of completed calls.
+ */
+export interface CallsUpsertCompleteReq {
+  /** Batch */
+  batch: CompletedCallSchemaForInsert[];
+}
+
+/**
+ * CallsUpsertCompleteRes
+ * Response for upserting a batch of completed calls.
+ */
+export type CallsUpsertCompleteRes = object;
+
+/**
  * CallsUsageReq
  * Request to compute aggregated usage for multiple root calls.
  *
@@ -2168,6 +2252,64 @@ export interface CallsUsageRes {
 export interface CatalogModelsRes {
   /** Models */
   models: LLMModelDetails[];
+}
+
+/**
+ * CompletedCallSchemaForInsert
+ * Schema for inserting a completed call directly.
+ *
+ * This represents a call that is already finished at insertion time, with both
+ * start and end information provided together. Used by the calls_complete endpoint.
+ */
+export interface CompletedCallSchemaForInsert {
+  /** Project Id */
+  project_id: string;
+  /** Id */
+  id: string;
+  /** Trace Id */
+  trace_id: string;
+  /** Op Name */
+  op_name: string;
+  /**
+   * Started At
+   * @format date-time
+   */
+  started_at: string;
+  /**
+   * Ended At
+   * @format date-time
+   */
+  ended_at: string;
+  /** Display Name */
+  display_name?: string | null;
+  /** Parent Id */
+  parent_id?: string | null;
+  /** Thread Id */
+  thread_id?: string | null;
+  /** Turn Id */
+  turn_id?: string | null;
+  /** Attributes */
+  attributes: Record<string, any>;
+  /** Inputs */
+  inputs: Record<string, any>;
+  /** Output */
+  output?: null;
+  summary: SummaryInsertMap;
+  /** Otel Dump */
+  otel_dump?: Record<string, any> | null;
+  /** Exception */
+  exception?: string | null;
+  /**
+   * Wb User Id
+   * Do not set directly. Server will automatically populate this field.
+   */
+  wb_user_id?: string | null;
+  /** Wb Run Id */
+  wb_run_id?: string | null;
+  /** Wb Run Step */
+  wb_run_step?: number | null;
+  /** Wb Run Step End */
+  wb_run_step_end?: number | null;
 }
 
 /**
@@ -2293,6 +2435,48 @@ export interface ConvertSpec {
     | ContainsOperation;
   /** To */
   to: 'double' | 'string' | 'int' | 'bool' | 'exists';
+}
+
+/**
+ * Cost
+ * Costs are expressed in USD per million tokens.
+ */
+export interface Cost {
+  /**
+   * Input
+   * Cost per million input tokens (USD).
+   */
+  input: number;
+  /**
+   * Output
+   * Cost per million output tokens (USD).
+   */
+  output: number;
+  /**
+   * Reasoning
+   * Cost per million reasoning tokens (USD).
+   */
+  reasoning?: number | null;
+  /**
+   * Cache Read
+   * Cost per million cached read tokens (USD).
+   */
+  cache_read?: number | null;
+  /**
+   * Cache Write
+   * Cost per million cached write tokens (USD).
+   */
+  cache_write?: number | null;
+  /**
+   * Input Audio
+   * Cost per million audio input tokens (USD).
+   */
+  input_audio?: number | null;
+  /**
+   * Output Audio
+   * Cost per million audio output tokens (USD).
+   */
+  output_audio?: number | null;
 }
 
 /** CostCreateInput */
@@ -2596,6 +2780,11 @@ export interface EvalResultsEvaluationSummary {
   trial_count?: number;
   /** Scorer Stats */
   scorer_stats?: EvalResultsScorerStats[];
+  /**
+   * Predict Total Tokens
+   * Sum of per-trial predict-only token usage for this evaluation (the model's predict() tokens only, excluding LLM-as-a-judge scorer usage); None when no trial reports usage.
+   */
+  predict_total_tokens?: number | null;
   /** Evaluation Ref */
   evaluation_ref?: string | null;
   /** Model Ref */
@@ -2685,6 +2874,12 @@ export interface EvalResultsQueryBody {
    * Filters applied to grouped rows. Multiple filters are AND'd together.
    */
   filters?: EvalResultsFilter[] | null;
+  /**
+   * Filter Logic Operator
+   * How to combine filters across evaluations: 'and' (Match All - row must match in ALL evals) or 'or' (Match Any - row must match in ANY eval). Defaults to 'or' (Match Any).
+   * @default "or"
+   */
+  filter_logic_operator?: 'and' | 'or';
   /**
    * Limit
    * Optional row-level page size applied after grouping and intersection.
@@ -3156,6 +3351,148 @@ export interface EvaluationStatusRunning {
   completed_rows: number;
   /** Total Rows */
   total_rows: number;
+}
+
+/**
+ * FeedbackAggregateBucket
+ * One (time bucket, group) row of aggregated scorer feedback.
+ */
+export interface FeedbackAggregateBucket {
+  /**
+   * Time Bucket Start Ms
+   * Time bucket start, unix epoch ms (UTC). None when unbucketed.
+   */
+  time_bucket_start_ms?: number | null;
+  /**
+   * Group
+   * Group-by dimension values for this row (e.g. {'scorer_id': '...'}).
+   */
+  group?: Record<string, string>;
+  /**
+   * Total Count
+   * Number of feedback rows in this bucket/group.
+   */
+  total_count: number;
+  /**
+   * Scored Count
+   * Rows that emitted a score (at least one tag or rating). Excludes agent-monitor rows that scored nothing — use this for score volume.
+   */
+  scored_count: number;
+  /**
+   * Tag Counts
+   * Count of each scorer tag.
+   */
+  tag_counts?: Record<string, number>;
+  /**
+   * Rating Counts
+   * Number of rows carrying each rating key (e.g. '_rating_').
+   */
+  rating_counts?: Record<string, number>;
+  /**
+   * Rating Sums
+   * Sum of each rating key's values; client derives avg = sum/count.
+   */
+  rating_sums?: Record<string, number>;
+}
+
+/**
+ * FeedbackAggregateReq
+ * Query for aggregate scores by time bucket and dimension.
+ */
+export interface FeedbackAggregateReq {
+  /** Project Id */
+  project_id: string;
+  /**
+   * After Ms
+   * Inclusive lower bound on created_at (milliseconds since epoch).
+   * @min 0
+   */
+  after_ms: number;
+  /**
+   * Before Ms
+   * Exclusive upper bound on created_at (milliseconds since epoch).
+   * @min 0
+   */
+  before_ms: number;
+  /**
+   * Time Bucket Seconds
+   * Time bucket size in seconds, e.g. 3600 for 1h buckets
+   */
+  time_bucket_seconds?: number | null;
+  /**
+   * Feedback Types
+   * Filter on feedback_type by prefix
+   */
+  feedback_types?: string[];
+  /**
+   * Tags
+   * Filter to feedback that includes any of the given tags
+   */
+  tags?: string[];
+  /**
+   * Rating Min
+   * Include only rows with a rating >= this value
+   */
+  rating_min?: number | null;
+  /**
+   * Rating Max
+   * Include only rows with a rating <= this value
+   */
+  rating_max?: number | null;
+  /**
+   * Monitor Ids
+   * Filter to these monitor ids (exact match; suffix with '*' for prefix match).
+   */
+  monitor_ids?: string[];
+  /**
+   * Scorer Ids
+   * Filter to these scorer ids (exact match; suffix with '*' for prefix match).
+   */
+  scorer_ids?: string[];
+  /**
+   * Span Agent Names
+   * Filter to feedback whose span_agent_name matches any of these (exact).
+   */
+  span_agent_names?: string[];
+  /**
+   * Span Types
+   * Filter by span type (turn vs conversation).
+   */
+  span_types?: ('agent_turn' | 'agent_conversation')[];
+  /**
+   * Group By
+   * Allowed: ['scorer_id', 'span_agent_name', 'span_agent_version', 'span_status_code'].
+   */
+  group_by?: (
+    | 'scorer_id'
+    | 'span_agent_name'
+    | 'span_agent_version'
+    | 'span_status_code'
+  )[];
+}
+
+/**
+ * FeedbackAggregateRes
+ * Sparse time-series of aggregated scorer feedback (empty buckets omitted).
+ */
+export interface FeedbackAggregateRes {
+  /**
+   * Time Bucket Seconds
+   * Time bucket size used (seconds). None when unbucketed.
+   */
+  time_bucket_seconds?: number | null;
+  /**
+   * After Ms
+   * Resolved inclusive lower bound, unix epoch ms (UTC).
+   */
+  after_ms: number;
+  /**
+   * Before Ms
+   * Resolved exclusive upper bound, unix epoch ms (UTC).
+   */
+  before_ms: number;
+  /** Buckets */
+  buckets?: FeedbackAggregateBucket[];
 }
 
 /** FeedbackCreateBatchReq */
@@ -3802,6 +4139,18 @@ export interface InOperation {
 }
 
 /**
+ * Interleaved
+ * Reasoning interleaving support details.
+ */
+export interface Interleaved {
+  /**
+   * Field
+   * Format identifier for interleaved reasoning.
+   */
+  field: 'reasoning_content' | 'reasoning_details';
+}
+
+/**
  * LLMAggregatedUsage
  * Aggregated usage metrics for a specific LLM.
  */
@@ -3950,6 +4299,28 @@ export interface LLMUsageSchema {
 }
 
 /**
+ * Limit
+ * Token limits for a model.
+ */
+export interface Limit {
+  /**
+   * Context
+   * Maximum context window in tokens.
+   */
+  context: number;
+  /**
+   * Input
+   * Maximum input tokens.
+   */
+  input: number;
+  /**
+   * Output
+   * Maximum output tokens.
+   */
+  output: number;
+}
+
+/**
  * LiteralOperation
  * Represents a constant value in the query language.
  *
@@ -4009,6 +4380,23 @@ export interface LteOperation {
    * @minItems 2
    */
   $lte: any[];
+}
+
+/**
+ * Modalities
+ * Supported input and output modalities.
+ */
+export interface Modalities {
+  /**
+   * Input
+   * Supported input types (e.g. text, image, audio, video, pdf).
+   */
+  input: string[];
+  /**
+   * Output
+   * Supported output types.
+   */
+  output: string[];
 }
 
 /** ModelCreateBody */
@@ -4111,6 +4499,126 @@ export interface ModelReadRes {
    * Additional attributes stored with the model
    */
   attributes?: Record<string, any> | null;
+}
+
+/**
+ * ModelsDevModel
+ * A single model entry in the models.dev schema.
+ */
+export interface ModelsDevModel {
+  /**
+   * Id
+   * Model identifier used by the AI SDK.
+   */
+  id: string;
+  /**
+   * Name
+   * Display name.
+   */
+  name: string;
+  /**
+   * Attachment
+   * File attachment support.
+   */
+  attachment: boolean;
+  /**
+   * Reasoning
+   * Chain-of-thought reasoning support.
+   */
+  reasoning: boolean;
+  /**
+   * Tool Call
+   * Tool calling support.
+   */
+  tool_call: boolean;
+  /**
+   * Structured Output
+   * Dedicated structured output feature.
+   */
+  structured_output?: boolean | null;
+  /**
+   * Temperature
+   * Temperature control support.
+   */
+  temperature?: boolean | null;
+  /**
+   * Knowledge
+   * Knowledge cutoff in YYYY-MM or YYYY-MM-DD format.
+   */
+  knowledge?: string | null;
+  /**
+   * Release Date
+   * First public release date (YYYY-MM-DD).
+   */
+  release_date: string;
+  /**
+   * Last Updated
+   * Most recent update date (YYYY-MM-DD).
+   */
+  last_updated: string;
+  /**
+   * Open Weights
+   * Public weights availability.
+   */
+  open_weights: boolean;
+  /**
+   * Status
+   * Lifecycle status of the model.
+   */
+  status?: 'alpha' | 'beta' | 'deprecated' | null;
+  /**
+   * Interleaved
+   * Reasoning interleaving support.
+   */
+  interleaved?: boolean | Interleaved | null;
+  /** Pricing information. */
+  cost?: Cost | null;
+  /** Token limits. */
+  limit?: Limit | null;
+  /** Supported input and output modalities. */
+  modalities?: Modalities | null;
+}
+
+/**
+ * ModelsDevProvider
+ * A provider entry in the models.dev schema.
+ */
+export interface ModelsDevProvider {
+  /**
+   * Id
+   * Provider identifier, derived from the folder name.
+   */
+  id: string;
+  /**
+   * Name
+   * Display name of the provider.
+   */
+  name: string;
+  /**
+   * Npm
+   * AI SDK package name.
+   */
+  npm: string;
+  /**
+   * Env
+   * Environment variable keys for authentication.
+   */
+  env: string[];
+  /**
+   * Doc
+   * Link to provider documentation.
+   */
+  doc: string;
+  /**
+   * Api
+   * OpenAI-compatible API endpoint. Required only when using @ai-sdk/openai-compatible.
+   */
+  api?: string | null;
+  /**
+   * Models
+   * Mapping of model id -> model.
+   */
+  models?: Record<string, ModelsDevModel>;
 }
 
 /**
@@ -6260,6 +6768,24 @@ export class Api<
       }),
 
     /**
+     * @description Returns the available models in the models.dev `api.json` schema. This API is available without authentication.
+     *
+     * @tags Inference
+     * @name InferenceModelsdevModelsInferenceModelsdevModelsGet
+     * @summary Inference Modelsdev Models
+     * @request GET:/inference/modelsdev/models
+     */
+    inferenceModelsdevModelsInferenceModelsdevModelsGet: (
+      params: RequestParams = {}
+    ) =>
+      this.request<Record<string, ModelsDevProvider>, any>({
+        path: `/inference/modelsdev/models`,
+        method: 'GET',
+        format: 'json',
+        ...params,
+      }),
+
+    /**
      * @description Returns available hardware and pricing for a given model. Called by NVIDIA to show users their options and redirect them based on what we support.  Only serverless options are returned.
      *
      * @tags Inference
@@ -6921,6 +7447,27 @@ export class Api<
       }),
 
     /**
+     * @description Aggregate typed scorer feedback (tags, ratings) over time buckets.
+     *
+     * @tags Feedback
+     * @name FeedbackAggregateFeedbackAggregatePost
+     * @summary Feedback Aggregate
+     * @request POST:/feedback/aggregate
+     */
+    feedbackAggregateFeedbackAggregatePost: (
+      data: FeedbackAggregateReq,
+      params: RequestParams = {}
+    ) =>
+      this.request<FeedbackAggregateRes, HTTPValidationError>({
+        path: `/feedback/aggregate`,
+        method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
      * @description Discover feedback payload schema (paths and types) from sample rows.
      *
      * @tags Feedback
@@ -7298,6 +7845,29 @@ export class Api<
       }),
   };
   v2 = {
+    /**
+     * @description Upsert a batch of completed calls directly to the calls_complete table. Each call in the batch contains both start and end information. This endpoint is used when calls are buffered client-side and sent as complete records.
+     *
+     * @tags Calls
+     * @name CallsCompleteV2EntityProjectCallsCompletePost
+     * @summary Calls Complete
+     * @request POST:/v2/{entity}/{project}/calls/complete
+     */
+    callsCompleteV2EntityProjectCallsCompletePost: (
+      entity: string,
+      project: string,
+      data: CallsUpsertCompleteReq,
+      params: RequestParams = {}
+    ) =>
+      this.request<CallsUpsertCompleteRes, HTTPValidationError>({
+        path: `/v2/${entity}/${project}/calls/complete`,
+        method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
     /**
      * @description Create an op object.
      *

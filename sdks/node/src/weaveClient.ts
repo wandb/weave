@@ -8,22 +8,27 @@ import {
   MAX_OBJECT_NAME_LENGTH,
 } from './constants';
 import {computeDigest} from './digest';
-import {
-  type AgentChatMessage as AgentChatMessageSchema,
-  type AgentTraceChatRes,
-  type AgentSchema,
-  type AgentSpanSchema,
-  type AgentVersionSchema,
-  type CallSchema,
-  type CallsQueryReq,
-  type CallsFilter,
-  type EndedCallSchemaForInsert,
-  type Query,
-  type SortBy,
-  type StartedCallSchemaForInsert,
-  type Api as TraceServerApi,
-  type HttpResponse,
-  type HTTPValidationError,
+import type {
+  AgentChatMessage as AgentChatMessageSchema,
+  AgentSearchConversationResult,
+  AgentTraceChatRes,
+  AgentSchema,
+  AgentSpanSchema,
+  AgentVersionSchema,
+  CallSchema,
+  CallsQueryReq,
+  CallsFilter,
+  EndedCallSchemaForInsert,
+  Query,
+  SortBy,
+  StartedCallSchemaForInsert,
+  Api as TraceServerApi,
+  HttpResponse,
+  HTTPValidationError,
+  AgentGroupByRef,
+  AgentSpanStatsMetricSpec,
+  AgentSpanStatsColumn,
+  AgentCustomAttrSchemaItem,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -57,7 +62,7 @@ import type {Prompt} from './prompt';
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
 
-export type Response<T extends unknown> = HttpResponse<T, HTTPValidationError>;
+export type Response<T> = HttpResponse<T, HTTPValidationError>;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -98,6 +103,7 @@ export interface GetCallsOptions {
 }
 
 export type Agent = AgentSchema;
+export type AgentConversationSearchResult = AgentSearchConversationResult;
 export type AgentMessage = AgentChatMessageSchema;
 export type AgentSpan = AgentSpanSchema;
 export type AgentTurn = AgentTraceChatRes;
@@ -154,6 +160,10 @@ export type GetAgentVersionsResult = {
 export interface GetAgentSpansOptions {
   agentName?: string;
   /**
+   * Mongo-style filter on the spans.
+   */
+  query?: Query | null;
+  /**
    * @min 0
    * @max 10000
    * @default 100
@@ -173,6 +183,35 @@ export interface GetAgentSpansOptions {
 export type GetAgentSpansResult = {
   spans: AgentSpan[];
   total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpanStats}.
+ */
+export interface GetAgentSpanStatsOptions {
+  start: string;
+  metrics: AgentSpanStatsMetricSpec[];
+  end?: string | null;
+  query?: Query | null;
+  groupBy?: AgentGroupByRef[];
+  granularity?: number | null;
+  /**
+   * @default "UTC"
+   */
+  timezone?: string;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpanStats}.
+ */
+export type GetAgentSpanStatsResult = {
+  start: string;
+  end: string;
+  granularity?: number | null;
+  timezone: string;
+  bucket_type?: 'time' | 'number';
+  columns?: AgentSpanStatsColumn[];
+  rows?: Record<string, string | number | boolean | null>[];
 };
 
 /**
@@ -221,6 +260,67 @@ export type GetAgentTurnsResult = {
 };
 
 /**
+ * Options for {@link WeaveClient.searchAgents}.
+ */
+export interface SearchAgentsOptions {
+  query: string;
+  agentName?: string | null;
+  conversationId?: string | null;
+  traceId?: string | null;
+  /**
+   * Limit
+   * @min 0
+   * @max 1000
+   * @default 20
+   */
+  limit?: number;
+  /**
+   * Offset
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.searchAgents}.
+ */
+export type SearchAgentsResult = {
+  results: AgentSearchConversationResult[];
+  total_conversations?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentCustomAttrsSchema}.
+ */
+export interface GetAgentCustomAttrsSchemaOptions {
+  query?: Query | null;
+  startedAfter?: string | null;
+  startedBefore?: string | null;
+  /**
+   * @min 1
+   * @max 2000
+   * @default 200
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentCustomAttrsSchema}.
+ */
+export type GetAgentCustomAttrsSchemaResult = {
+  attributes?: AgentCustomAttrSchemaItem[];
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
+};
+
+/**
  * Distinguishes the object-based getCalls options form from the legacy
  * positional filter CallsFilter form by checking for GetCallsOptions-only keys.
  *
@@ -248,6 +348,27 @@ function maybeIsGetCallsOptions(
     }
   }
   return false;
+}
+
+/**
+ * Build the `getAgentSpans` filter from the `agentName` shortcut and the
+ * caller's `query`. Mirrors Python's `_agent_spans_query_filter`: when both
+ * are present they are AND-combined; otherwise whichever is set passes
+ * through.
+ */
+function agentSpansQueryFilter(
+  agentName: string | undefined,
+  query: Query | null | undefined
+): Query | undefined {
+  if (!agentName) return query ?? undefined;
+  const agentExpr = {
+    $eq: [{$getField: 'agent_name'}, {$literal: agentName}] as [
+      {$getField: string},
+      {$literal: string},
+    ],
+  };
+  if (!query) return {$expr: agentExpr} as unknown as Query;
+  return {$expr: {$and: [agentExpr, query.$expr]}} as unknown as Query;
 }
 
 function generateTraceId(): string {
@@ -413,7 +534,8 @@ export class WeaveClient {
   }
 
   /**
-   * Query agent spans, optionally filtered by agent name.
+   * Query agent spans, optionally filtered by agent name and/or a mongo-style
+   * query expression.
    *
    * @example
    * ```ts
@@ -423,33 +545,35 @@ export class WeaveClient {
    * for (const span of resp.data.spans) {
    *   console.log(span.span_id, span.span_name, span.input_tokens);
    * }
+   * ```
    *
-   * console.log(`total count: ${resp.data.total_count}`)
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   *
+   * const resp = await client.getAgentSpans({
+   *   agentName: 'my-agent',
+   *   query: {
+   *     $expr: {$gt: [{$getField: 'input_tokens'}, {$literal: 1000}]},
+   *   },
+   * });
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
    * ```
    */
   public async getAgentSpans(
     options: GetAgentSpansOptions
   ): Promise<Response<GetAgentSpansResult>> {
-    const params = {
-      project_id: this.projectId,
-      sort_by: options.sortBy,
-      limit: options.limit,
-      offset: options.offset,
-    };
-
-    if (options.agentName) {
-      Object.assign(params, {
-        query: {
-          $expr: {
-            $eq: [{$getField: 'agent_name'}, {$literal: options.agentName}],
-          },
-        },
-      });
-    }
     const resp =
-      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost(
-        params
-      );
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost({
+        project_id: this.projectId,
+        query: agentSpansQueryFilter(options.agentName, options.query),
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      });
 
     return {
       ...resp,
@@ -458,6 +582,55 @@ export class WeaveClient {
         spans: resp.data.spans ?? [],
       },
     };
+  }
+
+  /**
+   * Agregations over agent spans in the project, returned as rows + column
+   * metadata suitable for time-series / bucketed visualizations.
+   *
+   * `start` (required) and `end` define the time window. Each entry in
+   * `metrics` declares a field to extract and how to aggregate it (`sum`,
+   * `avg`, `count`, percentiles, etc.). Pass `granularity` (seconds) to
+   * bucket rows by time, or `groupBy` to break results out per agent /
+   * provider / model / etc. `query` filters the underlying spans before
+   * aggregation.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpanStats({
+   *   start: '2026-06-10T00:00:00Z',
+   *   end: '2026-06-23T00:00:00Z',
+   *   granularity: 86400, // one row per day
+   *   metrics: [
+   *     {
+   *       alias: 'total_input_tokens',
+   *       value_type: 'number',
+   *       aggregations: ['sum'],
+   *       value: {source: 'field', key: 'input_tokens'},
+   *     },
+   *   ],
+   *   groupBy: [{key: 'agent_name'}],
+   * });
+   *
+   * for (const row of resp.data.rows ?? []) {
+   *   console.log(row.started_at_bucket, row.agent_name, row.total_input_tokens);
+   * }
+   * ```
+   */
+  public async getAgentSpanStats(
+    options: GetAgentSpanStatsOptions
+  ): Promise<Response<GetAgentSpanStatsResult>> {
+    return this.traceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost({
+      project_id: this.projectId,
+      start: options.start,
+      end: options.end,
+      metrics: options.metrics,
+      query: options.query,
+      group_by: options.groupBy,
+      granularity: options.granularity,
+      timezone: options.timezone,
+    });
   }
 
   /**
@@ -522,6 +695,91 @@ export class WeaveClient {
         limit: options.limit,
         offset: options.offset,
         include_feedback: options.includeFeedback,
+      }
+    );
+  }
+
+  /**
+   * Full-text search across agent messages in the project. Returns hits
+   * grouped by conversation, with a preview of each matched message.
+   *
+   * `query` is the full-text search term. Pass an empty string to retrieve
+   * all messages matching the structured filters (`agentName`,
+   * `conversationId`, `traceId`) without text matching. Use `limit` /
+   * `offset` to page through results.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.searchAgents({
+   *   query: 'Liverpool',
+   *   agentName: 'Assistant',
+   *   limit: 20,
+   * });
+   *
+   * for (const conversation of resp.data.results ?? []) {
+   *   console.log(`${conversation.conversation_id} (${conversation.agent_name})`);
+   *   for (const match of conversation.matched_messages) {
+   *     console.log(`  [${match.role}] ${match.content_preview}`);
+   *   }
+   * }
+   *
+   * console.log(`total conversations: ${resp.data.total_conversations}`);
+   * ```
+   */
+  public searchAgents(
+    options: SearchAgentsOptions
+  ): Promise<Response<SearchAgentsResult>> {
+    return this.traceServerApi.agents.genaiSearchAgentsSearchPost({
+      project_id: this.projectId,
+      query: options.query,
+      agent_name: options.agentName,
+      conversation_id: options.conversationId,
+      trace_id: options.traceId,
+      limit: options.limit,
+      offset: options.offset,
+    });
+  }
+
+  /**
+   * Discover typed custom-attribute keys observed on agent spans in the
+   * project. Each result row is one `(source, key, value_type)` triple plus
+   * a count of how many spans carry it, which is what the spans
+   * query/group/stats APIs use to reference custom attrs.
+   *
+   * Filter the spans considered by passing `query` (a structured span
+   * filter), `startedAfter` / `startedBefore` (ISO-8601), or both. Use
+   * `limit` / `offset` to page through the discovered keys.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentCustomAttrsSchema({
+   *   query: {
+   *     $expr: {
+   *       $eq: [{$getField: 'agent_name'}, {$literal: 'my-agent'}],
+   *     },
+   *   },
+   *   startedAfter: '2026-06-15T00:00:00Z',
+   *   limit: 200,
+   * });
+   *
+   * for (const attr of resp.data.attributes ?? []) {
+   *   console.log(`${attr.source}.${attr.key} (${attr.value_type}): ${attr.span_count}`);
+   * }
+   * ```
+   */
+  public getAgentCustomAttrsSchema(
+    options: GetAgentCustomAttrsSchemaOptions
+  ): Promise<Response<GetAgentCustomAttrsSchemaResult>> {
+    return this.traceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost(
+      {
+        project_id: this.projectId,
+        query: options.query,
+        started_after: options.startedAfter,
+        started_before: options.startedBefore,
+        limit: options.limit,
+        offset: options.offset,
       }
     );
   }
