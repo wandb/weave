@@ -21,11 +21,14 @@ def force_optimize(ch_client: CHClient, table: str) -> None:
     """OPTIMIZE `table` for test merge-consistency, distributed-mode aware.
 
     OPTIMIZE is not supported on Distributed engines; in distributed mode we
-    target the underlying `_local` ReplicatedMergeTree on the cluster.
+    target the underlying `_local` ReplicatedMergeTree on the cluster, then
+    SYNC REPLICA so the merged part is visible on whichever replica a later
+    read is routed to.
     """
     if wf_env.wf_clickhouse_use_distributed_tables():
         cluster = wf_env.wf_clickhouse_replicated_cluster()
         ch_client.command(f"OPTIMIZE TABLE {table}_local ON CLUSTER {cluster} FINAL")
+        ch_client.command(f"SYSTEM SYNC REPLICA {table}_local ON CLUSTER {cluster}")
     else:
         ch_client.command(f"OPTIMIZE TABLE {table} FINAL")
 
