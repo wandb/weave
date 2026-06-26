@@ -39,6 +39,7 @@ type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
   agents: {
     genaiAgentsQueryAgentsQueryPost: jest.Mock;
     genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
+    genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.Mock;
     genaiSearchAgentsSearchPost: jest.Mock;
     genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
     genaiSpansStatsAgentsSpansStatsPost: jest.Mock;
@@ -59,6 +60,7 @@ describe('WeaveClient', () => {
       agents: {
         genaiAgentsQueryAgentsQueryPost: jest.fn(),
         genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
+        genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.fn(),
         genaiSearchAgentsSearchPost: jest.fn(),
         genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
         genaiSpansStatsAgentsSpansStatsPost: jest.fn(),
@@ -617,7 +619,10 @@ describe('WeaveClient', () => {
         {data: {start: '', end: '', timezone: 'UTC'}} as any
       );
 
-      await client.getAgentSpanStats({start: '2026-06-10T00:00:00Z'});
+      await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        metrics: [],
+      });
 
       expect(
         mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
@@ -633,7 +638,7 @@ describe('WeaveClient', () => {
       );
 
       await expect(
-        client.getAgentSpanStats({start: '2026-06-10T00:00:00Z'})
+        client.getAgentSpanStats({start: '2026-06-10T00:00:00Z', metrics: []})
       ).rejects.toThrow('boom');
     });
   });
@@ -830,6 +835,94 @@ describe('WeaveClient', () => {
       );
 
       await expect(client.searchAgents({query: 'Liverpool'})).rejects.toThrow(
+        'boom'
+      );
+    });
+  });
+
+  describe('getAgentCustomAttrsSchema', () => {
+    it('forwards all options to the server', async () => {
+      const schema = {
+        attributes: [
+          {
+            source: 'custom_attrs_string',
+            key: 'environment',
+            value_type: 'string',
+            span_count: 12,
+          },
+          {
+            source: 'custom_attrs_int',
+            key: 'retries',
+            value_type: 'int',
+            span_count: 3,
+          },
+        ],
+        limit: 50,
+        offset: 5,
+        has_more: false,
+      };
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
+        {data: schema} as any
+      );
+
+      const query = {
+        $expr: {
+          $eq: [
+            {$getField: 'agent_name'},
+            {$literal: 'my-cool-agent-with-attributes'},
+          ],
+        },
+      };
+
+      const result = await client.getAgentCustomAttrsSchema({
+        query,
+        startedAfter: '2026-06-15T00:00:00Z',
+        startedBefore: '2026-06-23T00:00:00Z',
+        limit: 50,
+        offset: 5,
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query,
+        started_after: '2026-06-15T00:00:00Z',
+        started_before: '2026-06-23T00:00:00Z',
+        limit: 50,
+        offset: 5,
+      });
+
+      expect(result).toEqual({data: schema});
+    });
+
+    it('passes undefined for omitted optional fields', async () => {
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
+        {data: {attributes: []}} as any
+      );
+
+      await client.getAgentCustomAttrsSchema({});
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: undefined,
+        started_after: undefined,
+        started_before: undefined,
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentCustomAttrsSchema({})).rejects.toThrow(
         'boom'
       );
     });

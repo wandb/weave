@@ -28,6 +28,7 @@ import type {
   AgentGroupByRef,
   AgentSpanStatsMetricSpec,
   AgentSpanStatsColumn,
+  AgentCustomAttrSchemaItem,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -185,8 +186,8 @@ export type GetAgentSpansResult = {
  */
 export interface GetAgentSpanStatsOptions {
   start: string;
+  metrics: AgentSpanStatsMetricSpec[];
   end?: string | null;
-  metrics?: AgentSpanStatsMetricSpec[];
   query?: Query | null;
   groupBy?: AgentGroupByRef[];
   granularity?: number | null;
@@ -283,6 +284,36 @@ export interface SearchAgentsOptions {
 export type SearchAgentsResult = {
   results: AgentSearchConversationResult[];
   total_conversations?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentCustomAttrsSchema}.
+ */
+export interface GetAgentCustomAttrsSchemaOptions {
+  query?: Query | null;
+  startedAfter?: string | null;
+  startedBefore?: string | null;
+  /**
+   * @min 1
+   * @max 2000
+   * @default 200
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentCustomAttrsSchema}.
+ */
+export type GetAgentCustomAttrsSchemaResult = {
+  attributes?: AgentCustomAttrSchemaItem[];
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
 };
 
 /**
@@ -680,6 +711,49 @@ export class WeaveClient {
       limit: options.limit,
       offset: options.offset,
     });
+  }
+
+  /**
+   * Discover typed custom-attribute keys observed on agent spans in the
+   * project. Each result row is one `(source, key, value_type)` triple plus
+   * a count of how many spans carry it, which is what the spans
+   * query/group/stats APIs use to reference custom attrs.
+   *
+   * Filter the spans considered by passing `query` (a structured span
+   * filter), `startedAfter` / `startedBefore` (ISO-8601), or both. Use
+   * `limit` / `offset` to page through the discovered keys.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentCustomAttrsSchema({
+   *   query: {
+   *     $expr: {
+   *       $eq: [{$getField: 'agent_name'}, {$literal: 'my-agent'}],
+   *     },
+   *   },
+   *   startedAfter: '2026-06-15T00:00:00Z',
+   *   limit: 200,
+   * });
+   *
+   * for (const attr of resp.data.attributes ?? []) {
+   *   console.log(`${attr.source}.${attr.key} (${attr.value_type}): ${attr.span_count}`);
+   * }
+   * ```
+   */
+  public getAgentCustomAttrsSchema(
+    options: GetAgentCustomAttrsSchemaOptions
+  ): Promise<Response<GetAgentCustomAttrsSchemaResult>> {
+    return this.traceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost(
+      {
+        project_id: this.projectId,
+        query: options.query,
+        started_after: options.startedAfter,
+        started_before: options.startedBefore,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
   }
 
   private scheduleBatchProcessing() {
