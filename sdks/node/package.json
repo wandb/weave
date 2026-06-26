@@ -119,7 +119,8 @@
         },
         "moduleNameMapper": {
           "^weave$": "<rootDir>/src/index.ts",
-          "^weave/(.*)$": "<rootDir>/src/$1"
+          "^weave/(.*)$": "<rootDir>/src/$1",
+          "^lodash-es$": "lodash"
         }
       }
     ],
@@ -177,7 +178,10 @@
     "uuidv7": "^1.0.1"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.178",
     "@eslint/js": "^10.0.1",
+    "@google/adk": "^1.2.0",
+    "@google/genai": "^1.37.0",
     "@openai/agents": "^0.11.4",
     "@openai/agents-realtime": "^0.11.5",
     "@types/cli-progress": "^3.11.6",
@@ -186,6 +190,7 @@
     "@types/node": "^22.5.1",
     "eslint": "^10.4.1",
     "jest": "^30.4.0",
+    "lodash": "^4.17.21",
     "nyc": "^17.1.0",
     "openai": "^6.39.0",
     "prettier": "^3.3.3",

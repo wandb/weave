@@ -1,7 +1,6 @@
 import {join} from 'node:path';
 import {DefaultRequestMatcher, FileStorage, VCR} from 'vcr-test';
 import type {HttpRequest} from 'vcr-test';
-import {CLIENT_CAPABILITIES_HEADER} from '../../constants';
 
 const vcr = new VCR(new FileStorage(join(__dirname, '..', '__cassettes__')));
 
@@ -51,27 +50,11 @@ function normalizeMultipartBoundary(req: HttpRequest): HttpRequest {
   };
 }
 
-/**
- * Drop the client-capabilities header so cassettes recorded before it existed
- * still match. Like the `client_version` body field above, it is SDK-identity
- * metadata, not part of a request's logical identity.
- */
-function stripClientCapabilitiesHeader(req: HttpRequest): HttpRequest {
-  const key = CLIENT_CAPABILITIES_HEADER.toLowerCase();
-  if (!(key in req.headers)) {
-    return req;
-  }
-  const headers = {...req.headers};
-  delete headers[key];
-  return {...req, headers};
-}
-
 function normalizeRequest(req: HttpRequest): HttpRequest {
-  return [
-    normalizeMultipartBoundary,
-    normalizeVolatileBodyFields,
-    stripClientCapabilitiesHeader,
-  ].reduce((req, normalizer) => normalizer(req), req);
+  return [normalizeMultipartBoundary, normalizeVolatileBodyFields].reduce(
+    (req, normalizer) => normalizer(req),
+    req
+  );
 }
 
 class Matcher extends DefaultRequestMatcher {

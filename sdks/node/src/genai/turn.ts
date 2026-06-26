@@ -1,5 +1,6 @@
 import {
   type AttributeValue,
+  type Attributes,
   type Context,
   ROOT_CONTEXT,
   type Span,
@@ -7,7 +8,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
-import {_getGenaiState} from './context';
+import {getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
@@ -60,14 +61,15 @@ export class Turn extends SpanBase {
   }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.turn !== null) {
       throw new Error(
         'A Turn is already active in this async chain. End it before starting a new one.'
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.session?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
     if (opts.agentName) {
@@ -145,7 +147,7 @@ export class Turn extends SpanBase {
     }
     this._ended = true;
     this._closeSpan(opts);
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.turn === this) {
       state.turn = null;
     }

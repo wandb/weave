@@ -775,7 +775,7 @@ def test_time_stats_apply_group_filters() -> None:
            INNER JOIN qualified_groups_0 q ON s.conversation_id = q.conversation_id),
              aggregated_data AS
           (SELECT bucket,
-                  uniqExactIf(m_conversations, v_conversations) AS count_distinct_conversations
+                  uniqIf(m_conversations, v_conversations) AS count_distinct_conversations
            FROM
              (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_10:String}) AS bucket,
                      s.conversation_id AS m_conversations,

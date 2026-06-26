@@ -229,6 +229,11 @@ class EndedCallSchemaForInsert(BaseModel):
     # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
     trace_id: str | None = None
 
+    # Eval marker the SDK sets on the call-end so a server-side ingest sampler
+    # can keep/drop eval calls whose end arrives bare. Optional for backward
+    # compatibility: None/absent means "client did not say" (server keeps).
+    is_eval: bool | None = None
+
     # End time is required
     ended_at: datetime.datetime
 
@@ -3444,6 +3449,9 @@ class TraceServerInterface(Protocol):
     def agent_conversation_chat(
         self, req: agent_types.AgentConversationChatReq
     ) -> agent_types.AgentConversationChatRes: ...
+    def agent_conversation_spans(
+        self, req: agent_types.AgentConversationSpansReq
+    ) -> agent_types.AgentConversationSpansRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

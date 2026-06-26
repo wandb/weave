@@ -229,7 +229,7 @@ def test_grouped_rows_hydrate_message_previews() -> None:
         "\n        SELECT s.conversation_id AS conversation_id,\n"
         "               count() AS span_count,\n"
         "               countIf(s.operation_name = 'invoke_agent') AS invocation_count,\n"
-        "               uniqExact(s.conversation_id) AS conversation_count,\n"
+        "               uniq(s.conversation_id) AS conversation_count,\n"
         "               sum(s.input_tokens) AS total_input_tokens,\n"
         "               sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,\n"
         "               sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,\n"

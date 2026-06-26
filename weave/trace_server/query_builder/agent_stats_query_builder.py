@@ -669,7 +669,8 @@ def _aggregation_output(
         aggregate_sql = f"countIf({valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_DISTINCT:
-        aggregate_sql = f"uniqExactIf({metric_col}, {valid_col})"
+        # uniq (approx, memory-bounded); uniqExact OOMs on large projects.
+        aggregate_sql = f"uniqIf({metric_col}, {valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_TRUE:
         aggregate_sql = f"countIf({valid_col} AND {metric_col} = 1)"
