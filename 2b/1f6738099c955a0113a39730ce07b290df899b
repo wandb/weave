@@ -34,3 +34,9 @@ Multi-step session evolving the weave-instrument skill. User: (1) discussed why 
 - Build the Level-2 span-shape verification probe (in-memory exporter asserting gen_ai.operation.name) — triples as auto-detect, verify step, eval grader.
 - Confirm skills/ (top-level) is the intended home vs .claude/skills for in-repo discovery.
 - Old remote branch deletable; PR #7370 (draft) is updated by this push.
+
+## Update — prose clarity pass (amended into this commit)
+- User: "make the markdown concise and clear in simple english with proper grammar and syntax", then "push".
+- Rewrote all 6 markdown files (SKILL.md + 5 references) for plain grammatical English: split em-dash run-ons into complete sentences, dropped nested parentheticals and telegraphic fragments, restored articles. ZERO changes to facts, code blocks, version pins (weave>=0.52.42), env vars, the gotcha table, or the YAML frontmatter description's trigger phrases.
+- Diff +306/-279 across 6 files (net +27 lines; grammar costs articles/full clauses vs the prior telegraphic style). Verified: code fences balanced, the ~/.claude live-install copy and this repo copy are byte-identical (cp-synced both ways), repo has NO markdown linter (.pre-commit-config.yaml only lints examples/*.ipynb; no prettier config).
+- Amended into the original "add the skill" commit (was ffa1c9bfbe -> now this SHA) to keep draft PR #7370 a single clean commit; force-pushed with lease. Note migrated from the old SHA via `git notes add -f -F`.
