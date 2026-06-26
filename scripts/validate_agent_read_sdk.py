@@ -39,7 +39,11 @@ def main() -> None:
     if not args.base_url:
         parser.error("pass --base-url or set $WF_TRACE_SERVER_URL")
 
-    server = RemoteHTTPTraceServer(
+    # RemoteHTTPTraceServer is concrete at runtime (the binding tests build it the
+    # same way); mypy flags it as abstract only at a direct call site because the
+    # remote binding intentionally leaves a few unused interface methods
+    # unimplemented. from_env() avoids this but takes no explicit base URL / auth.
+    server = RemoteHTTPTraceServer(  # type: ignore[abstract]
         args.base_url, should_batch=False, auth=("api", os.environ["WANDB_API_KEY"])
     )
     client = WeaveClient(args.entity, args.project, server, ensure_project_exists=False)
