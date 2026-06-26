@@ -85,7 +85,7 @@ class FakeAgentReadServer:
         return self.search_res
 
 
-def _make_client(server: object) -> WeaveClient:
+def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveClient:
     return WeaveClient(
         "entity",
         "project",
