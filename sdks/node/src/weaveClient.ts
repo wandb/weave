@@ -160,6 +160,10 @@ export type GetAgentVersionsResult = {
 export interface GetAgentSpansOptions {
   agentName?: string;
   /**
+   * Mongo-style filter on the spans.
+   */
+  query?: Query | null;
+  /**
    * @min 0
    * @max 10000
    * @default 100
@@ -346,6 +350,27 @@ function maybeIsGetCallsOptions(
   return false;
 }
 
+/**
+ * Build the `getAgentSpans` filter from the `agentName` shortcut and the
+ * caller's `query`. Mirrors Python's `_agent_spans_query_filter`: when both
+ * are present they are AND-combined; otherwise whichever is set passes
+ * through.
+ */
+function agentSpansQueryFilter(
+  agentName: string | undefined,
+  query: Query | null | undefined
+): Query | undefined {
+  if (!agentName) return query ?? undefined;
+  const agentExpr = {
+    $eq: [{$getField: 'agent_name'}, {$literal: agentName}] as [
+      {$getField: string},
+      {$literal: string},
+    ],
+  };
+  if (!query) return {$expr: agentExpr} as unknown as Query;
+  return {$expr: {$and: [agentExpr, query.$expr]}} as unknown as Query;
+}
+
 function generateTraceId(): string {
   return uuidv7();
 }
@@ -509,7 +534,8 @@ export class WeaveClient {
   }
 
   /**
-   * Query agent spans, optionally filtered by agent name.
+   * Query agent spans, optionally filtered by agent name and/or a mongo-style
+   * query expression.
    *
    * @example
    * ```ts
@@ -519,33 +545,35 @@ export class WeaveClient {
    * for (const span of resp.data.spans) {
    *   console.log(span.span_id, span.span_name, span.input_tokens);
    * }
+   * ```
    *
-   * console.log(`total count: ${resp.data.total_count}`)
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   *
+   * const resp = await client.getAgentSpans({
+   *   agentName: 'my-agent',
+   *   query: {
+   *     $expr: {$gt: [{$getField: 'input_tokens'}, {$literal: 1000}]},
+   *   },
+   * });
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
    * ```
    */
   public async getAgentSpans(
     options: GetAgentSpansOptions
   ): Promise<Response<GetAgentSpansResult>> {
-    const params = {
-      project_id: this.projectId,
-      sort_by: options.sortBy,
-      limit: options.limit,
-      offset: options.offset,
-    };
-
-    if (options.agentName) {
-      Object.assign(params, {
-        query: {
-          $expr: {
-            $eq: [{$getField: 'agent_name'}, {$literal: options.agentName}],
-          },
-        },
-      });
-    }
     const resp =
-      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost(
-        params
-      );
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost({
+        project_id: this.projectId,
+        query: agentSpansQueryFilter(options.agentName, options.query),
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      });
 
     return {
       ...resp,
