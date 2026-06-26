@@ -26,6 +26,7 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsMetricSpec,
     AgentSpanStatsRes,
     AgentSpanValueRef,
+    AgentsQueryFilters,
     AgentsQueryRes,
     AgentTraceChatRes,
     AgentVersionsQueryRes,
@@ -34,6 +35,15 @@ from weave.trace_server.interface.query import Query
 
 AGENT_NAME_EXPR = {"$eq": [{"$getField": "agent_name"}, {"$literal": "my-agent"}]}
 GT_EXPR = {"$gt": [{"$getField": "input_tokens"}, {"$literal": 100}]}
+
+SORT_BY = [AgentSortBy(field="last_seen", direction="desc")]
+METRIC = AgentSpanStatsMetricSpec(
+    alias="input_tokens",
+    value_type="number",
+    value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
+    aggregations=["sum"],
+)
+START = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
 
 
 class FakeAgentReadServer:
@@ -47,9 +57,7 @@ class FakeAgentReadServer:
         self.turn_res = AgentTraceChatRes(trace_id="trace-123")
         self.turns_res = AgentConversationChatRes(conversation_id="conv-123")
         self.stats_res = AgentSpanStatsRes(
-            start=datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc),
-            end=datetime.datetime(2024, 1, 1, 1, tzinfo=datetime.timezone.utc),
-            timezone="UTC",
+            start=START, end=START + datetime.timedelta(hours=1), timezone="UTC"
         )
         self.schema_res = AgentCustomAttrsSchemaRes()
         self.search_res = AgentSearchRes(results=[])
@@ -96,63 +104,122 @@ def _make_client(server: FakeAgentReadServer) -> WeaveClient:
     )
 
 
-def test_agent_read_sdk_methods_build_requests():
+@pytest.mark.parametrize(
+    ("method", "kwargs", "key", "res_attr", "expected"),
+    [
+        pytest.param(
+            "get_agents",
+            {"agent_name": "my-agent", "limit": 20, "offset": 5, "sort_by": SORT_BY},
+            "agents",
+            "agents_res",
+            {
+                "filters": AgentsQueryFilters(agent_name="my-agent"),
+                "limit": 20,
+                "offset": 5,
+                "sort_by": SORT_BY,
+            },
+            id="get_agents",
+        ),
+        pytest.param(
+            "get_agents",
+            {},
+            "agents",
+            "agents_res",
+            {"filters": None, "limit": DEFAULT_AGENT_QUERY_LIMIT, "offset": 0},
+            id="get_agents_defaults",
+        ),
+        pytest.param(
+            "get_agent_versions",
+            {"agent_name": "my-agent", "limit": 7, "offset": 1, "sort_by": SORT_BY},
+            "versions",
+            "versions_res",
+            {"agent_name": "my-agent", "limit": 7, "offset": 1, "sort_by": SORT_BY},
+            id="get_agent_versions",
+        ),
+        pytest.param(
+            "get_agent_turn",
+            {"trace_id": "trace-123", "include_feedback": True},
+            "turn",
+            "turn_res",
+            {"trace_id": "trace-123", "include_feedback": True},
+            id="get_agent_turn",
+        ),
+        pytest.param(
+            "get_agent_turns",
+            {
+                "conversation_id": "conv-123",
+                "limit": 10,
+                "offset": 2,
+                "include_feedback": True,
+            },
+            "turns",
+            "turns_res",
+            {
+                "conversation_id": "conv-123",
+                "limit": 10,
+                "offset": 2,
+                "include_feedback": True,
+            },
+            id="get_agent_turns",
+        ),
+        pytest.param(
+            "get_agent_span_stats",
+            {"start": START, "metrics": [METRIC], "granularity": 3600},
+            "stats",
+            "stats_res",
+            {
+                "start": START,
+                "metrics": [METRIC],
+                "granularity": 3600,
+                "timezone": "UTC",
+            },
+            id="get_agent_span_stats",
+        ),
+        pytest.param(
+            "get_agent_custom_attrs_schema",
+            {"limit": 25, "offset": 5},
+            "schema",
+            "schema_res",
+            {"limit": 25, "offset": 5},
+            id="get_agent_custom_attrs_schema",
+        ),
+        pytest.param(
+            "get_agent_custom_attrs_schema",
+            {},
+            "schema",
+            "schema_res",
+            {"limit": DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT, "offset": 0},
+            id="get_agent_custom_attrs_schema_defaults",
+        ),
+        pytest.param(
+            "search_agents",
+            {"query": "boom", "agent_name": "my-agent", "limit": 10},
+            "search",
+            "search_res",
+            {"query": "boom", "agent_name": "my-agent", "limit": 10},
+            id="search_agents",
+        ),
+        pytest.param(
+            "search_agents",
+            {},
+            "search",
+            "search_res",
+            {"query": "", "limit": DEFAULT_SEARCH_LIMIT, "offset": 0},
+            id="search_agents_defaults",
+        ),
+    ],
+)
+def test_method_builds_request(method, kwargs, key, res_attr, expected):
     server = FakeAgentReadServer()
     client = _make_client(server)
-    sort_by = [AgentSortBy(field="last_seen", direction="desc")]
 
-    agents_res = client.get_agents(
-        agent_name="my-agent", limit=20, offset=5, sort_by=sort_by
-    )
-    assert agents_res is server.agents_res
-    req = server.requests["agents"]
+    res = getattr(client, method)(**kwargs)
+
+    assert res is getattr(server, res_attr)
+    req = server.requests[key]
     assert req.project_id == "entity/project"
-    assert req.filters.agent_name == "my-agent"
-    assert req.limit == 20
-    assert req.offset == 5
-    assert req.sort_by == sort_by
-
-    versions_res = client.get_agent_versions(
-        agent_name="my-agent", limit=7, offset=1, sort_by=sort_by
-    )
-    assert versions_res is server.versions_res
-    req = server.requests["versions"]
-    assert req.project_id == "entity/project"
-    assert req.agent_name == "my-agent"
-    assert req.limit == 7
-    assert req.offset == 1
-    assert req.sort_by == sort_by
-
-    turn_res = client.get_agent_turn(trace_id="trace-123", include_feedback=True)
-    assert turn_res is server.turn_res
-    req = server.requests["turn"]
-    assert req.project_id == "entity/project"
-    assert req.trace_id == "trace-123"
-    assert req.include_feedback is True
-
-    turns_res = client.get_agent_turns(
-        conversation_id="conv-123", limit=10, offset=2, include_feedback=True
-    )
-    assert turns_res is server.turns_res
-    req = server.requests["turns"]
-    assert req.project_id == "entity/project"
-    assert req.conversation_id == "conv-123"
-    assert req.limit == 10
-    assert req.offset == 2
-    assert req.include_feedback is True
-
-
-def test_get_agents_without_agent_name_omits_filters():
-    server = FakeAgentReadServer()
-    client = _make_client(server)
-
-    client.get_agents()
-
-    req = server.requests["agents"]
-    assert req.project_id == "entity/project"
-    assert req.filters is None
-    assert req.limit == DEFAULT_AGENT_QUERY_LIMIT
-    assert req.offset == 0
+    for attr, value in expected.items():
+        assert getattr(req, attr) == value
 
 
 @pytest.mark.parametrize(
@@ -189,59 +256,3 @@ def test_get_agent_spans_query_translation(agent_name, query, expected_query):
     req = server.requests["spans"]
     assert req.project_id == "entity/project"
     assert req.query == expected_query
-
-
-def test_agent_read_sdk_stats_schema_search_build_requests():
-    server = FakeAgentReadServer()
-    client = _make_client(server)
-
-    metric = AgentSpanStatsMetricSpec(
-        alias="input_tokens",
-        value_type="number",
-        value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
-        aggregations=["sum"],
-    )
-    start = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
-    stats_res = client.get_agent_span_stats(
-        start=start, metrics=[metric], granularity=3600
-    )
-    assert stats_res is server.stats_res
-    req = server.requests["stats"]
-    assert req.project_id == "entity/project"
-    assert req.start == start
-    assert req.metrics == [metric]
-    assert req.granularity == 3600
-    assert req.timezone == "UTC"
-
-    schema_res = client.get_agent_custom_attrs_schema(limit=25, offset=5)
-    assert schema_res is server.schema_res
-    req = server.requests["schema"]
-    assert req.project_id == "entity/project"
-    assert req.limit == 25
-    assert req.offset == 5
-
-    search_res = client.search_agents(query="boom", agent_name="my-agent", limit=10)
-    assert search_res is server.search_res
-    req = server.requests["search"]
-    assert req.project_id == "entity/project"
-    assert req.query == "boom"
-    assert req.agent_name == "my-agent"
-    assert req.limit == 10
-
-
-def test_agent_read_sdk_search_and_schema_defaults():
-    server = FakeAgentReadServer()
-    client = _make_client(server)
-
-    client.search_agents()
-    req = server.requests["search"]
-    assert req.project_id == "entity/project"
-    assert req.query == ""
-    assert req.limit == DEFAULT_SEARCH_LIMIT
-    assert req.offset == 0
-
-    client.get_agent_custom_attrs_schema()
-    req = server.requests["schema"]
-    assert req.project_id == "entity/project"
-    assert req.limit == DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT
-    assert req.offset == 0
