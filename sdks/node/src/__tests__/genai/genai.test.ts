@@ -12,7 +12,7 @@ import {clearWeaveTracerProvider} from '../../../src/genai/provider';
 import {spanSnapshot, type SpanSnapshotOpts} from './common';
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {initWithCustomTraceServer} from '../clientMock';
-import {openAIResponse} from 'helpers/openaiHelpers';
+import {openAIResponse} from '../helpers/openaiHelpers';
 
 let mockResponses: Response[] = [];
 
