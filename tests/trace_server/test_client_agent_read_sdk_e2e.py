@@ -72,29 +72,32 @@ def test_agent_read_sdk_end_to_end(ch_server):
     ]
     _insert_spans(ch_server.ch_client, spans)
 
-    # get_agent_spans: all spans for the project.
-    all_spans = client.get_agent_spans()
-    assert all_spans.total_count == 3
-    assert {s.agent_name for s in all_spans.spans} == {"planner", "researcher"}
+    # get_agent_spans: all spans for the project. (get_agents / get_agent_versions
+    # / get_agent_spans return a PaginatedIterator; len() round-trips to the count.)
+    all_spans = list(client.get_agent_spans())
+    assert len(all_spans) == 3
+    assert {s.agent_name for s in all_spans} == {"planner", "researcher"}
 
     # get_agent_spans: the agent_name shortcut must filter server-side.
-    planner_spans = client.get_agent_spans(agent_name="planner")
-    assert planner_spans.total_count == 2
-    assert all(s.agent_name == "planner" for s in planner_spans.spans)
+    planner_spans = list(client.get_agent_spans(agent_name="planner"))
+    assert len(planner_spans) == 2
+    assert all(s.agent_name == "planner" for s in planner_spans)
 
     # get_agents: aggregated per-agent stats.
-    agents = client.get_agents()
-    assert {a.agent_name for a in agents.agents} == {"planner", "researcher"}
-    planner = next(a for a in agents.agents if a.agent_name == "planner")
+    agents = list(client.get_agents())
+    assert {a.agent_name for a in agents} == {"planner", "researcher"}
+    planner = next(a for a in agents if a.agent_name == "planner")
     assert planner.span_count == 2
+    # len() reports the server-side total agent count.
+    assert len(client.get_agents()) == 2
 
     # get_agents: filtered by agent_name.
-    researcher_only = client.get_agents(agent_name="researcher")
-    assert {a.agent_name for a in researcher_only.agents} == {"researcher"}
+    researcher_only = list(client.get_agents(agent_name="researcher"))
+    assert {a.agent_name for a in researcher_only} == {"researcher"}
 
     # get_agent_versions: per-version stats for one agent.
-    versions = client.get_agent_versions(agent_name="planner")
-    assert {v.agent_version for v in versions.versions} == {"v1", "v2"}
+    versions = list(client.get_agent_versions(agent_name="planner"))
+    assert {v.agent_version for v in versions} == {"v1", "v2"}
 
     # get_agent_turn: structured chat view for a single trace.
     turn = client.get_agent_turn(trace_id=planner_trace)

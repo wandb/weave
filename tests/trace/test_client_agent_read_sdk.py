@@ -5,6 +5,9 @@ agent_name -> query translation, defaults, pass-through) and return the
 server's response. They mirror test_client_annotation_queue_sdk.py: a minimal
 fake server captures the request the client sends, which is client-side logic
 (not the server-side logic CLAUDE.md reserves for the real client fixture).
+
+get_agents / get_agent_versions / get_agent_spans return a PaginatedIterator
+(like get_calls), so they are exercised against a paging fake server below.
 """
 
 from __future__ import annotations
@@ -30,18 +33,16 @@ METRIC = agent_types.AgentSpanStatsMetricSpec(
 START = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
 
 
+# ---------------------------------------------------------------------------
+# Single-response methods (turn / turns / span_stats / custom_attributes / search)
+# ---------------------------------------------------------------------------
+
+
 class FakeAgentReadServer:
-    """Captures the request each agent read method sends and returns canned data."""
+    """Captures the request each non-iterator read method sends, returns canned data."""
 
     def __init__(self) -> None:
         self.requests: dict = {}
-        self.agents_res = agent_types.AgentsQueryRes(agents=[], total_count=0)
-        self.versions_res = agent_types.AgentVersionsQueryRes(
-            versions=[], total_count=0
-        )
-        self.spans_res = agent_types.AgentSpansQueryRes(
-            spans=[], groups=[], total_count=0
-        )
         self.turn_res = agent_types.AgentTraceChatRes(trace_id="trace-123")
         self.turns_res = agent_types.AgentConversationChatRes(
             conversation_id="conv-123"
@@ -51,18 +52,6 @@ class FakeAgentReadServer:
         )
         self.schema_res = agent_types.AgentCustomAttrsSchemaRes()
         self.search_res = agent_types.AgentSearchRes(results=[])
-
-    def agent_agents_query(self, req):
-        self.requests["agents"] = req
-        return self.agents_res
-
-    def agent_versions_query(self, req):
-        self.requests["versions"] = req
-        return self.versions_res
-
-    def agent_spans_query(self, req):
-        self.requests["spans"] = req
-        return self.spans_res
 
     def agent_traces_chat(self, req):
         self.requests["turn"] = req
@@ -97,39 +86,6 @@ def _make_client(server: FakeAgentReadServer | FakePagingAgentServer) -> WeaveCl
 @pytest.mark.parametrize(
     ("method", "kwargs", "key", "res_attr", "expected"),
     [
-        pytest.param(
-            "get_agents",
-            {"agent_name": "my-agent", "limit": 20, "offset": 5, "sort_by": SORT_BY},
-            "agents",
-            "agents_res",
-            {
-                "filters": agent_types.AgentsQueryFilters(agent_name="my-agent"),
-                "limit": 20,
-                "offset": 5,
-                "sort_by": SORT_BY,
-            },
-            id="get_agents",
-        ),
-        pytest.param(
-            "get_agents",
-            {},
-            "agents",
-            "agents_res",
-            {
-                "filters": None,
-                "limit": agent_types.DEFAULT_AGENT_QUERY_LIMIT,
-                "offset": 0,
-            },
-            id="get_agents_defaults",
-        ),
-        pytest.param(
-            "get_agent_versions",
-            {"agent_name": "my-agent", "limit": 7, "offset": 1, "sort_by": SORT_BY},
-            "versions",
-            "versions_res",
-            {"agent_name": "my-agent", "limit": 7, "offset": 1, "sort_by": SORT_BY},
-            id="get_agent_versions",
-        ),
         pytest.param(
             "get_agent_turn",
             {"trace_id": "trace-123", "include_feedback": True},
@@ -216,44 +172,8 @@ def test_method_builds_request(method, kwargs, key, res_attr, expected):
         assert getattr(req, attr) == value
 
 
-@pytest.mark.parametrize(
-    ("agent_name", "query", "expected_query"),
-    [
-        pytest.param(None, None, None, id="neither"),
-        pytest.param(
-            "my-agent",
-            None,
-            Query.model_validate({"$expr": AGENT_NAME_EXPR}),
-            id="agent_name_only",
-        ),
-        pytest.param(
-            None,
-            Query.model_validate({"$expr": GT_EXPR}),
-            Query.model_validate({"$expr": GT_EXPR}),
-            id="query_only",
-        ),
-        pytest.param(
-            "my-agent",
-            Query.model_validate({"$expr": GT_EXPR}),
-            Query.model_validate({"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}}),
-            id="agent_name_and_query_combined_with_and",
-        ),
-    ],
-)
-def test_get_agent_spans_query_translation(agent_name, query, expected_query):
-    server = FakeAgentReadServer()
-    client = _make_client(server)
-
-    spans_res = client.get_agent_spans(agent_name=agent_name, query=query)
-
-    assert spans_res is server.spans_res
-    req = server.requests["spans"]
-    assert req.project_id == "entity/project"
-    assert req.query == expected_query
-
-
 # ---------------------------------------------------------------------------
-# Paginated iterator methods (iter_agents / iter_agent_versions / iter_agent_spans)
+# Paginated iterator methods (get_agents / get_agent_versions / get_agent_spans)
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +217,7 @@ def _agent_span(i: int) -> agent_types.AgentSpanSchema:
 
 
 class FakePagingAgentServer:
-    """Serves offset/limit pages of a fixed item list for the iterator methods."""
+    """Serves offset/limit pages and records the request each iterator fetch sends."""
 
     def __init__(
         self,
@@ -309,14 +229,17 @@ class FakePagingAgentServer:
         self._agents = agents or []
         self._versions = versions or []
         self._spans = spans or []
+        self.requests: dict = {}  # last request per kind
         self.fetches: list[tuple[int, int]] = []  # (offset, limit) per request
 
     def agent_agents_query(self, req):
+        self.requests["agents"] = req
         self.fetches.append((req.offset, req.limit))
         page = self._agents[req.offset : req.offset + req.limit]
         return agent_types.AgentsQueryRes(agents=page, total_count=len(self._agents))
 
     def agent_versions_query(self, req):
+        self.requests["versions"] = req
         self.fetches.append((req.offset, req.limit))
         page = self._versions[req.offset : req.offset + req.limit]
         return agent_types.AgentVersionsQueryRes(
@@ -324,6 +247,7 @@ class FakePagingAgentServer:
         )
 
     def agent_spans_query(self, req):
+        self.requests["spans"] = req
         self.fetches.append((req.offset, req.limit))
         page = self._spans[req.offset : req.offset + req.limit]
         return agent_types.AgentSpansQueryRes(
@@ -332,34 +256,27 @@ class FakePagingAgentServer:
 
 
 @pytest.mark.parametrize(
-    ("method", "kwargs", "server_kwarg", "builder", "key_attr"),
+    ("method", "kwargs", "kind", "builder", "key_attr"),
     [
+        pytest.param("get_agents", {}, "agents", _agent, "agent_name", id="get_agents"),
         pytest.param(
-            "iter_agents", {}, "agents", _agent, "agent_name", id="iter_agents"
-        ),
-        pytest.param(
-            "iter_agent_versions",
+            "get_agent_versions",
             {"agent_name": "agent-0"},
             "versions",
             _agent_version,
             "agent_version",
-            id="iter_agent_versions",
+            id="get_agent_versions",
         ),
         pytest.param(
-            "iter_agent_spans",
-            {},
-            "spans",
-            _agent_span,
-            "span_id",
-            id="iter_agent_spans",
+            "get_agent_spans", {}, "spans", _agent_span, "span_id", id="get_agent_spans"
         ),
     ],
 )
-def test_iter_method_pages_through_all_items(
-    method, kwargs, server_kwarg, builder, key_attr
+def test_iterator_method_pages_through_all_items(
+    method, kwargs, kind, builder, key_attr
 ):
     items = [builder(i) for i in range(5)]
-    server = FakePagingAgentServer(**{server_kwarg: items})
+    server = FakePagingAgentServer(**{kind: items})
     client = _make_client(server)
 
     iterator = getattr(client, method)(page_size=2, **kwargs)
@@ -369,23 +286,104 @@ def test_iter_method_pages_through_all_items(
     assert [getattr(x, key_attr) for x in collected] == [
         getattr(x, key_attr) for x in items
     ]
-    # The 5 items were fetched in pages of page_size (2) at increasing offsets,
-    # not one big request. (len()/list() also issue a cheap limit=1 size probe,
-    # which we exclude by filtering on the page-sized fetches.)
+    # Fetched in pages of page_size (2) at increasing offsets, not one request.
+    # (list()/len() also issue a cheap limit=1 size probe, excluded by filter.)
     page_fetches = [f for f in server.fetches if f[1] == 2]
     assert page_fetches == [(0, 2), (2, 2), (4, 2)]
-
-    # len() reports the server-side total_count.
+    # project_id is inferred on every request.
+    assert server.requests[kind].project_id == "entity/project"
+    # len() reports the server total_count.
     assert len(iterator) == 5
 
 
-def test_iter_agents_respects_limit():
+def test_get_agents_respects_limit():
     server = FakePagingAgentServer(agents=[_agent(i) for i in range(10)])
     client = _make_client(server)
 
-    iterator = client.iter_agents(limit=3, page_size=2)
+    iterator = client.get_agents(limit=3, page_size=2)
 
     # Yields only `limit` items even though the server holds 10...
     assert [a.agent_name for a in iterator] == ["agent-0", "agent-1", "agent-2"]
     # ...and len() reflects the cap, not the raw total_count.
     assert len(iterator) == 3
+
+
+def test_get_agents_respects_offset():
+    server = FakePagingAgentServer(agents=[_agent(i) for i in range(5)])
+    client = _make_client(server)
+
+    iterator = client.get_agents(offset=2, page_size=2)
+
+    assert [a.agent_name for a in iterator] == ["agent-2", "agent-3", "agent-4"]
+    assert len(iterator) == 3  # 5 total - 2 skipped
+
+
+@pytest.mark.parametrize(
+    ("method", "kind", "builder", "kwargs", "expected"),
+    [
+        pytest.param(
+            "get_agents",
+            "agents",
+            _agent,
+            {"agent_name": "agent-0", "sort_by": SORT_BY},
+            {
+                "filters": agent_types.AgentsQueryFilters(agent_name="agent-0"),
+                "sort_by": SORT_BY,
+            },
+            id="get_agents",
+        ),
+        pytest.param(
+            "get_agent_versions",
+            "versions",
+            _agent_version,
+            {"agent_name": "agent-0", "sort_by": SORT_BY},
+            {"agent_name": "agent-0", "sort_by": SORT_BY},
+            id="get_agent_versions",
+        ),
+    ],
+)
+def test_iterator_method_builds_request(method, kind, builder, kwargs, expected):
+    server = FakePagingAgentServer(**{kind: [builder(0)]})
+    client = _make_client(server)
+
+    list(getattr(client, method)(**kwargs))
+
+    req = server.requests[kind]
+    assert req.project_id == "entity/project"
+    for attr, value in expected.items():
+        assert getattr(req, attr) == value
+
+
+@pytest.mark.parametrize(
+    ("agent_name", "query", "expected_query"),
+    [
+        pytest.param(None, None, None, id="neither"),
+        pytest.param(
+            "my-agent",
+            None,
+            Query.model_validate({"$expr": AGENT_NAME_EXPR}),
+            id="agent_name_only",
+        ),
+        pytest.param(
+            None,
+            Query.model_validate({"$expr": GT_EXPR}),
+            Query.model_validate({"$expr": GT_EXPR}),
+            id="query_only",
+        ),
+        pytest.param(
+            "my-agent",
+            Query.model_validate({"$expr": GT_EXPR}),
+            Query.model_validate({"$expr": {"$and": [AGENT_NAME_EXPR, GT_EXPR]}}),
+            id="agent_name_and_query_combined_with_and",
+        ),
+    ],
+)
+def test_get_agent_spans_query_translation(agent_name, query, expected_query):
+    server = FakePagingAgentServer(spans=[_agent_span(0)])
+    client = _make_client(server)
+
+    list(client.get_agent_spans(agent_name=agent_name, query=query))
+
+    req = server.requests["spans"]
+    assert req.project_id == "entity/project"
+    assert req.query == expected_query
