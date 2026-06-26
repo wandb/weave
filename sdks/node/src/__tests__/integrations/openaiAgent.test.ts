@@ -686,6 +686,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
             "gen_ai.output.type": "text",
             "gen_ai.provider.name": "openai",
             "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
             "gen_ai.response.id": "resp-call-tokyo",
             "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.usage.cache_read.input_tokens": 0,
@@ -728,6 +731,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
             "gen_ai.output.type": "text",
             "gen_ai.provider.name": "openai",
             "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
             "gen_ai.response.id": "resp-msg-final",
             "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.usage.cache_read.input_tokens": 0,
