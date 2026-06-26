@@ -96,12 +96,22 @@ export function spanSnapshot(
   span: ReadableSpan,
   {maskConversationId = true, maskTimestamps = true}: SpanSnapshotOpts = {}
 ) {
+  const attributes = {...span.attributes};
+
   if (maskConversationId && span.attributes[ATTR_GEN_AI_CONVERSATION_ID]) {
-    span.attributes[ATTR_GEN_AI_CONVERSATION_ID] = '<uuid>';
+    attributes[ATTR_GEN_AI_CONVERSATION_ID] = '<uuid>';
+  }
+
+  if (attributes['weave.openai_agents.span_id']) {
+    attributes['weave.openai_agents.span_id'] = '<span_id>';
+  }
+
+  if (attributes['weave.openai_agents.trace_id']) {
+    attributes['weave.openai_agents.trace_id'] = '<trace_id>';
   }
 
   return {
-    attributes: span.attributes,
+    attributes: attributes,
     endTime: maskTimestamps ? '<timestamp>' : span.endTime,
     startTime: maskTimestamps ? '<timestamp>' : span.startTime,
   };
