@@ -72,6 +72,11 @@ _max_estimated_execution_time = (
 _disable_query_failure_prediction = (
     wf_env.wf_clickhouse_disable_query_failure_prediction()
 )
+# Optional hard caps on how much data a single read query may scan. Unset by
+# default; operators opt in per deployment to fail very large scans fast, at
+# planning time -- before (and independent of) the estimated-time guard.
+_max_rows_to_read = wf_env.wf_clickhouse_max_rows_to_read()
+_max_bytes_to_read = wf_env.wf_clickhouse_max_bytes_to_read()
 
 CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
@@ -94,11 +99,23 @@ if not _disable_query_failure_prediction:
         }
     )
 
-# Read paths get query failure prediction. Command paths use the base settings
-# because the prediction guard is intended for read-query scans, not mutations.
+# Read-scan caps abort a read that would exceed them with TOO_MANY_ROWS (code 158)
+# or TOO_MANY_BYTES (code 307). 'throw' (the ClickHouse default) aborts rather than
+# silently truncating results.
+CLICKHOUSE_READ_SCAN_CAP_SETTINGS: dict[str, int | str] = {}
+if _max_rows_to_read is not None:
+    CLICKHOUSE_READ_SCAN_CAP_SETTINGS["max_rows_to_read"] = _max_rows_to_read
+if _max_bytes_to_read is not None:
+    CLICKHOUSE_READ_SCAN_CAP_SETTINGS["max_bytes_to_read"] = _max_bytes_to_read
+if CLICKHOUSE_READ_SCAN_CAP_SETTINGS:
+    CLICKHOUSE_READ_SCAN_CAP_SETTINGS["read_overflow_mode"] = "throw"
+
+# Read paths get the prediction guard and read-scan caps. Command paths use the
+# base settings -- these guards are for read-query scans, not mutations.
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS: dict[str, int | str] = {
     **CLICKHOUSE_BASE_QUERY_SETTINGS,
     **CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS,
+    **CLICKHOUSE_READ_SCAN_CAP_SETTINGS,
 }
 CLICKHOUSE_DEFAULT_COMMAND_SETTINGS = CLICKHOUSE_BASE_QUERY_SETTINGS
 

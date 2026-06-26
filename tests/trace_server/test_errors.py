@@ -91,6 +91,28 @@ def test_clickhouse_too_slow_returns_400_with_error_code() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "error_msg",
+    [
+        # Real ClickHouse messages captured from read-cap overflows (CH 25.12):
+        "Code: 158. DB::Exception: Limit for rows (controlled by 'max_rows_to_read' "
+        "setting) exceeded, max rows: 5.00, current rows: 100.00. (TOO_MANY_ROWS)",
+        "Code: 307. DB::Exception: Limit for rows or bytes to read exceeded, max "
+        "bytes: 16.00 B, current bytes: 511.01 KiB: While executing NumbersRange. "
+        "(TOO_MANY_BYTES)",
+    ],
+)
+def test_clickhouse_read_scan_cap_returns_400(error_msg: str) -> None:
+    """The read-scan caps (max_rows_to_read / max_bytes_to_read) abort with
+    TOO_MANY_ROWS (158) / TOO_MANY_BYTES (307); like TOO_SLOW it's a too-broad query
+    -> 400, classified as the same QueryTooExpensiveError.
+    """
+    exc = CHDatabaseError(error_msg)
+
+    with pytest.raises(QueryTooExpensiveError, match="limit the scope"):
+        handle_clickhouse_query_error(exc)
+
+
 def test_invalid_field_error_maps_to_422() -> None:
     """Unsupported/unselectable fields are well-formed but unprocessable input -> 422,
     not 403 (Forbidden, which implies an authz failure) or 500.

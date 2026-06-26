@@ -8,6 +8,8 @@ ENV_KEYS = [
     "WF_CLICKHOUSE_MAX_EXECUTION_TIME",
     "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME",
     "WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION",
+    "WF_CLICKHOUSE_MAX_ROWS_TO_READ",
+    "WF_CLICKHOUSE_MAX_BYTES_TO_READ",
 ]
 
 
@@ -83,3 +85,27 @@ def test_command_settings_skip_prediction_guards(monkeypatch, reload_settings):
     assert "max_estimated_execution_time" not in command_settings
     assert "timeout_before_checking_execution_speed" not in command_settings
     assert "timeout_overflow_mode" not in command_settings
+
+
+def test_read_scan_caps_apply_to_reads_not_commands(monkeypatch, reload_settings):
+    # Unset by default: no read-scan caps.
+    settings_module = reload_settings()
+    settings = settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+    assert "max_rows_to_read" not in settings
+    assert "max_bytes_to_read" not in settings
+    assert "read_overflow_mode" not in settings
+
+    # Configured caps apply to read queries and throw (not truncate) on overflow.
+    monkeypatch.setenv("WF_CLICKHOUSE_MAX_ROWS_TO_READ", "1000000")
+    monkeypatch.setenv("WF_CLICKHOUSE_MAX_BYTES_TO_READ", "2000000")
+    settings_module = reload_settings()
+    settings = settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+    assert settings["max_rows_to_read"] == 1000000
+    assert settings["max_bytes_to_read"] == 2000000
+    assert settings["read_overflow_mode"] == "throw"
+
+    # The caps are for read-query scans, not mutations.
+    command_settings = settings_module.CLICKHOUSE_DEFAULT_COMMAND_SETTINGS
+    assert "max_rows_to_read" not in command_settings
+    assert "max_bytes_to_read" not in command_settings
+    assert "read_overflow_mode" not in command_settings
