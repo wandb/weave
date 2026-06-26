@@ -1609,6 +1609,10 @@ def test_trace_call_filter_contains_token(client):
     for text in ["the example row", "examples", "Example"]:
         token_op({"str": text})
 
+    calls = list(client.get_calls())
+    # Attach a multi-value note feedback to exercise the array-feedback path.
+    calls[0].feedback.add_note("review needed")
+
     def count(query):
         res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq.model_validate(
@@ -1645,6 +1649,29 @@ def test_trace_call_filter_contains_token(client):
             }
         )
         == 2
+    )
+    # Multi-value feedback: token match over the note array.
+    assert (
+        count(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
+                    "substr": {"$literal": "review"},
+                }
+            }
+        )
+        == 1
+    )
+    assert (
+        count(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
+                    "substr": {"$literal": "missing"},
+                }
+            }
+        )
+        == 0
     )
 
 

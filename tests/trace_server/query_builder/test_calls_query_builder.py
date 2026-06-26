@@ -1480,7 +1480,16 @@ def test_calls_query_contains_token_case_insensitive() -> None:
     )
 
 
-def test_calls_query_contains_token_multi_value_feedback() -> None:
+@pytest.mark.parametrize(
+    ("case_insensitive", "expected_fn"),
+    [
+        (False, "hasToken"),
+        (True, "hasTokenCaseInsensitive"),
+    ],
+)
+def test_calls_query_contains_token_multi_value_feedback(
+    case_insensitive, expected_fn
+) -> None:
     """$containsToken on a multi-value feedback field uses arrayExists(hasToken)."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -1490,6 +1499,7 @@ def test_calls_query_contains_token_multi_value_feedback() -> None:
                 "$containsToken": {
                     "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
                     "substr": {"$literal": "hello"},
+                    "case_insensitive": case_insensitive,
                 }
             }
         )
@@ -1497,30 +1507,30 @@ def test_calls_query_contains_token_multi_value_feedback() -> None:
 
     assert_sql(
         cq,
-        """
+        f"""
         SELECT
             calls_merged.id AS id
         FROM
             calls_merged
                     LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+                SELECT * FROM feedback WHERE feedback.project_id = {{pb_3:String}}
             ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_3:String},
+            {{pb_3:String}},
             '/call/',
             calls_merged.id))
         PREWHERE
-            calls_merged.project_id = {pb_3:String}
+            calls_merged.project_id = {{pb_3:String}}
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
         HAVING
-            ((arrayExists(x -> hasToken(x, {pb_2:String}),
+            ((arrayExists(x -> {expected_fn}(x, {{pb_2:String}}),
             groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
-            {pb_1:String}), 'null'), ''),
-            feedback.feedback_type = {pb_0:String}
+            {{pb_1:String}}), 'null'), ''),
+            feedback.feedback_type = {{pb_0:String}}
             AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
-            {pb_1:String}), 'null'), '') != '')))
+            {{pb_1:String}}), 'null'), '') != '')))
                 AND ((any(calls_merged.deleted_at) IS NULL))
                     AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
