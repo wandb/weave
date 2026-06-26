@@ -14,33 +14,17 @@ import datetime
 import pytest
 
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.agents.types import (
-    DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
-    DEFAULT_AGENT_QUERY_LIMIT,
-    DEFAULT_SEARCH_LIMIT,
-    AgentConversationChatRes,
-    AgentCustomAttrsSchemaRes,
-    AgentSearchRes,
-    AgentSortBy,
-    AgentSpansQueryRes,
-    AgentSpanStatsMetricSpec,
-    AgentSpanStatsRes,
-    AgentSpanValueRef,
-    AgentsQueryFilters,
-    AgentsQueryRes,
-    AgentTraceChatRes,
-    AgentVersionsQueryRes,
-)
 from weave.trace_server.interface.query import Query
+from weave.trace_server.trace_server_interface import agent_types
 
 AGENT_NAME_EXPR = {"$eq": [{"$getField": "agent_name"}, {"$literal": "my-agent"}]}
 GT_EXPR = {"$gt": [{"$getField": "input_tokens"}, {"$literal": 100}]}
 
-SORT_BY = [AgentSortBy(field="last_seen", direction="desc")]
-METRIC = AgentSpanStatsMetricSpec(
+SORT_BY = [agent_types.AgentSortBy(field="last_seen", direction="desc")]
+METRIC = agent_types.AgentSpanStatsMetricSpec(
     alias="input_tokens",
     value_type="number",
-    value=AgentSpanValueRef(source="field", key="usage.input_tokens"),
+    value=agent_types.AgentSpanValueRef(source="field", key="usage.input_tokens"),
     aggregations=["sum"],
 )
 START = datetime.datetime(2024, 1, 1, tzinfo=datetime.timezone.utc)
@@ -51,16 +35,22 @@ class FakeAgentReadServer:
 
     def __init__(self) -> None:
         self.requests: dict = {}
-        self.agents_res = AgentsQueryRes(agents=[], total_count=0)
-        self.versions_res = AgentVersionsQueryRes(versions=[], total_count=0)
-        self.spans_res = AgentSpansQueryRes(spans=[], groups=[], total_count=0)
-        self.turn_res = AgentTraceChatRes(trace_id="trace-123")
-        self.turns_res = AgentConversationChatRes(conversation_id="conv-123")
-        self.stats_res = AgentSpanStatsRes(
+        self.agents_res = agent_types.AgentsQueryRes(agents=[], total_count=0)
+        self.versions_res = agent_types.AgentVersionsQueryRes(
+            versions=[], total_count=0
+        )
+        self.spans_res = agent_types.AgentSpansQueryRes(
+            spans=[], groups=[], total_count=0
+        )
+        self.turn_res = agent_types.AgentTraceChatRes(trace_id="trace-123")
+        self.turns_res = agent_types.AgentConversationChatRes(
+            conversation_id="conv-123"
+        )
+        self.stats_res = agent_types.AgentSpanStatsRes(
             start=START, end=START + datetime.timedelta(hours=1), timezone="UTC"
         )
-        self.schema_res = AgentCustomAttrsSchemaRes()
-        self.search_res = AgentSearchRes(results=[])
+        self.schema_res = agent_types.AgentCustomAttrsSchemaRes()
+        self.search_res = agent_types.AgentSearchRes(results=[])
 
     def agent_agents_query(self, req):
         self.requests["agents"] = req
@@ -113,7 +103,7 @@ def _make_client(server: FakeAgentReadServer) -> WeaveClient:
             "agents",
             "agents_res",
             {
-                "filters": AgentsQueryFilters(agent_name="my-agent"),
+                "filters": agent_types.AgentsQueryFilters(agent_name="my-agent"),
                 "limit": 20,
                 "offset": 5,
                 "sort_by": SORT_BY,
@@ -125,7 +115,11 @@ def _make_client(server: FakeAgentReadServer) -> WeaveClient:
             {},
             "agents",
             "agents_res",
-            {"filters": None, "limit": DEFAULT_AGENT_QUERY_LIMIT, "offset": 0},
+            {
+                "filters": None,
+                "limit": agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+                "offset": 0,
+            },
             id="get_agents_defaults",
         ),
         pytest.param(
@@ -176,20 +170,20 @@ def _make_client(server: FakeAgentReadServer) -> WeaveClient:
             id="get_agent_span_stats",
         ),
         pytest.param(
-            "get_agent_custom_attrs_schema",
+            "get_agent_custom_attributes",
             {"limit": 25, "offset": 5},
             "schema",
             "schema_res",
             {"limit": 25, "offset": 5},
-            id="get_agent_custom_attrs_schema",
+            id="get_agent_custom_attributes",
         ),
         pytest.param(
-            "get_agent_custom_attrs_schema",
+            "get_agent_custom_attributes",
             {},
             "schema",
             "schema_res",
-            {"limit": DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT, "offset": 0},
-            id="get_agent_custom_attrs_schema_defaults",
+            {"limit": agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT, "offset": 0},
+            id="get_agent_custom_attributes_defaults",
         ),
         pytest.param(
             "search_agents",
@@ -204,7 +198,7 @@ def _make_client(server: FakeAgentReadServer) -> WeaveClient:
             {},
             "search",
             "search_res",
-            {"query": "", "limit": DEFAULT_SEARCH_LIMIT, "offset": 0},
+            {"query": "", "limit": agent_types.DEFAULT_SEARCH_LIMIT, "offset": 0},
             id="search_agents_defaults",
         ),
     ],

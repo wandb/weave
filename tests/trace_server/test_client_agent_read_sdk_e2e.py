@@ -123,8 +123,8 @@ def test_agent_read_sdk_end_to_end(ch_server):
     total_input_tokens = sum(row[metric_cols[0]] or 0 for row in stats.rows)
     assert total_input_tokens == 310  # 100 + 200 + 10
 
-    # get_agent_custom_attrs_schema: discovers the typed custom-attr keys.
-    schema = client.get_agent_custom_attrs_schema()
+    # get_agent_custom_attributes: discovers the typed custom-attr keys.
+    schema = client.get_agent_custom_attributes()
     assert ("custom_attrs_string", "env") in {
         (a.source, a.key) for a in schema.attributes
     }

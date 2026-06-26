@@ -261,10 +261,10 @@ def _add_scored_by_to_calls_query(
     return Query.model_validate({"$expr": {"$and": exprs}})
 
 
-def _agent_spans_query_filter(
+def _build_agent_spans_query(
     agent_name: str | None, query: Query | None
 ) -> Query | None:
-    """Build the ``get_agent_spans`` filter from the ``agent_name`` shortcut.
+    """Build the ``get_agent_spans`` query from the ``agent_name`` shortcut.
 
     Mirrors the TS SDK: ``agent_name`` becomes an ``$eq`` on the ``agent_name``
     field, AND-combined with any user-supplied ``query`` when both are present.
@@ -891,7 +891,7 @@ class WeaveClient:
         return self.server.agent_spans_query(
             agent_types.AgentSpansQueryReq(
                 project_id=self.project_id,
-                query=_agent_spans_query_filter(agent_name, query),
+                query=_build_agent_spans_query(agent_name, query),
                 sort_by=sort_by,
                 limit=limit,
                 offset=offset,
@@ -1029,7 +1029,7 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
-    def get_agent_custom_attrs_schema(
+    def get_agent_custom_attributes(
         self,
         *,
         query: Query | None = None,
@@ -1056,7 +1056,7 @@ class WeaveClient:
         Example:
             ```python
             client = weave.init("entity/project")
-            resp = client.get_agent_custom_attrs_schema()
+            resp = client.get_agent_custom_attributes()
             for attr in resp.attributes:
                 print(attr.key, attr.value_type, attr.span_count)
             ```
