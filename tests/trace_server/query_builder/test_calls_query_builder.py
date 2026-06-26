@@ -26,6 +26,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.clickhouse.utilities import (
     CallDeleteChunk,
+    CallStartedAt,
     chunk_calls_by_started_at,
 )
 from weave.trace_server.errors import InvalidFieldError
@@ -4112,7 +4113,13 @@ def test_chunk_calls_by_started_at_orders_and_windows() -> None:
         return t0 + datetime.timedelta(seconds=seconds)
 
     # Deliberately unsorted input spanning a wide range.
-    calls = [("e", at(40)), ("a", at(0)), ("c", at(20)), ("d", at(30)), ("b", at(10))]
+    calls = [
+        CallStartedAt("e", at(40)),
+        CallStartedAt("a", at(0)),
+        CallStartedAt("c", at(20)),
+        CallStartedAt("d", at(30)),
+        CallStartedAt("b", at(10)),
+    ]
 
     assert chunk_calls_by_started_at([], 2) == []
     assert chunk_calls_by_started_at(calls, 10) == [

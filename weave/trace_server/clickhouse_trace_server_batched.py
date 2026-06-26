@@ -129,6 +129,7 @@ from weave.trace_server.clickhouse.schema_converters import (
 )
 from weave.trace_server.clickhouse.utilities import (
     CallDeleteChunk,
+    CallStartedAt,
     any_value_to_dump,
     chunk_calls_by_started_at,
     convert_to_insert_too_large,
@@ -1899,13 +1900,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if write_target == WriteTarget.CALLS_COMPLETE:
             started_at_by_id = {c.id: c.started_at for c in all_calls}
+            # find_call_descendants echoes back the requested root ids even when
+            # they don't exist, so skip any id we have no row (no started_at)
+            # for -- a non-existent id matches nothing in the delete anyway.
             descendants_with_started_at = [
-                (cid, started_at_by_id[cid])
+                CallStartedAt(cid, started_at_by_id[cid])
                 for cid in all_descendants
                 if cid in started_at_by_id
             ]
-            self._delete_calls_complete(req.project_id, descendants_with_started_at)
-            return tsi.CallsDeleteRes(num_deleted=len(all_descendants))
+            num_deleted = self._delete_calls_complete(
+                req.project_id, descendants_with_started_at
+            )
+            return tsi.CallsDeleteRes(num_deleted=num_deleted)
 
         deleted_at = datetime.datetime.now()
         insertables = [
@@ -1928,19 +1934,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _delete_calls_complete(
         self,
         project_id: str,
-        call_started_ats: list[tuple[str, datetime.datetime]],
-    ) -> None:
-        """Delete calls_complete rows in started_at-ordered chunks.
+        call_started_ats: list[CallStartedAt],
+    ) -> int:
+        """Delete calls_complete rows in started_at-ordered chunks; return count.
 
         One lightweight DELETE per chunk keeps each command tightly windowed (so
         it prunes partitions instead of rescanning the full span) and under the
-        query time ceiling, rather than one statement over the whole subtree.
+        query time ceiling. Chunks run sequentially and are not atomic: if one
+        fails the earlier chunks stay deleted, but delete is idempotent so a
+        retry converges.
         """
         chunks = chunk_calls_by_started_at(
             call_started_ats, ch_settings.DELETE_CALLS_COMPLETE_CHUNK_SIZE
         )
+        deleted = 0
         for chunk in chunks:
             self._delete_calls_complete_chunk(project_id, chunk)
+            deleted += len(chunk.ids)
+        return deleted
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._delete_calls_complete_chunk"
