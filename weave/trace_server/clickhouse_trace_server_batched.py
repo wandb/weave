@@ -177,6 +177,7 @@ from weave.trace_server.datadog import (
     set_root_span_dd_tags,
     tag_db_insert_path,
 )
+from weave.trace_server.dataset_sources import DatasetSourcesHandler
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
@@ -3672,6 +3673,41 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return self._fetch_queue_item_for_progress_update(
             req.project_id, req.queue_id, req.item_id
+        )
+
+    # Dataset Sources API
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.dataset_sources_link")
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        return self._dataset_sources_handler().link(req)
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched.dataset_sources_link_delete"
+    )
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        return self._dataset_sources_handler().link_delete(req)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.dataset_sources_query")
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        return self._dataset_sources_handler().query(req)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.source_datasets_query")
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        return self._dataset_sources_handler().source_datasets_query(req)
+
+    def _dataset_sources_handler(self) -> DatasetSourcesHandler:
+        return DatasetSourcesHandler(
+            query=self._query,
+            insert=self._insert,
+            table_routing_resolver=self.table_routing_resolver,
+            ch_client=self.ch_client,
         )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
