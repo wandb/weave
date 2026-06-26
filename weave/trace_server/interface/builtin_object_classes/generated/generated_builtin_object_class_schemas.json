@@ -2795,6 +2795,16 @@
           "title": "Alert Condition",
           "type": "string"
         },
+        "source_type": {
+          "default": "calls",
+          "description": "Data source this alert evaluates: calls table or agent spans",
+          "enum": [
+            "calls",
+            "spans"
+          ],
+          "title": "Source Type",
+          "type": "string"
+        },
         "comparison_operator": {
           "default": "GREATER_THAN",
           "description": "Direction of the threshold comparison",
@@ -2884,10 +2894,25 @@
             "median",
             "min",
             "max",
-            "mode"
+            "mode",
+            "percentage",
+            "count"
           ],
           "title": "Aggregation Function",
           "type": "string"
+        },
+        "status_match_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For percentage/count aggregation: the status value to match (e.g. '2' for error)",
+          "title": "Status Match Value"
         }
       },
       "title": "WeaveMetricThresholdSpec",

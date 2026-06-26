@@ -27,6 +27,11 @@ from weave.trace_server.agents.constants import (
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
 )
+from weave.trace_server.agents.conversation_spans import (
+    is_supported_feedback,
+    parse_conversation_spans,
+    span_feedback_marker,
+)
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
     messages_from_ch_value,
@@ -43,6 +48,11 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationMessagePreview,
+    AgentConversationSpan,
+    AgentConversationSpanFeedback,
+    AgentConversationSpans,
+    AgentConversationSpansReq,
+    AgentConversationSpansRes,
     AgentCustomAttrSchemaItem,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
@@ -88,6 +98,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_conversation_previews_query,
+    make_conversation_spans_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
@@ -152,7 +163,7 @@ class AgentQueryHandler:
     Takes a `query_fn` (typically the server's `_query` method) so queries
     participate in the same logging / ddtrace / error-handling wrapper as the
     rest of the trace server. Also takes a `feedback_query_fn` (the server's
-    `feedback_query` method), invoked only when ``include_feedback=True`` to
+    `feedback_query` method), invoked only when `include_feedback=True` to
     fold agent-target feedback into the chat response.
     """
 
@@ -231,6 +242,115 @@ class AgentQueryHandler:
             preview = previews_by_conv.get(cid) if isinstance(cid, str) else None
             if preview is not None:
                 g.first_message, g.last_message = preview
+
+    def conversation_spans(
+        self, req: AgentConversationSpansReq
+    ) -> AgentConversationSpansRes:
+        """Return per-conversation span sequences + feedback markers.
+
+        Runs one bounded query scoped to the requested conversation_ids that
+        reads only scalar columns (no message bodies), then a single batched
+        feedback query for those conversations and their turns. Best-effort:
+        failures yield empty sequences so the spans minimap never hard-fails.
+        """
+        if not req.conversation_ids:
+            return AgentConversationSpansRes()
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_conversation_spans_query(
+            pb,
+            req.project_id,
+            req.conversation_ids,
+            started_after=req.started_after,
+            started_before=req.started_before,
+        )
+        try:
+            rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        except Exception:
+            logger.exception(
+                "failed to query conversation spans (project=%s, conversations=%d)",
+                req.project_id,
+                len(req.conversation_ids),
+            )
+            rows = []
+
+        spans_by_conv: dict[str, list[AgentConversationSpan]] = {}
+        # Map each turn (trace_id) back to its conversation so turn-level
+        # feedback can be bucketed without a second lookup.
+        trace_to_conv: dict[str, str] = {}
+        for row in rows:
+            cid = safe_str(row.get("conversation_id"))
+            if not cid:
+                continue
+            spans = parse_conversation_spans(row.get("spans"))
+            spans_by_conv[cid] = spans
+            for span in spans:
+                if span.trace_id:
+                    trace_to_conv.setdefault(span.trace_id, cid)
+
+        feedback_by_conv = self._fetch_conversation_spans_feedback(
+            req.project_id, req.conversation_ids, trace_to_conv
+        )
+
+        return AgentConversationSpansRes(
+            conversations=[
+                AgentConversationSpans(
+                    conversation_id=cid,
+                    spans=spans_by_conv.get(cid, []),
+                    spans_feedback=feedback_by_conv.get(cid, []),
+                )
+                for cid in req.conversation_ids
+            ]
+        )
+
+    def _fetch_conversation_spans_feedback(
+        self,
+        project_id: str,
+        conversation_ids: list[str],
+        trace_to_conv: dict[str, str],
+    ) -> dict[str, list[AgentConversationSpanFeedback]]:
+        """Batch-fetch conversation- and turn-level feedback for one list page.
+
+        One feedback query covering every conversation + turn target on the
+        page; results are bucketed per conversation and shaped into positioned
+        markers (turn markers carry their trace_id; conversation-level markers
+        carry none). Step-level (span) feedback is intentionally not fetched —
+        markers are anchored to turns for the list view. Best-effort.
+        """
+        by_conv: dict[str, list[AgentConversationSpanFeedback]] = {
+            cid: [] for cid in conversation_ids
+        }
+        try:
+            grouped = self._fetch_agent_feedback(
+                project_id=project_id,
+                conversation_ids=list(conversation_ids),
+                trace_ids=list(trace_to_conv),
+            )
+        except Exception:
+            logger.exception(
+                "failed to fetch conversation spans feedback "
+                "(project=%s, conversations=%d, turns=%d)",
+                project_id,
+                len(conversation_ids),
+                len(trace_to_conv),
+            )
+            return by_conv
+
+        for cid, items in grouped.by_conversation_id.items():
+            if cid in by_conv:
+                by_conv[cid].extend(
+                    span_feedback_marker(raw, trace_id=None)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
+                )
+        for tid, items in grouped.by_trace_id.items():
+            conv_id = trace_to_conv.get(tid)
+            if conv_id is not None and conv_id in by_conv:
+                by_conv[conv_id].extend(
+                    span_feedback_marker(raw, trace_id=tid)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
+                )
+        return by_conv
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         """Return chart-ready aggregations over spans."""
@@ -779,9 +899,9 @@ class AgentWriteHandler:
     def insert_span(self, span: AgentSpanCHInsertable) -> None:
         """Insert a single pre-built span into the spans table.
 
-        Unlike ``insert_otel_spans`` this skips OTel protobuf parsing and
+        Unlike `insert_otel_spans` this skips OTel protobuf parsing and
         GenAI extraction — the caller is responsible for constructing a
-        fully populated ``AgentSpanCHInsertable``.
+        fully populated `AgentSpanCHInsertable`.
         """
         self.insert_spans([span])
 

@@ -17,6 +17,7 @@ import {
 import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
 
 import {
+  expectSpanTimesToMatch,
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
@@ -269,5 +270,83 @@ describe('genai api (top-level functions)', () => {
     expect(getCurrentLLM()).toBeUndefined();
     // Turn + LLM spans were closed by the cascade.
     expect(getExporter().getFinishedSpans()).toHaveLength(2);
+  });
+
+  it('endSession passes options when implicitly ending LLM and Turn', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:01.700Z');
+
+    startSession({});
+    startTurn({startTime: startedAt});
+    startLLM({model: 'gpt-4o', startTime: startedAt});
+
+    endSession({endTime: endedAt});
+
+    const spans = getExporter().getFinishedSpans();
+    const turnSpan = findSpan(spans, 'invoke_agent');
+    const llmSpan = findSpan(spans, 'chat');
+    expectSpanTimesToMatch(turnSpan, startedAt, endedAt);
+    expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
+  });
+
+  it('startTurn and endTurn respect given times', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:01.700Z');
+
+    startTurn({startTime: startedAt});
+    endTurn({endTime: endedAt});
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expectSpanTimesToMatch(turnSpan, startedAt, endedAt);
+  });
+
+  it('startLLM and endLLM respect given times', () => {
+    const startedAt = new Date('2026-05-29T10:00:00.000Z');
+    const endedAt = new Date('2026-05-29T10:00:00.800Z');
+
+    startTurn({});
+    startLLM({model: 'gpt-4o', startTime: startedAt});
+    endLLM({endTime: endedAt});
+
+    const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+    expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
+  });
+
+  test('startSession stamps custom attributes on every emitted span', () => {
+    startSession({
+      attributes: {
+        'weave.integration.name': 'wb-agent',
+        'weave.custom.run_id': 42,
+      },
+    });
+    startTurn({});
+    startLLM({model: 'gpt-4o'});
+    const tool = startTool({name: 'get_weather'});
+    tool.end();
+    endLLM();
+    endSession();
+
+    const spans = getExporter().getFinishedSpans();
+    expect(spans.map(s => s.name).sort()).toEqual([
+      'chat',
+      'execute_tool',
+      'invoke_agent',
+    ]);
+    for (const s of spans) {
+      expect(s.attributes['weave.integration.name']).toBe('wb-agent');
+      expect(s.attributes['weave.custom.run_id']).toBe(42);
+    }
+  });
+
+  test('custom attributes do not override the emitter`s own semconv keys', () => {
+    startSession({
+      attributes: {'gen_ai.operation.name': 'custom-loses'},
+    });
+    startTurn({});
+    endTurn();
+    endSession();
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(turnSpan.attributes['gen_ai.operation.name']).toBe('invoke_agent');
   });
 });

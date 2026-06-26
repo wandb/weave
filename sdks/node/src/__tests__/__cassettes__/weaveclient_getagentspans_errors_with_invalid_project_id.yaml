@@ -9,10 +9,10 @@
     status: 200
     statusText: OK
     headers:
-      alt-svc: h3=":443"; ma=2592000
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length: "15"
       content-type: application/json
-      date: Wed, 17 Jun 2026 20:34:01 GMT
+      date: Fri, 26 Jun 2026 16:17:19 GMT
       server: uvicorn
       via: 1.1 google
     body: '{"status":"ok"}'
@@ -34,7 +34,7 @@
       content-encoding: br
       content-length: "69"
       content-type: application/json; charset=utf-8
-      date: Wed, 17 Jun 2026 20:34:02 GMT
+      date: Fri, 26 Jun 2026 16:17:20 GMT
       ratelimit-limit: "1000"
       ratelimit-remaining: "1000"
       vary: Origin
@@ -42,7 +42,7 @@
       x-content-type-options: nosniff
       x-ratelimit-limit: "1000"
       x-ratelimit-remaining: "1000"
-      x-wandb-trace-id: de1780c585f71a5e69ddcf0397036e0f
+      x-wandb-trace-id: 376637a00e628c1cc58f8fd4587938b1
     body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
 - request:
     url: https://trace.wandb.ai/agents/spans/query
@@ -51,15 +51,16 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/nonexistent-project","limit":5}'
   response:
     status: 403
     statusText: Forbidden
     headers:
-      alt-svc: h3=":443"; ma=2592000
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length: "30"
       content-type: application/json
-      date: Wed, 17 Jun 2026 20:34:02 GMT
+      date: Fri, 26 Jun 2026 16:17:19 GMT
       server: uvicorn
       via: 1.1 google
     body: '{"detail":"Project not found"}'

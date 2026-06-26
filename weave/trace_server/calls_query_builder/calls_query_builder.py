@@ -3092,8 +3092,9 @@ def _try_optimized_stats_query(
     # Pattern 3: Unfiltered distinct-call count on calls_merged.
     #
     # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
-    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
-    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # scan: uniq(id) - uniqIf(id, isNotNull(deleted_at)), mirroring the GROUP BY
+    # path's deleted-call exclusion. uniq is exact below ~64K distinct ids and
+    # <1% off above, where uniqExact's hash set OOMs. calls_complete has its own
     # flat path; limit=1 stays with Pattern 1.
     if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
         return _optimized_unfiltered_calls_merged_count_query(
@@ -3103,7 +3104,7 @@ def _try_optimized_stats_query(
     # Pattern 4: Time-windowed distinct-call count on calls_merged.
     #
     # Generalizes Pattern 3 to a count whose only narrowing is a started_at
-    # time bound: count windowed start rows with uniqExact (started_at lives
+    # time bound: count windowed start rows with uniq (started_at lives
     # only on the start row, so the per-row filter equals the GROUP BY path's
     # `any(started_at) <op> T` HAVING), and exclude soft-deleted ids via an
     # anti-set instead of a parallel aggregator (deleted_at lives on a separate
@@ -3178,18 +3179,20 @@ def _optimized_wb_run_id_not_null_query(
 
 
 def _unfiltered_calls_merged_count_expr(table_name: str) -> str:
-    """Distinct non-deleted started-id count over calls_merged via inclusion-exclusion.
+    """Approximate non-deleted distinct-id count over calls_merged via inclusion-exclusion.
 
     count(started not deleted) = count(started or deleted) - count(deleted).
     op_name is start-only and deleted_at is delete-row-only (never on the same
     row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
     deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- in one scan.
+    uniq (not uniqExact) keeps memory fixed: exact below ~64K distinct ids,
+    <1% off above, where uniqExact's full hash set OOMs on large projects.
     """
     started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
     deleted = f"isNotNull({table_name}.deleted_at)"
     return (
-        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
-        f"- uniqExactIf({table_name}.id, {deleted})"
+        f"uniqIf({table_name}.id, {started} OR {deleted}) "
+        f"- uniqIf({table_name}.id, {deleted})"
     )
 
 
@@ -3271,7 +3274,8 @@ def _optimized_time_filtered_calls_merged_count_query(
 ) -> str:
     """Distinct-call count for a calls_merged stats request filtered only by time.
 
-    Counts windowed start rows with uniqExact. started_at gates the window;
+    Counts windowed start rows with uniq (exact below ~64K distinct ids, <1% off
+    above, fixed memory). started_at gates the window;
     since #6933 call-end rows carry started_at too, we also require op_name
     (start-only) to be non-null -- that selects the start row and reproduces the
     GROUP BY path's orphaned-call-end exclusion. Soft-deleted ids are removed
@@ -3325,7 +3329,7 @@ def _optimized_time_filtered_calls_merged_count_query(
         f"WHERE {lower_prefilter} AND isNotNull({table_name}.deleted_at)"
     )
     inner = (
-        f"SELECT uniqExact({table_name}.id) AS raw_count "
+        f"SELECT uniq({table_name}.id) AS raw_count "
         f"FROM {table_name} "
         f"PREWHERE {table_name}.project_id = {project_id_slot} "
         f"WHERE {outer_prefilter} "

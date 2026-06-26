@@ -4510,7 +4510,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4535,7 +4535,7 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4554,8 +4554,8 @@ def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
-                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
                toUInt8(0) AS has_more,
                coalesce(
                           (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
@@ -4634,7 +4634,7 @@ def _started_at_query(expr: dict) -> tsi.Query:
 def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> None:
     """A started_at-only window takes the distinct-id fast path (Pattern 4).
 
-    uniqExact counts start rows in the window -- the exact `started_at`
+    uniq counts start rows in the window -- the exact `started_at`
     predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
     drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
     orphaned-call-end exclusion (since #6933 end rows carry started_at too).
@@ -4661,7 +4661,7 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) AS raw_count
+            SELECT uniq(calls_merged.id) AS raw_count
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_0:String}
             WHERE calls_merged.sortable_datetime > {pb_2:String}
@@ -4846,8 +4846,8 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
-                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
                toUInt8(0) AS has_more,
                coalesce(
                           (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))

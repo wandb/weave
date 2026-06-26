@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -34,6 +34,7 @@ from weave.trace_server.agents.schema import (
     SpanKindLiteral,
     StatusCodeLiteral,
 )
+from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 
 if TYPE_CHECKING:
@@ -566,7 +567,7 @@ class AgentSpanGroupDistributionSpec(BaseModel):
         return self
 
     def custom_attr_source(self) -> AgentCustomAttrSource:
-        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+        """Return `value.source` narrowed to `AgentCustomAttrSource`.
 
         The model validator guarantees this at construction time; this helper
         re-checks each literal so callers avoid `cast()` at use sites.
@@ -626,6 +627,83 @@ class AgentConversationMessagePreview(BaseModel):
 
     role: str = ""
     text: str = ""
+
+
+class AgentConversationSpan(BaseModel):
+    """One span in a conversation's trace.
+
+    Returned by `agent_conversation_spans`, which reads span scalar columns
+    only (no message bodies). Spans are ordered by `started_at`, which
+    approximates — but does not exactly match — the detail chat view's
+    parent/child tree-walk order. `operation_name` is the raw OTel value; the
+    client maps it to a display category.
+    """
+
+    operation_name: str
+    trace_id: str
+    span_id: str
+    status: StatusCodeLiteral
+    duration_ms: int
+
+
+class AgentConversationSpanRating(BaseModel):
+    """One numeric rating (a scorer score) applied to a turn or conversation."""
+
+    name: str
+    value: float
+    reason: str | None = None
+    confidence: float | None = None
+
+
+class AgentConversationSpanFeedback(BaseModel):
+    """Tags and ratings applied to a conversation's turn (or the conversation).
+
+    Positioned client-side by matching `trace_id` (turn) against the spans;
+    `trace_id` is None for conversation-level feedback.
+    """
+
+    trace_id: str | None = Field(
+        description="The turn this feedback is anchored to; None for conversation-level."
+    )
+    feedback_type: AgentSpanFeedbackType
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Arbitrary descriptive tags applied to this feedback.",
+        examples=[["👍", "needs-review"]],
+    )
+    ratings: list[AgentConversationSpanRating] = Field(
+        default_factory=list,
+        description="Numeric scorer ratings applied to this feedback.",
+    )
+
+
+class AgentConversationSpans(BaseModel):
+    """One conversation's span sequence and its feedback markers."""
+
+    conversation_id: str
+    spans: list[AgentConversationSpan] = Field(default_factory=list)
+    spans_feedback: list[AgentConversationSpanFeedback] = Field(default_factory=list)
+
+
+class AgentConversationSpansReq(BaseModel):
+    """Request the span sequences for an explicit set of conversations.
+
+    Reads span scalar columns only (no message bodies) for the given
+    `conversation_ids`. Powers the conversations-list spans minimap.
+    """
+
+    project_id: str
+    conversation_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_AGENT_QUERY_LIMIT
+    )
+    started_after: AwareDatetime | None = None  # filter started_at >= start
+    started_before: AwareDatetime | None = None  # filter started_at < end
+
+
+class AgentConversationSpansRes(BaseModel):
+    """Span sequences + feedback markers, one entry per requested conversation."""
+
+    conversations: list[AgentConversationSpans] = Field(default_factory=list)
 
 
 class AgentSpanGroupRow(BaseModel):
