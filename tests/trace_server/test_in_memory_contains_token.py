@@ -12,14 +12,12 @@ from weave.trace_server.orm import Column, Table
 @pytest.mark.parametrize(
     ("haystack", "needle", "case_insensitive", "expected"),
     [
-        ("the example row", "example", False, True),
-        ("examples", "example", False, False),
-        ("Example", "example", False, False),
-        ("Example", "example", True, True),
-        ("the example row", "example", True, True),
-        ("a.b-c", "b", False, True),
-        (123, "example", False, False),
-        ("example", 123, False, False),
+        ("the example row", "example", False, True),  # whole-token hit
+        ("examples", "example", False, False),  # substring is not a token
+        ("Example", "example", True, True),  # case-insensitive match
+        ("a.b-c", "b", False, True),  # separator-split tokenization
+        (123, "example", False, False),  # non-string haystack guard
+        ("example", 123, False, False),  # non-string needle guard
     ],
 )
 def test_ch_has_token_semantics(haystack, needle, case_insensitive, expected) -> None:
@@ -52,23 +50,36 @@ def _token_query(field: str, needle: str, case_insensitive: bool = False) -> tsi
     )
 
 
+_NESTED_AND_QUERY = tsi.Query.model_validate(
+    {
+        "$expr": {
+            "$and": [
+                {
+                    "$containsToken": {
+                        "input": {"$getField": "op_name"},
+                        "substr": {"$literal": "example"},
+                    }
+                }
+            ]
+        }
+    }
+)
+
+
 @pytest.mark.parametrize(
     ("row", "query", "expected"),
     [
-        # String column, case-sensitive: whole-token match only.
+        # String column: hasToken whole-token match, case-sensitive then -insensitive.
         ({"op_name": "the example row"}, _token_query("op_name", "example"), True),
         ({"op_name": "examples"}, _token_query("op_name", "example"), False),
-        ({"op_name": "Example"}, _token_query("op_name", "example"), False),
-        # String column, case-insensitive.
         (
             {"op_name": "Example"},
             _token_query("op_name", "example", case_insensitive=True),
             True,
         ),
-        # Array(String) column, case-sensitive membership.
+        # Array(String) column: membership, case-sensitive (hit + miss), -insensitive, empty.
         ({"input_refs": ["alpha", "beta"]}, _token_query("input_refs", "alpha"), True),
         ({"input_refs": ["alphas"]}, _token_query("input_refs", "alpha"), False),
-        # Array(String) column, case-insensitive membership.
         (
             {"input_refs": ["Alpha"]},
             _token_query("input_refs", "alpha", case_insensitive=True),
@@ -76,24 +87,7 @@ def _token_query(field: str, needle: str, case_insensitive: bool = False) -> tsi
         ),
         ({"input_refs": []}, _token_query("input_refs", "alpha"), False),
         # Nested under $and: exercises the operand-dispatch branch.
-        (
-            {"op_name": "the example row"},
-            tsi.Query.model_validate(
-                {
-                    "$expr": {
-                        "$and": [
-                            {
-                                "$containsToken": {
-                                    "input": {"$getField": "op_name"},
-                                    "substr": {"$literal": "example"},
-                                }
-                            }
-                        ]
-                    }
-                }
-            ),
-            True,
-        ),
+        ({"op_name": "the example row"}, _NESTED_AND_QUERY, True),
     ],
 )
 def test_orm_eval_query_contains_token(row, query, expected) -> None:
@@ -106,9 +100,9 @@ def test_orm_eval_query_contains_token(row, query, expected) -> None:
 @pytest.mark.parametrize(
     ("value", "needle", "case_insensitive", "expected"),
     [
-        ("the example row", "example", False, True),
-        ("examples", "example", False, False),
-        ("Example", "example", True, True),
+        ("the example row", "example", False, True),  # token hit
+        ("examples", "example", False, False),  # token miss
+        ("Example", "example", True, True),  # case-insensitive match
     ],
 )
 def test_query_filter_evaluator_contains_token(

@@ -654,6 +654,7 @@ def _create_hastoken_optimized_contains_token_condition(
     ) or not isinstance(operation.contains_token_.substr.literal_, str):
         return None
 
+    # Lazy import mirrors this file's existing circular-import workaround.
     from weave.trace_server.calls_query_builder.calls_query_builder import (
         get_field_by_name,
     )
