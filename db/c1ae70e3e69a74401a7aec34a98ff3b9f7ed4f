@@ -22,3 +22,10 @@ ruff format collapsed my wrapped logger.exception(...) calls back to one line in
 ## Open questions
 - Confirm the exact CH 396 message string against the deployed CH version (26.2.1.413) in an integration test before relying on the suffix match.
 - Pick concrete cap values for T-Mobile in core (needs their legit query-scan distribution).
+
+## E2E verification + fix (addendum)
+Verified against the real local ClickHouse (orbstack container weave-python-test-clickhouse-server, CH 25.12). Probed the ACTUAL read-cap errors:
+- max_rows_to_read -> Code 158 "(TOO_MANY_ROWS)"  ("Limit for rows (controlled by 'max_rows_to_read' setting) exceeded ...")
+- max_bytes_to_read -> Code 307 "(TOO_MANY_BYTES)" ("Limit for rows or bytes to read exceeded ...")
+The original branch matched the literal "TOO_MANY_ROWS_OR_BYTES", which does NOT appear -> the real error would have fallen through to a 502. FIX: match `"TOO_MANY_ROWS" in error_str or "TOO_MANY_BYTES" in error_str` (covers 158, 307, and a hypothetical combined 396). Test now uses the two real captured messages (parametrized); docstrings/comments updated.
+Confirmed end-to-end: a real clickhouse_connect driver exception -> handle_clickhouse_query_error -> QueryTooExpensiveError -> handle_server_exception -> HTTP 400 + {error_code: QUERY_TOO_EXPENSIVE} for BOTH rows and bytes. TOO_SLOW stays validated by the real prod Datadog span string.
