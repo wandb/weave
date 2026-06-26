@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
@@ -193,6 +193,7 @@ from weave.utils.attributes_dict import AttributesDict
 from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
@@ -275,6 +276,48 @@ def _build_agent_spans_query(
     if query is None:
         return Query.model_validate({"$expr": agent_expr})
     return Query.model_validate({"$expr": {"$and": [agent_expr, query.expr_]}})
+
+
+_AgentListItemT = TypeVar("_AgentListItemT")
+
+
+def _make_agent_iterator(
+    fetch_page: Callable[[int, int], tuple[list[_AgentListItemT], int]],
+    *,
+    limit_override: int | None,
+    page_size: int,
+) -> PaginatedIterator[_AgentListItemT, _AgentListItemT]:
+    """Wrap an offset/limit agent list endpoint as a ``PaginatedIterator``.
+
+    ``fetch_page(offset, limit)`` returns one page of items together with the
+    endpoint's ``total_count``; the count backs ``len(iterator)`` (capped by
+    ``limit_override`` when set).
+    """
+
+    def fetch_func(offset: int, limit: int) -> list[_AgentListItemT]:
+        return fetch_page(offset, limit)[0]
+
+    def size_func() -> int:
+        # total_count is returned with every page; fetch the cheapest one.
+        total = fetch_page(0, 1)[1]
+        return min(limit_override, total) if limit_override is not None else total
+
+    return PaginatedIterator(
+        fetch_func,
+        size_func=size_func,
+        limit=limit_override,
+        page_size=page_size,
+    )
+
+
+# Iterator return types for the paginated agent list methods (mirrors ``CallsIter``).
+AgentsIter = PaginatedIterator[agent_types.AgentSchema, agent_types.AgentSchema]
+AgentVersionsIter = PaginatedIterator[
+    agent_types.AgentVersionSchema, agent_types.AgentVersionSchema
+]
+AgentSpansIter = PaginatedIterator[
+    agent_types.AgentSpanSchema, agent_types.AgentSpanSchema
+]
 
 
 def get_obj_name(val: Any) -> str:
@@ -1119,6 +1162,173 @@ class WeaveClient:
                 limit=limit,
                 offset=offset,
             )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def iter_agents(
+        self,
+        *,
+        agent_name: str | None = None,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentsIter:
+        """Iterate over agents in this project, fetching pages on demand.
+
+        Like ``get_agents``, but returns a ``PaginatedIterator`` that fetches
+        further pages as you consume it, rather than a single ``AgentsQueryRes``
+        page. Use ``get_agents`` when you want one page plus ``total_count`` up
+        front; use this to stream through every agent.
+
+        Args:
+            agent_name: If set, restrict results to this agent.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of agents to yield. `None` yields all.
+            page_size: Number of agents fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentSchema`. Supports iteration,
+            indexing/slicing, and `len()` (which reports the server-side
+            `total_count`).
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for agent in client.iter_agents():
+                print(agent.agent_name, agent.total_input_tokens)
+            ```
+        """
+        filters = (
+            agent_types.AgentsQueryFilters(agent_name=agent_name)
+            if agent_name is not None
+            else None
+        )
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentSchema], int]:
+            res = self.server.agent_agents_query(
+                agent_types.AgentsQueryReq(
+                    project_id=self.project_id,
+                    filters=filters,
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.agents, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page, limit_override=limit, page_size=page_size
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def iter_agent_versions(
+        self,
+        *,
+        agent_name: str,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentVersionsIter:
+        """Iterate over a single agent's versions, fetching pages on demand.
+
+        The streaming counterpart to ``get_agent_versions`` (see that method for
+        the single-page form with ``total_count``).
+
+        Args:
+            agent_name: The agent whose versions to iterate.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of versions to yield. `None` yields all.
+            page_size: Number of versions fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentVersionSchema`. Supports iteration,
+            indexing/slicing, and `len()`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for version in client.iter_agent_versions(agent_name="my-agent"):
+                print(version.agent_version, version.total_input_tokens)
+            ```
+        """
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentVersionSchema], int]:
+            res = self.server.agent_versions_query(
+                agent_types.AgentVersionsQueryReq(
+                    project_id=self.project_id,
+                    agent_name=agent_name,
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.versions, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page, limit_override=limit, page_size=page_size
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def iter_agent_spans(
+        self,
+        *,
+        agent_name: str | None = None,
+        query: Query | None = None,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentSpansIter:
+        """Iterate over agent spans for this project, fetching pages on demand.
+
+        The streaming counterpart to ``get_agent_spans`` (see that method for the
+        single-page form with ``total_count``). Grouped aggregations
+        (``group_by``) are not supported here -- this iterates individual spans;
+        use ``get_agent_span_stats`` for grouped metrics.
+
+        Args:
+            agent_name: If set, restrict results to this agent (a convenience
+                shortcut for a `query` on the `agent_name` field).
+            query: A mongo-style filter expression. Combined with `agent_name`
+                via `$and` when both are provided.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of spans to yield. `None` yields all.
+            page_size: Number of spans fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentSpanSchema`. Supports iteration,
+            indexing/slicing, and `len()`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for span in client.iter_agent_spans(agent_name="my-agent"):
+                print(span.span_id, span.span_name, span.input_tokens)
+            ```
+        """
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentSpanSchema], int]:
+            res = self.server.agent_spans_query(
+                agent_types.AgentSpansQueryReq(
+                    project_id=self.project_id,
+                    query=_build_agent_spans_query(agent_name, query),
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.spans, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page, limit_override=limit, page_size=page_size
         )
 
     @trace_sentry.global_trace_sentry.watch()

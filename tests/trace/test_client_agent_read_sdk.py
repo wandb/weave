@@ -85,7 +85,7 @@ class FakeAgentReadServer:
         return self.search_res
 
 
-def _make_client(server: FakeAgentReadServer) -> WeaveClient:
+def _make_client(server: object) -> WeaveClient:
     return WeaveClient(
         "entity",
         "project",
@@ -250,3 +250,142 @@ def test_get_agent_spans_query_translation(agent_name, query, expected_query):
     req = server.requests["spans"]
     assert req.project_id == "entity/project"
     assert req.query == expected_query
+
+
+# ---------------------------------------------------------------------------
+# Paginated iterator methods (iter_agents / iter_agent_versions / iter_agent_spans)
+# ---------------------------------------------------------------------------
+
+
+def _agent(i: int) -> agent_types.AgentSchema:
+    return agent_types.AgentSchema(
+        project_id="entity/project",
+        agent_name=f"agent-{i}",
+        invocation_count=0,
+        span_count=0,
+        total_input_tokens=0,
+        total_output_tokens=0,
+        total_duration_ms=0,
+        error_count=0,
+        first_seen=None,
+        last_seen=None,
+    )
+
+
+def _agent_version(i: int) -> agent_types.AgentVersionSchema:
+    return agent_types.AgentVersionSchema(
+        project_id="entity/project",
+        agent_name="agent-0",
+        agent_version=f"v{i}",
+        invocation_count=0,
+        span_count=0,
+        total_input_tokens=0,
+        total_output_tokens=0,
+        total_duration_ms=0,
+        error_count=0,
+        first_seen=None,
+        last_seen=None,
+    )
+
+
+def _agent_span(i: int) -> agent_types.AgentSpanSchema:
+    return agent_types.AgentSpanSchema(
+        project_id="entity/project",
+        trace_id="trace-0",
+        span_id=f"span-{i}",
+    )
+
+
+class FakePagingAgentServer:
+    """Serves offset/limit pages of a fixed item list for the iterator methods."""
+
+    def __init__(
+        self,
+        *,
+        agents: list | None = None,
+        versions: list | None = None,
+        spans: list | None = None,
+    ) -> None:
+        self._agents = agents or []
+        self._versions = versions or []
+        self._spans = spans or []
+        self.fetches: list[tuple[int, int]] = []  # (offset, limit) per request
+
+    def agent_agents_query(self, req):
+        self.fetches.append((req.offset, req.limit))
+        page = self._agents[req.offset : req.offset + req.limit]
+        return agent_types.AgentsQueryRes(agents=page, total_count=len(self._agents))
+
+    def agent_versions_query(self, req):
+        self.fetches.append((req.offset, req.limit))
+        page = self._versions[req.offset : req.offset + req.limit]
+        return agent_types.AgentVersionsQueryRes(
+            versions=page, total_count=len(self._versions)
+        )
+
+    def agent_spans_query(self, req):
+        self.fetches.append((req.offset, req.limit))
+        page = self._spans[req.offset : req.offset + req.limit]
+        return agent_types.AgentSpansQueryRes(
+            spans=page, groups=[], total_count=len(self._spans)
+        )
+
+
+@pytest.mark.parametrize(
+    ("method", "kwargs", "server_kwarg", "builder", "key_attr"),
+    [
+        pytest.param(
+            "iter_agents", {}, "agents", _agent, "agent_name", id="iter_agents"
+        ),
+        pytest.param(
+            "iter_agent_versions",
+            {"agent_name": "agent-0"},
+            "versions",
+            _agent_version,
+            "agent_version",
+            id="iter_agent_versions",
+        ),
+        pytest.param(
+            "iter_agent_spans",
+            {},
+            "spans",
+            _agent_span,
+            "span_id",
+            id="iter_agent_spans",
+        ),
+    ],
+)
+def test_iter_method_pages_through_all_items(
+    method, kwargs, server_kwarg, builder, key_attr
+):
+    items = [builder(i) for i in range(5)]
+    server = FakePagingAgentServer(**{server_kwarg: items})
+    client = _make_client(server)
+
+    iterator = getattr(client, method)(page_size=2, **kwargs)
+
+    # Iterates every item, in order, transparently fetching each page.
+    collected = list(iterator)
+    assert [getattr(x, key_attr) for x in collected] == [
+        getattr(x, key_attr) for x in items
+    ]
+    # The 5 items were fetched in pages of page_size (2) at increasing offsets,
+    # not one big request. (len()/list() also issue a cheap limit=1 size probe,
+    # which we exclude by filtering on the page-sized fetches.)
+    page_fetches = [f for f in server.fetches if f[1] == 2]
+    assert page_fetches == [(0, 2), (2, 2), (4, 2)]
+
+    # len() reports the server-side total_count.
+    assert len(iterator) == 5
+
+
+def test_iter_agents_respects_limit():
+    server = FakePagingAgentServer(agents=[_agent(i) for i in range(10)])
+    client = _make_client(server)
+
+    iterator = client.iter_agents(limit=3, page_size=2)
+
+    # Yields only `limit` items even though the server holds 10...
+    assert [a.agent_name for a in iterator] == ["agent-0", "agent-1", "agent-2"]
+    # ...and len() reflects the cap, not the raw total_count.
+    assert len(iterator) == 3
