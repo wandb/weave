@@ -25,6 +25,7 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import (
     clickhouse_cast,
     datetime_literal_to_timestamp,
+    has_token_fn,
     timestamp_to_datetime_str,
 )
 from weave.trace_server.project_version.types import ReadTable, TableConfig
@@ -667,12 +668,7 @@ def _create_hastoken_optimized_contains_token_condition(
         return None
 
     field_name = f"{table_alias}.{field}"
-    # hasTokenCaseInsensitive cannot use the tokenbf skip index.
-    has_token = (
-        "hasTokenCaseInsensitive"
-        if operation.contains_token_.case_insensitive
-        else "hasToken"
-    )
+    has_token = has_token_fn(bool(operation.contains_token_.case_insensitive))
     param_name = pb.add_param(substr_value)
     has_token_condition = (
         f"{has_token}({field_name}, {param_slot(param_name, 'String')})"

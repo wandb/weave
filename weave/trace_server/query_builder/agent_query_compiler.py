@@ -33,6 +33,7 @@ from weave.trace_server.orm import (
     ParamBuilder,
     assert_single_token,
     clickhouse_cast,
+    has_token_fn,
     python_value_to_ch_type,
 )
 from weave.trace_server.query_builder.agent_custom_attrs import (
@@ -195,12 +196,7 @@ def _compile_operation(
             op.contains_token_.input, pb, alias, sibling_hint=str
         )
         rhs_sql = _compile_operand(op.contains_token_.substr, pb, alias)
-        # hasTokenCaseInsensitive cannot use the tokenbf skip index.
-        fn = (
-            "hasTokenCaseInsensitive"
-            if op.contains_token_.case_insensitive
-            else "hasToken"
-        )
+        fn = has_token_fn(bool(op.contains_token_.case_insensitive))
         return f"{fn}({lhs_sql}, {rhs_sql})"
 
     raise TypeError(f"Unknown operation type: {type(op).__name__}")

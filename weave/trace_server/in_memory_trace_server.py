@@ -115,7 +115,11 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.orm import (
+    TOKEN_SEPARATOR_CLASS,
+    Table,
+    split_escaped_field_path,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -490,7 +494,7 @@ def _ch_has_token(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
     return any(token == needle for token in tokens if token)
 
 
-_TOKEN_SEPARATOR_RE = re.compile(r"[^a-zA-Z0-9]+")
+_TOKEN_SEPARATOR_RE = re.compile(TOKEN_SEPARATOR_CLASS + "+")
 
 
 def _ch_sorted_by_terms(

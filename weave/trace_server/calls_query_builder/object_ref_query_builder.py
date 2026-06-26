@@ -66,6 +66,7 @@ from weave.trace_server.orm import (
     assert_single_token_value,
     clickhouse_cast,
     combine_conditions,
+    has_token_fn,
     python_value_to_ch_type,
     quote_json_path,
     split_escaped_field_path,
@@ -427,11 +428,7 @@ class ObjectRefConditionHandler:
         assert_single_token_value(condition.value)
         filter_param = self.pb.add_param(condition.value)
         json_extract = self._create_json_extract_expression()
-
-        # hasTokenCaseInsensitive cannot use the tokenbf skip index.
-        has_token = (
-            "hasTokenCaseInsensitive" if condition.case_insensitive else "hasToken"
-        )
+        has_token = has_token_fn(condition.case_insensitive)
         return f"{has_token}({json_extract}, {param_slot(filter_param, 'String')})"
 
     def handle_in_operation(self, condition: ObjectRefFilterCondition) -> str:
