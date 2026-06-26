@@ -1,6 +1,25 @@
 /**
  * OpenAI Agents → Weave: a multi-agent example that self-checks offline.
  *
+ * Code orchestration (https://openai.github.io/openai-agents-python/multi_agent/):
+ * @openai/agents has no Sequential/Parallel/Loop workflow agents the way
+ * Google ADK does, so the equivalent control flow is plain TS. Five plain
+ * `Agent` instances are wired together by the `research()` function:
+ *
+ *   research(prompt) = withTrace('research_pipeline', async () => {
+ *     ├─ await run(planner, prompt)                          // Sequential
+ *     ├─ await Promise.all([
+ *     │     run(weather, prompt),                            // Parallel
+ *     │     run(market, prompt),                             // (recon_team)
+ *     │  ])
+ *     ├─ for i in 1..2: await run(critic, …)                 // Loop
+ *     └─ await run(synthesist, …)                            // Sequential
+ *   })
+ *
+ * `withTrace` ties the six `run()`s into one OTel trace named
+ * `research_pipeline` — that's the only thing standing in for ADK's
+ * Sequential agent.
+ *
  * Modes:
  *   (default)     offline self-check — a scripted model, no creds, no network.
  *                 Spans are captured in-memory and asserted. Exits 0 on
@@ -17,7 +36,13 @@
  */
 
 import * as weave from 'weave';
-import {Agent, OpenAIResponsesModel, Runner, tool} from '@openai/agents';
+import {
+  Agent,
+  OpenAIResponsesModel,
+  run,
+  tool,
+  withTrace,
+} from '@openai/agents';
 import type {Model, ModelRequest} from '@openai/agents';
 import OpenAI from 'openai';
 import {z} from 'zod';
@@ -29,8 +54,6 @@ import {
   type ReadableSpan,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
-import {randomUUID} from 'crypto';
-
 const WANDB_PROJECT = process.env.WANDB_PROJECT || 'examples-openai-agents-2';
 const LIVE_MODEL = 'gpt-4o-mini';
 const LIVE = !!process.env.WEAVE_LIVE;
@@ -66,121 +89,102 @@ const getStockPrice = tool({
   },
 });
 
-function buildAgentGraph(modelFor: ModelFor): Agent {
-  const plannerAgent = new Agent({
-    name: 'planner_agent',
-    instructions: 'Briefly outline what to look up.',
-    model: modelFor('planner_agent'),
-  });
-
-  const weatherAgent = new Agent({
-    name: 'weather_agent',
-    instructions:
-      'Extract a city from the input and call get_weather, then summarize in one sentence.',
-    model: modelFor('weather_agent'),
-    tools: [getWeather],
-  });
-
-  const marketAgent = new Agent({
-    name: 'market_agent',
-    instructions:
-      'Extract a ticker from the input and call get_stock_price, then summarize in one sentence.',
-    model: modelFor('market_agent'),
-    tools: [getStockPrice],
-  });
-
-  const reconTeam = new Agent({
-    name: 'recon_team',
-    instructions:
-      'Gather weather and stock information in parallel by calling subagents.',
-    model: modelFor('recon_team'),
-    tools: [weatherAgent.asTool({}), marketAgent.asTool({})],
-  });
-
-  const criticAgent = new Agent({
-    name: 'critic_agent',
-    instructions: 'Score the draft 0-1 and suggest one improvement.',
-    model: modelFor('critic_agent'),
-  });
-
-  const synthesistAgent = new Agent({
-    name: 'synthesist_agent',
-    instructions: 'Summarize the weather, the stock price, and the critique.',
-    model: modelFor('synthesist_agent'),
-  });
-
-  // asTool by default takes `{input: string}` and feeds the input to the
-  // sub-agent as a plain user-role message — that's what produces the
-  // duplicate "User" turns in the Agents-tab timeline (the orchestrator's
-  // ad-libbed prompt looks like another real user message). Pass a typed
-  // `parameters` schema and an `inputBuilder` that formats your own seed
-  // message instead, so each sub-agent's seed turn is deliberate phrasing
-  // rather than orchestrator improv.
-  const researchAgent = new Agent({
-    name: 'research_pipeline',
-    instructions:
-      'Use the tools in order: plan, then gather, then critique, then synthesize. Return the synthesize result as the final answer.',
-    model: modelFor('research_pipeline'),
-    tools: [
-      plannerAgent.asTool({
-        toolName: 'plan',
-        toolDescription: 'Outline what to research for a given user request.',
-        parameters: z.object({
-          topic: z.string().describe('the user request to plan around'),
-        }),
-        inputBuilder: ({params}) =>
-          `Outline the research steps needed for: ${params.topic}`,
-      }),
-      reconTeam.asTool({
-        toolName: 'gather',
-        toolDescription:
-          'Gather weather + market info via specialist sub-agents.',
-        parameters: z.object({
-          topic: z.string().describe('the topic to gather data for'),
-        }),
-        inputBuilder: ({params}) =>
-          `Gather all relevant data (weather, market) for: ${params.topic}`,
-      }),
-      criticAgent.asTool({
-        toolName: 'critique',
-        toolDescription: 'Score and improve a draft.',
-        parameters: z.object({
-          draft: z.string().describe('the draft to critique'),
-        }),
-        inputBuilder: ({params}) =>
-          `Score this draft 0-1 and suggest one improvement:\n${params.draft}`,
-      }),
-      synthesistAgent.asTool({
-        toolName: 'synthesize',
-        toolDescription:
-          'Combine gathered notes + critique into a final summary.',
-        parameters: z.object({
-          material: z.string().describe('the notes to combine'),
-        }),
-        inputBuilder: ({params}) =>
-          `Combine these notes into a final summary:\n${params.material}`,
-      }),
-    ],
-  });
-
-  return researchAgent;
+// Code-orchestration shape: workflow agents like ADK's Sequential / Parallel
+// / Loop don't exist in @openai/agents — the equivalent is plain TS. The
+// only Agent instances are the actual LLM-backed ones (5 of them). The
+// "pipeline" is the `research()` function below.
+interface ResearchAgents {
+  planner: Agent;
+  weather: Agent;
+  market: Agent;
+  critic: Agent;
+  synthesist: Agent;
 }
 
+function buildAgentGraph(modelFor: ModelFor): ResearchAgents {
+  return {
+    planner: new Agent({
+      name: 'planner_agent',
+      instructions: 'Briefly outline what to look up.',
+      model: modelFor('planner_agent'),
+    }),
+    weather: new Agent({
+      name: 'weather_agent',
+      instructions:
+        'Extract a city from the input and call get_weather, then summarize in one sentence.',
+      model: modelFor('weather_agent'),
+      tools: [getWeather],
+    }),
+    market: new Agent({
+      name: 'market_agent',
+      instructions:
+        'Extract a ticker from the input and call get_stock_price, then summarize in one sentence.',
+      model: modelFor('market_agent'),
+      tools: [getStockPrice],
+    }),
+    critic: new Agent({
+      name: 'critic_agent',
+      instructions: 'Score the draft 0-1 and suggest one improvement.',
+      model: modelFor('critic_agent'),
+    }),
+    synthesist: new Agent({
+      name: 'synthesist_agent',
+      instructions:
+        'Summarize the weather, the stock price, and the critique.',
+      model: modelFor('synthesist_agent'),
+    }),
+  };
+}
+
+// Sequential → Parallel → Loop → Sequential, but hand-rolled. `withTrace`
+// pins everything inside this function to a single trace named
+// `research_pipeline`, so Weave's Agents view shows the whole workflow as
+// one unit instead of five disconnected traces.
 async function research(
-  agents: Agent,
+  agents: ResearchAgents,
   prompt: string
-): Promise<string | undefined> {
-  const runner = new Runner({groupId: randomUUID()});
-  const result = await runner.run(agents, prompt);
-  return result.finalOutput;
+): Promise<string> {
+  return await withTrace('research_pipeline', async () => {
+    // 1) Plan
+    const plan = await run(agents.planner, prompt);
+
+    // 2) Recon: parallel fan-out. Each specialist sees the full prompt and
+    // extracts its own slice — the orchestration code doesn't hard-code
+    // city/ticker anywhere.
+    const [weather, market] = await Promise.all([
+      run(agents.weather, prompt),
+      run(agents.market, prompt),
+    ]);
+
+    // 3) Critique loop: 2 iterations, each a fresh run() of the same
+    // critic. Each iteration is its own root invoke_agent within the
+    // shared trace.
+    let draft = `Plan: ${plan.finalOutput}\nWeather: ${weather.finalOutput}\nMarket: ${market.finalOutput}`;
+    let critique = '';
+    for (let i = 0; i < 2; i++) {
+      const result = await run(
+        agents.critic,
+        `Iteration ${i + 1}: critique this draft.\n${draft}`
+      );
+      critique = result.finalOutput ?? '';
+      draft = `${draft}\nCritique ${i + 1}: ${critique}`;
+    }
+
+    // 4) Synthesize
+    const final = await run(
+      agents.synthesist,
+      `Combine the plan, weather, stock price, and critique into a final summary.\n${draft}`
+    );
+    return final.finalOutput ?? '';
+  });
 }
 
 // Complete live usage: init Weave, run the graph, flush spans on the way out.
 async function runLive(): Promise<void> {
   await weave.init(WANDB_PROJECT);
 
-  const agent = buildAgentGraph(() => LIVE_MODEL);
-  console.log('Agent output:\n' + (await research(agent, PROMPT)));
+  const agents = buildAgentGraph(() => LIVE_MODEL);
+  console.log('Agent output:\n' + (await research(agents, PROMPT)));
 
   await weave.flushOTel(); // short-lived script: flush before exit
   console.log(
@@ -282,113 +286,12 @@ function fakeResponse(opts: {
 function scriptedModelFor(): ModelFor {
   const llms = new Map<string, MockAgent>([
     [
-      // research_pipeline is the only agent that `runner.run()` invokes
-      // directly. Its model walks the pipeline one asTool call per turn:
-      // plan → gather → critique → synthesize → final text. Each turn's
-      // args match the typed schema we declared on `.asTool({...})`.
-      'research_pipeline',
-      new MockAgent([
-        // Turn 1: plan
-        fakeResponse({
-          id: 'research-1',
-          toolCalls: [
-            {
-              callId: 'call-plan',
-              name: 'plan',
-              args: {topic: 'a day in Paris with weather + AAPL price'},
-            },
-          ],
-          usage: {input: 20, output: 8},
-        }),
-        // Turn 2: gather (after seeing the plan)
-        fakeResponse({
-          id: 'research-2',
-          toolCalls: [
-            {
-              callId: 'call-gather',
-              name: 'gather',
-              args: {topic: 'Paris weather and AAPL price'},
-            },
-          ],
-          usage: {input: 50, output: 8},
-        }),
-        // Turn 3: critique (after seeing the gathered data)
-        fakeResponse({
-          id: 'research-3',
-          toolCalls: [
-            {
-              callId: 'call-critique',
-              name: 'critique',
-              args: {
-                draft:
-                  'Plan: visit Paris. Data: Paris sunny ~21°C; AAPL ~$199.98.',
-              },
-            },
-          ],
-          usage: {input: 90, output: 12},
-        }),
-        // Turn 4: synthesize (after seeing the critique)
-        fakeResponse({
-          id: 'research-4',
-          toolCalls: [
-            {
-              callId: 'call-synth',
-              name: 'synthesize',
-              args: {
-                material:
-                  'Plan + Paris weather + AAPL price + critique combined.',
-              },
-            },
-          ],
-          usage: {input: 130, output: 15},
-        }),
-        // Turn 5: final text (the synthesist result, returned as-is)
-        fakeResponse({
-          id: 'research-5',
-          text: 'Final plan: sunny Paris (~21°C), AAPL ~$199.98; plan looks complete.',
-          usage: {input: 160, output: 18},
-        }),
-      ]),
-    ],
-    [
       'planner_agent',
       new MockAgent([
         fakeResponse({
           id: 'planner-1',
           text: 'Plan: 1) Paris weather 2) AAPL price 3) critique.',
           usage: {input: 12, output: 11},
-        }),
-      ]),
-    ],
-    [
-      'recon_team',
-      new MockAgent([
-        // recon_team uses asTool (not handoffs) for its specialists, so both
-        // can run in one turn via parallel tool calls. The default asTool
-        // schema is `{input: string}`, so each call carries a free-form
-        // natural-language slice of the gather request.
-        fakeResponse({
-          id: 'recon-1',
-          toolCalls: [
-            {
-              callId: 'call-wa',
-              name: 'weather_agent',
-              args: {input: 'Look up the current weather in Paris.'},
-            },
-            {
-              callId: 'call-ma',
-              name: 'market_agent',
-              args: {input: 'Look up the current AAPL stock price.'},
-            },
-          ],
-          usage: {input: 30, output: 12},
-        }),
-        // Turn 2: model receives both sub-agent results and writes the
-        // combined recon summary.
-        fakeResponse({
-          id: 'recon-2',
-          text: 'Weather: Paris is sunny, ~21°C. Market: AAPL ~$199.98.',
-          usage: {input: 60, output: 15},
         }),
       ]),
     ],
@@ -535,24 +438,20 @@ function checkSpans(spans: ReadableSpan[]): string[] {
   // without `--import=weave/instrument`.
   check('Weave auto-registered with @openai/agents tracing', spans.length > 0);
 
-  // ONE top-level run(researchAgent, prompt). research_pipeline walks the
-  // pipeline by calling its four asTool children in sequence (plan, gather,
-  // critique, synthesize). recon_team in turn calls weather + market as
-  // asTool — both run in parallel within one recon turn. asTool nests sub-
-  // agent spans under their parent's `execute_tool` and inherits the trace,
-  // so only research_pipeline is a root and everything sits in one trace.
+  // Code orchestration: 6 top-level `run()` calls inside one `withTrace`.
+  // Each run() opens its own root invoke_agent span (TS owns control flow,
+  // not the SDK), and `withTrace` ties them all into a single OTel trace.
+  // No `research_pipeline`/`recon_team` Agent spans — those are ADK workflow
+  // primitives without an @openai/agents equivalent; they live in TS code.
   const rootInvokes = invokes.filter(s => !s.parentSpanId);
   check(
-    'exactly one root invoke_agent span (research_pipeline)',
-    rootInvokes.length === 1 &&
-      rootInvokes[0].attributes['gen_ai.agent.name'] === 'research_pipeline'
+    'six root invoke_agent spans (planner, weather, market, critic×2, synthesist)',
+    rootInvokes.length === 6
   );
 
-  // All six named agents are visited via asTool.
+  // All five LLM-backed agents are visited; the critic twice.
   for (const name of [
-    'research_pipeline',
     'planner_agent',
-    'recon_team',
     'weather_agent',
     'market_agent',
     'critic_agent',
@@ -560,19 +459,12 @@ function checkSpans(spans: ReadableSpan[]): string[] {
   ]) {
     check(`invoke_agent span for ${name}`, invokesByName(name).length >= 1);
   }
+  check(
+    'critic_agent invoked twice (one root per loop iteration)',
+    invokesByName('critic_agent').length === 2
+  );
 
-  // Typed-schema asTool calls produce execute_tool spans named after the
-  // toolName, with structured args (not the default `{input: "..."}`).
-  const asToolNames = ['plan', 'gather', 'critique', 'synthesize'];
-  for (const name of asToolNames) {
-    const toolSpan = tools.find(s => s.attributes['gen_ai.tool.name'] === name);
-    check(
-      `execute_tool ${name} (typed asTool)`,
-      !!toolSpan &&
-        typeof toolSpan.attributes['gen_ai.tool.call.arguments'] === 'string'
-    );
-  }
-  // The leaf tools inside weather_agent + market_agent.
+  // Leaf tool spans for the two specialists.
   const weatherTool = tools.find(
     s => s.attributes['gen_ai.tool.name'] === 'get_weather'
   );
@@ -598,80 +490,9 @@ function checkSpans(spans: ReadableSpan[]): string[] {
       String(stockTool.attributes['gen_ai.tool.call.result']).includes('199.98')
   );
 
-  // asTool nesting: each sub-agent invoke_agent should sit under its
-  // corresponding execute_tool span. The chain goes
-  //   research_pipeline
-  //     ├ execute_tool plan
-  //     │   └ planner_agent
-  //     ├ execute_tool gather
-  //     │   └ recon_team
-  //     │       ├ execute_tool weather_agent
-  //     │       │   └ weather_agent
-  //     │       └ execute_tool market_agent
-  //     │           └ market_agent
-  //     ├ execute_tool critique
-  //     │   └ critic_agent
-  //     └ execute_tool synthesize
-  //         └ synthesist_agent
-  const researchAgentSpan = invokesByName('research_pipeline')[0];
-  const plannerAgentSpan = invokesByName('planner_agent')[0];
-  const reconAgentSpan = invokesByName('recon_team')[0];
-  const criticAgentSpan = invokesByName('critic_agent')[0];
-  const synthesistAgentSpan = invokesByName('synthesist_agent')[0];
+  // Tool spans parented under their owning agent's invoke_agent span.
   const weatherAgentSpan = invokesByName('weather_agent')[0];
   const marketAgentSpan = invokesByName('market_agent')[0];
-  const planTool = tools.find(s => s.attributes['gen_ai.tool.name'] === 'plan');
-  const gatherTool = tools.find(
-    s => s.attributes['gen_ai.tool.name'] === 'gather'
-  );
-  const critiqueTool = tools.find(
-    s => s.attributes['gen_ai.tool.name'] === 'critique'
-  );
-  const synthTool = tools.find(
-    s => s.attributes['gen_ai.tool.name'] === 'synthesize'
-  );
-  const weatherSubTool = tools.find(
-    s => s.attributes['gen_ai.tool.name'] === 'weather_agent'
-  );
-  const marketSubTool = tools.find(
-    s => s.attributes['gen_ai.tool.name'] === 'market_agent'
-  );
-  if (plannerAgentSpan && planTool) {
-    check(
-      'planner_agent nests under execute_tool plan',
-      plannerAgentSpan.parentSpanId === planTool.spanContext().spanId
-    );
-  }
-  if (reconAgentSpan && gatherTool) {
-    check(
-      'recon_team nests under execute_tool gather',
-      reconAgentSpan.parentSpanId === gatherTool.spanContext().spanId
-    );
-  }
-  if (weatherAgentSpan && weatherSubTool) {
-    check(
-      'weather_agent nests under execute_tool weather_agent (asTool)',
-      weatherAgentSpan.parentSpanId === weatherSubTool.spanContext().spanId
-    );
-  }
-  if (marketAgentSpan && marketSubTool) {
-    check(
-      'market_agent nests under execute_tool market_agent (asTool)',
-      marketAgentSpan.parentSpanId === marketSubTool.spanContext().spanId
-    );
-  }
-  if (criticAgentSpan && critiqueTool) {
-    check(
-      'critic_agent nests under execute_tool critique',
-      criticAgentSpan.parentSpanId === critiqueTool.spanContext().spanId
-    );
-  }
-  if (synthesistAgentSpan && synthTool) {
-    check(
-      'synthesist_agent nests under execute_tool synthesize',
-      synthesistAgentSpan.parentSpanId === synthTool.spanContext().spanId
-    );
-  }
   if (weatherTool && weatherAgentSpan) {
     check(
       'get_weather nests under weather_agent',
@@ -685,15 +506,29 @@ function checkSpans(spans: ReadableSpan[]): string[] {
     );
   }
 
-  // No handoffs in this version — everything is asTool, which doesn't emit
-  // handoff spans.
+  // No handoffs and no asTool, so no handoff spans and no nested invoke_agent
+  // spans either.
   const handoffs = spans.filter(s => s.name.startsWith('handoff '));
-  check('no handoff spans (asTool fan-out everywhere)', handoffs.length === 0);
+  check('no handoff spans (code orchestration)', handoffs.length === 0);
 
-  // asTool inherits the parent trace, so the entire pipeline lives in a
-  // single OTel trace.
+  // Each top-level `run()` opens its own OTel trace today — `withTrace` ties
+  // them together at the Agents-SDK trace layer, not at the OTel layer. The
+  // groupId from withTrace lands on every span as `gen_ai.conversation.id`,
+  // which is what the Agents-tab UI uses to render them as one flow.
   const traceIds = new Set(spans.map(s => s.spanContext().traceId));
-  check('single trace (asTool inherits the parent trace)', traceIds.size === 1);
+  check(
+    'one OTel trace per run() (6 total)',
+    traceIds.size === 6
+  );
+  const conversationIds = new Set(
+    spans
+      .map(s => s.attributes['gen_ai.conversation.id'])
+      .filter((v): v is string => typeof v === 'string')
+  );
+  check(
+    'all spans share one gen_ai.conversation.id (withTrace groupId)',
+    conversationIds.size === 1
+  );
 
   // Provider tag on invoke_agent spans too (not just chat).
   check(
