@@ -7,6 +7,7 @@ specific setup requirements.
 
 import base64
 import os
+import socket
 from unittest import mock
 
 import boto3
@@ -290,6 +291,60 @@ def test_keepalive_gcs_client_scopes_credentials_for_session():
     prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
     passthrough = file_storage._build_keepalive_gcs_client(prescoped)
     assert passthrough._http.credentials.scopes == ["existing-scope"]
+
+
+def test_keepalive_adapter_sets_tcp_user_timeout():
+    """In-flight stalls need TCP_USER_TIMEOUT; keep-alive only covers idle sockets."""
+    adapter = file_storage._KeepAliveHTTPAdapter(
+        pool_maxsize=file_storage.GCS_POOL_MAXSIZE
+    )
+    socket_options = adapter.poolmanager.connection_pool_kw["socket_options"]
+
+    assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in socket_options
+    # Linux-only knob (skipped on macOS/BSD where the constant is absent).
+    if hasattr(socket, "TCP_USER_TIMEOUT"):
+        assert (
+            socket.IPPROTO_TCP,
+            socket.TCP_USER_TIMEOUT,
+            file_storage.GCS_TCP_USER_TIMEOUT_MS,
+        ) in socket_options
+
+
+class _CountingStorageClient(file_storage.FileStorageClient):
+    """Records store() calls so a test can assert the dedup cache skips repeats."""
+
+    def __init__(self, base_uri: file_storage.FileStorageURI):
+        super().__init__(base_uri)
+        self.store_calls = 0
+
+    def store(self, uri: file_storage.FileStorageURI, data: bytes) -> None:
+        self.store_calls += 1
+
+    def read(self, uri: file_storage.FileStorageURI) -> bytes:
+        raise NotImplementedError
+
+
+def test_store_in_bucket_dedups_repeat_keys():
+    """A repeat content-addressed write is served from the per-pod cache, not the backend."""
+    file_storage.reset_stored_key_cache()
+    base = file_storage.FileStorageURI.parse_uri_str("gs://dedup-test-bucket")
+    client = _CountingStorageClient(base)
+
+    path = file_storage.key_for_project_digest("proj", "digestA")
+    uri1 = file_storage.store_in_bucket(client, path, b"data")
+    uri2 = file_storage.store_in_bucket(client, path, b"data")
+    assert uri1.to_uri_str() == uri2.to_uri_str()
+    assert client.store_calls == 1  # second call served from cache
+
+    file_storage.store_in_bucket(
+        client, file_storage.key_for_project_digest("proj", "digestB"), b"x"
+    )
+    assert client.store_calls == 2  # a distinct key still reaches the backend
+
+    # reset re-arms the backend write for an already-seen key.
+    file_storage.reset_stored_key_cache()
+    file_storage.store_in_bucket(client, path, b"data")
+    assert client.store_calls == 3
 
 
 class TestAzureStorage:

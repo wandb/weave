@@ -17,6 +17,7 @@ from weave.integrations.integration_metadata import (
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
+from weave.trace.serialization.serialize import stable_repr
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +112,11 @@ class DSPyPatcher(MultiPatcher):
                     "name": model_name,
                     "dump_state": raw_dump_state,
                     "_compiled": getattr(program, "_compiled", None),
-                    "callbacks": [repr(cb) for cb in getattr(program, "callbacks", [])],
-                    "program_repr": repr(program),
-                    "metric_repr": repr(metric),
+                    "callbacks": [
+                        stable_repr(cb) for cb in getattr(program, "callbacks", [])
+                    ],
+                    "program_repr": stable_repr(program),
+                    "metric_repr": stable_repr(metric),
                     "num_threads": num_threads,
                     "display_progress": display_progress,
                     "failure_score": failure_score,

@@ -26,6 +26,12 @@ MAX_AGENT_STATS_RESULT_ROWS = 10_000
 # Maximum number of traces to render in the multi-turn conversation chat view.
 MAX_CONVERSATION_CHAT_TURNS = 50
 
+# Maximum number of spans returned per conversation by agent_conversation_spans.
+# Bounds the payload of the per-conversation spans sequence (the "minimap"); the
+# client downsamples further for narrow columns. Conversations longer than this
+# truncate their tail.
+MAX_CONVERSATION_SPANS = 200
+
 # ---------------------------------------------------------------------------
 # Chat view walk limits
 # ---------------------------------------------------------------------------
@@ -91,6 +97,11 @@ SPAN_GROUP_RESULT_COLS: frozenset[str] = SPAN_GROUP_AGGREGATE_COLS.union(
             "provider_names",
             "request_models",
             "conversation_names",
+            # Cost aggregate aliases (populated only when include_costs is set).
+            # Reserved here so user measure aliases can never collide with them.
+            "total_cost_usd",
+            "total_input_cost_usd",
+            "total_output_cost_usd",
         }
     )
 )

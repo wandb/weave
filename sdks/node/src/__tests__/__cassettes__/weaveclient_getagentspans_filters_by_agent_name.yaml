@@ -12,7 +12,7 @@
       alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
       content-length: "15"
       content-type: application/json
-      date: Mon, 22 Jun 2026 15:04:00 GMT
+      date: Fri, 26 Jun 2026 16:17:18 GMT
       server: uvicorn
       via: 1.1 google
     body: '{"status":"ok"}'
@@ -22,7 +22,7 @@
     headers:
       authorization: masked
       content-type: application/json
-      user-agent: Weave JS Client 0.15.1
+      user-agent: Weave JS Client 0.16.0
     body: '{"query":"\nquery DefaultEntity {\n    viewer
       {\n        username\n        defaultEntity
       {\n            name\n        }\n    }\n}\n","variables":{}}'
@@ -34,7 +34,7 @@
       content-encoding: br
       content-length: "69"
       content-type: application/json; charset=utf-8
-      date: Mon, 22 Jun 2026 15:04:01 GMT
+      date: Fri, 26 Jun 2026 16:17:19 GMT
       ratelimit-limit: "1000"
       ratelimit-remaining: "1000"
       vary: Origin
@@ -42,7 +42,7 @@
       x-content-type-options: nosniff
       x-ratelimit-limit: "1000"
       x-ratelimit-remaining: "1000"
-      x-wandb-trace-id: f23271aabf884a675db908422e7eafe3
+      x-wandb-trace-id: d547fc337079feb93059b30f6566e2c0
     body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
 - request:
     url: https://trace.wandb.ai/agents/spans/query
@@ -51,15 +51,16 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
-    body: '{"project_id":"drtangible-mocha/example","limit":2,"query":{"$expr":{"$eq":[{"$getField":"agent_name"},{"$literal":"my-cool-agent"}]}}}'
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","query":{"$expr":{"$eq":[{"$getField":"agent_name"},{"$literal":"my-cool-agent"}]}},"limit":2}'
   response:
     status: 200
     statusText: OK
     headers:
       alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
-      content-length: "3158"
+      content-length: "3447"
       content-type: application/json
-      date: Mon, 22 Jun 2026 15:04:00 GMT
+      date: Fri, 26 Jun 2026 16:17:18 GMT
       server: uvicorn
       via: 1.1 google
-    body: '{"spans":[{"project_id":"drtangible-mocha/example","trace_id":"a5a90a8d59e2c5e10f3ce5e69ba3c39a","span_id":"efbffb030cab41c9","parent_span_id":"","span_name":"invoke_agent","span_kind":"CLIENT","started_at":"2026-06-15T20:49:24.875000","ended_at":"2026-06-15T20:49:24.875329","status_code":"UNSET","status_message":"","operation_name":"invoke_agent","provider_name":"","agent_name":"my-cool-agent","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"019ecd0b-d38b-7079-ac31-ee541e48a389","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"82a4727d59d526801594379ded785542","span_id":"68fa67d5baecc6ae","parent_span_id":"","span_name":"invoke_agent","span_kind":"CLIENT","started_at":"2026-06-15T20:49:24.418000","ended_at":"2026-06-15T20:49:24.418812","status_code":"UNSET","status_message":"","operation_name":"invoke_agent","provider_name":"","agent_name":"my-cool-agent","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"reasoning_content":null,"conversation_id":"019ecd0b-d1c0-7fa7-bd22-85e31b44f90e","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null}],"groups":[],"total_count":33}'
+    body: '{"spans":[{"project_id":"drtangible-mocha/example","trace_id":"a5a90a8d59e2c5e10f3ce5e69ba3c39a","span_id":"14faef3efa03c09f","parent_span_id":"2a980d7ca117e220","span_name":"execute_tool","span_kind":"INTERNAL","started_at":"2026-06-15T20:49:24.875000","ended_at":"2026-06-15T20:49:24.875113","status_code":"UNSET","status_message":"","operation_name":"execute_tool","provider_name":"","agent_name":"my-cool-agent","agent_id":"","agent_description":"","agent_version":"","request_model":"","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_cost_usd":null,"output_cost_usd":null,"cache_read_cost_usd":null,"cache_creation_cost_usd":null,"total_cost_usd":null,"reasoning_content":null,"conversation_id":"019ecd0b-d38b-7079-ac31-ee541e48a389","conversation_name":"","tool_name":"get-weather","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null},{"project_id":"drtangible-mocha/example","trace_id":"a5a90a8d59e2c5e10f3ce5e69ba3c39a","span_id":"2a980d7ca117e220","parent_span_id":"efbffb030cab41c9","span_name":"chat","span_kind":"CLIENT","started_at":"2026-06-15T20:49:24.875000","ended_at":"2026-06-15T20:49:24.875197","status_code":"UNSET","status_message":"","operation_name":"chat","provider_name":"","agent_name":"my-cool-agent","agent_id":"","agent_description":"","agent_version":"","request_model":"some-model","response_model":"","response_id":"","input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_cost_usd":null,"output_cost_usd":null,"cache_read_cost_usd":null,"cache_creation_cost_usd":null,"total_cost_usd":null,"reasoning_content":null,"conversation_id":"019ecd0b-d38b-7079-ac31-ee541e48a389","conversation_name":"","tool_name":"","tool_type":"","tool_call_id":"","tool_description":null,"tool_definitions":null,"finish_reasons":[],"error_type":"","request_temperature":0.0,"request_max_tokens":0,"request_top_p":0.0,"request_frequency_penalty":0.0,"request_presence_penalty":0.0,"request_seed":0,"request_stop_sequences":[],"request_choice_count":0,"output_type":"","input_messages":[],"output_messages":[],"system_instructions":[],"tool_call_arguments":null,"tool_call_result":null,"compaction_summary":null,"compaction_items_before":0,"compaction_items_after":0,"content_refs":[],"artifact_refs":[],"object_refs":[],"custom_attrs_string":{},"custom_attrs_int":{},"custom_attrs_float":{},"custom_attrs_bool":{},"server_address":"","server_port":0,"wb_user_id":"VXNlcjo0MDQ5MTgy","wb_run_id":"","wb_run_step":0,"wb_run_step_end":0,"raw_span_dump":null}],"groups":[],"total_count":99}'

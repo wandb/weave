@@ -862,6 +862,55 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
         )
 
+    # Dataset Sources API
+    def dataset_sources_link(
+        self, req: tsi.DatasetSourcesLinkReq
+    ) -> tsi.DatasetSourcesLinkRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.dataset_sources_link, req, req.project_id
+        )
+
+    def dataset_sources_link_delete(
+        self, req: tsi.DatasetSourcesLinkDeleteReq
+    ) -> tsi.DatasetSourcesLinkDeleteRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.dataset_sources_link_delete, req, req.project_id
+        )
+
+    def dataset_sources_query(
+        self, req: tsi.DatasetSourcesQueryReq
+    ) -> tsi.DatasetSourcesQueryRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        res = self._ref_apply(
+            self._internal_trace_server.dataset_sources_query, req, req.project_id
+        )
+        for link in res.links:
+            if link.added_by is not None:
+                link.added_by = self._idc.int_to_ext_user_id(link.added_by)
+        return res
+
+    def source_datasets_query(
+        self, req: tsi.SourceDatasetsQueryReq
+    ) -> tsi.SourceDatasetsQueryRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.source_datasets_query, req, req.project_id
+        )
+
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
@@ -1365,6 +1414,16 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
             self._internal_trace_server.agent_conversation_chat,
+            req,
+            req.project_id,
+        )
+
+    def agent_conversation_spans(
+        self, req: tsi.agent_types.AgentConversationSpansReq
+    ) -> tsi.agent_types.AgentConversationSpansRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.agent_conversation_spans,
             req,
             req.project_id,
         )

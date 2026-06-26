@@ -28,6 +28,25 @@ function normalizeVolatileBodyFields(req: HttpRequest): HttpRequest {
 }
 
 /**
+ * Replace the SDK version token in the `user-agent` header with a stable
+ * placeholder, so cassette matching survives version bumps.
+ */
+function normalizeUserAgentVersion(req: HttpRequest): HttpRequest {
+  const userAgent = req.headers['user-agent'];
+  if (!userAgent) {
+    return req;
+  }
+
+  return {
+    ...req,
+    headers: {
+      ...req.headers,
+      'user-agent': userAgent.replace(/(JS Client ).+$/, '$1<VERSION>'),
+    },
+  };
+}
+
+/**
  * Replace per-request multipart boundary with a stable placeholder
  * in both the `content-type` header and the body, so cassette matching works
  * across runs. Non-multipart requests pass through untouched.
@@ -51,10 +70,11 @@ function normalizeMultipartBoundary(req: HttpRequest): HttpRequest {
 }
 
 function normalizeRequest(req: HttpRequest): HttpRequest {
-  return [normalizeMultipartBoundary, normalizeVolatileBodyFields].reduce(
-    (req, normalizer) => normalizer(req),
-    req
-  );
+  return [
+    normalizeMultipartBoundary,
+    normalizeVolatileBodyFields,
+    normalizeUserAgentVersion,
+  ].reduce((req, normalizer) => normalizer(req), req);
 }
 
 class Matcher extends DefaultRequestMatcher {

@@ -1,6 +1,6 @@
 import * as weave from 'weave';
-import {op, type Op} from 'weave';
 import {WeaveClient} from '../weaveClient';
+import type {Op} from 'weave';
 
 const mockOpName = 'weave://test-project-id/op/test-op';
 const mockCallId = 'test-call-id';
@@ -24,10 +24,10 @@ jest.mock('weave/clientApi', () => ({
       createCall: (...args: any) => {
         return WeaveClient.prototype.createCall.apply(weaveClient, args);
       },
-      startCall: (...args: any[]) => {
+      startCall: (..._args: any[]) => {
         return Promise.resolve();
       },
-      saveOp: (op: any, ...rest: any) => {
+      saveOp: (op: any, ..._rest: any) => {
         op.__savedRef = Promise.resolve(op);
         op.uri = () => 'weave://test-project-id/op/test-op';
         return Promise.resolve();

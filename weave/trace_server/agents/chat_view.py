@@ -70,6 +70,22 @@ class TokenTotals:
     output_tokens: int
     reasoning_tokens: int
     reasoning_content: str | None
+    # Query-time costs (USD). None means no contributing span had a price, so
+    # the cost is unknown rather than 0 (mirrors AgentSpanSchema cost columns).
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    total_cost_usd: float | None = None
+
+
+def add_optional_cost(acc: float | None, value: float | None) -> float | None:
+    """Sum two optional costs, treating None as "no contribution".
+
+    Stays None until a non-None value appears, so a collection of entirely
+    unpriced spans reports None (unknown) rather than 0.0.
+    """
+    if value is None:
+        return acc
+    return (acc or 0.0) + value
 
 
 def _datetime_sort_seconds(dt: datetime | None) -> float:
@@ -156,6 +172,7 @@ def build_trace_chat(
     root_status_code: str | None = None
     provider: str | None = None
     total_duration_ms: int | None = None
+    total_cost_usd: float | None = None
 
     if spans:
         root = _select_root_span(spans)
@@ -170,6 +187,9 @@ def build_trace_chat(
         # whole turn — not a sum of child durations (which would double
         # count overlapping subagents / parallel tool calls).
         total_duration_ms = _compute_duration_ms(root.started_at, root.ended_at)
+        # Cost, unlike duration, IS a sum across every span in the trace.
+        for span in spans:
+            total_cost_usd = add_optional_cost(total_cost_usd, span.total_cost_usd)
 
     return AgentTraceChatRes(
         trace_id=trace_id,
@@ -179,6 +199,7 @@ def build_trace_chat(
         status_code=root_status_code,
         provider=provider,
         total_duration_ms=total_duration_ms,
+        total_cost_usd=total_cost_usd,
         messages=messages,
     )
 
@@ -186,20 +207,39 @@ def build_trace_chat(
 def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     """Convert a list of agent spans into a linear chat trajectory.
 
-    Build the parent-child tree, prepend a single user prompt if one can be
-    found, then let `ChatTraversal` apply the explicit tree-walk policy.
+    Walk the parent-child tree, emitting one user message per turn — each LLM
+    span's *new* user input (see `ChatTraversal._emit_user_turn`) — interleaved
+    with its assistant/tool events. A single realtime trace can hold many turns
+    (one chat span each), so the conversation is reconstructed from the spans'
+    own messages rather than assuming one user prompt per trace.
+
+    Only when the walk surfaces no user message at all — e.g. an SDK that
+    records the prompt on the enclosing `invoke_agent` span rather than the LLM
+    span — do we fall back to a single synthesized leading prompt.
     """
     if not spans:
         return []
 
     tree = build_span_tree(spans)
     traversal = ChatTraversal()
-
-    if user_message := _find_user_message(spans):
-        traversal.messages.append(user_message)
-
     traversal.walk_roots(tree)
-    return traversal.messages
+
+    messages = traversal.messages
+    if not traversal.emitted_user and (user_message := _find_user_message(spans)):
+        messages.insert(0, user_message)
+
+    # The walk emits an invoke_agent's `agent_start` before descending to the
+    # chat span that carries that turn's user message, but the user speaks
+    # first and the agent is invoked in response. Restore that order so the
+    # opening prompt leads (matches the single-prompt-per-trace SDK shape).
+    if (
+        len(messages) >= 2
+        and messages[0].type == "agent_start"
+        and messages[1].type == "user_message"
+    ):
+        messages[0], messages[1] = messages[1], messages[0]
+
+    return messages
 
 
 @dataclass
@@ -214,6 +254,12 @@ class ChatTraversal:
     """
 
     messages: list[AgentChatMessage] = field(default_factory=list)
+    # True once any per-turn user message has been emitted during the walk;
+    # gates the invoke_agent leading-prompt fallback in build_chat_messages.
+    emitted_user: bool = False
+    # (text, media-digests) of the most recently emitted user message, so the
+    # same message replayed by a following LLM span is not emitted twice.
+    _last_user_sig: tuple[str, tuple[str, ...]] | None = None
 
     def walk_roots(self, roots: list[SpanNode]) -> None:
         for root in roots:
@@ -328,18 +374,63 @@ class ChatTraversal:
     def _walk_content_span(
         self, node: SpanNode, nearest_agent: str | None, depth: int
     ) -> bool:
-        """Walk a regular content span and emit its assistant text if present."""
+        """Walk a regular content span and emit its assistant text if present.
+
+        A span that produced reasoning but no assistant text (an LLM step that
+        only emitted a tool call) still emits a reasoning-only message, so
+        thinking interleaved between tool calls is surfaced rather than dropped.
+        Such a step is not the turn's final assistant text, so it does not
+        suppress a mirrored final message on the enclosing `invoke_agent` span.
+        """
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
+        self._emit_user_turn(span)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
 
         msg = _emit_assistant_message(span, agent_name)
-        if msg:
-            self.messages.append(msg)
-            return True
-        return subtree_emitted_assistant
+        if msg is None:
+            return subtree_emitted_assistant
+        self.messages.append(msg)
+        assistant = msg.assistant_message
+        emitted_text = bool(assistant and assistant.text)
+        return emitted_text or subtree_emitted_assistant
+
+    def _emit_user_turn(self, span: AgentSpanSchema) -> None:
+        """Emit the user message(s) for the new turn this LLM span answers.
+
+        The new user input is the trailing run of consecutive user-role
+        messages in ``input_messages`` — those appended since the previous
+        assistant/system message (or the start). Earlier turns are replayed as
+        history and skipped; they were emitted by the span that first answered
+        them. The run need not alternate: a turn can be several user messages.
+
+        Each message becomes its own bubble so its own media stays with it;
+        collapsing the run would re-group every turn's audio onto one message.
+        Media comes from the message's inline ``uri`` parts, resolved to the
+        internal ref form via the span's ``content_refs`` because the read path
+        requires internal refs (the int->ext converter rejects a bare external
+        ref).
+        """
+        for message in _trailing_user_messages(span.input_messages):
+            text = _display_text(message.content)
+            media = _directional_content_refs(span, _media_part_digests([message]))
+            if not text and not media:
+                continue
+            sig = (text, tuple(media))
+            if sig == self._last_user_sig:
+                continue
+            self._last_user_sig = sig
+            self.emitted_user = True
+            self.messages.append(
+                AgentChatMessage(
+                    type="user_message",
+                    agent_name="User",
+                    started_at=span.started_at,
+                    user_message=AgentChatUserMessage(text=text, content_refs=media),
+                )
+            )
 
     def _walk_children(
         self, node: SpanNode, nearest_agent: str | None, depth: int
@@ -558,10 +649,12 @@ def _ref_digest(ref: str) -> str:
 
 
 def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
-    """Object digests of media (uri/blob/file) parts inlined in these messages.
+    """Object digests of media (uri/blob/file) parts inlined in ``messages``.
 
-    Direction lives in the parts: a user-supplied audio/image is a ``uri`` part
-    on an input message; model-generated media is a part on an output message.
+    Pure extraction — it carries no notion of direction. Callers decide whose
+    media this is by choosing which messages to pass: media belongs to the role
+    that owns the message it sits on, not to whichever input/output list it
+    appears in (see ``_user_messages``).
     """
     digests: set[str] = set()
     for message in messages:
@@ -576,31 +669,66 @@ def _media_part_digests(messages: list[NormalizedMessage]) -> set[str]:
 def _directional_content_refs(
     span: AgentSpanSchema, part_digests: set[str]
 ) -> list[str]:
-    """Span ``content_refs`` whose object digest matches an inline part.
+    """Resolve ``part_digests`` against the span's ``content_refs``.
 
-    The value comes from ``content_refs`` because it holds the ref in the
-    internal, int<->ext-convertible form the response pipeline requires — the
-    int->ext adapter raises on a bare external ref. The direction comes from
-    the message parts (external form). Match the two by digest so each ref is
-    surfaced on the correct side (input -> user, output -> assistant).
+    ``content_refs`` is a direction-agnostic digest->ref lookup holding each ref
+    in the internal, int<->ext-convertible form the response pipeline requires
+    (the int->ext adapter raises on a bare external ``weave:///`` ref, the form
+    inline message parts carry). Returns the internal refs whose digest matches
+    a supplied part digest; direction is the caller's choice of messages, never
+    this lookup.
     """
     if not part_digests:
         return []
     return [r for r in _content_refs(span) if _ref_digest(r) in part_digests]
 
 
+def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]:
+    """The user's side of a message list, selected by role.
+
+    Direction is the message role, not its input/output position: a multi-turn
+    conversation replays the prior assistant turn — model-generated media and
+    all — into the next turn's ``input_messages``, so selecting by position
+    would mislabel that assistant audio/image as user-supplied. Uses the same
+    role resolution as ``_extract_user_text``: everything that isn't
+    assistant/system/tool context (explicit ``user`` plus provider-variant
+    empty/unknown roles).
+    """
+    return [m for m in messages if m.role not in _NON_USER_PROMPT_ROLES]
+
+
+def _trailing_user_messages(
+    messages: list[NormalizedMessage],
+) -> list[NormalizedMessage]:
+    """The contiguous run of user-role messages at the end of ``messages``.
+
+    This is the new user input an LLM span responds to: the messages appended
+    since the previous assistant/system message (or the start). Earlier history
+    is excluded; it was answered by earlier spans. Role decides the boundary
+    (see ``_user_messages``), so the sequence need not alternate.
+    """
+    turn: list[NormalizedMessage] = []
+    for message in reversed(messages):
+        if message.role in _NON_USER_PROMPT_ROLES:
+            break
+        turn.append(message)
+    turn.reverse()
+    return turn
+
+
 def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
-    """Input-side media refs across a trace, de-duplicated, in internal form.
+    """User-supplied media refs across a trace, de-duplicated, in internal form.
 
     ``attach_media`` records media on the LLM/chat span, but the rendered user
-    prompt is synthesized from the enclosing invoke_agent span, so the media
-    lives on a different span than the user text. Gather input media across all
-    spans so it lands on the user message regardless of which span carries it.
+    prompt is synthesized from the enclosing invoke_agent span, so media and
+    user text live on different spans. Gather user-side input media across all
+    spans so it lands on the user message regardless of which span carries it;
+    only user-role messages contribute (see ``_user_messages``).
     """
     refs: list[str] = []
     seen: set[str] = set()
     for span in spans:
-        in_digests = _media_part_digests(span.input_messages)
+        in_digests = _media_part_digests(_user_messages(span.input_messages))
         for ref in _directional_content_refs(span, in_digests):
             if ref not in seen:
                 seen.add(ref)
@@ -609,11 +737,14 @@ def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
 
 
 def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
-    """Sum input, output, and reasoning tokens across a subtree."""
+    """Sum input, output, and reasoning tokens (and costs) across a subtree."""
     input_t = node.span.input_tokens or 0
     output_t = node.span.output_tokens or 0
     reasoning_t = node.span.reasoning_tokens or 0
     reasoning_text = node.span.reasoning_content
+    input_cost_usd = node.span.input_cost_usd
+    output_cost_usd = node.span.output_cost_usd
+    total_cost_usd = node.span.total_cost_usd
     for child in node.children:
         child_totals = _sum_descendant_tokens(child)
         input_t += child_totals.input_tokens
@@ -621,7 +752,20 @@ def _sum_descendant_tokens(node: SpanNode) -> TokenTotals:
         reasoning_t += child_totals.reasoning_tokens
         if child_totals.reasoning_content and not reasoning_text:
             reasoning_text = child_totals.reasoning_content
-    return TokenTotals(input_t, output_t, reasoning_t, reasoning_text)
+        input_cost_usd = add_optional_cost(input_cost_usd, child_totals.input_cost_usd)
+        output_cost_usd = add_optional_cost(
+            output_cost_usd, child_totals.output_cost_usd
+        )
+        total_cost_usd = add_optional_cost(total_cost_usd, child_totals.total_cost_usd)
+    return TokenTotals(
+        input_t,
+        output_t,
+        reasoning_t,
+        reasoning_text,
+        input_cost_usd=input_cost_usd,
+        output_cost_usd=output_cost_usd,
+        total_cost_usd=total_cost_usd,
+    )
 
 
 def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
@@ -671,12 +815,19 @@ def _emit_assistant_message(
     descendant LLM span. Callers pass `aggregate_node` only when the invoke span
     itself needs to emit because no descendant already did; in that case token
     usage is summed across the subtree so the emitted message reflects the
-    whole agent turn. Returns None when there is no non-user output text.
+    whole agent turn.
+
+    A span that produced reasoning but no assistant text (e.g. an LLM step that
+    only emitted a tool call) still yields a message carrying that reasoning, so
+    thinking interleaved between tool calls is surfaced rather than dropped.
+    Returns None only when there is neither output text nor reasoning content.
     """
-    if not span.output_messages:
-        return None
-    text = _extract_non_user_output_text(span.output_messages)
-    if not text:
+    text = (
+        _extract_non_user_output_text(span.output_messages)
+        if span.output_messages
+        else ""
+    )
+    if not text and not span.reasoning_content:
         return None
 
     if aggregate_node:
@@ -687,6 +838,9 @@ def _emit_assistant_message(
             output_tokens=span.output_tokens or 0,
             reasoning_tokens=span.reasoning_tokens or 0,
             reasoning_content=span.reasoning_content,
+            input_cost_usd=span.input_cost_usd,
+            output_cost_usd=span.output_cost_usd,
+            total_cost_usd=span.total_cost_usd,
         )
 
     return AgentChatMessage(
@@ -703,6 +857,9 @@ def _emit_assistant_message(
             reasoning_tokens=totals.reasoning_tokens,
             input_tokens=totals.input_tokens or span.input_tokens,
             output_tokens=totals.output_tokens or span.output_tokens,
+            input_cost_usd=totals.input_cost_usd,
+            output_cost_usd=totals.output_cost_usd,
+            total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
             content_refs=_directional_content_refs(

@@ -2377,9 +2377,14 @@ def test_aggregated_data_size_field():
 
     # Test SQL generation
     sql = field.as_select_sql(pb, "calls_merged")
-    assert "CASE" in sql
-    assert "parent_id" in sql
-    assert "rolled_up_cms.total_storage_size_bytes" in sql
+    assert sql == (
+        "\n            CASE\n"
+        "                WHEN any(calls_merged.parent_id) IS NULL\n"
+        "                THEN any(rolled_up_cms.total_storage_size_bytes)\n"
+        "                ELSE NULL\n"
+        "            END\n"
+        "             AS total_storage_size_bytes"
+    )
 
 
 def test_datetime_optimization_simple() -> None:
@@ -4068,6 +4073,31 @@ def test_build_calls_complete_delete_query_with_cluster() -> None:
     assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
 
 
+def test_build_calls_complete_delete_query_with_started_at_window() -> None:
+    """started_at bounds bracket the partition/primary key so the delete prunes."""
+    query = build_calls_complete_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        started_at_min_param="started_at_min",
+        started_at_max_param="started_at_max",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        DELETE FROM calls_complete ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String}
+        AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
+        AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')
+        AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
 def test_build_calls_complete_update_query() -> None:
     """Ensure the update helper builds the expected query."""
     query = build_calls_complete_update_query(
@@ -4453,7 +4483,7 @@ def test_stats_query_calls_merged_unfiltered_no_limit_uses_flat_distinct() -> No
         SELECT raw_count AS count,
                toUInt8(0) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4478,7 +4508,7 @@ def test_stats_query_calls_merged_unfiltered_with_limit_caps_in_outer_select() -
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
+            SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name) OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS raw_count
             FROM calls_merged
             WHERE calls_merged.project_id = {pb_0:String})
         """,
@@ -4497,8 +4527,8 @@ def test_stats_query_calls_merged_unfiltered_storage_uses_flat_sum() -> None:
     assert_stats_sql(
         req,
         """
-        SELECT uniqExactIf(calls_merged.id, isNotNull(calls_merged.op_name)
-                           OR isNotNull(calls_merged.deleted_at)) - uniqExactIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
                toUInt8(0) AS has_more,
                coalesce(
                           (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
@@ -4577,7 +4607,7 @@ def _started_at_query(expr: dict) -> tsi.Query:
 def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> None:
     """A started_at-only window takes the distinct-id fast path (Pattern 4).
 
-    uniqExact counts start rows in the window -- the exact `started_at`
+    uniq counts start rows in the window -- the exact `started_at`
     predicates match the GROUP BY path's `any(started_at) <op> T` HAVING (and
     drop the prefilter buffer slop), and `op_name IS NOT NULL` reproduces its
     orphaned-call-end exclusion (since #6933 end rows carry started_at too).
@@ -4604,7 +4634,7 @@ def test_stats_query_calls_merged_started_at_window_uses_distinct_anti_set() -> 
         SELECT least(raw_count, 5) AS count,
                toUInt8(raw_count > 5) AS has_more
         FROM (
-            SELECT uniqExact(calls_merged.id) AS raw_count
+            SELECT uniq(calls_merged.id) AS raw_count
             FROM calls_merged
             PREWHERE calls_merged.project_id = {pb_0:String}
             WHERE calls_merged.sortable_datetime > {pb_2:String}
@@ -4782,12 +4812,25 @@ def test_stats_query_calls_merged_no_cap_when_summing_storage() -> None:
         project_id="project",
         include_total_storage_size=True,
     )
-    query, _columns, settings = build_calls_stats_query(
+    _query, _columns, settings = build_calls_stats_query(
         req, ParamBuilder("pb"), ReadTable.CALLS_MERGED
     )
     assert settings == {}
-    assert "LIMIT" not in query
-    assert "toUInt8(0) AS has_more" in query
+    assert_stats_sql(
+        req,
+        """
+        SELECT uniqIf(calls_merged.id, isNotNull(calls_merged.op_name)
+                           OR isNotNull(calls_merged.deleted_at)) - uniqIf(calls_merged.id, isNotNull(calls_merged.deleted_at)) AS count,
+               toUInt8(0) AS has_more,
+               coalesce(
+                          (SELECT sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_dump_size_bytes, 0))
+                           FROM calls_merged_stats
+                           WHERE project_id = {pb_0:String}), 0) AS total_storage_size_bytes
+        FROM calls_merged PREWHERE calls_merged.project_id = {pb_0:String}
+        """,
+        {"pb_0": "project"},
+        read_table=ReadTable.CALLS_MERGED,
+    )
 
 
 # ---------------------------------------------------------------------------

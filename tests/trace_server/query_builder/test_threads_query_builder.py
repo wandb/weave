@@ -410,17 +410,38 @@ def test_turn_filtering_explanation():
     # This means:
     # ✅ Turn calls (where call.id == call.turn_id) are included
     # ❌ Descendant calls (where call.id != call.turn_id) are excluded
-    pb = ParamBuilder("pb")
-    clickhouse_query = make_threads_query(project_id="test", pb=pb)
-
-    # Check that turn filtering is present
-    assert "id = any(turn_id)" in clickhouse_query
-
-    # Check that thread filtering is also present (non-null, non-empty),
-    # in the HAVING clause using aggregated_thread_id
-    assert (
-        "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
-        in clickhouse_query
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY last_updated DESC
+        """,
+        {"pb_0": "test"},
+        project_id="test",
     )
 
 
@@ -576,19 +597,41 @@ def test_clickhouse_with_thread_id_and_all_options():
 
 def test_thread_id_filter_no_match():
     """Test that thread_id filter doesn't break query even if no threads match."""
-    # This test verifies that the SQL generation doesn't break with thread_id filter
-    pb = ParamBuilder("pb")
-    query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["nonexistent_thread"]
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+                AND (thread_id IS NULL OR thread_id IN ({pb_1: String}))
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_1: String})
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY last_updated DESC
+        """,
+        {"pb_0": "test_project", "pb_1": "nonexistent_thread"},
+        project_id="test_project",
+        thread_ids=["nonexistent_thread"],
     )
-
-    # Should contain the thread filter
-    assert "thread_id IN ({pb_1: String})" in query
-
-    # Should have the expected parameter
-    params = pb.get_params()
-    assert "pb_1" in params
-    assert params["pb_1"] == "nonexistent_thread"
 
 
 def test_query_structure_documentation():
@@ -597,22 +640,36 @@ def test_query_structure_documentation():
     This test serves AS living documentation of what the threads query does
     and why it's structured the way it is.
     """
-    pb = ParamBuilder("pb")
-    query = make_threads_query(project_id="test_project", pb=pb)
-
-    # Should be a two-level aggregation for ClickHouse
-    assert "SELECT" in query  # Outer query
-    assert "FROM (" in query  # Inner subquery
-    assert "GROUP BY aggregated_thread_id" in query  # Outer aggregation by thread
-    assert "GROUP BY (project_id, id)" in query  # Inner aggregation by call
-
-    # Should include key aggregations
-    assert "COUNT(*) AS turn_count" in query
-    assert "min(call_start_time) AS start_time" in query
-    assert "max(call_end_time) AS last_updated" in query
-
-    # Should include turn filtering
-    assert "id = any(turn_id)" in query
-
-    # Should have default ordering
-    assert "ORDER BY last_updated DESC" in query
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY last_updated DESC
+        """,
+        {"pb_0": "test_project"},
+        project_id="test_project",
+    )

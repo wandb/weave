@@ -153,7 +153,7 @@ class TestMaybeUseNullCheck:
 
 def test_heavy_field_eq_with_null_check() -> None:
     """Eq on a heavy start/end field adds OR IS NULL outside NOT context."""
-    pb = ParamBuilder()
+    pb = ParamBuilder("pb")
     processor = HeavyFieldOptimizationProcessor(pb, "calls_merged", use_null_check=True)
 
     op = tsi_query.EqOperation.model_validate(
@@ -161,9 +161,10 @@ def test_heavy_field_eq_with_null_check() -> None:
     )
     result = apply_processor(processor, op)
 
-    assert result is not None
-    assert "LIKE" in result
-    assert "OR calls_merged.attributes_dump IS NULL" in result
+    assert result == (
+        "(calls_merged.attributes_dump LIKE {pb_0:String} "
+        "OR calls_merged.attributes_dump IS NULL)"
+    )
 
 
 def test_heavy_field_eq_inside_not_skips_optimization() -> None:

@@ -89,6 +89,62 @@ def test_implicit_patch_multiple_libraries(setup_env, monkeypatch):
         mock_patch_mistral.assert_called_once()
 
 
+# The real modules realtime wraps. Tests below isolate the one under test by
+# clearing all three from sys.modules first, then injecting only the target.
+# Otherwise, since aiohttp/websockets are genuinely installed here, an un-mocked
+# sibling key still in sys.modules would let the real patch_openai_realtime fire
+# and pre-populate _PATCHED_INTEGRATIONS.
+_REALTIME_TRIGGER_MODULES = ["websocket", "websockets", "aiohttp"]
+
+
+def test_implicit_patch_realtime_websocket_already_imported(setup_env, monkeypatch):
+    """Realtime auto-patches when its real trigger module (websocket) is imported.
+
+    Mirrors ``test_implicit_patch_already_imported`` but keys on ``websocket``,
+    one of the real modules the realtime patcher wraps (the old synthetic
+    ``openai_realtime`` key never matched ``sys.modules`` so it never fired).
+    """
+    for module in _REALTIME_TRIGGER_MODULES:
+        _reset_import(monkeypatch, module)
+    _inject_fake_module(monkeypatch, "websocket")
+
+    mock_patch_func = MagicMock()
+
+    with patch.dict(
+        "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+        {"websocket": mock_patch_func},
+    ):
+        implicit_patch()
+        mock_patch_func.assert_called_once()
+
+
+@pytest.mark.parametrize("module_name", _REALTIME_TRIGGER_MODULES)
+def test_implicit_patch_realtime_trigger_modules(setup_env, monkeypatch, module_name):
+    """Each of the three real modules realtime wraps triggers its patch func."""
+    for module in _REALTIME_TRIGGER_MODULES:
+        _reset_import(monkeypatch, module)
+    _inject_fake_module(monkeypatch, module_name)
+
+    mock_patch_func = MagicMock()
+
+    with patch.dict(
+        "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
+        {module_name: mock_patch_func},
+    ):
+        implicit_patch()
+        mock_patch_func.assert_called_once()
+
+
+def test_realtime_registered_under_real_trigger_modules(setup_env):
+    """The real mapping wires realtime to the modules it instruments, not a
+    synthetic ``openai_realtime`` key that never matched ``sys.modules``.
+    """
+    mapping = patch_module.INTEGRATION_MODULE_MAPPING
+    for module_name in ("websocket", "websockets", "aiohttp"):
+        assert mapping[module_name] is patch_module.patch_openai_realtime
+    assert "openai_realtime" not in mapping
+
+
 def test_implicit_patch_disabled(setup_env, monkeypatch):
     """Test that implicit patching can be disabled via environment variable."""
     monkeypatch.setenv("WEAVE_IMPLICITLY_PATCH_INTEGRATIONS", "false")
