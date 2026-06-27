@@ -5,6 +5,7 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
@@ -50,6 +51,37 @@ describe('Turn', () => {
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.status.message).toBe('boom');
     expect(span.events.some(e => e.name === 'exception')).toBe(true);
+  });
+});
+
+// Mirrors the Python SDK's `system_instructions` support on the invoke_agent
+// (Turn) span (wandb/weave#7348). The TS SDK has no include_content / PII layer,
+// so only the serialization + empty-omission behavior has a counterpart here.
+describe('Turn.systemInstructions', () => {
+  setupGenAITestEnvironment();
+  const getExporter = setupExporterPerTest();
+
+  it('serializes systemInstructions as a TextPart array on gen_ai.system_instructions', () => {
+    const turn = Turn.create({agentName: 'weather-bot'});
+    turn.systemInstructions = ['Be helpful', 'Be concise'];
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    // Same TextPart array shape as the chat span (per semconv).
+    expect(
+      JSON.parse(span.attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] as string)
+    ).toEqual([
+      {type: 'text', content: 'Be helpful'},
+      {type: 'text', content: 'Be concise'},
+    ]);
+  });
+
+  it('omits gen_ai.system_instructions when systemInstructions is empty', () => {
+    const turn = Turn.create({agentName: 'weather-bot'});
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS]).toBeUndefined();
   });
 });
 

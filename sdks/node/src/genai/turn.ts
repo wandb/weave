@@ -17,6 +17,7 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
@@ -50,6 +51,15 @@ export interface TurnInit extends SpanInitBase {
  * }
  */
 export class Turn extends SpanBase {
+  /**
+   * The agent's system prompt. Flushed to `gen_ai.system_instructions` on
+   * `end()` as a TextPart array (the same shape the chat span uses, per
+   * semconv) so the Agents tab can surface it on the agent-start marker.
+   * Empty → the attribute is omitted. Mirrors the Python SDK's
+   * `Turn.system_instructions`.
+   */
+  systemInstructions: string[] = [];
+
   private constructor(
     span: Span,
     private readonly context: Context,
@@ -146,6 +156,16 @@ export class Turn extends SpanBase {
       return;
     }
     this._ended = true;
+
+    if (this.systemInstructions.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+        JSON.stringify(
+          this.systemInstructions.map(content => ({type: 'text', content}))
+        )
+      );
+    }
+
     this._closeSpan(opts);
     const state = getGenaiState();
     if (state.turn === this) {
