@@ -61,6 +61,7 @@ except ImportError:
     _OTEL_AVAILABLE = False
 
 if TYPE_CHECKING:
+    from opentelemetry.context import Context as _OTelContext
     from opentelemetry.context import Token as _OTelToken
     from opentelemetry.trace import Span as _OTelSpan
     from opentelemetry.util.types import Attributes
@@ -131,6 +132,10 @@ class _SpanBase(BaseModel):
 
     _otel_span: _OTelSpan | None = PrivateAttr(default=None)
     _otel_token: _OTelToken | None = PrivateAttr(default=None)
+    # Explicit OTel parent context, set by ``SubAgent.llm/tool/subagent`` on
+    # children it creates so they nest under the SubAgent's span regardless of
+    # what's on the ambient OTel context stack at ``__enter__`` time.
+    _parent_otel_context: _OTelContext | None = PrivateAttr(default=None)
 
     def _start_otel_span(
         self,
@@ -145,6 +150,10 @@ class _SpanBase(BaseModel):
         the SDK object was constructed (e.g. ``Turn.started_at``) so the
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
+
+        When ``_parent_otel_context`` is set (a child of a SubAgent), that
+        context wins over ambient. ``new_trace`` is only honored when no
+        explicit parent was provided.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -152,7 +161,9 @@ class _SpanBase(BaseModel):
         kwargs: dict[str, Any] = {}
         if start_time_ns is not None:
             kwargs["start_time"] = start_time_ns
-        if new_trace:
+        if self._parent_otel_context is not None:
+            kwargs["context"] = self._parent_otel_context
+        elif new_trace:
             kwargs["context"] = Context()
         self._otel_span = tracer.start_span(name, **kwargs)
         self._otel_token = otel_context.attach(
@@ -722,6 +733,34 @@ class SubAgent(_SpanBase):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
+    # OTel context captured at ``__enter__`` time (parent context with this
+    # SubAgent's span as current). Threaded to child LLM/Tool/SubAgent spans
+    # so they nest under this SubAgent even if the ambient OTel context has
+    # since drifted (e.g. caller never entered ``with sub:`` or exited it
+    # before creating the child).
+    #
+    # Scoped to SubAgent (not Turn) on purpose. The drift-prone pattern —
+    # build a child handle, then enter it *outside* the ``with`` block (queue
+    # worker, callback, parallel sub-agent fan-out) — is a sub-agent concern:
+    # fanning work out to other execution contexts is what sub-agents are for,
+    # and OTel's ambient context is thread-local, so it's empty/stale by the
+    # time that dispatched child runs. A Turn is the trace root and is
+    # effectively always used within its own ``with`` block, so its children
+    # pick up the correct ambient context at ``__enter__``. The mechanism
+    # lives on ``_SpanBase`` (via ``_parent_otel_context``), so if a Turn ever
+    # needs to hand a child to out-of-block code, lift this capture and
+    # ``_thread_otel_context`` onto Turn too — no base-class change required.
+    _own_otel_context: _OTelContext | None = PrivateAttr(default=None)
+
+    def _thread_otel_context(self, child: _SpanBase) -> None:
+        """Pin ``child``'s OTel parent to this SubAgent's span.
+
+        No-op until this SubAgent has been entered (``_own_otel_context`` is
+        set at ``__enter__``); children created before then fall back to the
+        ambient OTel context, matching the bare ``LLM()`` / ``Tool()`` path.
+        """
+        if self._own_otel_context is not None:
+            child._parent_otel_context = self._own_otel_context
 
     def llm(
         self,
@@ -734,18 +773,38 @@ class SubAgent(_SpanBase):
 
         Sets the ``_current_llm`` contextvar so the LLM is visible via
         ``get_current_llm()`` regardless of whether a context manager is used.
+        Pins the LLM's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
         """
         llm = LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        self._thread_otel_context(llm)
         llm._token = _current_llm.set(llm)
         return llm
 
     def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
-        """Start a tool execution within this sub-agent."""
-        return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        """Start a tool execution within this sub-agent.
+
+        Pins the Tool's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
+        """
+        tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        self._thread_otel_context(tool)
+        return tool
+
+    def subagent(self, *, name: str, model: str = "") -> SubAgent:
+        """Start a nested sub-agent under this one.
+
+        Pins the nested SubAgent's OTel parent to this SubAgent's span when
+        this SubAgent has been entered. Mirrors ``Turn.subagent()`` and the
+        TypeScript ``startSubagent`` factory on SubAgent.
+        """
+        sub = SubAgent(name=name, model=model or self.model)
+        self._thread_otel_context(sub)
+        return sub
 
     def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
         """Build the full OTel attribute dict for this sub-agent span.
@@ -785,6 +844,8 @@ class SubAgent(_SpanBase):
             self.started_at = datetime.now(timezone.utc)
         start_ns = int(self.started_at.timestamp() * 1_000_000_000)
         self._start_otel_span(f"invoke_agent {self.name}", start_time_ns=start_ns)
+        if _OTEL_AVAILABLE and self._otel_span is not None:
+            self._own_otel_context = otel_trace.set_span_in_context(self._otel_span)
         return self
 
     def __exit__(
@@ -837,6 +898,13 @@ class Turn(_SpanBase):
         self.messages.append(Message(role="user", content=content))
         return self
 
+    # These factories deliberately do NOT pin children to an explicitly
+    # captured context the way ``SubAgent.llm/tool/subagent`` do; children
+    # rely on ambient OTel context. A Turn is the trace root and is
+    # effectively always used inside its own ``with`` block, so ambient is
+    # correct at the child's ``__enter__``. See ``SubAgent._own_otel_context``
+    # for the out-of-block dispatch case that motivates explicit capture and
+    # for when it would be worth lifting that mechanism up to Turn.
     def llm(
         self,
         *,
