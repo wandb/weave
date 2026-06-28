@@ -40,6 +40,7 @@ from weave.session.session import (
     start_llm,
     start_session,
     start_tool,
+    start_turn,
 )
 from weave.session.session_otel import (
     execute_tool_attributes,
@@ -940,6 +941,27 @@ class TestOTelSpanEmission:
         attrs = dict(turn_spans[0].attributes or {})
         assert "gen_ai.system_instructions" not in attrs
 
+    def test_start_turn_system_instructions_param_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="weather-bot", session_id="sess-si-param") as s:
+            with s.start_turn(system_instructions=["You are a weather bot"]):
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent weather-bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+
+    def test_module_start_turn_system_instructions_param(self) -> None:
+        # weave.start_turn(...) wires the field onto the returned Turn whether
+        # or not a session is active (delegates to Session.start_turn when one is).
+        turn = start_turn(system_instructions=["You are a weather bot"])
+        assert turn.system_instructions == ["You are a weather bot"]
+
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Session(agent_name="bot", session_id="sess-llm") as s:
             with s.start_turn() as turn:
@@ -1471,6 +1493,25 @@ class TestLogTurn:
             assert "gen_ai.system_instructions" not in attrs
             assert "gen_ai.tool.call.arguments" not in attrs
             assert "gen_ai.tool.call.result" not in attrs
+
+    def test_system_instructions_emitted_on_turn_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-si-batch",
+            agent_name="bot",
+            system_instructions=["You are a weather bot"],
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
 
     def test_no_spans_just_emits_turn(self, otel_spans: InMemorySpanExporter) -> None:
         result = log_turn(

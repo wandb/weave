@@ -986,18 +986,24 @@ class Session(BaseModel):
         user_message: str = "",
         model: str = "",
         agent_name: str = "",
+        system_instructions: list[str] | None = None,
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
         Propagates ``continue_parent_trace`` from this session.
+
+        ``system_instructions`` (the agent's system prompt) is carried on the
+        turn's invoke_agent span; it can also be set later via attribute
+        assignment on the returned ``Turn``, mirroring ``start_llm``.
         """
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
         turn = Turn(
             agent_name=agent_name or self.agent_name,
             model=model or self.model,
+            system_instructions=system_instructions or [],
             continue_parent_trace=self.continue_parent_trace,
         )
         if user_message:
@@ -1084,6 +1090,7 @@ def start_turn(
     user_message: str = "",
     model: str = "",
     agent_name: str = "",
+    system_instructions: list[str] | None = None,
 ) -> Turn:
     """Create and activate a turn. Uses the current session if available.
 
@@ -1095,9 +1102,16 @@ def start_turn(
     session = get_current_session()
     if session is not None:
         return session.start_turn(
-            user_message=user_message, model=model, agent_name=agent_name
+            user_message=user_message,
+            model=model,
+            agent_name=agent_name,
+            system_instructions=system_instructions,
         )
-    turn = Turn(agent_name=agent_name, model=model)
+    turn = Turn(
+        agent_name=agent_name,
+        model=model,
+        system_instructions=system_instructions or [],
+    )
     if user_message:
         turn.messages.append(Message(role="user", content=user_message))
     return turn
@@ -1292,6 +1306,7 @@ def log_turn(
     session_name: str = "",
     model: str = "",
     messages: list[Message] | None = None,
+    system_instructions: list[str] | None = None,
     spans: list[LLM | Tool | SubAgent] | None = None,
     started_at: datetime | None = None,
     ended_at: datetime | None = None,
@@ -1324,6 +1339,7 @@ def log_turn(
     turn = Turn(
         agent_name=agent_name,
         model=model,
+        system_instructions=system_instructions or [],
         messages=messages or [],
         spans=resolved_spans,
         started_at=turn_started_at,
