@@ -1022,6 +1022,25 @@ class TestOTelSpanEmission:
         # SubAgent's parent should be the Turn span
         assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
 
+    def test_subagent_system_instructions_via_factory(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(
+                    name="research-bot",
+                    system_instructions=["You research things"],
+                ):
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
+
     def test_parent_child_hierarchy(self, otel_spans: InMemorySpanExporter) -> None:
         """LLM and Tool are both children of Turn (flat model)."""
         with Session(agent_name="bot") as s:
@@ -1415,6 +1434,55 @@ class TestLogTurn:
         assert len(sa_spans) == 1
         assert len(turn_spans) == 1
         assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_subagent_system_instructions_emitted(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-sa-si",
+            agent_name="orchestrator",
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    system_instructions=["You research things"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(2),
+        )
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
+
+    def test_subagent_system_instructions_omitted_when_content_excluded(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-sa-si2",
+            agent_name="orchestrator",
+            include_content=False,
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    system_instructions=["secret prompt"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(2),
+        )
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert "gen_ai.system_instructions" not in attrs
 
     def test_continue_parent_trace_nests_under_outer_span(
         self, otel_spans: InMemorySpanExporter
