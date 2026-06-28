@@ -891,6 +891,47 @@ class Turn(_SpanBase):
             system_instructions=system_instructions or [],
         )
 
+    def record(
+        self,
+        *,
+        messages: list[Message] | None = None,
+        system_instructions: list[str] | None = None,
+        agent_name: str | None = None,
+        model: str | None = None,
+        agent_id: str | None = None,
+        agent_description: str | None = None,
+        agent_version: str | None = None,
+    ) -> Turn:
+        """Set multiple turn fields in one call.
+
+        Collapses the per-field assignments a manually-instrumented agent
+        otherwise makes on a turn (``system_instructions``, ``agent_id``,
+        ...) into a single keyword call. Only fields explicitly passed
+        (non-``None``) are applied — existing values are preserved. Returns
+        ``self`` for chaining. Mirrors ``LLM.record``.
+
+        Note: on the streaming (``with``) path the turn span is named from
+        ``agent_name`` at ``__enter__``, so set ``agent_name`` via
+        ``start_turn`` rather than ``record`` if you need the span name to
+        reflect it; ``record`` still updates the ``gen_ai.agent.name``
+        attribute.
+        """
+        if messages is not None:
+            self.messages = messages
+        if system_instructions is not None:
+            self.system_instructions = system_instructions
+        if agent_name is not None:
+            self.agent_name = agent_name
+        if model is not None:
+            self.model = model
+        if agent_id is not None:
+            self.agent_id = agent_id
+        if agent_description is not None:
+            self.agent_description = agent_description
+        if agent_version is not None:
+            self.agent_version = agent_version
+        return self
+
     def _build_attrs(
         self, *, session_id: str, session_name: str, include_content: bool
     ) -> dict[str, Any]:
@@ -1330,52 +1371,27 @@ def _attrs_for_span(
     )
 
 
-def log_turn(
+def _emit_turn(
+    turn: Turn,
     *,
     session_id: str,
-    agent_name: str = "",
-    session_name: str = "",
-    model: str = "",
-    messages: list[Message] | None = None,
-    system_instructions: list[str] | None = None,
-    spans: list[LLM | Tool | SubAgent] | None = None,
-    started_at: datetime | None = None,
-    ended_at: datetime | None = None,
-    include_content: bool = True,
-    continue_parent_trace: bool = False,
+    session_name: str,
+    include_content: bool,
     attributes: Attributes = None,
 ) -> LogResult:
-    """Imperatively emit one turn and its child spans to OTel.
+    """Emit one fully-built ``Turn`` (and its child spans) to OTel.
 
-    Use when context managers aren't viable (stateless containers, callbacks,
-    queue workers). Each child span passed in should have ``started_at`` /
-    ``ended_at`` set; the emitted OTel span timestamps come from those fields.
-    Falls back to the earliest/latest child timestamp, then ``now()``, when
-    the turn doesn't supply its own.
-
-    ``attributes`` are stamped on every emitted span; the streaming path reads
-    these from the active session instead. Use custom, non-semconv keys: a
-    key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
-    is unsupported (which value wins is path-dependent).
+    Shared by ``log_turn`` (which builds the Turn from scalar kwargs) and
+    ``log_session`` (which is handed Turns directly), so every Turn field —
+    ``system_instructions``, ``agent_id`` / ``agent_description`` /
+    ``agent_version``, etc. — is honored identically on both batch paths.
+    ``continue_parent_trace`` is read from the Turn. Timestamp resolution is
+    idempotent when the Turn already carries both timestamps.
     """
-    if not _OTEL_AVAILABLE or should_disable_weave():
-        return LogResult(session_id=session_id)
-
-    resolved_spans = spans or []
     turn_started_at, turn_ended_at = _resolve_turn_timestamps(
-        started_at=started_at,
-        ended_at=ended_at,
-        spans=resolved_spans,
-    )
-    turn = Turn(
-        agent_name=agent_name,
-        model=model,
-        system_instructions=system_instructions or [],
-        messages=messages or [],
-        spans=resolved_spans,
-        started_at=turn_started_at,
-        ended_at=turn_ended_at,
-        continue_parent_trace=continue_parent_trace,
+        started_at=turn.started_at,
+        ended_at=turn.ended_at,
+        spans=turn.spans,
     )
 
     turn_attrs = turn._build_attrs(
@@ -1386,7 +1402,7 @@ def log_turn(
     if attributes:
         turn_attrs.update(attributes)
 
-    parent_ctx = Context() if not continue_parent_trace else None
+    parent_ctx = Context() if not turn.continue_parent_trace else None
     turn_span = _emit_span_now(
         f"invoke_agent {turn.agent_name}",
         parent_ctx=parent_ctx,
@@ -1423,6 +1439,71 @@ def log_turn(
     )
 
 
+def log_turn(
+    *,
+    session_id: str,
+    agent_name: str = "",
+    session_name: str = "",
+    model: str = "",
+    agent_id: str = "",
+    agent_description: str = "",
+    agent_version: str = "",
+    messages: list[Message] | None = None,
+    system_instructions: list[str] | None = None,
+    spans: list[LLM | Tool | SubAgent] | None = None,
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
+    include_content: bool = True,
+    continue_parent_trace: bool = False,
+    attributes: Attributes = None,
+) -> LogResult:
+    """Imperatively emit one turn and its child spans to OTel.
+
+    Use when context managers aren't viable (stateless containers, callbacks,
+    queue workers). Each child span passed in should have ``started_at`` /
+    ``ended_at`` set; the emitted OTel span timestamps come from those fields.
+    Falls back to the earliest/latest child timestamp, then ``now()``, when
+    the turn doesn't supply its own.
+
+    ``attributes`` are stamped on every emitted span; the streaming path reads
+    these from the active session instead. Use custom, non-semconv keys: a
+    key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
+    is unsupported (which value wins is path-dependent).
+    """
+    if not _OTEL_AVAILABLE or should_disable_weave():
+        return LogResult(session_id=session_id)
+
+    resolved_spans = spans or []
+    # Resolve timestamps before constructing the Turn so model_post_init
+    # doesn't override a missing started_at with now() ahead of the
+    # earliest-child fallback.
+    turn_started_at, turn_ended_at = _resolve_turn_timestamps(
+        started_at=started_at,
+        ended_at=ended_at,
+        spans=resolved_spans,
+    )
+    turn = Turn(
+        agent_name=agent_name,
+        model=model,
+        agent_id=agent_id,
+        agent_description=agent_description,
+        agent_version=agent_version,
+        system_instructions=system_instructions or [],
+        messages=messages or [],
+        spans=resolved_spans,
+        started_at=turn_started_at,
+        ended_at=turn_ended_at,
+        continue_parent_trace=continue_parent_trace,
+    )
+    return _emit_turn(
+        turn,
+        session_id=session_id,
+        session_name=session_name,
+        include_content=include_content,
+        attributes=attributes,
+    )
+
+
 def log_session(
     *,
     turns: list[Turn],
@@ -1451,17 +1532,21 @@ def log_session(
     root_span_ids: list[str] = []
     span_count = 0
     for turn in turns:
-        result = log_turn(
+        # Emit the caller's Turn directly so every field survives (not just the
+        # subset log_turn accepts as kwargs). Fill in session-level
+        # agent_name/model defaults and apply the session's
+        # continue_parent_trace, without mutating the caller's object.
+        result = _emit_turn(
+            turn.model_copy(
+                update={
+                    "agent_name": turn.agent_name or agent_name,
+                    "model": turn.model or model,
+                    "continue_parent_trace": continue_parent_trace,
+                }
+            ),
             session_id=sid,
             session_name=session_name,
-            agent_name=turn.agent_name or agent_name,
-            model=turn.model or model,
-            messages=turn.messages,
-            spans=turn.spans,
-            started_at=turn.started_at,
-            ended_at=turn.ended_at,
             include_content=include_content,
-            continue_parent_trace=continue_parent_trace,
             attributes=attributes,
         )
         trace_ids.extend(result.trace_ids)
