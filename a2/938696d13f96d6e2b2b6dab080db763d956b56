@@ -1,0 +1,1 @@
+Release commit for v0.53.0 (minor bump); tag v0.53.0 points here. Rebased onto origin/master b9a8184d7c (pre-rebase hash 7389bdcc7d). Full context: note on 095c556414. Tag NOT pushed yet — if the PR is squash-merged, re-point v0.53.0 to the squashed master commit.
