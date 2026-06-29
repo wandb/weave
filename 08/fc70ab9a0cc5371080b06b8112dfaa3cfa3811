@@ -1,0 +1,1 @@
+Starts the 0.53.x dev cycle after v0.53.0 (-> 0.53.1-dev0). PR #7448, base hatchery/adept-release. Rebased onto adept-release after #7446 merged (pre-rebase cbec1620bd). Full release context: note on the #7447 release commit.
