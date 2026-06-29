@@ -718,6 +718,7 @@ class SubAgent(_SpanBase):
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
+    system_instructions: list[str] = Field(default_factory=list)
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -747,18 +748,31 @@ class SubAgent(_SpanBase):
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
-    def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
+    def _build_attrs(
+        self, *, session_id: str, session_name: str, include_content: bool
+    ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this sub-agent span.
 
-        Sub-agents have no content fields — the dispatch only needs
-        identifiers and capture-info. Shared between streaming (``end``)
-        and batch (``_attrs_for_span``).
+        Shared between streaming (``end``) and batch (``_attrs_for_span``).
+        ``system_instructions`` is the only content-bearing field — it is
+        gated by ``include_content`` and PII-redacted, mirroring ``Turn``;
+        the identifiers are always emitted.
         """
+        system_instructions: list[str] | None
+        if include_content:
+            system_instructions = self.system_instructions
+            if should_redact_pii():
+                system_instructions = pii_redaction.redact_system_instructions(
+                    system_instructions
+                )
+        else:
+            system_instructions = None
         attrs = invoke_agent_attributes(
             agent_name=self.name,
             model=self.model,
             conversation_id=session_id,
             conversation_name=session_name,
+            system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
@@ -777,6 +791,7 @@ class SubAgent(_SpanBase):
         attrs = self._build_attrs(
             session_id=session.session_id if session else "",
             session_name=session.session_name if session else "",
+            include_content=session.include_content if session else True,
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
@@ -819,6 +834,7 @@ class Turn(_SpanBase):
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
+    system_instructions: list[str] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
     spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
@@ -861,9 +877,19 @@ class Turn(_SpanBase):
         """Start a tool execution (execute_tool span, child of this turn)."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
-    def subagent(self, *, name: str, model: str = "") -> SubAgent:
+    def subagent(
+        self,
+        *,
+        name: str,
+        model: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> SubAgent:
         """Start a sub-agent invocation (nested invoke_agent span, same trace)."""
-        return SubAgent(name=name, model=model or self.model)
+        return SubAgent(
+            name=name,
+            model=model or self.model,
+            system_instructions=system_instructions or [],
+        )
 
     def _build_attrs(
         self, *, session_id: str, session_name: str, include_content: bool
@@ -875,18 +901,25 @@ class Turn(_SpanBase):
         source so Presidio is never called for already-dropped content.
         """
         messages: list[Message] | None
+        system_instructions: list[str] | None
         if include_content:
             messages = self.messages
+            system_instructions = self.system_instructions
             if should_redact_pii():
                 messages = pii_redaction.redact_messages(messages)
+                system_instructions = pii_redaction.redact_system_instructions(
+                    system_instructions
+                )
         else:
             messages = None
+            system_instructions = None
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
             conversation_id=session_id,
             conversation_name=session_name,
             model=self.model,
             input_messages=messages,
+            system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
@@ -978,18 +1011,24 @@ class Session(BaseModel):
         user_message: str = "",
         model: str = "",
         agent_name: str = "",
+        system_instructions: list[str] | None = None,
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
         Propagates ``continue_parent_trace`` from this session.
+
+        ``system_instructions`` (the agent's system prompt) is carried on the
+        turn's invoke_agent span; it can also be set later via attribute
+        assignment on the returned ``Turn``, mirroring ``start_llm``.
         """
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
         turn = Turn(
             agent_name=agent_name or self.agent_name,
             model=model or self.model,
+            system_instructions=system_instructions or [],
             continue_parent_trace=self.continue_parent_trace,
         )
         if user_message:
@@ -1076,6 +1115,7 @@ def start_turn(
     user_message: str = "",
     model: str = "",
     agent_name: str = "",
+    system_instructions: list[str] | None = None,
 ) -> Turn:
     """Create and activate a turn. Uses the current session if available.
 
@@ -1087,9 +1127,16 @@ def start_turn(
     session = get_current_session()
     if session is not None:
         return session.start_turn(
-            user_message=user_message, model=model, agent_name=agent_name
+            user_message=user_message,
+            model=model,
+            agent_name=agent_name,
+            system_instructions=system_instructions,
         )
-    turn = Turn(agent_name=agent_name, model=model)
+    turn = Turn(
+        agent_name=agent_name,
+        model=model,
+        system_instructions=system_instructions or [],
+    )
     if user_message:
         turn.messages.append(Message(role="user", content=user_message))
     return turn
@@ -1135,7 +1182,9 @@ def start_tool(*, name: str, arguments: str = "", tool_call_id: str = "") -> Too
     return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
 
-def start_subagent(*, name: str, model: str = "") -> SubAgent:
+def start_subagent(
+    *, name: str, model: str = "", system_instructions: list[str] | None = None
+) -> SubAgent:
     """Create a sub-agent invocation span.
 
     The SubAgent's OTel span automatically becomes a child of whatever span
@@ -1143,7 +1192,9 @@ def start_subagent(*, name: str, model: str = "") -> SubAgent:
     Mirrors ``start_tool`` in shape; OTel context handles parent-child
     propagation, no explicit delegation is needed.
     """
-    return SubAgent(name=name, model=model)
+    return SubAgent(
+        name=name, model=model, system_instructions=system_instructions or []
+    )
 
 
 def end_session() -> None:
@@ -1273,7 +1324,9 @@ def _attrs_for_span(
             session_id=session_id, include_content=include_content
         )
     return f"invoke_agent {span.name}", span._build_attrs(
-        session_id=session_id, session_name=session_name
+        session_id=session_id,
+        session_name=session_name,
+        include_content=include_content,
     )
 
 
@@ -1284,6 +1337,7 @@ def log_turn(
     session_name: str = "",
     model: str = "",
     messages: list[Message] | None = None,
+    system_instructions: list[str] | None = None,
     spans: list[LLM | Tool | SubAgent] | None = None,
     started_at: datetime | None = None,
     ended_at: datetime | None = None,
@@ -1316,6 +1370,7 @@ def log_turn(
     turn = Turn(
         agent_name=agent_name,
         model=model,
+        system_instructions=system_instructions or [],
         messages=messages or [],
         spans=resolved_spans,
         started_at=turn_started_at,

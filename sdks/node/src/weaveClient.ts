@@ -291,9 +291,9 @@ export type SearchAgentsResult = {
 };
 
 /**
- * Options for {@link WeaveClient.getAgentCustomAttrsSchema}.
+ * Options for {@link WeaveClient.getAgentCustomAttributes}.
  */
-export interface GetAgentCustomAttrsSchemaOptions {
+export interface GetAgentCustomAttributesOptions {
   query?: Query | null;
   startedAfter?: string | null;
   startedBefore?: string | null;
@@ -311,9 +311,9 @@ export interface GetAgentCustomAttrsSchemaOptions {
 }
 
 /**
- * Result shape returned by {@link WeaveClient.getAgentCustomAttrsSchema}.
+ * Result shape returned by {@link WeaveClient.getAgentCustomAttributes}.
  */
-export type GetAgentCustomAttrsSchemaResult = {
+export type GetAgentCustomAttributesResult = {
   attributes?: AgentCustomAttrSchemaItem[];
   limit?: number;
   offset?: number;
@@ -754,7 +754,7 @@ export class WeaveClient {
    * @example
    * ```ts
    * const client = await weave.init('entity/project');
-   * const resp = await client.getAgentCustomAttrsSchema({
+   * const resp = await client.getAgentCustomAttributes({
    *   query: {
    *     $expr: {
    *       $eq: [{$getField: 'agent_name'}, {$literal: 'my-agent'}],
@@ -769,9 +769,9 @@ export class WeaveClient {
    * }
    * ```
    */
-  public getAgentCustomAttrsSchema(
-    options: GetAgentCustomAttrsSchemaOptions
-  ): Promise<Response<GetAgentCustomAttrsSchemaResult>> {
+  public getAgentCustomAttributes(
+    options: GetAgentCustomAttributesOptions
+  ): Promise<Response<GetAgentCustomAttributesResult>> {
     return this.traceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost(
       {
         project_id: this.projectId,

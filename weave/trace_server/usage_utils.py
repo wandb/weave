@@ -5,9 +5,8 @@ from collections import deque
 from collections.abc import Iterable
 from typing import Any
 
-import ddtrace
-
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.tracing import traced
 
 
 @dataclasses.dataclass(frozen=True)
@@ -17,7 +16,7 @@ class UsageCall:
     summary: dict[str, Any] | None
 
 
-@ddtrace.tracer.wrap(name="usage_utils.aggregate_usage_with_descendants")
+@traced(name="usage_utils.aggregate_usage_with_descendants")
 def aggregate_usage_with_descendants(
     calls: Iterable[UsageCall],
     include_costs: bool,

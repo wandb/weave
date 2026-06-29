@@ -1,7 +1,6 @@
 import logging
 import threading
 
-import ddtrace
 from cachetools import LRUCache
 from clickhouse_connect.driver.client import Client as CHClient
 
@@ -18,6 +17,7 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
+from weave.trace_server.tracing import _tracer
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class TableRoutingResolver:
 
         # Only span the cache-miss path. Cache-hit calls are extremely high
         # volume and produce noisy DD spans with no useful information.
-        with ddtrace.tracer.trace("table_routing.fetch_residence"):
+        with _tracer.start_as_current_span("table_routing.fetch_residence"):
             residence = get_project_data_residence(project_id, ch_client)
 
             set_root_span_dd_tags({"project_version.fetch_residence": residence.value})
