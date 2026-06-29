@@ -126,10 +126,10 @@ def _capture_info_attrs() -> dict[str, str]:
 
 # Forward-looking deprecation: OpenTelemetry is phasing out the Span Event API
 # (``Span.add_event`` / ``Span.record_exception``) in favor of log-based events
-# emitted through the Logs API — see OTEP 4430 and the March 2026 plan
-# (https://opentelemetry.io/blog/2026/span-event-api-deprecation/). We mark the
-# public ``add_event`` surface deprecated to signal direction. Note: the
-# upstream OTel SDKs have NOT removed ``Span.add_event``, and Weave has no
+# emitted through the Logs API — see OTEP 4430 ("Span Event API deprecation
+# plan") and the OpenTelemetry blog "Deprecating Span Events API" (March 2026).
+# We mark the public ``add_event`` surface deprecated to signal direction. Note:
+# the upstream OTel SDKs have NOT removed ``Span.add_event``, and Weave has no
 # log-based-events replacement yet, so there is no migration target today — the
 # method keeps working and existing span-event data stays valid.
 _ADD_EVENT_DEPRECATION_MESSAGE = (
