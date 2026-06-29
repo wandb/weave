@@ -3663,27 +3663,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     # Dataset Sources API
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.dataset_sources_link")
+    @traced(name="clickhouse_trace_server_batched.dataset_sources_link")
     def dataset_sources_link(
         self, req: tsi.DatasetSourcesLinkReq
     ) -> tsi.DatasetSourcesLinkRes:
         return self._dataset_sources_handler().link(req)
 
-    @ddtrace.tracer.wrap(
-        name="clickhouse_trace_server_batched.dataset_sources_link_delete"
-    )
+    @traced(name="clickhouse_trace_server_batched.dataset_sources_link_delete")
     def dataset_sources_link_delete(
         self, req: tsi.DatasetSourcesLinkDeleteReq
     ) -> tsi.DatasetSourcesLinkDeleteRes:
         return self._dataset_sources_handler().link_delete(req)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.dataset_sources_query")
+    @traced(name="clickhouse_trace_server_batched.dataset_sources_query")
     def dataset_sources_query(
         self, req: tsi.DatasetSourcesQueryReq
     ) -> tsi.DatasetSourcesQueryRes:
         return self._dataset_sources_handler().query(req)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.source_datasets_query")
+    @traced(name="clickhouse_trace_server_batched.source_datasets_query")
     def source_datasets_query(
         self, req: tsi.SourceDatasetsQueryReq
     ) -> tsi.SourceDatasetsQueryRes:
