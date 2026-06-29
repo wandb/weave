@@ -2367,6 +2367,139 @@ def test_total_storage_size(with_filter: bool):
         )
 
 
+@pytest.mark.parametrize("with_filter", [False, True])
+def test_total_storage_size_calls_complete(with_filter: bool):
+    """calls_complete scopes the total-storage rollup by id (the stats PK).
+
+    Without scoping, the rollup aggregates the entire project's
+    calls_complete_stats. The storage_scope_ids CTE narrows it to the matched
+    calls' traces so the (project_id, id) primary key prunes the scan.
+    """
+    cq = CallsQuery(
+        project_id="test/project",
+        read_table=ReadTable.CALLS_COMPLETE,
+        include_total_storage_size=True,
+    )
+    cq.add_field("id")
+    cq.add_field("total_storage_size_bytes")
+
+    if with_filter:
+        cq.set_hardcoded_filter(
+            HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
+        )
+        cq.set_limit(50)
+        assert_sql(
+            cq,
+            """
+            WITH storage_scope_ids AS (
+                SELECT calls_complete.id AS id
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
+                    OR (calls_complete.op_name IS NULL))
+                    AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+                LIMIT 50
+            )
+            SELECT
+                calls_complete.id AS id,
+                CASE
+                    WHEN calls_complete.parent_id = {pb_3:String}
+                    THEN rolled_up_cms.total_storage_size_bytes
+                    ELSE NULL
+                END AS total_storage_size_bytes
+            FROM calls_complete
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_complete_stats
+            WHERE project_id = {pb_2:String}
+            AND id IN (
+                SELECT id
+                FROM calls_complete
+                WHERE project_id = {pb_2:String}
+                AND trace_id IN (
+                    SELECT trace_id
+                    FROM calls_complete
+                    WHERE project_id = {pb_2:String}
+                    AND id IN storage_scope_ids
+                )
+            )
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_complete.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_complete.project_id = {pb_2:String}
+            WHERE ((calls_complete.op_name IN {pb_5:Array(String)})
+                OR (calls_complete.op_name IS NULL))
+                AND (calls_complete.deleted_at = {pb_4:DateTime64(3)})
+            LIMIT 50
+            """,
+            {
+                "pb_0": SENTINEL_EPOCH,
+                "pb_1": ["a", "b"],
+                "pb_2": "test/project",
+                "pb_3": "",
+                "pb_4": SENTINEL_EPOCH,
+                "pb_5": ["a", "b"],
+            },
+        )
+    else:
+        cq.add_field("trace_id")
+        cq.add_condition(
+            tsi_query.EqOperation.model_validate(
+                {"$eq": [{"$getField": "id"}, {"$literal": "my_id"}]}
+            )
+        )
+        assert_sql(
+            cq,
+            """
+            WITH storage_scope_ids AS (
+                SELECT calls_complete.id AS id
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE 1
+                    AND (((calls_complete.id = {pb_0:String}))
+                        AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)}))))
+            SELECT
+                calls_complete.id AS id,
+                CASE
+                    WHEN calls_complete.parent_id = {pb_3:String}
+                    THEN rolled_up_cms.total_storage_size_bytes
+                    ELSE NULL
+                END AS total_storage_size_bytes,
+                calls_complete.trace_id AS trace_id
+            FROM calls_complete
+            LEFT JOIN (SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_size_bytes,0)) AS total_storage_size_bytes
+            FROM calls_complete_stats
+            WHERE project_id = {pb_2:String}
+            AND id IN (
+                SELECT id
+                FROM calls_complete
+                WHERE project_id = {pb_2:String}
+                AND trace_id IN (
+                    SELECT trace_id
+                    FROM calls_complete
+                    WHERE project_id = {pb_2:String}
+                    AND id IN storage_scope_ids
+                )
+            )
+            GROUP BY trace_id) AS rolled_up_cms
+            ON calls_complete.trace_id = rolled_up_cms.trace_id
+            PREWHERE calls_complete.project_id = {pb_2:String}
+            WHERE 1
+                AND (((calls_complete.id = {pb_0:String}))
+                    AND ((calls_complete.deleted_at = {pb_4:DateTime64(3)})))
+            """,
+            {
+                "pb_0": "my_id",
+                "pb_1": SENTINEL_EPOCH,
+                "pb_2": "test/project",
+                "pb_3": "",
+                "pb_4": SENTINEL_EPOCH,
+            },
+        )
+
+
 def test_aggregated_data_size_field():
     """Test the AggregatedDataSizeField class."""
     field = AggregatedDataSizeField(
