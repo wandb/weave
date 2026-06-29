@@ -119,6 +119,7 @@ def attributed_spans_source(
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
     base_relation: str = "spans",
+    fallback_trace_id_scope: str | None = None,
 ) -> str:
     """Return a parenthesized subquery that stands in for the `spans` table.
 
@@ -133,6 +134,13 @@ def attributed_spans_source(
     through untouched. The per-trace fallback always scans the raw `spans`
     table since it only needs the identity columns and `trace_id`.
 
+    `fallback_trace_id_scope`, when set, is a subquery of `trace_id` values the
+    fallback rollup is restricted to (`trace_id IN (...)`). Since the fallback
+    is consumed only via the `trace_id` join, scoping it to the join's trace_ids
+    removes only rows the join would discard, so attributed values are
+    unchanged. Used by the page-prefetch two-pass list read to scope the rollup
+    to the page's traces.
+
     The inner scan is bounded to `project_id` and the outer time window so it
     prunes by primary key; the fallback scan is bounded to the same window
     widened by one trace-duration of slack so edge spans still resolve.
@@ -141,6 +149,8 @@ def attributed_spans_source(
 
     fallback_conds = [f"project_id = {pid_slot}"]
     base_conds = [f"s0.project_id = {pid_slot}"]
+    if fallback_trace_id_scope is not None:
+        fallback_conds.append(f"trace_id IN ({fallback_trace_id_scope})")
     if started_after is not None:
         fb_after = pb.add(
             started_after - _TRACE_FALLBACK_WINDOW_SLACK, param_type="DateTime64(6)"
