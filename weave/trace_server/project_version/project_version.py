@@ -63,9 +63,7 @@ class TableRoutingResolver:
         with _tracer.start_as_current_span("table_routing.fetch_residence"):
             residence = get_project_data_residence(project_id, ch_client)
 
-            set_root_span_dd_tags(
-                {"project_version.fetch_residence": residence.value}
-            )
+            set_root_span_dd_tags({"project_version.fetch_residence": residence.value})
 
             # Log warning if we detect dual residency - data should only ever be in
             # calls_merged OR calls_complete, not both. This is handled gracefully but
