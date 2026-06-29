@@ -432,6 +432,16 @@ AnyRef = (
 
 
 def parse_name_version(name_version: str) -> tuple[str, str]:
+    """Split a ``name:version`` token, defaulting the version to "latest".
+
+    Splits on the last colon, so any colons in the name are preserved.
+
+    Examples:
+        >>> parse_name_version("model:v1")
+        ('model', 'v1')
+        >>> parse_name_version("model")
+        ('model', 'latest')
+    """
     if ":" in name_version:
         name, version = name_version.rsplit(":", maxsplit=1)
         return name, version

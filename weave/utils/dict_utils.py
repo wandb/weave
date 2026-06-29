@@ -28,19 +28,13 @@ def safe_get(
     Returns:
         The value at the specified path if it exists, otherwise the default value.
 
-    Example:
-        ```python
-        data = {
-            "a": {
-                "b": {
-                    "c": 123
-                }
-            }
-        }
-        value = safe_get(data, ["a", "b", "c"])  # Returns 123
-        value = safe_get(data, ["a", "x", "c"])  # Returns None
-        value = safe_get(data, ["a", "x", "c"], default=0)  # Returns 0
-        ```
+    Examples:
+        >>> safe_get({"a": {"b": {"c": 123}}}, ["a", "b", "c"])
+        123
+        >>> safe_get({"a": {"b": {"c": 123}}}, ["a", "x", "c"]) is None
+        True
+        >>> safe_get({"a": {"b": {"c": 123}}}, ["a", "x", "c"], default=0)
+        0
     """
     if not path:
         return obj
@@ -113,6 +107,15 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
 
 
 def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge ``new_dict`` into ``base_dict``.
+
+    Nested dicts present in both are merged recursively; for any other shared
+    key the value from ``new_dict`` wins; keys unique to either side are kept.
+
+    Examples:
+        >>> zip_dicts({"a": 1, "b": {"x": 1}}, {"b": {"y": 2}, "c": 3})
+        {'a': 1, 'b': {'x': 1, 'y': 2}, 'c': 3}
+    """
     final_dict = {}
     for key, value in base_dict.items():
         if key in new_dict:
@@ -144,6 +147,10 @@ def flatten_attributes(
 
     Returns:
         A flattened dictionary with dot-separated keys
+
+    Examples:
+        >>> flatten_attributes({"a": {"b": 1}, "c": [10, 20]})
+        {'a.b': 1, 'c.0': 10, 'c.1': 20}
     """
     if json_attributes is None:
         json_attributes = []

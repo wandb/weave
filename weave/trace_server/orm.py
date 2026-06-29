@@ -507,6 +507,18 @@ class Insert:
 
 
 def combine_conditions(conditions: list[str], operator: str) -> str:
+    """Join SQL condition fragments with AND/OR, dropping empty ones.
+
+    Surviving fragments are parenthesized and wrapped when more than one
+    remains; a single fragment is returned unwrapped and an empty list yields
+    the empty string.
+
+    Examples:
+        >>> combine_conditions(["a=1", "b=2"], "AND")
+        '((a=1) AND (b=2))'
+        >>> combine_conditions(["a=1"], "AND")
+        'a=1'
+    """
     if operator not in {"AND", "OR"}:
         raise ValueError(f"Invalid operator: {operator}")
     conditions = [c for c in conditions if c is not None and c != ""]
@@ -519,7 +531,18 @@ def combine_conditions(conditions: list[str], operator: str) -> str:
 
 
 def python_value_to_ch_type(value: Any) -> str:
-    """Helper function to convert python types to clickhouse types."""
+    """Helper function to convert python types to clickhouse types.
+
+    ``bool`` is checked before ``int`` because ``bool`` is an ``int`` subclass.
+
+    Examples:
+        >>> python_value_to_ch_type("s")
+        'String'
+        >>> python_value_to_ch_type(True)
+        'Bool'
+        >>> python_value_to_ch_type(3)
+        'Int64'
+    """
     if isinstance(value, str):
         return "String"
     elif isinstance(value, bool):
@@ -611,7 +634,16 @@ def datetime_literal_to_timestamp(
 
 
 def clickhouse_cast(inner_sql: str, cast: tsi_query.CastTo | None = None) -> str:
-    """Helper function to cast a sql expression to a clickhouse type."""
+    """Helper function to cast a sql expression to a clickhouse type.
+
+    Examples:
+        >>> clickhouse_cast("x", "double")
+        'toFloat64OrNull(x)'
+        >>> clickhouse_cast("x", "exists")
+        '(x IS NOT NULL)'
+        >>> clickhouse_cast("x")
+        'x'
+    """
     if cast is None:
         return inner_sql
     if cast == "int":
@@ -686,6 +718,15 @@ def quote_json_path(path: str) -> str:
 
 
 def quote_json_path_parts(parts: list[str]) -> str:
+    """Build a ClickHouse JSON path from pre-split segments.
+
+    Integer-looking segments become bracket indices; every other segment is
+    double-quoted as an object key.
+
+    Examples:
+        >>> quote_json_path_parts(["a", "0", "b"])
+        '$."a"[0]."b"'
+    """
     parts_final = []
     for part in parts:
         try:
