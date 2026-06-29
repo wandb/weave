@@ -12,7 +12,7 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
-from weave.trace_server.trace_server_interface import EvaluateModelArgs
+from weave.trace_server.trace_server_interface import EvaluateModelArgs, EvalWorkerJob
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
@@ -26,7 +26,7 @@ __all__ = ["EvaluateModelArgs", "EvaluateModelDispatcher", "evaluate_model"]
 
 class EvaluateModelDispatcher(ABC):
     @abstractmethod
-    def dispatch(self, args: EvaluateModelArgs) -> None:
+    def dispatch(self, args: EvalWorkerJob) -> None:
         pass
 
 
