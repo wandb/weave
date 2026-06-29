@@ -243,6 +243,13 @@ class CallsMergedDynamicField(CallsMergedAggField):
         cast: tsi_query.CastTo | None = None,
         use_agg_fn: bool = True,
     ) -> str:
+        if use_agg_fn and self.extra_path and cast != "exists":
+            # Aggregate the extracted scalar instead of the raw dump so GROUP BY
+            # state stays tiny (see json_dump_field_as_sql).
+            raw = super().as_sql(pb, table_alias, use_agg_fn=False)
+            return json_dump_field_as_sql(
+                pb, table_alias, raw, self.extra_path, cast, agg_fn=self.agg_fn
+            )
         res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 

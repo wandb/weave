@@ -548,7 +548,7 @@ def test_object_ref_filter_duplicates_and_similar() -> None:
              OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                (SELECT ref
                 FROM obj_filter_3)))
-           AND (positionCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), ''), {pb_9:String}) > 0)
+           AND (positionCaseInsensitive(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_8:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), ''), {pb_9:String}) > 0)
            AND ((any(calls_merged.deleted_at) IS NULL))
            AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
         SELECT calls_merged.id AS id
@@ -709,7 +709,7 @@ def test_object_ref_filter_complex_mixed_conditions() -> None:
                          OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
                            (SELECT ref
                             FROM obj_filter_1)))))
-                  OR ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_8:String}), 'null'), '') = {pb_9:String}))
+                  OR ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_8:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_9:String}))
                   OR ((NOT ((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_7:String}), 'null'), '') GLOBAL IN
                              (SELECT ref
                               FROM obj_filter_2)
