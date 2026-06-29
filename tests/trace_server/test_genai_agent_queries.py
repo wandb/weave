@@ -580,6 +580,100 @@ def test_two_pass_inherits_root_outside_window_via_slack(ch_server):
     assert by_id["other"] == ("", "", "", "")
 
 
+def test_two_pass_include_costs_matches_full_attribution(ch_server):
+    """include_costs two-pass joins prices to the page; per-span costs equal the
+    full-attribution path, the cost is span-exact (a child's own tokens, not the
+    inherited agent's), and an unpriced model passes through as null cost.
+    """
+    project_id = _make_project_id("two_pass_costs")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    tx = uuid.uuid4().hex
+    root, child, lone = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+
+    def at(secs: int) -> datetime.datetime:
+        return now + datetime.timedelta(seconds=secs)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=root,
+            operation_name="invoke_agent",
+            agent_name="Delta",
+            agent_version="dv",
+            agent_id="did",
+            conversation_id="cx",
+            request_model="gpt-4o",
+            input_tokens=1000,
+            output_tokens=500,
+            started_at=at(1),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=child,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="gpt-4o",
+            input_tokens=200,
+            output_tokens=100,
+            started_at=at(2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=lone,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="no-such-model-xyz",
+            input_tokens=10,
+            output_tokens=10,
+            started_at=at(3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    tp = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(project_id=project_id, include_costs=True)
+        ).spans
+    }
+    # A cost-column sort gates out of the two-pass -> the full-attribution path.
+    full = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                include_costs=True,
+                sort_by=[AgentSortBy(field="total_cost_usd", direction="desc")],
+            )
+        ).spans
+    }
+
+    def costs(s: object) -> tuple:
+        return (s.input_cost_usd, s.output_cost_usd, s.total_cost_usd)
+
+    for sid in (root, child, lone):
+        assert costs(tp[sid]) == costs(full[sid])
+        assert _identity(tp[sid]) == _identity(full[sid])
+
+    # Priced spans get real costs; the child's cost is its own (200/100 tokens),
+    # not the inherited agent's (1000/500), while its identity IS inherited.
+    assert tp[root].total_cost_usd
+    assert tp[child].total_cost_usd
+    assert tp[child].total_cost_usd != tp[root].total_cost_usd
+    assert _identity(tp[child]) == ("Delta", "dv", "did", "cx")
+    # An unpriced model stays null (distinguishes "unpriced" from "free").
+    assert tp[lone].total_cost_usd is None
+
+
 def test_unset_span_inherits_a_coherent_agent_triple(ch_server):
     """An inherited identity is one real agent, never a mix of two.
 

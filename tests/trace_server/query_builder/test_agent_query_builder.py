@@ -516,10 +516,10 @@ class TestMakeSpansListQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
-    def test_include_costs_uses_two_pass_over_cost_source(self) -> None:
-        # The page CTE reads the cost-augmented source (per-span price JOIN),
-        # then only the page is attributed. Compose the expected from the same
-        # helpers so the snapshot stays exact without copying the price-JOIN SQL.
+    def test_include_costs_joins_costs_over_the_page(self) -> None:
+        # The page CTE is bare `spans` (sort-key pruned); the per-span price JOIN
+        # wraps the page, then the page is attributed. Compose the expected from
+        # the same helpers so the snapshot stays exact without copying the JOIN.
         pb = ParamBuilder("genai")
         query = make_spans_list_query(
             pb, AgentSpansQueryReq(project_id="p1", include_costs=True)
@@ -529,22 +529,59 @@ class TestMakeSpansListQuery:
         expected_pb.add("p1", param_type="String")  # genai_0: page project filter
         expected_pb.add(100, param_type="UInt64")  # genai_1: limit
         expected_pb.add(0, param_type="UInt64")  # genai_2: offset
+        cost_page = cost_augmented_source_sql(
+            expected_pb, "p1", base_relation="page"
+        )  # genai_3, genai_4
+        attributed = attributed_spans_source(
+            expected_pb,
+            project_id="p1",
+            started_after=None,
+            started_before=None,
+            base_relation=cost_page,
+            fallback_trace_id_scope=_PAGE_SCOPE,
+        )  # genai_5
+        expected = _two_pass_expected(
+            base="spans",
+            where="s.project_id = {genai_0:String}",
+            order_by="started_at DESC, span_id DESC",
+            projection=f"{SPANS_LIST_COLS}, {SPANS_COST_COLS}",
+            attr_sql=attributed,
+        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
+
+    def test_cost_sort_keeps_full_attribution(self) -> None:
+        # Sorting by a cost column makes the page depend on the price JOIN, so
+        # the two-pass does not apply: the whole cost-augmented source is
+        # attributed before the ORDER BY / LIMIT (always-attribute path).
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                include_costs=True,
+                sort_by=[AgentSortBy(field="total_cost_usd", direction="desc")],
+            ),
+        )
+
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: filter project
+        expected_pb.add(100, param_type="UInt64")  # genai_1: limit
+        expected_pb.add(0, param_type="UInt64")  # genai_2: offset
         cost_source = cost_augmented_source_sql(expected_pb, "p1")  # genai_3, genai_4
         attributed = attributed_spans_source(
             expected_pb,
             project_id="p1",
             started_after=None,
             started_before=None,
-            base_relation="page",
-            fallback_trace_id_scope=_PAGE_SCOPE,
+            base_relation=cost_source,
         )  # genai_5
-        expected = _two_pass_expected(
-            base=cost_source,
-            where="s.project_id = {genai_0:String}",
-            order_by="started_at DESC, span_id DESC",
-            projection=f"{SPANS_LIST_COLS}, {SPANS_COST_COLS}",
-            attr_sql=attributed,
-        )
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}, {SPANS_COST_COLS}
+            FROM {attributed} s
+            WHERE s.project_id = {{genai_0:String}}
+            ORDER BY total_cost_usd desc, span_id desc
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
     def test_include_details_rejected_with_group_by(self) -> None:
