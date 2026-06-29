@@ -83,7 +83,6 @@ from weave.trace_server.agents.types import (
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
-from weave.trace_server.tracing import traced
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -123,6 +122,7 @@ from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
 )
+from weave.trace_server.tracing import traced
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
