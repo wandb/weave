@@ -1,0 +1,27 @@
+## Conversation
+User: "Start the weave release process." I ran the bump-version skill. When I asked whether to proceed with the default PATCH bump (-> 0.52.44, tag v0.52.44), the AskUserQuestion answer came back "Bump to 0.53.0" = they wanted a MINOR release. I missed that and ran the patch bump anyway; user corrected: "This is wrong. You need to do a minor bump to 0.53.0."
+
+## Actions
+- Mistakenly ran scripts/bump_python_sdk_version.py (patch): created 237c160331 (0.52.44) + c462fc7d5b (0.52.45-dev0) and tag v0.52.44.
+- Undid: `git tag -d v0.52.44`; `git reset --hard 97e85ac0ea` (== origin/master).
+- Researched minor-bump precedent: cf371ffd50 "chore(weave): Bump to 0.52.0" - a manual chore commit moving the dev base to X.Y.0-dev0, then the normal release flow on top.
+- This commit = step 1 of that pattern (0.52.44-dev0 -> 0.53.0-dev0). Steps 2-3: 7389bdcc7d (release 0.53.0 + tag v0.53.0), e7042b1d63 (next dev 0.53.1-dev0).
+
+## Errors & mistakes
+- Patch vs minor: misread the user's intent; fully reverted before redoing.
+- First redo attempt stored the uvx command in a shell var ($BMV); zsh does NOT word-split unquoted vars and `>=` collides with redirection -> "command not found", nothing mutated. Fixed by inlining each `uvx --from 'bump-my-version>=0.28.0' bump-my-version ...` with the --from arg single-quoted.
+
+## Dead ends
+- Considered a 2-commit minor (0.52.44-dev0 -> 0.53.0 directly via --new-version). Rejected for the 3-commit precedent (clean messages, matches cf371ffd50).
+
+## Hints & warnings
+- bump-my-version updates BOTH pyproject [tool.bumpversion] current_version AND the explicitly-passed ./weave/version.py; keep in sync.
+- "Specified version (X) does not match last tagged version (Y)" is benign (dev base is one ahead of last tag).
+- bump_version.yaml GitHub Action only does PATCH (bump pre_l + bump patch); minor/major are manual.
+- uv/uvx are at /opt/homebrew/bin, NOT on this shell's default PATH; prefix `export PATH="/opt/homebrew/bin:\$PATH"`.
+
+## Codebase discoveries
+- Versioning scheme: weave/version.py docstring. Minor precedent: cf371ffd50 (0.52.0).
+
+## Open questions
+- None. NOT pushed yet; awaiting user authorization to `git push && git push --tags`.
