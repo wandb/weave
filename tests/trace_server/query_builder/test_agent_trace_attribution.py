@@ -13,8 +13,10 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_trace_attribution import (
     IDENTITY_COLUMNS,
     attributed_spans_source,
+    extract_scopable_trace_ids,
     fields_reference_identity,
     query_references_identity,
+    trace_id_scope_subquery,
 )
 
 
@@ -107,3 +109,103 @@ def test_fields_reference_identity() -> None:
     assert fields_reference_identity(["operation_name", "agent_id"])
     assert not fields_reference_identity(["operation_name", "request_model"])
     assert not fields_reference_identity([])
+
+
+def _q(expr: dict) -> Query:
+    return Query.model_validate({"$expr": expr})
+
+
+def _eq(field: str, lit: object) -> dict:
+    return {"$eq": [{"$getField": field}, {"$literal": lit}]}
+
+
+def test_extract_scopable_trace_ids_gates_exactly() -> None:
+    # Extractable: bare trace_id eq, trace_id IN (sorted+deduped), and
+    # trace_id ANDed with a non-identity predicate.
+    assert extract_scopable_trace_ids(_q(_eq("trace_id", "t1"))) == ["t1"]
+    assert extract_scopable_trace_ids(
+        _q(
+            {
+                "$in": [
+                    {"$getField": "trace_id"},
+                    [{"$literal": "tb"}, {"$literal": "ta"}],
+                ]
+            }
+        )
+    ) == ["ta", "tb"]
+    assert extract_scopable_trace_ids(
+        _q({"$and": [_eq("trace_id", "t1"), _eq("operation_name", "invoke_agent")]})
+    ) == ["t1"]
+
+    # Not extractable: no query, no trace_id predicate, identity referenced
+    # (the whole query is poisoned), $or root, and a non-string trace_id literal.
+    assert extract_scopable_trace_ids(None) is None
+    assert extract_scopable_trace_ids(_q(_eq("operation_name", "x"))) is None
+    assert (
+        extract_scopable_trace_ids(
+            _q({"$and": [_eq("trace_id", "t1"), _eq("agent.name", "bot")]})
+        )
+        is None
+    )
+    assert (
+        extract_scopable_trace_ids(
+            _q({"$or": [_eq("trace_id", "t1"), _eq("trace_id", "t2")]})
+        )
+        is None
+    )
+    assert extract_scopable_trace_ids(_q(_eq("trace_id", 5))) is None
+
+
+def test_trace_id_scope_subquery_sql() -> None:
+    pb = ParamBuilder("genai")
+    sql = trace_id_scope_subquery(pb, project_id="p1", trace_ids=["t1", "t2"])
+    assert (
+        sql == "SELECT trace_id FROM spans WHERE project_id = {genai_0:String}"
+        " AND trace_id IN {genai_1:Array(String)}"
+    )
+    assert pb.get_params() == {"genai_0": "p1", "genai_1": ["t1", "t2"]}
+
+
+def test_attributed_source_scopes_fallback_to_trace_ids() -> None:
+    pb = ParamBuilder("genai")
+    scope = trace_id_scope_subquery(pb, project_id="p1", trace_ids=["t1"])
+    sql = attributed_spans_source(
+        pb,
+        project_id="p1",
+        started_after=None,
+        started_before=None,
+        trace_scope_subquery=scope,
+    )
+    # Only the fallback `tf` scan is scoped; the outer/base scans are untouched,
+    # and `tf` still GROUPs BY trace_id over all spans of the scoped trace, so
+    # per-trace attribution is identical to the unscoped query (lossless).
+    expected = """
+        (SELECT * EXCEPT (agent_name, agent_version, agent_id, conversation_id,
+                          has_own_agent_identity, fb_agent_identity, fb_conversation_id),
+            if(has_own_agent_identity, agent_name, fb_agent_identity.1) AS agent_name,
+            if(has_own_agent_identity, agent_version, fb_agent_identity.2) AS agent_version,
+            if(has_own_agent_identity, agent_id, fb_agent_identity.3) AS agent_id,
+            if(conversation_id != '', conversation_id, fb_conversation_id) AS conversation_id
+         FROM (
+           SELECT s0.*, (s0.agent_name != '') AS has_own_agent_identity,
+                  tf.fb_agent_identity, tf.fb_conversation_id
+           FROM spans s0
+           LEFT JOIN (
+             SELECT trace_id,
+                 argMinIf((agent_name, agent_version, agent_id), started_at, agent_name != '')
+                   AS fb_agent_identity,
+                 anyIf(conversation_id, conversation_id != '') AS fb_conversation_id
+             FROM spans
+             WHERE project_id = {genai_2:String}
+               AND trace_id IN (SELECT trace_id FROM spans
+                                WHERE project_id = {genai_0:String}
+                                  AND trace_id IN {genai_1:Array(String)})
+             GROUP BY trace_id) tf ON s0.trace_id = tf.trace_id
+           WHERE s0.project_id = {genai_2:String}))
+    """
+    assert _fmt(sql) == _fmt(expected)
+    assert pb.get_params() == {
+        "genai_0": "p1",
+        "genai_1": ["t1"],
+        "genai_2": "p1",
+    }

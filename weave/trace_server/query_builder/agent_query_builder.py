@@ -892,16 +892,40 @@ def _spans_source(
     four identity columns inherit from their trace when unset (see
     `agent_trace_attribution`); otherwise the base is used directly so
     non-identity queries skip the extra trace scan.
+
+    When the query restricts to concrete `trace_id`s without touching any
+    attributed column, the attribution fallback is scoped to those traces (see
+    `_trace_scope_subquery`) so it stops rolling up every trace in the project.
     """
     base = cost_augmented_source_sql(pb, req.project_id) if include_costs else "spans"
     if not attribute:
         return base
+    trace_scope_subquery = _trace_scope_subquery(pb, req)
     return agent_trace_attribution.attributed_spans_source(
         pb,
         project_id=req.project_id,
         started_after=req.started_after,
         started_before=req.started_before,
         base_relation=base,
+        trace_scope_subquery=trace_scope_subquery,
+    )
+
+
+def _trace_scope_subquery(pb: ParamBuilder, req: AgentSpansQueryReq) -> str | None:
+    """Scope subquery for the attribution fallback, or None to leave it unscoped.
+
+    Only returned when the request narrows to concrete `trace_id`s via a query
+    that references no attributed identity column. Both halves of the gate are
+    required: the non-identity check keeps the raw-`spans` scan from filtering
+    on a value that only exists post-attribution, and the extracted trace_ids
+    are the real narrowing predicate that makes scoping a win over a bare
+    project (plus optional time window) scan.
+    """
+    trace_ids = agent_trace_attribution.extract_scopable_trace_ids(req.query)
+    if not trace_ids:
+        return None
+    return agent_trace_attribution.trace_id_scope_subquery(
+        pb, project_id=req.project_id, trace_ids=trace_ids
     )
 
 
