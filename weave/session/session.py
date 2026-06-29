@@ -1503,7 +1503,8 @@ def log_turn(
     queue workers). Each child span passed in should have ``started_at`` /
     ``ended_at`` set; the emitted OTel span timestamps come from those fields.
     Falls back to the earliest/latest child timestamp, then ``now()``, when
-    the turn doesn't supply its own.
+    the turn doesn't supply its own. The agent-identity fields (``agent_id`` /
+    ``agent_description`` / ``agent_version``) mirror the streaming path.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
     these from the active session instead. Use custom, non-semconv keys: a
@@ -1559,6 +1560,10 @@ def log_session(
 
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
     ``session_id`` if empty. By default each turn gets its own OTel trace.
+    ``agent_name`` / ``model`` are session-level defaults — a Turn's own value
+    wins; the session value only fills in when the Turn leaves it empty. The
+    session's ``continue_parent_trace`` applies to every turn (a per-Turn
+    ``continue_parent_trace`` is intentionally superseded here).
 
     ``attributes`` are stamped on every emitted span. Use custom, non-semconv
     keys: a key that collides with a span's own ``gen_ai.*`` / ``weave.*``

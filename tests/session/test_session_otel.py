@@ -1788,6 +1788,26 @@ class TestLogSession:
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
         assert attrs["gen_ai.agent.version"] == "v2"
 
+    def test_does_not_mutate_caller_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # log_session applies session-level defaults / continue_parent_trace to
+        # a model_copy of each Turn, not the caller's instance. Locks in the
+        # "without mutating the caller's object" contract that model_copy exists
+        # to guarantee — a future _emit_turn edit that mutated in place would
+        # break this.
+        turn = Turn(started_at=_ts(0), ended_at=_ts(1))  # no agent_name / model
+        log_session(
+            session_id="sess-no-mutate",
+            agent_name="session-bot",
+            model="gpt-4o",
+            continue_parent_trace=True,
+            turns=[turn],
+        )
+        assert turn.agent_name == ""
+        assert turn.model == ""
+        assert turn.continue_parent_trace is False
+
     def test_empty_turns_returns_empty_log_result(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
