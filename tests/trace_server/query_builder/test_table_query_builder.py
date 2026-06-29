@@ -4,6 +4,7 @@ from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.table_query_builder import (
     make_table_row_digests_query,
     make_table_stats_basic_query,
+    make_table_stats_query_with_storage_size,
 )
 
 
@@ -64,6 +65,44 @@ def test_make_table_stats_basic_query() -> None:
     FROM tables
     WHERE project_id = {pb_0: String} AND digest IN {pb_1: Array(String)}
     GROUP BY digest
+    """
+
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": ["d1", "d2"],
+    }
+
+    assert_sql(expected_query, expected_params, query, params)
+
+
+def test_make_table_stats_query_with_storage_size() -> None:
+    pb = ParamBuilder("pb")
+    query = make_table_stats_query_with_storage_size(
+        project_id="project",
+        table_digests=["d1", "d2"],
+        pb=pb,
+    )
+    params = pb.get_params()
+
+    expected_query = """
+    WITH requested_tables AS (
+        SELECT digest, row_digests
+        FROM tables
+        WHERE project_id = {pb_0: String} AND digest in {pb_1: Array(String)}
+    )
+    SELECT tb_digest, any(length), sum(size_bytes) FROM
+    (
+        SELECT digest as tb_digest, length(row_digests) as length, row_digests
+        FROM requested_tables
+    ) AS sub ARRAY JOIN row_digests as row_digest
+    LEFT JOIN
+    (
+        SELECT * FROM table_rows_stats
+        WHERE table_rows_stats.project_id = {pb_0: String}
+          AND table_rows_stats.digest IN (SELECT arrayJoin(row_digests) FROM requested_tables)
+    ) as table_rows_stats ON table_rows_stats.digest = row_digest
+
+    GROUP BY tb_digest
     """
 
     expected_params = {

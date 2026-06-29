@@ -180,16 +180,24 @@ def make_table_stats_query_with_storage_size(
     project_id_name = pb.add_param(project_id)
     digest_ids = pb.add_param(table_digests)
 
+    # Scope the table_rows_stats subquery to only the row digests being joined so
+    # the (project_id, digest) sort key prunes instead of materializing the whole project.
     query = f"""
+    WITH requested_tables AS (
+        SELECT digest, row_digests
+        FROM tables
+        WHERE project_id = {{{project_id_name}: String}} AND digest in {{{digest_ids}: Array(String)}}
+    )
     SELECT tb_digest, any(length), sum(size_bytes) FROM
     (
         SELECT digest as tb_digest, length(row_digests) as length, row_digests
-        FROM tables
-        WHERE project_id = {{{project_id_name}: String}} AND digest in {{{digest_ids}: Array(String)}}
+        FROM requested_tables
     ) AS sub ARRAY JOIN row_digests as row_digest
     LEFT JOIN
     (
-        SELECT * FROM table_rows_stats WHERE table_rows_stats.project_id = {{{project_id_name}: String}}
+        SELECT * FROM table_rows_stats
+        WHERE table_rows_stats.project_id = {{{project_id_name}: String}}
+          AND table_rows_stats.digest IN (SELECT arrayJoin(row_digests) FROM requested_tables)
     ) as table_rows_stats ON table_rows_stats.digest = row_digest
 
     GROUP BY tb_digest
