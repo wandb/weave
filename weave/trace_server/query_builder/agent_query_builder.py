@@ -1741,10 +1741,9 @@ def make_conversation_chat_spans_query(
     # Always cost-augmented so the multi-turn chat view can render per-message
     # and per-turn cost; bounded to one conversation's turns, so cheap.
     source = cost_augmented_source_sql(pb, req.project_id)
-    # trace_id is reused across conversations in agent-eval workloads, so the
-    # page's trace_ids alone would pull in foreign conversations' spans. Scope
-    # the outer scan to the page's trace_ids (idx_trace_id prune) and keep only
-    # this conversation's spans plus untagged children (conversation_id = '').
+    # Scope to this conversation's spans + untagged children. The duplicate
+    # `trace_id IN (turn_page)` is the index prune CH won't derive from the
+    # JOIN; keep turn_page's total ORDER BY so both inlined scans agree.
     return f"""
         WITH turn_page AS (
             SELECT trace_id, min(started_at) AS turn_started_at
