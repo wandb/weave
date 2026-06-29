@@ -1,0 +1,62 @@
+## Conversation
+Round 3 ts-split PR 7: the Content edges, redesigned per rules 4/5. Round 2
+git-mv'd 4 client files into the mirror, left 4 LOAD-BEARING shims at the old
+paths (serialized op source bytes embed the import paths -- deleting them
+would change op digests), and refactored Content to delegate to mirror twins.
+Round 3: the client tree is 100% UNTOUCHED -- no moves, no shims, no digest
+hazard -- and the server gets its own weave/trace_server/content/ package.
+
+## Actions
+- Server suite adapted from the round-2 twins (proven code): content_types ->
+  content/types.py, content_utils -> content/utils.py, content_resolution ->
+  content/resolution.py, both magic resolvers. Path map applied; __init__
+  docstring explains the per-side + corpus design.
+- base64_content_conversion + image_completion adopted from the tip (they
+  already consumed the resolution module; only paths remapped).
+- Corpus rows generated from the server module: content_b64 / content_data_url
+  / content_url, expected = {data_base64, metadata_json} where metadata_json
+  is the EXACT stored-bytes string (json.dumps in field-declaration order).
+- Runner tests/conformance/test_corpus_content.py: client rows via REAL
+  Content.from_* (URL rows patch weave.utils.http_requests.get -- the
+  external boundary -- with an httpx-faithful fake response); server rows via
+  the resolution functions.
+- Burned the final 2 C2 entries -> CONTRACT 2 AT ZERO.
+- tests: tip's test_base64_content_conversion + test_image_completion adopted
+  w/ path remaps; tests/trace/type_handlers/Content/* (the CLIENT tests) run
+  UNMODIFIED against unmodified client code -- 250 content tests green.
+
+## Errors & Mistakes
+- Lazy bare-form resolver imports inside content/utils.py (_get_resolver)
+  escaped the dotted-path remap -- the EXACT trap round-2's note warned about
+  ("the joint-form replace missed the separate-form lazy imports"). Caught by
+  the generator's import failure.
+- REAL ROUND-2 BUG EXPOSED by writing the corpus against the untouched
+  client: the round-2 twin's _encoding_from_content_type_header reimplemented
+  requests' ISO-8859-1 default for charset-less text/*, but Content.from_url
+  fetches via weave.utils.http_requests = HTTPX, whose Response.encoding
+  falls back to utf-8. Round 2 (which refactored the client to delegate to
+  the twin) would have silently changed stored encodings for charset-less
+  text URLs. Fixed to httpx semantics BEFORE freezing the corpus row. This is
+  the user's conformance-corpus-against-real-behavior design paying off.
+- My first fake response lacked .encoding entirely (the tip's parity test
+  fake worked only because tip's client no longer read resp.encoding).
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- If Content gains/reorders fields, BOTH the client class and the server's
+  metadata_dict_from_resolved_args must change together with NEW corpus rows
+  (append-only); the metadata_json compare fails loudly on order drift.
+- The weave_type string "weave.type_wrappers.Content.content.Content" in
+  store_content_object is WIRE FORMAT, not an import.
+- url_safety (SSRF gate) runs BEFORE the fetch in image_completion; it lives
+  in the interface (contract constraint predicate), unchanged here.
+
+## Codebase Discoveries
+- requests 2.32.5's get_encoding_from_headers returns None for charset-less
+  text/* (the old RFC 2616 ISO default is gone there too) -- but irrelevant:
+  the client is httpx-based.
+
+## Open Questions
+None.

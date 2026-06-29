@@ -1,0 +1,28 @@
+## Conversation
+User: continue burning down weave.shared, one shared file per stacked PR,
+'guarantee by confirming the file is no longer in shared'. This is the first of
+three (trace_server_interface_util, validation_util, message_templating).
+
+## What
+weave.shared.trace_server_interface_util is server-only (importers: only
+weave/trace_server/*; its sole import is weave.shared.refs_internal = foundation).
+git mv -> weave/trace_server/trace_server_interface_util.py. Repointed 4 server
+modules + 4 TEST files.
+
+## Errors & Mistakes
+First attempt repointed only weave/ importers and MISSED the 4 test files
+(tests/trace/test_client_trace.py, test_weave_client.py,
+tests/trace_server/query_builder/test_calls_query_builder.py,
+tests/trace_server/test_trace_server_interface_util.py) -> pytest collection
+ModuleNotFoundError. LESSON for the remaining burndowns: grep REPO-WIDE
+(tests/ too), not just weave/, when moving a module. import-linter only covers
+weave/ so it stays green even when tests break.
+
+## Verification
+weave/shared/trace_server_interface_util.py GONE (ls confirms). import weave OK.
+import-linter 4/0. conformance 19 + test_weave_client + test_trace_server_interface_util
+115 passed/12 skipped. ruff+ty clean.
+
+## Note
+test_trace_server_interface_util.py stays under tests/trace_server/ (just
+repointed its import); optional polish to move it next to the module later.

@@ -1,0 +1,35 @@
+## Conversation
+PR 3 of the ts-split stack: the whale -- client-side contract copy + rewires + identity gate + in-process twin boundary. Strict zero per user decision (vendored copies over single shared layer; user confirmed the ~6-7k-line duplication cost with identity gates).
+
+## Actions
+- Closure-cleaned server contract in place (guided by v2 697880c312's note): inlined validate_tag_name/validate_alias_name into tsi (deleted from validation.py -- tsi was the ONLY consumer; verified by grep); inverted sentinel deps (agents/schema defines SENTINEL_EPOCH/EXPIRE_AT_NEVER, ch_sentinel_values re-exports). AST closure check then showed the copy set imports only itself + weave.shared.
+- Copied contract set into weave/shared (cp, then blanket-rewrote weave.trace_server.->weave.shared. INSIDE copies); copy set = v2's relocate list: tsi, common/service/http_service interfaces, constants, errors, ids, trace_server_converter, validation_util, helpers/url_safety, interface/** (incl generated JSON), agents/{types,constants,schema,semconv}.
+- Codemod rewired 36 weave/ files (client+bindings+flow runnable+shared registry) and 68 tests/ files (all but tests/trace_server). Two stragglers from a bare-import form (from weave.trace_server import http_service_interface) fixed by hand.
+- Conformance test (tests/trace_server/test_contract_conformance.py): byte-identity modulo ordered path rewrites; subtree pairing for interface/**; short parametrize ids (long ids overflow tmpdir name limit via the caching_client_isolation fixture).
+- Schema generator now dual-emits to both twins.
+- TwinNormalizingTraceServer in tests/conftest.py: req->server-copy revalidation (model_dump(by_alias=True), mirroring the wire), res->client-copy, server-copy error transplant (__dict__/args onto the client twin class -- twin classes identical so exact), lazy translation for streaming methods.
+- pyproject: C1 and C3 ignore_imports burned to [].
+
+## Errors & Mistakes
+- The big one: dual-copy identity issues at the IN-PROCESS seam (predicted during planning, confirmed empirically). Production crosses copies via HTTP serialization; the in-process client fixture does not. Fixed at the fixture seam, NOT by weakening client/server code.
+- Cache namespace bug: CachingMiddlewareTraceServer namespaces keys by func.__name__; my wrapper's closure was named 'call' -> ALL methods cached under one namespace -> obj_delete invalidation prefixes never matched -> stale reads (test_object_deletion). Fix: call.__name__ = name. If you write another server-wrapping proxy, set __name__.
+- Exceptions: e.args reconstruction broke on kwargs-style __init__ (ObjectDeletedError(message, deleted_at)) -> switched to __new__ + __dict__ transplant.
+- Streaming: errors raise lazily on consumption -> translation must wrap iteration (generator), not just the call.
+- Revalidation itself runs server-copy model validators -> must sit INSIDE the error-translation block (test_table_query_empty_sort_field_validation).
+- rg -g '!dir/**' excludes are NOT honored by this environment's Bash rg shim -- use /usr/bin/grep --exclude-dir. Burned twice this session.
+
+## Dead Ends
+- Considered a SHIPPED twin-boundary adapter in weave/trace_server (server-side, strict-zero-clean). Deferred: only tests cross in-process today in this repo; the eval-worker seam gets decided in PR 7. If core needs one for online evals post-move, build it server-side (model_validate(model_dump) needs only the server's own classes).
+
+## Hints for Future Agents
+- tests/trace_server tests that drive the `client` fixture see CLIENT-copy responses/errors (wire semantics). Three files now assert twin-tuples or dump-equality (pydantic equality is class-sensitive): test_opentelemetry (isinstance tuples), test_digest_validation + test_trace_server_evaluation_apis (error-tuple aliases), GenAISpanRef compare-by-model_dump.
+- tests/flow/test_evaluation_imperative (5 param cases) + tests/flow/test_scorer::test_from_obj_unwraps_nested_weave_object FAIL ON PRISTINE MASTER in this env (verified via detached worktree at 59cdd382b1, same 0.23s signature). Pre-existing; NOT caused by this stack; did not chase.
+- The twin conformance normalizer already maps weave.trace_server.shared.* -> weave.shared.* in anticipation of PR 4 (server twins of the format utils).
+- generated_builtin_object_class_schemas.json: regenerate via scripts/generate_base_object_schemas.py which writes BOTH twins now; the conformance test pins them equal.
+
+## Codebase Discoveries
+- The only client->server edges beyond the contract were exception RE-EXPORTS (NotFoundError/InvalidRequest imported from clickhouse_trace_server_batched/sqlite_trace_server in tests) -- the weave/ tree itself was contract-only, matching v2's audit.
+- CachingMiddlewareTraceServer is enabled in the test client fixture (recorder showed hits/misses), despite the create_client comment implying it's off.
+
+## Open Questions
+- Should TwinNormalizingTraceServer eventually ship (e.g. for core's in-process online-eval client)? Decide at PR 7 (eval worker relocation).

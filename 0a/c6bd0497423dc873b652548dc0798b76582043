@@ -1,0 +1,24 @@
+## Purpose
+Intermediate gate PR. Adds `@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, ...)` to
+tests/trace/test_llm_as_a_judge_scorer.py::test_llm_as_a_judge_scorer_publish_has_no_op_refs (T2).
+Single-line change.
+
+## Why this is its own PR (not in #7146 call-writes)
+T2 was added to master by #7183 (2026-06-16, "exclude op methods from LLMAsAJudgeScorer
+publish payload") AFTER the fake-server skeleton #7145's gating was authored. #7145 gated
+every other fake-unimplemented test but missed this late-arriving one, so master's
+fake-trace-tests job is RED on T2 (weave.publish -> weave_client.py 'NoneType' has no
+attribute 'digest', because obj_create does not exist on the fake yet). This PR completes
+the skeleton's gating for that test. It has nothing to do with call-writes; it was re-homed
+here after a stray skeleton-leftover commit had bled into #7146's diff.
+
+## How it is un-gated
+fake-ts-03-objects-tables (#7147) implements obj_create/obj_read; T2 passes on the fake
+backend there, and that PR removes this skipif. (T1, test_publish_and_load_scorer_with_prompt_ref,
+remains gated until #7157 per the original stack design.)
+
+## History
+Commit 0ac6bd0497 was originally the andrew/fake-ts-01-skeleton tip. After #7145 squash-merged
+(as 0caf63ee7e), gt refused to re-submit that branch ("merged commits not contained in trunk"),
+so the gate was re-homed onto a fresh branch andrew/fake-ts-judge-gate as an intermediate PR
+and andrew/fake-ts-01-skeleton was deleted.

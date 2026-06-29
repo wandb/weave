@@ -1,0 +1,47 @@
+## Conversation
+This stack is round 2 of the in-memory fake trace server. Round 1 (PRs
+#7145-#7152 v3) replicated the SQLite trace server. The user then said:
+'It seems like a lot of this stack tries to replicate the sqlite trace
+server, when in reality it should probably replicate the clickhouse trace
+server. Please update the stack accordingly.' Everything here is the
+ClickHouse re-target: the fake now replicates ClickHouse (the production
+backend) at the interface level, client_is_sqlite(client) is False for the
+fake, and a new client_is_clickhouse(client) predicate gates tests that
+assert ClickHouse *internals* (SQL, table routing/residence, batching,
+bucket file storage, raw server._query access).
+
+## Verification protocol (applies to the whole stack)
+ClickHouse baselines: tests/trace_server 1336 passed/2 skipped/1 failed
+(test_skip_clickhouse_client, pre-existing); tests/trace 1679/26/1
+(test_flask_server, pre-existing env). Fake converged runs on this exact
+tree: tests/trace_server 1240 passed/105 skipped/0 failed; tests/trace
+1665 passed/42 skipped/1 failed (same flask test). Every extra fake skip
+was audited with -rs: all are explicit ClickHouse-only gates (the
+internals listed above) plus 26 environment skips identical on both
+backends. The CH-internals skip total in tests/trace is exactly the gate
+flips in the wiring commit. Secondary shards (flow/compat/utils/
+wandb_interface/session/shared/object) pass identically to sqlite
+(2 pre-existing env failures: test_evaluation_invalid_model_name_*,
+test_from_obj_unwraps_nested_weave_object — fail the same on sqlite,
+backend-independent).
+
+## This commit (stage 3/10: objects/tables/files/refs)
+Object CRUD with tombstones, version indexes, latest-alias bookkeeping,
+tags/aliases, digest-addressed tables, files. Storage sizes are
+uncompressed dump lengths exactly like CH reports them: _ObjRec records
+val_dump_len=len(json_val of sorted dumps), table rows record
+len(json.dumps(row)), files len(content). objs_query only computes
+size_bytes when include_storage_size is set. _read_internal_obj_ref lands
+here with refs_read_batch (its first use); the expanded-ref filter/sort
+machinery that also uses it is stage 5.
+
+## Errors & Mistakes
+- _AliasRec.created_at and obj_delete's deleted_at were still assigned
+  SQLite 'YYYY-MM-DD HH:MM:SS' strings after the datetime conversion
+  (annotated datetime, assigned str). Fixed to
+  datetime.now(timezone.utc); nothing compared them yet so tests never
+  caught it — type checker would have.
+
+## Hints for Future Agents
+- obj_delete raises NotFoundError with the exact CH digest-diff message
+  format; tests assert on substrings of it.

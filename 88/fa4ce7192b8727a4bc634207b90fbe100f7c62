@@ -1,0 +1,8 @@
+## Split of Google ADK plugin-core — slice 1/3 (run spans)
+The original single commit "add Google ADK plugin core (run/model/tool span tracing)" (~1080-line googleAdk.ts) was too large to review, so it was split into 3 PRs: run / model / tool. Full original history is preserved on tag bak-adk-old-plugincore (9f89888690, 197-line note).
+
+This slice: plugin scaffolding (WeaveAdkPlugin, guard/tracer/beforeExit dangling cleanup, InvocationState run fields, finishInvocation), run callbacks (beforeRun/onEvent/afterRun → root invoke_agent span), all message-serialization + env helpers, run-subset types, semconv +AGENT_DESCRIPTION/+AGENT_ID, the @google/adk dep + lodash jest-shim, exports, AGENTS.md.
+
+Omits model+tool callbacks (slices 2/3). KEY constraint: ADK's PluginManager.runCallbacks calls plugin.<cb>(...) with NO existence guard (verified in dist/cjs/plugins/plugin_manager.js), so a plugin missing callbacks throws in the real runner. Hence this slice's tests drive run callbacks DIRECTLY (no InMemoryRunner); real-runner tests live in slices 2/3.
+
+Built: branch off master, restore old plugin-core files, delete model+tool code, author direct-call run tests. Verified 4/4 jest + eslint + prettier (nvm node v24.16.0; PATH node is a bun shim that crashes jest).

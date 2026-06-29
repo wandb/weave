@@ -1,0 +1,42 @@
+## Conversation
+Final PR of the v2 stack, regenerated a second time after the parent (#7178)
+was amended for a review comment on feedback.py: client files must not reach
+the SDK models THROUGH the bindings module — alias weave_server_sdk directly,
+with a lint rule. The parent now bans weave.trace_server_bindings.models for
+client code (spot-level noqa for the unavoidable gap imports), feedback.py
+owns its Feedback row model locally, and wal_sender aliases the real SDK.
+This PR then removes ALL aliasing (and the bindings' temporary SDK re-export)
+in favor of direct imports.
+
+## Actions
+- Reset to the amended #7178 tip; re-ran the converter (partition tsi.X refs
+  by hasattr(weave_server_sdk.models, X); SDK names -> weave_server_sdk.models,
+  gap names -> weave.trace_server_bindings.models; collision-checked).
+- feedback.py and wal_sender came through with zero gap imports needed at
+  conversion time (their fixes live in the parent).
+
+## Errors & Mistakes
+- ruff's import-sorting --fix DROPS inline `# noqa: TID251` comments when it
+  rewrites an import line — re-apply noqa AFTER running ruff --fix, then
+  verify with a plain check. (Hit in the parent amendment.)
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- If #7178 is amended again: reset this branch to the parent tip and re-run
+  the converter; never hand-resolve the import-line conflicts.
+- Validation: bindings + trace + flow + compat + utils + session + shared =
+  2195 passed; the 10 standing failures are the documented pre-existing set;
+  ty/pyright/mypy/ruff hooks pass.
+
+## Codebase Discoveries
+None new.
+
+## Open Questions
+None.
+
+## Addendum (stack split, 2026-06-11)
+Re-cut during the #7177 split; same three micro-fixes as the parent commit
+(markers, weave_init annotation, weave_client comment names). See parent
+notes for details.

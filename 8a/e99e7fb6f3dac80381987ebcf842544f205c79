@@ -1,0 +1,52 @@
+## Conversation
+Step 4 (clean move, no shims). Move CH impl into clickhouse_trace_server/.
+
+## Actions
+- git mv 17 top-level CH files + 8 dirs (actions_worker agents clickhouse costs helpers
+  migrations model_providers query_builder) into weave/trace_server/clickhouse_trace_server/.
+  CH bucket = everything left after interface/ (PR2) + shared/ (PR3), minus sqlite_trace_server.py.
+- Codemod .context/pr4_repoint_clickhouse.py: per-unit dotted + space-form -> clickhouse_trace_server.*.
+- Hand-fixed the lone CH multi-line block (conftest_lib/trace_server_external_adapter.py).
+
+## Errors & Mistakes (IMPORTANT — systemic gap)
+- The import-only codemods (PR2/PR3/PR4) rewrote IMPORT STATEMENTS but NOT string module refs.
+  Module paths also appear as STRINGS: unittest.mock.patch("weave.trace_server.kafka.X"),
+  logging logger names ("weave.trace_server.redis_client"), pkgutil.resolve_name (the root
+  conftest's kafka patch -> errored 29 test_evaluations tests at fixture setup), ddtrace.
+  Collection PASSED (imports fine) but @patch resolves at RUNTIME -> latent failures.
+  FIX: .context/fix_string_refs.py rewrites `weave.trace_server.<unit>` over ALL lines (not just
+  imports) for every moved unit (interface+shared+CH). 22 files / ~135 lines. This caught
+  SHARED-module string refs too (environment, clickhouse_trace_server_settings, redis_client)
+  = latent PR3 breakage, fixed here.
+  LESSON FOR PR5 + future moves: rewrite ALL lines, and grep mock-patch strings / logger names /
+  pkgutil / entry_points after every module move, not just import statements.
+- Two CONFIG paths tracked moved files and broke:
+  - ruff [tool.ruff.lint.per-file-ignores] PLW1514: weave/trace_server/costs/update_costs.py ->
+    clickhouse_trace_server/costs/update_costs.py (the moved file lost its PLW1514 ignore ->
+    4 ruff errors until fixed; this file is mocked-file-IO sensitive per AGENTS.md).
+  - hatch [tool.hatch.build] exclude: weave/trace_server/model_providers ->
+    clickhouse_trace_server/model_providers (else the model-provider JSONs get bundled into wheel).
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- CONTRACT->IMPL couplings now explicit (pre-existing, flagged for review, NOT fixed):
+  interface/trace_server_interface.py imports clickhouse_trace_server.agents.types;
+  interface/builtin_object_classes/provider.py imports clickhouse_trace_server.model_providers.
+  These prevent interface/ from being standalone. SHARED->CH too: shared/methods/feedback_stats,
+  shared/opentelemetry/genai_extraction import clickhouse_trace_server.*.
+- Shared-module string-ref fixes are in THIS commit (PR4) but logically belong to PR3 — flagged
+  in commit msg; redistribute during restack/review if desired.
+- CH-backend tests (test_clickhouse_trace_server_batched, _migrator, async_clickhouse,
+  migration_lock, llm_completion) need Docker; not run locally. Their string fixes are mechanical
+  (same pattern) + ruff/collection pass.
+
+## Codebase Discoveries
+- pkgutil.resolve_name walks dotted module strings via importlib+getattr; a moved module breaks
+  any string that names its old path. ddtrace plugin (ddtrace-4.0.0 in pytest plugins) + mock
+  patches are the main string-ref consumers.
+
+## Open Questions
+- None blocking. PR5 next (final): git mv sqlite_trace_server.py -> sqlite_trace_server/ package.
+  Remember: fix string refs (mock patches of sqlite_trace_server.*) + check config paths.

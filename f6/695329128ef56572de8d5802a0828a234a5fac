@@ -1,0 +1,81 @@
+## Conversation
+User wants to move weave/trace_server/ (the server) into the `core` repo, restructured
+into interface/ (contract), shared/ (impl-shared utils), sqlite_trace_server/,
+clickhouse_trace_server/, and give the CLIENT (weave/) its own trace_server_interface.
+Directives: use gt to build the stack locally; DO NOT push; "don't worry about
+backcompat, focus on moving files into the correct spot first"; resolve open questions
+via the grill-me skill.
+
+Grill resolved (decision tree):
+1. Clean move, fresh on andrew/move-trace-server-to-core-v1, NO shims. Prior shim-based
+   ts-* stack (ts-server-interface->ts-impl-dirs->ts-move-impls->ts-ch-data, + ts-sqlite-impl)
+   is reference-only.
+2. Full client decoupling IS in scope, done FACADE-FIRST (this commit) so the ~169 client
+   sites are repointed ONCE, then server reorg happens behind the facade.
+3. Errors: server-raised errors stay SERVER-SIDE, NOT in the facade. Client keeps importing
+   them directly from weave.trace_server.errors in local-in-process-server paths
+   (transitional). Future: wire-level error-type discriminator -> client reconstructs.
+   "For now keep it separate." Purely-client errors live client-side (already do).
+
+## Actions
+- Mapped client coupling (Explore agent): dominated by trace_server_interface (60 sites),
+  errors (23), common_interface (19), ids (14), interface.query (14), builtin_object_classes
+  (12), constants (10), service_interface (5), trace_server_converter (2).
+- Created weave/trace_server_interface/ : __init__ + thin re-export submodules
+  (trace_server_interface, common_interface, service_interface, http_service_interface,
+  query, feedback_types, constants, ids, trace_server_converter) + builtin_object_classes/
+  package (leaderboard, annotation_spec, saved_view, llm_structured_model,
+  builtin_object_registry). Each does `from weave.trace_server.<x> import *  # noqa: F403`
+  (CURRENT locations; PR2/PR3 will repoint these targets).
+- Codemod at .context/pr1_repoint_client_imports.py (gitignored): ordered regex rules,
+  scoped to weave/ excluding trace_server/ and trace_server_interface/, import lines only.
+  Repointed 34 files / ~50 import lines. errors imports deliberately left untouched.
+- Verified: facade smoke test; `import weave` + all repointed modules; pytest --collect-only
+  on tests/trace+tests/flow = 2125 collected, 0 import errors; focused flow tests 8 passed
+  on sqlite; ruff check --fix + format clean.
+
+## Errors & Mistakes
+- Codemod exclusion bug: first version used str.startswith('weave/trace_server'), which
+  ALSO excluded weave/trace_server_bindings/ (shares the prefix). Bindings weren't
+  repointed. Fixed to a Path.parents membership check; re-ran (idempotent) -> bindings done.
+- saved_view facade: `from ...saved_view import *` did NOT export Column/Pin because
+  saved_view.py defines `__all__ = ["SavedView"]`. Star import respects __all__. Fixed that
+  one facade file to explicitly re-export Column, Pin, SavedView. (Only comparison_view,
+  saved_view, test_only_example define __all__ among contract modules; only saved_view is
+  client-facing.)
+- ruff invoked with an unquoted $FILES list hit a spurious 'File name too long (os error 63)'
+  on weave/utils/retry.py and aborted mid-list, leaving 12 files unfixed. Re-ran scoped via
+  `xargs ruff` reading a file list -> all 12 import-order fixes applied, clean.
+
+## Dead Ends
+- Considered splitting errors.py (exception classes -> interface/, registry -> shared/).
+  User overruled: errors are server-side, not split for the client. So no split this PR.
+
+## Hints for Future Agents
+- mypy config (pyproject [tool.mypy]) does NOT disable implicit_reexport and sets
+  ignore_missing_imports=true, and excludes tests/examples. So the facade `import *`
+  re-exports type-check fine. mypy is NOT installed in the venv (.venv has no mypy); it
+  runs via prek/pre-commit with additional_dependencies.
+- weave_server_sdk is an OPTIONAL dep, missing in this env; stainless_remote_http_trace_server
+  imports it at module top but real code loads stainless lazily (weave_init.py). Not a
+  regression — ignore eager-import failures of that one module.
+- No .venv ships in fresh Conductor worktrees here; created with
+  `uv venv --python 3.12 --clear && uv sync --group test`.
+- Shell `grep`/`rg` is ripgrep-aliased: `-E` errors out. Use the Grep tool or `git grep`.
+- Branch is gt-tracked with parent master. PR2 should be `gt create`d as a child.
+- Facade re-export TARGETS (the `from weave.trace_server.<x>`) must be updated in PR2
+  (interface/ move) and PR3 (shared/ move) as those source modules relocate.
+
+## Codebase Discoveries
+- weave/trace_server/interface/ already existed pre-migration (query, feedback_types,
+  builtin_object_classes/) with NO __init__.py in builtin_object_classes (namespace pkg).
+- Local `master` ref fast-forwarded mid-session (40cb -> 0b3db) — other worktrees' gt sync
+  moves the shared master ref. Branch sits at master (0b3db35cf6).
+- The client/server error story is already dual: local in-process servers raise real
+  exception classes; remote HTTP returns status codes that http_utils.py partially
+  reconstructs (e.g. CallsCompleteModeRequired from error_code). weave_client.py
+  distinguishes local DigestMismatchError from remote HTTPError explicitly.
+
+## Open Questions
+- None blocking. PR2 (interface/ consolidation) is next: git mv contract files into
+  interface/, update facade re-export targets + server-internal importers, no shims.

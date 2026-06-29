@@ -1,0 +1,121 @@
+## Conversation
+User asked to add Google ADK support for the weave TypeScript SDK (success =
+real ADK program runs and traces show correctly in Weave), then in a second
+turn asked to break the single commit (1f431dd1ae, now re-split) into a
+stack of digestible PRs. This is PR 1/4 of that stack (core plugin). The
+full session note lives on this commit; PRs 2-4 carry scoped notes.
+
+## Actions
+Researched @google/adk 1.2.0 by installing into /tmp/adk-js-probe and
+reading dist/types + dist/esm sources (telemetry/tracing.js, runner/
+runner.js, agents/llm_agent.js callLlmAsync + runAndHandleError, agents/
+functions.js tool dispatch, plugins/plugin_manager.js, models/google_llm.js
++ base_llm.js trackingHeaders). Studied existing TS integration seams:
+openai-agents weave-tracing-processor (saveCallStart/End transport, the
+default), piCodingAgent OTel adapter (/agents/otel/v1/traces, behind
+WEAVE_USE_OTEL_V2 for openai-agents), googleGenAI constructor proxy. Then
+wrote googleAdk.ts + googleAdk.types.ts and wired hooks/index exports.
+
+## Errors & Mistakes
+- First duck-type draft used index signatures ([key: string]: unknown) and
+  Record-typed config; real genai/ADK interfaces (Part, Content,
+  GenerateContentConfig) have no index signatures, so WeaveAdkPlugin was not
+  assignable to BasePlugin — exactly what users hit passing the plugin in
+  RunnerConfig.plugins. Fixed by dropping index signatures, typing config as
+  object, and listing common Part fields as unknown.
+- /opt/homebrew/bin/node is a bun shim and npm is absent from PATH on this
+  machine; use ~/.nvm/versions/node/v24.16.0/bin.
+
+## Dead Ends
+- OTel-based design (mirror the Python google_adk integration): rejected.
+  ADK-JS emits spans via the GLOBAL OTel tracer; capturing them requires
+  registering the global TracerProvider + ContextManager, which breaks any
+  user OTel stack registered later (second registration is refused), and
+  SDK 2.x removed addSpanProcessor so we cannot attach to a user provider.
+  Python can patch ADK's tracing functions in-place; ESM immutable bindings
+  + relative internal imports make that impossible in JS.
+- Parenting @google/genai generateContent calls under ADK calls via OTel
+  span-id correlation: without a registered ContextManager ADK context
+  propagation is a no-op and NonRecording spans share the INVALID all-zero
+  span id; module-global correlation breaks under ParallelAgent. Chose
+  exclusion (PR 2/4) instead.
+
+## Hints for Future Agents
+- ADK 1.2.0 NEVER dispatches plugin beforeAgentCallback/afterAgentCallback
+  (PluginManager.runBefore/AfterAgentCallback have zero call sites), hence
+  lazy invoke_agent synthesis from callbackContext.agentName + the agent
+  tree captured at beforeRun. Both agent callbacks ARE implemented so timing
+  becomes exact if ADK wires them; afterAgentCallback deletes the map entry
+  so LoopAgent re-runs would get fresh calls.
+- PluginManager RETHROWS plugin callback errors into the user's run — every
+  callback body goes through guard() (warnOnce + swallow). Never let a
+  logging bug break the host app.
+- afterModelCallback fires once per streamed response; partial=true chunks
+  are skipped; the final aggregated response closes the call.
+- afterToolCallback fires even after onToolErrorCallback handled the same
+  call (result=null); endToolCall tolerates the missing map entry.
+- CJS hook subPath is dist/cjs/index.js (@google/adk is type:module with a
+  require condition). Patching Runner.prototype.runAsync/runEphemeral covers
+  subclasses (InMemoryRunner); registration is idempotent via
+  pluginManager.getPlugin('weave') and a globalSingleton plugin instance.
+- If a run aborts mid-flight afterRun never fires; process.once('beforeExit')
+  force-closes dangling calls with status 'interrupted'.
+- Ordering requirement: import weave BEFORE @google/adk (CJS) or run with
+  node --import=weave/instrument (ESM).
+
+## Codebase Discoveries
+- sdks/node has two ingestion paths: legacy calls API (default; used here)
+  and OTel v2 /agents/otel/v1/traces via genai/provider.ts (piCodingAgent
+  always; openai-agents only when WEAVE_USE_OTEL_V2=true).
+
+## Open Questions
+- When ADK starts dispatching plugin agent callbacks, consider whether the
+  lazy synthesis fallback should be kept for older ADK versions (yes for
+  back-compat, probably).
+- ADK runLive is unimplemented in 1.2.0; revisit live mode when it ships.
+
+---
+
+# ADDENDUM (amend via gt absorb, 2026-06-10)
+
+## Conversation
+User asked (while on andrew/adk-ts-03-tests) to make the comments in
+sdks/node/src/integrations/googleAdk.ts more terse and to use correct
+TypeScript formatting for the TS examples in the module doc. A follow-up
+asked to make sure the change landed in the correct PR and to fix unstaged
+file issues.
+
+## Actions
+- Tersened ~20 comment blocks in googleAdk.ts (module header, constants,
+  InvocationState fields, toJsonSafe/sanitizeLlmRequest docs, class doc,
+  guard/ensureAgentCall/finishInvocation/registerBeforeExitHookOnce docs,
+  inline comments in model/tool callbacks, instrumentation section).
+  Load-bearing "why"s kept: plugin-vs-OTel rationale, ADK 1.2.0 missing
+  agent callbacks, FIFO synthetic tool keys, late afterToolCallback,
+  beforeExit flush.
+- Reformatted the second usage example to prettier style (one property per
+  line, trailing comma) and dropped the unused LlmAgent import from the
+  first example. Verified with npx prettier --check (passes) and tsc
+  --noEmit (only pre-existing import.meta error in src/esm/instrument.mts).
+- Edits were made while 03-tests was checked out, but git log showed only
+  this commit ever touched googleAdk.ts, so the right home was PR #7135.
+  Used `git add` + `gt absorb --force` (after --dry-run): all 31 hunks
+  absorbed here; 02/03/04 restacked.
+- Deleted stray untracked sdks/node/package-lock.json: generated by `npm i`
+  per AGENTS.md instructions, but master removed it deliberately in
+  00d1f18d72 (#6802) — the repo tracks pnpm-lock.yaml instead.
+
+## Errors & Mistakes
+- `npx` is not on PATH in the sandbox shell (/opt/homebrew/bin/node is a
+  bun symlink); used ~/.nvm/versions/node/v20.19.4/bin.
+
+## Hints for Future Agents
+- gt absorb/modify orphan git notes onto pre-rewrite SHAs. Notes for all 4
+  stack commits were re-copied to the new SHAs after this absorb (backups
+  in workspace .context/notes-backup/).
+- AGENTS.md still says `cd sdks/node && npm i` for TS tests; that is what
+  creates the stray package-lock.json. Repo convention is pnpm.
+
+## Open Questions
+- PRs #7135-#7138 show "local changes, need submit" — submission left to
+  the user (no push without explicit ask).

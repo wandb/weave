@@ -1,0 +1,26 @@
+## Conversation
+PR 2 of the ts-split stack (strict-zero decoupling of weave/trace_server; plan in docs/TRACE_SERVER_DECOUPLING.md). This commit is mined from the prior-generation v2 stack per the user's instruction to reuse its hard moves.
+
+## Actions
+- Cherry-picked 596223b313 (andrew/ts-v2-llm-structured-model). Two conflicts, both because I skipped v2's separate registry-repoint commit (4226afa14e) and folded it here instead:
+  - weave/shared/object_class_util.py: took the incoming side (lazy import -> contract registry module).
+  - pyproject.toml C3 ignore list: took incoming (entry swap base_objects -> builtin_object_registry), reworded comment for this stack's numbering.
+- Post-pick fixes: removed llm_structured_model.py from ROOT_IMPORT_BASELINE in tests/trace_server/test_import_contract.py (the stale-baseline assert failed until I did -- working as designed); fixed a v2 PR-number reference in a pyproject comment (their PR5 = this stack's PR 7).
+- Verified: lint-imports 3 kept / 0 broken; meta-tests 4/4; tests/trace/test_llm_structured_completion_model.py + test_llm_as_a_judge_scorer.py 23 passed; data_serialization + test_serialize with WF_TRACE_SERVER_URL=https://trace.wandb.ai (CI-like markdown behavior): 42 passed, 1 skipped.
+
+## Errors & Mistakes
+- The meta-test failure after the pick was EXPECTED (stale ROOT_IMPORT_BASELINE entry); do not weaken that assert -- it is the mechanism that forces baseline burn-down.
+
+## Dead Ends
+- Considered keeping v2's registry repoint as its own PR (v2's ordering). Folded it here instead: it is cohesive with the digest-marker change (both make object canonicalization self-contained in the shared zone) and avoids an extra one-line PR.
+
+## Hints for Future Agents
+- __weave_canonical_bases__ on the server schema MUST stay equal to the runnable's real MRO; tests/trace/test_llm_structured_completion_model.py has the parity test. If you change either class hierarchy, change both.
+- The 4 transient ignore entries added here are deliberate and documented inline; PR 3 (client contract copy) legalizes the runnable->contract ones, PR 7 (eval worker move) removes the worker->runnable one. Do not "clean them up" early.
+- Raw-dict publishes (frontend playground / wb_agent) ship NO _bases; the server canonicalizes via the marker. Golden digest tests in data_serialization are the canary.
+
+## Codebase Discoveries
+- v2's commit 596223b313 applied onto master+1 with only those 2 conflicts; master drift since v2's base did not touch the split files.
+
+## Open Questions
+None for this commit.

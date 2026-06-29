@@ -1,0 +1,57 @@
+## This commit
+Rebuilt for round 10 (lint/type-check pass); see stack-wide context in
+sibling commits' notes.
+
+## Round 10 addendum: every PR now passes the repo lint (type checkers included)
+User asked to 'ensure all PRs pass linting'. The repo's CI lint gate
+(nox -e lint -> prek pre-push hooks) effectively runs THREE always_run
+type checkers repo-wide — ty, pyright@1.1.387 (relaxed: attr/call/arg
+checks off, tests excluded), and mypy@1.19.1 (tests excluded, weave.*
+has disallow_untyped_defs/calls) — while the ruff hooks only see staged
+files. So 'passing lint' per PR means every intermediate module state
+must type-check.
+
+Found and fixed two classes of problems:
+1. Stage-ordering forward references: _compile_expanded_field /
+   _resolve_ref_str_for_filter / _expand_refs lived in the late
+   refs-threads stage but were called from the compile/read stages —
+   mypy attr-defined errors on 5 intermediate branches (the Protocol base
+   covers PUBLIC methods, so only private helpers can dangle). Fixed by
+   moving them to their first callers; _compile_calls_sort_field moved
+   into the compilation stage to keep the read stage in size budget.
+   New deltas: compile 573, read 595, eval-subtree+threads 179.
+2. 16 genuine mypy errors in the canonical module (never caught before
+   because an earlier scoped mypy run had silently executed against the
+   skeleton branch — the gt-track HEAD footgun AGAIN): Optional
+   started_at/ended_at flow from the part-merge change (latency, threads
+   aggregation — restructured with explicit non-None narrowing),
+   calls_delete re-binding a comprehension-typed name to an Optional,
+   feedback_aggregate narrowing time_bucket_seconds and reusing 'key'
+   for both a list and tuple, _log_completion_span response now
+   dict | None (open stream spans), _ch_sorted_by_terms terms param
+   widened to Sequence (invariance), _ch_position bool() coercion,
+   _orm_select 'out' no-redef rename.
+
+## Verification (round 10)
+- mypy@1.19.1 scoped: 0 errors on ALL 17 stage states (loop-verified
+  with each stage written into the tree).
+- ty: clean on full repo and spot stages; pyright@1.1.387: 0 errors on
+  the canonical module; ruff: all stages + tree clean.
+- Suites unchanged: fake tests/trace_server 1203/115/0; tests/trace
+  1664/44/1 (flask, pre-existing).
+- Static per-stage guard added to the process: every self._private call
+  must resolve within its stage (now 0 issues; checked in the splitter
+  workflow).
+
+## Hints for Future Agents
+- The CI lint job runs 'prek run --hook-stage=pre-push' WITHOUT
+  --all-files: only always_run hooks (the type checkers) actually gate
+  PRs; ruff runs against staged files (no-op in CI). Don't assume
+  ruff-clean == lint-clean.
+- mypy narrowing does not survive list comprehensions or closures over
+  Optionals; the threads/feedback_aggregate restructures exist for the
+  type checker, keep the explicit is-not-None filters.
+
+## Stack Correction Context
+After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
+Copied from prior rewritten commit 0636d53f3a25 while correcting per-PR test placement.

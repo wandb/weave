@@ -1,0 +1,181 @@
+## Conversation
+This commit is part of a stack REFRAME: the user asked that each PR in the
+Google ADK stack be standalone, tested, and documented, with the plugin
+implemented incrementally across PRs for readability. The original stack
+(andrew/adk-ts-01..04, PRs #7135-#7138, left intact) was layered: full
+plugin / genai exclusion / all tests / example+docs. This new stack is
+vertical: 1 core (this), 2 genai exclusion, 3 agent hierarchy, 4
+auto-instrumentation + example. The full original session note lives on the
+old andrew/adk-ts-01-plugin commit (de553f7b46); read it for ADK research
+context (plugin-vs-OTel decision, duck-typing pitfalls, lodash-es, etc.).
+
+## Actions
+Derived this slice from the old stack's final tree by restore-then-trim:
+checked out the old files and removed everything that belongs to later
+slices. googleAdk.ts here has NO agent-call synthesis (model/tool calls
+parent to the invocation root; agent callbacks are no-op stubs) and NO
+module-hook auto-instrumentation (explicit plugins:[new WeaveAdkPlugin()]
+only). googleAdk.types.ts has no tree-walk fields (parentAgent/subAgents/
+findAgent) and no AdkPluginManager/AdkRunnerLike. Tests are the core subset
+(single-agent E2E with FLAT parenting assertions, model errors, streaming,
+tool error + late afterToolCallback, dangling cleanup, no-client). AGENTS.md
+gets the section with transport/duck-typing/lodash bullets only.
+
+## Errors & Mistakes
+- The committed googleAdk.ts contained a LITERAL NUL byte as the separator
+  in syntheticQueueKey's template string, making grep/file treat the source
+  as binary (it rendered invisibly as a space when reading). Replaced with
+  the equivalent \0 escape — same runtime string, pure-text source. This is
+  the ONE intended content difference vs the old stack's final tree.
+- Sandbox 'grep' in Bash is not real grep (empty results are lies); use
+  /usr/bin/grep. /usr/bin/grep refused the file as binary until the NUL fix.
+
+## Dead Ends
+None in this slice (see old-stack notes for the original design dead ends).
+
+## Hints for Future Agents
+- The flat parenting here is INTENTIONAL for this slice; the next commit in
+  the stack rewires model/tool calls under synthesized invoke_agent calls
+  and updates the parenting assertions in the single-agent test.
+- Stack discipline: end tree of the 4-slice stack must equal the old
+  andrew/adk-ts-04-docs tree except the \0-escape fix above.
+
+## Codebase Discoveries
+- AGENTS.md fails prettier on master already; it is outside the SDK's
+  prettier scope (src/**, examples/**) so not a gate.
+
+## Open Questions
+- Whether to close old draft PRs #7135-#7138 once this stack is submitted —
+  user decision.
+
+---
+
+# ADDENDUM: transport reworked to the agents OTel endpoint (2026-06-10)
+
+User directive: ADK runs must log to the AGENTS OTel endpoint
+(/agents/otel/v1/traces) so they appear in the Weave Agents view — the
+original calls transport (saveCallStart/End) only fed the Traces page. The
+stack was rebuilt in place (same branch names/positions) with the plugin
+emitting GenAI-semconv OTel spans through getWeaveTracer (shared provider,
+src/genai/provider.ts) — same pipeline as piCodingAgent and the
+openai-agents WeaveOtelTracingProcessor, same conventions as the Python
+google_adk integration (weave/integrations/google_adk: extractors mirrored
+incl. ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS gate, GOOGLE_GENAI_USE_VERTEXAI
+provider naming, parts-model messages, tool definitions). Calls-era
+versions of these slices: 91e4f038ee^..4fde323b1c history (notes on
+c059413134 / ac1e328342 / d1cab0e03e / 4fde323b1c).
+
+Key mechanics: spans parented via otelTrace.setSpan contexts; plugin
+beforeExit hook registers BEFORE the provider's (listeners fire in
+registration order — dangling spans must end before the provider flush);
+tests inject InMemorySpanExporter via settings.genai.spanProcessor +
+clearWeaveTracerProvider between tests; semconv.ts gained
+gen_ai.agent.description/id + gen_ai.tool.definitions.
+
+## Review feedback addendum (rebase/review session)
+
+Amended in response to two local review comments on googleAdk.ts:
+
+- L113 `TRUTHY_ENV_VALUES = Set(['true','1'])` flagged "not complete". It was
+  worse than incomplete — it conflated two env vars with DIFFERENT upstream
+  contracts and lowercased both. Verified against the installed packages:
+  * @google/genai `stringToBoolean(GOOGLE_GENAI_USE_VERTEXAI)` is truthy ONLY
+    when `str.toLowerCase()==='true'` — NOT '1'. Old code mapped '1'→vertex_ai
+    while google-genai actually runs Gemini for '1' (real provider-mislabel bug).
+  * @google/adk `shouldAddRequestResponseToSpans`: `(env||'true')` then
+    `===\'true\'||===\'1\'` (case-SENSITIVE; ''→capture). Old code used `?? 'true'`
+    (so ''→no-capture) and lowercased.
+  Fix: removed the shared set; `providerName()` now mirrors genai's
+  stringToBoolean exactly, `captureMessageContent()` mirrors ADK exactly.
+
+- L162 `toJsonSafe` flagged "too defensive? + warrant a test". Dropped the
+  over-defensive nested try/catch (`String(value)` fallback — String() throwing
+  is exotic). Kept cycle (WeakSet) + bigint handling because JSON.stringify
+  GENUINELY throws on both and both are reachable via tool args/results; kept
+  one outer catch for throwing getters/toJSON. Docstring now justifies this.
+
+Tests (interface-level, asserting on exported span attributes, not internals):
+- test.each provider.name over GOOGLE_GENAI_USE_VERTEXAI (incl. '1'→gemini).
+- test.each content-capture over ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS.
+- tool result with a cycle + bigint → span result contains '[Circular]' and
+  the bigint stringified, proving sanitize-not-crash.
+
+Also fixed two pre-existing eslint errors surfaced by master's eslint-10 bump
+(now that node_modules has @eslint/js): `ReadableSpan` → inline `type` import,
+and a require-yield disable on the intentionally-throwing ExplodingLlm test
+double. Verified: 20/20 googleAdk tests pass at the stack tip; eslint+prettier
+clean. Changes were amended into THIS commit (not a fixup) and the stack
+restacked; descendants 02/03/04 had no conflicts.
+
+# ADDENDUM: committed orphaned working-tree changes into this commit (2026-06-16)
+
+A prior session left uncommitted working-tree changes checked out on this
+branch. The user asked to commit them "at the appropriate PR in the stack"
+and to DISCARD the AGENTS.md change. Investigation showed every non-AGENTS.md
+change is a plugin-CORE concern, so all of it was amended into THIS commit
+(#7159) and the stack restacked (02/03/04 clean, no conflicts). AGENTS.md
+(a one-bullet note about beforeModelCallback short-circuiting) was reverted
+with `git restore` per the user.
+
+## What was committed (3 files)
+
+1. pnpm-lock.yaml (+~3500): the committed lockfile had ZERO @google/adk
+   entries even though package.json on THIS commit declares @google/adk
+   ^1.2.0 (L182) and lodash ^4.17.21 (L191, devDep for the lodash-es jest
+   mapping). The lockfile was never regenerated when those deps were added,
+   so CI frozen-lockfile install was BROKEN on this branch. The regen is
+   purely additive (@google/adk's transitive tree: Azure / Google-Cloud /
+   grpc / mikro-orm / pg / mariadb / a2a-js / ...). The 102 '-' lines are
+   pnpm re-resolutions, NOT deletions — e.g. swagger-typescript-api 13.9.3 ->
+   13.9.3(encoding@0.1.13) because `encoding` now enters the tree; every
+   removed package still resolves in the new lockfile (verified by grep).
+
+2. googleAdk.ts — plugin-core behavior fixes:
+   - closeShortCircuitedModelSpan + modelSpanKeyForEvent: when a before-model
+     callback returns a cached LlmResponse, ADK SKIPS afterModelCallback, so
+     the yielded event is the only signal to close the chat span. Without it
+     the chat span dangled and was marked interrupted. (This is exactly the
+     behavior the discarded AGENTS.md bullet described — the fix lives in code
+     now, so the doc bullet was redundant.)
+   - recordEventError + applyRootError + InvocationState.rootErrorType/Message:
+     propagate event.errorCode/errorMessage onto the root invoke_agent span
+     (previously only the chat span carried the error).
+   - beforeExit hook refactor: per-instance `beforeExitRegistered` flag ->
+     module-level BEFORE_EXIT_CLEANUPS Set + per-instance beforeExitCleanup,
+     plus unregisterBeforeExitHookIfIdle / runBeforeExitCleanups /
+     unregisterBeforeExitHookIfUnused. Completed invocations now REMOVE their
+     cleanup so a long-lived process creating many plugins doesn't leak one
+     'beforeExit' listener per instance.
+   - childContext + root startSpan now use ROOT_CONTEXT instead of
+     otelContext.active() (the `context as otelContext` import was dropped):
+     parent off the explicit root, not ambient context.
+   - Expanded usage docstring + clarifying comments in toJsonSafe /
+     systemInstructionParts (no behavior change).
+
+3. googleAdk.test.ts (+64): root span ERROR status on model error; new
+   'closes chat spans when beforeModelCallback returns a cached response';
+   new 'completed invocations unregister their beforeExit cleanup' (asserts
+   <=1 net beforeExit listener after 12 plugin lifecycles).
+
+## Verification
+nvm node v20.19.4 (PATH `node` is a bun shim that crashes jest). On THIS
+branch: prettier --check, eslint, tsc -p tsconfig.cjs.json all clean on the
+changed files; jest googleAdk.test.ts = 18/18. On the restacked TIP (04):
+tsc cjs clean + jest googleAdk = 22/22 — confirms removing the otelContext
+import / beforeExitRegistered field did not break descendants (none of the
+new or removed symbols pre-existed upstack; grepped).
+
+## Restack + notes
+gt modify amended this commit (git notes.rewrite.amend carried THIS note
+forward automatically) and restacked descendants via the clean
+'Restacked X on Y' path, which DROPS notes on the new SHAs. Re-migrated with
+`git notes copy -f <old> <new>`:
+  01 48de4a47 -> cbd99867 (note auto-preserved by amend)
+  02 3ae83506 -> 638cacd2
+  03 0e06aef4 -> 00b80d0e
+  04 39d18fa0 -> 119ed43f
+NOT pushed (no push without explicit ask).
+
+## Open Questions
+- None. Did not re-run 02/03/04 OWN added tests in isolation, but the tip
+  test run exercises the full combined file, which is sufficient.

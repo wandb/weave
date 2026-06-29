@@ -1,0 +1,28 @@
+## Conversation
+PR2: remove the vestigial iterator-level offset param. Re-added after gt modify
+restacked PR2 onto the staticmethod version of PR1 (SHA -> 51ab49b7e9).
+
+## Actions
+- Chesterton's Fence: get_calls(offset=) is implemented in fetch_func (call.py),
+  iterator built offset=None -> the iterator's own offset param was dead +
+  untested and had a latent bug (_get_one bounded limit as `index >= limit +
+  offset`, disagreeing with the correct slice path). Removed param + handling +
+  the offset=None call-site kwarg. Added limit-bounds-index-and-slice test.
+- get_calls offset/limit/page_size tests pass on sqlite -> public behavior intact.
+
+## Errors & Mistakes
+- None.
+
+## Dead Ends
+- Fixing _get_one instead of removing offset (rejected: dead/untested code).
+
+## Hints for Future Agents
+- Do NOT reintroduce an iterator-level offset param; route offset through
+  fetch_func as make_calls_iterator does.
+
+## Codebase Discoveries
+- get_calls(offset=N): offset baked into effective_offset in fetch_func; the
+  iterator sees a stream already starting at row N.
+
+## Open Questions
+- ClickHouse run not done locally (sqlite only); CI clickhouse is final gate.

@@ -1,0 +1,41 @@
+## Conversation
+Stack v2: reviewer (user, via Conductor local comments on PR 1 lines 32-47)
+flagged that the SQLite-semantics helpers and their constants were introduced
+in the scaffold PR before anything used them, with the directive: "only
+introduce functions as they are used by the PR in the stack." This rebuild
+moves every module-level helper/constant to its FIRST point of use. Full
+original build history lives in the note on backup/fake-ts-monolith
+(47ce0eb23f).
+
+## Actions
+/tmp/build_stack.py now hand-assigns only class methods to stages; every
+module-level segment (function, dataclass, const) is assigned by a fixpoint
+over the reference graph: stage(segment) = min stage among referencing
+segments. A post-build assertion verifies every module-level name is
+referenced within the stage that introduces it. Stage 1 shrank 472 -> 221
+lines: imports, storage records (referenced by _init_storage annotations),
+class + lifecycle, parity stubs. Also rebased the stack base onto the new
+master (fd7eced353) since local master advanced during review.
+
+## Errors & Mistakes
+First rebuild of the top branch restored AGENTS.md from the old-base
+monolith, silently reverting master's new "Generated Files" section — caught
+by diffing against master and fixed by re-applying only the fake-backend
+additions onto master's AGENTS.md. Lesson: after a base move, never restore
+shared files wholesale from a backup built on the old base.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- The first-use property is enforced by the splitter assertion; if you add a
+  helper to the module, the splitter will place it automatically.
+- Records stay in stage 1 because _init_storage's annotated assignments
+  reference them (genuine use, and ruff F821 would flag them otherwise).
+
+## Codebase Discoveries
+Local master can advance mid-review in Conductor workspaces; `git reset
+--hard master` in stack rebuilds silently picks up the new base.
+
+## Open Questions
+None for this chunk.

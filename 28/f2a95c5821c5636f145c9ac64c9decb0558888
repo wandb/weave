@@ -1,0 +1,85 @@
+## Conversation
+Round 3 ts-split PR 5: the llm split + eval-worker relocation, MERGED into one
+PR by design. Rule 3 (no transient state) forces the merge: post-split,
+client.get() returns the runnable, so the worker's isinstance check must
+reference the runnable class in the same change; a server-side worker
+importing a client runnable would need a NEW C2 ignore entry (forbidden), and
+moving the worker first would leave it importing the unsplit schema
+(client->server, also a new entry). Together: zero new entries, both lists
+shrink. Rule 4's separate-shuffle preference is consciously traded away here;
+the commit message says why.
+
+## Actions
+- Server schema rebuilt from the tip schema (round-2 0cd2182121 content) MINUS
+  the helpers (is_response_format, cast_to_message*, MessageListLike/Like,
+  parse_response, _prepare_llm_messages, parse_params_to_litellm_params) --
+  they have ZERO server users (verified by grep at the tip) and moved into the
+  runnable. Docstrings updated (no "helpers both sides reuse" claim).
+- Runnable adapted from tip's flow file to weave/model/llm_structured_completion_model.py:
+  helpers folded in; templating from weave.prompt.prompt (master's home, NOT a
+  mirror module); schema types (Message/DefaultParams/ResponseFormat) from the
+  client mirror. NEW PACKAGE weave/model (modern singular-noun convention:
+  object/dataset/evaluation/agent) with __init__.py docstring.
+- Dispatcher Protocol inserted into the SERVER tsi before RescoringArgs; the
+  client mirror is REGENERATED from the server tree with NO exclusions now
+  (schema + registry join; 27 files).
+- Servers (sqlite/ch) import EvaluateModelDispatcher from their own tsi.
+- Worker (tip content, flow->model path) + isolated_client_executor moved to
+  weave/eval_worker/; weave/trace_server/workers removed.
+- Client repoints: scorer -> weave.model; base_objects + serialize -> mirror
+  registry; serialize regains the runnable-by-name lazy block;
+  test_base_object_classes flips test_only_example to the mirror path (the
+  PR 3 note predicted this).
+- Marker change applied to BOTH per-side object_class_util copies.
+- Adopted tip llm/worker test files w/ path adaptation; the llm test's helper
+  imports split: contract names from the mirror, helpers from weave.model,
+  digest/object_class_util from weave.trace (per-side, round-3 layout).
+- pyproject: C1 ignore -> [] (ZERO). C2 -11. weave.model/weave.eval_worker
+  added to C1 sources + C2/leaf forbidden. ROOT_IMPORT_BASELINE and
+  INTERFACE_LEAF_BASELINE -> empty.
+- Generated schemas regenerated (both copies; the split changes the JSON
+  schema -- round-2's addendum warned v2 forgot this).
+- Verified: lint-imports 3 kept; 190 gate+corpus tests (the llm golden digest
+  row = the split's stability canary, green); llm 20 + judge + base_objects;
+  evaluation_apis 25 (CLICKHOUSE-backed); isolated_client_executor 16;
+  data_serialization goldens 30 (CI-like WF_TRACE_SERVER_URL); ruff.
+
+## Errors & Mistakes
+- LATENT ROUND-2 BUG found: test_evaluation_status compares
+  client.server.evaluation_status(...).status against SERVER-tsi status
+  classes, but the fixture's TwinNormalizingTraceServer revalidates responses
+  into CLIENT-tsi classes -> pydantic cross-class inequality. Round 2 never
+  saw it: the test skips on sqlite and round 2 never ran ClickHouse locally
+  (its strict-zero note admits this); my env runs CH via docker. Fixed per
+  the documented convention (client-fixture tests observe CLIENT copies):
+  EvaluationStatus{NotFound,Running,Complete} now import from weave.interface.
+
+## Dead Ends
+- Considered keeping the split and worker move as separate PRs with a root
+  `weave.LLMStructuredCompletionModel` export so the worker could use its
+  already-baselined `import weave` (no new entry). Works, but changes public
+  API surface as a side effect of stack mechanics -- rejected.
+
+## Hints for Future Agents
+- The llm corpus golden row is FROZEN and must never change -- it pins digest
+  bytes across the fused->split transition. If you touch the schema's fields
+  or the runnable's MRO, the parity test + that row are the tripwires.
+- weave/model is where future runnable builtins go. NOT flow. Flow is frozen.
+- The worker's EvaluateModelArgs/__all__ re-export stays: core's Kafka
+  dispatcher imports EvaluateModelArgs from the worker module path.
+
+## Codebase Discoveries
+- The schema helpers had zero server users even at the round-2 tip -- the
+  "pure helpers that both sides reuse" docstring claim was aspirational.
+- pydantic v2 equality requires class identity; cross-tree twins with equal
+  fields compare UNEQUAL. Any test mixing fixture responses with direct
+  contract imports must pick the client copies.
+
+## Open Questions
+None.
+## Addendum (round-3 fix-forward 2)
+tests/trace/test_weave_client.py's LLMStructuredCompletionModel import flips to
+the weave.model RUNNABLE here (it instantiates the model and the evaluate path
+calls prepare_completion_request/predict -- schema instances have neither).
+Found by the full test_weave_client battery at the stack tip; the targeted
+PR 5 suites missed it because this test lives in test_weave_client.py.

@@ -1,0 +1,32 @@
+## Conversation
+Part 3/8 of the fake trace server stack (split of the verified monolith;
+full history in the note on backup/fake-ts-monolith).
+
+## Actions
+Segments: all obj_* methods + tag/alias helpers + _select_objs, table_*,
+refs_read_batch, file_*, MAX_REFS_BATCH_SIZE.
+
+## Errors & Mistakes
+None in this chunk.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- is_latest is HYBRID: explicit "latest" alias row wins; the column flag is
+  the fallback (mirrors _IS_LATEST_FROM_ALIASES_SQL and the CH window
+  fallback). obj_delete re-points the column to the newest survivor.
+- obj_create's version_index counts ALL versions including soft-deleted
+  ones, and re-creating a deleted digest resurrects the row in place
+  (ON CONFLICT DO UPDATE parity).
+- Table rows are content-addressed with first-writer-wins across projects;
+  reads filter by project — a second project writing identical content
+  cannot read it back. SQLite behaves the same (digest UNIQUE).
+- table_query sorts/slices raw entries and only deep-copies the returned
+  page — added for performance; keep it that way.
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.

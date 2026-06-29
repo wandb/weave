@@ -1,0 +1,130 @@
+## Restructure addendum (2026-06-10, feedback round)
+Re-authored from ba496ab642 per user feedback items 3+4: client conformance
+tests live in tests/conformance/, server conformance tests live in
+tests/trace_server/conformance/, and FIXTURES ARE NEVER SHARED -- each side
+owns a byte-identical copy of the JSONL corpus and reads only its own.
+Deltas vs the original commit:
+- The side-parametrized combined tests (one file running both sides via a
+  `side` fixture) are split into per-side twins with side-suffixed basenames:
+  test_corpus_library_{client,server}.py, test_corpus_units_{client,server}.py
+  (suffixes because pytest's prepend import mode errors on duplicate test
+  basenames across non-package dirs -- 'import file mismatch' -- and neither
+  tests/conformance nor tests/trace_server is a package).
+  test_per_side_units.py is gone (it WAS the combined units file).
+- test_corpus_server.py moved into tests/trace_server/conformance/ and now
+  drives the server-side `trace_server` fixture (UserInjectingExternal...,
+  project_id f"{TEST_ENTITY}/conformance-corpus") instead of the client
+  fixture: the server suite uses no client fixtures at all.
+- generate_fixtures.py lives at tests/trace_server/conformance/ (it imports
+  only weave.trace_server.*) and writes BOTH fixture dirs; verified
+  regeneration is byte-stable against the committed copies.
+- Corpus identity gate added to tests/trace_server/test_contract_conformance.py
+  (file-set equality + per-file byte equality); docstring retitled to cover
+  both gates.
+- Full corpus README lives server-side (the reference implementation side);
+  tests/conformance/README.md is a short client-side pointer.
+- noxfile: tests/conformance/ ADDED to the trace_no_server shard. This fixes
+  a LATENT CI GAP in the original commit: the trace_server shard runs only
+  -m trace_server, tests/conformance files carry no marker (except the old
+  manual pytestmark on test_per_side_units.py), and no other shard included
+  the path -- so test_corpus_library.py (and later test_corpus_content.py)
+  were collected nowhere in CI. Now: unmarked client consumers run in the
+  no-server leg; the publish test (client fixture -> transitively marked)
+  runs in the server legs; server-side files are path-auto-marked by
+  tests/trace_server/conftest.py.
+- The manual `pytestmark = pytest.mark.trace_server` workaround is gone
+  (marker docs say not to set it by hand).
+- Per-side module docstrings (weave/trace/digest.py, ref_converters.py,
+  weave/trace_server/digest.py) now cite their OWN side's fixture copy.
+Original note follows.
+
+=============== ORIGINAL NOTE: ba496ab642 ===============
+## Conversation
+Round 3 ts-split PR 4: dissolve weave/shared into PER-SIDE implementations +
+the frozen JSONL conformance corpus. This is the heart of the user's rule 1
+("no shared dir; duplicate per side with conformance tests stored in JSONL,
+future home core repo") and replaces round 2's approach of moving shared into
+the byte-identical mirror (which violated rule 5: impl in interface).
+
+## Actions
+- Per-side copies created from the master shared content:
+  - server: weave/trace_server/{digest,object_class_util,pydantic_util,
+    refs_internal,trace_server_interface_util}.py. object_class_util's lazy
+    registry import -> the SERVER contract registry.
+  - client: weave/trace/{digest,object_class_util,pydantic_util,
+    refs_internal}.py + weave/trace/ref_converters.py (full copy of the
+    converter; client imports weave.interface.errors + weave.trace.refs_internal)
+    + weave/utils/ids.py. Client object_class_util keeps master's lazy import
+    of weave.trace.base_objects -- per-side copies make the round-2 "registry
+    repoint" commit UNNECESSARY (each side resolves its own registry), which
+    is also what burns the old C3 contract without any repoint.
+- Scripted rewires (42 files): server files weave.shared.X ->
+  weave.trace_server.X; client files -> weave.trace.X (+ ids -> weave.utils.ids,
+  converter -> weave.trace.ref_converters); tests/trace_server -> server paths;
+  tests/trace -> client paths EXCEPT trace_server_interface_util (server-only,
+  no client copy -- tests import the server module).
+- weave/shared DELETED. tests/shared/test_refs_internal.py -> tests/trace/
+  (it tests the client ref stack: refs.ObjectRef, sanitize_object_name).
+  test_digest/test_pydantic_util superseded by side-parametrized
+  tests/conformance/test_per_side_units.py (+ uuidv7 format/sortability).
+- Conformance corpus: conformance/{README.md,generate_fixtures.py,fixtures/
+  {digest,validator,refs,ref_conversion}.jsonl}. digest+validator rows adopted
+  VERBATIM from the v2 stack (andrew/ts-v2-* prior art) -- regenerating at
+  this level produced BYTE-IDENTICAL files, proving pre-split behavior matches
+  v2's post-split pinning (incl. the llm_structured_completion_model golden
+  row, which is the cross-PR digest-stability canary for PR 5's marker).
+  refs.jsonl (parse/round-trip/quoting) and ref_conversion.jsonl (ext<->int
+  over payloads) are NEW in round 3.
+- Runners: tests/conformance/test_corpus_library.py (every row x BOTH sides;
+  require_* validators server-only, validate_* against both tsi twins),
+  test_corpus_server.py (obj/table/file create through the client fixture),
+  test_corpus_client.py (weave.publish digests).
+- noxfile: trace_server shard tests/shared -> tests/conformance.
+- pyproject: 21 C2-shared entries burned; the shared-foundation contract
+  REMOVED (import-linter errors on missing SOURCE modules); weave.shared
+  tombstoned in C1 (added) + C2 + leaf forbidden lists; C1 ids x5 + converter
+  burned (C1 down to 3 entries).
+- Meta-test: test_no_shared_zone (pycache-ghost hardened).
+
+## Errors & Mistakes
+- test_generate_id_is_time_sortable first asserted whole-id sortedness --
+  WRONG: UUIDv7's random tail is not monotonic within one millisecond (this
+  home-rolled impl has no counter). Assert the 48-bit timestamp prefix only.
+- Discovered PR 3's phantom flow import via this PR's test run; fixed by
+  amending PR 3 (stash -> amend -> pop; the stash carried PR 4's WIP cleanly).
+- PT011/PT017 dance in the corpus validator runner: corpus pins the exact
+  class NAME from data, so `pytest.raises(Exception) as exc_info` + post-block
+  type-name assert with a spot `# noqa: PT011`.
+
+## Dead Ends
+- Considered a client-side subset copy of the converter (only
+  universal_ext_to_int_ref_converter). Full copy instead: the module is
+  cohesive, the corpus covers both directions, and a subset would drift.
+
+## Hints for Future Agents
+- Corpus rows are FROZEN (append-only). Changing an `expected` is a
+  backwards-incompatible wire change -- see conformance/README.md.
+- The llm golden digest row must stay green through PR 5's split (the
+  __weave_canonical_bases__ marker exists precisely for that).
+- Tests may import either side (outside lint scope); weave/ code must import
+  its OWN side -- the import-linter contracts enforce it.
+- generate_fixtures.py imports the SERVER reference impl; run it from the
+  project venv.
+
+## Codebase Discoveries
+- Regenerated digest.jsonl is byte-identical pre-split vs v2's post-split
+  freeze -- the canonical-bases marker design holds end to end.
+- Only tests/shared/test_digest.py ever used the shared __init__ re-exports.
+
+## Open Questions
+None.
+
+## Addendum (review round 3 follow-through)
+The per-side refs_internal split reintroduced an untranslated wire error: weave.trace_server.refs_internal.InvalidInternalRef (and trace_server_converter's same-named class) escaped the in-process wire boundary raw, while tests/trace/test_trace_server.py::test_robust_to_url_sensitive_chars expects the CLIENT's weave.trace.refs_internal.InvalidInternalRef. Fix, consistent with the wire design: both server-side classes registered at 400 and added to CONTRACT_ERROR_TYPES (they share the wire name "InvalidInternalRef"); the client-side catalog in tests/conftest.py becomes an ordered module tuple (weave.interface.errors, then weave.trace.refs_internal) so the client rebuilds ITS class from the payload name; the registry-sync conformance test checks the same catalog. Caught by the tip seam battery after the restack.
+
+## Addendum (round 4 restack)
+Rebased over the staging PR (client builtin-object surface removed) + rebuilt interface/guard. Conflict resolution notes:
+- pyproject C1: the ids/converter baselines this PR burns were already in HEAD's list; the registry entries it used to keep (trace.base_objects/serialize -> registry) no longer exist (staging deleted base_objects; serialize lost its registry import). C1 now keeps only the two llm entries plus a NEW entry: weave.trace.object_class_util -> contract registry (digest parity -- the client twin canonicalizes raw-dict publishes like the server; was baselined on the dead C3 shared contract as weave.shared.object_class_util -> registry).
+- The C3 'Shared foundation' contract is deleted whole; weave.shared becomes a forbidden tombstone in C1 (and stays one in C2/C4).
+- tests/trace/test_weave_client.py auto-merged cleanly this round because the interface-level isort fix moved the llm import to its sorted home; WILDCARD now imports from the server twin weave.trace_server.trace_server_interface_util (verified l.70).
+- Rename-merge worked FOR us here: object_class_util twins inherited the staging PR's repointed lazy registry import + comment in both per-side copies (verified content, not assumed).

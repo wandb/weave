@@ -1,0 +1,98 @@
+## Conversation
+User asked to remove RemoteHTTPTraceServer and uptake the stainless server
+(weave-server-sdk on test PyPI) as default; client must never import from
+weave.trace_server (lint-enforced), prefer weave_server_sdk types over tsi,
+ideally drop TraceServerInterface from the client; deliver a stack of PRs each
+green and minimal. This commit is PR1 of the planned 6-PR stack (see
+.context/sdk-uptake-plan.md): adopt the SDK + rewrite the stainless binding at
+parity, interface still tsi-typed. Codex consult (thread
+019eb506-341c-7d72-86e5-fcb41344e597) reshaped the stack: shared-leaf moves
+land BEFORE the seam retype; retype+client-migration is one PR; no
+lenient-coercion intermediate state.
+
+## Actions
+- Explored bindings, test infra, lint setup, server selection via two Explore
+  agents; full client tsi-import inventory is in the agent report (heavy:
+  weave_client.py, call.py, vals.py, feedback.py, saved_view.py, eval.py,
+  wal_sender.py; submodules: trace_server_interface, interface.query,
+  builtin_object_classes, constants, ids, errors, common_interface,
+  feedback_types, trace_server_converter, service_interface,
+  http_service_interface).
+- Installed weave-server-sdk==0.0.1 from test PyPI; inspected every resource
+  and model. Wrote findings to .context/sdk-uptake-plan.md.
+- Rewrote weave/trace_server_bindings/stainless_remote_http_trace_server.py
+  from scratch (old file targeted a dead git-SHA SDK: `Client`, nested .v2.*,
+  batch_requests kwarg — incompatible with published 0.0.1).
+- pyproject: weave-server-sdk==0.0.1 in [project.dependencies]; [tool.uv.sources]
+  + [[tool.uv.index]] testpypi explicit=true; removed the commented-out
+  stainless extras block. uv lock adds exactly one package.
+- Renamed weave/utils/http_requests.py _log_request/_log_response to public
+  log_request/log_response (reused as event hooks by the new binding).
+- Rewrote tests/trace_server_bindings/test_http_behavior_stainless.py around a
+  SpyTransport (httpx.BaseTransport) injected via the new `transport` kwarg.
+- Enabled "stainless" shard in .github/workflows/test.yaml (was commented out
+  at lines 152 and 581).
+
+## Errors & Mistakes
+- First `uv lock` failed with a bogus crewai/dspy conflict: I had inserted
+  [tool.uv.sources]/[[tool.uv.index]] in the MIDDLE of [tool.uv], which
+  re-parented exclude-dependencies and conflicts into the index table. TOML
+  table scoping; moved the new tables after all [tool.uv] keys.
+- First stream impl returned stream_ctx.__enter__() and used `with response:`
+  — httpx.Response is not a context manager; also PLC2801. Replaced with
+  build_request + send(stream=True) + caller close().
+- Old stainless tests mocked `_stainless_client` internals and imported
+  APIStatusError from the old SDK; useless against 0.0.1.
+
+## Dead Ends
+- Considered teaching utils/retry + http_utils about weave_server_sdk
+  exceptions (APIError family). Rejected: a response event hook that raises
+  through handle_response_error BEFORE the SDK sees the status preserves the
+  exact existing exception currency (httpx.HTTPStatusError), so retry
+  predicates, 413 splitting, calls-complete detection, and client catch sites
+  need zero changes.
+- Considered SDK resource methods for the batch flush paths. Rejected: the
+  processor hands pre-encoded bytes; SDK round-trip would re-parse/re-serialize.
+
+## Hints for Future Agents
+- weave-server-sdk 0.0.1 codegen bugs (all worked around with raw _request +
+  comments; remove when fixed SDK ships): duplicate generated method names
+  where last-def-wins — feedback.create (=batch), objects.tags (=tags list),
+  objects.create_remove (=alias remove), calls.create_usage (=/calls/usage),
+  annotation_queues.query (=items query); files.create() and otel.export()
+  lost their bodies. EndedCallSchemaForInsert lacks started_at (extra=allow
+  saves us at runtime). TraceStatus is a Literal, not an Enum (saved_view's
+  .SUCCESS will need care in PR5). No Feedback row model, no
+  CompletedCallSchemaForInsert, no CallsQueryRes, no EnsureProjectExistsRes.
+- Endpoints with include_in_schema=False on the server (core repo
+  services/weave-trace/src/trace_server.py) are DELIBERATELY absent from the
+  SDK: completions, project/stats, ttl_settings, v2 calls/complete + eager v2
+  call start/end. Raw paths are by-design, not a workaround.
+- /files/stats does not exist on the server; only /files/query_stats does.
+  RemoteHTTPTraceServer.files_stats has been silently broken. The SDK route is
+  correct; behavior intentionally fixed here.
+- The response event hook MUST response.read() before inspecting error bodies
+  (hooks fire before the body is read; required for streamed error responses).
+- conftest server fixture relies on _send_batch_to_server.__wrapped__
+  (with_retry exposes it) and on the method NAME _send_batch_to_server.
+- Shared bindings tests call server._flush_calls(batch) directly, so they pass
+  regardless of use_calls_complete default (True).
+- Core-repo mirror CI (bot/weave-mirror/*) may fail to install weave now: the
+  required dep only resolves from test PyPI. If that bites, core needs
+  PIP_EXTRA_INDEX_URL=https://test.pypi.org/simple/ or equivalent. User
+  explicitly approved temporary test-PyPI usage.
+
+## Codebase Discoveries
+- noxfile shards run `uv sync --frozen`, so the lockfile's test-PyPI URL pin
+  flows into every CI shard with no workflow changes.
+- weave/utils/http_requests builds pooled httpx clients keyed on
+  (ssl_verify, http_timeout) read per call; the new binding reads them once at
+  construction (set_auth mutates client auth in place rather than rebuilding).
+- use_calls_complete defaults to True (settings.py:255) — calls_complete is
+  the production batching mode and HAD to be ported to the stainless binding.
+
+## Open Questions
+- calls_query_stream via raw streaming keeps memory behavior; if/when the SDK
+  grows real streaming, swap and delete _raw_stream.
+- Whether to rename StainlessRemoteHTTPTraceServer once RemoteHTTPTraceServer
+  is gone (PR2 keeps the name; revisit at end of stack).

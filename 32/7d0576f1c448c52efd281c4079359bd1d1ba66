@@ -1,0 +1,64 @@
+## Conversation
+User attached two of @drtangible's (Dan's) review comments on PR #7303 (slice 03,
+andrew/google-adk-03-plugin-tool) with the instruction to read them before
+proceeding. Same workflow as the slice-05/06 rounds: resolve Dan's comments.
+HEAD had been externally switched to slice 03 (the user/Conductor positions me on
+the relevant slice before feeding its comments — same as slice 05). Dan APPROVED
+#7303 (comments are non-blocking).
+
+## Dan's two comments
+1. googleAdk.ts:114-117 (AdkCallbackContext interface): "If we pull in
+   `Context as AdkCallbackContext` from the library directly, looks like we
+   wouldn't need to fake this type."
+2. googleAdk.test.ts:104 (`as LlmResponse`): "Looks like the `as LlmResponse;`
+   might not be necessary. (One above could probably be removed too)."
+
+## Comment 2 — RESOLVED (this commit)
+Removed BOTH `as LlmResponse` casts (textResponse + functionCallResponse helpers,
+old lines 86 and 104). Both functions already annotate `: LlmResponse` returns
+and the object literals satisfy that type, so the casts were redundant.
+Verification was non-trivial because tests are NOT in typecheck:esm/cjs scope
+(all three tsconfigs exclude src/__tests__/**). Tests are type-checked ONLY by
+ts-jest at jest time (jest 'default' project -> src/__tests__/tsconfig.json, no
+isolatedModules anywhere -> ts-jest type-checks). PROVED ts-jest type-checks by
+injecting an excess property (__bogus_typecheck_probe__) -> jest failed with
+TS2353 -> reverted. Then jest passes 22/22 with casts removed. eslint clean.
+
+## Comment 1 — NOT FEASIBLE as suggested (no code change)
+Investigated whether AdkCallbackContext can be replaced by an ADK-exported type:
+- base_plugin.d.ts types beforeModelCallback's callbackContext and
+  beforeToolCallback's toolContext both as `Context` (from agents/context.js).
+- That `Context extends ReadonlyContext`; ReadonlyContext has
+  `get invocationId(): string` and `get agentName(): string` (exactly the two
+  fields we model), and Context adds `readonly functionCallId?: string` (what
+  AdkToolContext adds).
+- BUT neither `Context` nor `ReadonlyContext` is exported from @google/adk's
+  index. The package.json `exports` map exposes ONLY "." -> dist/types/index.d.ts
+  (no subpath/wildcard), so a deep import like
+  '@google/adk/dist/types/agents/context.js' is blocked under modern module
+  resolution. Only InvocationContext and ExecutorContext are exported (and
+  InvocationContext is the wrong shape — run context, not callback context).
+=> The existing doc comment is correct ("ReadonlyContext, which @google/adk does
+   not export as this shape"). The hand-rolled minimal interface stays; it also
+   documents exactly the fields we read (better than importing the full Context).
+Left for the user to decide: reply to Dan explaining, and/or tighten the doc
+comment to name Context/ReadonlyContext + the exports-map reason (would cascade).
+Did NOT make a fragile deep-import change.
+
+## Stacking / cascade (pending user go-ahead)
+This commit is on slice 03, which is BELOW slices 05 and 06. Landing it requires
+restacking BOTH 05 and 06 onto the new slice 03, then force-pushing #7305 and
+#7306 (both approved). gt clean-restack drops notes -> restore with
+`git notes copy -f <old> <new>` for the noted commits (slice 05 tip 2b54e2983d
+has a note; slice 06 has notes on its review-feedback + H1-fix commits). Held the
+restack+push for explicit confirmation, per the established rhythm
+(resolve+commit -> user says "restack and push").
+
+## Errors & mistakes
+- Initially ran `tsc -p tsconfig.esm.json --listFilesOnly | grep test` -> 0 matches
+  (tests excluded). Then `tsc -p src/__tests__/tsconfig.json` directly -> flood of
+  UNRELATED errors (express/@types missing, @google-cloud/vertexai missing
+  @google/genai/vertex_internal, legacy/op.test.ts decorators, esm/instrument.mts
+  import.meta) — none on googleAdk.test.ts. That direct-tsc path is not how
+  ts-jest checks (ts-jest compiles each file with its import graph). The probe
+  test was the reliable verification.

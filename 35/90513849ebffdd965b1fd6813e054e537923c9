@@ -1,0 +1,24 @@
+## Conversation
+The user asked to fix review findings in the appropriate PR in the fake trace-server stack. This commit owns the in-memory fake's evaluation run lifecycle APIs. The specific finding was that `evaluation_run_list` built invalid `$in` queries by passing one `LiteralOperation` containing a whole Python list, while `InOperation` expects the right side to be a list of operand objects. Any evaluation/model/run-id filter would fail instead of filtering.
+
+## Actions
+- Used `git blame` to map `evaluation_run_list` to `andrew/fake-ts-07-eval-apis`.
+- Replaced the three list-valued `LiteralOperation` RHS expressions with list comprehensions that create one `LiteralOperation` per evaluation ref, model ref, or evaluation run id, matching the ClickHouse implementation.
+- Extended `tests/trace/test_trace_server_v2_api.py::TestEvaluationRunsV2API::test_evaluation_run_list` to cover filtering by evaluation ref, model ref, and evaluation run id.
+- Amended this branch with `gt modify --into andrew/fake-ts-07-eval-apis --all --no-interactive --no-verify`; Graphite restacked descendants.
+
+## Errors & Mistakes
+- No implementation mistake in this patch. Verification initially used a wrong class node (`TestTraceServerV2API`) and nox selected zero tests; reran the exact node as `TestEvaluationRunsV2API::test_evaluation_run_list` with explicit shard options.
+
+## Dead Ends
+- Did not introduce a helper abstraction for literal-list operands; the surrounding ClickHouse implementation uses direct list comprehensions and this is only three concrete uses.
+
+## Hints for Future Agents
+- `tsi_query.InOperation` has shape `(lhs_operand, list[Operand])`, not `(lhs_operand, OperandContainingList)`. Follow the query model, not Mongo-ish shorthand.
+- The fake's query compiler already expects `operation.in_[1]` to be iterable operands; supplying a single literal-list operand breaks both validation and evaluation.
+
+## Codebase Discoveries
+- The V2 API tests previously listed evaluation runs but did not exercise server-side filters; this commit adds coverage for those filter paths.
+
+## Open Questions
+None.

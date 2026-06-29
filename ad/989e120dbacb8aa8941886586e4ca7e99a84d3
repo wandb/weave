@@ -1,0 +1,38 @@
+## Conversation
+Top of stack v2. v1 front-loaded all SQLite-semantics helpers into PR 1; the
+reviewer asked for helpers to be introduced at first use, so the stack was
+rebuilt with a fixpoint first-use assignment (see the note on
+andrew/fake-ts-01-skeleton). Original monolithic build + full history:
+backup/fake-ts-monolith (47ce0eb23f).
+
+## Actions
+- Rebuilt all 8 branches in place (same names/parents, new commits), now
+  based on the new master (fd7eced353, which added AGENTS.md "Generated
+  Files" + model provider/cost JSON updates).
+- Restored the monolith's 9 test files (verified untouched by master's
+  delta) and re-applied the AGENTS.md fake-backend additions ONTO master's
+  version after catching that the wholesale restore had reverted master's
+  new section (amended).
+- Verified: module + tests diff vs backup/fake-ts-monolith is exactly the
+  8-line dead-constant removal; AGENTS.md diff vs master is only the
+  fake-backend docs; per-stage lint/import/construct green; smoke +
+  trace_server shard rerun green on the new base.
+
+## Errors & Mistakes
+The AGENTS.md wholesale-restore regression described above — caught before
+submit by `git diff master HEAD -- AGENTS.md`.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- Known pre-existing local failures and the CI-shard open question are in
+  the monolith note; still true.
+- client_is_sqlite treating the fake as sqlite is LOAD-BEARING for ~156
+  test gates.
+
+## Codebase Discoveries
+See part-1 note (master can move mid-review; restore-from-backup hazard).
+
+## Open Questions
+- Whether to enable a CI shard for the fake backend.

@@ -1,0 +1,65 @@
+## Conversation
+Continuation of the trace_server->core reorg stack (user: build the full stacked
+set of PRs, local only). This is PR4 = the data-aware half of step 2b, after PR3
+(7688235001) moved the pure-Python CH modules.
+
+## Actions
+- Reconfigured .context/reorg.py: MOVES={}, PACKAGE_MOVES={costs, model_providers}
+  -> clickhouse_trace_server.*. Cleaned __pycache__ first. Ran it: 5 importers
+  rewritten, .py re-export shims created at old paths (namespace pkgs).
+- git mv weave/trace_server/migrations -> clickhouse_trace_server/migrations
+  MANUALLY (pure .sql, no Python importers -> NO shim). 64 .sql files, R100.
+- Retargeted the two model_providers symlinks +1 ../ (rm + ln -s with relative
+  target string) so they keep resolving after going one dir deeper. git records
+  them as D(old)+A(new) symlinks (mode 120000), not renames, because target
+  changed.
+- Updated path-keyed config: pyproject hatch exclude, ruff PLW1514 per-file-
+  ignore (update_costs.py), and the two CI path filters in
+  check-which-tests-to-run.yaml.
+
+## Errors & Mistakes
+- ruff surfaced 4 PLW1514 in costs/update_costs.py AFTER the move. Cause: the
+  per-file-ignore was keyed to the OLD path; moving the file un-ignored it.
+  AGENTS.md explicitly says update_costs.py must keep the PLW1514 ignore (adding
+  encoding= changed behavior/tests). FIX = repath the ignore, NOT add encoding=.
+  This is the 3rd path-keyed config broken by a move (hatch exclude, ruff ignore,
+  CI filter) — a general hazard: grep the repo for the OLD path after any move.
+- Broken shell grep/rg alias struck again (`grep -vE`, `grep -iE` errored).
+  Verified config staging via `git diff --cached --name-only -- <paths>` instead.
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- LATENT BUG FIXED: step 2a left migrations/ orphaned from the moved migrator;
+  default migration_dir = dirname(migrator.__file__)/"migrations" pointed at a
+  nonexistent clickhouse_trace_server/migrations/. _run_migrations passes no
+  explicit dir, so production CH migrations would have raised
+  MigrationError("Migration directory not found"). Only visible at CH runtime
+  (no Docker here) -> never caught locally. The migrator UNIT test's module-level
+  DEFAULT_MIGRATION_DIR (test_clickhouse_trace_server_migrator.py:27) also now
+  resolves correctly.
+- CI path filters use SUBSTRING grep (`echo \"$changed_files\" | grep -q \"$path\"`).
+  Old entries like weave/trace_server/clickhouse_trace_server_migrator.py do NOT
+  substring-match the new weave/trace_server/clickhouse_trace_server/clickhouse_
+  trace_server_migrator.py (verified), so they were dead. Updated MIGRATOR +
+  DISTRIBUTED filters to the real new paths (kept environment.py + calls_query_
+  builder/ which haven't moved).
+- model_providers/ is EXCLUDED from the wheel (dev catalog tooling). costs/ is
+  NOT excluded; its update_costs.py reads ../model_providers/modelsBegin.json,
+  but that's a dev/maintenance path (runtime uses the pre-generated
+  cost_checkpoint.json), so the wheel/dev split is pre-existing and fine.
+
+## Codebase Discoveries
+- hatchling build (not setuptools); data files under weave/ are auto-included, so
+  migrations .sql + costs .json stay bundled after moving deeper. Only the
+  model_providers EXCLUDE entry needed a path update.
+- model_providers symlinks point ../../../../../../frontends/... (6 ../) -
+  calibrated for the core monorepo nesting (weave -> ../weave-python/weave-public/
+  weave), not this OSS checkout; they don't resolve in this workspace either way.
+
+## Open Questions
+- Did step 2a leave any OTHER path-keyed config stale beyond what PR3/PR4 fixed?
+  Searched configs for model_providers/migrations; clean now. Worth a final sweep
+  for the step-2a-moved file basenames (clickhouse_schema, database_engine, etc.)
+  in CI/docs before the eventual physical move to core.

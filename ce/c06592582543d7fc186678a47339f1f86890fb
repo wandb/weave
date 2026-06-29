@@ -1,0 +1,28 @@
+## Conversation
+User asked to review the ts-v2 decouple stack for correctness, specifically whether too much got promoted into weave/shared. Analysis (grimp importer-bucket sweep, .context/analyze_shared.py) found the shared wire contract was fusing three audiences. User then directed: create a top-level weave/server_worker_shared/ dir with a documented __init__ (their exact words: "put the server_worker_shared dir at the top level with a comment in the init about this decision"), in-repo only (NO core moves yet), and make each move its own PR on the gt stack. This is PR6, stacked on andrew/ts-v2-eval-worker (the prior tip).
+
+## What & why
+EvaluateModelArgs / RescoringArgs / EvalWorkerJob / EvaluateModelDispatcher are shared between the trace server (dispatch side) and the eval worker (consume side), NOT between the client SDK and the server. grimp confirmed: their only importers are weave.trace_server.{sqlite,clickhouse}_trace_server* (dispatch) and weave.eval_worker (consume); ZERO client importers. They were living in weave/shared/trace_server_interface.py (the client<->server contract), so the client SDK transitively carried a job contract it never uses. Moved them to a new leaf package weave/server_worker_shared/. EvaluateModelReq/EvaluateModelRes stay in shared -- those ARE client-facing (TraceServerInterface.evaluate_model method, implemented by the client bindings). EvalWorkerJob is unused in-repo (core consumes it) but moved with its union members.
+
+## Actions
+- Created weave/server_worker_shared/__init__.py: module docstring explains the bucket (server<->worker, not client<->server; leaf; future core-split rationale) + the 4 types (only pydantic/abc/typing deps, no weave imports -> clean leaf).
+- Removed the 4 types from weave/shared/trace_server_interface.py (L2020-2086) + the now-sole-user `from abc import ABC, abstractmethod` import. ruff --fix then auto-removed the now-unused `Annotated` from the typing import (EvalWorkerJob was its only user).
+- Repointed importers: weave/eval_worker/evaluate_model_worker.py (kept its __all__ re-export for core back-compat; updated the comment), weave/trace_server/sqlite_trace_server.py, weave/trace_server/clickhouse_trace_server_batched.py, tests/trace_server/workers/evaluate_model_test_worker.py.
+- pyproject.toml import-linter: renamed C1 + removed weave.eval_worker from its source_modules (eval_worker is now a top-layer worker, not 'client') + added weave.server_worker_shared to C1 & C3 forbidden lists; added C4 'Server<->worker shared contract is a leaf'.
+
+## Verification
+- lint-imports: 4 contracts kept, 0 broken (444 files).
+- ruff check: clean (after auto-fixing import sort I001 + the Annotated F401).
+- tests/trace_server/test_trace_server_evaluation_apis.py: 18 passed, 8 skipped (sqlite). Smoke-imported sqlite/clickhouse trace servers + eval_worker re-export.
+
+## Errors & Mistakes
+- First Edit of sqlite import block failed ('File has not been read yet') -- had only inspected via Bash sed, not the Read tool. Fixed by Reading first.
+- ruff flagged I001 because weave.server_worker_shared sorts BEFORE weave.shared.* (isort). Auto-fixed.
+
+## Hints for Future Agents
+- weave.eval_worker is INTENTIONALLY not in C1's source_modules anymore. It is the top of the dependency graph: free to import client + shared + server_worker_shared; nothing imports it (only tests + core's Kafka consumer). Do NOT 're-add' it to the client list.
+- server_worker_shared MUST stay a leaf (C4): it may import only weave.shared + third-party, never client/server/workers. shared (C3) must NOT import it.
+- CORE BREAKAGE (expected, deferred): core's services/weave-trace imports EvaluateModelArgs/EvaluateModelDispatcher from weave.shared.trace_server_interface (src/workers/evaluate_model_worker/*). Those break on the next weave submodule bump -> needs a paired core PR repointing to weave.server_worker_shared. The eval_worker __all__ re-export still resolves the eval_worker path if core uses that one.
+
+## Open Questions
+None for this PR. Next PR (PR7) moves the server-only agents/* subtree out of shared into trace_server (needs a Protocol split of TraceServerInterface).

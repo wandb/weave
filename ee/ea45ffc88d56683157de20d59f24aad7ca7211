@@ -1,0 +1,32 @@
+## This commit
+Rebuilt for round 9 (object-annotation removal); see stack-wide context
+in sibling commits' notes.
+
+## Round 9 addendum: object type annotations removed
+Review comment on otel_export's calls list ('Why is this object? Don't use
+this type here or anywhere else in this stack'). Fixes:
+- otel_export: calls was list[dict[str, object]] holding
+  {'mode': ..., 'req': ...} dicts that CallCreateBatchReq validated later.
+  Now constructs the real models directly:
+  list[tsi.CallBatchStartMode | tsi.CallBatchEndMode] — typed at the
+  source, no validation-time coercion.
+- _OrderableOrNone.__eq__(self, other: object) deleted entirely: the class
+  is only ever a list.sort key and timsort invokes only __lt__, so __eq__
+  was dead code (its removal also retired the PLW1641 noqa). The object
+  annotation there was the typeshed-required dunder signature, but the
+  method itself was unnecessary.
+- Swept the whole stack (module + every changed test file): zero
+  object-typed annotations remain; the only 'object' occurrences left are
+  JSON type-tag string literals and prose.
+
+## Verification (round 9)
+Fake: tests/trace_server 1203/115/0 (otel suite 71 passed with the typed
+batch modes); tests/trace 1664/44/1 (flask, pre-existing). Stage splitter:
+17 stages, stage17 == canonical, first-use property holds, all stages
+import + ruff clean.
+
+## Errors & Mistakes (round 9)
+- A transient .git/worktrees index.lock (fsmonitor race) interrupted
+  'git stash push' AFTER the stash commit was created but BEFORE the tree
+  reset — leaving the change both stashed and in the tree. Resolved by
+  resetting the tree (content was already in the stash + /tmp/verified).

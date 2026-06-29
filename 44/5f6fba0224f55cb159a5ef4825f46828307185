@@ -1,0 +1,44 @@
+## Conversation
+User: "remove the tests" -- delete the colocated unit test file for the
+stale-draft-PR script.
+
+## Actions
+- git rm scripts/test_close_stale_draft_prs.py (was the 17-test pure-logic suite).
+- Reverted the optional PyGithub import (try/except ImportError -> None sentinels)
+  back to a normal top-level `from github import Auth, Github, UnknownObjectException`.
+  The optional form existed ONLY so the pure functions could be imported without
+  PyGithub during tests; with tests gone that justification is void. Also removed the
+  now-dead `if Github is None or Auth is None: raise RuntimeError(...)` guard in run().
+- Updated the workflow header comment (no longer claims "unit-tested" / references
+  the deleted test file).
+- Updated the PR #7212 body to drop the "Unit-tested (17 tests)" claims.
+- Validated: ruff format+check clean, actionlint clean, and
+  `uv run scripts/close_stale_draft_prs.py --help` exits 0 (confirms the normal
+  top-level PyGithub import resolves under uv).
+
+## Errors & Mistakes
+- First commit attempt failed due to shell chaining: `git add -A <paths>` included
+  the already-staged-deleted test path -> "pathspec did not match" -> exit 1 -> the
+  `&&` short-circuited the commit. The `git notes add` line was newline-separated
+  (NOT &&-joined), so it ran anyway against the OLD commit 261a577 and errored
+  ("existing notes... use -f"). No new commit was created and the old note was
+  untouched. Redid it as: stage the two modified files (deletion already staged) ->
+  commit (separate Bash call) -> notes on the new HEAD.
+
+## Tradeoff (stated, then complied)
+Removing the tests drops regression coverage on the pure decision logic
+(reduce_events / decide). The logic is unchanged. The user's own conventions favor
+tests, so this was an explicit user override; complied. Offered to relocate the
+suite to tests/ (where CI would collect it) if the real concern was that scripts/
+tests don't run in CI.
+
+## Hints for Future Agents
+- The script now hard-depends on PyGithub at import time (installed by uv via the
+  PEP 723 block). Bare `python scripts/...py` without PyGithub now raises ImportError
+  at import rather than the old friendly RuntimeError.
+- If re-adding tests: put them under tests/ (CI-collected), and add PyGithub to the
+  test dependency-group (or reintroduce a PyGithub-free import seam).
+
+## Open Questions
+- Intent unclear: "no tests at all" vs "tests in the wrong place"? Offered tests/
+  relocation as a follow-up.

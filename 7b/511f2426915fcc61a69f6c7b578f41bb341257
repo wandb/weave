@@ -1,0 +1,35 @@
+## Conversation
+User asked to (a) confirm the regression tests actually fail before the
+fix, and (b) restructure the single commit into two: commit 1 = failing
+tests, commit 2 = the fix that makes them pass. This commit is #1.
+
+## What this commit is
+ONLY the regression tests in tests/trace/test_serialize.py
+(test_dictify_circular_reference, test_dictify_self_reference,
+test_dictify_shared_reference_traversed_once). The source fix is NOT here
+— it is in the child commit. So at this commit the tests FAIL by design.
+
+## Demonstrated failure (run against this commit's tree)
+uv run --group test python -m pytest tests/trace/test_serialize.py \
+  -k 'circular or self_reference or shared_reference' --trace-server=sqlite
+=> 3 failed:
+  - test_dictify_circular_reference          -> ValueError: to_dict failed
+      (RecursionError from the cyclic to_dict recursion, caught at
+       serialize.py and re-raised as ValueError("to_dict failed"))
+  - test_dictify_self_reference              -> ValueError: to_dict failed
+  - test_dictify_shared_reference_traversed_once -> AssertionError
+      (shared child expanded twice instead of stringified on 2nd visit;
+       isinstance(result['b'], str) is False)
+
+## How the split was produced
+From the original combined commit (1c7570452b, now orphaned in reflog):
+git reset --mixed HEAD~1; git restore --source=HEAD --worktree on the two
+source files to drop the fix; verified tests fail; committed tests only.
+Fixed source files were stashed to /tmp and restored for commit #2.
+
+## Hints for Future Agents
+- This commit intentionally has failing tests / red CI — it exists to
+  prove the regression. The fix is the immediate next commit. Squash on
+  merge if a green-at-every-commit history is required.
+- crewai/dspy are not installed in the base env; these tests target the
+  generic dictify directly so they run in the 'trace' shard.

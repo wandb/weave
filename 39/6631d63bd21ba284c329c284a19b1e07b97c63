@@ -1,0 +1,60 @@
+## Conversation
+Round 3 of the in-memory fake trace server stack. Round 1 replicated
+SQLite; round 2 re-targeted to ClickHouse on review feedback ('it should
+probably replicate the clickhouse trace server') and grew to 10 PRs
+(#7145-#7152, #7156, #7157). This round: the user asked to rebase onto PR
+#7153 ('chore(weave): remove the sqlite trace server', branch
+andrew/remove-sqlite-trace-server, head c626345fd9) — 'This new base
+already has the sqlite server removed, which should simplify some of the
+PRs.'
+
+## Rebase mechanics
+18 of the stack's 20 files overlapped #7153, so instead of replaying 10
+commits through conflicts, the verified tree was reconstructed once:
+git apply -3 of the full stack diff onto c626345fd9, 17 conflicted files
+resolved by hand, then the stage splitter re-run and every branch rebuilt
+from scratch (same single-commit-per-branch model; stage 9 byte-identical
+to the canonical module; tree cmp-verified file-by-file against the
+tested snapshot).
+
+## Verification on this exact tree
+Fake: tests/trace_server 1203 passed / 115 skipped / 0 failed; tests/trace
+1665 / 42 / 1 (test_flask_server, pre-existing env failure on every
+backend). ClickHouse on the SAME tree (regression check for the test-file
+edits): tests/trace_server 1317 / 1 / 0; tests/trace 1681 / 26 / 1 (same
+flask). Totals line up exactly (1318 and 1708 per shard) — every test
+either passes on the fake or is an explicit ClickHouse-internals skip.
+Secondary shards (flow/compat/utils/wandb_interface/session/shared/
+object): 559 passed; the 6 failures (test_evaluation_invalid_model_name_*,
+test_from_obj_unwraps_nested_weave_object) are pre-existing env issues,
+backend-independent, identical on every backend.
+
+## Key #7153 interactions (READ THIS before touching gating)
+- client_is_sqlite no longer exists anywhere; tests/trace/util.py now only
+  gains client_is_clickhouse.
+- #7153 turned several ClickHouse-only fixture skips into bare asserts
+  (ch_server, test_calls_complete/test_otel_calls_complete
+  clickhouse_trace_server fixture, test_ttl_insert_paths internal_server)
+  because CH was briefly the ONLY backend. With the fake selectable again,
+  those are restored to pytest.skip — an assert would hard-fail the whole
+  file on --trace-server=fake.
+- test_ttl_insert_paths.py was redesigned CH-only by #7153 (raw
+  call_parts/calls_complete reads + table_routing_resolver._mode
+  mutation); the fake's per-backend branches from round 2 were DROPPED in
+  favor of a skip — raw table residence is ClickHouse internals per the
+  stack's gating taxonomy.
+- tests/trace_server/conftest.py: fake+clickhouse are the only backends;
+  the trace_server fixture raises ValueError on anything else; the
+  ClickHouse session fixture now short-circuits via
+  get_trace_server_flag(request) so the --fake SHORTHAND also skips CH
+  spin-up (reading the raw --trace-server option would miss it).
+- test_queue_filtering.py needed pytest + find_server_layer imports
+  restored (deleted with the sqlite gate it replaced; F821 caught it).
+
+## This commit (stage 4/10: feedback/costs + ORM evaluation)
+ORM-equivalent evaluation now documented as the ClickHouse flavor (the
+'SQLite flavor' docstrings died with the base): JSON_VALUE semantics,
+to*OrNull casts, mapContains, datetime literals, driver-exact
+DatabaseError for numeric contains needles. feedback_aggregate mirrors
+build_feedback_aggregate_query row-at-a-time including the
+one-global-row-even-when-empty no-GROUP-BY rule.

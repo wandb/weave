@@ -1,0 +1,49 @@
+## Conversation
+User directed: server test should be folded into the corpus PR, then "a follow
+up PR should be to test the client." This is that follow-up
+(andrew/ts-v2-conformance-client), stacked on andrew/ts-v2-conformance-corpus.
+
+## What & why
+The weave client computes object digests CLIENT-SIDE
+(weave_client.py:2276/2293 compute_object_digest -> ObjCreateReq.expected_digest;
+the server validates it). So the client is a distinct producer worth its own
+conformance consumer. test_conformance_client.py publishes the corpus's plain
+object_digest rows via weave.publish and asserts ObjectRef.digest == corpus
+digest. Trust chain: client==corpus + server==corpus + (future) ts==corpus =>
+all producers agree.
+
+## Verification
+- sqlite: 6 passed. clickhouse: 6 passed. ruff + ty clean.
+- The 6 plain dict cases (incl. floats + non-ascii) reproduce the corpus digest
+  through the full client publish+serialize+digest path.
+
+## Discovery (IMPORTANT -- surfaced to user)
+weave.publish(LLMStructuredCompletionModel(llm_model_id='gpt-4')) yields digest
+R4haXWo7Y45rNOIu6OQQJOxTVYty395huswOAOkA9l4, NOT the corpus golden
+eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc. These are DIFFERENT wire
+representations of "the same" model:
+- eCEXZKYo = server canonicalization of the RAW DICT {llm_model_id:'gpt-4'}
+  tagged builtin_object_class=LLMStructuredCompletionModel (the frontend/wb_agent
+  path; process_incoming_object_val -> dump_object(schema.model_validate(val))).
+  Covered by the server test (obj_create with builtin_object_class) + library.
+- R4haX = the Python SDK serializing the RUNNABLE Model object (weave/flow
+  LLMStructuredCompletionModel(Model)), digest computed client-side.
+Client and server AGREE on R4haX (publish succeeded -> server validated the
+client's expected_digest), so there is NO client<->server drift. The corpus
+(server canonicalization) simply does not pin the runnable's serialization.
+OPEN QUESTION for the user: is it intended that publishing the model via the SDK
+(runnable) produces a different ref/digest than the raw-dict+builtin-class path?
+If both are meant to be "the same model", that is a cross-path dedup
+inconsistency rooted in the PR2 runnable/schema split. Not investigated further
+(would require diffing the runnable Model fields/bases vs the schema BaseObject).
+
+## Hints for Future Agents
+- Do NOT assert the runnable publish equals the raw-dict golden; they are
+  different serializations. The client test scopes to plain dicts; the
+  builtin-class golden is a server/raw-dict artifact (server test owns it).
+- weave.publish returns the ObjectRef directly (api.py:225); .digest is the
+  client-computed digest. Uses the global client set by the `client` fixture.
+
+## Open Questions
+The runnable-vs-raw-dict digest divergence above. Plus the standing follow-up:
+a TypeScript consumer reading the same fixtures/*.jsonl.

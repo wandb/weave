@@ -1,0 +1,118 @@
+## Conversation
+Slice 3/4 of the REFRAMED Google ADK stack (each PR standalone + tested + docs). This slice adds what slice 1 deliberately left out: invoke_agent synthesis. See slice 1 note (andrew/google-adk-01-plugin-core) for reframe context; the original research notes live on the old andrew/adk-ts-01-plugin commit de553f7b46.
+
+## Actions
+Built by restore-then-trim: restored googleAdk.ts/types/tests from the old stack final (andrew/adk-ts-03-tests), re-applied the \\0-escape fix for the syntheticQueueKey separator (the old blob has a literal NUL byte), then removed ONLY the auto-instrumentation parts (module-hook section, its imports globalSingleton/addCJS+ESMInstrumentation/AdkRunnerLike, the ADK_VERSION_RANGE/ADK_CJS_SUBPATH consts, the Automatic-usage header block, AdkPluginManager/AdkRunnerLike types, the auto-registration test and its commonPatchGoogleADK import). Diff vs slice 1 therefore reads as pure hierarchy: state fields (rootAgent/agentCalls/agentCallOrder/openToolKeys), findAgentInTree, ensureAgentCall + innermostOpenToolCall, agent callbacks implemented, reparenting, finishInvocation agent loop, test tightening. AGENTS.md gotchas bullet gains the agent-callback-gap sentence (final wording).
+
+## Errors & Mistakes
+The first excision of the auto-registration test left a stray blank line before the describe close (`    });\n\n  });`); fixed so slice 4 restores the file to the exact old-stack content without whitespace noise.
+
+## Dead Ends
+None in this slice.
+
+## Hints for Future Agents
+- The single-agent test's parenting assertions were intentionally RE-TIGHTENED here from slice 1's flat expectations (parent = root) to the hierarchy (parent = invoke_agent). That is a deliberate behavior change in the stack, not assertion weakening.
+- ensureAgentCall's MAX_AGENT_ANCESTRY_DEPTH guards parentAgent cycles; out-of-tree fallback order is innermost open tool call, then root.
+
+## Codebase Discoveries
+None new (see prior slices).
+
+## Open Questions
+None.
+
+---
+
+# ADDENDUM: transport reworked to the agents OTel endpoint (2026-06-10)
+
+User directive: ADK runs must log to the AGENTS OTel endpoint (/agents/otel/v1/traces) so they appear in the Weave Agents view — the original calls transport (saveCallStart/End) only fed the Traces page. The stack was rebuilt in place (same branch names/positions) with the plugin emitting GenAI-semconv OTel spans through getWeaveTracer (shared provider, src/genai/provider.ts) — same pipeline as piCodingAgent and the openai-agents WeaveOtelTracingProcessor, same conventions as the Python google_adk integration (weave/integrations/google_adk: extractors mirrored incl. ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS gate, GOOGLE_GENAI_USE_VERTEXAI provider naming, parts-model messages, tool definitions). Calls-era versions of these slices: 91e4f038ee^..4fde323b1c history (notes on c059413134 / ac1e328342 / d1cab0e03e / 4fde323b1c).
+
+Key mechanics: spans parented via otelTrace.setSpan contexts; plugin beforeExit hook registers BEFORE the provider's (listeners fire in registration order — dangling spans must end before the provider flush); tests inject InMemorySpanExporter via settings.genai.spanProcessor + clearWeaveTracerProvider between tests; semconv.ts gained gen_ai.agent.description/id + gen_ai.tool.definitions.
+
+## Session addendum — rebase onto master
+Rebased onto origin/master (ba337cff57). Restack hit a conflict in test-1's "root carries the user message" block: branch 01 consolidated it to `expect(root.attributes).toMatchObject({...})`, while this branch had changed `root` to come from `.find()` (hence `root!`). Resolved by merging both into `expect(root!.attributes).toMatchObject({...})`. Inherited branch 01's other assertion consolidations + Settings migration. Verified 21/21 jest, prettier + eslint clean.
+
+## Session addendum — use semconv constants
+Inherited branch 01's conversion; additionally converted this branch's own 'gen_ai.agent.name' literals (in the sub-agent tests) to ATTR_GEN_AI_AGENT_NAME. Restack hit a test-1 conflict (my constant conversion vs this branch's per-agent root!/agentSpan structure) — resolved keeping both (structure + constants). prettier rewrapped two now-longer lines. Verified 21/21 jest, prettier + eslint clean.
+
+## Session addendum — reparented onto split plugin-core
+Reparented (cherry-pick) onto andrew/google-adk-04-genai-exclusion after the plugin-core split. googleAdk.ts/types applied cleanly (split slice-3 source == old plugin-core). Test conflict resolved by taking the new reorganized test structure + re-applying this branch's two logical changes: the single-agent e2e 1→2-span hierarchy modification, and the two sub-agent tests (nests-sub-agents, agents-outside-tree). Verified 23/23 jest + lint. Pre-split commit at tag bak-adk-old-agent (3c457ed993).
+
+## Session addendum — keep inherited runner test valid under hierarchy
+The user clarified that every PR in the Google ADK stack must be standalone, with features and tests moved to the PR that owns their behavior. Branch 05 is where per-agent `invoke_agent` spans are introduced, so the real ADK runner smoke test inherited from branch 01 had to be adjusted here rather than downstack. Once hierarchy exists, the test file can contain multiple `invoke_agent` spans; selecting the first by operation is order-dependent and can bind to a child/per-agent span instead of the root invocation. Updated only this branch to select the `invoke_agent` span with no parent span id for the inherited explicit-plugin smoke assertion.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (24 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed.
+
+---
+
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+
+Final verification for this branch:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (24 passed, 24 total)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
+
+No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 05 — owns per-agent span synthesis)
+googleAdk.ts:
+- before/afterAgentCallback: dropped `?.` on ADK-guaranteed callbackContext and
+  agent (agent: BaseAgent, callbackContext: Context are required).
+- InvocationState.rootAgent: `AdkBaseAgent | null` -> `AdkBaseAgent`. It is set
+  only in beforeRunCallback from `ic.agent`, which is now required (slice 01),
+  so it is never null.
+- ensureAgentSpan: removed the now-dead `if (state.rootAgent)` guard around
+  findAgentInTree; `let agent` -> `const agent = findAgentInTree(...)`. agent can
+  still be undefined (out-of-tree agents), so the rest of the parent-resolution
+  logic is unchanged.
+
+## Hints for Future Agents
+- findAgentInTree returning undefined (out-of-tree agent, e.g. AgentTool) is a
+  DIFFERENT nullability from rootAgent — that path (innermostOpenToolSpan
+  fallback) is still live and intentional. Don't conflate the two.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-05 jest 24/24.
+
+---
+## Session addendum — review-comment pass (2026-06-23)
+
+Comment 2 (toMatchObject): converted the lone agentSpan AGENT_NAME assert to
+expect(agentSpan!.attributes).toMatchObject({[ATTR_GEN_AI_AGENT_NAME]:
+'weather_agent'}). Converted here (not slice 03) because slice 05 is where this
+assertion reaches its final agentSpan form (slice 03 asserted on `root`).
+
+This slice's restack also absorbed slice 03's loop->toMatchObject conversion via
+conflict resolution (kept slice 05's root! + slice 03's toMatchObject); no
+behavior change. Validated at stack tip: 26 ADK jest tests pass, typecheck clean.
+
+---
+## Session addendum — literal OTEL keys in tests (2026-06-23)
+
+Per review feedback ("use the literal OTEL key instead of the const ... easier
+to read in the test"), googleAdk.test.ts now uses literal OTEL semconv strings
+(e.g. 'gen_ai.output.messages', 'gen_ai.tool.call.id') in place of the
+ATTR_GEN_AI_* consts imported from ../../genai/semconv; the now-unused semconv
+import was removed. TEST-ONLY — production googleAdk.ts still imports the consts.
+
+Applied uniformly across the whole ADK slice stack (01/02/03/05/06) via a
+deterministic, idempotent transform (.context/relit.mjs, gitignored): object
+keys [CONST]: -> 'lit':, property access x[CONST] -> x['lit']. Each upstack
+restack hit the test file and was resolved with `git checkout --theirs` +
+re-running the transform, so every slice's full file ends up literal-ized.
+Notes survived because these restacks took git's conflict path (gt's
+clean-restack path would have dropped them).
+
+Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
+slice 01 5).

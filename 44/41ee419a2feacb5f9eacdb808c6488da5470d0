@@ -1,0 +1,30 @@
+## Conversation
+PR 6 of the ts-split stack: the Content edges -- the decoupling v2 explicitly DEFERRED (its note: Content.from_url -> weave.utils.http_requests -> weave.trace.{display,env,settings}, "not a simple lift"). Solved here by splitting transport (per-side) from resolution (twinned contract behavior).
+
+## Actions
+- git mv content_types.py/utils.py/python_magic_resolver.py/polyfile_magic_resolver.py from weave/type_wrappers/Content/ to weave/shared/ (utils.py renamed content_utils.py); wrote re-export shims at all four old paths.
+- Authored weave/shared/content_resolution.py: from_base64/from_data_url bodies extracted VERBATIM from Content; from_url split into transport (stays in Content / server _fetch_url) + resolve_url_content. _encoding_from_content_type_header reimplements requests' Response.encoding rule (charset param, else ISO-8859-1 for text/*) so the client's historical `resp.encoding or "utf-8"` behavior is preserved exactly while becoming deterministic for the server.
+- metadata_dict_from_resolved_args: hand-ordered to Content's field declaration order (size, mimetype, digest, filename, content_type, input_type, encoding, metadata, extension) because json.dumps of model_dump is the STORED BYTES.
+- Content.from_base64/from_data_url/from_url delegate; server files rewritten (store_content_object signature: Content -> ResolvedContentArgs).
+- 5 twins under trace_server/shared/; TWIN_FILES += 5; C2 ignores -= 2.
+- Updated tests: test_content_resolvers.py repointed at canonical weave.shared.content_utils (it pokes module-level resolver cache state + caplog logger names -- shim indirection broke both); test_image_completion.py mocks moved from Content.from_url to the _fetch_url seam (resolution now runs REAL in tests); test_base64_content_conversion.py uses resolve_base64.
+
+## Errors & Mistakes
+- THE BIG ONE: my from_base64 body-replacement edit spanned "docstring .. def from_data_url" which SWALLOWED the entire from_path method sitting between them (33 test failures, AttributeError: from_path). Restored verbatim from git show HEAD. Lesson: when replacing a method body by start/end string anchors, anchor the END on the same method's last line, not on the next known def.
+- Parity test initially passed b64 cases as **case dicts including the data key -- cleaned to explicit kwargs filtering.
+
+## Dead Ends
+- Considered a condensed server-side reimplementation (no client refactor, behavioral test only). Rejected: the mime-resolver preference stack (python-magic vs polyfile) feeds detected mimetypes into stored metadata, so a faithful reimplementation converges on copying all of it anyway -- without the byte gate.
+
+## Hints for Future Agents
+- The four type_wrappers/Content shims are LOAD-BEARING for serialization: media_cases.py golden exp_content embeds "from weave.type_wrappers.Content.content_types import ..." inside the serialized load-op SOURCE BYTES. Deleting the shims changes op digests. Do not remove until a digest-migration story exists.
+- The weave_type string "weave.type_wrappers.Content.content.Content" in store_content_object is WIRE FORMAT, not an import (commented inline). Same reason the shims exist.
+- If Content gains/reorders fields, metadata_dict_from_resolved_args (BOTH twins) must change in the same PR; test_content_resolution_parity fails loudly (compares json.dumps including key order).
+- _fetch_url is the server's mockable HTTP seam; is_publicly_routable_url runs BEFORE it (SSRF gate unchanged, tests renamed test_unsafe_url_skips_fetch).
+
+## Codebase Discoveries
+- Content.model_dump(exclude={"data"}) on model_construct'd instances includes defaults for unset fields (metadata: None) -- so the resolver's .get("metadata") mapping is exact.
+- requests' encoding rule actually matters here: text/html without charset stores encoding ISO-8859-1, and tests would catch a utf-8 simplification via the parity gate.
+
+## Open Questions
+- The shims could be retired after a digest-migration for the Content load op (out of scope for this stack).

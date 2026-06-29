@@ -1,0 +1,31 @@
+## Conversation
+Second/final commit of PR0 (the guard baseline) on branch andrew/decouple-trace-server-client. User approved D4 = "guard-incremental, 6-PR gt stack, import-linter + repo:local pre-commit hook." See the prior commit's note for the __init__.py prep.
+
+## Actions
+- Added [tool.importlinter] to pyproject.toml: 3 forbidden contracts (client->server, server->client, shared->either), allow_indirect_imports="true" (flag DIRECT edges only).
+- `uv add --group dev import-linter` -> import-linter 2.6 + grimp 3.13 (uv.lock additive only: +116/-0, just those two pkgs).
+- Ran `lint-imports` with empty ignores to CAPTURE all violations -> 77 edges. Bucketed by a python script into the 3 contracts (62/14/1) and spliced the populated block into pyproject.toml programmatically (avoided 3 identical `ignore_imports = []` Edit-anchor collisions).
+- Result: "Contracts: 3 kept, 0 broken" across 440 files / 1170 deps.
+- Added repo-local pre-commit hook `import-linter` (entry `uv run lint-imports`, language: system, pass_filenames false) mirroring the existing `ty` hook. noxfile lint does `uv sync --group dev` then `prek run --hook-stage=pre-push`, so the hook rides nox -e lint + CI in an env where weave is importable.
+- Verified the hook PASSES through prek: `uv run prek run --hook-stage=pre-push import-linter --all-files` -> Passed.
+- Documented the boundary + the __init__.py/grimp gotcha in AGENTS.md (CLAUDE.md is a symlink to it).
+
+## Errors & Mistakes
+- Initial pyproject block used `ignore_imports = []`; three identical lines would have made targeted Edits ambiguous, so I regenerated the whole block via script and spliced between "[tool.importlinter]" and "[tool.ty.rules]".
+- allow_indirect_imports value: used the STRING "true" (matches import-linter's BooleanField / INI semantics); confirmed it works (only direct l.NN edges reported).
+
+## Dead Ends
+- Considered language: python with additional_dependencies for the hook (pre-commit isolated env) -- REJECTED: grimp must import the real `weave` package, which an isolated hook env lacks. Must run in the uv project env via `uv run`.
+
+## Hints for Future Agents
+- BURNDOWN RULE: follow-up PRs DELETE ignore_imports entries as they sever couplings; never ADD. Empty lists = done.
+- The 62 client->server entries are mostly client importing the CONTRACT (trace_server_interface/common_interface/interface/*) + 4 utils (constants/errors/ids/trace_server_converter). They collapse in PR3 when the contract relocates to weave/trace_server_interface/. The 14 server->client are the real severances (PR4/PR5). The 1 shared edge is PR1 (object_class_util.py:54).
+- Run locally: `uv run lint-imports`.
+- The whole .context/ probe artifacts (il_violations.txt, scripts) are gitignored.
+
+## Codebase Discoveries
+- grimp built 440 modules / 1170 dependencies for `weave`.
+- The client->server coupling is broader than a manual grep showed: e.g. weave.trace.weave_client alone imports 7 contract modules.
+
+## Open Questions
+- Branch andrew/decouple-trace-server-client is NOT yet gt-tracked. PR0 committed here as the stack base; PR1-PR5 to be stacked with gt. Not pushed (awaiting user OK).

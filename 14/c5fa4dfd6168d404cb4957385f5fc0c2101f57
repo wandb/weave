@@ -1,0 +1,29 @@
+## Conversation
+PR 4 of the ts-split stack: server-side twins of the weave.shared format utils, burning the 21 strict-zero baseline entries added in PR 1.
+
+## Actions
+- Created weave/trace_server/shared/ with twins of digest, refs_internal, trace_server_interface_util, object_class_util, pydantic_util (the last two pulled in by closure: digest -> object_class_util -> pydantic_util).
+- Twin-internal rewrites ordered: weave.shared.interface -> weave.trace_server.interface FIRST (contract ref in object_class_util's lazy registry import), then weave.shared.* -> weave.trace_server.shared.*.
+- Blanket-rewired 16 server impl files. Residue check: only the new __init__ docstring mentions weave.shared (prose).
+- Conformance TWIN_FILES += 5 pairs; the PR-3-era normalizer rule (weave.trace_server.shared. -> weave.shared.) was added in anticipation and worked unchanged.
+- pyproject: deleted the strict-zero ignore block; per-file I001 exemption for trace_server_converter.py.
+
+## Errors & Mistakes
+- Ran `ruff --fix` BEFORE the I001 exemption landed (the pyproject Edit had failed on a stale read) -> ruff re-sorted the converter twin -> conformance gate FAILED exactly as designed. Restored the client-mapped order (shared-refs line before errors line) and added the exemption.
+
+## Dead Ends
+- Considered changing import FORMS in both twins so isort order coincides (full dotted submodule imports). The comparison is between "shared.<util>" and "<contract>" path components on the server vs "<util>" and "<contract>" on the client -- not fixable by form alone. Per-file ignore + conformance-pinned order is the honest fix.
+
+## Hints for Future Agents
+- If a server contract twin ever needs to import BOTH a shared-twin util and another contract module, check the sort: the twin path mapping is not order-preserving. Pattern: keep the CLIENT copy ruff-sorted, mirror its order on the server side, and per-file-ignore I001 there with the comment pointing at the conformance test.
+- weave/trace_server/shared/__init__.py is server-owned prose (NOT a twin pair); only the 5 modules pair.
+- The C2 ignore list is now down to the genuine code edges: kafka_events->flow.monitor, image_completion/base64_content_conversion->Content, isolated_client_executor x2, llm_completion->prompt.prompt, evaluate_model_worker x6 (incl. the PR2 transient to the runnable).
+
+## Codebase Discoveries
+- validation.py, clickhouse_schema.py, trace_server_common.py etc. are pure impl (non-twin) so ruff-fix is safe there; only converter among twins imports both worlds.
+
+## Open Questions
+None.
+
+## Addendum (amended post-PR-7 discovery)
+- Generalized the test-fixture twin-error mapping: the static errors/validation_util dict missed the NEW error-bearing twin this PR introduces (weave.trace_server.shared.refs_internal raises InvalidInternalRef). tests/trace/test_trace_server.py::test_robust_to_url_sensitive_chars caught it during PR 7's full battery. The mapping now mirrors the conformance path map (trace_server.shared.->shared., trace_server.->shared.) and resolves twin modules dynamically, so future twins are covered automatically.

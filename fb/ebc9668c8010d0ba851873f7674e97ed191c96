@@ -1,0 +1,38 @@
+## Conversation
+PR6 (final) of the SDK-uptake stack (plan: .context/sdk-uptake-plan.md):
+enforcement. The user's criterion: "The client does not ever import from
+trace_server... enforce this using an import lint checker."
+
+## Actions
+- pyproject: TID251 added to ruff select; [tool.ruff.lint.flake8-tidy-imports.banned-api]
+  bans "weave.trace_server"; per-file-ignores exempt weave/trace_server/**,
+  tests/** (merged into the existing tests ignore entry), scripts/**.
+- Verified empirically with a probe file: exactly the 3 weave.trace_server
+  imports flagged; weave.trace_server_bindings and weave.shared imports NOT
+  flagged (ruff matches dotted-path components, not string prefixes).
+- AGENTS.md documents the layering rule + where types/gap models/shims live.
+- Fixed a stale comment in http_utils referencing weave.trace_server.errors.
+
+## Errors & Mistakes
+- First config attempt produced a TOML duplicate-key error: per-file-ignores
+  already had a "tests/**/*.py" entry; merged TID251 into it. (Same TOML
+  table-scoping family of mistake as PR1's [tool.uv.sources] misplacement —
+  watch where you insert TOML.)
+
+## Dead Ends
+- import-linter (the dedicated tool) was considered in planning; rejected in
+  favor of ruff TID251 — zero new tooling, runs in the existing lint pass.
+
+## Hints for Future Agents
+- To check the ban quickly: drop a file importing weave.trace_server under
+  weave/trace/ and run `uvx ruff check` on it.
+- If a legitimate new shared need appears, move the code to weave/shared with
+  an old-path shim (PR3/PR4 pattern) rather than poking a lint hole.
+
+## Codebase Discoveries
+None beyond the above.
+
+## Open Questions
+- Whether to also ban weave.trace_server imports inside weave/shared (the
+  llm_structured_model schema imports client modules but no server modules
+  today; saved_view/llm_structured_model lost their tsi imports in PR5).

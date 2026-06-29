@@ -1,0 +1,71 @@
+## Conversation
+Round 3 ts-split PR 2: server contract consolidation, rebuilt under the user's
+5 rules (.context/ts-split-round3-design.md). Key delta vs round 2 (194ff8d864):
+rule 5 -- the interface tree is PURE CONTRACT, so the impl modules round 2
+moved in (trace_server_converter, validation_util, ids) now STAY at their
+master homes. They become per-side implementations in PR 4.
+
+## Actions
+- cherry-pick --no-commit 194ff8d864 onto the round-3 guard. 3 conflicts:
+  - pyproject.toml: resolved by `git checkout HEAD -- pyproject.toml` +
+    scripted path-remap of ONLY the 6 moved flat contract modules
+    (tsi/common/constants/errors/service/http_service). Round-2's version
+    carried flow entries + PR2-transient comments that round 3 must not have.
+  - evaluate_model_worker.py: kept master's schema import (round 3 has no
+    split yet) + took the tsi path remap.
+  - weave/flow/llm_structured_completion_model.py: DU (deleted in HEAD,
+    updated in pick) -- git rm; round 3 has no flow runnable, ever (rule 2).
+- git mv'd converter/validation_util/ids back out of interface/; scripted
+  un-rewrite of their import paths across weave/tests/scripts (20 files);
+  fixed the one bare-form import (validation.py `from ...interface import
+  validation_util`).
+- CHValidationError inversion: defined in interface/errors.py, validation_util
+  imports it back. Other importers (tests) still resolve via validation_util's
+  namespace -- no churn.
+- llm_structured_model.py (unsplit, master content): remapped its
+  `weave.trace_server.trace_server_interface` import to the new interface path
+  -- round-2's codemod never needed this because its PR 2 had already
+  rewritten the file. Found via import smoke failure.
+- Added test_interface_trees_are_import_leaves (AST): every interface tree
+  imports only itself; INTERFACE_LEAF_BASELINE = {llm_structured_model.py}
+  (pre-existing master coupling, burned by PR 5). Client tree auto-joins the
+  check when PR 3 creates it.
+- ruff check --fix + format on all touched files (15 import-order fixes);
+  re-verified gates after (round-2 lesson: late ruff fixes broke the mirror).
+- Verified: lint-imports 3 kept; 8 meta-tests; converter/ids/service tests
+  24 passed; import smoke ok.
+
+## Errors & Mistakes
+- `uv run` without --no-sync RESYNCED the venv and stripped the test extras
+  (Levenshtein vanished, scorers import chain broke). Repaired with
+  `uv sync --group test --group dev --extra scorers --extra trace_server
+  --extra wandb`; ALL subsequent uv run calls use --no-sync.
+- An Edit-tool failure left conflict markers in the worker file while a
+  parallel `git add` staged them; caught by re-grep for markers. When
+  resolving conflicts, always re-grep for <<<<<<< after staging.
+
+## Dead Ends
+- Considered an import-linter contract for server-interface leafness:
+  impossible to express (forbidding the parent package flags intra-tree
+  imports). AST meta-test instead; the client mirror ALSO gets the
+  import-linter leaf contract in PR 3 (expressible there since
+  weave.interface is not nested in a forbidden module).
+
+## Hints for Future Agents
+- The unsplit llm_structured_model carries client imports (weave root,
+  prompt.prompt, trace.vals, weave_client_context, utils.project_id). They are
+  baselined in THREE places until PR 5: C2 ignores, ROOT_IMPORT_BASELINE, and
+  INTERFACE_LEAF_BASELINE. The split burns all three.
+- url_safety in interface/ is a DOCUMENTED judgment call: pure deterministic
+  constraint predicate used by the Provider schema validator (VULNMGMT-770).
+  No sockets/DNS at runtime -- socket.inet_aton is just a parser.
+- ch_sentinel_values re-exports SENTINEL_EPOCH from interface/agents/schema --
+  do not invert back.
+
+## Codebase Discoveries
+- import-linter errors on unmatched ignore entries; grimp cannot resolve
+  import targets under namespace packages (weave.flow.* edges are simply
+  absent from the graph).
+
+## Open Questions
+None.

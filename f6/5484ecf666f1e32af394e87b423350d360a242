@@ -1,0 +1,36 @@
+## Conversation
+Step 5 (final). Move SQLite impl into sqlite_trace_server/ to complete the target structure.
+
+## Actions
+- git mv weave/trace_server/sqlite_trace_server.py -> sqlite_trace_server/__init__.py (mkdir the
+  dir first, then git mv; rename detected 100%).
+- Chose package-__init__ form (single-module impl) so the import path
+  weave.trace_server.sqlite_trace_server is PRESERVED exactly -> zero importer/string-ref repointing.
+
+## Errors & Mistakes
+- None. (Collecting tests/trace + tests/trace_server together still throws the pre-existing
+  test_utils.py basename collision; each suite collects clean separately: 1322/1704/421/55.)
+
+## Dead Ends
+- Considered Option B (sqlite_trace_server/sqlite_trace_server.py named file, parallel to
+  clickhouse_trace_server_batched.py) but it forces a doubled path
+  weave.trace_server.sqlite_trace_server.sqlite_trace_server + full repoint + a non-idempotent
+  codemod (the rule would re-double on re-run). Rejected for the zero-churn __init__ form.
+
+## Hints for Future Agents
+- Final structure: weave/trace_server/{__init__.py, README.md, interface/, shared/,
+  clickhouse_trace_server/, sqlite_trace_server/}. The two impl dirs are asymmetric: clickhouse has
+  empty __init__ + named files; sqlite has impl-in-__init__. If the reviewer wants symmetry, move
+  sqlite impl to a named file + re-export from __init__ (keeps path) — trivial follow-up.
+- Whole stack is local/unpushed: move-trace-server-to-core-v1 -> ts-interface-v1 -> ts-shared-v1 ->
+  ts-clickhouse-v1 -> ts-sqlite-v1.
+
+## Codebase Discoveries
+- None new.
+
+## Open Questions
+- Stack-review items (all DEFERRED per user): (1) clickhouse_schema + clickhouse_trace_server_settings
+  in shared/ (break token_costs/feedback coupling to move to CH); (2) contract->impl couplings
+  interface->clickhouse_trace_server.agents and provider->model_providers; (3) shared-string-ref fixes
+  bundled in PR4 belong to PR3; (4) the `from weave.trace_server import interface as tsi` convention
+  comment (needs interface/__init__ re-export); (5) sqlite impl-in-__init__ vs named file.

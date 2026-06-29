@@ -1,0 +1,60 @@
+## Conversation
+User directed: duplicate the TraceServerInterface protocol (and BaseModelStrict)
+so they live on both sides; chose EXPLICIT imports over a star-facade; placement
+client=weave/trace_server_interface.py, server=weave/trace_server/trace_server_interface.py;
+"move all protocols". This is PR1 of the shared->0 contract split.
+
+## What
+Four protocols: TraceServerInterface (3050), ObjectInterface (3234),
+FullTraceServerInterface (3313) in shared/trace_server_interface.py, and
+ServiceInterface in shared/service_interface.py. Removed from shared (by marker,
+not line numbers); copied verbatim into a client facade + a server facade.
+No `from __future__ import annotations` in the source -> signatures evaluate at
+class-def time -> the copies need every referenced type in scope. Derived the
+EXACT set via ruff F821 on the protocols-without-model-imports (194 tsi models +
+4 service models + the agent_types module alias), imported explicitly. The two
+facades are identical except the docstring. Repointed ~28 importers (client->
+weave.trace_server_interface, server/tests->weave.trace_server.trace_server_interface);
+models stay imported from weave.shared. Added weave.trace_server_interface to all
+4 import-linter contracts.
+
+## Errors & Mistakes (brutal honesty)
+1. The data-driven repoint script inserted the facade import after the LAST
+   `from weave...` line -- which, when that line was a multi-line block OPENER
+   (`from weave.shared.errors import (`), put the import INSIDE the block ->
+   SyntaxError in 6 server files (evaluation_status, feedback, clickhouse,
+   llm_judge, + 2 tests). `import weave` still passed (these are server-only, not
+   loaded by the client import) which masked it; lint-imports caught it. Fixed
+   with a regex that swaps the misplaced single-line facade import BEFORE the
+   block opener.
+2. Removing the protocols from shared/tsi made `agent_types` unused there, so
+   ruff --fix deleted `from weave.shared.agents import types as agent_types`.
+   But external_to_internal_trace_server_adapter.py + test_trace_server_interface_util.py
+   accessed it via the INCIDENTAL re-export `tsi.agent_types.X` -> AttributeError.
+   Fixed by importing agent_types directly in those 2 files and dropping the
+   `tsi.` prefix.
+
+## Verification
+import weave OK (client copy is not server copy); import-linter 4/0 (the new
+top-level module guarded); ruff + ty clean; sqlite sweep 151 passed/12 skipped
+(conformance + test_weave_client + test_client_server_caching +
+test_trace_server_interface_util + test_service_interface). NOT run: clickhouse
+(the split is structural -- the Protocol base only needs to resolve, which
+import+ty confirm).
+
+## Hints for Future Agents
+- Protocols are STRUCTURAL (type-checker only) -> no conformance fixtures for
+  this PR; conformance arrives with the model split.
+- The facades explicitly import the 198 protocol-referenced models from shared,
+  so they DO re-expose those names; but importers were repointed to get models
+  from weave.shared (protocols from the facade) -- don't rely on the facade as a
+  model source for models outside the 198.
+- BaseModelStrict NOT yet duplicated (the user OK'd copying it) -- it happens in
+  the model-split PRs, where per-side models need a per-side base.
+- When moving a module, grep REPO-WIDE incl tests/ AND watch for incidental
+  re-exports (X.agent_types) + ruff auto-removing now-unused imports that others
+  depended on transitively.
+
+## Open / Next
+Model subsets per side (per-side BaseModelStrict + request_schema conformance),
+then foundation, until shared is empty + deleted.

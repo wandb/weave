@@ -1,0 +1,38 @@
+## Conversation
+Part 4/8 of the fake trace server stack (split of the verified monolith;
+full history in the note on backup/fake-ts-monolith).
+
+## Actions
+Segments: feedback CRUD/stats/schema, cost APIs + default-cost seeding +
+_apply_costs_to_calls, the module-level _orm_* evaluator, the feedback-stats
+helper functions, and the cost datetime/usage helpers.
+
+## Errors & Mistakes
+From the original build (preserved here because the code carries the fix):
+feedback_query(fields=["count(*)"]) initially crashed — the ORM accepts
+count(*) as a field; _orm_select grew an aggregate branch that counts
+matched rows PRE-limit and applies LIMIT/OFFSET to the single result row.
+
+## Dead Ends
+Considered reusing methods/sqlite_feedback_stats.py helpers directly —
+rejected (fetch path is sqlite-coupled); the pure aggregation logic is
+ported instead.
+
+## Hints for Future Agents
+- Feedback rows are stored post-readback-shaped: created_at as
+  isoformat(sep=' ') STRINGS and payload JSON-normalized. Query results and
+  the string-window filtering in feedback_stats depend on this.
+- The ORM evaluator drops casts on JSON fields (sqlite parity — only CH
+  applies clickhouse_cast_json_value) and sorts dynamic fields with an
+  existence term first.
+- maybe_convert_datetime_operands parity: datetime literals normalize to
+  'YYYY-MM-DD HH:MM:SS.ffffff' and compare as STRINGS against stored text,
+  including sqlite's quirky 'T'-vs-space ordering.
+- Default cost seeding parses migrations/006_seed_costs.up.sql (same file
+  the sqlite server reads); it runs lazily on first include_costs use.
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.

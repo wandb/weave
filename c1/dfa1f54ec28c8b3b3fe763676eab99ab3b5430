@@ -1,0 +1,57 @@
+## Conversation
+Follow-up to PR #7219 ("feat(weave): add generic agent_name_override for OTel
+invoke_agent spans"). After that PR was pushed as a DRAFT, the user left a series
+of Conductor local review comments. I made the changes in the working tree but
+had not yet committed/pushed them when #7219 got MERGED (as non-draft, head =
+original commit 601c1026ca) and its branch was deleted. So the review-feedback
+changes could not update #7219 — they land here as a new follow-up PR.
+
+## Actions
+- Discovered the merge via `gh pr view 7219` (state MERGED, isDraft false,
+  headRefOid 601c1026ca) after a --force-with-lease push was rejected and
+  `git fetch origin <branch>` reported the remote ref gone.
+- Confirmed master now contains the feature (merge commit 66cf1b92b0, #7219) and
+  that the 5 review-touched files were NOT modified on master after the merge
+  (so master's versions == original 601c1026ca versions).
+- Created branch andrew/agent-name-otel-followup off CURRENT origin/master,
+  overlaid the 5 refined files from the amended commit c3fb96ae8a via
+  `git checkout c3fb96ae8a -- <files>`. Diff vs master = exactly the review-delta.
+- Ran tests (22 passed: test_agent_context.py + claude OTEL suite + the openai
+  override test) and ruff check/format (clean) on the fresh base.
+
+## Review-delta contents
+- agent_context.py: resolve_agent_name -> resolve_agent_name_or_default; signature
+  now (default: str | None) -> str, coalescing None/empty default to "".
+- claude otel_integration.py + openai otel_processor.py: call the renamed resolver;
+  openai drops `or ""` (resolve_agent_name_or_default(sd.name)).
+- test_agent_context.py: integration-agnostic, user-meaningful placeholders
+  (default_agent_name / research_agent / summarizer_agent / customer_support_agent)
+  + new test_none_default_coalesces_to_empty_string.
+- openai_agents_otel_test.py: override test driven through Mock(spec=Span) +
+  on_span_start/on_span_end (public path), no Trace mock / on_trace_start-end /
+  client fixture, no internal-function calls.
+
+## Errors & Mistakes
+- I amended my local branch (601c1026ca -> c3fb96ae8a) and tried to force-push to
+  update the "draft" before realizing #7219 had already merged. The amend +
+  updated note are now orphaned on the old (deleted) branch; this follow-up
+  re-applies the same delta cleanly onto current master.
+- Earlier test-shape churn (recorded on #7219's note): over-corrected the openai
+  test to internal-function calls, reverted to a lean Mock after reviewer said
+  "reaching for internals is bad form" and "mock is cleaner, just drop the stuff
+  around it."
+
+## Hints for Future Agents
+- The claude OTEL test (claude_agent_sdk_otel_test.py) is NOT in this delta: it
+  uses the public agent_name_override, so the internal resolver rename doesn't
+  touch it.
+- openai_agents OTel processor tests that only drive on_span_start/on_span_end
+  need NO weave client fixture (processor uses no weave client) -> no ClickHouse.
+- openai-agents lock pin (0.2.0) lacks TaskSpanData/TurnSpanData imported at the
+  top of openai_agents_otel_test.py; need newer openai-agents (e.g. 0.17.x) to
+  collect that module locally.
+
+## Open Questions
+- The override remains scope-wide (every invoke_agent span in an
+  agent_name_override block takes the name). "Outermost-only" semantics and
+  nested sub-agent invoke_agent spans were discussed and intentionally deferred.

@@ -1,0 +1,55 @@
+## Conversation
+PR3 (top of the agent-span-get stack). User: the skill should cover BOTH read
+and write, but "focus on correct writing to start." So it's a round-trip skill
+weighted toward correct emission.
+
+## Actions
+- Created .claude/skills/instrument-agent-tracing/SKILL.md (Claude skill format:
+  YAML frontmatter name/description + markdown body), matching the existing
+  .claude/skills/<name>/SKILL.md layout (bump-version, publish-pypi).
+- Phase 1 (write, primary): weave.init() auto-wires the OTLP exporter to
+  /agents/otel/v1/traces (weave_init.py:_setup_session_tracing). Documents the
+  weave.session model (Session>Turn>LLM/Tool/SubAgent), the context-manager
+  pattern (start_session / session.start_turn / turn.llm(model, provider_name) /
+  turn.tool / turn.subagent / llm.output / llm.usage / llm.record), the imperative
+  log_turn/log_session path, and correctness rules (pass provider_name explicitly,
+  set model/usage/agent_name, tool arguments+tool_call_id+result, include_content).
+- Phase 2 (read): client.get_agent_spans (PR2) -> dict rows + to_pandas + mongo
+  query filter; client.server.agent_spans_stats / agent_custom_attrs_schema (PR1)
+  for aggregates/schema; raw curl to /agents/spans/query.
+- Verified the API names against weave/session/session.py (start_session:955,
+  turn.llm:647, turn.tool:667, turn.subagent:782, LLM.record:474, LLM/Tool are
+  pydantic models). Smoke-tested both snippets:
+    * context-manager block ran clean with no provider (export no-ops).
+    * imperative log_turn with a real InMemory TracerProvider emitted
+      'invoke_agent weather-bot', 'chat gpt-4o', 'execute_tool get_weather'
+      (span_count=3). PASS.
+
+## Errors & Mistakes
+- First smoke test ran log_turn WITHOUT weave.init() and WITHOUT a real provider;
+  it raised AttributeError: 'NonRecordingSpan' object has no attribute 'context'
+  (log_turn accesses turn_span.context, a ReadableSpan-only property). This is an
+  unsupported state (skill requires weave.init() first), not a skill defect — see
+  Open Questions for the latent SDK rough edge.
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- The skill's imperative example REQUIRES weave.init() (or some real SDK
+  TracerProvider) to be active. Under the default OTel proxy/NoOp provider,
+  log_turn/log_session can raise on turn_span.context instead of no-oping.
+- Emitted span names are the convention to teach: invoke_agent <agent>, chat
+  <model>, execute_tool <tool>. operation_name column derives from these.
+
+## Codebase Discoveries
+- weave.init() returns the WeaveClient and installs the session OTel provider as
+  a side effect (only if no TracerProvider is already set, and only if a trace
+  server URL is configured).
+
+## Open Questions
+- Latent SDK rough edge (out of scope here, candidate follow-up): log_turn /
+  log_session raise AttributeError on turn_span.context when opentelemetry is
+  installed but no real provider is set (e.g. user calls log_turn before
+  weave.init()). The _OTEL_AVAILABLE guard only checks importability; it should
+  also bail when the emitted span is non-recording.

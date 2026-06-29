@@ -1,0 +1,37 @@
+## Conversation
+Round 3 of the ts-split stack (PR 1, commit 1/2). The user reviewed the round-2
+stack and issued 5 rules: (1) never add to a shared dir -- duplicate per side +
+conformance tests (JSONL, future home core repo); (2) never add ANYTHING to
+weave/flow (deprecated); (3) no transient state -- every PR legal as-is;
+(4) minimize shuffling, separate shuffle PRs; (5) interface dirs are pure
+contract -- no impl (resolvers/utils belong in precise per-side homes like
+serde/digest/normalizer/adapters with their own conformance tests).
+Full audit + design: .context/ts-split-round3-design.md.
+
+## Actions
+- Rebuilt round-2 commit bd5a207a90 minus weave/flow/__init__.py (rule 2: the
+  empty __init__.py was still "adding to flow"). 23 files instead of 24.
+- Round-2 stack preserved at backup/ts-split-v2-*; notes in
+  .context/ts-split-v2-notes/.
+
+## Errors & Mistakes
+- First attempt passed a newline-joined file list to git checkout unquoted;
+  zsh does NOT word-split unquoted vars, so it became one giant pathspec and
+  failed. Used xargs.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- grimp silently skips PEP 420 namespace packages. flow is now DELIBERATELY
+  namespace (rule 2); test_import_contract.py asserts it STAYS namespace and
+  carries its boundary coverage via AST checks (commit 2/2).
+- NEVER delete the other __init__.py files; the namespace meta-test allowlists
+  exactly weave/flow.
+
+## Codebase Discoveries
+- weave/flow on master has NO __init__.py already -- the client imports
+  weave.flow.* fine via PEP 420; only grimp cares.
+
+## Open Questions
+None.

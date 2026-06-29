@@ -1,0 +1,38 @@
+## Conversation
+User asked for a STACK of PRs that gradually eliminate the import-linter ignores in pyproject.toml, with the hard constraint that fixes must NOT be routed through a shared dir/file (e.g. the existing weave/shared) — each side must stand alone. After analysis I proposed a two-phase plan; user approved Phase 1 only (make the trace SERVER stop importing the client), said: no shared dir, do NOT codegen yet, vendor what you need, and leave codegen-destined files (llm_structured_model + the builtin-object registry) untouched.
+
+This is PR1 of the Phase-1 stack (decouple-01-agentspanopname).
+
+## Actions
+- Mapped all ~80 ignore edges across the 3 contracts via parallel Explore agents.
+- PR1 target: ignore 'weave.trace_server.agents.kafka_events -> weave.flow.monitor'.
+- AgentSpanOpName is defined in weave/flow/monitor.py:22 as 'TypeAlias = Literal["weave.genai.turn_ended"]'. kafka_events.py used it as a pydantic field type and assigns the literal value.
+- grep confirmed kafka_events.py is the ONLY server consumer of AgentSpanOpName; no other trace_server file imports flow.monitor.
+- Added AgentSpanOpName to weave/trace_server/agents/schema.py (the server's agent-span literal home, already exporting StatusCodeLiteral which kafka_events imports). Added TypeAlias to its typing import.
+- Repointed kafka_events.py import to schema.py (grouped with the existing AgentSpanCHInsertable/StatusCodeLiteral import).
+- Removed the ignore from pyproject.toml.
+- Left weave/flow/monitor.py UNTOUCHED (keeps its own copy) to minimize churn; documented the intentional duplication in schema.py.
+
+## Verification
+- lint-imports: 3 kept / 0 broken; dependency count 1385 -> 1384 (the removed edge).
+- ruff: clean on both changed files.
+- Import test: kafka_events imports OK; server and client literals have identical get_args.
+
+## Errors & Mistakes
+None.
+
+## Dead Ends
+Considered defining AgentSpanOpName locally in kafka_events.py (most local). Chose schema.py instead because it is the semantic home for agent-span literals and is already server-clean (imports only ch_sentinel_values + stdlib/pydantic).
+
+## Hints for Future Agents
+- gt trunk 'master' is the STALE local ref (21b27490f2) in the sibling worktree /Users/andrew/conductor/weave; HEAD is ~19 commits ahead of it and 2 behind origin/master. Conductor quirk. The base branch andrew/eliminate-importlinter-ignores was 'gt track --parent master' (shows '19 commits'). User rebases the stack onto real master at submit time.
+- Do NOT push; user pushes explicitly.
+- Phase 1 remaining: PR2 format_message_with_template_vars vendor (llm_completion only), PR3 Content decoder vendor, PR4 eval-worker move to weave/eval_worker/.
+- The 4 llm_structured_model ignores stay (codegen-destined; user said don't touch).
+
+## Codebase Discoveries
+- weave/trace_server/agents/schema.py holds the agent-span CH row schema + literals; it is client-import-free.
+- weave/flow/monitor.py Monitor.op_names is list[AgentSpanOpName | str] — already tolerant of arbitrary strings, so independent literals can't break client validation.
+
+## Open Questions
+None for PR1.

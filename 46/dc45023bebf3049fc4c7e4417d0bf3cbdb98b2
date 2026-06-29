@@ -1,0 +1,35 @@
+## Conversation
+PR2 of the stack: remove the vestigial iterator-level offset param. Re-added
+after gt modify restacked PR2 (SHA e620f0c6d0 -> 46dc45023b).
+
+## Actions
+- Chesterton's Fence: offset traces to #3356; get_calls(offset=) is a real,
+  tested public feature but is implemented by baking offset into fetch_func
+  (call.py) with the iterator built offset=None. The iterator's own offset
+  param was therefore dead + untested and carried a latent bug: _get_one
+  bounded the limit as `index >= limit + offset` (wrong), disagreeing with the
+  slice path (which clamped correctly).
+- Removed the offset param + handling in __init__/_get_one/_get_slice and the
+  offset=None kwarg at the call.py construction site. Added
+  test_paginated_iterator_limit_bounds_index_and_slice_consistently.
+- Verified: 6 unit tests; get_calls offset/limit/page_size tests pass on sqlite
+  (test_get_calls_len, test_get_calls_limit_offset,
+  test_get_calls_page_size_with_offset) -> public offset behavior intact.
+
+## Errors & Mistakes
+- None.
+
+## Dead Ends
+- Considered fixing _get_one to match _get_slice instead of removing offset;
+  rejected (dead + untested code; simplicity favors removal).
+
+## Hints for Future Agents
+- Do NOT reintroduce an iterator-level offset param; route offset through
+  fetch_func as make_calls_iterator does.
+
+## Codebase Discoveries
+- get_calls(offset=N): offset baked into effective_offset in fetch_func, so the
+  iterator sees a stream already starting at row N; calls[0] is logical row N.
+
+## Open Questions
+- ClickHouse run not done locally (sqlite only); CI clickhouse is the final gate.

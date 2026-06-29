@@ -1,0 +1,59 @@
+## Conversation
+REVISED stack v2 after user feedback on the first 6-PR stack (#7163-#7168):
+(1) RemoteHTTPTraceServer must be the surviving class — swap its mechanics in
+place, delete StainlessRemoteHTTPTraceServer; no feature drops. (2) no
+tests/sdk_bridge.py — tests must not need tsi. (3) import lint incremental
+across PRs. (4) no weave/shared code-motion PRs. This is PR A of the new
+2-PR stack (plan: .context/sdk-uptake-plan.md).
+
+## Actions
+- Built off master on branch andrew/sdk-uptake-01-remote-server-on-sdk.
+- Content cherry-sourced from the validated old stack via `git show
+  9eeb020c7f:<path>` (old PR2 tip): the tsi-typed, FULL-parity SDK-backed
+  binding (was stainless_remote_http_trace_server.py) became
+  remote_http_trace_server.py with the class renamed; weave_init/settings/
+  api/noxfile/test.yaml/conftests mapped back to the RemoteHTTPTraceServer
+  name; http_requests log hooks made public; probe hunk in weave_client.
+- master's wal_sender/test_weave_init_availability/test_wave_client_file_cache
+  need ZERO changes now (they already name RemoteHTTPTraceServer).
+- Lint step 1: TID251 + ban weave.trace_server.http_service_interface (this
+  PR makes it unused by the binding) + per-file-ignores
+  (trace_server/scripts/trace_server_mock/tests).
+
+## Errors & Mistakes
+- zsh modifier gotcha: `git show $SRC:weave/...` mangled the path ($SRC:w
+  parsed as a history-style modifier) — quote the whole rev:path argument.
+- git rm is atomic: one bad path in the argument list and NOTHING is removed.
+
+## Dead Ends
+None (this PR is a re-cut of already-validated content).
+
+## Hints for Future Agents
+- All the SDK 0.0.1 workaround knowledge lives in the binding's module
+  docstring and in the notes on the old-stack commits (a0d360a296,
+  9eeb020c7f). The old branches andrew/stainless-sdk-default and
+  andrew/sdk-02..06 hold the previous iteration.
+- The binding keeps method names/behavior parity with the old hand-rolled
+  implementation INCLUDING NotImplementedError markers (otel_export,
+  evaluate_model, evaluation_status, rescore, calls_score).
+
+## Codebase Discoveries
+- See old-stack notes; nothing new in this re-cut.
+
+## Open Questions
+- PR B retypes this same surface to weave_server_sdk models with gap models
+  for everything the published SDK cannot express.
+
+## Addendum (stack split, 2026-06-11)
+This commit was re-cut when the user asked to split the original #7177 into
+(1) stainless removal and (2) the rebuild. The stainless-removal hunks now
+live in the parent commit (chore(weave): remove experimental
+StainlessRemoteHTTPTraceServer); this commit's tree is byte-identical to the
+pre-split d34b793bdb EXCEPT three deliberate fixes: the dead
+remote_only/stainless_only pytest markers are gone (removed by the parent),
+weave_client.py's _get_call_processor docstring no longer names the deleted
+class, and weave_init's res one-liner dropped its variable annotation —
+the annotated form pinned the protocol type and failed the standalone mypy
+hook (set_auth is only on the concrete binding; latent failure verified on
+d34b793bdb itself, masked at stack tips where the client protocol has
+set_auth).

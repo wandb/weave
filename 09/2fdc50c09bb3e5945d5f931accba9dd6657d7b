@@ -1,0 +1,24 @@
+## Conversation
+The user asked to rebase the fake trace-server stack onto origin/master and push after earlier review fixes were amended into their owning PRs.
+
+## Actions
+This commit was recreated by restacking/rebasing the fake trace-server stack onto origin/master after origin/master advanced to 0caf63ee7e. The already-merged skeleton commit was skipped as duplicate; this commit remains part of the live stack above origin/master.
+
+## Errors & Mistakes
+The rebase attempt hit conflicts on the duplicate skeleton commit already represented on origin/master. After skipping/aborting left branch refs reset to remote tips, the rebased stack tips were recovered from reflog and branch refs restored manually.
+
+## Dead Ends
+Graphite sync/restack initially skipped the merged bottom branch and did not make origin/master an ancestor of the live stack.
+
+## Hints for Future Agents
+If this stack appears to diverge from remote, check origin/master ancestry first. The rebased stack should include origin/master as an ancestor and preserve the review fixes in the call writes, tables/files, calls read, and eval API branches.
+
+## Codebase Discoveries
+Graphite may skip restacking a branch marked merged even when descendants still use it as their local parent; a manual rebase/reflog recovery may be needed if the merged parent has local-only commits.
+
+## Open Questions
+None.
+
+## Stack Correction Context
+After the origin/master rebase and push, the user noticed that unrelated LLM-judge test gating had landed in the call-writes PR because the old skeleton gating commit became part of the first live branch when the merged skeleton PR was reparented away. This stack rewrite removes `tests/trace/test_llm_as_a_judge_scorer.py` from `andrew/fake-ts-02-call-writes`, removes the compensating unskip hunk from the tables/files PR, and applies the intended LLM-judge ungate only in `andrew/fake-ts-09-completions`.
+Copied from prior rewritten commit c092595838b8 while correcting per-PR test placement.

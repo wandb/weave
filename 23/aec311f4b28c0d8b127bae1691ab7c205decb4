@@ -1,0 +1,50 @@
+## Conversation
+Step 2 of the trace_server->core migration (clean move, no shims; see PR1 note + memory
+project_trace_server_to_core_migration). User: build the whole stack, report at end.
+
+## Actions
+- git mv 4 contract modules into weave/trace_server/interface/: trace_server_interface.py
+  (99%), common_interface.py (100%), service_interface.py (94%), http_service_interface.py
+  (98%). interface/ already had query.py, feedback_types.py, builtin_object_classes/, empty
+  __init__.py.
+- Codemod .context/pr2_repoint_interface.py (gitignored): repo-wide, import lines only,
+  ordered rules rewriting weave.trace_server.{trace_server_interface,common_interface,
+  service_interface,http_service_interface} (dotted + `from weave.trace_server import X`
+  space-form) -> weave.trace_server.interface.*. 158 files changed.
+- Hand-fixed 3 stale COMMENTS the codemod (import-lines-only) skipped:
+  interface/trace_server_interface.py:34, trace_server_mock/pyproject.toml (2 lines).
+- Facade re-export targets auto-updated: weave/trace_server_interface/{trace_server_interface,
+  common_interface,service_interface,http_service_interface}.py now re-export from
+  weave.trace_server.interface.* (client call sites unchanged).
+
+## Errors & Mistakes
+- pytest collect of tests/trace + tests/trace_server together throws a basename-collision
+  error (two test_utils.py, no __init__). PRE-EXISTING infra quirk (shards run separately in
+  CI), NOT from this change. Collecting each suite alone: tests/trace_server 1322,
+  tests/trace_server_bindings 55, both clean.
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- The codemod's word-boundary+literal-dot rules deliberately DO NOT touch the client facade
+  path weave.trace_server_interface.* (underscore after trace_server, not dot). That's how
+  the client stays untouched while server paths move. Re-running is idempotent.
+- weave.trace_server.interface.* is never re-matched (rules require the 4 names immediately
+  after `weave.trace_server.`, not after `.interface.`).
+- CONTRACT->IMPL smell to fix in PR4: interface/trace_server_interface.py still imports
+  `from weave.trace_server.agents import types as agent_types` (agents/ is CH impl, moves in
+  PR4 -> update that import then). Also imports weave.trace_server.validation (-> shared/ in
+  PR3) and weave.trace_server.interface.query (stays).
+- mypy type-neutral: moved files have identical content; importers resolve to the same
+  classes (runtime identity verified: facade CallSchema IS server CallSchema).
+
+## Codebase Discoveries
+- interface/__init__.py is empty; no package-init cycle risk from adding contract modules.
+- git rename detection held (94-100% similarity) despite the import-line edits.
+
+## Open Questions
+- None. PR3 next: extract shared/ utils (errors.py whole -> server-side; ids, constants,
+  trace_server_converter, orm, validation*, ttl_settings, trace_server_common,
+  object_creation_utils, otel/feedback helpers). Repoint facade targets (ids/constants/
+  converter) + server importers + the 5 residual client errors imports (-> shared/errors).

@@ -1,0 +1,69 @@
+## Split of Google ADK plugin-core — slice 3/3 (tool/execute_tool spans)
+Final slice. See slice 1 / tag bak-adk-old-plugincore for full original history.
+
+Adds: tool callbacks (beforeTool/afterTool/onToolError → execute_tool spans, replacing slice 2's stubs), endToolSpan, syntheticQueueKey, InvocationState tool fields (toolSpans/syntheticToolKeys/toolSeq) + finishInvocation tool loop, tool types.
+
+CRITICAL INVARIANT: this slice's googleAdk.ts + googleAdk.types.ts + semconv.ts are BYTE-IDENTICAL to the original plugin-core (tag bak-adk-old-plugincore) — verified 0-line diff. That is what lets the downstream branches (genai-exclusion/agent-hierarchy/auto-instrument) reparent onto this slice with their SOURCE applying cleanly; only the (reorganized) test file needed conflict resolution.
+
+Tests: tool-using e2e (real runner) + tool-errors + cyclic/bigint sanitization. Verified 20/20 jest + lint clean.
+
+## Session addendum — resolve restack duplicate helper after moved tests
+User clarified every PR must be standalone and the GoogleGenAI exclusion test was moved downstack into the model slice. Restacking the tool slice over the amended model slice produced a duplicate ScriptedLlm helper in sdks/node/src/__tests__/integrations/googleAdk.test.ts. Removed the duplicate at the tool slice so this PR is independently testable and the upstack branches inherit a clean test file.
+
+Verification for this amendment:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (22 passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check src/integrations/googleAdk.ts src/integrations/googleAdk.types.ts src/integrations/googleGenAI.ts src/__tests__/integrations/googleAdk.test.ts
+
+No push performed.
+
+---
+
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+
+Final verification for this branch:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (22 passed, 22 total)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
+
+No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Actions (slice 03 — owns tool/execute_tool spans)
+googleAdk.ts (beforeToolCallback + endToolSpan):
+- Dropped `ctx ? this.invocations.get(...) : undefined` ternaries and the `?.`
+  on ADK-guaranteed toolContext / tool (toolContext: Context, tool: BaseTool,
+  toolArgs: Record<string,unknown> are all required in ADK's BasePlugin
+  signature).
+- `jsonAttr(params.toolArgs ?? {})` -> `jsonAttr(params.toolArgs)` (toolArgs is
+  framework-built and required/non-null upstream).
+
+## Dead Ends / Deliberately NOT changed
+- KEPT afterToolCallback's `result: Record<string, unknown> | null` and the
+  `params.result ?? null`. A tool's RETURN VALUE is user code that can genuinely
+  be null/undefined, unlike the framework-provided fields — so this `| null` is
+  justified defensiveness, not laziness. Distinguished from the framework-field
+  `?.` removals on purpose.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-03 jest 22/22.
+
+===================================================================
+## ADDENDUM — discriminated union for tool outcome (later session)
+===================================================================
+Following the user's "use discriminated unions where they make sense", modeled
+endToolSpan's terminal outcome as a tagged union instead of {result?, error?}:
+  type ToolSpanOutcome =
+    | {kind:'result'; result: Record<string,unknown> | null}
+    | {kind:'error'; error: Error}
+Call sites pass {kind:'result',...} / {kind:'error',...}; the body branches on
+`outcome.kind`. This makes the result-XOR-error contract explicit and rejects
+the previously-representable invalid states (both set / neither set). The
+result `| null` is retained (tool return values can legitimately be null).
+Verified tsc esm+cjs, eslint, prettier, slice-03 jest 22/22.

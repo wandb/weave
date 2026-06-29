@@ -1,0 +1,95 @@
+## Conversation
+Follow-on from the ts-v2 decouple stack review. User asked why message
+templating / validation utils must live in weave/shared and whether they can be
+broken out, then proposed contract tests asserting "the same shape on both
+sides" because the impl can't be shared across languages (TypeScript). We
+converged on a language-neutral golden corpus: a JSONL of (input -> expected)
+examples that every SDK reimplements ser/de against. User confirmed: "the TS SDK
+will need to write ser/de to match python. That is OK and expected"; skip PIL
+(no PIL in TS, a client detail); "proceed with your work. Make it stack on top
+of the existing PRs." This is PR7 of the stack (andrew/ts-v2-conformance-corpus
+on top of andrew/ts-v2-server-worker-shared).
+
+## Actions
+- Explored existing infra: tests/trace/data_serialization/ already freezes
+  serialization as a contract (spec.py SerializationTestCase carries exp_json +
+  exp_objects[].digest; driver docstring states the never-modify/is_legacy
+  discipline). BUT it is Python-bound (runtime_object_factory callables + a live
+  `client` round-trip), so TS can't consume it. The new corpus externalizes the
+  pure-data parts.
+- Read weave/shared/digest.py: ObjectDigestResult exposes BOTH json_val
+  (canonical string) and digest. bytes_digest = sha256 -> urlsafe_b64 ->
+  replace -=>X, _=>Y, rstrip '='. str/object/row/file use it; compute_table_digest
+  uses HEX of concatenated row-digest strings (different encoding -- pinned).
+  compute_object_digest_result does json.dumps(processed_val, sort_keys=True)
+  (Python defaults: ', '/': ' separators WITH spaces, ensure_ascii=True).
+- Read process_incoming_object_val (object_class_util.py): dict + builtin_object_class
+  -> model_validate + dump_object adds _class_name/_bases; unknown class -> ValueError.
+- Read validators: require_* (validation_util.py) raise CHValidationError;
+  validate_tag_name/validate_alias_name (trace_server_interface.py:842/859) raise
+  ValueError. Corpus pins which exception class each rejects with.
+- Built conformance/generate_fixtures.py (imports canonical weave.shared impl,
+  curated case lists as module constants, emits JSONL), ran it ->
+  conformance/fixtures/{digest,message_template,validator}.jsonl.
+- Built tests/contract/test_conformance.py (Python consumer): loads JSONL,
+  single parametrized test dispatching by kind via a _CHECKERS dict, raises
+  AssertionError on unknown kind (defensive-branching convention), plus a
+  non-empty guard so a missing file can't pass as zero cases. No `client`
+  fixture -> pure functions, no backend, 0.14s.
+- Wrote conformance/README.md: schema table, the canonicalization contract
+  (json.dumps != JSON.stringify), digest algo, hazards, freeze discipline,
+  run instructions.
+
+## Verification
+- pytest tests/contract/test_conformance.py: 48 passed (47 rows + guard), 0.14s.
+- Generator deterministic: regenerate -> byte-identical (diff clean) all 3 files.
+- uvx ruff check: clean. uv run ty check: clean. uv run lint-imports: 4 kept / 0
+  broken (new code is outside the weave/ package, so the import graph is
+  unaffected). Tree clean post-commit (no hook modifications).
+- object_digest 'llm_structured_completion_model' golden digest ==
+  eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc (ties into PR2's existing gate).
+
+## Errors & Mistakes
+None. (Pre-validated ruff/ty/import-linter before `gt create` so pre-commit
+hooks passed first try.)
+
+## Dead Ends
+- Considered a separate CI "regenerate + assert no diff" drift guard. Dropped as
+  redundant: the conformance test already compares impl output to frozen
+  expected, so an impl serialization change fails the test directly. The
+  generator stays a dev convenience (don't hand-compute SHAs).
+- Considered a top-level conformance/ vs tests/contract/ for everything. Split
+  it: conformance/ holds the language-neutral artifact (fixtures + spec +
+  generator), tests/contract/ holds Python's verification. hatch build
+  include=['weave'] only, so top-level conformance/ is NOT packaged.
+
+## Hints for Future Agents
+- THE cross-language footgun: a TS SDK MUST NOT use JSON.stringify for digests.
+  Python json.dumps emits ', '/': ' WITH spaces, escapes non-ASCII to \\uXXXX,
+  and prints 1.0 (not 1). canonical_json is pinned in each object/row row so TS
+  can diff at the byte level. Whole-number/large floats are tagged
+  python_only:true (JSON loses the int/float distinction in JS) -- TS consumers
+  skip those rows.
+- FREEZE DISCIPLINE: never edit an existing row's expected (that's a wire-break);
+  add a new id and keep the old. Mirrors data_serialization's rule. Adding new
+  inputs is always fine (extend the case lists, rerun the generator).
+- Validator exception classes are part of the contract: require_* ->
+  CHValidationError, validate_tag/alias -> ValueError.
+- The TS consumer is intentionally NOT in this PR -- user owns it ("a detail for
+  the client to handle"). README documents exactly what TS must reproduce.
+
+## Codebase Discoveries
+- tests/ has tests/__init__.py but tests/trace/ does NOT; tests/contract/ omits
+  __init__.py to match tests/trace/ (pytest rootdir discovery). test_conformance.py
+  basename is unique (no collision; the repo has a known test_utils.py collision).
+- ruff: T201 (print) is ignored everywhere EXCEPT weave/trace/** (negated
+  per-file-ignore), so the generator can print. D10* (missing-docstring) is
+  globally ignored; pydocstyle convention = google. ANN rules are NOT selected.
+
+## Open Questions
+- Core staging: none -- this PR adds no production code and doesn't touch the
+  contract surface, so no paired core/chengdu change is needed.
+- Follow-ups (not this PR): the validation_util breakout (move server-only
+  validators out of shared, leave only CHValidationError in the contract error
+  registry); the TS consumer test in sdks/node; extending the corpus to more
+  builtin object classes as they stabilize.

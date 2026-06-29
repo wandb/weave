@@ -1,0 +1,80 @@
+## Conversation
+User: 'when you test conformance client, I think you should decouple the client's
+use of shared and have it now rely on its own implementation. This should be
+enforced in the linter.' This grew the client PR (andrew/ts-v2-conformance-client)
+from 'add a client conformance test' into 'give the client its own digest impl,
+enforced by the linter, validated by the conformance test'. It is the payoff of
+the corpus: the contract is separated from the implementations, so the client and
+server can each own their serialization code.
+
+## What & why
+The client computed digests by importing weave.shared.digest (the same code the
+server uses). To make client and server INDEPENDENT implementations (so the
+server can be extracted to its own package with no client dependency), the client
+now has its own copy: weave/trace/digest.py. The conformance corpus is what keeps
+the two byte-identical.
+
+## Actions
+- New weave/trace/digest.py: bytes_digest, str_digest, compute_object_digest,
+  compute_row_digest, compute_table_digest, compute_file_digest. stdlib-only
+  (base64/hashlib/json) -- a clean leaf, no weave imports.
+- Repointed the only client importers (grep-confirmed: nothing outside weave/trace
+  imports weave.shared.digest): weave/trace/weave_client.py (4 fns),
+  serialization/op_type.py (str_digest), serialization/serialize.py (bytes_digest).
+  ruff --fix re-sorted the imports.
+- pyproject.toml: new import-linter contract 'Client must own its serialization
+  (not the shared digest impl)' -- source = the client (ROTC) module list,
+  forbidden = ['weave.shared.digest'], allow_indirect_imports=true.
+- The existing tests/contract/test_conformance_client.py now validates the NEW
+  client impl (it goes through weave.publish -> weave.trace.digest).
+
+## Key simplification (verified safe)
+The client's compute_object_digest takes NO builtin_object_class. The client only
+ever digests already-serialized values (weave_client always calls
+compute_object_digest(val) with one arg), and the server's
+compute_object_digest(val, None) reduces -- via process_incoming_object_val(val,
+None), a pure passthrough -- to str_digest(json.dumps(val, sort_keys=True)). So
+the client copy is byte-identical for every input the client produces. The full
+client suite (refs/dedup) confirms it.
+
+## Verification
+- import-linter: 5 contracts / 0 broken (new contract KEPT; no client->shared.digest
+  direct edges remain).
+- conformance: 19 passed (client 6 + server 13, sqlite). client suite:
+  test_weave_client.py + test_dataset.py 95 passed / 13 skipped -- no digest/ref
+  regression. ruff + ty clean.
+
+## Tradeoff (stated to user)
+Deliberate duplication of the digest impl (client weave.trace.digest vs server
+weave.shared.digest). Violates DRY on purpose: independence is the goal; the
+conformance corpus is the safety net that makes the duplication safe (drift fails
+tests/contract).
+
+## Hints for Future Agents
+- weave.shared.digest is now effectively SERVER-owned (server + the fixture
+  generator use it); it moves to core with the server. weave.trace.digest is the
+  client's and stays.
+- The import-linter contract uses allow_indirect_imports=true, so it catches only
+  DIRECT 'from weave.shared.digest import'. The client still transitively loads
+  weave.shared.digest at runtime via weave.shared.__init__'s re-export; fully
+  severing that is a deeper follow-up (don't eagerly re-export digest from
+  weave.shared.__init__) but is not required for the decoupling guarantee.
+- This amend superseded the prior 'add client-side conformance consumer' note on
+  35c03c9022 (now orphaned); scope grew to the decoupling.
+
+## Open Questions
+Whether to also give the SERVER its own digest module (vs keeping
+weave.shared.digest as the server's), and whether to scope message_template /
+validator out of the corpus (they are behaviors, not ser/de). Both raised to the
+user, pending.
+
+## Addendum (user diff comment: contract placement)
+Removed the 'Client must own its serialization (not the shared digest impl)'
+import-linter contract that this PR originally added. User asked why it wasn't
+added earlier with the base contracts; the real issue is it was TRANSITIONAL --
+added here, then removed in the server-digest PR once weave.shared.digest was
+deleted (add-then-remove churn). It also couldn't go in the guard PR (the client
+still imported weave.shared.digest there). Resolution: rely on the structural
+contracts from the guard PR; the client/server digest split is enforced once the
+server PR deletes weave.shared.digest (client !-> trace_server covers the
+server's digest; shared !-> both covers shared). lint-imports stays 4/0 here.

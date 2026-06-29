@@ -1,0 +1,1 @@
+Session CI-fix: re-gated test_filter_calls_by_ref_properties_with_table_rows_simple here — it was un-gated at this costs-usage test commit but FAILS on the fake under CI xdist (passes single-process). Kept gated PR10-17. See PR1 mechanical commit note for full context.

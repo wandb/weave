@@ -1,0 +1,68 @@
+## Conversation
+Slice 2/4 of the REFRAMED Google ADK stack (each PR standalone + tested +
+docs; see slice 1 note on andrew/google-adk-01-plugin-core for the reframe
+context, and the old andrew/adk-ts-02-genai-exclusion note for the original
+research trail).
+
+## Actions
+googleGenAI.ts change restored verbatim from the old stack
+(isAdkInternalClientOptions + constructor-proxy early return). Its test
+(fake GoogleGenAI exports; marked construction unwrapped, plain construction
+wrapped) moved INTO this slice from the old tests PR, plus the AGENTS.md
+gotchas bullet (exclusion sentence only — the agent-callback-gap sentence
+arrives with the hierarchy slice).
+
+## Errors & Mistakes
+First targeted jest run used a wrong path (src/__tests__/googleGenAI.test.ts);
+the real suites are src/__tests__/integrations/googleGenAI.test.ts and
+src/__tests__/genai/ (9 suites, 51 tests — all pass).
+
+## Dead Ends
+Linking instead of excluding (parenting generateContent under the ADK
+call_llm) was rejected in the original session: no ambient correlation
+survives ParallelAgent without owning the global OTel ContextManager, and
+both calls carry usage so rollups would double-count.
+
+## Hints for Future Agents
+- The marker is ADK's BaseLlm.trackingHeaders; if ADK renames the header or
+  drops the 'google-adk/' label the exclusion silently stops and ADK runs
+  start showing duplicate usage. The test in this commit pins the behavior.
+- User-supplied headers merge AFTER trackingHeaders, so a user could
+  overwrite x-goog-api-client and re-enable wrapping inside ADK; not worth
+  defending against.
+
+## Codebase Discoveries
+None beyond the header behavior above.
+
+## Open Questions
+None.
+
+---
+
+# ADDENDUM: transport reworked to the agents OTel endpoint (2026-06-10)
+
+User directive: ADK runs must log to the AGENTS OTel endpoint
+(/agents/otel/v1/traces) so they appear in the Weave Agents view — the
+original calls transport (saveCallStart/End) only fed the Traces page. The
+stack was rebuilt in place (same branch names/positions) with the plugin
+emitting GenAI-semconv OTel spans through getWeaveTracer (shared provider,
+src/genai/provider.ts) — same pipeline as piCodingAgent and the
+openai-agents WeaveOtelTracingProcessor, same conventions as the Python
+google_adk integration (weave/integrations/google_adk: extractors mirrored
+incl. ADK_CAPTURE_MESSAGE_CONTENT_IN_SPANS gate, GOOGLE_GENAI_USE_VERTEXAI
+provider naming, parts-model messages, tool definitions). Calls-era
+versions of these slices: 91e4f038ee^..4fde323b1c history (notes on
+c059413134 / ac1e328342 / d1cab0e03e / 4fde323b1c).
+
+Key mechanics: spans parented via otelTrace.setSpan contexts; plugin
+beforeExit hook registers BEFORE the provider's (listeners fire in
+registration order — dangling spans must end before the provider flush);
+tests inject InMemorySpanExporter via settings.genai.spanProcessor +
+clearWeaveTracerProvider between tests; semconv.ts gained
+gen_ai.agent.description/id + gen_ai.tool.definitions.
+
+## Session addendum — rebase onto master
+Rebased onto origin/master (ba337cff57). Restack hit an import conflict in googleAdk.test.ts: branch 01 dropped the now-unused `import {Settings}` (Settings became a type on master) while this branch had added `import {commonPatchGoogleGenAI}`. Resolved by keeping commonPatchGoogleGenAI (used by the genai-exclusion test) and dropping Settings. Inherited branch 01's assertion shape-refactor + Settings-API migration via the shared beforeEach. Verified 19/19 jest, prettier + eslint clean.
+
+## Session addendum — use semconv constants
+Inherited branch 01's gen_ai.* → ATTR_GEN_AI_* conversion + semconv import via restack (clean, no conflict — the genai-exclusion test adds no gen_ai attribute-key literals). Verified 19/19 jest, prettier + eslint clean.

@@ -1,0 +1,54 @@
+## This commit (2/17 call writes)
+See the stack-wide round-5 note on the prior submission of this branch
+(same content; rebuilt for the round-6 review-comment application).
+
+## Round 6 addendum (review comments applied stack-wide)
+Two review comments asked for consistency: 'Why do you need this
+[client_is_clickhouse] check? Don't we already skip NOT CLICKHOUSE BACKEND
+above?' and 'shouldn't this [isinstance fixture check] use the NOT
+CLICKHOUSE check?'. Applied across every change in the stack:
+- test_calls_complete.py / test_otel_calls_complete.py: wholly
+  ClickHouse-only files -> module-level pytestmark =
+  pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, ...); their
+  clickhouse_trace_server fixtures reverted to plain asserts (unreachable
+  on the fake).
+- test_ttl_insert_paths.py: the four raw-read tests carry the skipif
+  decorator; internal_server fixture reverted to an assert. The
+  endpoints round-trip test keeps running on the fake.
+- conftest ch_server: checks get_trace_server_flag(request) !=
+  'clickhouse' (the authority the skipif string mirrors) instead of
+  isinstance, then asserts the type.
+- test_call_lifecycle.py: a gate the earlier conversion script MISSED
+  (it died on file_storage before reaching it) is now a decorator.
+- test_client_trace dupe-select: split in two — the output-shape
+  assertions run on every backend; a new
+  test_calls_query_dupe_select_columns_no_duplicate_sql carries the
+  skipif and asserts the emitted SQL. GOTCHA: get_calls returns a LAZY
+  iterator — the new test must consume it (len(list(calls))) or no
+  query executes and the log assertion IndexErrors (caught on the CH
+  run).
+- client_is_clickhouse(client) now has exactly ONE user: the
+  force_merge_calls helper in test_call_stats (a capability no-op on a
+  live client instance, not a test gate — markers cannot express it).
+
+## Errors & Mistakes (round 6)
+- A gt track invocation had left HEAD on andrew/fake-ts-01-skeleton; the
+  review edits and several test runs silently ran against the SKELETON
+  module, where every unimplemented method resolves to the
+  TraceServerInterface Protocol stub and returns None. This produced a
+  phantom 'failure' of the dupe-select test (None.digest AttributeErrors)
+  that disappeared on the real top branch. Lesson: ALWAYS check
+  git branch --show-current before diagnosing 'failures' in a
+  multi-branch stack workspace; gt track/checkout moves HEAD.
+- Naive 'insert import after last import line' corrupted a multi-line
+  parenthesized import in test_calls_complete.py (syntax error caught by
+  ruff immediately).
+
+## Verification (final, on the rebuilt top)
+Fake: tests/trace_server 1203/115/0; tests/trace 1664/44/1 (flask,
+pre-existing; the 44th skip is the new CH-only SQL test). ClickHouse:
+all review-edited files re-run green (test_calls_complete,
+test_otel_calls_complete, test_ttl_insert_paths, test_call_lifecycle,
+test_trace_server_conftest, both dupe-select tests = 66 passed, 0
+unexpected skips); genai ch_server consumers skip correctly on fake and
+the conftest fixture change is flag-based.

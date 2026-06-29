@@ -1,0 +1,39 @@
+## Conversation
+Final PR of the v2 stack, per review comments on #7178: the tsi alias (and
+the bindings module's temporary SDK re-export that let migration diffs keep
+their tsi.X references) is a migration step only; this PR removes it.
+
+## Actions
+- Branch was RESET to the amended #7178 tip and the conversion REGENERATED
+  (the previous PR C commit predated the superset-alias amendment and would
+  have conflicted on every import line).
+- Script-converted 18 alias files: collected tsi.X references, partitioned by
+  hasattr(weave_server_sdk.models, X) into SDK vs gap names, emitted two
+  direct import blocks, stripped prefixes; collision-checked per file.
+  Binding: 139 SDK + 67 gap names — explicit by design.
+- Removed the explicit SDK re-export block from bindings/models.py (added in
+  the #7178 amendment); its internal alias became direct named imports.
+
+## Errors & Mistakes
+- Earlier in the amendment: `from weave_server_sdk.models import *` re-export
+  SHADOWED the bindings module's own `import datetime` (the SDK module
+  exports its `from datetime import datetime` import) — broke every
+  datetime.datetime annotation at import time. Star imports of generated
+  modules leak their imports; the re-export had to be an explicit name list.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- If #7178 is amended again, regenerate this PR the same way (reset to the
+  parent tip, rerun the converter) rather than resolving import-line
+  conflicts by hand.
+- Validation: bindings 58/58; trace+flow+compat+utils+session+shared 2137
+  passed; the 10 standing failures are the documented pre-existing set.
+
+## Codebase Discoveries
+- weave_server_sdk.models has no __all__; star-importing it pulls datetime/
+  date/Field/BaseModel/etc. into the importer's namespace.
+
+## Open Questions
+None.

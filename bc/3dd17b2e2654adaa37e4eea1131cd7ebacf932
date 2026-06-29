@@ -1,0 +1,1 @@
+Docs-only tip commit: AGENTS.md updated with the final trace_server structure + a relocation-gotchas note (string refs / __file__ data paths / config paths / multi-line imports). Closes out the move-trace-server-to-core stack. No code change.

@@ -1,0 +1,175 @@
+## Conversation
+User asked (Conductor workspace port-louis, branch andrew/remove-sqlite-trace-server):
+"Remove all traces of the sqlite trace server implementation, including from
+tests, CI, etc." Follow-up: "Put up this PR in draft." No other steering; all
+scope decisions below were mine. The branch name preexisted the work — the
+workspace was created for exactly this task.
+
+## Actions
+1. Inventory: rg -l -i sqlite across the repo (~50 files: weave/, tests/, CI,
+   docs, pyproject, dependabot).
+2. Read the fixture plumbing end-to-end: tests/conftest.py,
+   tests/trace_server/conftest.py (options, get_trace_server_flag,
+   _ch_session_server, get_sqlite_trace_server, trace_server/ch_server/
+   internal_server/require_clickhouse fixtures), tests/trace/util.py
+   (client_is_sqlite), conftest_lib/clickhouse_server.py.
+3. Read CI: test.yaml (per-shard sqlite leg + CH leg with
+   `-m "trace_server and not skip_clickhouse_client"`, windows_trace_tests =
+   sqlite-only), nightly-tests.yaml, nightly-replicated-leg.yaml.
+4. Deleted sqlite_trace_server.py, methods/sqlite_feedback_stats.py,
+   tests/trace_server/test_sqlite_trace_server.py,
+   tests/trace_server/query_builder/conftest.py (existed only to auto-mark
+   query_builder tests skip_clickhouse_client).
+5. orm.py: removed DatabaseType + all database_type params + sqlite branches
+   (ParamBuilder.add placeholder style, _JSON_TEXT_BACKED_COL_TYPES coercion,
+   Insert sqlite SQL, json_extract vs JSON_VALUE, INSTR vs position,
+   json_each vs has()). Removed Column.create_sql, Table.create_sql/drop_sql/
+   truncate_sql (sqlite-server-only; verified no other callers).
+   PreparedInsert lost its `sql` field (CH path never used it).
+6. Updated call sites: clickhouse_trace_server_batched.py (prepare()/
+   tuples_to_rows()), token_costs.py (prepare(param_builder=...)).
+7. threads_query_builder.py: deleted make_threads_query_sqlite.
+8. Test conftest rewrite: --sqlite/--sq gone; get_trace_server_flag is now
+   just --clickhouse shorthand or --trace-server; the
+   `-m "not trace_server"` → sqlite fallback deleted (client-fixture tests
+   are deselected by the marker anyway, so it was nearly-dead);
+   trace_server fixture raises ValueError on non-clickhouse;
+   require_clickhouse fixture deleted (one consumer, real_ch_lock, just
+   dropped the param); internal_server/ch_server simplified to CH-only.
+9. Removed ~115 client_is_sqlite guards across ~30 test files. Bulk
+   mechanical files were delegated to three parallel subagents with explicit
+   edit rules; judgment files done by hand: test_client_trace.py (value
+   conditionals `X if is_sqlite else Y` → CH values; capsys QUERY-SELECT
+   block → CH caplog assertion; force_optimize guard unconditional),
+   test_weave_client.py (sqliteNotFoundError alias removed — it was a
+   re-export of errors.NotFoundError), test_feedback.py (created_at
+   MatchAnyDatetime; `if not client_is_sqlite` DatabaseError expectation now
+   unconditional), test_trace_server_evaluation_apis.py (CH call counts 7;
+   deleted sqlite-only test_eval_subtree_query_excludes_unrelated_top_level_calls
+   — it tested _calls_query_stream_for_eval_subtree which only existed on
+   the sqlite server), test_ttl_insert_paths.py (CH-only helpers,
+   V1/V2_READ_TABLE consts), test_rescore_evaluation.py (dispatcher helper
+   CH-only), test_orm.py / query_builder tests (sqlite dialect tests
+   deleted; test_thread_id_filter_consistency deleted — cross-backend parity
+   is meaningless with one backend; the surviving CH assertion lives in
+   test_thread_id_filter_no_match), test_digest_validation.py (import
+   compute_file_digest from weave.shared.digest, its real home).
+10. skip_clickhouse_client marker: removed ~165 decorators (script: drop any
+    line whose lstrip starts with @pytest.mark.skip_clickhouse_client),
+    pyproject marker registration, all CI -m filters. Deleted
+    test_skip_clickhouse_client (asserted flag != clickhouse — only made
+    sense on the sqlite leg).
+11. CI: removed sqlite steps; moved the sqlite leg's secrets-or-dummy API-key
+    env block onto the CH leg (the newly-included VCR tests ran with that env
+    before); deleted windows_trace_tests job entirely + updated
+    windows-trace-tests-matrix-check needs.
+12. Docs: AGENTS.md testing sections; tests/trace_server/README.md.
+13. Verification (all CH): trace_server shard 1315 passed; trace shard
+    (tests/trace+compat+utils+wandb_interface+session, -n 8,
+    -m trace_server) 946 passed; ORM+query_builder units 501 passed;
+    openai 27/27, anthropic 16, google_genai 39, litellm both files,
+    instructor, bedrock moto, verifiers single — all passed. ruff
+    check+format clean (5 autofixes), `uv run ty check` clean, workflow
+    YAML parses, `-m "not trace_server"` collection still deselects 952.
+
+## Errors & Mistakes
+- BIGGEST: I repeatedly clobbered my own test runs. Single-process pytest
+  sessions all use ClickHouse DB `<base>_test` (xdist workers use _wN), and
+  the session fixture DROPs+recreates that DB at start. Running the
+  trace_server shard in the background while launching openai/flask runs in
+  the foreground produced "3 passed, 24 errors" and "1086 passed, 229
+  errors" that looked like real regressions. All passed once serialized.
+  Future agents: NEVER run two non-xdist pytest sessions concurrently here.
+- My first marker inventory used `| head -60` and I concluded only 5 files
+  used skip_clickhouse_client. A later accidental `rg -rn` (-r is
+  --replace! output-only rewrite, files untouched) revealed ~30 files. The
+  decorator strip then had to be redone repo-wide.
+- Wrong test name guess (test_openai_quickstart_with_stream doesn't exist)
+  plus `| tail` masking pytest's exit code made the first VCR experiment
+  read as a false success ("collected 1 item / 0 ran", exit 0 via tail).
+- `git stash -u` for an A/B check collided with a transient Conductor git
+  index.lock — scary output ("stash entry kept") but no stash was created
+  and the working tree was intact. Switched to `git worktree add` for the
+  A/B instead (clean).
+- Edit-tool friction: my own bulk python rewrites invalidated tracked file
+  state mid-batch (test_orm.py), and Bash `sed -n`/cat reads don't satisfy
+  the Edit tool's read-before-write (test_digest_validation.py,
+  test_rescore_evaluation.py). Re-read via Read tool and reapplied.
+- zsh ate `====FOO` separators in compound commands (treated as glob/eq);
+  use quoted echo markers.
+
+## Dead Ends
+- Considered keeping DatabaseType = Literal["clickhouse"] to minimize churn;
+  rejected — a one-variant Literal threaded through ~10 signatures is dead
+  complexity and "remove all traces" argues for full removal.
+- Considered keeping the skip_clickhouse_client filters and letting marked
+  tests go dormant (zero CI legs would run them). Rejected after empirically
+  proving they pass on CH — ignore_localhost: True (#7097, e902eae664)
+  removed the original VCR-vs-CH conflict. Memory of a 2026-06 nightly
+  failure ("VCR tests broke on CH") predates that fix.
+- gh code search for wandb/core usage of sqlite_trace_server/database_type
+  returned empty (likely submodule indexing limits) — inconclusive; the
+  weave→core mirror CI is the real check.
+
+## Hints for Future Agents
+- pysqlite3 (pyproject langchain extra), libsqlite3-dev apt steps, and the
+  dependabot pysqlite3* entry are for CHROMADB (langchain shard), not the
+  trace server. langchain_test.py sys.modules-swaps sqlite3→pysqlite3 per
+  chroma's troubleshooting doc. Do not remove. Origin: 6c559b71e2.
+- tests/integrations VCR config (ignore_localhost: True, ignore api.wandb.ai)
+  is what makes client-fixture VCR tests CH-compatible. If a VCR test fails
+  on CH with CannotOverwriteExistingCassetteException, check whether the
+  request is to an EXTERNAL host (cassette drift) before blaming CH: the
+  huggingface failure here was huggingface_hub adding
+  ?expand=inferenceProviderMapping, reproducible on any backend.
+- test_flask_server (tests/trace/test_weave_client_threaded.py) fails on
+  this macOS box on a pristine HEAD worktree ("Server disconnected without
+  sending a response") — environmental, not change-related.
+- --trace-server=prod and =http in tests/conftest.py create_client look
+  half-broken (http passes the literal flag as URL) and now ALSO raise in
+  the trace_server fixture for non-clickhouse flags. If anyone needs them,
+  they must bypass/skip the trace_server fixture dependency.
+- windows_trace_tests deletion = Windows loses ALL trace-server-marked test
+  coverage (Linux-container CH can't run on GH Windows runners). If this is
+  unacceptable, options: remote CH service for Windows jobs, or accept
+  trace_no_server-only coverage (chosen here).
+- The trace shard locally needs -m "trace_server" to match CI selection;
+  without it you also pull no-server tests into the CH session.
+
+## Codebase Discoveries
+- pytest_collection_modifyitems in tests/trace_server/conftest.py marks
+  trace_server both by path (tests/trace_server/) AND by fixture usage, so
+  client-fixture tests anywhere get the marker — that's why the
+  `-m "not trace_server"` sqlite fallback in get_trace_server_flag was
+  effectively dead code.
+- PreparedInsert.sql was only consumed by the sqlite path; the CH client
+  inserts via (table, data, column_names).
+- sqlite_trace_server re-exported errors.NotFoundError; tests aliasing it as
+  sqliteNotFoundError were raising/catching the same class twice.
+- compute_file_digest's canonical home is weave.shared.digest.
+- The query_builder tests are pure SQL-string unit tests (no DB); they were
+  marker-skipped on the CH leg purely to avoid double-running.
+
+## Open Questions
+- Does wandb/core's services/weave-trace import sqlite_trace_server or pass
+  database_type= to orm APIs? Mirror CI (bot/weave-mirror/<branch>) will
+  answer; if it breaks, core needs a paired change.
+- Is dropping Windows trace-server coverage acceptable long-term? Flagged in
+  PR body.
+- huggingface cassettes need re-recording for huggingface_hub's
+  ?expand=inferenceProviderMapping (pre-existing, no CI shard runs it).
+
+## Rebase addendum (2026-06-10, 4915b96ff0 -> b8135fe354)
+Rebased onto origin/master picking up #7043 (aggregate feedback endpoint) and
+#7131. Conflicts: (1) sqlite_trace_server.py modify/delete — upstream added a
+NotImplementedError stub for feedback_aggregate; resolved by keeping the
+deletion. (2) test_feedback.py import block — kept upstream's DummyIdConverter
+import, dropped client_is_sqlite. Beyond markers: upstream's new tests
+reintroduced two client_is_sqlite guards (test_feedback_aggregate asserted
+sqlite raises NotImplementedError then returned early; a query-builder test
+skipped on sqlite) — stripped both as part of the resolution, so
+test_feedback_aggregate now exercises the real CH path everywhere. Verified
+post-rebase on ClickHouse: 8 aggregate tests + full test_feedback.py (28
+passed); repo-wide sqlite audit still shows only the chromadb toolchain files.
+Note: notes.rewriteRef is set in this repo, so rebase auto-copies notes — no
+manual notes copy needed after restacks (gt modify may still orphan them).

@@ -1,0 +1,30 @@
+## Conversation
+Phase-1 PR2 of the import-linter decoupling stack. User: vendor what you need, no shared dir, leave codegen-destined files (llm_structured_model + builtin registry) untouched.
+
+## Actions
+- Target ignore: 'weave.trace_server.llm_completion -> weave.prompt.prompt' (symbol format_message_with_template_vars).
+- Read the source: weave/prompt/prompt.py:108-161 (function) + :29-32 (IncorrectPromptVarError). Confirmed the only in-module dependency is IncorrectPromptVarError; no other prompt.py internals used.
+- Two server consumers of the helper: llm_completion.py AND interface/builtin_object_classes/llm_structured_model.py. Repointed ONLY llm_completion.py; llm_structured_model.py left importing the client copy (its ignore on weave.prompt.prompt remains, by design — codegen-destined).
+- Removed import in llm_completion.py:10; added vendored IncorrectPromptVarError + format_message_with_template_vars after the module cache constants (before parse_prompt_reference).
+- Removed the ignore from pyproject.toml.
+
+## Verification
+- lint-imports: 3 kept / 0 broken.
+- ruff: clean.
+- Behavior test: simple substitution, nested multimodal list substitution, and missing-var -> IncorrectPromptVarError all pass on the vendored copy.
+
+## Errors & Mistakes
+None.
+
+## Dead Ends
+Considered a dedicated server module (e.g. weave/trace_server/message_template.py); chose inline-in-llm_completion.py because there is exactly one server consumer (delay-abstraction; llm_structured_model will use the client copy when it moves).
+
+## Hints for Future Agents
+- Do NOT repoint llm_structured_model.py to this vendored copy — that file moves client-side later; repointing now would be throwaway churn and the import would flip back to the client.
+- The vendored copy and weave.prompt.prompt's copy must stay behavior-compatible only insofar as the wire format (message dicts) is shared; both are tiny.
+
+## Codebase Discoveries
+- format_message_with_template_vars skips assistant-role messages at the call site in llm_completion.py (line ~233), not inside the function.
+
+## Open Questions
+None.

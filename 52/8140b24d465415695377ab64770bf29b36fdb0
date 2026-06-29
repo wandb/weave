@@ -1,0 +1,34 @@
+## Conversation
+Top of a 2-branch stack (parent: andrew/rm-orphaned-cassettes). Item #2 of the
+user's "use gt for this" request: "delete the gql stuff". Confirms the user's
+seed hypothesis ("I dont think the wb_schema is used anymore"). After the user
+said "rebase this whole thing off of origin master", this was rebased to sit on
+top of the cassette branch, which sits on the new origin/master.
+
+## What & Why
+git rm of wb_schema.gql (757 lines) + .graphqlrc (1 line). Dead GraphQL tooling:
+- .graphqlrc only points at wb_schema.gql; nothing references .graphqlrc.
+- No other .graphql/.gql operation files exist; no graphql-codegen; no UI in
+  this repo (Browse3 is in the core repo).
+- node SDK uses inline gql strings (wandbServerApi.ts) validated by no build step.
+- No reference in .pre-commit-config.yaml, pyproject.toml, Makefile, noxfile.py.
+- Verified with the Grep tool (NOT bash grep = ripgrep, where `\\|` is literal).
+
+## History / rebases
+- Originally d7d4c3524d on origin/master@120c265879 as a SIBLING of the cassette
+  branch.
+- User wanted both changes together + rebased off origin/master. Restacked:
+  `git rebase --onto andrew/rm-orphaned-cassettes <old-base>` -> new SHA
+  528140b24d, now on top of the cassette commit which is on origin/master@0b3db35cf6.
+  Clean, no conflicts. Note re-added (notes don't follow rebase here).
+
+## State
+- This branch cumulatively deletes all 9 files (7 cassettes + 2 gql).
+  origin/master..HEAD == 2 commits.
+- gt: parent = andrew/rm-orphaned-cassettes (shows clean +1). The bottom branch
+  shows a cosmetic ~175 due to stale LOCAL master (checked out in main worktree,
+  unmovable from here); GitHub PRs (base master) will be clean.
+- Not pushed/submitted.
+
+## Open Questions
+None.

@@ -1,0 +1,41 @@
+## Conversation
+Second half of 'implement the rest of those' — enable the deferred tests.
+
+## Actions
+Un-gated (removed skipif(FAKE_NOT_IMPLEMENTED) + now-unused imports) and verified
+on --trace-server=fake:
+- test_monitor_create_rejects/accepts (needs the feat-commit validation)
+- test_refs_read_batch_missing_refs_reports_digests (needs feat-commit impl)
+- test_agent_user_feedback (ALREADY worked — passed unchanged)
+- test_filter_calls_by_ref_properties_with_table_rows_simple (ALREADY worked)
+- test_declarative_eval_marks_child_calls_with_eval_meta + _merges_with_existing
+  (ALREADY worked — _weave_eval_meta is set client-side by the Evaluation
+  wrapper; the fake stores/returns call attributes faithfully)
+Re-tagged FAKE_NOT_IMPLEMENTED -> NOT_CLICKHOUSE_BACKEND (permanent, not pending):
+- test_lock_acquire_release_real_clickhouse (uses a real ClickHouse lock)
+- test_flask_server (see below)
+
+## Errors & Mistakes
+- I assumed test_flask_server was backend-agnostic and un-gated it; it FAILED on
+  the fake: httpcore.RemoteProtocolError 'Server disconnected without sending a
+  response' + a SystemExit:1 thread exception. Root cause: the flask route calls
+  weave.publish() inside a werkzeug request thread, where the in-process fake
+  client is not reachable. A served backend (CH in tests) doesn't have this. So
+  it's an architectural limit, not a missing fake capability -> NOT_CLICKHOUSE_BACKEND.
+
+## Hints for Future Agents
+- 3 of the 5 'portable gaps' were over-conservative skips, not real gaps. When a
+  FAKE_NOT_IMPLEMENTED test looks portable, just un-gate and run it on the fake
+  before writing any impl.
+- FAKE_NOT_IMPLEMENTED now has ZERO skipif usages (only the doc comment in
+  tests/trace/util.py). The alias is left defined for future capability gating.
+
+## Codebase Discoveries
+- FAKE_NOT_IMPLEMENTED == NOT_CLICKHOUSE_BACKEND (same condition string); the
+  names encode intent (temporary-pending vs permanent-CH-only).
+
+## Open Questions
+- Whether to delete the now-unused FAKE_NOT_IMPLEMENTED alias from util.py.
+
+## Follow-up (CI fix, PR #7337)
+Re-gated test_filter_calls_by_ref_properties_with_table_rows_simple back to FAKE_NOT_IMPLEMENTED (CH-only). CI (Py3.13, full trace shard, -n4) failed it with 'assert 15 == 16': the target=16 row's inputs.example ref intermittently resolves to null at query time under the concurrent Evaluation, sorting it into the NULLS-LAST group (desc calls[1] becomes 15). Passed locally 50+ times (isolated, CPU-contended, and -n4) — unreproducible. The fake's sort/resolve path is deterministic given stored data (_resolve_ref_str_for_filter returns None gracefully); the nondeterminism is in eval-concurrency data production, not the fake query. Re-gated rather than mask with reruns (none configured: addopts='-v') or guess an unverifiable fix. This was the only test un-gated in that file by the PR, so the change reverts the file to its pre-PR state.

@@ -1,0 +1,25 @@
+## Conversation
+PR 5 of the ts-split stack: small server->client lifts (templating + AgentSpanOpName), mined from v2 commits 223a8fbf39 (small-lifts) and the rm-shared-message-templating endpoint, adapted to the twin architecture.
+
+## Actions
+- weave/shared/message_templating.py + server twin: function + exception extracted verbatim from weave/prompt/prompt.py; prompt.py re-exports (noqa F401) and its Prompt.format_message delegates as before.
+- weave/shared/agents/op_names.py + server twin (v2's file content + twin-aware docstring); flow/monitor.py re-exports.
+- kafka_events -> weave.trace_server.agents.op_names; llm_completion -> weave.trace_server.shared.message_templating; flow/llm_structured_completion_model -> weave.shared.message_templating.
+- TWIN_FILES += 2 pairs; pyproject contract-2 -= 2 entries.
+
+## Errors & Mistakes
+- First twin docstring named BOTH sides' dotted paths -> the conformance path-map rewrote the server's own path into the client's, producing a doubled string and a gate failure. Twin docstrings must be PATH-INVARIANT under the map ("each own a copy of this module"), or use only client-side paths. Gate caught it immediately.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- When authoring twin files by hand, never mention the server-side dotted path in prose; the normalizer maps weave.trace_server.shared.->weave.shared. and weave.trace_server.->weave.shared. in BOTH code and comments.
+- v2's note for this commit documents why the Content lift was deferred there: image_completion uses Content.from_url -> weave.utils.http_requests -> weave.trace.{display,env,settings}. That decoupling is THIS stack's PR 6; do not attempt it as a simple lift.
+- Test coverage for the lifted symbols lives in tests/flow/test_prompt.py (62 passed incl llm_completion + agent_scorer_event_producer + llm_structured).
+
+## Codebase Discoveries
+- grep for AgentSpanOpName consumers found only flow.monitor + kafka_events + tests via re-export; no direct client imports needed rewiring beyond the re-export.
+
+## Open Questions
+None.

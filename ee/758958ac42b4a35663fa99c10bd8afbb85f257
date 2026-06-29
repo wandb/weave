@@ -1,0 +1,50 @@
+## Conversation
+User: "This integration feels like it may be blocking the user process.
+Please confirm if that's true and if it is, ensure that it doesn't block...
+you can upload in a background thread." Investigated empirically rather
+than asserting; found the run path non-blocking but process EXIT held
+hostage by the exporter's idle keep-alive socket.
+
+## Actions
+Experiment script (3 ADK invocations via InMemoryRunner + ScriptedLlm,
+inline HTTP server as the agents endpoint) in four modes:
+- baseline (no weave.init): agent loop 10ms, exit 23ms after done
+- fast endpoint: loop 16ms, beforeExit fired +2ms, but EXIT +6017ms
+- slow endpoint (3s/response): loop 17ms (!), exit +9012ms
+- handle dump after flushOTel (9ms): one ref'd client Socket to the
+  endpoint remained; loop could not drain until the SERVER closed it
+  (node http server default keepAliveTimeout 5s → the ~6s constant).
+Mechanism: beforeExit cannot fire while a ref'd handle exists, so even the
+provider's shutdown hook waits on the socket. Fix: keepAlive:false on the
+OTLP exporter in src/genai/provider.ts buildOtlpExporter.
+
+## Errors & Mistakes
+None; the 6s constant was initially mysterious until the active-handles
+dump identified the keep-alive socket (the 9012ms slow case = 3s shutdown
+flush + ~6s socket linger, corroborating).
+
+## Dead Ends
+- Unref'ing the socket instead of disabling keep-alive: node's http.Agent
+  is supposed to unref free-pool sockets, but the exporter's socket stayed
+  ref-holding in practice; no exporter config exposes socket refs, and
+  reaching into transport internals is fragile. keepAlive:false is the
+  robust, supported knob (flows into httpAgentOptions).
+
+## Hints for Future Agents
+- "Integration blocks the process" reports for Node SDKs: check EXIT
+  behavior, not just run-path latency. process._getActiveHandles() after
+  the workload + hasRef() identifies the holder.
+- The run path was never blocking: span building is in-memory; OTLP export
+  is async event-loop I/O (node's equivalent of a background thread); a
+  3s/request endpoint did not slow the 17ms agent loop.
+- This affects all agents-endpoint emitters (ADK, pi, openai-agents otel),
+  which is why the fix sits below the ADK stack as its own PR.
+
+## Codebase Discoveries
+- BatchSpanProcessor unrefs its flush timer (core unrefTimer), and the
+  weave client's call batcher only schedules timers when calls are queued —
+  neither holds the loop; the socket was the sole culprit.
+
+## Open Questions
+- Hung-endpoint exit bound is the exporter's request timeout (default 10s);
+  acceptable, not configurable via our settings today.

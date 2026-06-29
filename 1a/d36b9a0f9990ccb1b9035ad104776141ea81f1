@@ -1,0 +1,30 @@
+## Conversation
+Step 5 (final): move SQLite impl into sqlite_trace_server/. Amended to also fix a __file__-relative
+data-file path the structural moves broke.
+
+## Actions
+- git mv sqlite_trace_server.py -> sqlite_trace_server/__init__.py (package form preserves the
+  import path weave.trace_server.sqlite_trace_server exactly; zero importer/string-ref repointing).
+
+## Errors & Mistakes (file-path category — NOT imports/strings)
+- Final broad functional run (tests/trace on sqlite) caught 5 cost tests FileNotFoundError:
+  sqlite_trace_server/__init__.py:213 `_DEFAULT_COSTS_FILE = Path(__file__).parent / "migrations" /
+  "006_seed_costs.up.sql"`. The SQLite impl reuses the ClickHouse cost-seed migration for default
+  costs. That path broke because migrations/ moved to clickhouse_trace_server/ (PR4) AND sqlite moved
+  into a subdir (PR5). Fixed -> Path(__file__).parent.parent / "clickhouse_trace_server" /
+  "migrations" / "006_seed_costs.up.sql". All 5 pass.
+  THIRD codemod-gap category (after import-statements and string-module-refs): __file__-relative DATA
+  FILE paths that cross the new dir boundaries. All other __file__ paths in trace_server stayed within
+  clickhouse_trace_server/ (migrator->migrations, costs->json, model_providers->json moved together,
+  so preserved). Only sqlite->migrations crossed.
+- This was latent since PR4 (migrations move); I only caught it in PR5's broad run because PR4's
+  functional set didn't exercise sqlite cost-seeding. Fixed at the tip; could be pushed down to PR4.
+
+## Hints for Future Agents
+- After moving modules with DATA files (.sql/.json) or cross-module __file__ paths: grep `__file__`,
+  `os.path.dirname`, `Path(__file__)` and check every path that traverses to a sibling dir.
+- NEW sqlite->clickhouse_trace_server coupling (the cost-seed file). Added to the deferred-couplings
+  review list.
+
+## Open Questions
+- Stack-review deferred items: see PR3/PR4 notes + this cost-seed coupling.

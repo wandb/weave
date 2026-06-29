@@ -1,0 +1,72 @@
+## Conversation
+
+The user is reviewing the larger `andrew/adk-otel-integration` branch
+(Google ADK ↔ Weave OTel integration) and asked the agent to spin up a
+subagent to figure out which parts of that branch should split into
+separate PRs in the stack. The user agreed the SEMCONV mechanism is the
+clearest candidate to peel off — the rest (pyproject.toml dep bump + the
+ADK integration code) stay together.
+
+The user said: "I think it's okay to have one big PR for the core Google
+ADK stuff but for example things like SEMCON could probably be a
+separate PR." Then: "Okay I would condense PR2 and PR3 into a single PR
+but please split up the first PR into a separate thing. You can go
+ahead and create the PR for me."
+
+## Actions
+
+1. `git fetch origin master` — confirmed origin/master at c07904dd was
+   ahead of local master (40cb57e4). Branch off origin/master, not local
+   master.
+2. `git checkout -b andrew/adk-otel-semconv-aliases origin/master`
+3. `git checkout andrew/adk-otel-integration -- weave/trace_server/agents/semconv.py`
+4. Confirmed staged diff was exactly the semconv changes (no other
+   files snuck in).
+5. Ran `tests/trace_server/test_genai_semconv.py` — both
+   `test_all_attribute_constants_are_registered` and
+   `test_filterable_columns_reference_registered_attributes` pass.
+6. `uvx ruff check` clean.
+
+## Errors & Mistakes
+
+None on this branch. The earlier subagent flagged two suspicious hunks
+in `pyproject.toml` on the parent ADK branch (`current_version`
+0.52.39-dev0→0.52.40-dev0 and `[tool.uv.workspace] members =
+["trace_server_mock"]`). Verified those are already on origin/master at
+0.52.42-dev0 — they're stale-branch artifacts on `andrew/adk-otel-integration`,
+not anything we added. They'll drop out when the ADK branch is rebased
+onto current origin/master.
+
+## Dead Ends
+
+None.
+
+## Hints for Future Agents
+
+- This branch is the bottom of a stack. The parent
+  `andrew/adk-otel-integration` (ADK ↔ Weave OTel integration) emits
+  `gen_ai.usage.reasoning.output_tokens` as the canonical wire name and
+  *does not need* `additional_aliases` to function. The aliases preserve
+  (a) old stored data using `gen_ai.usage.reasoning_tokens` and (b)
+  ADK-native (un-Weave-patched) spans that emit
+  `gen_ai.usage.experimental.reasoning_tokens`. So this PR is a soft
+  dependency for ADK — useful but not gating.
+- The mechanism is generic; future naming drift cases register more
+  `additional_aliases` without further plumbing.
+- Local `master` was stale (40cb57e). Always branch off `origin/master`
+  when carving a child PR out of a long-lived feature branch in this
+  repo — local master can lag origin by days.
+
+## Codebase Discoveries
+
+- The `Attribute` dataclass already had a `gen_ai_alias: str = ""`
+  field for the upstream OTel name. Adding `additional_aliases:
+  tuple[str, ...] = ()` is a strict superset; one ADK-driven naming
+  migration paid for plumbing that any future migration can reuse.
+- `_build_filterable_lookup()` was the third site that needed alias
+  awareness (after `lookup_keys` and `_ALIAS_TO_CANONICAL`) — easy to
+  miss when reading the patch.
+
+## Open Questions
+
+None. The PR is self-contained, tests pass, lint clean.

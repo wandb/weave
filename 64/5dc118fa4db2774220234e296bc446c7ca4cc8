@@ -1,0 +1,33 @@
+## Conversation
+Continuation of the ts-v2 shared-cleanup. User: "move the agents code too -- it should be in another PR on the stack." This is PR7, stacked on andrew/ts-v2-server-worker-shared (PR6).
+
+## What & why
+The GenAI/agent observability API is server-only. Evidence: client bindings (RemoteHTTPTraceServer/stainless) implement ZERO agent methods; no weave-client module calls any agent query; the only consumers are weave.trace_server.* (query builders, OTel extraction, chat_view, clickhouse impl) + core's agent_scoring_worker. It lived in weave/shared ONLY because the monolithic TraceServerInterface(Protocol) typed 9 agent methods using agent_types, and types.py is fused with schema/semconv/constants (it imports all three). So ~1900 lines of ClickHouse schema + GenAI semantic conventions + query-builder constants sat in the client SDK's dependency closure.
+
+## Actions
+- git mv weave/shared/agents/{types,schema,semconv,constants}.py -> weave/trace_server/agents/ (joins existing chat_view/clickhouse/kafka_events/playground/helpers). op_names.py + __init__.py STAY in weave/shared/agents (op_names is genuinely shared: flow.monitor client + trace_server kafka_events server both import it).
+- Removed the 9 agent method stubs (L3055-3081) + `from weave.shared.agents import types as agent_types` from weave/shared/trace_server_interface.py; left a comment pointing to the new server-side interface. (These were `...` stubs in a Protocol, not abstractmethods, so removal is type-safe; bindings never implemented them.)
+- New weave/trace_server/agents/interface.py: AgentsTraceServerInterface(Protocol) with the 9 methods, importing agent_types from weave.trace_server.agents.types.
+- ClickHouseTraceServer + ExternalTraceServer now inherit (tsi.FullTraceServerInterface, AgentsTraceServerInterface). SqliteTraceServer does NOT (it implements 0 agent methods -- this is more correct than the old state where it inherited them via the shared Protocol).
+- external_to_internal_trace_server_adapter.py referenced tsi.agent_types.* (relying on the contract re-exporting agent_types). Added a direct `from weave.trace_server.agents import types as agent_types` and replaced tsi.agent_types. -> agent_types. (sed, 18 refs).
+- Repointed ~12 server modules + ~14 test files from weave.shared.agents.{types,schema,semconv,constants} -> weave.trace_server.agents.* via zsh-safe `grep -rl | while read | sed`. ruff --fix sorted imports.
+- Fixed tests/trace_server/test_trace_server_interface_util.py: 2 genai_otel_export tests did MagicMock(spec=tsi.FullTraceServerInterface) then called .genai_otel_export -- now spec=AgentsTraceServerInterface (mechanism adapted, intent preserved).
+
+## Errors & Mistakes
+- FIRST sed loop used `for f in $FILES` -- zsh does NOT word-split unquoted vars, so sed got the whole newline-blob as one filename ('File name too long') and changed nothing. Caught by re-grep (all refs still present). Redone with `grep -rl ... | while IFS= read -r f; do sed -i '' ... "$f"; done`.
+- Initial smoke test used issubclass() on a non-runtime_checkable Protocol -> TypeError. Re-verified via `AgentsTraceServerInterface in Cls.__mro__` instead.
+- The 5 genai mock-spec failures (see above) -- spec'd against the old interface that no longer had genai_otel_export.
+
+## Verification
+- lint-imports: 4 contracts kept, 0 broken (shared no longer imports weave.trace_server.agents).
+- Smoke: agents modules import; CH+adapter in AgentsTraceServerInterface.__mro__; tsi has no agent_types; contract clean.
+- pytest sqlite: 133 passed/3 skipped across test_genai_*, query_builder/test_agent_*, test_agent_*, test_trace_server_interface_util. ruff clean.
+
+## Hints for Future Agents
+- agent_types is NO LONGER on weave.shared.trace_server_interface (no tsi.agent_types). Import from weave.trace_server.agents.types.
+- AgentsTraceServerInterface (weave.trace_server.agents.interface) is the server-side contract for agent endpoints; FastAPI/core should type against it. It is a non-runtime_checkable Protocol (no isinstance/issubclass).
+- CORE BREAKAGE (deferred): core's agent_scoring_worker + any FastAPI agent routes import weave.shared.agents.{types,schema,semconv,constants} -> break on submodule bump; paired core PR must repoint to weave.trace_server.agents.*. (op_names path is unchanged.)
+- types.py keeps a TYPE_CHECKING import of ProcessedResourceSpans from weave.shared.trace_server_interface and a runtime import of weave.shared.interface.query.Query -- both legal server->shared edges, no cycle (shared no longer imports agents).
+
+## Open Questions
+None. Remaining shared over-promotions deliberately NOT moved: url_safety (shared Provider schema validator uses it), trace_server_interface_util (pre-existing + client tests use it). validation_util borderline (errors.py registers CHValidationError).

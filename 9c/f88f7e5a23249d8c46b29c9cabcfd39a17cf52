@@ -1,0 +1,49 @@
+## Conversation
+PR3 of the SDK-uptake stack (plan: .context/sdk-uptake-plan.md). Per Codex
+review, shared-leaf moves land BEFORE the client/server seam retype so the
+later client-code migration (PR5) only has to think about tsi -> sdk models.
+
+## Actions
+- git mv'd ids/constants/feedback_types/trace_server_converter into
+  weave/shared; wrote star-import shims at the old paths (star is deliberate:
+  pure constant/function modules, zero-maintenance shims; noqa F403).
+- Split errors.py: exception classes + ErrorCode + _describe_object_class to
+  weave/shared/errors.py; weave/trace_server/errors.py keeps the
+  ErrorRegistry/handlers and re-imports the classes explicitly (identity
+  preserved — verified `e.NotFoundError is shared.NotFoundError`).
+- trace_server_converter's own InvalidExternalRef import flipped to
+  weave.shared.errors (no shared -> trace_server edge).
+- sed-swapped client imports in 14 files (weave/trace, chat, evaluation,
+  integrations, utils, trace_server_bindings).
+
+## Errors & Mistakes
+None of substance; ruff --fix cleaned 15 import-sort/format issues from the
+mechanical sed edits.
+
+## Dead Ends
+- Originally planned weave/utils as the target. Discovered weave/shared/
+  already exists ("Utilities shared between the Weave client and trace server
+  implementations" — digest, refs_internal, object_class_util, pydantic_util)
+  — the converter already imported weave.shared.refs_internal. Used it.
+- Considered moving common_interface (SortBy etc.) too; skipped — PR5 replaces
+  client usage with weave_server_sdk models, so a move would be churn.
+
+## Hints for Future Agents
+- Exception identity matters: client `except NotFoundError` must catch what
+  the in-process servers raise. Single definition in weave/shared/errors.py,
+  re-imported by the server module — do NOT duplicate class definitions.
+- The old import paths are kept indefinitely (core repo + external code may
+  import them). Tests intentionally still use old paths in places — they're
+  exempt from the upcoming lint.
+- Server-side imports deliberately NOT updated (Codex scope-cut to keep the
+  stack reviewable). A later cleanup can flip them.
+
+## Codebase Discoveries
+- weave/shared/__init__.py re-exports digest helpers only; submodules are
+  imported directly elsewhere (from weave.shared import refs_internal) — new
+  modules follow that pattern, no __init__ changes needed.
+- All names imported from the moved modules across the repo are public, so
+  star-import shims lose nothing.
+
+## Open Questions
+- None.

@@ -1,0 +1,44 @@
+## Conversation
+User asked (after I enumerated the remaining fake-backend gaps): "Ok start
+implementing the rest of those." 'Those' = the portable FAKE_NOT_IMPLEMENTED
+gaps on the in-memory fake trace server. This commit is the real-implementation
+half (the other half is the test-enable commit on top).
+
+## Actions
+- Built a py3.12 test venv (system python is 3.14, which breaks tiktoken):
+  uv venv --python 3.12 --clear && uv sync --group test. Verified fake import.
+- Monitors: CH obj_create calls validate_monitor_query_fields(base, leaf, val)
+  (clickhouse_trace_server_batched.py:2002) right after validate_expected_digest.
+  That helper (calls_query_builder/monitor_query_validation.py) is fully
+  backend-agnostic — it compiles the query via process_query_to_conditions to
+  surface bad fields (InvalidFieldError w/ allowed list) or structural errors
+  (InvalidRequest), and early-returns for non-Monitor/opaque/absent queries. So
+  the fake just had to call it identically; digest_result already carries
+  base/leaf_object_class + processed_val. Drop-in.
+- refs_read_batch: mirrored CH:5830 — collect ALL missing base-object digests
+  and raise RefObjectsNotFoundError(msg, missing_object_digests) instead of the
+  old per-ref NotFoundError. Added _obj_ref_target_exists() which checks
+  existence INCLUDING soft-deleted (a deleted object is 'found' and reads back
+  as None via _read_internal_obj_ref, NOT missing) — matches CH include_deleted.
+
+## Errors & Mistakes
+None in the impl. (The test-enable commit's note records the bigger surprise:
+3 of the 5 'gaps' were already implemented — over-conservative skips.)
+
+## Hints for Future Agents
+- validate_monitor_query_fields runs on EVERY obj_create; it early-returns for
+  non-Monitor objects, so the cost is one isinstance-ish check. Don't gate it.
+- _obj_exists() excludes soft-deleted; do NOT use it for ref-missing detection
+  (a deleted object would wrongly be 'missing'). Use _obj_ref_target_exists.
+- RefObjectsNotFoundError(message, missing_object_digests: list[str]) — the test
+  asserts on .missing_object_digests.
+
+## Codebase Discoveries
+- monitor_query_validation is deliberately backend-agnostic (no DB call; pure
+  query compilation), so the fake reuses it verbatim.
+
+## Open Questions
+None.
+
+## Follow-up (CI fix, PR #7337)
+ruff-format reflowed the _obj_ref_target_exists lambda (wrapped predicate in parens). No behavior change; CI 'Python lint' (ruff-format hook) was the only lint failure (mypy + ruff check passed).

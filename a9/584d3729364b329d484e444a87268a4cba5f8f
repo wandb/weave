@@ -1,0 +1,55 @@
+## Conversation
+Part of fixing issue #5479 (litellm.responses/aresponses autopatch). User: don't
+post to GH, use a gt stack. This is the BASE of a 2-PR stack; the litellm feature
+(andrew/litellm-responses-5479) is stacked on top.
+
+## What this commit does
+Hardens client-side usage-summary computation in weave_client.finish_call. The
+dict-output branch used to splat `original_output["usage"]` into the per-model
+summary whenever the output dict had "usage" and "model" keys, assuming usage was
+a mapping. Now it guards `isinstance(usage, dict) and isinstance(model, str)` —
+exactly mirroring the sibling object-output branch a few lines below, which
+already had this guard. The dict branch missing it was accidental asymmetry.
+
+## Why (root cause)
+Discovered while probing the litellm responses feature: a streaming Responses
+call abandoned before its terminal `response.completed` event leaves the
+accumulator holding an in_progress object whose usage is None. model_dump()
+produces {model: ..., usage: None, output: []}. The old code did
+`{**original_output["usage"]}` = `{**None}` -> TypeError: 'NoneType' object is
+not a mapping. The error was caught (weave/trace/util.py logs "Error closing
+iterator, call data may be incomplete") and NOT propagated to user code, BUT the
+call was left in RUNNING status with no output/usage recorded — a corrupted,
+incomplete trace.
+
+## How verified
+- Reproduced with a throwaway partial-stream cassette + the real `client`
+  fixture: confirmed RUNNING/ended_at=None + the logged TypeError before the fix.
+- Regression test `test_call_summary_with_null_usage` in tests/trace/test_client_trace.py:
+  an op returning {"output_val": 30, "usage": None, "model": "some-model"} now
+  finishes cleanly (ended_at set, exception None, output recorded) with no usage
+  summary. Modeled on the neighboring test_call_read_with_unkown_llm.
+- Existing usage/cost/summary tests in test_client_trace.py still pass (10),
+  plus all litellm tests (sqlite).
+
+## Design decision (Codex consult, threadId 019ebd12-e158-7120-9c1b-fe23a4a3020e)
+Option A (fix core, this commit) vs Option B (contain in litellm via a
+responses-specific exclude_none post-processor like the openai integration).
+Codex endorsed A as a narrow base PR: it's a genuine latent core bug affecting
+ANY integration emitting partial/null usage in a dict output; the sibling branch
+proves the intended invariant; blast radius is favorable (only stops fabricating
+summaries from non-dict usage). Used Codex's cleaner form (extract usage/model
+locally, single isinstance guard) rather than padding the elif condition.
+
+## Behavior-preservation argument
+Plain dicts were ONLY ever handled by this branch (the object branch uses
+attribute access — `hasattr(dict, "usage")` is False). So routing all dicts here
+and guarding internally is equivalent for the happy path (usage dict + model str
+still enters) and strictly safer otherwise (usage=None / non-dict / non-str model
+now skip instead of crash). Pydantic BaseModel is not a dict subclass, so no
+overlap with the object branch.
+
+## Open questions / notes
+- Kept the PR deliberately narrow (one guard + one regression test), per Codex's
+  caution not to refactor broader summary logic.
+- NOT pushed (push needs explicit go-ahead).

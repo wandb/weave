@@ -1,0 +1,33 @@
+## Conversation
+User: "go ahead and make the full stack" (steps 2-4 of the trace_server->core
+reorg). I flagged the scale + that only sqlite is validatable here (no Docker for
+ClickHouse). Proceeding via move+shim+repo-wide-rewrite (behavior-preserving).
+
+## Actions
+- Wrote a reusable mover .context/reorg.py (git mv + repo-wide import rewrite,
+  Form A `weave.trace_server.X` and Form B `from weave.trace_server import X`,
+  + file re-export shims; flags Form-B-multi for manual handling).
+- Ran it for the ClickHouse CORE FILES (this commit). 31 files had imports
+  rewritten; 0 Form-B-multi flags. ruff --fix fixed 3 I001.
+
+## Verification
+- Import smoke: `import weave`, new canonical paths, and OLD shim paths all OK;
+  ClickHouseTraceServer importable via the old path (core symlink compat).
+- pytest (sqlite): tests/trace_server/query_builder/ + test_orm +
+  tests/trace/test_client_trace = 634 passed, 8 skipped.
+
+## Hints for Future Agents
+- Reuse .context/reorg.py for subsequent chunks: edit MOVES. It currently
+  handles FILES only; PACKAGE moves (calls_query_builder/, query_builder/,
+  clickhouse/, etc.) need package shims (old dir + per-submodule re-export) -
+  extend the script before moving packages.
+- Mixed packages (agents/: types/schema/constants/semconv are interface-ish and
+  imported by tsi; clickhouse/chat_view/kafka_events are CH impl), (workers/:
+  evaluate_model_worker used by sqlite too), (methods/: sqlite_feedback_stats is
+  sqlite, feedback_stats is CH, evaluation_status shared) - DO NOT move wholesale.
+- CH runtime NOT validated here (no Docker); move+shim doesn't change CH logic,
+  but confirm in CI before merge.
+
+## Open Questions
+- agents/types is part of the contract (tsi imports it) but wasn't moved to
+  interface/ in step 1 - revisit whether it belongs in interface/.

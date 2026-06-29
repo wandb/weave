@@ -1,0 +1,44 @@
+## Conversation
+Part 5/8 of the fake trace server stack (split of the verified monolith;
+full history in the note on backup/fake-ts-monolith).
+
+## Actions
+Segments: the compiled query/sort machinery (_compile_calls_query,
+_compile_calls_field, _compile_feedback_field, _compile_calls_sort_field),
+affinity + inferred-cast helpers, _CALLS_* column constants, filter
+matching/validation, calls_query and its read-path siblings (call_read,
+streams, calls_query_stats, call_stats, trace_usage, calls_usage,
+threads_query_stream), _expand_refs, _apply_aggregations.
+
+## Errors & Mistakes
+From the original build (the code here carries the fixes):
+1. Column AFFINITY was the biggest semantic gotcha: started_at > <numeric
+   literal> must convert the literal to TEXT (sqlite affinity rules), or a
+   real test (test_calls_query_stats_started_at_window_excludes_deletes)
+   returns 3 instead of 0. Storage-class ordering alone is WRONG for plain
+   columns.
+2. Filter length validation originally lived in the per-record matcher and
+   never fired on empty stores; it is hoisted to _validate_calls_filter.
+3. The first evaluator interpreted the AST per record — 2.5x SLOWER than
+   sqlite. The compile-once closure design here is the fix (1.4x+ faster);
+   do not regress to per-row interpretation.
+
+## Dead Ends
+See monolith note (per-record interpreter; copy.deepcopy on hot paths).
+
+## Hints for Future Agents
+- Literal handling mirrors SQL rendering: bool literals become 1/0,
+  dict/list literals compare as minified JSON text.
+- $eq with literal None is IS NULL; NOT(NULL) is NULL (filtered out) — SQL
+  three-valued logic, not Python truthiness.
+- turn_ids in CallsFilter is intentionally ignored (sqlite parity).
+- LIMIT quirks ported exactly: limit 0 or negative = unlimited; offset <= 0
+  ignored.
+- summary.weave.trace_name is sortable but NOT queryable (sqlite parity —
+  the query-side transform lacks the trace_name CASE).
+
+## Codebase Discoveries
+See the monolith note.
+
+## Open Questions
+None for this chunk.

@@ -1,0 +1,23 @@
+## Conversation
+Spun off from the weave-instrument skill work. Dan asked on Slack (thread p1782508728616839) whether the SDKs print a Weave URL on init, because the skill's "Verify" step told agents to watch for a printed link. Investigation found an asymmetry: Python's weave.init() prints "View Weave data at <url>" but the Node SDK printed only "Initializing project: <entity>/<project>" with no URL. User: "Make a stacked PR where you fix the TS to do what python does, then change this skill back to be more appropriate." This is the bottom PR of that stack; the skill PR (#7370) stacks on top and depends on it.
+
+## Actions
+- sdks/node/src/clientApi.ts:140 — changed `console.log(\`Initializing project: ${projectId}\`)` to `console.log(\`View Weave data at https://${domain}/${projectId}/weave\`)`.
+- Confirmed Python's format: weave/trace/init_message.py:119 prints `f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"` (→ https://wandb.ai/<entity>/<project>/weave) via logger.info, called unconditionally from weave_init.py:278.
+- `domain` and `projectId` are both already in scope in init(): destructured from getWandbConfigs() (clientApi.ts:87) and built at :101. No new imports.
+- urls.ts: defaultDomain='wandb.ai' (:4); domain = isDefaultBaseUrl ? defaultDomain : resolvedHost (:65). So on the default base URL the Node line is byte-identical to Python's; on a custom host it correctly uses that host.
+
+## Errors & mistakes
+None. One-line change.
+
+## Verification
+- `grep -rn "Initializing project" src test` → no references; no test asserts the old string, so nothing breaks.
+- prettier@3.3.3 --config sdks/node/.prettierrc --check src/clientApi.ts → clean (line is ~74 cols, not wrapped).
+- Type-safe: both interpolated values are `string`.
+
+## Hints & warnings
+- This is the BOTTOM of a 2-PR gt stack on base 56eaf74797 (= origin/master at the time). The skill PR #7370 sits on top and its "Verify" guidance now assumes Node prints the URL — do not merge the skill PR ahead of this one or that guidance is wrong again.
+- Did NOT run the full Node build/jest here (node on PATH is a bun shim per repo notes; jest needs nvm node). The change is trivially type-safe and prettier-clean; CI will run the SDK suite.
+
+## Open questions
+None.

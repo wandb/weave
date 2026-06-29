@@ -1,0 +1,56 @@
+## Conversation
+User asked: "Should the server itself verify that it passes the conformance
+tests? Maybe you already do that?" This is the follow-up to PR7 (the
+cross-language ser/de conformance corpus). PR8 = andrew/ts-v2-conformance-server,
+stacked on andrew/ts-v2-conformance-corpus.
+
+## Investigation (the answer)
+Grepped weave/trace_server for digest computation. BOTH server impls compute
+ALL digests via the same weave.shared.digest functions the corpus pins:
+- sqlite_trace_server.obj_create:1897 / clickhouse:1917,2030 ->
+  compute_object_digest_result(req.obj.val, req.obj.builtin_object_class)
+- table_create -> compute_row_digest + compute_table_digest (sqlite:2369/2442,
+  clickhouse:2487/2542)
+- file_create -> compute_file_digest (sqlite:2813, clickhouse:5936)
+- object_creation_utils.py:8 imports compute_file_digest/compute_object_digest.
+So there is ONE canonicalization implementation by design (digest.py docstring:
+"centralizes digest calculation logic to ensure consistency between the client
+and server"). The PR7 library test therefore already verifies the exact code the
+server runs -- but it calls the functions directly, not through the write path.
+Gap: nothing asserted that a real obj_create/table_create/file_create returns the
+corpus digest, i.e. corpus == server was implied by a code-read, not asserted.
+
+## Actions
+- Read the existing round-trip harness tests/trace/data_serialization/
+  test_serialization_correctness.py (seed_legacy_data: obj_create returns
+  obj_res.digest; file_create returns file_res.digest) for the API pattern.
+- Confirmed ObjSchemaForInsert (trace_server_interface.py:323) carries
+  builtin_object_class:327; TableCreateRes:1094 returns row_digests:1105.
+- Wrote tests/contract/test_conformance_server.py: parametrized over the corpus
+  object/row/file rows, driving them through client.server and asserting the
+  server-assigned digest == corpus digest. Filters object_digest to dict-valued
+  rows (a bare scalar is not a stored object record); documented the skip.
+  row_digest verified via table_create(... rows=[row]).row_digests[0].
+
+## Verification
+- sqlite: 13 passed. clickhouse (--clickhouse-process=true, Docker up): 13 passed.
+- Full tests/contract/: 61 passed (48 library + 13 server). ruff + ty clean.
+- The LLMStructuredCompletionModel builtin-class row round-trips to the
+  eCEXZKYo... golden through the real obj_create.
+
+## Hints for Future Agents
+- Trust chain: SDK == corpus (per-language consumer) AND corpus == server (this
+  test) => SDK == server. PR8 owns the second link.
+- Why not redundant with test_serialization_correctness: that suite round-trips
+  its OWN Python-factory cases; this one anchors the *cross-language corpus* (the
+  thing TS targets) to the server.
+- The digest is computed pre-storage, so it is backend-independent; sqlite is
+  authoritative, clickhouse confirms the round-trip.
+- message_template + validator corpus kinds have no write endpoint, so they are
+  library-only (the server calls them internally via llm_completion / request
+  model validators). Not a gap.
+- Did NOT amend PR7 (would orphan its git note onto the old SHA, per the
+  conductor+gt memory). Stacked as PR8 instead.
+
+## Open Questions
+None. No production code changed; no core/chengdu staging needed.

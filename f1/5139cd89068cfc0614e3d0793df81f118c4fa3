@@ -1,0 +1,23 @@
+## Conversation
+PR 8 (final) of the ts-split stack: declare strict zero. The user's criteria 1-3 (client never imports trace_server; trace_server imports nothing under weave; workers/auxiliary code may import trace_server but never the client) are achieved and CI-enforced; criterion 4 (verbatim move to core) is unblocked and documented as the cutover checklist.
+
+## Actions
+- Doc: PR table rewritten to the as-built order (llm_structured split BEFORE the big copy -- v2's proven ordering; registry repoint folded into the copy PR; identity gate covers llm_structured because the split made both halves pure), status line, extended cutover checklist.
+- AGENTS.md + pyproject importlinter header: burn-down -> maintain-zero.
+
+## Errors & Mistakes
+None in this commit.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- THE INVARIANTS, in priority order: (1) ignore lists stay empty; (2) twins stay byte-identical modulo the path map (conformance test); (3) every weave/* package stays governed (meta-test); (4) no __init__.py deletions under weave/ (grimp blindness).
+- Remaining work lives in the doc's Cutover section. The deferred decision (what backs the client fixture post-removal) blocks ONLY the final removal PR.
+- ClickHouse-backend runs (--trace-server=clickhouse --clickhouse-process=true) were NOT run locally for this stack (no Docker assumption); SQLite-backend suites + gates are green throughout. CI covers ClickHouse on submit.
+
+## Codebase Discoveries
+None new.
+
+## Open Questions
+- Cutover timing/coordination with core (submodule bump + mirror branches per [[project_weave_mirror_core_ci]]).

@@ -1,0 +1,31 @@
+## Conversation
+PR3 of the stack (goal: zero import-linter ignores). User: 'set a goal to clear all
+the ignores and keep going into new PRs in the stack.' Continues
+andrew/decouple-client-ids <- -constants <- THIS (-wire-leaves).
+
+## Actions
+- Classified remaining Contract 2 (53): clean leaves (common_interface 5,
+  feedback_types 1, query 6; service_interface 5 + http_service_interface 1 depend
+  only on common_interface) vs the knot (trace_server_interface 22 = codegen,
+  errors 5 + trace_server_converter 1 = cross-process except trap,
+  builtin_object_classes 7 = registry/digest knot).
+- Vendored common_interface -> weave/utils/trace_server_common.py (BaseModelStrict,
+  SortBy, AnnotationState, AnnotationQueueItemsFilter) and the runnable-feedback
+  selector subset -> weave/utils/feedback_types.py. Repointed 6 importers
+  (weave_client, casting, call, flow.saved_view, link_asset_to_registry).
+- Golden-parity test both sides: froze SortBy/AnnotationQueueItemsFilter
+  model_json_schema() + AnnotationState values + the 3 selector outputs to
+  vendored_wire_leaves_golden.jsonl (duplicated per side, sha-identical).
+  Test basenames unique (test_vendored_wire_leaves.py client /
+  test_wire_leaves_contract.py server) to avoid the pytest import-file-mismatch.
+
+## Verification
+lint-imports 3/0; ruff check+format clean; 2 new tests pass; 1539 collected no
+collision. Contract 2: 53 -> 47.
+
+## Next / open
+~47 C2 + 16 C1 remain. Bulk is the wire-contract knot (trace_server_interface 22)
+-> needs the codegen/Stainless decision, NOT hand-vendor. query (6) is a clean leaf
+(451-line AST) - vendorable next. errors+converter = boundary-translation design.
+builtin_object_classes = the digest knot. C1 eval-worker = the open #7360.
+PRESENTED the fork to the user after this PR.

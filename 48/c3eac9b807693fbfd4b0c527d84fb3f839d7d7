@@ -1,0 +1,31 @@
+## Conversation
+PR 7 of the ts-split stack: eval worker relocation, mined from v2 commit (eval-worker; "lift dispatcher ABC to contract") and adapted to the twin design (ABC goes into BOTH tsi copies). This empties contract 2 -- criteria 1-3 of the user's success list are now enforced at zero.
+
+## Actions
+- Inserted EvaluateModelDispatcher(ABC) into both tsi twins directly after EvaluateModelArgs (same anchor in both; conformance gate keeps them locked). Added `from abc import ABC, abstractmethod` to both twins' stdlib import block.
+- git mv evaluate_model_worker.py + isolated_client_executor.py -> weave/eval_worker/; removed the now-empty weave/trace_server/workers entirely (v2 did the same; the layer rule in the doc covers any future return).
+- Worker imports EvaluateModelArgs + EvaluateModelDispatcher from weave.shared.trace_server_interface; kept the back-compat __all__ re-export (downstream Kafka dispatcher in core imports EvaluateModelArgs from the worker module path).
+- Servers: the worker-module import replaced by their own tsi twin import.
+- Tests rewired (isolated_client_executor/ x3, evaluation_apis, workers/evaluate_model_test_worker.py); kept test file LOCATIONS to minimize churn -- re-sorting test dirs is cutover work.
+- pyproject: C1 source_modules += weave.eval_worker (meta-test enumeration enforces this); C2 ignore_imports = [] with a strict-zero comment. ROOT_IMPORT_BASELINE = empty set.
+
+## Errors & Mistakes
+- PR 7's full tests/trace battery exposed a PR 4 gap: the conftest twin-error mapping was static (errors, validation_util) and missed the refs_internal twin's InvalidInternalRef (test_robust_to_url_sensitive_chars). Fixed by AMENDING PR 4 (generic path-map-based module resolver) and rebasing PRs 5-6 -- each PR must be independently green, and a fix-forward here would have left 4-6 broken for CI. Notes were captured to /tmp and re-added after the rebases (git notes do not survive rewrites).
+- tests/trace/test_weave_client_threaded.py::test_flask_server fails on PRISTINE MASTER in this env (httpx connect; port/env flake) -- verified via detached worktree; not stack-related.
+
+## Dead Ends
+- Considered keeping an empty weave/trace_server/workers/ as the documented future layer. Removed instead: an empty package is dead structure; contract 2 governs any future weave.trace_server.workers.* automatically because it is inside the source tree it guards.
+
+## Hints for Future Agents
+- The dispatcher seam: servers accept EvaluateModelDispatcher | None (their tsi twin); core subclasses the ABC (its Kafka dispatcher) and runs the worker via pip-installed weave post-move. In-repo tests wire tests/trace_server/workers/evaluate_model_test_worker.py through the conftest fixtures.
+- isolated_client_executor imports ONLY client modules (weave_client_context, WeaveClient) -- it was always client-pure; only its location was server-side.
+- If you rewrite stack history: capture `git notes show` per branch FIRST, re-add with -F after; gt tolerates manual `git rebase --onto` fine (no needs-restack flag) when parents stay consistent.
+
+## Codebase Discoveries
+- EvaluateModelArgs was ALREADY in tsi (moved there earlier per the comment at the class) -- only the ABC remained in the worker module, which is why the seam severs this cleanly.
+
+## Open Questions
+- Cutover: core currently imports weave.trace_server.workers.evaluate_model_worker paths from the copied tree; at submodule bump it repoints to weave.eval_worker (noted in the doc's cutover checklist).
+
+## Addendum (stack rebuild, round 2)
+Two changes vs round 1: (1) EvaluateModelDispatcher is a typing.Protocol, not an ABC -- per user review feedback and the repo's Protocol-for-contracts convention; tsi already imports Protocol (TraceServerInterface itself is one). Core's Kafka dispatcher and the test worker inherit it explicitly, which Protocol supports. (2) Mirror paths: the protocol lives in BOTH weave/interface/trace_server_interface.py and weave/trace_server/interface/trace_server_interface.py; the worker consumes weave.interface. The round-1 note below predates the mirror layout (it says ABC and weave.shared paths).

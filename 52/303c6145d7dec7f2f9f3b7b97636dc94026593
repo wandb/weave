@@ -1,0 +1,55 @@
+## Conversation
+User asked to "analyze the codebase for slowness, in particular with imports and
+init. Benchmark it, include the script, and then show a flame graph of where the
+hotspots are and where we can improve." Then asked to open a PR with the
+benchmark results (before AND after table) and instructions for users to
+reproduce before/after themselves.
+
+## Actions
+- Recreated .venv at py3.12 (uv venv --python 3.12 --clear && uv sync --group test);
+  fresh Conductor workspaces ship a stale py3.14 venv where tiktoken won't build.
+- Read weave/__init__.py, weave/trace/api.py, weave/trace/weave_init.py,
+  weave/integrations/patch.py to map import + init paths.
+- Wrote scripts/benchmarks/import_init_profile.py: subprocess timing (warmup
+  discarded), -X importtime aggregation (by package + module), and a faithful
+  HTML import flame graph built by reconstructing the importtime tree
+  (post-order, indentation-based) — plus optional pyinstrument/py-spy.
+- Installed pyinstrument (uv pip install, into venv) and tuna (uv tool install).
+  py-spy was already a uv tool but needs sudo on macOS, so it's best-effort.
+
+## Errors & Mistakes
+- First attempt to capture a BEFORE flame graph used `git stash push -- $FILES`
+  and `git checkout -- $FILES` with a zsh variable holding two space-separated
+  paths. zsh does NOT word-split unquoted vars, so both paths were passed as a
+  single pathspec: stash silently no-op'd and checkout errored. Result: a
+  mislabeled "before" run that was actually the fixed code. Fixed by passing
+  paths as explicit separate args ("$A" "$B").
+- Dynamically loading the profiler module via importlib for an ad-hoc icicle
+  print failed with AttributeError on dataclass (slots) until I registered it in
+  sys.modules before exec_module.
+- pyinstrument (0.1ms sampling) over-weighted call-heavy pure-Python
+  (pydantic model_rebuild in query.py, lark grammar build), suggesting query.py
+  was a huge cost; -X importtime (authoritative) showed it's ~12ms. Trust
+  importtime for magnitude, pyinstrument for call-stack structure.
+
+## Dead Ends
+- py-spy SVG on macOS: needs root; handled gracefully (skip + message).
+- Benchmarking real (enabled) init offline: not possible without auth + server;
+  measured the disabled path (~0ms) and documented that real init is network RTTs.
+
+## Hints for Future Agents
+- bash grep here is ripgrep: `-E`/`--include` error out, `\|` is literal.
+- .artifacts/ is gitignored; pyinstrument HTML is 10-20MB (show_all + fine
+  interval) — the 60-80KB flame_importtime.html is the better shareable artifact.
+- Run the profiler with the project venv's python so `import weave` resolves to
+  the local checkout, not a pinned PyPI build.
+
+## Codebase Discoveries
+- weave/__init__.py eagerly imports the whole public API surface.
+- `weave.init()` code cost is ~0; implicit_patch() only scans sys.modules,
+  register_import_hook() is one meta_path.insert. Wall-clock is network.
+
+## Open Questions
+- Secondary eager imports (httpx + gql/graphql via trace_server.errors;
+  sentry_sdk + urllib3 via durability.wal -> telemetry.trace_sentry) could be
+  deferred to init for ~0.25s more; deferred to a follow-up.

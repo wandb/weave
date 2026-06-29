@@ -1,0 +1,46 @@
+## Conversation
+PR 2 of the 2-PR stack (see [[andrew/decouple-client-ids]] note). User wants the
+Contract 2 reduction split into reviewable PRs; no shared dir (trace_server is
+leaving the repo, so each side owns its copy).
+
+## Actions
+- weave/utils/constants.py: vendored exactly the client-used subset of
+  weave/trace_server/constants.py. Client-used set derived by grep:
+  INFERENCE_HOST, COMPLETIONS_CREATE_OP_NAME, MAX_{DISPLAY_NAME,OP_NAME,OBJECT_NAME}_LENGTH,
+  EVALUATION_RUN_OP_NAME, EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME(+_TS)+_OP_NAMES,
+  EVAL_{EVALUATION_NAME,PREDICT_AND_SCORE_CALL_ID,PROJECT_ID}_SPAN_ATTR,
+  GENAI_SPAN_REF_ATTR_KEY, WEAVE_ATTRIBUTES_NAMESPACE.
+- Repointed 7 importers: chat/completions, chat/inference_models, trace/call,
+  trace/weave_client (from-import style); evaluation/eval, evaluation/otel_eval_linker
+  (module style `from weave.trace_server import constants` -> `from weave.utils import
+  constants`); integrations/integration_utilities.
+- Completeness check: grepped eval.py + otel_eval_linker.py for ALL `constants.X`
+  refs (module-style access AttributeErrors at runtime, not import time) and
+  confirmed every referenced name is in the client copy.
+- tests/trace/test_constants_parity.py: imports both modules, asserts every public
+  UPPER_SNAKE name in the client copy equals the server's value (whole-dict compare,
+  not membership). Lives in tests/ so import-linter (governs the weave package graph
+  only) doesn't flag it.
+- pyproject.toml: removed the 7 '-> weave.trace_server.constants' rows; comment now
+  reads "(as already done for ids/constants)".
+
+## Dead ends / decisions (Codex-reviewed)
+- Considered splitting constants by client-only vs server-only and MOVING — rejected:
+  the op-name/attr-key constants OVERLAP (both sides use EVALUATION_RUN_OP_NAME,
+  GENAI_SPAN_REF_ATTR_KEY, WEAVE_ATTRIBUTES_NAMESPACE), so a move leaves a shared
+  remainder. Vendor + parity test is the no-shared-dir answer.
+- Deferred (NOT in this stack): errors (cross-process raise/catch -> duplicate
+  exception classes silently break `except` for in-process client+server; raised in
+  in_memory/clickhouse, caught in weave_client/vals), common_interface + feedback_types
+  (pydantic wire models -> codegen territory), trace_server_interface/query (the big
+  wire contract -> codegen). After this stack Contract 2 = 65 -> 53.
+
+## Verification
+ruff clean; lint-imports 3 kept / 0 broken at tip; parity test passes;
+`import weave` smoke OK. Full prek pre-push OOM-killed earlier (mypy+pyright+ty),
+not re-run.
+
+## Build mechanics
+Stacked on andrew/decouple-client-ids. All B files recovered wholesale from backup
+commit 0c900a3 via `git checkout 0c900a3 -- <file>` (weave_client.py + pyproject.toml
+carry A's ids layer too, so recovery preserves A and adds only the constants delta).

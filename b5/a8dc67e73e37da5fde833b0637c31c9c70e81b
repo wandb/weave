@@ -1,0 +1,51 @@
+## Conversation
+User: "Write a skill that will autoinstrument weave tracing into a user's code."
+Success criteria: (1) auto-instrument with weave agent tracing -> Agent OTEL
+endpoint; (2) prefer native integration when supported; (3) custom code -> manual
+Agent APIs; (4) build example cases + verify end-to-end. User invited grill-me.
+Grilling locked: scope = agent OTEL ONLY (not legacy non-agent integrations);
+native path = the 3 OTEL agent-span integrations; everything else (incl. unknown
+3rd-party agent libs, per explicit user emphasis) = manual weave.session; skill
+EDITS user code; offline-primary verification is acceptable. Later the user asked
+to validate the skill by having a subagent use it, then to add TS as stack part 2.
+
+## Actions
+Explored (via subagents): weave/session/ manual API; weave/trace/weave_init.py
+OTEL wiring; weave/integrations/patch.py registry. Built SKILL.md + references/
++ scripts/ + examples/. Proved offline span capture with InMemorySpanExporter.
+Validated by spawning a general-purpose subagent that instrumented two fresh
+uninstrumented apps (in gitignored .context/skill-eval) using only the skill —
+it chose native vs manual correctly; I independently re-ran span capture for both.
+Applied fixes from its feedback (native-verify seam, looping-turn guidance,
+tool_call_id synthesis, None-token-column note).
+
+## Codebase discoveries (verified on this branch)
+- weave.init("entity/project") configures the OTLP exporter to
+  /agents/otel/v1/traces (weave_init.py::_setup_session_tracing, urls.py) AND
+  registers the integration import hook. No project_id header (Python routes via
+  Resource attrs wandb.entity/wandb.project). init defers if a real
+  TracerProvider already exists.
+- Native OTEL agent-span integrations: openai_agents, claude_agent_sdk,
+  google_adk. Other integrations emit LEGACY calls, not agent spans. Plain openai
+  is NOT auto-patched under use_otel_v2=True (default) -> treat as manual.
+- Manual API = weave.session: start_session/start_turn/turn.llm/turn.tool/
+  subagent (context managers) OR log_turn/log_session (batch).
+
+## Hints for future agents
+- OFFLINE VERIFY TECHNIQUE: set a global TracerProvider + InMemorySpanExporter
+  BEFORE running; weave.session + the integration OTEL processors grab the global
+  tracer at emit time -> spans captured with NO weave.init/network/creds.
+  set_tracer_provider is once-per-process -> run each check in its own subprocess
+  (examples/run_all.py does this).
+- openai_agents native offline: a fake Model yields only Function+Agent spans
+  (NO chat); to get chat spans, back the Agent with a real
+  OpenAIChatCompletionsModel over httpx.MockTransport (examples/native_openai_agents/fake_backend.py).
+  OpenAIAgentsOtelPatcher.attempt_patch() + set_trace_processors([proc]) to drop
+  the SDK's default OpenAI uploader (avoids a 401).
+- scripts/verify_instrumentation.py only works for the MANUAL path; the native
+  processor only attaches via weave.init() (network). SKILL.md Step 4 documents this.
+
+## Open questions / follow-ups
+- TS support is the next stack commit.
+- Not pushed (per repo rule). Offline-primary verification; live read-back API
+  (get_agent_spans) is not on master.

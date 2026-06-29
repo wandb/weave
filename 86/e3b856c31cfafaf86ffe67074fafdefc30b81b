@@ -1,0 +1,27 @@
+## Conversation
+User asked (via the grill-me skill): "How can I disentangle the trace server from the client? Nothing in the weave repo should import from the trace_dir and vice versa... totally separate repos in the future." After a 4-question grill resolving D1-D4, user approved a 6-PR guard-incremental stack on branch andrew/decouple-trace-server-client. This is the FIRST commit of PR0 (the import-linter guard baseline). User explicitly approved adding the __init__.py files as a "standalone prep commit."
+
+## Actions
+- Audited coupling: client->server already nearly clean (contract + 4 utils); server->client ~14 edges.
+- Tried to configure import-linter; grimp errored "Module 'weave.compat' does not exist" then revealed it SILENTLY skips PEP 420 namespace packages.
+- Walked weave/ for dirs that (recursively) contain .py but lack __init__.py; found 22 initially, 24 after including intermediate path dirs (weave/compat/, weave/trace_server/workers/).
+- Created 24 empty __init__.py. Verified grimp coverage jumped to 440/440 modules (0 blind spots) and `import weave` still works (0.52.43-dev0). ruff clean.
+
+## Errors & Mistakes
+- First coverage scan only flagged dirs with DIRECT .py files, missing intermediate dirs like weave/compat/ (which has only subdirs). Fixed by switching to "subtree contains any .py".
+- A python heredoc failed with "command not found: python" because the venv deactivates between Bash calls (shell state doesn't persist) -- must `source .venv/bin/activate` every call.
+
+## Dead Ends
+- Tried grimp.build_graph("weave", "weave.flow", ...) to pull namespace pkgs in as additional roots: raised NamespacePackageEncountered. grimp flatly refuses namespace packages; the only fix is __init__.py.
+
+## Hints for Future Agents
+- NEVER remove these __init__.py: doing so makes grimp silently blind to that subtree and the import boundary guard (next commit) will report green while coupling leaks.
+- Bash grep is ripgrep-aliased and mangles pipes; used /usr/bin/grep for audits.
+- venv: fresh workspace had none; created via `uv venv --python 3.12 --clear && uv sync --group test`.
+
+## Codebase Discoveries
+- weave/ was riddled with unintentional namespace packages (weave.flow, weave.chat, weave.trace.context, weave.trace.serialization, weave.trace_server.{agents,calls_query_builder,query_builder,opentelemetry,interface.builtin_object_classes,...}, weave.trace_server_bindings). All first-party; no namespace markers anywhere.
+- pyproject.toml:76 already documents intent to "extract [trace_server] to a separate package."
+
+## Open Questions
+- None for this commit. Next commit adds the import-linter config + pre-commit hook + AGENTS.md doc.

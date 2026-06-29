@@ -1,0 +1,42 @@
+## Conversation
+Multi-step session evolving the weave-instrument skill. User: (1) discussed why the repo has many agent fixtures; (2) rebase master + audit new APIs to cover; (3) renamed the auto fixture; (4) asked how fixtures/evals.json are used; (5) decided the eval suite is worth keeping IF run; ran it; (6) added gotcha fixtures; (7) consulted Codex to make the skill GENERIC for all agents; (8) relocated the skill to ~/.claude/skills (out of the repo); (9) made references concise; (10) documented 3 raw-OTEL cases; (11) final: put the skill under the repo's top-level skills/weave-instrument and push (this commit, updating draft PR #7370).
+
+## Actions
+- Canonical/current skill content lives in ~/.claude/skills/weave-instrument (the user's global install). THIS commit was produced by `cp -R ~/.claude/skills/weave-instrument skills/weave-instrument` onto a fresh origin/master base, then force-push to branch andrew/weave-instrument-skill (old remote tip 8e94b0da45 had it under .claude/skills/).
+- Audited new SDK APIs since the prior base: weave.session.agent_name_override (weave/session/agent_context.py), start_session/log_turn/log_session `attributes=` param, TS pi.dev createOtelExtension. Documented agent_name_override; skipped attributes=/pi.dev (niche).
+- Reframed GENERIC (Codex consult, thread 019f0444): decision.md spine = detect SHAPE -> detect STRUCTURE -> PROBE the installed registry (Python INTEGRATION_MODULE_MAPPING in weave/integrations/patch.py; TS integrations/hooks.ts) -> auto-if-right-shape else Session SDK -> verify emitted spans. Session SDK = universal; OTEL auto = optimization; framework names = examples not allow-list.
+- Added 3rd mechanism RAW OTEL EXPORT (references/otel_endpoint.md): endpoint /agents/otel/v1/traces (weave.trace.urls.otel_traces_endpoint), Basic base64("api:"+WANDB_API_KEY), resource wandb.entity/wandb.project. Two cases: env-var export; add exporter to an app's own TracerProvider.
+- Gotchas moved to a condition-triggered lookup table in otel_auto.md. Made all 5 reference docs concise.
+- 6 eval fixtures by category: python-custom-agent + ts-custom-agent (Session SDK), python-auto (auto; renamed from python-openai-agents — "auto" = strategy not lib), python-plain-openai + ts-esm-openai (gotcha regressions), python-unknown-framework (fake `miniagent` — proves the generic fallback).
+
+## Errors & mistakes
+- evals.json/SKILL.md Edits in ~/.claude failed once each with "File has not been read yet" — Edit requires a prior Read of the exact path (copies aren't auto-tracked). Fixed by Read-then-Edit.
+- Location churned: skill committed in .claude/skills/ (prior) -> relocated to ~/.claude/skills/ (user: "pull it out, it's generic") -> now committed at repo top-level skills/ (user: "put it under weave/skills"). The ~/.claude copy is the user's live install and stays; this commit is the shareable/PR'd copy.
+
+## Errors output verified
+- weave_init.py:140 `if isinstance(trace.get_tracer_provider(), TracerProvider): return` — confirms weave.init() BACKS OFF when a global provider exists (root cause of the "existing TracerProvider -> no traces" case). Auth recipe weave_init.py:155-156; Resource :158-164.
+
+## Dead ends
+- None pursued. Considered building the "Level-2" runtime span-shape probe and running iteration-2 of the eval; both deferred (not done).
+
+## Hints & warnings
+- This skill is at top-level skills/, NOT .claude/skills/ — so it does NOT auto-load as a Claude Code skill inside the weave repo. Intentional per the user. Discovery/use happens via the ~/.claude/skills copy.
+- Eval = skill-creator CAPABILITY eval (executor with/without skill -> blind grader), NOT scripts/run_eval.py (which is trigger-only, query/should_trigger schema, never touches fixtures). Run OUTPUTS go to gitignored .context/, never committed; fixtures+evals.json ARE the skill.
+- Iteration-1 (3 happy-path fixtures): with AND without skill both 100% -> no measurable lift, because (a) baselines ran in-repo and could read weave source, (b) happy-path fixtures don't probe gotchas. Gotcha + unknown-framework fixtures added to fix this; ITERATION-2 (ISOLATED baseline, temp dir outside repo) NOT YET RUN.
+- agent_name_override is Python-only; relabels integration invoke_agent spans (claude_agent_sdk defaults to literal "claude_agent_sdk"); creates no span itself.
+
+## Codebase discoveries
+- otel_traces_endpoint() in weave/trace/urls.py (path _OTEL_GENAI_TRACES_PATH = /agents/otel/v1/traces). _setup_session_tracing in weave_init.py:111.
+- INTEGRATION_MODULE_MAPPING (weave/integrations/patch.py) is the live auto-instrumentation registry to PROBE rather than memorize.
+
+## Open questions / next steps
+- Run iteration-2 capability eval (gotcha + unknown-framework fixtures, isolated baseline) — the real test of the generic reframe / lift.
+- Build the Level-2 span-shape verification probe (in-memory exporter asserting gen_ai.operation.name) — triples as auto-detect, verify step, eval grader.
+- Confirm skills/ (top-level) is the intended home vs .claude/skills for in-repo discovery.
+- Old remote branch deletable; PR #7370 (draft) is updated by this push.
+
+## Update — prose clarity pass (amended into this commit)
+- User: "make the markdown concise and clear in simple english with proper grammar and syntax", then "push".
+- Rewrote all 6 markdown files (SKILL.md + 5 references) for plain grammatical English: split em-dash run-ons into complete sentences, dropped nested parentheticals and telegraphic fragments, restored articles. ZERO changes to facts, code blocks, version pins (weave>=0.52.42), env vars, the gotcha table, or the YAML frontmatter description's trigger phrases.
+- Diff +306/-279 across 6 files (net +27 lines; grammar costs articles/full clauses vs the prior telegraphic style). Verified: code fences balanced, the ~/.claude live-install copy and this repo copy are byte-identical (cp-synced both ways), repo has NO markdown linter (.pre-commit-config.yaml only lints examples/*.ipynb; no prettier config).
+- Amended into the original "add the skill" commit (was ffa1c9bfbe -> now this SHA) to keep draft PR #7370 a single clean commit; force-pushed with lease. Note migrated from the old SHA via `git notes add -f -F`.

@@ -1,0 +1,60 @@
+## Conversation
+User asked: "Add the weave-sdk to codeowner for anything under sdks/node and
+weave/ but not trace_server/". Then: "put this up as draft".
+
+Intent: make @wandb/weave-sdk a code owner across the weave/ Python tree and
+the node SDK, but explicitly NOT for weave/trace_server/ (which is owned by
+the broader weave-team and, for migrations, specific individuals).
+
+## Actions
+- Located CODEOWNERS at .github/CODEOWNERS (only CODEOWNERS in repo).
+- Confirmed directory layout: weave/trace_server/ exists; siblings
+  weave/trace_server_bindings/ and weave/trace_server_version.py also exist.
+- Original file:
+    * @wandb/weave-team
+    /docs/ @wandb/docs-team @wandb/weave-team
+    /sdks/node/ @wandb/weave-sdk @wandb/weave-team
+    /weave/trace_server/migrations @tssweeney @gtarpenning @neutralino1
+- sdks/node/ already granted @wandb/weave-sdk, so no change needed there.
+- Added two lines (last-match-wins semantics; later patterns override earlier):
+    /weave/ @wandb/weave-sdk @wandb/weave-team
+    /weave/trace_server/ @wandb/weave-team
+  The /weave/ rule grants weave-sdk across weave/; the /weave/trace_server/
+  rule overrides it back to weave-team only. The pre-existing
+  /weave/trace_server/migrations rule stays LAST so it remains most-specific.
+- Kept @wandb/weave-team on the new /weave/ line (user said 'add', not
+  'replace'), mirroring the existing /sdks/node/ convention.
+- Committed on branch andrew/codeowners-weave-sdk (branched off master, was
+  clean). Then pushing + opening a DRAFT PR per explicit user request.
+
+## Errors & Mistakes
+None. Session env reported starting branch andrew/quito, but the actual
+checked-out branch was andrew/codeowners-weave-sdk (Conductor created a
+purpose-named branch). Verified via git branch --show-current before acting.
+
+## Dead Ends
+Considered Graphite (gt) per global workflow rules, but this is a single
+one-off PR, not a stack, and gt operations in this Conductor worktree setup
+are known to orphan git notes (see memory: gt clean restack drops notes /
+conductor gt stack off master). Used plain git + gh and recorded the reason.
+
+## Hints for Future Agents
+- CODEOWNERS is last-match-wins: a single file matches exactly ONE rule (the
+  last one listed that matches). Ordering is load-bearing here. If you add a
+  more-specific weave/ subtree rule, place it AFTER /weave/ or weave-sdk will
+  silently re-own it.
+- JUDGMENT CALL flagged to user: 'trace_server/' was read literally as the
+  directory weave/trace_server/. Sibling paths weave/trace_server_bindings/
+  and weave/trace_server_version.py are therefore owned by weave-sdk (they
+  match /weave/, not /weave/trace_server/). User was asked to confirm whether
+  those should also be excluded; not yet answered as of this commit.
+
+## Codebase Discoveries
+- Team handle is @wandb/weave-sdk (confirmed from the existing /sdks/node/
+  line, not guessed).
+- No CODEOWNERS linter exists in-repo; ruff/nox cover Python only, so no lint
+  step applies to this change.
+
+## Open Questions
+- Should weave/trace_server_bindings/ and weave/trace_server_version.py also
+  be excluded from weave-sdk ownership? Awaiting user confirmation.

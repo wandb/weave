@@ -1,0 +1,40 @@
+## Conversation
+Stack PR 2/3: add the GHA step (success criterion 3) while keeping the docker
+step for a same-job timing comparison (criterion 4 evidence).
+
+## Actions
+- test.yaml trace-tests + nightly-tests: "Install ClickHouse binary" step
+  (bin/get_clickhouse.sh → WEAVE_CLICKHOUSE_BINARY via GITHUB_ENV) after the
+  pip install step; "Run nox (ClickHouse Local Trace Server)" step after the
+  dockerized step, same marker selection plus --trace-server=clickhouse-local.
+- Deliberately NO actions/cache: repo uses none today; a ~280MB tarball from
+  packages.clickhouse.com CDN downloads in seconds on GH runners and cache
+  restore wouldn't be clearly faster. Revisit if the install step is slow.
+- Omitted WF_CLICKHOUSE_HOST from the new step env: the plugin sets
+  WF_CLICKHOUSE_HOST/PORT inside the pytest process at configure time.
+  (noxfile forwards a fixed env-var list; None values are tolerated — the
+  trace_no_server job already runs without these vars.)
+- Validated with actionlint + yaml.safe_load; only pre-existing info-level
+  shellcheck nits remain (untouched lines).
+
+## Errors & Mistakes
+- None in this commit's scope.
+
+## Dead Ends
+- actions/cache for the binary — rejected for now (no repo precedent, cache
+  budget pressure, restore≈download speed).
+
+## Hints for Future Agents
+- nox merges its env dict over os.environ, so job-level GITHUB_ENV vars like
+  WEAVE_CLICKHOUSE_BINARY flow through to pytest without noxfile changes.
+- While PR2 is the tip, every trace-tests job runs THREE test steps (sqlite,
+  docker CH, local CH) — slower than master by design; PR3 removes one.
+- Windows jobs are sqlite-only; the backend is POSIX-only by construction.
+
+## Codebase Discoveries
+- nightly-tests.yaml is schedule/dispatch-only: a PR cannot exercise it. Its
+  edits are validated by actionlint + sharing step shapes with test.yaml.
+
+## Open Questions
+- If the binary download flakes at scale (78 jobs/run), add actions/cache or
+  mirror the tarball into GHCR like ch-image.sh does for images.

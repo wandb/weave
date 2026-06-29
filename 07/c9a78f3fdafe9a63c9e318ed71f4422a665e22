@@ -1,0 +1,93 @@
+## Conversation
+User ran a multi-turn PR-cleanup session. First three turns: close ~20 specific
+PRs by number (all closed via `gh pr close`, no branch deletion). Fourth turn:
+"scan the weave repo for open PRs older than 3 months, mark them as stale, and
+close them." When asked about scope/method, user chose: close ALL matching PRs
+(not just their own), label-only (no comment), and -- critically -- "I
+personally dont want to be the one to close these. Use a repo bot if you can."
+
+That last constraint is the whole reason this workflow exists. The earlier 20
+closures were attributed to the user's personal account (andrewtruong) via
+local `gh`. For the bulk 3-month sweep, the user explicitly did NOT want to be
+the actor on record.
+
+## Actions
+- Scanned: `gh pr list --repo wandb/weave --state open --limit 500 --json
+  number,title,author,createdAt,updatedAt,isDraft,labels` -> 222 open PRs.
+- Filtered with jq: 77 PRs with updatedAt < 2026-03-23 (3 months); 94 by
+  createdAt. Only 3 are the user's own (andrewtruong: #6023 #5987 #6104). The
+  "4" my first regex matched included andrewmonostate (#5289) -- a false match
+  on "andrew". The other ~74 span ~45 authors incl. founders (lukas #2785,
+  shawnlewis #1686, vanpelt #3250) and many external/community contributors.
+- Found the only local gh auth is andrewtruong (no bot token in env). So a bot
+  identity is ONLY reachable via GitHub Actions (github-actions[bot] +
+  GITHUB_TOKEN). You cannot attribute a CLI `gh pr close` to a bot.
+- Discovered TWO existing workflows on master:
+  - close-inactive-prs.yml (#6125, merged 2026-02-13): actions/stale, 14-day
+    stale + 7-day close, posts comments, daily 03:00 UTC. RUNS SUCCESSFULLY
+    DAILY (~20s) but only 5/77 are labeled Stale and 0 closed after 4 months
+    -- almost certainly throttled by actions/stale's default
+    operations-per-run: 30 against 222 open PRs. Effectively broken for the
+    backlog. (Flagged to user as a separate bug to fix.)
+  - close-stale-draft-prs.yml (#7212): scripts/close_stale_draft_prs.py via uv,
+    keys off draft age. THIS is the pattern I modeled the new script on.
+- Wrote scripts/close_stale_prs.py (pure decide() + I/O _apply(), dataclasses,
+  dry-run, step summary) and .github/workflows/close-stale-prs.yml
+  (workflow_dispatch only; inputs dry_run [default true] + days_inactive
+  [default 90]; permissions pull-requests:write + issues:write).
+- Verified: `GITHUB_TOKEN=$(gh auth token) uv run scripts/close_stale_prs.py
+  --repo wandb/weave --dry-run --inactive-after-days 90` -> "Scanned 222 open
+  PR(s); closed 77". Exactly matches the jq scan. drafts skipped, none exempt.
+- Lint: `uvx ruff check` + `uvx ruff format --check` both clean. YAML parses.
+
+## Errors & Mistakes
+- First author-regex over-matched: counted andrewmonostate as the user. Real
+  count of user's own stale PRs is 3, not 4.
+- `python3 -c "import yaml"` failed (ModuleNotFoundError) -- system python has
+  no pyyaml. Re-ran via `uv run --with pyyaml`. (Note: pyyaml parses GitHub's
+  `on:` key as boolean True -- harmless YAML quirk, Actions handles it.)
+
+## Dead Ends
+- Triggering existing close-inactive-prs.yml as-is: rejected. It's 14-day (not
+  90), posts comments (user wants label-only), and a single dispatch only
+  labels then closes 7 days later -- wouldn't close the backlog now.
+- Closing as andrewtruong locally: rejected by user (don't want to be the
+  actor).
+- push-triggered-on-branch workflow (runs as bot without merging to master):
+  considered as a no-merge path but not chosen -- it's a privileged-token
+  anti-pattern for a mass-close and still needs a push approval. Left
+  workflow_dispatch (needs merge) as the clean path.
+
+## Hints for Future Agents
+- workflow_dispatch workflows must be on the DEFAULT branch (master) to be
+  dispatchable. This branch (andrew/close-stale-prs) must be merged before
+  `gh workflow run close-stale-prs.yml` works.
+- Intended run sequence after merge: dispatch with dry_run=true (preview in the
+  run's step summary), eyeball it, then dispatch dry_run=false to actually
+  label+close as github-actions[bot].
+- The new workflow is deliberately SEPARATE from close-inactive-prs.yml. Do not
+  merge/fold them without team input: the 14-day + warning-comment policy was a
+  deliberate choice in #6125. This sweep is a manual, gentler (no-comment),
+  higher-threshold backlog tool.
+- 90 days == the user's "3 months". Dry-run with --inactive-after-days 90 gave
+  the same 77 as updatedAt < 2026-03-23. If run later, the set will differ as
+  PRs age in/out and as authors push activity.
+- Script uses updated_at from the list endpoint (no per-PR API calls), so the
+  sweep is fast and won't blow rate limits. _snapshot reads only fields present
+  in get_pulls() output: number, draft, labels, updated_at.
+
+## Codebase Discoveries
+- The repo's "Stale" label (color ededed) is the default actions/stale label
+  from close-inactive-prs.yml; that's why it already exists. New script
+  defaults stale_label="Stale" to reuse it.
+- scripts/close_stale_draft_prs.py is the canonical "PyGithub via uv, run from
+  a workflow, lintable + locally dry-runnable" pattern in this repo. Copy it
+  for any future PR-automation script.
+
+## Open Questions
+- close-inactive-prs.yml is effectively non-functional for the backlog
+  (operations-per-run throttle). Should it get operations-per-run bumped, or be
+  replaced by a script-based sweep? Offered to the user as a follow-up; not yet
+  decided.
+- Branches of the closed PRs are left intact (consistent with the earlier 20
+  manual closures). No one asked to delete them.

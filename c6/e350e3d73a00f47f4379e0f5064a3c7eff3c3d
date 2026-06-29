@@ -1,0 +1,39 @@
+## What this slice does
+Stamps attributes.integration on the callback/tracer family — integrations that
+build an attributes dict and call client.create_call directly (not via weave.op):
+- langchain: apply_integration_metadata(call_attrs, LANGCHAIN_INTEGRATION) before
+  create_call. call_attrs is the call_attributes context dict, so setdefault-style
+  merge preserves any user-set integration.
+- llamaindex: span_attributes/event_attributes seeded from
+  LLAMAINDEX_INTEGRATION.as_attributes() (then weave.kind added if present).
+- claude_agent_sdk (legacy calls): spread ...CLAUDE_AGENT_SDK_INTEGRATION
+  .as_attributes() into each create_call's attributes={"kind": ...} (5 sites).
+- openai_agents (direct create_call path), verdict (1 site): spread into the dict.
+- gepa_callback: _kind_attrs() now includes the integration block; the 4 attribute-
+  less create_calls get attributes=GEPA_INTEGRATION.as_attributes().
+- dspy_callback (3 sites), openai_realtime/state_exporter (9 sites): added
+  attributes=<INTEGRATION>.as_attributes() to each create_call.
+
+## Key decisions
+- Used setdefault/spread so a user-set "integration" key isn't clobbered (mirrors
+  the op-level lowest-precedence intent). Collisions are not realistic but kept
+  predictable.
+- distribution_name: langchain->langchain-core, llamaindex->llama-index-core,
+  openai_agents->openai-agents, openai_realtime->openai. Others default to name.
+- claude_agent_sdk keeps its pre-existing top-level "kind" attribute convention
+  (not nested under "weave"); I did not change that — only added integration.
+
+## How it was built
+openai_realtime (9 varied create_call sites) was delegated to a subagent with a
+strict rule; the rest done directly. All edited modules import cleanly.
+
+## Testing
+The create_call-carries-integration path is covered by
+tests/trace/test_integration_metadata.py::test_create_call_carries_integration_attributes
+(slice 1). langchain/llamaindex/etc. integration tests need their libs (not in the
+base env) so weren't run here; the modules import fine and the mechanism is proven.
+ruff clean.
+
+## Depends on
+Slice 1 (integration_metadata). openai_agents.py here defines OPENAI_AGENTS_INTEGRATION
+which slice 4's otel_processor reuses — keep slice 3 below slice 4.

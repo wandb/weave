@@ -1,0 +1,142 @@
+## What this slice does
+TypeScript parity for integration tracking (user task: "add this to the TS SDK").
+New src/integrations/integrationMetadata.ts mirrors the Python module:
+IntegrationMetadata {name, version, meta}, libraryIntegration(), asAttributes()
+(nested), applyIntegrationMetadata() (non-overriding merge), asOtelAttributes()
+(flattened for OTel). version defaults to packageVersion (utils/packageVersion.ts).
+
+OpOptions gained a generic `attributes?: Record<string, any>`; op.ts seeds the
+per-call attributes object from options.attributes, then layers kind/color on top
+(kind/color win on collision). Integrations wired:
+- op-based (openai images, anthropic create+stream, googleGenAI generate*): set
+  attributes: asAttributes(<INTEGRATION>) in their OpOptions.
+- openai chat/responses (direct createCall) + openai.agent + openai.realtime.agent
+  (callback saveCallStart): spread ...asAttributes(<INTEGRATION>) into the dict.
+- piCodingAgent (OTel spans): spread ...asOtelAttributes(...) into each startSpan's
+  attributes; widened the tool span's `Record<string,string>` to
+  `Record<string,string|number|boolean>` to accept the helper's scalar union.
+
+## Precedence divergence from Python (intentional, documented)
+In TS, op-level attributes flow through the per-call `attributes` arg, which is the
+HIGHEST-precedence layer in WeaveClient.createCall (global < context < per-call).
+So TS op-level attributes are highest, whereas Python's are lowest. For the
+integration key this is immaterial (no realistic user collision). Faithfully
+reproducing Python's lowest-precedence would require threading a separate op-default
+channel through createCall — not worth it for this use case.
+
+## Known limitation
+meta.package_version is NOT captured in TS (only package_name). Getting the patched
+library's version requires threading the version the CJS/ESM loader already reads
+(utils/commonJSLoader.ts / esm/instrument.mts) through the HookFn into each
+integration — deferred. Python captures it via importlib.metadata; TS sets
+version=SDK version + meta.package_name only.
+
+## Reserved-key note (pre-existing, left alone)
+WeaveClient.createCall merges `{ weave: {...}, ...combinedAttributes }`, so a user
+attribute could clobber the reserved `weave` block. This pre-dates my change and I
+didn't touch it. attributes.integration is unaffected (separate top-level key).
+
+## Testing
+- typecheck:cjs + typecheck:esm pass.
+- New src/__tests__/integrationMetadata.test.ts (builders + op-level end-to-end via
+  InMemoryTraceServer + kind-over-attributes precedence).
+- Tightened src/__tests__/integrations/anthropic.test.ts to assert the real patched
+  call carries attributes.integration {name: "anthropic", meta.package_name:
+  "@anthropic-ai/sdk"}.
+- Ran anthropic, openaiAgent, googleGenAI, piCodingAgent suites — all green.
+  prettier --check clean (had to --write openai.realtime.agent.ts).
+- Toolchain note: foreground shell lacks npm on PATH; used
+  /Users/andrew/.nvm/versions/node/v20.19.4/bin (node20 + npm10) for npm i / jest /
+  tsc / prettier. package-lock.json is a local install artifact (untracked) and was
+  deliberately NOT committed.
+
+## Amendment (post-submit)
+Mirrored the Python TypedDict tightening in TS for parity: integrationMetadata.ts
+now exports an IntegrationAttributes interface { integration: IntegrationMetadata }
+and asAttributes() is typed to return it. The computed [INTEGRATION_ATTRIBUTE_KEY]
+key resolves to the literal 'integration' (the const is `as const`), so the return
+satisfies the interface — confirmed by typecheck:cjs/esm. prettier + jest green.
+Commit amended (SHA changed); note re-attached.
+
+## Restack relocation (2026-06-12)
+
+This commit was restacked onto an updated `master`. Between the original base
+(`cbc186845b`) and the new base, master refactored the OpenAI-Agents TS
+integration: `WeaveTracingProcessor` was extracted out of
+`sdks/node/src/integrations/openai.agent.ts` (791 -> 234 lines, now a thin
+registration wrapper) into
+`sdks/node/src/integrations/openai-agents/weave-tracing-processor.ts`.
+
+The only rebase conflict was in `openai.agent.ts`. Resolution:
+- `openai.agent.ts` -> took the new (refactored) base verbatim; it no longer
+  builds any attribute objects, so there is nothing to stamp there.
+- The integration-metadata stamping this commit originally added to
+  `openai.agent.ts` was RELOCATED into `openai-agents/weave-tracing-processor.ts`
+  (import `{asAttributes, libraryIntegration}` from `../integrationMetadata`,
+  the module-level `OPENAI_AGENTS_INTEGRATION = libraryIntegration('openai_agents',
+  {packageName: '@openai/agents'})` const, and `...asAttributes(OPENAI_AGENTS_INTEGRATION)`
+  spread into the two attribute objects: the `onTraceStart` agent-trace
+  attributes and the span attributes). Intent and scope are unchanged from the
+  original two hunks.
+
+## Hint for future agents
+The refactor also introduced `openai-agents/weave-otel-tracing-processor.ts`
+(the OTel-v2 path, used when `shouldUseOtelV2()`). This commit does NOT stamp
+that processor because it post-dates the original change. If the openai_agents
+integration should carry `attributes.integration` under OTel v2, that file needs
+the same stamping as a follow-up.
+
+## Test coverage added (follow-up: "same for the ts integrations")
+
+The commit already shipped integrationMetadata.test.ts (builder unit tests) + an
+anthropic.test.ts assert. Added shape asserts for the remaining 5 TS integrations,
+all VERIFIED locally with jest (pass):
+
+- openai (integrationOpenAI.test.ts) and googleGenAI (googleGenAI.test.ts):
+  calls[0].attributes.integration.{name, meta.package_name} -> openai/openai,
+  google_genai/@google/genai.
+- openai_agents (openaiAgent.test.ts) and openai_agents_realtime
+  (openaiAgent.realtime.test.ts): multi-call traces (nested openai calls carry their
+  OWN block), so filter calls by attributes.integration.name and assert package_name
+  (@openai/agents, @openai/agents-realtime).
+- pi_coding_agent (piCodingAgent.test.ts): emits OTel SPANS via asOtelAttributes
+  (NOT weave Calls via asAttributes), so its assert reads the flattened dotted keys
+  span.attributes['integration.name'] / ['integration.meta.package_name']
+  (pi_coding_agent / @pi-dev/coding-agent).
+
+## Verification status
+All 5 edited test files PASS jest locally (mocks / in-memory exporters, no network /
+no creds). A negative control (wrong expected value -> test fails) confirmed the
+asserts are load-bearing. prettier clean. eslint NOT run (offline: npx eslint pulls
+from the network and there's no local binary) — but ts-jest typechecks on each run.
+
+## Amendment (PR #7103 review — @drtangible)
+
+Addressed TS-SDK review comments (Python side unchanged):
+- Removed `applyIntegrationMetadata` + its 2 unit tests: no production caller in
+  TS (only self-tested). Python keeps `apply_integration_metadata` (used by the
+  langchain callback) — intentional cross-SDK divergence per the reviewer + user.
+- `interface` -> `type` for `IntegrationMetadata` and `IntegrationAttributes`
+  (reviewer style pref). Both stay exported: `declaration: true` needs
+  `IntegrationAttributes` as `asAttributes`' return type (else TS4053), and the
+  test imports `IntegrationMetadata`.
+- `INTEGRATION_ATTRIBUTE_KEY`: dropped `export` (used only in-file) and `as const`
+  (a `const` string literal is already a literal type; the computed key still
+  satisfies the type — confirmed by typecheck:cjs/esm).
+- Aliased `import {packageVersion as weavePackageVersion}` to disambiguate from
+  `libraryIntegration`'s `packageVersion` option.
+- Tightened anthropic.test.ts: dropped optional-chaining guards, assert the whole
+  `integration` block. `version` matched via `expect.any(String)` because
+  packageVersion is rewritten on every release (a pinned snapshot would break
+  each bump) — chosen over the reviewer's `toMatchInlineSnapshot` suggestion for
+  that reason.
+- KEPT `integration.version` (reviewer asked if it duplicates
+  `weave.client_version`): they answer different provenance questions
+  (emitting-SDK vs integration-code version), only coincidentally equal for
+  first-party integrations, and Python carries it too (trace server reconstructs
+  one shape from both SDKs).
+
+Verified: TS prettier-check (CI gate) clean, typecheck:cjs+esm clean, 15/15 jest
+(anthropic + integrationMetadata) green; Python prek pre-push (ty/pyright/mypy/
+ruff/typos) green. Pre-existing/out-of-scope: 4 eslint consistent-type-imports
+errors in untouched files (eslint is not a CI gate); these were not changed.

@@ -1,0 +1,38 @@
+## Conversation
+Phase-1 PR3 of the import-linter decoupling stack. User: vendor what you need, no shared dir, don't codegen, leave codegen-destined files untouched.
+
+## Actions
+- Target ignores: 'base64_content_conversion -> weave.type_wrappers.Content.content' and 'image_completion -> weave.type_wrappers.Content.content'.
+- Read the FULL wire contract before choosing an approach:
+  - weave/type_wrappers/Content/content.py (the Content class): server uses from_base64/from_data_url/from_url + .data/.mimetype/.model_dump(exclude={'data'}).
+  - weave/type_handlers/Content/content.py: save() writes metadata.json = obj.model_dump(exclude={'data'}); load() reads it into ResolvedContentArgsWithoutData and reconstructs via Content._from_resolved_args(model_construct). So the server's metadata.json MUST have the same key set as the client Content's public fields.
+  - content_types.py ResolvedContentArgsWithoutData = {size,mimetype,digest,filename,content_type,input_type,encoding, +metadata?, +extension?}.
+- Confirmed content_types.py / utils.py / python_magic_resolver.py / polyfile_magic_resolver.py have ZERO weave deps (only sibling + stdlib). Confirmed httpx is already a server dep (errors.py).
+- Created weave/trace_server/content/: cp'd the 4 leaf files verbatim; repointed utils.py's 3 internal imports (content_types + 2 lazy resolver imports) to the new package; hand-wrote a slim content.py.
+- Repointed base64_content_conversion.py + image_completion.py imports (ruff --fix sorted them). Removed the 2 ignores.
+
+## Errors & Mistakes
+- First draft of slim from_url added 'extension' to resolved_args conditionally. WRONG: the original from_url NEVER sets extension (it stays field-default None), unlike from_base64/from_data_url which always set it. Fixed to match — otherwise metadata.json would carry extension:'' vs null.
+- Put 'import base64' inside from_base64 (violates imports-at-top). Moved to module top.
+- ruff I001 unsorted-imports on the 2 repointed files; fixed with ruff --fix.
+
+## Verification
+- lint-imports: 3 kept / 0 broken.
+- ruff: clean on content/ + both repointed files.
+- WIRE PARITY test: server vs client Content.model_dump(exclude={'data'}) byte-identical INCLUDING key order, matching mimetype, for from_base64, from_base64+mimetype, from_data_url, from_data_url+charset. Direct init blocked on both.
+- Existing tests: tests/trace_server/test_base64_content_conversion.py + test_image_completion.py = 32 passed on --trace-server=fake.
+
+## Dead Ends
+Considered a minimal hand-rolled (data,mimetype) decoder (~120 LOC). Rejected: (a) wire format requires the exact field set; (b) magic-based MIME detection is load-bearing for base64 (no filename -> octet-stream -> auto-convert guard skips). Verbatim copy of the leaf cluster is lower-risk.
+
+## Hints for Future Agents
+- The stored weave_type string 'weave.type_wrappers.Content.content.Content' in base64_content_conversion.py:108 is a WIRE CONTRACT (client reads it to pick the type_handler). It must NOT change to the server module path, even though the server now uses its own Content. Left untouched intentionally.
+- If you edit MIME detection in either copy, re-run the wire-parity check — divergent mimetype changes the auto-convert decision and the stored metadata.
+- from_url uses follow_redirects=True (httpx default is False; the client's http_requests/requests followed redirects). Minor behavioral choice for image-URL fetching.
+
+## Codebase Discoveries
+- Content.__init__ raises NotImplementedError; all construction goes through classmethods using model_construct (bypasses validation + __init__).
+- _ref/_art/_last_saved_path are pydantic PrivateAttrs on the client Content -> excluded from model_dump, so dropping them server-side does not change metadata.json.
+
+## Open Questions
+None.

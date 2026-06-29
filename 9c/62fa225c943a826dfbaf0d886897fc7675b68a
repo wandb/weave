@@ -1,0 +1,27 @@
+## Conversation
+Review feedback round 4: the interface PR was massive. User directed: (1) a staging PR at the START removing builtin_object_classes from the client entirely ("not needed in the client, nor will they ever be... follow up PR to add them back"); (2) audit whether the client uses the agents interface ("if not, we can just remove this. Same same for... the rest"); (3) asked whether the duplication should instead be server-owned schemas + GENERATED client models (answered in the summary: yes for declarative models; the conformance corpus covers behavioral contracts).
+
+## Actions
+- Audit: agents types had ZERO client consumers (only the shared tsi protocol signatures referenced them); url_safety's only client consumer was the provider builtin; builtin classes were consumed by the flow wrappers, base_objects, serialize's registry branch, api.py's leaderboard URL branch, and the judge scorer's typed model field.
+- Removed wrappers + exports + tests (test_base_object_classes, test_saved_view, test_leaderboard); de-wrapper-ized test_annotation_feedback (kept the SERVER validation coverage via raw obj_create publishes; deleted the wrapper-conversion tests whose subject was the wrapper itself) and test_feedback's single spec publish; pruned the AnnotationSpec/Leaderboard serialization corpus cases (SavedView's was already commented out).
+- serialize.py: replaced the registry branch with a single LLMStructuredCompletionModel special case (filter to model_fields + validate) -- discovered load-bearing when LLMAsAJudgeScorer round-trips failed (its model field is typed with the builtin; the old branch's field filtering dropped the serialized predict op).
+- Agents: extracted the 9 agent methods + agent_types import from TraceServerInterface into AgentsTraceServerInterface (server-only, defined beside the types). external adapter now declares InternalTraceServerInterface(Full + Agents, Protocol) for the server it wraps; tests spec mocks against it.
+- shared object_class_util's lazy registry import repointed from the deleted weave.trace.base_objects to the contract registry (server-side canonicalization concern).
+
+## Errors & Mistakes
+- First broad battery wrote "no tests ran" because a nonexistent test path (test_objectify.py) was passed -- re-ran with real paths and found the leaderboard test import error + the judge-scorer regression. Lesson: a 0-collected pytest run is a wrong-invocation signal, not a pass.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- The LLMStructuredCompletionModel special case in serialize.py is TEMPORARY: the llm-structured PR later in this stack replaces it (standalone weave/model runnable + a 2-entry client mirror registry). Do not generalize it back into a registry.
+- IN-FLIGHT CAVEAT: the local agent-span-get-api stack adds agent_spans_query to RemoteHTTPTraceServer typed with the agent types -- when that lands, the client needs those types back (per the follow-up generated-models design). "Zero current client importers" was verified TODAY; that stack will change it.
+- tests/flow/test_evaluation_imperative (5 cases) + test_scorer::test_from_obj_unwraps_nested_weave_object fail on PRISTINE MASTER in this env (verified twice via detached worktree earlier this session). Pre-existing.
+
+## Codebase Discoveries
+- The SavedView serialization corpus case was already disabled ("SavedViews are sufficiently messed up that this does not work").
+- api.py's only leaderboard dependency was a vanity URL in the publish printout.
+
+## Open Questions
+- The generated-models follow-up (server-owned schemas -> generated client models, e.g. the dormant Stainless pipeline): the right end-state for declarative models; behavioral contracts stay per-side + corpus-gated.

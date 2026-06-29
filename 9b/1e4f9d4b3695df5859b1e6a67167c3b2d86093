@@ -1,0 +1,33 @@
+## Conversation
+User attached 3 of Dan's (@drtangible) comments on PR #7301 (slice 01, bottom of
+the ADK stack). I investigated, presented options, and the user said "restack
+everything and push" — i.e. proceed with my recommended plan, then list the
+remaining open comments.
+
+## Dan's 3 comments + dispositions
+1. :109 (BEFORE_EXIT_CLEANUPS Set + beforeExitHookRegistered flag, "subject to
+   the CJS/ESM dual-package hazard ... not sure if this needs to follow suit"):
+   LEFT AS-IS (no code change). Unlike the slice-06 plugin holder (where two
+   module copies cause double-tracing), this state's dual-package exposure is
+   benign: each copy registers its own `process.once('beforeExit')` and cleans
+   up its own instances, so no spans are lost — just two listeners. Moving it to
+   state.ts would be consistency-only and tangles with slice 06's googleAdk slot.
+   Stays OPEN/unresolved by choice.
+2. :112 (`interface InvocationState` "could be a simple type"): RESOLVED here —
+   converted to `type InvocationState = {...}`. NB this conflicts on every upper
+   slice (02/03/05/06 each add fields to InvocationState), resolved mechanically
+   by keeping `type` + the accrued fields.
+3. :291 (`can this class implements BasePlugin?`): can NOT be done on slice 01 —
+   the plugin is scaffolding here (only run-span callbacks); BasePlugin is an
+   abstract class with 12 non-optional callbacks, so `implements` requires all
+   12, which only exist at slice 06 (verified count=12; BasePlugin IS importable
+   via the common barrel). PLAN: add `import type {BasePlugin}` +
+   `implements BasePlugin` on slice 06's class decl AFTER the cascade, and verify
+   the 12 signatures satisfy BasePlugin. If signatures don't match, drop it and
+   report.
+
+## Cascade plan (this is the deepest slice — restacks 02/03/05/06)
+After this commit: gt restack, resolve the InvocationState interface→type
+conflict in each slice, restore notes (8 noted commits across the stack; gt
+clean-restack drops them — copy -f by subject), validate every slice, then add
+implements BasePlugin at slice 06, then push all (01 FF; 02/03/05/06 lease).

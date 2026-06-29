@@ -1,0 +1,198 @@
+---
+
+## Session addendum — make full package lint green at stack base
+After the stack was reshaped for standalone ownership, the user asked to run every PR and confirm it is green. The stack-owned checks passed on each branch, but `cd sdks/node && npm run lint` failed on every branch with the same `@typescript-eslint/consistent-type-imports` errors in files unrelated to the Google ADK integration. Since those failures would prevent a literal green result for every PR, applied the mechanical no-behavior `import type` cleanup at the bottom of the stack so all upstack PRs inherit it.
+
+Changed files for this addendum:
+- sdks/node/src/__tests__/clientMock.ts
+- sdks/node/src/clientApi.ts
+- sdks/node/src/integrations/openai-agents/messages.ts
+- sdks/node/src/state.ts
+- sdks/node/src/utils/urlToMediaPart.ts
+- sdks/node/src/weaveClient.ts
+
+This is intentionally a syntax-only lint cleanup: values that were only used as TypeScript types now use inline `type` imports. No runtime code paths changed.
+
+Verification was rerun after this addendum across every surviving stack branch; see the later session summary/logs in .context/stack-green for exact branch-by-branch results. No push performed.
+
+---
+
+## Session addendum - final branch-green verification after base lint cleanup
+The user asked to run each PR in the stack and confirm it is green. Initial stack-owned checks passed, but full sdks/node npm run lint failed on every branch due the same @typescript-eslint/consistent-type-imports errors in unrelated files. A mechanical import-type cleanup was amended into the bottom branch so every surviving PR can pass full package lint. This branch was restacked after that base cleanup and then rerun.
+
+Final verification for this branch:
+- cd sdks/node && PATH=/opt/homebrew/opt/node/bin:$PATH pnpm test -- --runInBand src/__tests__/integrations/googleAdk.test.ts (5 passed, 5 total)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec eslint changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH pnpm exec prettier --check changed TypeScript files (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run build (passed)
+- PATH=/opt/homebrew/opt/node/bin:$PATH npm run lint (passed)
+
+No push performed.
+
+===================================================================
+## ADDENDUM — type-precision pass (later session)
+===================================================================
+
+## Conversation
+User asked to scan the entire google-adk TS stack for type precision and fix:
+(1) any/undefined/null that isn't actually true, (2) lazy `?` where upstream
+is required, (3) over-defensive code that hurts readability. Verified every
+duck type against the REAL @google/adk@1.2.0 + @google/genai .d.ts installed in
+node_modules (ground truth), not from memory.
+
+## Actions (slice 01 — owns the core duck types + run lifecycle + helpers)
+googleAdk.types.ts:
+- AdkPart.text: unknown -> string (genai Part.text is string | undefined; kept `?`)
+- Removed dead fields never read by the impl: AdkPart.thought, AdkBlob.data,
+  AdkEvent.id, AdkInvocationContext.branch, AdkCallbackContext.userContent.
+- AdkEvent.content: dropped `| null` (genai/adk Content is never null, only undefined).
+- AdkInvocationContext.agent/session -> required; AdkSession.id/appName/userId
+  -> required (all required upstream; real types stay assignable to the duck
+  types, verified by tsc against the test which drives the plugin with REAL
+  @google/adk objects).
+googleAdk.ts:
+- toJsonSafe(): any -> unknown (all callers stringify / accept unknown).
+- partToWire: String(part.text) -> part.text (text is now string).
+- finishReasonString / contentToOutputMessage param: unknown ->
+  `string | null | undefined`, dropped the now-redundant String() (FinishReason
+  is a genai string enum).
+- beforeRun/onEvent/afterRun: removed gratuitous `?.`/ternary guards on
+  params.invocationContext (ADK-guaranteed) and ic.agent/ic.session (now
+  required). Kept the empty-string `!invocationId` guard.
+
+## Errors & Mistakes
+- After dropping `?.` in onEventCallback the `invocations.get(...)` call became
+  <80 cols; prettier wanted it on one line. Fixed here (it is slice-01 code) and
+  re-restacked; that re-restack was conflict-free.
+
+## Hints for Future Agents
+- The duck types are deliberately structural (no instanceof). Making a field
+  REQUIRED is safe iff the REAL upstream field is also required — a required
+  real field is assignable to a required duck field. Do NOT make a field
+  required when upstream has it optional.
+- The test imports LlmRequest/LlmResponse from the REAL @google/adk, so tsc
+  validates these duck types against reality. Trust tsc here.
+
+## Verified
+tsc esm+cjs PASS, prettier clean, slice-01 jest 5/5.
+
+===================================================================
+## ADDENDUM — split out unrelated lint cleanup (later session)
+===================================================================
+
+## Conversation
+User reviewed the stack and noted the consistent-type-imports cleanup was
+unrelated to the ADK integration; asked to split it into a separate PR.
+
+## Actions
+Removed the 6 unrelated import-type files from this slice (reverted to the
+master base a4091018a5): src/state.ts, src/clientApi.ts, src/weaveClient.ts,
+src/utils/urlToMediaPart.ts, src/integrations/openai-agents/messages.ts,
+src/__tests__/clientMock.ts. They now live in the standalone branch
+andrew/weave-ts-consistent-type-imports (off master, NOT in this stack).
+This slice now changes only ADK-related files.
+
+## Hints for Future Agents
+- These consistent-type-imports errors PRE-EXIST on origin/master (verified via
+  eslint on master's file versions: 9 errors). Whole-package `npm run lint` is
+  therefore red on master too, so CI does not gate on it — removing the fix from
+  this stack does not make the ADK PRs red. That's why the cleanup is an
+  independent PR rather than a stack prerequisite.
+- The prior "make full package lint green at stack base" addendum above is now
+  historical: that bundling was undone here.
+
+## Verified
+tsc esm+cjs PASS, eslint clean on ADK files, slice-01 jest 5/5 after the split.
+
+===================================================================
+## ADDENDUM — discriminated union for WirePart (later session)
+===================================================================
+User review comment on partToWire's return: asked for a more precise/idiomatic
+type than the loose object. Replaced `type WirePart = Record<string, unknown>`
+with a discriminated union on `type`:
+  | {type:'text'; content:string}
+  | {type:'blob'; mime_type:string}
+  | {type:'tool_call'; id:string; name:string; arguments:unknown}
+  | {type:'tool_call_response'; id:string; response:unknown}
+partToWire/contentToParts/systemInstructionParts all typecheck against it; the
+compiler now catches a misspelled/missing wire-part field. Verified tsc esm+cjs,
+prettier, slice-01 jest 5/5.
+
+Note: toJsonSafe was deliberately LEFT as-is (robust bigint+cycle+catch
+safe-stringify). User asked whether ADK users hit bigint/cycles; answer: not the
+common path, but reachable via tool RETURN values (cycles realistic, bigint
+rare). The branches aren't crash-protection (the try/catch is) — they preserve a
+degraded value instead of nulling the whole result. User did not ask to simplify.
+
+---
+
+## Session addendum — address local review comments on ADK docstrings (2026-06-23)
+
+### Conversation
+User left two local Conductor review comments (not GitHub threads) on slice-01
+files and asked to apply them, then said "push these up":
+1. sdks/node/src/__tests__/integrations/googleAdk.test.ts (lines 12-16):
+   "we dont need this comment" — the Note: paragraph explaining the jest
+   lodash-es -> lodash module-mapping shim.
+2. sdks/node/src/integrations/googleAdk.ts (lines 2-15): "Simplify this. The
+   user doesn't need to know all the details, just that we're implementing an
+   ADK plugin and logging to our OTEL endpoint. We don't need to know the
+   reasons for that."
+
+### Actions
+- Removed the lodash-es Note paragraph from the test file header (the jest
+  moduleNameMapper shim itself stays in jest config; only the explanatory
+  comment was removed).
+- Collapsed the googleAdk.ts module docstring from two rationale paragraphs
+  (why-a-plugin-not-native-OTel-spans, Pi/openai-agents pipeline comparison,
+  Python google_adk parity, Agents-view note) down to two lines: "implemented
+  as an ADK plugin that mirrors agent runs into OpenTelemetry spans and exports
+  them to Weave's agents OTel endpoint." The Usage: code block was untouched.
+- Ran prettier --check and eslint on both files via nvm node + local
+  node_modules/.bin (the PATH `node` is a Bun shim that crashes jest/eslint).
+  Both green.
+- Comment-only change; no behavior, no test impact.
+
+### Git mechanics
+- Folded both edits into slice 01 via `gt modify` (amend), which auto-restacked
+  the four upstack ADK branches 02-plugin-model -> 03-plugin-tool ->
+  05-agent-hierarchy -> 06-auto-instrument. Clean restack, no conflicts.
+- gt's no-conflict restack path DROPPED notes on 02/03/05/06 (known behavior);
+  slice 01's own note survived the amend (git notes.rewrite.amend default).
+  Restored the four with `git notes copy -f <old> <new>`:
+    02 ecfb67e6 -> a15b9b46
+    03 7c3cf5d6 -> 9682be7b
+    05 13349a1c -> da37a9a0
+    06 9305c8ba -> 147510b2
+  slice 01 old 4e2d8850 -> new c7b59dbfbf.
+- Published with `git push --force-with-lease` per branch rather than
+  `gt submit`, to avoid un-drafting the draft PRs (#7301-#7306) and to avoid
+  interactive prompts in a non-interactive shell. Notes pushed via
+  `git push origin refs/notes/commits`.
+
+### Errors & Mistakes
+None.
+
+### Hints for Future Agents
+- Any future `gt modify`/restack on this stack will again drop upstack notes;
+  re-copy old->new SHAs after every restack.
+
+---
+## Session addendum — literal OTEL keys in tests (2026-06-23)
+
+Per review feedback ("use the literal OTEL key instead of the const ... easier
+to read in the test"), googleAdk.test.ts now uses literal OTEL semconv strings
+(e.g. 'gen_ai.output.messages', 'gen_ai.tool.call.id') in place of the
+ATTR_GEN_AI_* consts imported from ../../genai/semconv; the now-unused semconv
+import was removed. TEST-ONLY — production googleAdk.ts still imports the consts.
+
+Applied uniformly across the whole ADK slice stack (01/02/03/05/06) via a
+deterministic, idempotent transform (.context/relit.mjs, gitignored): object
+keys [CONST]: -> 'lit':, property access x[CONST] -> x['lit']. Each upstack
+restack hit the test file and was resolved with `git checkout --theirs` +
+re-running the transform, so every slice's full file ends up literal-ized.
+Notes survived because these restacks took git's conflict path (gt's
+clean-restack path would have dropped them).
+
+Validated: eslint clean, typecheck:esm clean; jest green (tip 26, slice 03 22,
+slice 01 5).

@@ -1,0 +1,54 @@
+## Conversation
+User asked to investigate feasibility of moving server-side trace_server code
+into the core repo, then (after a long grill-me design session) to execute
+"phase 1 in a stack using graphite": untangle OSS-keep modules from
+ClickHouse-only modules so the eventual cut is clean. User chose to root the
+stack on origin/master ("rebase against origin master").
+
+## Actions
+- AST import-graph analysis (.context/split_analysis.py) partitioned
+  weave/trace_server into ~66 OSS-keep vs ~48 core-move modules; interface
+  closure (33 modules) is import-pure (0 edges to CH). Blockers all originate
+  from the fake/sqlite closure.
+- This branch (branch 1/5): grep confirmed CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE
+  is used ONLY in feedback.py (def in ch_settings + 1 use); NOT referenced in
+  the core repo (/Users/andrew/conductor/core/services/weave-trace). So moving
+  it is safe cross-repo.
+- Edits: removed `import clickhouse_trace_server_settings as ch_settings` from
+  feedback.py; added MAX_FEEDBACK_PAYLOAD_SIZE = 1*1024*1024 near top of
+  feedback.py (per repo convention: consts after imports); updated the size
+  check; deleted the orphaned constant from clickhouse_trace_server_settings.py.
+
+## Verification
+- Repo-wide grep: zero remaining refs to CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE.
+- Import smoke: feedback, clickhouse_trace_server_batched, sqlite_trace_server
+  all import; ch_settings no longer has the constant.
+- tests/trace/test_feedback.py: 21 passed, 5 skipped (CH-only) on sqlite.
+- ruff check on both files: clean.
+
+## Errors & Mistakes
+None for this branch. (Env note: fresh Conductor workspace had no .venv;
+recreated with `uv venv --python 3.12 --clear && uv sync --group test --group
+trace_server --group trace_server_tests`.)
+
+## Dead Ends
+Considered adding a regression test for the payload-size guard (currently
+UNtested), but kept branch minimal to avoid scope creep; flagged as a coverage
+gap. ENTITY_TOO_LARGE_PAYLOAD (a different, CH-specific call-size limit) remains
+in ch_settings intentionally.
+
+## Hints for Future Agents
+- Stack is rooted on origin/master (120c265879). Local `master` ref is stale
+  (40cb57e4d9) AND checked out in /Users/andrew/conductor/weave, so it cannot be
+  fast-forwarded from this worktree. gt's local trunk view may show phantom
+  commits until `gt sync` runs elsewhere; PR submission against remote master is
+  still correct. Do NOT submit PRs without user confirmation.
+- The `grep`/`rg` in this shell is aliased with a broken config (mangles -E and
+  substitutes match text); use the Grep tool, not bash grep.
+
+## Codebase Discoveries
+- The "CLICKHOUSE_" prefix was misleading: the cap is enforced pre-storage,
+  backend-agnostic. Renamed to MAX_FEEDBACK_PAYLOAD_SIZE.
+
+## Open Questions
+None for this branch.

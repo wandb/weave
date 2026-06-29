@@ -1,0 +1,51 @@
+## Conversation
+PR4 of the SDK-uptake stack (plan: .context/sdk-uptake-plan.md): physically
+move builtin_object_classes out of trace_server (Codex consult confirmed a
+facade would either violate the upcoming import lint or hide the dependency).
+
+## Actions
+- git mv of the package + url_safety helper; intra-package imports flipped to
+  weave.shared; provider.py's url_safety import flipped.
+- Old-path shims created per submodule (namespace package — there is NO
+  __init__.py at either the old or new location).
+- Client importers updated: weave/trace/base_objects.py, api.py,
+  serialization/serialize.py (lazy import), weave/flow/{leaderboard,
+  annotation_spec,saved_view}.py, weave/scorers/llm_as_a_judge_scorer.py.
+- scripts/generate_base_object_schemas.py output dir updated; regenerated and
+  verified byte-identical json. dev_docs/BuiltinObjectClasses.md paths updated.
+- tests/trace/test_llm_structured_completion_model.py patch targets updated to
+  the new module path.
+
+## Errors & Mistakes
+- First shim attempt was a bare star re-export; test_base_object_classes
+  failed: star-import honors __all__, and test_only_example.__all__ EXCLUDES
+  TestOnlyNestedBaseModel which tests import. Hardened every shim (including
+  PR3's leaf shims) with a PEP 562 __getattr__ forwarding to the impl module.
+- 7 llm_structured_completion_model tests failed after the move because they
+  @patch'd get_weave_client on the OLD module path — patching a shim's
+  attribute does not affect the implementation module's globals. Updated the
+  patch targets. THIS IS THE CANONICAL SHIM GOTCHA: mock.patch targets must
+  name the module where the function is LOOKED UP, and shims are not that
+  module.
+
+## Dead Ends
+None beyond the above.
+
+## Hints for Future Agents
+- weave/shared/builtin_object_classes has shared->client imports
+  (llm_structured_model imports weave.trace.vals, weave.prompt, client
+  context). Pre-existing coupling, moved as-is. Its tsi imports
+  (saved_view.py, llm_structured_model.py) are addressed in PR5.
+- pytest "no tests ran" confusion: tests/flow/test_saved_view.py does not
+  exist; the saved-view tests live at tests/trace/test_saved_view.py.
+- Packaging includes the whole weave/ tree (pyproject include=["weave"]), so
+  the generated json needed no packaging changes.
+
+## Codebase Discoveries
+- builtin_object_classes was ALREADY an implicit namespace package (no
+  __init__.py) — shim files per submodule are sufficient for both
+  `from pkg import mod` and `from pkg.mod import X` forms.
+
+## Open Questions
+- comparison_view.py and saved_view.py also define __all__ — their shims rely
+  on the __getattr__ fallback for any non-__all__ names.

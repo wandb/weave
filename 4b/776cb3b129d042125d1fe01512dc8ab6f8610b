@@ -1,0 +1,30 @@
+## Conversation
+The user asked to fix review findings in the appropriate PR in the fake trace-server stack. This commit owns the in-memory fake's table, file, and ref implementation. The specific finding was that table rows were keyed only by digest, while ClickHouse stores `table_rows` by `(project_id, digest)`. Identical rows in different projects could therefore be attributed to the first project and fail later ref hydration for the second project.
+
+## Actions
+- Used `git blame` to map the table-row storage code to `andrew/fake-ts-tables-files`.
+- Changed `_table_rows` from `dict[str, _TableRowRec]` to `dict[tuple[str, str], _TableRowRec]` keyed by `(project_id, row_digest)`.
+- Updated table creation, table update, table query, table stats, batched row reads, and single row reads to use project-scoped keys.
+- Added `tests/trace/test_weave_client.py::test_refs_read_batch_dataset_rows_multi_project_same_digest`, which saves identical dataset rows in two projects and reads both row refs back.
+- Amended this branch with `gt modify --into andrew/fake-ts-tables-files --all --no-interactive --no-verify`; Graphite restacked descendants.
+- After `ruff-format` rewrote one wrapping site in this file, split that formatting-only delta back into this same branch with another `gt modify --into andrew/fake-ts-tables-files`.
+
+## Errors & Mistakes
+- Initially wrapped a walrus expression in a style that passed `ruff check` but was reformatted by `ruff-format`; fixed by accepting the formatter output and amending the owning branch.
+- The first nox trace invocation selected zero tests due shard selection; reran the exact targeted tests directly with `--num-shards=1 --shard-id=0`.
+
+## Dead Ends
+- None.
+
+## Hints for Future Agents
+- Table digests and row digests are content-addressed, but row storage is still project-scoped in ClickHouse. Do not dedupe `_table_rows` globally across projects.
+- The `project_id` stored on `_TableRowRec` remains useful for stats and defensive checks, even though the dict key is now project-scoped.
+
+## Codebase Discoveries
+- Dataset row refs resolve through `_read_internal_obj_ref` -> `_table_row_read`; that path is a good end-to-end regression for project-scoped row storage.
+
+## Open Questions
+None.
+
+## Rebase / Push Context
+This note was copied from pre-origin-master-rebase commit 9bdd6d50e5d7. The user then explicitly asked to rebase onto origin/master and push. During the rebase, the already-merged fake trace-server skeleton commit was skipped because origin/master contains it as 0caf63ee7e. The stack was restored from reflog after an interrupted/aborted rebase reset visible branch refs to their remote tips, then branch pointers were restored to the rebased refs with origin/master as ancestor.

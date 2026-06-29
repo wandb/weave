@@ -1,0 +1,115 @@
+## Conversation
+User (atruong, weave-trace owner): "Our Agents OTEL endpoint is a bit loose
+atm. We don't enforce that the trace requires a certain shape. Please
+investigate what shape is enforced today and help me tighten this constraint.
+The goal is to ensure that data that ends up in our DB is an expected shape. If
+spans show up in the database that are not expected, we should warn the user
+what the problem is (and ideally provide a way for them to improve their code).
+Optionally the server can reject the span." Also prefixed with "Use no-mistakes."
+
+Interpreted as: warn-by-default (surface actionable guidance), opt-in reject.
+The "Optionally the server can reject" phrasing drove the warn-default +
+env-gated-strict design (non-breaking rollout).
+
+## Actions
+1. Mapped the agent OTel ingest path with Explore agents + direct reads:
+   - HTTP route `/agents/otel/v1/traces` lives in wandb/core (services/
+     weave-trace), NOT this repo. Repo side = the contract + extraction + writer.
+   - genai_otel_export (clickhouse_trace_server_batched.py:6946) ->
+     AgentWriteHandler.insert_otel_spans (agents/clickhouse.py:627) -> per span:
+     Span.from_proto (raises AttributePathConflictError) -> extract_genai_span
+     (opentelemetry/genai_extraction.py:453) -> AgentSpanCHInsertable -> bulk
+     insert into the `spans` table (migration 030).
+   - Response = GenAIOTelExportRes(accepted_spans, rejected_spans, error_message)
+     == OTLP partial-success shape; the calls path (otel_export) already does
+     ExportTracePartialSuccess. error_message reaches the producer via the OTLP
+     exporter's logged warning. OTLP allows error_message with rejected_spans=0
+     (warnings), which is exactly the warn-only channel.
+   - Pre-existing enforcement: STRICT only on structural attr conflicts +
+     pydantic literal/type violations (per-span reject). PERMISSIVE on values:
+     safe_int/safe_float->0, missing strings->'', unknown attrs -> custom_attrs_*
+     maps (size-capped only). NOTHING checked a span was actually a GenAI span.
+   - semconv.py = source of truth (Attribute, KNOWN_KEYS, lookup_keys).
+     schema.py = AgentSpanCHInsertable (CH row). Commit #7346's 'agent-spans
+     schema' validates FILTERS (compile_agent_query), a DIFFERENT path from
+     ingest; not reused here.
+2. Consulted Codex (thread 019ef4aa) on the design. Key adopted feedback:
+   - Post-extraction loses PRESENCE: a real gen_ai.usage.input_tokens=0 looks
+     identical to absence in the row. So the junk gate must read the ORIGINAL
+     span's attribute KEYS, not the extracted row's values.
+   - Do NOT count borrowed generic OTel keys (server.address, error.type,
+     server.port are in KNOWN_KEYS!) as GenAI signal -> use namespace prefixes
+     gen_ai./weave. instead. A plain HTTP span has server.address.
+   - Cut warned_spans response field (no consumer; error_message already
+     carries it). Keep response schema unchanged.
+   - Aggregate by code, not per-span prose. Catalog (code->severity/message/
+     remediation) instead of rich per-instance objects.
+   - warn-default + opt-in reject is right for an ingest compatibility change.
+3. Implemented:
+   - NEW agents/span_validation.py: SpanShapeSeverity, SpanShapeIssueCode,
+     ISSUE_CATALOG, span_claims_genai(attrs, event_names), validate_span_shape(
+     row, *, claims_genai), has_shape_error, summarize_shape_issues. Pure module.
+   - environment.py: wf_genai_otel_reject_shape_errors() (env
+     WEAVE_GENAI_OTEL_REJECT_SHAPE_ERRORS, default false).
+   - agents/clickhouse.py insert_otel_spans: added *, reject_malformed param,
+     per-row validation, Counter aggregation, extended logger.warning,
+     _build_ingest_error_message helper.
+   - clickhouse_trace_server_batched.py genai_otel_export: pass
+     reject_malformed=wf_env.wf_genai_otel_reject_shape_errors().
+4. Tests: test_span_validation.py (29 pure tests), test_genai_otel_ingest_
+   validation.py (real-protobuf wiring: warn stores+reports, strict rejects,
+   strict keeps warning-only, env flag parsing), updated test_agent_scorer_
+   event_ingest.py to feed a real Span (was MagicMock; validation reads
+   span.attributes/events so a MagicMock span breaks the loop).
+
+## Errors & Mistakes
+- Stale py3.14 .venv shipped in the Conductor workspace; tiktoken won't build on
+  3.14 (PyO3 0.22.6 abi3 forward-compat). Fixed per prior knowledge:
+  `uv venv --python 3.12 --clear && uv sync --group test`.
+- First ruff pass flagged D209 (multi-line docstring close) + PLC0207 (missing
+  maxsplit). Auto-fixed. Then ruff format reformatted two test files.
+
+## Dead Ends
+- Considered adding a `warned_spans` response field; cut per Codex (no consumer).
+- Considered counting extracted row fields (operation_name, agent_name) as GenAI
+  signal; rejected because operation_name is inferred from the span NAME prefix
+  (genai_extraction._KNOWN_OP_PREFIXES), so 'chat-service' -> operation_name=
+  'chat' would let generic spans escape the junk gate. Settled on pure namespace
+  presence (gen_ai./weave. attr key OR gen_ai.* event) as the lossless gate.
+- Considered a ClickHouse-gated e2e test of genai_otel_export; the in-memory
+  fake does NOT implement genai_otel_export, and the repo's existing pattern
+  (test_agent_scorer_event_ingest.py) tests insert_otel_spans by mocking only
+  the CH client + proto seam. Used real-protobuf + MagicMock-ch instead (no
+  Docker), which exercises real extraction + validation.
+
+## Hints for Future Agents
+- claims_genai MUST be computed from the original Span (span_claims_genai), NOT
+  the extracted row. Extraction is lossy on presence. If you move validation
+  earlier/later, preserve this.
+- _ended_before_started compares tz-normalized: SENTINEL_EPOCH is tz-AWARE but
+  extraction builds NAIVE datetimes; a raw `<` across the two raises TypeError.
+  Mirrors ch_sentinel_values from_ch_value's tz-insensitive compare.
+- 5 pre-existing mypy errors in agents/clickhouse.py (lines ~241/243/255/257/438
+  on master: str->Literal in pydantic ctor calls via safe_str). They appear in
+  single-file mypy mode and are NOT mine; verified by stashing my diff.
+- The FastAPI route that maps the response to OTLP partial-success is in
+  wandb/core services/weave-trace, not this repo. To actually ENFORCE rejection
+  in prod, set WEAVE_GENAI_OTEL_REJECT_SHAPE_ERRORS=true on the weave-trace
+  server deployment.
+- Did NOT edit AGENTS.md (repo rule asks to, but this user reverted AGENTS.md
+  edits in a prior stack; in-module docstrings cover the new concept). Revisit
+  if the user wants it documented there.
+
+## Codebase Discoveries
+- KNOWN_KEYS (semconv.py) includes non-gen_ai aliases: error.type,
+  server.address, server.port. So it is NOT a safe 'is this GenAI' signal.
+- After unflatten_key_values, dotted attr keys nest under a top-level root
+  ('gen_ai', 'weave'); flat dotted form also possible. span_claims_genai handles
+  both (root membership + dotted prefix).
+- Span.from_proto builds trace_id/span_id via hexlify(bytes); all-zero bytes ->
+  all-'0' hex (not empty). _is_blank_id treats empty AND all-zero as missing.
+
+## Open Questions
+- Should rejection be default-on eventually? Left default-off for safe rollout.
+  Flip via env once real-world rejection rates are observed (per Codex phased
+  plan). Could add a metric for shape_issue_counts by code for that.

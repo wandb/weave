@@ -1,0 +1,20 @@
+## This commit
+Rebuilt for round 8 (shorthand removal); see stack-wide context in
+sibling commits' notes.
+
+## Round 8 addendum: --fk/--fake shorthand removed
+Review comment: 'Dont need this shorthand.' Removed the --fk/--fake
+boolean addoption; the backend is selected only via --trace-server=fake
+(--ch/--clickhouse shorthand is pre-existing on the base, untouched).
+Cascade: get_trace_server_flag lost its --fake branch;
+NOT_CLICKHOUSE_BACKEND (tests/trace/util.py) no longer references
+config.getoption('--fake') — IMPORTANT: it would raise ValueError at
+collection if it referenced a now-unregistered option; AGENTS.md shorthand
+sentence dropped. Verified: skipif gates still fire under
+--trace-server=fake (35 skips across spot files), zero skips on ClickHouse
+(25 passed), full fake shards 1203/115/0 and 1664/44/1 (flask,
+pre-existing).
+
+## Stack Correction Context
+The user pointed out that call-lifecycle test changes should not be in the root call-writes PR because that PR does not own the call lifecycle test enablement. This rewrite removes `tests/trace_server/test_call_lifecycle.py` from `andrew/fake-ts-02-call-writes` and moves `test_call_end_v2_requires_existing_start` plus its `NotFoundError` import into `andrew/fake-ts-calls-read`, the same branch that already ungates `test_call_update_out_of_order`. Future agents should verify per-PR diffs against each Graphite parent, not just the final stack diff.
+Copied from prior rewritten commit 0169b08625ec while correcting call-lifecycle test placement.

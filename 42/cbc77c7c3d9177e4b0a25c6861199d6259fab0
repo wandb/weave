@@ -1,0 +1,30 @@
+## This commit
+Rebuilt for round 7 (deepcopy simplification); see stack-wide context in
+sibling commits' notes.
+
+## Round 7 addendum: _json_deep_copy removed in favor of copy.deepcopy
+Reviewer asked twice why a hand-rolled deep copy exists ('doesn't python's
+deepcopy already do this? I don't see how this implementation is any
+different'). Settled with measurements instead of assertions:
+- Micro: _json_deep_copy was a real ~3x faster than copy.deepcopy on
+  representative payloads (flat 5-key dict 0.39us vs 1.36us; nested
+  call-shape 2.0us vs 5.6us; 50-key dict 3.4us vs 10.9us; 100-row list
+  42us vs 140us) — deepcopy's memo dict + reduce-protocol dispatch is the
+  overhead, exactly as the old docstring claimed.
+- Macro (the question that matters): swapping in copy.deepcopy does NOT
+  move suite wall-clock. tests/trace_server with the custom copy: 71.5s;
+  with copy.deepcopy: 50.4s — i.e. run-to-run noise (this shard ranged
+  49-71s across identical-code runs this session) completely dominates.
+  Per-copy microseconds are invisible behind fixtures/pydantic/client
+  machinery.
+Conclusion: a 3x micro win with no observable effect is not a perf
+justification — simplicity wins. Deleted _json_deep_copy (13 call sites
+-> copy.deepcopy, import copy added). If a future profile ever shows
+payload copying as a real hotspot, the function and its measurements are
+in this note's history; re-specialize only with suite-level evidence.
+
+## Verification (round 7)
+Fake: tests/trace_server 1203/115/0; tests/trace 1664/44/1 (flask,
+pre-existing). Stage splitter re-run: 17 stages, stage17 == canonical
+(now 7254 lines), first-use property holds, all stages import + ruff
+clean.

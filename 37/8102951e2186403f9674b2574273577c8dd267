@@ -1,0 +1,67 @@
+## Conversation
+User asked to "formalize the weave attributes" to shape attributes.integration =
+{name, version, meta} for integration tracking, then update integrations. This is
+the bottom of a 5-PR Graphite stack splitting that work: (1) core [this commit],
+(2) op-based Python integrations, (3) callback Python integrations, (4) agent OTel
+processors, (5) TS SDK.
+
+## What this slice does
+- New module weave/integrations/integration_metadata.py: frozen dataclass
+  IntegrationMetadata(name, version=WEAVE_VERSION, meta) + builders
+  library_integration() / with_integration_metadata() / apply_integration_metadata().
+  as_attributes() -> {"integration": {...}} (nested, for create_call paths).
+  as_otel_attributes() -> flattened dotted keys (for OTel spans, slice 4); OTel
+  attrs must be scalars so nested meta values are stringified.
+- Generic op-level attributes: OpSettings.attributes + op(attributes=...) +
+  Op protocol field. Stored as wrapper.attributes. _create_call merges
+  func.attributes as the LOWEST-precedence base.
+
+## Key decisions (don't "fix" these without reading)
+- version = the INTEGRATING CODE's version (Weave SDK for built-ins), NOT the
+  patched library version. Library version goes in meta.package_version. This
+  matches the user's spec comment ("version of e.g. the weave SDK or claude code
+  plugin version"). A future agent may be tempted to make version the lib version
+  — that's wrong per spec.
+- Precedence: op-level defaults are LOWEST. Codex review caught that injecting them
+  into call_attrs (the __weave dict, which wins over context) would let op defaults
+  override weave.attributes() — wrong. Fix: merge func.attributes as the base in
+  _create_call BEFORE the context attrs, so user context wins on collision.
+- 'weave' key rejected in op-level attributes (op() raises ValueError) because
+  AttributesDict routes 'weave' into the reserved internal subdict.
+- Chose generic op-level attributes over a dedicated 'integration' field so op.py
+  stays integration-agnostic (no 'integration' magic key in core).
+
+## Testing
+tests/trace/test_integration_metadata.py: 22 tests — model/builders, precedence
+(context overrides op defaults; weave subdict preserved), all 4 op execution paths
+(sync/async/gen/async-gen), the direct create_call path, and as_otel_attributes
+flattening. All green on sqlite. ruff clean.
+
+## Gotchas
+- func.attributes is read directly in _create_call (not getattr); every op created
+  via op() sets wrapper.attributes (None default), and deserialized ops are
+  reconstructed via @weave.op, so the attribute always exists.
+- importlib.metadata.version returns PEP440-normalized strings (0.52.43.dev0) which
+  can differ in punctuation from weave.version.VERSION (0.52.43-dev0); tests account
+  for this.
+
+## Amendment (post-submit)
+User asked to (a) remove the AGENTS.md changes from the stack and (b) tighten the
+integration attribute shape as a TypedDict.
+- AGENTS.md reverted to master (git checkout master -- AGENTS.md); it is no longer
+  part of this commit. The conceptual doc was dropped from the stack entirely.
+- integration_metadata.py now defines TypedDicts IntegrationInfo {name, version,
+  meta} and IntegrationAttributes {integration: IntegrationInfo};
+  IntegrationMetadata.as_attributes() returns IntegrationAttributes built via the
+  typed constructor (IntegrationAttributes(integration=IntegrationInfo(...))) so a
+  type checker verifies the shape (a {VAR_KEY: ...} dict literal would NOT, since
+  TypedDict needs literal keys). as_otel_attributes stays a flat dict[str, Any].
+Verified: ruff clean, 22 tests pass, `uvx mypy integration_metadata.py` exit 0.
+Commit amended + `gt restack` ran, so every branch SHA changed and notes were
+re-attached from /tmp/imeta_notes.
+
+## Review follow-up
+Reviewer (Conductor local comment) noted the module docstring's literal
+attributes:{integration:{...}} shape diagram duplicated the IntegrationInfo /
+IntegrationAttributes TypedDicts. Trimmed the docstring to a concise pointer to
+those types plus the attach guidance. Doc-only; ruff clean, tests unaffected.

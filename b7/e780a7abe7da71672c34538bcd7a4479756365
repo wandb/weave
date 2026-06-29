@@ -1,0 +1,68 @@
+## Conversation
+PR7 of the ts-v2 stack: the cross-language ser/de conformance corpus. Originally
+landed as two stacked PRs (corpus+library test, then server round-trip). User
+then directed: "test conformance server should be with the corpus. Then a
+follow up PR should be to test the client." So PR8 (server) was folded into PR7
+and the two commits squashed into this single commit. A separate follow-up PR
+(andrew/ts-v2-conformance-client) adds the client-side consumer.
+
+## What & why
+The trace server's serialization/canonicalization/digest logic lives in Python
+(weave.shared) and is reimplemented (not shared) by other-language SDKs (TS).
+Divergence => different digests for the same object => broken refs/dedup. The
+corpus freezes (input -> expected) examples as JSONL; every SDK ships a consumer
+that asserts its impl reproduces each row.
+
+## Contents
+- conformance/{README.md,generate_fixtures.py,fixtures/*.jsonl}: the
+  language-neutral corpus + spec + generator (generator imports the canonical
+  weave.shared impl; fixtures are frozen).
+- tests/contract/test_conformance.py: library-level consumer (asserts
+  weave.shared functions reproduce every row).
+- tests/contract/test_conformance_server.py: server-path consumer (drives
+  object/row/file rows through client.server.obj_create/table_create/file_create
+  and asserts the server-assigned digest == corpus digest -> pins corpus==server).
+
+## Key facts / hazards
+- Canonicalization = Python json.dumps(sort_keys=True) DEFAULTS: ', '/': '
+  separators WITH spaces, ensure_ascii=True (\\uXXXX), Python float repr. A TS
+  SDK MUST NOT use JSON.stringify. canonical_json is pinned per object/row row.
+- bytes_digest = sha256 -> urlsafe_b64 -> replace -=>X, _=>Y, rstrip '='.
+  table_digest uses HEX of concatenated row-digest strings (different encoding).
+- Validator exception classes are contract: require_* -> CHValidationError,
+  validate_tag/alias -> ValueError.
+- whole-number/large floats are python_only:true (JSON loses int/float in JS);
+  scalar object rows are library-only (a bare scalar is not a server record).
+- The server delegates ALL digesting to weave.shared.digest
+  (sqlite/clickhouse obj_create:1897/1917 -> compute_object_digest_result(
+  req.obj.val, req.obj.builtin_object_class)), so there is one implementation;
+  the server test guards against a future change that normalizes around it.
+
+## Verification
+- tests/contract/: library 48 passed; server 13 passed (sqlite AND clickhouse).
+  ruff + ty clean. import-linter 4 kept / 0 broken (corpus lives outside the
+  weave/ package, so the import graph is unaffected). object_digest
+  'llm_structured_completion_model' round-trips to eCEXZKYo... through obj_create.
+
+## Reorg mechanics (for future agents)
+- gt fold (from the server branch) merged it into the corpus branch but kept TWO
+  commits; squashed via `git reset --soft <parent> && git commit` then
+  `gt restack` (clean, no children to fix). This rewrote the SHA, orphaning the
+  two prior per-commit notes (1e152ae667 corpus, c47b9e8a29 server) -- their
+  content is consolidated here. Did this rather than amend-in-place precisely
+  because rewriting orphans notes (conductor+gt memory).
+
+## Freeze discipline
+Never edit an existing row's expected (wire-break). Add a new id; keep the old
+(mirrors tests/trace/data_serialization). New inputs are always fine: extend the
+case lists in generate_fixtures.py and rerun.
+
+## Open Questions
+None. Follow-up: tests/contract/test_conformance_client.py (publish via the weave
+client, assert ObjectRef.digest == corpus) on andrew/ts-v2-conformance-client.
+
+## Addendum (rename per user diff comment)
+User asked on test_conformance.py: 'is this testing the consumer or the server? I think it should be the server, right?' -- the generic name hid that this is the SHARED-layer test (calls weave.shared functions directly), distinct from the server boundary test (test_conformance_server.py). Renamed test_conformance.py -> test_conformance_shared.py + clarified the docstring so the trio reads shared/server/client by layer. The server IS tested (test_conformance_server.py); kept the shared test because it uniquely pins canonical_json bytes + covers message_template/validator/str/table (no object-write endpoint).
+
+## Addendum 2 (conformance principle -- user)
+User: 'the point of conformance is so that we separate implementation from client and server!' DELETED tests/contract/test_conformance_shared.py. Rationale: testing weave.shared directly against a corpus GENERATED from weave.shared is circular and re-couples the test to the very implementation the corpus is meant to separate out. Conformance now = the SERVER consumer (this PR) + the CLIENT consumer (follow-up), each validating an IMPLEMENTATION against the separated, frozen corpus. Consequence: object/row/file digests stay covered (server + client boundaries); message_template / validator / str_digest / synthetic table_digest lose their only Python consumer (no obj-write boundary). They remain in the corpus as the contract (TS + future conform); whether to add boundary coverage or scope them out of the corpus is an OPEN QUESTION raised to the user.

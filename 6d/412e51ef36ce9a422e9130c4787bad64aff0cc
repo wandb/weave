@@ -1,0 +1,31 @@
+## Conversation
+PR4 of the decouple stack (user chose "1": proceed with PR4/PR5, defer PR2/PR3). Plan called PR4 "four small server->client lifts"; reality narrowed it to TWO real edges.
+
+## Actions
+- Investigated all four planned lifts. Found:
+  - AgentSpanOpName (flow/monitor.py:17, a Literal alias + AGENT_SPAN_OP_NAMES frozenset) -> imported by trace_server/agents/kafka_events.py. REAL edge.
+  - format_message_with_template_vars (prompt/prompt.py:108, pure str-template recursion, raises IncorrectPromptVarError) -> imported by trace_server/llm_completion.py AND interface/builtin_object_classes/llm_structured_model.py. REAL edges.
+  - auto_summarize: object_creation_utils.py:16 references it only inside PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE -- a STRING of op source, NOT a static import. grimp never flagged it. The placeholder op runs client-side (eval worker). NOT a boundary edge -> skipped (deleted the prematurely-created weave/shared/summarize.py).
+  - Content: server uses Content.from_base64/from_data_url + .data/.mimetype/.model_dump. It's a rich CustomWeaveType; not a small lift. Deferred (needs codec/schema extraction).
+- Created weave/shared/agent_op_names.py + weave/shared/message_templating.py (moved code verbatim).
+- Repointed: monitor.py (re-import + re-export), kafka_events.py, llm_completion.py, llm_structured_model.py, prompt.py (re-import format_message; removed local class+func).
+- Updated tests/flow/test_prompt.py to import IncorrectPromptVarError from the new shared home.
+- Removed 3 resolved entries from the "Trace server must not import the client" ignore list (14 -> 11).
+
+## Errors & Mistakes
+- zsh word-split gotcha (see [[project_decouple_trace_server_in_place]] / the trace_server migration memory): `uvx ruff check $FILES` with an unquoted multi-path var passed the whole string as ONE filename -> "No such file or directory" + a misleading "All checks passed!" (0 files). Re-ran with explicit paths.
+- Tried the redundant-alias re-export idiom `IncorrectPromptVarError as IncorrectPromptVarError` for back-compat. This repo's ruff enables PLC0414 ("Import alias does not rename original package") and REJECTS it. Fix: IncorrectPromptVarError isn't publicly exported (only test_prompt.py imported it from prompt), so I repointed the test to the shared module and dropped the re-export. If a public re-export is ever needed here, PLC0414 blocks the alias trick -- use __all__ or a spot # noqa: F401.
+
+## Verification
+- ruff check: All checks passed (after explicit-path rerun + I001 autofix split the import).
+- lint-imports: 3 kept, 0 broken WITH the 3 edges removed from ignores (proves they're gone, not just ignored).
+- tests/flow/test_prompt.py: 5 passed (covers IncorrectPromptVarError + format_message).
+- Runtime import smoke of all touched server+client modules OK.
+
+## Hints for Future Agents
+- All three clean lifts went to weave/shared/ (NOT the contract) on purpose: client callers importing weave.shared is allowed AND server callers importing weave.shared is allowed, so each lift removes a server->client edge with ZERO new edges. Putting them in the contract would have added client->contract edges.
+- llm_structured_model still has 3 server->client edges (trace.vals, weave_client_context, project_id) -> PR2.
+- Content lift still pending; the server needs Content's schema (model_dump), so it needs schema extraction, not just a decode codec.
+
+## Open Questions
+- None for PR4. Next: PR5 (eval worker -> weave/eval_worker/).

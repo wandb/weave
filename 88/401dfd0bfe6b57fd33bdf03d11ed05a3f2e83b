@@ -1,0 +1,30 @@
+## Conversation
+PR0 (commit 2/2): the import-linter guard. User plan: enforce the client<->trace_server boundary with a linter that ignores ALL current violations (green day 1), then burn down in later PRs. End goal: extract weave/trace_server to core. See .context/PLAN.md.
+
+## Actions
+- uv add --group dev import-linter>=2.6 (got import-linter 2.6 + grimp 3.13; regenerated uv.lock cleanly instead of cherry-picking the prior config commit c10820a9a9 whose lock+baseline were stale).
+- Wrote [tool.importlinter] into pyproject.toml: 3 forbidden contracts (client->trace_server, trace_server->client, shared->{client,trace_server}), allow_indirect_imports="true" (DIRECT edges only). Module lists verified vs current top-level weave packages.
+- Baseline: ran lint-imports with empty ignores -> 81 violations. Parsed/bucketed via .context/populate_lint_ignores.py (ANSI-strip, split by the 3 contract headers, dedupe, positional splice into the 3 ignore_imports slots). Counts 65/15/1. (Prior decouple baseline 62/14/1; +3/+1 from the 18 drift commits.)
+- Re-ran: "3 kept, 0 broken" across 440 files / 1332 deps.
+- Added repo-local pre-commit hook import-linter (entry: uv run lint-imports, language: system, pass_filenames false, priority 0), mirroring the ty hook. Verified via prek (pre-push) -> Passed.
+- Documented boundary + burndown + grimp gotcha in AGENTS.md.
+
+## Errors & Mistakes
+- git branch -f master origin/master FAILED ("cannot force update branch master used by worktree /Users/andrew/conductor/weave"). Local master was 18 behind origin and checked out in another Conductor worktree. Fixed by FF inside that (clean) worktree: git -C /Users/andrew/conductor/weave merge --ff-only origin/master. Needed for clean gt PR ranges; side effect: other stale stacks now show needs-restack.
+- Bash grep is ripgrep (\| is literal); a hook-scan grep returned empty. Used Read/Grep tools.
+
+## Dead Ends
+- Cherry-picking c10820a9a9 wholesale: rejected (uv.lock conflict + stale baseline). Re-derived fresh.
+
+## Hints for Future Agents
+- BURNDOWN: later PRs DELETE ignore_imports entries; never ADD. Empty lists = done.
+- allow_indirect_imports must be the STRING "true".
+- Hook uses language: system so uv run uses the PROJECT env (grimp must import real weave).
+- repo-root tests/ are OUTSIDE the weave package -> guard does NOT see test-side client<->server edges (~127+20). They matter only at physical-move time.
+
+## Codebase Discoveries
+- The lone shared->client edge (weave.shared.object_class_util -> weave.trace.base_objects) is a DEFERRED import ("circular import avoidance") but import-linter walks deferred imports -> still flagged. PR1 must replace it with a registration callback.
+- Contract->impl back-edges are clean today; trace_server_interface pulls only agents.types -> PR3 must move agents/{types,constants,schema,semconv}.py with the contract.
+
+## Open Questions
+- gt base set to parent=master (now current). v2 bookmark (andrew/move-trace-server-to-core-v2) left at master.

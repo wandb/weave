@@ -1,0 +1,134 @@
+## Conversation
+User asked for a "fake" trace server: a drop-in replacement for the trace
+server implementations in tests. Success criteria: (1) significantly faster
+in memory than sqlite/clickhouse, (2) drop-in anywhere trace_server is used
+in tests, (3) passes all tests without modifying them unless the test itself
+had a clickhouse/sqlite hack, (4) lives parallel to the sqlite and
+clickhouse impls. Single prompt; no mid-task clarifications (autonomous
+session).
+
+## Actions
+1. Read the full SQLite trace server (weave/trace_server/sqlite_trace_server.py,
+   ~5500 lines) as the behavioral spec, plus orm.py, feedback.py,
+   threads_query_builder.py, interface/query.py, trace_server_common.py,
+   token_costs.py, ttl_settings.py, methods/sqlite_feedback_stats.py,
+   eval_results_helpers.py signatures, tests/conftest.py and
+   tests/trace_server/conftest.py fixture wiring.
+2. Wrote weave/trace_server/in_memory_trace_server.py (~5400 lines):
+   - storage: dicts keyed like the SQLite PKs (_calls by id GLOBALLY, not
+     per project, matching the SQLite PK; _objs by (project, kind, object,
+     digest); _tables by (project, digest); _table_rows by digest with
+     first-writer-wins like the UNIQUE constraint; feedback rows stored in
+     post-SQLite-readback shape: created_at as isoformat(sep=' ') strings,
+     payload JSON-normalized via dumps/loads).
+   - a SQLite-semantics expression layer: _json_extract returns
+     (value, json_type) with bools as 1/0 and objects/arrays as MINIFIED
+     json text; _raw_cast implements prefix-parsing CAST; inferred-cast
+     helpers mirror _sqlite_inferred_json_cast_sql /
+     _sqlite_inferred_scalar_cast_sql; _sql_compare implements NULL +
+     storage-class ordering; _sql_instr is 1-based instr.
+   - calls Query AST + ORDER BY terms COMPILED ONCE into closures
+     (_compile_calls_query/_compile_calls_field/_compile_feedback_field/
+     _compile_calls_sort_field). Initially wrote a per-record interpreter;
+     replaced after profiling (see Errors).
+   - ORM-equivalent evaluation for feedback/costs (_orm_select,
+     _orm_eval_query) incl. datetime-literal normalization, array_string
+     $contains membership, dynamic-field triple sort (exists desc + value),
+     and count(*) aggregate rows.
+   - ports of all builder APIs, costs application, otel_export, threads
+     aggregation, TTL, feedback stats/payload schema.
+3. Wired fixtures: --trace-server=fake + --fk shorthand,
+   get_fake_trace_server, internal_server fallback chain, CH session
+   fixture early-exit; client_is_sqlite treats the fake as sqlite-like.
+4. Iterated on failures across tests/trace, tests/trace_server, flow,
+   bindings, durability, shared, object, compat, utils, wandb_interface,
+   session until results matched sqlite exactly.
+
+## Errors & Mistakes
+- BIGGEST SEMANTIC GOTCHA: SQLite column AFFINITY. First failure was
+  test_calls_query_stats_started_at_window_excludes_deletes:
+  started_at > 99999999999 must return 0 rows because the no-affinity
+  numeric literal is converted to TEXT ('99999999999' > '2026-...').
+  Storage-class ordering alone (numeric < text) returns ALL rows. Fixed
+  with _apply_comparison_affinity + _CALLS_INTEGER_COLUMNS; applies to
+  binary ops AND $in elements.
+- Filter length validation (assert_parameter_length_less_than_max) was
+  initially inside the per-record matcher, so it never fired on an empty
+  store; test_calls_query_hardcoded_filter_length_validation expects the
+  ValueError with zero rows. Hoisted to _validate_calls_filter run once.
+- feedback_query(fields=["count(*)"]) crashed: the ORM treats count(*) as
+  a valid field; added an aggregate branch (count over pre-LIMIT matched
+  rows; LIMIT/OFFSET apply to the single result row).
+- First perf benchmark showed queries 2.5x SLOWER than sqlite and tables
+  1.7x slower: per-record AST interpretation rebuilt closures 15k times,
+  and copy.deepcopy dominated. Fixes: compile-once query/sort closures,
+  _json_deep_copy (plain-JSON recursion), and table_query now sorts/slices
+  on raw (index, digest, val) tuples and materializes pydantic rows only
+  for the returned slice. After: queries 1.4x, objects 4.3x, tables 3.0x,
+  writes 1.6x FASTER than sqlite; costs section at parity (the bench's
+  0.3x readout there is one-time seeding + measurement-order artifact;
+  isolated timing showed 6.6ms cold / 3ms warm vs sqlite 8-10ms).
+- A scripted bulk edit failed with "command not found: python" because a
+  fresh Bash shell has no venv on PATH; reran with source .venv/bin/activate.
+- Several Edit calls failed because ruff --fix reformatted docstrings
+  (D209) between my Write and Edit; had to re-read/replace by line range.
+
+## Dead Ends
+- Considered subclassing SqliteTraceServer over a :memory: connection -
+  rejected: tests already use file::memory:?cache=shared, so no real
+  speedup and not a true parallel implementation.
+- Considered importing the private feedback-stats helpers from
+  methods/sqlite_feedback_stats.py - rejected (sqlite-coupled fetch);
+  ported the pure aggregation logic instead.
+
+## Hints for Future Agents
+- The fake mirrors SQLITE semantics on purpose. client_is_sqlite
+  (tests/trace/util.py) returns True for it; if you add a
+  sqlite-capability gate to a test, it gates the fake too.
+- _calls is keyed by call id with NO project scoping on call_end/
+  call_update/calls_delete - this matches the SQLite schema (id PRIMARY
+  KEY, UPDATE ... WHERE id = ?). Do not "fix" by scoping to project.
+- calls_delete counts num_deleted = len(descendants + requested ids) even
+  if some requested ids do not exist - SQLite does the same.
+- turn_ids in CallsFilter is intentionally IGNORED (SQLite ignores it).
+- table rows: digest UNIQUE globally, first writer wins, reads filter by
+  project - cross-project same-content rows are invisible to the second
+  project, mirroring SQLite.
+- obj_create version_index counts ALL rows for (project, object) including
+  deleted ones; ON CONFLICT resurrects tombstoned versions in place.
+- expire_at stores text; '2100-01-01 00:00:00' default and the computed
+  EXPIRE_AT_NEVER isoformat both normalize to None in responses.
+- The query evaluator's literal handling: bool literals become 1/0
+  (json.dumps renders SQL TRUE/FALSE), dict/list literals compare as
+  minified JSON text (real SQLite would be a syntax error; nothing
+  exercises it today).
+- pytest runs used -p no:randomly for determinism; the suite normally
+  randomizes order.
+- KNOWN pre-existing local failures (fail at HEAD on sqlite too, verified
+  via git stash): tests/flow/test_evaluation_imperative.py
+  test_evaluation_invalid_model_name_* (WeaveInitError when run standalone),
+  tests/flow/test_scorer.py::test_from_obj_unwraps_nested_weave_object,
+  tests/trace/test_weave_client_threaded.py::test_flask_server (cannot
+  bind port in this sandbox).
+
+## Codebase Discoveries
+- tests/trace_server/conftest.py's _ch_session_server early-exits per
+  backend flag BEFORE touching docker because ensure_clickhouse_db yields
+  a lazy factory, not a live server.
+- The ORM's sqlite path DROPS casts on json fields (only ClickHouse
+  applies clickhouse_cast_json_value); sort terms for dynamic fields are
+  exists-desc + the raw value twice.
+- make_threads_query_sqlite does NOT filter deleted_at, and first/last
+  turn ids tie-break by rowid (insertion) order.
+- SQLite's calls_query LIMIT handling: req.limit or -1 means limit=0
+  returns ALL rows; negative limits are unlimited; offset<=0 ignored.
+- nox shard 'trace' = tests/trace + compat + utils + wandb_interface +
+  session; 'trace_server' = tests/trace_server + tests/shared.
+
+## Open Questions
+- The fake is not wired into any CI shard; adding e.g. a
+  tests-3.12(shard='trace_fake') nox target is a natural follow-up.
+- agent_* protocol methods (agent_spans_query etc.) are not implemented -
+  SQLite does not implement them either; revisit when a local backend
+  grows them.
+- threads p50/p99 turn durations return -1 (SQLite placeholder parity).

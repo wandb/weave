@@ -1,0 +1,44 @@
+## Conversation
+Item #2 of the user's "use gt for this" request (after an unused-file scan).
+User: "delete the gql stuff". User's seed hypothesis was "I dont think the
+wb_schema is used anymore" — this confirms and acts on it. Sibling branch
+andrew/rm-orphaned-cassettes holds item #1 (cassettes).
+
+## What & Why
+Deleted wb_schema.gql (757 lines) + .graphqlrc (1 line).
+Evidence the pair is dead tooling:
+- Grep tool (NOT bash grep — see gotcha below): only .graphqlrc references
+  wb_schema.gql (`schema: \"./wb_schema.gql\"`). Nothing references .graphqlrc.
+- No other .graphql/.gql files exist anywhere in the repo (find confirmed only
+  wb_schema.gql). So there are zero GraphQL operations the schema validates.
+- No graphql-codegen config; no UI dir in this repo (Browse3 is in core repo).
+- node SDK (sdks/node/src/wandb/wandbServerApi.ts) uses inline gql strings but
+  no build step checks them against this schema.
+- No reference in .pre-commit-config.yaml, pyproject.toml, Makefile, noxfile.py.
+- git log: wb_schema.gql last meaningfully touched 2023 (#689 just relocated it;
+  #4521 added an @internal directive). .graphqlrc untouched since 2023-10-03.
+
+## Chesterton's Fence
+Checked tooling configs before deleting (.pre-commit-config.yaml, pyproject,
+Makefile, noxfile) — none reference graphql. Safe.
+
+## gt / branch mechanics
+- Based off origin/master tip (120c265879); local `master` is 173 commits stale
+  and checked out in the main worktree, so can't be refreshed here.
+- git checkout -b off the workspace branch, commit, `gt track --parent master`.
+- gt shows '174 commits' — COSMETIC (stale trunk). origin/master..HEAD == 1.
+  GitHub PR base=master will show only the single deletion commit.
+
+## Errors & Mistakes
+- The Bash `grep` alias is ripgrep: `\\|` is literal (not alternation), `-E`/
+  `--include` error out. Early greps gave false 'no matches'. Verified all
+  conclusions with the Grep tool / single-pattern greps instead.
+
+## Hints for Future Agents
+- Not pushed/submitted. Two independent sibling branches off master:
+  andrew/rm-orphaned-cassettes (#1) and andrew/rm-gql-schema (#2).
+- If a future need for GraphQL schema validation arises, this is recoverable
+  from git history (origin/master @ 120c265879).
+
+## Open Questions
+None.

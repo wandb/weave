@@ -1,0 +1,29 @@
+## Conversation
+PR3 of the v2 decouple stack. Delegated to a background subagent (a165f1e4) per .context/pr-3-relocate-contract.md; lead independently verified + committed. This is the big client->server severance.
+
+## Actions (by the subagent, verified by lead)
+- git mv the wire contract out of weave/trace_server/ into weave/shared/: interface/ (whole subpackage incl builtin_object_classes/ + generated/), trace_server_interface/common_interface/service_interface/http_service_interface, constants/errors/ids/trace_server_converter/validation_util, helpers/url_safety, and pure agent contract types agents/{types,constants,schema,semconv} -> weave/shared/agents/.
+- Codemod (.context/pr3_repoint.py + pr3_fix_glued.py): prefix swap weave.trace_server.<moved> -> weave.shared.<moved> across ALL importers (client/server/tests), incl multi-line import blocks, attribute-style refs (weave.trace_server.errors.NotFoundError in pytest.raises), and string module refs (mock.patch). Also updated docs, scripts/generate_base_object_schemas.py, trace_server_mock/.
+- Back-edge fixes (so weave.shared imports neither client nor server): inlined validate_tag_name/validate_alias_name into shared/trace_server_interface.py (were in trace_server/validation.py); inlined EXPIRE_AT_NEVER/SENTINEL_EPOCH into shared/agents/schema.py and made trace_server/ch_sentinel_values.py re-export them (single source).
+- D3: wrote a thorough docstring in weave/shared/__init__.py explaining shared = foundation + wire contract, required by both sides.
+- import-linter ignores: contract-1 (client->server) 64 -> 0; contract-3 (shared->*) 1 -> 0 (PR1 transient removed); PR2 transients removed (now client->shared / shared->shared). contract-2 (server->client) unchanged at 12 (PR4/PR5).
+
+## Verification (lead, independent)
+- uv run lint-imports -> EXIT 0, "3 kept, 0 broken" (442 files). contract-1 ignore list EMPTY.
+- Golden digest eCEXZKYo6MdXGYfTnXgFef5PzBZg2YX1cVYMVozYcmc still matches; import weave OK.
+- Collection clean SEPARATELY: tests/trace 1708, tests/trace_server 1334 (combined hits the pre-existing test_utils.py basename collision).
+- sqlite tests: llm_structured + data_serialization 50p/1s; validation/converter/genai/url_safety 87p; weave_client/trace_server/client_trace 207p/20s; objectify/eval_apis/base_object_classes/eval_ref_get 39p/8s. ruff clean.
+- 263 files changed (32 renames); only 1 genuinely-new file (weave/shared/interface/builtin_object_classes/__init__.py).
+
+## Surprises / discoveries
+- Two contract->impl back-edges NOT in the original audit: shared/errors.py -> validation_util (fixed by moving validation_util to shared); shared/trace_server_interface.py:828 -> validation.validate_alias_name/validate_tag_name (fixed by inlining).
+- Sibling trace_server_mock/ project imports the contract; its docs/code/pyproject needed updates.
+- Codemod first pass glued consecutive `from weave.shared import` lines (consumed leading \n); fixed by a repair pass + ruff import merge.
+
+## Hints for Future Agents
+- weave/trace_server/__init__.py is empty; server impl now imports the contract as weave.shared.* (server->shared, legal).
+- Deferred (locked plan): break the contract out of weave.shared into its own package later. For now shared = foundation + contract.
+- CORE STAGING grew: core also imports the contract from weave.trace_server.* -> must codemod to weave.shared.* at submodule bump. See .context/core-staging.md.
+
+## Open Questions
+- None blocking. PR4 (small server->client lifts) and PR5 (eval worker) next; both reduce contract-2.

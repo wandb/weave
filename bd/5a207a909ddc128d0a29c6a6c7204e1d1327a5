@@ -1,0 +1,21 @@
+## Conversation
+PR 1 (commit 1/2) of the ts-split stack: decouple weave/trace_server from the client so it can move to core verbatim. Plan resolved via grill-me in this session; user confirmed: fresh guard-first stack, STRICT ZERO (server may not import even weave.shared; identity-gated twins instead), eval worker relocates client-side, test-backend question deferred, keep everything LOCAL (no push/submit).
+
+## Actions
+- Cherry-picked f27c517c0a (andrew/ts-v2-guard stack's companion commit) onto master 59cdd382b1. Clean, 0 conflicts.
+- Re-ran the namespace scan (os.walk for dirs with .py but no __init__.py) on current master: NONE missing; the 4 drift commits added no gaps.
+
+## Errors & Mistakes
+None for this commit.
+
+## Dead Ends
+None.
+
+## Hints for Future Agents
+- grimp (import-linter's graph builder) SILENTLY skips PEP 420 namespace packages. NEVER delete these __init__.py files; tests/trace_server/test_import_contract.py::test_no_namespace_packages_under_weave (added in commit 2/2) now enforces this.
+
+## Codebase Discoveries
+- Original commit f27c517c0a on andrew/ts-v2-guard carries a verbose note (git notes show f27c517c0a) with the v2-era context.
+
+## Open Questions
+None.

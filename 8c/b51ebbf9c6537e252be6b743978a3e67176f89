@@ -1,0 +1,82 @@
+## Conversation
+
+User asked to split the long-lived ADK feature branch into a stack: the
+SEMCONV multi-alias change as its own PR, and the ADK integration on top
+of it. The user explicitly said: "rebase on top of the semconv alias
+pr".
+
+## Actions
+
+1. Tried a straight `git rebase andrew/adk-otel-semconv-aliases` — hit
+   conflicts in `pyproject.toml` and `uv.lock` because the long-lived
+   ADK branch was based off stale master and carried hunks that
+   origin/master had since superseded (version bump 0.52.40-dev0,
+   `[tool.uv.workspace] members = ["trace_server_mock"]`).
+2. Aborted the rebase. The 8 commits unique to the ADK branch were all
+   "test"/"wip" checkpoint commits with no history value worth
+   preserving, so opted for a clean reset-and-recommit on top of the
+   semconv branch.
+3. `git reset --hard andrew/adk-otel-semconv-aliases`.
+4. `git checkout 2ff1c8c53f -- weave/integrations/google_adk/
+   scripts/google_adk_otel_custom_tool_example.py
+   tests/integrations/google_adk/` to bring the pure-add files over
+   verbatim.
+5. Re-applied two surgical edits because master had moved on and the
+   old branch versions could not be checked out wholesale:
+   - `weave/integrations/patch.py`: master had renamed `patch_mcp` to
+     `patch_fastmcp`; checking out the whole old file would have
+     reverted that rename. Instead added the `patch_google_adk` function
+     and the `"google.adk": patch_google_adk` mapping entry by hand.
+   - `pyproject.toml`: master had `opentelemetry-api>=1.28.0` pins (the
+     branch lacked them). Added only the new line
+     `opentelemetry-semantic-conventions>=0.63b0` to the existing block.
+6. Ran tests: all 10 in `tests/integrations/google_adk/test_google_adk.py`
+   pass on the new base. Ruff clean.
+7. Single clean commit on top of semconv-aliases tip.
+
+## Errors & Mistakes
+
+- First rebase attempt failed because the old ADK branch carried hunks
+  master had already superseded — predictable in hindsight but worth
+  noting as the trigger for switching strategies.
+- Pre-existing branch was at `2ff1c8c53f` with 8 checkpoint commits
+  ("test"/"wip"). Force-pushing this branch is acceptable because the
+  PR (#6841) is in DRAFT status — confirmed via `gh pr list` before
+  rewriting history.
+
+## Dead Ends
+
+- Conventional rebase (option A in my analysis). Aborted after first
+  conflict — too much in-flight master noise to be worth resolving
+  commit-by-commit when the 8 commits had no history value.
+
+## Hints for Future Agents
+
+- When rebasing a long-lived branch onto a new base, first check the
+  reflog state (`git reflog`) and confirm whether the original commits
+  carry meaningful history. If they're all "test"/"wip" checkpoints,
+  reset-and-recommit is faster than fighting line-by-line conflicts.
+- `git checkout <old-ref> -- <file>` is great for files that are
+  pure-adds. For files that exist on both branches and have diverged
+  (here: `patch.py`, `pyproject.toml`), do surgical edits on the
+  new-base version instead — checking them out wholesale would revert
+  unrelated master changes.
+- The `patch_mcp` → `patch_fastmcp` rename across master between the
+  ADK branch's original base and origin/master was the specific reason
+  `patch.py` could not be checked out wholesale.
+- After force-push, PR #6841 will show the cleaner diff (just ADK +
+  semconv) and the semconv portion will disappear on top once #6916
+  merges, leaving only ADK.
+
+## Codebase Discoveries
+
+- `git log --oneline origin/master..andrew/adk-otel-integration` was a
+  fast way to verify branch divergence (8 commits, all "test"/"wip").
+- `gh pr list --author "@me" --head <branch>` confirmed the upstream
+  PR was a draft before any history rewriting.
+
+## Open Questions
+
+- The ADK PR (#6841) was titled "Preliminary Google ADK integration".
+  Worth refreshing the title to drop "Preliminary" before marking
+  ready-for-review, but that's a user call.

@@ -1,0 +1,25 @@
+## Conversation
+PR2 of the TOO_SLOW stack (item 1, client side). Builds on PR1 (server classifies CH TOO_SLOW as QueryTooExpensiveError -> 400 with error_code QUERY_TOO_EXPENSIVE).
+
+## Actions
+- weave/trace_server_bindings/http_utils.py: added ERROR_CODE_QUERY_TOO_EXPENSIVE constant + QueryTooExpensive(Exception) (mirrors ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED / CallsCompleteModeRequired); handle_response_error raises QueryTooExpensive when error_code matches, using extracted_message/default_message fallback.
+- weave/utils/retry.py: extended the lazy-imported non-retryable check to (CallsCompleteModeRequired, QueryTooExpensive).
+- tests/trace_server_bindings/test_http_utils.py: test_query_too_expensive_raises (400 body w/ error_code+reason -> raises, matches "limit the scope") and test_query_too_expensive_is_not_retryable (_is_retryable_exception is False).
+- pytest tests/trace_server_bindings/test_http_utils.py -> 5 passed. ruff --fix applied (2x D209 docstring close-quote) + reformatted http_utils.py; re-verified clean.
+
+## Errors & mistakes
+Initial test docstrings tripped ruff D209 (multi-line close quote) and one http_utils line exceeded length; fixed with ruff --fix + ruff format.
+
+## Hints & warnings
+- CRITICAL: _is_retryable_exception defaults to RETRY (returns True) for any non-HTTPStatusError. So raising a *custom* exception for a 4xx would have made it retryable again -- the retry.py edit is what actually stops the retry. Letting the raw 400 HTTPStatusError propagate would already be non-retryable, but the user asked for explicit client handling and a catchable type.
+- Client QueryTooExpensive (http_utils, no "Error" suffix) is a DISTINCT class from server QueryTooExpensiveError (errors.py); same split-naming convention as CallsCompleteModeRequired. retry.py imports the CLIENT one from http_utils (lazy, to avoid the http_utils->retry circular import).
+- handle_response_error references the constant/class defined later in the same file; resolved at call time (matches existing CallsComplete pattern).
+
+## Codebase discoveries
+- Client retry policy lives entirely in weave/utils/retry.py (tenacity, retry_max_attempts()); retry_id generated per with_retry call = the retry_id seen on the Datadog spans.
+
+## Dead ends
+Considered NOT adding a custom exception (rely on 400 being non-retryable) -- rejected: user explicitly wanted client-side handling + a catchable type for UIs.
+
+## Open questions
+None for this PR.

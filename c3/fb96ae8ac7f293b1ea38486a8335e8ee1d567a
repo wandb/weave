@@ -1,0 +1,143 @@
+## Conversation
+User: "Update the claude agents sdk OTEL integration support users specifying
+`agent_name`. Right now it defaults to `claude_agent_sdk`."
+
+Arc of the request:
+1. First implemented a claude-specific `claude_agent_sdk_agent_name(...)` context
+   manager exported from the claude subpackage.
+2. Reviewer comment (Conductor local comment on otel_integration.py): "this should
+   be more generic. Does the SDK already have something for this? If so use the
+   generic SDK version instead of exposing this thing. They would all write to
+   gen_ai.agent.name anyways." -> reworked into the generic
+   `weave.session.agent_name_override`.
+3. User asked whether sub-agents get their own trace/invoke_agent span (would need
+   naming). Investigated; user then said "ignore my tangent. Let's just add a way
+   to configure the root agent span name generically." -> sub-agent work dropped.
+4. User: "put this up as draft" -> this commit + draft PR.
+
+## Actions
+- Read otel_integration.py, claude_agent_sdk_integration.py (legacy), patch.py
+  (dispatch), session_otel.py (invoke_agent_attributes is the only emitter of
+  gen_ai.agent.name), autopatch.py, openai_agents/otel_processor.py.
+- Consulted Codex twice. (1) ContextVar vs patch-time arg -> ContextVar (patch is
+  implicit + singleton-cached -> patch-time config is timing-fragile). (2) generic
+  design -> new ambient ContextVar in a small module, public CM
+  `agent_name_override`, internal `resolve_agent_name(default)`, resolve at
+  integration call sites (NOT inside invoke_agent_attributes, which manual session
+  names also use), wire claude + openai.
+- Created weave/session/agent_context.py; exported agent_name_override from
+  weave.session (__all__ is ASCII-sorted: lowercase funcs after Capitalized
+  classes, so it sits before end_llm).
+- claude otel_integration.py: resolve_agent_name(_DEFAULT_AGENT_NAME) once per turn
+  in _trace_turn (stored on _TurnState.agent_name, used by span name + _finalize_turn).
+- openai_agents otel_processor.py: resolve_agent_name(sd.name or "") in BOTH
+  _agent_attrs and the _otel_span_name AgentSpanData branch (kept name + attr in sync).
+- Tests: tests/session/test_agent_context.py (unit), reworked claude otel tests to
+  use agent_name_override, added openai test_agent_name_override_wins_over_native.
+- Env: no .venv existed; created with `uv venv --python 3.12 --clear`,
+  `uv sync --group test --extra claude_agent_sdk --extra openai_agents`.
+- Verified: claude+unit tests 20 passed; openai override test passed (ClickHouse via
+  Docker auto-start); ruff clean; `import weave` does not pull the optional SDK.
+
+## Errors & Mistakes
+- First draft exported agent_name_override (then claude_agent_sdk_agent_name) from
+  weave/integrations/__init__.py. That breaks plain `import weave` when the optional
+  claude_agent_sdk package is NOT installed, because otel_integration.py does
+  `from claude_agent_sdk import ...` at module top and `import weave` runs
+  weave/integrations/__init__.py. Reverted; kept the export on weave.session instead
+  (agent_context.py has no third-party imports, so it is import-safe).
+- openai_agents_otel_test.py imports TaskSpanData/TurnSpanData at module top, which
+  do NOT exist in the lock-pinned openai-agents==0.2.0 -> the whole module fails to
+  collect. Had to `uv pip install -U openai-agents` (got 0.17.5) locally to run the
+  test. Did NOT change uv.lock/pyproject.
+
+## Dead Ends
+- Top-level export from weave.integrations (import-safety, above).
+- Reusing weave.session Session/Turn agent_name as the override source: those CREATE
+  their own invoke_agent span, so auto-instrumentation under them would get a
+  redundant second invoke_agent span. Rejected.
+- Patch-time agent_name argument: timing-fragile under implicit/singleton patching;
+  forces one name per process. Rejected for the ContextVar.
+- Sub-agent nested invoke_agent spans + naming: investigated, then dropped by the
+  user ("ignore my tangent").
+
+## Hints for Future Agents
+- DO NOT export anything from weave/integrations/__init__.py that transitively
+  imports an optional integration package at module top. It runs on `import weave`.
+- The override is SCOPE-WIDE: resolve_agent_name reads the ContextVar, so EVERY
+  invoke_agent span created inside an agent_name_override(...) block takes the name.
+  For claude that is always exactly 1 span/turn (fine). For openai handoffs (multiple
+  agent spans) they would ALL get the same name. If you ever need strict
+  "1 CM = 1 span", implement consume-for-descendants (outermost agent consumes the
+  override; nested fall back). Not done here on purpose.
+- claude_agent_sdk OTel emits exactly 1 invoke_agent per query/turn. It IGNORES
+  parent_tool_use_id, so sub-agent (sidechain) messages currently fold into the root
+  invoke_agent as extra `chat` spans. There is NO nested invoke_agent / separate
+  weave trace for sub-agents (the SDK's separate "session" for sidechains,
+  isSidechain:true, is CLI-internal storage, not a weave span). If you add nested
+  sub-agent spans, name them from the Task ToolUseBlock.input["subagent_type"]
+  (auto, like openai's sd.name) — a context manager cannot reach an auto-spawned
+  sub-agent.
+- Resolve once at span creation (claude does this in _trace_turn on the first
+  __anext__, which runs inside the user's `with` block, so the ContextVar is visible).
+- openai _call_name is SHARED with the legacy (calls) path — do not route the
+  override through it; only the AgentSpanData branches in otel_processor were changed.
+
+## Codebase Discoveries
+- invoke_agent_attributes (weave/session/session_otel.py) is the single emitter of
+  gen_ai.agent.name across integrations — that is why the reviewer said "they all
+  write to gen_ai.agent.name anyways."
+- Precedence chosen: explicit override > integration-native name > integration default.
+- openai-agents API churn: AgentSpanData/Span/Trace exist in 0.2.0, but the test
+  module also needs TaskSpanData/TurnSpanData (newer). The lock pins 0.2.0; the nox
+  shard must use a newer version in CI.
+
+## Open Questions
+- Should the override be consume-for-descendants (outermost-only) rather than
+  scope-wide? Left scope-wide; flagged to the user.
+- Should claude emit nested invoke_agent spans for sub-agents at all? Dropped here.
+- The sibling legacy tests/integrations/claude_agent_sdk/claude_agent_sdk_test.py has
+  PRE-EXISTING failures (len(calls)==1 vs 2) unrelated to this change (verified by
+  stashing and running on a clean tree).
+
+## Review Feedback Rounds (Conductor local comments, post-initial-push)
+Amended into this commit (SHA changed from 601c1026ca). Iterations:
+
+1. "make it generic" (otel_integration.py): the original draft exposed a
+   claude-only `claude_agent_sdk_agent_name`. Reworked into the generic
+   `weave.session.agent_name_override` + resolver used by claude AND openai.
+   (This was the big rework; already reflected in the sections above.)
+
+2. test_agent_context.py "tests a generic feature but uses integration-specific
+   things": rewrote with neutral placeholders. Then "instead of 'fallback', be
+   descriptive — think like a user": settled on `"default_agent_name"` for the
+   default and realistic user labels (`"research_agent"`, `"summarizer_agent"`,
+   `"customer_support_agent"`) for overrides.
+
+3. openai test mock churn — IMPORTANT LESSON. I first answered "does the mock
+   need all these props?" by switching to call the internals `_agent_attrs` /
+   `_otel_span_name` directly via SimpleNamespace. Reviewer pushback: "reaching
+   for the internals is bad form" AND "mock is cleaner, you just don't need all
+   the stuff AROUND it." Final: keep Mock(spec=Span) driving the PUBLIC path
+   (on_span_start/on_span_end -> emitted span), but drop the ceremony — no Trace
+   mock, no on_trace_start/on_trace_end, no `client` fixture. The processor needs
+   NO weave client (grep: zero get_weave_client refs), so pure span-event tests
+   don't need ClickHouse. The span Mock still needs started_at/ended_at/span_id/
+   trace_id/parent_id/span_data/error because the processor READS them
+   (_iso_to_ns(None) is safe, so timing/error = None).
+
+4. resolve_agent_name -> renamed `resolve_agent_name_or_default` (reviewer:
+   "more explicitly written as..."). Also removed the `or ""` from call sites
+   (reviewer: "having to put or '' seems like bad form") by making the resolver
+   accept `str | None` and coalesce to "" internally; added
+   test_none_default_coalesces_to_empty_string. openai call site is now
+   `resolve_agent_name_or_default(sd.name)`.
+
+## Hints for Future Agents (review round)
+- Don't over-correct test-shape feedback by reaching into module internals; the
+  reviewer wants public-interface tests with less ceremony, not internal calls.
+- openai_agents OTel processor tests that only drive on_span_start/on_span_end
+  do NOT need the `client` fixture (no weave client used) -> no ClickHouse.
+- openai-agents lock pin (0.2.0) lacks TaskSpanData/TurnSpanData imported at the
+  top of openai_agents_otel_test.py; need a newer openai-agents (e.g. 0.17.x) to
+  collect that module locally. Unrelated to this change.

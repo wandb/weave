@@ -1,0 +1,38 @@
+## Conversation
+PR2 of the import-linter decoupling stack (Contract A: trace_server -> client).
+See PR1's note (HEAD~1) for the overall plan + the no-shared-helper constraint
++ the Codex strategy thread.
+
+## Actions
+- agents/kafka_events.py imported AgentSpanOpName (a `Literal["weave.genai.
+  turn_ended"]`) from weave.flow.monitor (client). Discovery: the server ALREADY
+  duplicates the op-name SET (AGENT_SPAN_OP_NAMES) in agents/constants.py
+  precisely to avoid importing weave.flow (used by monitor_query_validation),
+  with a test asserting client/server set equality.
+- Added `AgentSpanOpName = Literal["weave.genai.turn_ended"]` to
+  agents/constants.py and changed AGENT_SPAN_OP_NAMES to derive from it via
+  get_args (single in-file source of truth; still plain strings at runtime, no
+  client import). Added `from typing import Literal, get_args`.
+- Repointed kafka_events to import AgentSpanOpName from agents.constants.
+- Removed the ignore from pyproject.toml.
+
+## Verification
+- lint-imports: 3 kept / 0 broken.
+- tests/trace_server/calls_query_builder/test_monitor_query_validation.py: 23
+  passed (incl. the client/server parity assertion at line 44).
+- tests/trace_server/test_agent_scorer_events.py +
+  test_agent_scorer_event_producer.py: 6 passed.
+- ruff check: clean.
+
+## Hints for Future Agents
+- The parity test (test_monitor_query_validation.py:44) compares the two
+  frozensets, NOT the Literals. If you add an op name, update BOTH
+  weave/flow/monitor.py AND weave/trace_server/agents/constants.py or the test
+  fails — by design (they are intentionally independent copies).
+- Chesterton's fence: the old comment said "kept here as plain strings so the
+  trace server needn't import weave.flow." Deriving via get_args on a LOCAL
+  Literal preserves that intent (no client import) while removing the duplicate
+  hardcoded string.
+
+## Open Questions / Dead Ends
+None.

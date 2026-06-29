@@ -1,0 +1,56 @@
+## Conversation
+User asked "Is our PaginatedIterator implementation any good? Can we do better?"
+I reviewed weave/utils/paginated_iterator.py and flagged: (1) @lru_cache on a
+method = process-lifetime memory leak (B019, suppressed via noqa); (2) a
+stateful __next__ vs restartable __iter__ inconsistency; (3) a latent
+offset+limit bug in _get_one; plus minor nits. User said "ok do that as a
+stack of PRs", scoping to what I'd offered: "per-instance cache + drop the
+broken offset path". This commit is PR1 of that stack (the cache fix). The
+iteration-model change was explicitly NOT in scope (it contradicts a
+deliberate prior commit #6115 and touches restartability semantics).
+
+## Actions
+- Read paginated_iterator.py, its tests, and the call.py construction site.
+- git log on the file; confirmed B019 noqa is long-standing.
+- Replaced the @lru_cache-decorated _fetch_page with a bounded per-instance
+  OrderedDict LRU (DEFAULT_MAX_CACHED_PAGES=128, matching the old implicit
+  lru_cache default bound). move_to_end on hit; popitem(last=False) to evict.
+- Added two tests: page reuse within an instance (fetch-count at the
+  fetch_func boundary), and weakref-based release-after-del (the actual leak
+  regression).
+- ruff --fix: clean. pytest tests/utils/test_paginated_iterator.py: 5 passed.
+
+## Errors & Mistakes
+- gt create initially failed: 'master' is checked out in a sibling Conductor
+  worktree (/Users/andrew/conductor/weave), so I cannot checkout master here.
+- gt create --onto master then failed because the current branch
+  (andrew/paginatediterator-review) was UNTRACKED. Fixed by
+  `gt track --parent master` on the review branch first, then
+  `gt create --onto master` succeeded (parent=master, sibling to review).
+
+## Dead Ends
+- Considered a plain unbounded per-instance dict: simpler, but would regress
+  peak memory for large forward iterations (old code bounded to ~128 pages).
+  Chose bounded OrderedDict LRU to preserve that bound.
+- Considered per-instance functools.lru_cache built in __init__: 2 lines but
+  creates a self-reference cycle (self -> cache -> bound method -> self),
+  GC-collectable but icky and not refcount-immediate. Rejected for the
+  explicit OrderedDict (no cycle, debuggable).
+
+## Hints for Future Agents
+- The 128 bound is a const at top; it is NOT a constructor param on purpose
+  (no caller needs to tune it; avoid speculative config).
+- Caching is an optimization, not correctness: restartable iteration and
+  random access work without it (they just refetch). Tests must not assert on
+  internal cache structure -- the release test uses weakref (observable),
+  the reuse test counts fetch_func calls (the external seam).
+- Worktree gotcha: master lives in another worktree; use
+  `gt create --onto master`, never `gt checkout master`, in this workspace.
+
+## Codebase Discoveries
+- PaginatedIterator is not publicly exported; users only receive instances via
+  client.get_calls() (CallsIter = PaginatedIterator[CallSchema, WeaveObject]).
+
+## Open Questions
+- None for this PR. The iteration-model duality (__next__ vs __iter__) remains
+  a known wart, deliberately deferred as a separate, riskier change.

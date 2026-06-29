@@ -1,0 +1,80 @@
+## Conversation
+PR B (final) of the v2 stack, restructured per user feedback: (1) keep
+RemoteHTTPTraceServer as the surviving class with its FULL surface; (2) no
+tests/sdk_bridge.py — tests construct SDK models/JSON, never tsi; (3) lint
+incremental (this PR extends the TID251 ban list); (4) no weave/shared moves
+(client keeps importing the utility leaves: ids, constants, errors,
+feedback_types, trace_server_converter, builtin_object_classes — only the
+MODEL/INTERFACE modules are banned).
+
+## Actions
+- Sources cherry-picked from the superseded stack tip (d3412b7c52) via
+  `git show`, with weave.shared imports reverse-mapped to the original
+  trace_server paths and Stainless names mapped to RemoteHTTPTraceServer.
+- Restored the surface the superseded PR5 had dropped, SDK-typed: v2 object
+  APIs (request envelopes composed from SDK bodies), project_stats, TTL,
+  threads_query_stream (ThreadSchema gap model), feedback_aggregate,
+  calls_complete/call_start_v2/call_end_v2 publics (gap models renamed to the
+  legacy tsi names: CallsUpsertCompleteReq etc.), rescore NotImplemented
+  marker with a real RescoreReq gap model.
+- Builtin schema files (saved_view, llm_structured_model) stay at their
+  trace_server/interface location but now type query/completions fields with
+  SDK / bindings models — the server consumes them through the same package.
+- NEW generic test seam replacing the explicit bridge:
+  tests/trace_server/conftest_lib/request_coercion.py — wraps the in-process
+  server, introspects each method's own first-parameter annotation
+  (get_type_hints), and re-validates foreign pydantic models / dicts into it
+  (dump by_alias + exclude_none, matching the SDK wire encoding). No SDK
+  imports, no per-method code. Wired in tests/conftest.create_client.
+
+## Errors & Mistakes (read these)
+1. SILENT CACHE BUG via functools.wraps omission: the caching middleware
+   namespaces cache keys by func.__name__; the coercion wrapper was named
+   "wrapper", so obj_read entries were cached under "wrapper_..." and the
+   "obj_read_..." invalidation prefixes never matched -> stale tag/alias
+   reads with NO error. @functools.wraps(attr) is load-bearing, not hygiene.
+2. Mixed response identity: cache MISS returned the inner server's family,
+   HIT returned the SDK family -> equality tests caught it. The middleware
+   now normalizes results to its declared response type (no-op in production
+   where the binding already returns SDK models).
+3. `uv sync --group dev` (run for prek) PRUNES the test group and corrupted a
+   full-suite run mid-flight (76 bogus failures incl. missing moviepy);
+   re-sync --group test before pytest. This bit twice this session.
+4. tests/flow/test_evaluation_imperative.py passed tsi ObjectVersionFilter
+   into client._objects -> pydantic rejects foreign models; per the user
+   directive the TEST now constructs the SDK model (client-API tests use the
+   client's currency).
+5. zsh mangles `git show $SRC:path` ($SRC:w parsed as modifier) — quote it.
+
+## Dead Ends
+- Considered converting RESPONSES in the coercion wrapper: would need
+  SDK-type knowledge per method = the bridge again. Responses stay tsi and
+  are duck-typed by field; middleware normalization covers the cached reads.
+
+## Hints for Future Agents
+- The known pre-existing failures under `-p no:randomly` full runs (NOT this
+  stack): test_flask_server, session-settings disabled-spans trio,
+  eval_imperative invalid_model_name family, test_from_obj_unwraps_nested.
+- The middleware-chain walker (tests/trace/server_utils.py) probes instance
+  __dict__ (vars) because three wrappers forward attributes; the coercer's
+  inner attr is `_server` (same as the flushing proxy).
+- SDK 0.0.1 gotchas are documented in the binding module docstring; gap
+  models each carry deletion notes.
+
+## Codebase Discoveries
+- tsi.OpListReq no longer declares `eager`, but the legacy binding still
+  forwarded req.eager (dead/broken since the field was removed). Dropped.
+
+## Open Questions
+- client._objects still requires the SDK ObjectVersionFilter; a casting-style
+  coercion could be added if legacy user code passes tsi filters.
+
+## Addendum (stack split, 2026-06-11)
+Re-cut during the #7177 split (parent chain gained the stainless-removal
+commit). Tree identical to pre-split 801dbac8af except: dead
+remote_only/stainless_only markers gone (removed below), weave_init res
+one-liner lost its annotation (standalone-mypy fix, see parent note), and
+THREE weave_client.py comments that this commit had REGRESSED from
+RemoteHTTPTraceServer back to StainlessRemoteHTTPTraceServer (lines
+439/2203/3103 — cherry-source artifacts from the old stack where the class
+had the stainless name) now say RemoteHTTPTraceServer again.

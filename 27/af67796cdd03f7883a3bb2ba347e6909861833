@@ -1,0 +1,29 @@
+## Conversation
+PR1 of the 6-PR decouple stack (user: "Use gt to make a stack. Move on to the next PRs. You don't need my approval to build the stack."). Goal of PR1 per plan: make weave/shared/ fully free of client imports.
+
+## Actions
+- Read weave/shared/object_class_util.py. The lazy _get_builtin_object_registry() imported BUILTIN_OBJECT_REGISTRY from weave.trace.base_objects (CLIENT).
+- Found weave/shared/digest.py:24,54 is the only consumer (process_incoming_object_val), and weave.trace.base_objects is just a re-export of weave.trace_server.interface.builtin_object_classes.builtin_object_registry.
+- DISCOVERED a layering tension: digest (deepest foundation) -> object_class_util -> BUILTIN_OBJECT_REGISTRY (contract). So foundation needs the contract, contradicting the strict shared<contract layering I'd planned.
+- CONSULTED Codex (thread 019e982f-213c-7091-806d-6d40464a66fd). Codex endorsed option (A): treat shared+contract as ONE cohesive 'shared contract zone'; the registry is part of the canonical digest algorithm, so digest and the object model co-belong. Hard invariant = client⊥server, not strict shared<contract. Guardrail: keep the zone from becoming a dumping ground; leave a 1-sentence ADR.
+- Repointed the lazy import to the contract registry module. Added ADR comment in code, a note in pyproject foundation-contract ignore, and a 'shared contract zone' paragraph in AGENTS.md.
+- Updated the foundation contract ignore entry (swapped client edge -> contract edge).
+
+## Errors & Mistakes
+- Initially assumed PR1 was a trivial one-line repoint (per the older migration memory). It is NOT: it forced the shared/contract layering decision. Resolved via Codex.
+
+## Verification
+- lint-imports: 3 kept, 0 broken.
+- Proved behavior unchanged: _get_builtin_object_registry() returns the IDENTICAL object as both the old client re-export and the contract source (reg is client_reexport == True, reg is contract_src == True). 13 builtin classes.
+- ruff clean. `import weave` works.
+
+## Hints for Future Agents
+- The shared zone (weave.shared + the wire contract) may freely intra-import. Do NOT re-impose strict shared<contract layering. Do NOT point the registry import back at any client module (weave.trace.base_objects).
+- The remaining foundation ignore entry (shared.object_class_util -> trace_server.interface...builtin_object_registry) is zone-internal and gets DELETED in PR3 when the contract relocates to weave.trace_server_interface (then it's no longer under weave.trace_server, so the foundation contract won't flag it).
+- Transitive caveat: the registry imports llm_structured_model which still imports the client; that transitive edge is invisible to the guard (allow_indirect_imports=true) and is resolved in PR2 (split llm_structured_model). The lazy import keeps this from being an import-time cycle.
+
+## Codebase Discoveries
+- weave.trace.base_objects is a pure re-export of the contract's builtin_object_registry. 13 builtin object classes registered.
+
+## Open Questions
+- None. Next: PR2 (split llm_structured_model).

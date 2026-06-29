@@ -1,0 +1,75 @@
+## Conversation
+User: 'In addition to removing the client-side dependency we should similarly
+remove the server-side dependency on shared. We should effectively remove (or
+move) the shared parts into each of the client and server.' This PR
+(andrew/ts-v2-server-digest, on top of the client PR) does the server half of
+the digest decoupling.
+
+## Key insight
+After the client moved to weave.trace.digest, grep showed weave.shared.digest +
+weave.shared.object_class_util were used ONLY by the server (object_class_util is
+imported only by digest). So they were already de-facto server-owned; moving them
+into weave/trace_server/ is clean -- no client involvement, no new boundary edges.
+
+## Actions
+- git mv weave/shared/digest.py -> weave/trace_server/digest.py (fixed its
+  internal import of object_class_util to weave.trace_server.object_class_util).
+- git mv weave/shared/object_class_util.py -> weave/trace_server/object_class_util.py
+  (no edits needed: it imports weave.shared.pydantic_util (foundation) + lazily
+  weave.shared.interface.builtin_object_classes (the contract) -- both server->shared,
+  allowed; NO client import, so no server->client violation).
+- Repointed server importers (sqlite_trace_server, clickhouse_trace_server_batched,
+  object_creation_utils, eval_results_helpers) + conformance/generate_fixtures.py
+  from weave.shared.digest -> weave.trace_server.digest. ruff --fix re-sorted.
+- Removed the digest re-export from weave/shared/__init__.py (grep confirmed no
+  package-level importers) + updated its layout docstring.
+- pyproject.toml: REMOVED the transitional 'Client must own its serialization
+  (shared.digest)' contract -- the forbidden module no longer exists, and the
+  structural contracts (client !-> trace_server, server !-> client, shared !-> both)
+  now enforce the split physically. Back to 4 contracts.
+
+## Why no new contract
+The client cannot import weave.trace_server.digest (contract 1: client !-> trace_server);
+the server cannot import weave.trace.digest (contract 2: server !-> client); shared
+imports neither (contract 3). Physical separation + the existing contracts = stronger
+guarantee than the temporary same-module forbid.
+
+## Verification
+- import-linter: 4 kept / 0 broken. import weave OK (smoke). conformance 19 passed
+  (client 6 + server 13). test_weave_client + test_dataset + data_serialization:
+  125 passed / 14 skipped -- data_serialization round-trips digests through the
+  server, so this confirms the moved server impl is byte-identical. ruff + ty clean.
+
+## State of weave.shared now
+Purely the wire CONTRACT + foundation: trace_server_interface, interface/, agents/,
+refs_internal, ids, errors, constants, trace_server_converter, pydantic_util,
+message_templating, validation_util, helpers. No serialization IMPLEMENTATION left.
+
+## Open / next (raised to user)
+- Tier 2: the wire CONTRACT itself. The client still imports weave.shared for the
+  request/response schemas (the protocol). Fully eliminating weave.shared means the
+  client needs its own protocol copy -- duplicate schemas + schema-conformance, a
+  protocol package, or codegen. A real decision, not done here.
+- pydantic_util + message_templating are still shared (used by BOTH sides); if 'each
+  side owns everything' is the goal they'd be duplicated too (conformance already
+  has message_template rows). Pending user direction.
+
+## Addendum (contract churn collapsed)
+This PR originally REMOVED the transitional 'Client must own its serialization'
+import-linter contract. After user feedback, that contract was dropped from the
+client PR entirely (never added), so this PR no longer touches pyproject.toml --
+the contract churn (add in client PR, remove here) is gone. Enforcement is the
+structural contracts from the guard PR (client !-> trace_server etc.); they
+cover the digest split once weave.shared.digest is removed here. lint-imports
+4/0.
+
+## Addendum (fix: dangling test importers)
+The original server-digest move repointed only weave/ importers and MISSED test
+importers of weave.shared.digest/object_class_util, breaking collection of:
+tests/trace/{test_client_side_digests,test_server_file_storage,test_llm_structured_completion_model}.py,
+tests/shared/test_digest.py, tests/trace_server/test_clickhouse_batching.py
+(+ a stale docstring line in tests/contract/test_conformance_server.py). Repointed:
+test_client_side_digests -> weave.trace.digest (client; uses only client-available
+symbols); the rest -> weave.trace_server.digest / .object_class_util (server;
+they use compute_object_digest_result / process_incoming_object_val, which are
+server-only). LESSON (third time): grep REPO-WIDE incl tests/ when moving a module.

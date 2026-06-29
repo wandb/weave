@@ -1,0 +1,41 @@
+## Conversation
+PR1: page-cache leak fix. Evolved through review:
+1. v1: per-instance OrderedDict LRU.
+2. Review comment "what if a helper func that used lru_cache?" -> switched to a
+   module-level _make_page_fetcher returning an lru_cache-wrapped closure
+   (demo + Codex; user chose it; Codex preferred OrderedDict but user overrode).
+3. Review comment "I wonder if this should be a staticmethod" + "yes" -> moved
+   _make_page_fetcher into PaginatedIterator as a @staticmethod; call site is
+   self._make_page_fetcher(...).
+
+## Actions
+- @staticmethod _make_page_fetcher(fetch_func, page_size, max_cached_pages)
+  returns @lru_cache(maxsize=...) closure over fetch_func+page_size only.
+- Verified staticmethod + class-TypeVar typing with `uvx mypy --strict` on
+  .context/staticmethod_check.py (both free-func and staticmethod forms green).
+- ruff clean; 5 unit tests pass incl. weakref release-after-del (leak guard).
+
+## Errors & Mistakes
+- None. Each gt modify amend changes SHAs and orphans git notes; re-added.
+
+## Dead Ends
+- OrderedDict LRU (v1) and bound-method lru_cache (cyclic). Free-func form
+  superseded by the staticmethod per user preference.
+
+## Hints for Future Agents
+- INVARIANT: the cache closure must not capture the iterator. @staticmethod
+  enforces no-self by construction, but if anyone converts it to a regular
+  method to read self.page_size etc., the leak returns and ruff B019 will NOT
+  flag it (decorator is on the nested fetch_page, not a method). Keep the
+  weakref release test as the guardrail.
+- __init__ calls self._make_page_fetcher before its definition in the class
+  body -- fine, method lookup is at call time.
+
+## Codebase Discoveries
+- PaginatedIterator is fully self-contained: no subclasses; nothing outside
+  paginated_iterator.py touches _fetch_page/_make_page_fetcher/fetch_func; sole
+  construction site is call.py:417. FetchFunc contract unchanged, so no
+  fetch_func implementation needed changes.
+
+## Open Questions
+- Iteration-model duality (__next__ vs __iter__) still deferred.

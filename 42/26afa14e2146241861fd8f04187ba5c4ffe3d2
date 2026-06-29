@@ -1,0 +1,17 @@
+## Conversation
+PR1 of the v2 decouple stack: "shared self-containment". User approved building PR1-5 autonomously (review async). See .context/PLAN.md.
+
+## Actions
+- Repointed weave/shared/object_class_util._get_builtin_object_registry's lazy import from weave.trace.base_objects (client) to weave.trace_server.interface.builtin_object_classes.builtin_object_registry (contract). base_objects.py is a pure re-export of that contract module, so symbol/value are identical.
+- Swapped the contract-3 ignore entry (shared->base_objects => shared->...builtin_object_registry) with a comment that PR3 deletes it when the contract moves into weave.shared.
+- Verified: lint-imports "3 kept, 0 broken"; runtime smoke _get_builtin_object_registry() returns 13 entries incl LLMStructuredCompletionModel.
+
+## Dead Ends
+- Considered a full registration-callback inversion to remove the ignore NOW. Rejected (simplicity-first): the edge resolves naturally at PR3 when the contract joins shared (shared->shared). The audit suggested a callback, but the prior decouple stack + Codex used this simpler repoint.
+
+## Hints for Future Agents
+- Kept the import lazy: contract builtin-class modules can recurse through weave at import time; and after PR3 the contract imports shared, so a top-level shared->contract import could cycle.
+- This PR does NOT reduce the ignore COUNT (still 1 shared edge); it changes shared's dependency from client to contract. PR3 removes it.
+
+## Codebase Discoveries
+- weave/trace/base_objects.py is nothing but a re-export of the contract registry (13 builtin classes + register_base_object).

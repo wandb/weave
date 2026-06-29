@@ -1,0 +1,45 @@
+## Conversation
+User: "Please dont use an inline script. Prefer colocating an actual file along
+side the workflow." The Python logic was already a colocated file
+(scripts/close_stale_draft_prs.py); the remaining inline script was the multi-line
+bash in the workflow's run: block (it built an args array and conditionally
+appended --dry-run). The user wants that gone.
+
+## Actions
+- Added _env_truthy(name) and made main() compute
+  dry_run = args.dry_run or _env_truthy(\"DRY_RUN\"). Documented DRY_RUN in the
+  module docstring's env section.
+- Rewrote the workflow step to a single line: `run: uv run
+  scripts/close_stale_draft_prs.py`, with env GITHUB_TOKEN + DRY_RUN:
+  ${{ inputs.dry_run }}. Dropped --repo (GITHUB_REPOSITORY is auto-set by Actions
+  and the script already defaults --repo to it).
+- Validated: ruff format+check clean, actionlint clean, 17 unit tests pass,
+  _env_truthy parsing spot-checked, and a LIVE `DRY_RUN=true GITHUB_REPOSITORY=...
+  uv run ...` (no flags) against wandb/weave printed the [dry-run] prefix and
+  closed 0 -- proving the env-only invocation the workflow now uses.
+
+## Decisions / Interpretation
+- Kept the file at scripts/ (NOT moved to .github/). Rationale: last turn the user
+  asked to put it \"in python alongside the workflow\" and accepted scripts/
+  (which matches the repo convention scripts/slack_digest.py +
+  slack-digest.yml). \"Alongside the workflow\" in their vocabulary has meant \"a
+  real file the workflow invokes,\" so this message reads as \"the bash is still
+  inline -- move it into the file too,\" which is what was done. If they actually
+  want the file physically under .github/, it's a trivial git mv follow-up.
+- Chose env (DRY_RUN) over a GitHub expression ternary
+  (${{ inputs.dry_run && '--dry-run' || '' }}) so ALL logic lives in the file and
+  the run: line is a pure invocation, not even an Actions expression.
+
+## Errors & Mistakes
+None this round.
+
+## Hints for Future Agents
+- The workflow passes DRY_RUN: ${{ inputs.dry_run }}. On the schedule trigger the
+  inputs context is empty so DRY_RUN=\"\" -> _env_truthy False -> real run. On
+  workflow_dispatch it is \"true\"/\"false\".
+- --dry-run flag still works for local CLI use; the env var is the workflow path.
+- Still no --max-actions-per-run cap; the 1-day grace + 112-PR backlog
+  rate-limit caveat from the prior commit's note still stands.
+
+## Open Questions
+- Confirm scripts/ vs .github/ is the location the user meant by \"alongside.\"

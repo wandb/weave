@@ -1,0 +1,62 @@
+## Conversation
+Round 4 of the in-memory fake trace server stack. Rounds 1-3: built
+SQLite-twin -> re-targeted to ClickHouse on review -> rebased onto #7153
+(sqlite removal). This round, review feedback asked for: (a) PRs around
+~500 lines ('1000 lines is definitely too much'), (b) pytest.mark.skipif
+decorators instead of in-body 'if not client_is_clickhouse: pytest.skip'
+gates, (c) merging the test-wiring PR (#7152, andrew/fake-trace-server)
+into the skeleton PR (#7145).
+
+## What changed structurally
+- The module is now split into 17 stages (was 9); every PR diff is 265-624
+  lines. Ordering note: the feedback APIs intentionally come AFTER the
+  calls dynamic-field stage so the ClickHouse value-semantics helpers
+  (JSON_VALUE/casts/compare) land with the calls engine — the fixpoint
+  assigns module helpers to their FIRST USE, so stage order controls
+  which PR carries shared machinery.
+- Test wiring (conftest --trace-server=fake, util predicates, skipif
+  gates, AGENTS.md) now rides the FIRST branch; #7152 is closed and the
+  andrew/fake-trace-server branch deleted. The fake is selectable from
+  PR 1; the suite only fully passes with --fake at the top of the stack.
+- skipif conversion: in-body gates became
+  @pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason=...) decorators.
+  NOT_CLICKHOUSE_BACKEND (tests/trace/util.py) is a pytest condition
+  STRING evaluated at collection time with config in the namespace —
+  fixture-based predicates can't run there. It mirrors
+  get_trace_server_flag precedence (--clickhouse > --fake >
+  --trace-server). Fixture-internal skips (ch_server,
+  calls_complete/otel/ttl internal_server) stay as pytest.skip — pytest
+  has no fixture-level skipif. client_is_clickhouse(client) remains for
+  the two genuinely mid-test branches (dupe_select partial assertion,
+  call_stats force_merge helper).
+- test_large_keys_are_stripped_call previously early-RETURNED on the fake
+  (counted as passed); it is now an honest skipif (passed->skipped, totals
+  unchanged).
+
+## Verification on this exact tree
+Fake: tests/trace_server 1203 passed / 115 skipped / 0 failed; tests/trace
+1664 / 43 / 1 (test_flask_server, pre-existing env failure on every
+backend). ClickHouse spot-verified after the skipif conversion: every
+converted file runs with ZERO skips on a real ClickHouse backend
+(batching/project_version/lifecycle/feedback 52 passed; annotation_queues/
+queue_filtering/file_storage 71 passed, 0 skipped). Earlier full-CH runs
+on the same tree (pre-refactor, semantics unchanged): 1317/1/0 and
+1681/26/1 — per-shard totals match the fake exactly (1318, 1708).
+
+## This commit (9/17: feedback stats + aggregates)
+feedback_stats buckets and feedback_aggregate mirroring
+build_feedback_aggregate_query (incl. the one-global-row no-GROUP-BY
+rule), feedback_payload_schema.
+
+## PR Description / Lint Follow-up Context
+The user asked to update PR descriptions to match the corrected test ownership. While doing that, `nox --no-install -e lint` exposed that `weave/trace_server/in_memory_trace_server.py` used `NotFoundError` without importing it after the previous stack rewrite. The missing import was amended into `andrew/fake-ts-02-call-writes`, and descendants were restacked. This preserves the corrected PR boundary: the root PR owns the implementation import and write behavior, while call lifecycle test coverage remains in `andrew/fake-ts-calls-read`.
+Copied from prior rewritten commit 01a51b5ee8b0 after the NotFoundError import fix/restack.
+
+## Review follow-up (readability)
+Added a phase-describing docstring and section/inline comments to feedback_stats
+per a local Conductor review comment ('these funcs are so complicated... group
+into logical chunks'). Marked the five phases (window+granularity, fetch rows,
+bin values, per-bucket rows, window rollup) and explained the non-obvious bits
+(granularity capping, dense empty-bucket series, slug column suffixing, boolean
+vs numeric handling). Comments/docstring only -- no behavior change. Applied via
+'gt absorb'.

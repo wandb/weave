@@ -1,0 +1,62 @@
+## Conversation
+User asked for "the minimal set of APIs to support getting agent span data
+back from the trace server in the client." Success = (1) curl, (2) idiomatic
+typed Python + TS clients, (3) a skill to auto-instrument. Work split into
+stacked PRs; grill-me skill used to lock scope. User chose minimal set =
+agent_spans_query + agent_spans_stats + agent_custom_attrs_schema. TS deferred.
+This is PR1 of the stack (bindings only).
+
+## Actions
+- Mapped the agent observability surface: weave/trace_server/agents/ (types,
+  clickhouse, query builders), TraceServerInterface (declares the 9 agent
+  methods at trace_server_interface.py:3063-3090), external_to_internal adapter,
+  and ClickHouse impl (clickhouse_trace_server_batched.py:6832+).
+- Confirmed RemoteHTTPTraceServer had NO agent methods (ingest genai_otel_export
+  also absent client-side; ingest goes via OTLP exporter to /agents/otel/v1/traces).
+- Found the read routes in core: services/weave-trace/src/trace_server.py. They
+  were ONLY on the user's branch andrew/vaduz (workspaces/core/vaduz), NOT on the
+  master checkouts (conductor/core, repos/core). Routes (all include_in_schema=False):
+    agent_spans_query            -> POST /agents/spans/query
+    agent_spans_stats            -> POST /agents/spans/stats
+    agent_custom_attrs_schema    -> POST /agents/spans/custom-attrs/schema
+- Added the three methods after otel_export in remote_http_trace_server.py,
+  each calling _generic_request(path, req, ReqModel, ResModel). Used
+  tsi.agent_types.* (trace_server_interface re-exports agents.types as agent_types).
+- Added tests/trace_server_bindings/test_agent_spans_remote.py: patches
+  weave.utils.http_requests.post (the HTTP edge), asserts endpoint URL + typed
+  parse + request-body serialization. 4 tests, all pass. ruff clean.
+
+## Errors & Mistakes
+- I initially asserted stats/custom_attrs had NO core route. WRONG: I grepped the
+  master core checkouts, not the user's andrew/vaduz branch where they exist. User
+  corrected me. Lesson: check the user's working branch, and the explicitly-added
+  workspace (workspaces/core/vaduz) before concluding absence.
+- First test run failed: .venv was Python 3.14 (stale Conductor default); tiktoken
+  won't build on 3.14. Fixed per known issue: `uv venv --python 3.12 --clear &&
+  uv sync --group test`.
+
+## Dead Ends
+- Considered adding new core routes for stats/schema (cross-repo). Unnecessary —
+  they already exist on andrew/vaduz.
+
+## Hints for Future Agents
+- These routes are include_in_schema=False, so they're absent from weave.openapi.json
+  and the TS generated client. TS bindings (deferred) must be hand-written like
+  sdks/node/src/traceServerBindings/linkAssetToRegistry.ts.
+- _generic_request is annotated -> BaseModel but callers annotate the concrete *Res;
+  this is the established pattern across the file (call_read etc.) — matched it, no
+  cast/ignore.
+- Per user: anything returning *Res stays at the trace-server (RemoteHTTPTraceServer)
+  layer, NOT in the client proper. The only client method (PR2) is get_agent_spans,
+  which returns an iterator of dicts (to_pandas-able) and delegates to agent_spans_query.
+- Stainless variant intentionally skipped (user said not needed).
+
+## Codebase Discoveries
+- tsi.agent_types resolves because trace_server_interface.py does
+  `from weave.trace_server.agents import types as agent_types`.
+- AgentSpanStatsReq requires >=1 metric (validator) and start; build a valid one with
+  a derived total_tokens metric. AgentSpanStatsRes requires start/end/timezone.
+
+## Open Questions
+- None for PR1. PR2 (get_agent_spans iterator-of-dicts, wire __len__ via total_count)
+  and PR3 (write-first skill) follow in the stack.
