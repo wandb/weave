@@ -1,4 +1,4 @@
-"""OTel attribute builders for the Weave Session SDK.
+"""OTel attribute builders for the Weave Conversation SDK.
 
 Each function returns a dict of GenAI semantic convention attributes
 for a specific span type. These are pure functions that build attribute
@@ -37,7 +37,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from weave.session.types import MediaAttachment, Message, Reasoning, Usage
+from weave.conversation.types import MediaAttachment, Message, Reasoning, Usage
 
 
 def _media_to_part(media: MediaAttachment) -> dict[str, Any]:

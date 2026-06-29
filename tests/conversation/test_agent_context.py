@@ -1,6 +1,6 @@
 """Unit tests for the generic agent-name override.
 
-Exercises ``weave.session.agent_name_override`` and the internal
+Exercises ``weave.conversation.agent_name_override`` and the internal
 ``resolve_agent_name`` resolver that auto-instrumentation integrations call.
 """
 
@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from weave.session import agent_name_override
-from weave.session.agent_context import resolve_agent_name
+from weave.conversation import agent_name_override
+from weave.conversation.agent_context import resolve_agent_name
 
 
 def test_resolve_returns_default_when_unset() -> None:

@@ -7,7 +7,7 @@ on it. Some SDKs expose a native agent name (OpenAI Agents); others don't
 lets a user name those auto-created spans for a block of work, regardless of
 which integration produced them.
 
-This is deliberately distinct from ``weave.session.start_turn(agent_name=...)``,
+This is deliberately distinct from ``weave.conversation.start_turn(agent_name=...)``,
 which *creates* a manual ``invoke_agent`` span. The override here only relabels a
 span created elsewhere — it never creates a span of its own.
 """
@@ -33,7 +33,7 @@ def agent_name_override(agent_name: str) -> Iterator[None]:
     integrations stamp on their ``invoke_agent`` span::
 
         import weave
-        from weave.session import agent_name_override
+        from weave.conversation import agent_name_override
 
         weave.init("my-project")
 

@@ -29,10 +29,10 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from weave.conversation.agent_context import agent_name_override
 from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 from weave.integrations.openai_realtime.otel_state_exporter import OTelStateExporter
 from weave.integrations.openai_realtime.state_exporter import StateExporter
-from weave.session.agent_context import agent_name_override
 
 _MODEL = "gpt-4o-realtime-preview"
 _SESSION_ID = "sess_1"

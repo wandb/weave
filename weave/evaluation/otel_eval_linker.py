@@ -9,7 +9,7 @@ It also injects eval metadata (call ID, evaluation name, project) onto the
 span so the agent traces UI can deep-link and filter by eval run.
 
 Register this processor alongside the ``BatchSpanProcessor`` during
-``_setup_session_tracing`` in ``weave_init.py``.
+``_setup_conversation_tracing`` in ``weave_init.py``.
 """
 
 from __future__ import annotations

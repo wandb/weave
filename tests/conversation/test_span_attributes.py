@@ -13,13 +13,13 @@ import logging
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from weave.session.session import (
+from weave.conversation.conversation import (
     LLM,
-    Session,
+    Conversation,
     SubAgent,
     Tool,
     Turn,
-    log_session,
+    log_conversation,
     log_turn,
 )
 
@@ -51,7 +51,7 @@ def _only_span(spans: list, span_name: str):
 def test_set_attributes_lands_on_span(
     otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="test-session"), factory() as span_obj:
+    with Conversation(conversation_id="test-conversation"), factory() as span_obj:
         span_obj.set_attributes({"weave.first": "one", "weave.second": "two"})
     finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
     assert finished_span.attributes["weave.first"] == "one"
@@ -64,7 +64,7 @@ def test_set_attributes_lands_on_span(
 def test_set_attributes_no_op_after_end(
     otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="test-session"):
+    with Conversation(conversation_id="test-conversation"):
         span_obj = factory()
         with span_obj:
             pass
@@ -78,7 +78,7 @@ def test_set_attributes_accepts_sequence_value(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     """OTel accepts ``Sequence[str]`` — used for e.g. ``gen_ai.response.finish_reasons``."""
-    with Session(session_id="test-session"), LLM(model="gpt-4o") as llm:
+    with Conversation(conversation_id="test-conversation"), LLM(model="gpt-4o") as llm:
         llm.set_attributes({"gen_ai.response.finish_reasons": ["stop"]})
     chat_span = _only_span(otel_spans.get_finished_spans(), "chat gpt-4o")
     assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
@@ -95,7 +95,7 @@ def test_set_attributes_accepts_sequence_value(
 def test_add_event_records_on_span(
     otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="test-session"), factory() as span_obj:
+    with Conversation(conversation_id="test-conversation"), factory() as span_obj:
         span_obj.add_event("weave.evt", {"event_key": "event_value"})
     finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
     assert len(finished_span.events) == 1
@@ -109,7 +109,7 @@ def test_add_event_records_on_span(
 def test_add_event_no_op_after_end(
     otel_spans: InMemorySpanExporter, _class_label, factory, span_name
 ) -> None:
-    with Session(session_id="test-session"):
+    with Conversation(conversation_id="test-conversation"):
         span_obj = factory()
         with span_obj:
             pass
@@ -130,7 +130,7 @@ def test_returns_self_for_chaining(
     otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
 ) -> None:
     """Both mutators return ``self`` for fluent chaining on a live span."""
-    with Session(session_id="test-session"), factory() as span_obj:
+    with Conversation(conversation_id="test-conversation"), factory() as span_obj:
         assert span_obj.set_attributes({"key": "value"}) is span_obj
         assert span_obj.add_event("event-name") is span_obj
 
@@ -139,7 +139,7 @@ def test_warns_when_span_not_started(
     caplog: pytest.LogCaptureFixture, otel_spans: InMemorySpanExporter
 ) -> None:
     """Both mutators warn and emit no span when called before ``with``."""
-    caplog.set_level(logging.WARNING, logger="weave.session.session")
+    caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
     tool = Tool(name="test-tool")
     tool.set_attributes({"weave.first": "one"})
     tool.add_event("weave.evt")
@@ -151,8 +151,8 @@ def test_warns_when_span_not_started(
 
 def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None:
     """Both mutators warn when called after ``end()``."""
-    caplog.set_level(logging.WARNING, logger="weave.session.session")
-    with Session(session_id="test-session"):
+    caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
+    with Conversation(conversation_id="test-conversation"):
         tool = Tool(name="test-tool")
         with tool:
             pass
@@ -164,17 +164,19 @@ def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None
 
 
 # ---------------------------------------------------------------------------
-# Session attributes (stamped on every span)
+# Conversation attributes (stamped on every span)
 # ---------------------------------------------------------------------------
 
 
-def test_session_attributes_on_every_streaming_span(
+def test_conversation_attributes_on_every_streaming_span(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """A session's attributes land on the turn root and every child span."""
+    """A conversation's attributes land on the turn root and every child span."""
     attrs = {"weave.integration.name": "wb-agent", "custom.tier": "gold"}
-    with Session(session_id="s", attributes=attrs) as session:
-        turn = session.start_turn(agent_name="bot")
+    with Conversation(
+        conversation_id="convo-attrs-streaming", attributes=attrs
+    ) as conversation:
+        turn = conversation.start_turn(agent_name="bot")
         with turn:
             with turn.llm(model="gpt-4o"):
                 pass
@@ -195,12 +197,12 @@ def test_session_attributes_on_every_streaming_span(
         assert span.attributes["custom.tier"] == "gold"
 
 
-def test_session_attributes_on_every_batch_span(
+def test_conversation_attributes_on_every_batch_span(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     """log_turn applies attributes to the turn and its child spans."""
     log_turn(
-        session_id="s",
+        conversation_id="convo-attrs-batch",
         agent_name="bot",
         spans=[LLM(model="gpt-4o"), Tool(name="Edit")],
         attributes={"weave.integration.name": "wb-agent"},
@@ -211,16 +213,16 @@ def test_session_attributes_on_every_batch_span(
         assert span.attributes["weave.integration.name"] == "wb-agent"
 
 
-def test_session_attributes_on_every_log_session_span(
+def test_conversation_attributes_on_every_log_conversation_span(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """log_session applies attributes to every turn root and child span."""
-    log_session(
+    """log_conversation applies attributes to every turn root and child span."""
+    log_conversation(
         turns=[
             Turn(agent_name="bot", spans=[LLM(model="gpt-4o")]),
             Turn(agent_name="bot", spans=[Tool(name="Edit")]),
         ],
-        session_id="s",
+        conversation_id="convo-attrs-log-conversation",
         attributes={"weave.integration.name": "wb-agent"},
     )
     spans = otel_spans.get_finished_spans()
@@ -229,11 +231,11 @@ def test_session_attributes_on_every_log_session_span(
         assert span.attributes["weave.integration.name"] == "wb-agent"
 
 
-def test_no_session_attributes_by_default(
+def test_no_conversation_attributes_by_default(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    with Session(session_id="s") as session:
-        with session.start_turn(agent_name="bot"):
+    with Conversation(conversation_id="convo-attrs-default") as conversation:
+        with conversation.start_turn(agent_name="bot"):
             pass
     span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
     assert "weave.integration.name" not in (span.attributes or {})

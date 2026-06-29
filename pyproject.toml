@@ -50,7 +50,7 @@ dependencies = [
   # Remove once license content filtering is upstreamed
   "polyfile-weave>=0.5.9",
 
-  # Session SDK — uses OTel GenAI semantic conventions for span emission
+  # Conversation SDK — uses OTel GenAI semantic conventions for span emission
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
@@ -602,6 +602,7 @@ forbidden_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",
@@ -647,6 +648,7 @@ source_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",
@@ -748,6 +750,7 @@ forbidden_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",
