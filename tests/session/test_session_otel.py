@@ -40,6 +40,7 @@ from weave.session.session import (
     start_llm,
     start_session,
     start_tool,
+    start_turn,
 )
 from weave.session.session_otel import (
     execute_tool_attributes,
@@ -130,6 +131,24 @@ class TestInvokeAgentAttributes:
         assert "gen_ai.conversation.name" not in attrs
         assert "gen_ai.provider.name" not in attrs
         assert "gen_ai.request.model" not in attrs
+
+    def test_system_instructions_serialized(self) -> None:
+        attrs = invoke_agent_attributes(
+            agent_name="bot", system_instructions=["Be helpful", "Be concise"]
+        )
+        # Same TextPart array shape as the chat span (per semconv).
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "Be helpful"},
+            {"type": "text", "content": "Be concise"},
+        ]
+
+    def test_empty_system_instructions_omitted(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="bot", system_instructions=[])
+        assert "gen_ai.system_instructions" not in attrs
+
+    def test_none_system_instructions_omitted(self) -> None:
+        attrs = invoke_agent_attributes(agent_name="bot", system_instructions=None)
+        assert "gen_ai.system_instructions" not in attrs
 
     def test_input_messages_serialized(self) -> None:
         msgs = [Message(role="user", content="Hello")]
@@ -892,6 +911,57 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.conversation.id"] == "sess-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
 
+    def test_turn_system_instructions_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="weather-bot", session_id="sess-si") as s:
+            with s.start_turn(user_message="hi") as turn:
+                turn.system_instructions = ["You are a weather bot"]
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent weather-bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+
+    def test_turn_system_instructions_omitted_when_content_excluded(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(
+            agent_name="bot", session_id="sess-si2", include_content=False
+        ) as s:
+            with s.start_turn() as turn:
+                turn.system_instructions = ["secret prompt"]
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert "gen_ai.system_instructions" not in attrs
+
+    def test_start_turn_system_instructions_param_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="weather-bot", session_id="sess-si-param") as s:
+            with s.start_turn(system_instructions=["You are a weather bot"]):
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent weather-bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+
+    def test_module_start_turn_system_instructions_param(self) -> None:
+        # weave.start_turn(...) wires the field onto the returned Turn whether
+        # or not a session is active (delegates to Session.start_turn when one is).
+        turn = start_turn(system_instructions=["You are a weather bot"])
+        assert turn.system_instructions == ["You are a weather bot"]
+
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Session(agent_name="bot", session_id="sess-llm") as s:
             with s.start_turn() as turn:
@@ -951,6 +1021,25 @@ class TestOTelSpanEmission:
         assert sa_spans[0].context.trace_id == turn_spans[0].context.trace_id
         # SubAgent's parent should be the Turn span
         assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
+
+    def test_subagent_system_instructions_via_factory(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(
+                    name="research-bot",
+                    system_instructions=["You research things"],
+                ):
+                    pass
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
 
     def test_parent_child_hierarchy(self, otel_spans: InMemorySpanExporter) -> None:
         """LLM and Tool are both children of Turn (flat model)."""
@@ -1346,6 +1435,55 @@ class TestLogTurn:
         assert len(turn_spans) == 1
         assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
 
+    def test_subagent_system_instructions_emitted(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-sa-si",
+            agent_name="orchestrator",
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    system_instructions=["You research things"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(2),
+        )
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
+
+    def test_subagent_system_instructions_omitted_when_content_excluded(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-sa-si2",
+            agent_name="orchestrator",
+            include_content=False,
+            spans=[
+                SubAgent(
+                    name="research-bot",
+                    system_instructions=["secret prompt"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+            ],
+            started_at=_ts(0),
+            ended_at=_ts(2),
+        )
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert "gen_ai.system_instructions" not in attrs
+
     def test_continue_parent_trace_nests_under_outer_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
@@ -1423,6 +1561,25 @@ class TestLogTurn:
             assert "gen_ai.system_instructions" not in attrs
             assert "gen_ai.tool.call.arguments" not in attrs
             assert "gen_ai.tool.call.result" not in attrs
+
+    def test_system_instructions_emitted_on_turn_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-si-batch",
+            agent_name="bot",
+            system_instructions=["You are a weather bot"],
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
 
     def test_no_spans_just_emits_turn(self, otel_spans: InMemorySpanExporter) -> None:
         result = log_turn(
