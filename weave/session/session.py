@@ -945,7 +945,9 @@ class Turn(_SpanBase):
         Collapses the per-field assignments a manually-instrumented agent
         otherwise makes on a turn (``system_instructions``, ``agent_id``,
         ...) into a single keyword call. Only fields explicitly passed
-        (non-``None``) are applied — existing values are preserved. Returns
+        (non-``None``) are applied — existing values are preserved.
+        ``messages`` **replaces** the turn's existing messages (unlike
+        ``Turn.user(...)``, which appends a single message). Returns
         ``self`` for chaining. Mirrors ``LLM.record``.
 
         Note: on the streaming (``with``) path the turn span is named from
