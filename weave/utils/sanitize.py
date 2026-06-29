@@ -19,12 +19,13 @@ def add_redact_key(key: str) -> None:
         key: The key name to add to the redaction list.
              The key will be matched case-insensitively.
 
-    Example:
-        >>> import weave
+    Examples:
         >>> from weave.utils import sanitize
-        >>> weave.init("my-project", settings={"redact_pii": True})
-        >>> sanitize.add_redact_key("token")
-        >>> sanitize.add_redact_key("client_id")
+        >>> sanitize.should_redact("session_token")
+        False
+        >>> sanitize.add_redact_key("session_token")
+        >>> sanitize.should_redact("Session_Token")  # matched case-insensitively
+        True
     """
     _REDACT_KEYS.add(key.lower())
 

@@ -28,7 +28,10 @@ def first(iterable: Iterable[T]) -> T:
         'h'
         >>> first(range(5))
         0
-        >>> first([])  # Raises StopIteration
+        >>> first([])
+        Traceback (most recent call last):
+            ...
+        StopIteration
     """
     return next(iter(iterable))
 

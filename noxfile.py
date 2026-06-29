@@ -57,12 +57,17 @@ def lint(session: nox.Session):
 DOCTEST_MODULES = [
     "weave/utils/project_id.py",
     "weave/utils/dict_utils.py",
+    "weave/utils/iterators.py",
+    "weave/utils/sanitize.py",
     "weave/trace/view_utils.py",
     "weave/trace_server/call_stats_helpers.py",
     "weave/trace_server/clickhouse/utilities.py",
     "weave/trace_server/trace_server_common.py",
     "weave/trace_server/feedback_payload_schema.py",
+    "weave/trace_server/object_creation_utils.py",
+    "weave/trace_server/opentelemetry/helpers.py",
     "weave/trace_server/orm.py",
+    "weave/integrations/langchain/helpers.py",
 ]
 
 
