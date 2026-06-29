@@ -559,8 +559,8 @@ def shorten_name(
         >>> shorten_name("hello/world.txt", 20)
         'hello/world.txt'
         >>> shorten_name("verylongword", 8)
-        'verylo...'
-        >>> shorten_name("hello/world.txt", 10, ":1234" use_delimiter_in_abbr=False)
+        'veryl...'
+        >>> shorten_name("hello/world.txt", 10, ":1234", use_delimiter_in_abbr=False)
         'hello:1234'
     """
     if len(name) <= max_len:

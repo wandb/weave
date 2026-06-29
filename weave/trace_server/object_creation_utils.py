@@ -139,7 +139,7 @@ def build_op_val(file_digest: str, load_op: str | None = None) -> dict[str, Any]
         Dictionary with the complete structure for an Op object ready for storage
 
     Examples:
-        >>> result = build_op_val_with_file_digest("abc123")
+        >>> result = build_op_val("abc123")
         >>> result["files"][OP_SOURCE_FILE_NAME]
         'abc123'
     """

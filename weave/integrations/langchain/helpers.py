@@ -78,8 +78,10 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
         Full model name if found, otherwise returns the partial model name
 
     Examples:
-        >>> _find_full_model_name(output, "gemini-1.5-pro")
-        "gemini-1.5-pro-002"  # if found in the flattened output
+        >>> _find_full_model_name({"meta": {"model": "gemini-1.5-pro-002"}}, "gemini-1.5-pro")
+        'gemini-1.5-pro-002'
+        >>> _find_full_model_name({}, "gpt-4")
+        'gpt-4'
     """
     # Flatten the entire output to search for model names
     # Look for values that start with the partial model name and are longer
