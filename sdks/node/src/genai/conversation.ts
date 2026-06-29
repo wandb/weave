@@ -59,6 +59,23 @@ export class Conversation {
     return conversation;
   }
 
+  /**
+   * Start a new `Turn` under this `Conversation`. The turn inherits the
+   * conversation's `conversationId`; `agentName` and `model` fall back to
+   * the conversation's values when not provided on `opts`.
+   *
+   * @example
+   * const turn = conversation.startTurn();
+   *
+   * @example
+   * const turn = conversation.startTurn({
+   *   model: 'gpt-4o',
+   *   agentName: 'research-bot',
+   *   userMessage: 'What is the weather in Tokyo?',
+   *   systemInstructions: ['You are a helpful weather bot.'],
+   *   startTime: new Date('2026-05-29T10:00:00.000Z'),
+   * });
+   */
   startTurn(opts: TurnInit = {}): Turn {
     return Turn.create({
       ...opts,

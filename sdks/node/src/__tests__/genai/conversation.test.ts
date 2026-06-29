@@ -4,7 +4,12 @@ import {
 } from '../../genai/semconv';
 import {Conversation, Session} from '../../genai/conversation';
 
-import {setupExporterPerTest, setupGenAITestEnvironment} from './common';
+import {
+  findSpan,
+  setupExporterPerTest,
+  setupGenAITestEnvironment,
+  spanSnapshot,
+} from './common';
 
 describe('Conversation', () => {
   setupGenAITestEnvironment();
@@ -54,5 +59,62 @@ describe('Conversation', () => {
     });
     expect(conversation.conversationId).toBe('new');
     conversation.end();
+  });
+
+  it('startTurn emits given data on `invoke_agent` span', () => {
+    const conversation = Conversation.create({
+      agentName: 'dispatcher',
+      model: 'some-model',
+      conversationId: 'c-2',
+    });
+    const turn = conversation.startTurn({
+      agentName: 'weather-bot',
+      model: 'gpt-4o',
+      userMessage: "What's the weather?",
+      systemInstructions: ['Be helpful', 'Be concise'],
+    });
+    turn.end();
+    conversation.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.name": "weather-bot",
+          "gen_ai.conversation.id": "<uuid>",
+          "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
+  });
+
+  it('startTurn falls back to conversation data when not given', () => {
+    const conversation = Conversation.create({
+      agentName: 'dispatcher',
+      model: 'some-model',
+      conversationId: 'c-3',
+    });
+    const turn = conversation.startTurn();
+    turn.end();
+    conversation.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.name": "dispatcher",
+          "gen_ai.conversation.id": "<uuid>",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "some-model",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
   });
 });

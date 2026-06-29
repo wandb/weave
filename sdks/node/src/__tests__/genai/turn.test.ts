@@ -1,11 +1,4 @@
-import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
-
-import {
-  ATTR_GEN_AI_AGENT_NAME,
-  ATTR_GEN_AI_CONVERSATION_ID,
-  ATTR_GEN_AI_OPERATION_NAME,
-  ATTR_GEN_AI_REQUEST_MODEL,
-} from '../../genai/semconv';
+import {SpanStatusCode} from '@opentelemetry/api';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -13,6 +6,7 @@ import {
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
+  spanSnapshot,
 } from './common';
 
 describe('Turn', () => {
@@ -24,16 +18,26 @@ describe('Turn', () => {
       agentName: 'weather-bot',
       model: 'gpt-4o',
       conversationId: 'conv-1',
+      userMessage: "What's the weather?",
+      systemInstructions: ['Be helpful', 'Be concise'],
     });
     turn.end();
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.kind).toBe(SpanKind.CLIENT);
-    expect(span.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
-    expect(span.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
-    expect(span.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
-    expect(span.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
-    expect(span.parentSpanId).toBeUndefined();
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.name": "weather-bot",
+          "gen_ai.conversation.id": "<uuid>",
+          "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
   });
 
   it('end() is idempotent', () => {
