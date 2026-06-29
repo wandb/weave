@@ -71,6 +71,13 @@ export abstract class SpanBase {
    * context compaction, tool-loop detection, or guardrail trips. Warns and
    * no-ops after `end()`. Mirrors OTel `Span.addEvent`.
    *
+   * @deprecated OpenTelemetry is phasing out the Span Event API
+   * (`Span.addEvent`) in favor of log-based events emitted via the Logs API
+   * (OTEP 4430). This method still works and existing span-event data stays
+   * valid; there is no Weave replacement yet, so no action is required today.
+   * Forward-looking marker — the upstream OTel SDKs have not removed
+   * `Span.addEvent`, and a Weave log-based-events API is planned.
+   *
    * @example
    * span.addEvent('context_compacted', {removedMessages: 12});
    */

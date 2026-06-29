@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from weave.conversation.conversation_otel import (
     execute_tool_attributes,
@@ -122,6 +122,24 @@ def _capture_info_attrs() -> dict[str, str]:
     every emit, matching ``@op`` semantics in ``weave_client.py``.
     """
     return {f"weave.{k}": v for k, v in get_capture_info().items()}
+
+
+# Forward-looking deprecation: OpenTelemetry is phasing out the Span Event API
+# (``Span.add_event`` / ``Span.record_exception``) in favor of log-based events
+# emitted through the Logs API — see OTEP 4430 and the March 2026 plan
+# (https://opentelemetry.io/blog/2026/span-event-api-deprecation/). We mark the
+# public ``add_event`` surface deprecated to signal direction. Note: the
+# upstream OTel SDKs have NOT removed ``Span.add_event``, and Weave has no
+# log-based-events replacement yet, so there is no migration target today — the
+# method keeps working and existing span-event data stays valid.
+_ADD_EVENT_DEPRECATION_MESSAGE = (
+    "`add_event` is deprecated. OpenTelemetry is phasing out the Span Event "
+    "API (`Span.add_event`) in favor of log-based events emitted via the Logs "
+    "API (OTEP 4430). This method still works and existing span-event data "
+    "stays valid; there is no Weave replacement yet, so no action is required "
+    "today. This is a forward-looking marker — the upstream OTel SDKs have not "
+    "removed `Span.add_event`, and a Weave log-based-events API is planned."
+)
 
 
 class _SpanBase(BaseModel):
@@ -243,6 +261,7 @@ class _SpanBase(BaseModel):
             span.set_attributes(attributes)
         return self
 
+    @deprecated(_ADD_EVENT_DEPRECATION_MESSAGE)
     def add_event(
         self,
         name: str,
@@ -250,6 +269,15 @@ class _SpanBase(BaseModel):
         timestamp: datetime | None = None,
     ) -> Self:
         """Record an OTel span event at a point in time within this span.
+
+        .. deprecated::
+            OpenTelemetry is phasing out the Span Event API
+            (``Span.add_event``) in favor of log-based events emitted via the
+            Logs API (OTEP 4430). This method still works and existing
+            span-event data stays valid, but the surface may change once Weave
+            ships a log-based-events replacement. No action is required today —
+            this is a forward-looking marker; the upstream OTel SDKs have not
+            removed ``Span.add_event``, and a Weave replacement is planned.
 
         Use for marker / lifecycle data — permission prompts (e.g.
         ``weave.permission_request``), lifecycle transitions (e.g.
