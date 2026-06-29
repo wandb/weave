@@ -109,7 +109,7 @@ export class LLM extends SpanBase {
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {
-      ...(state.session?.attributes ?? {}),
+      ...(state.conversation?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
       [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
     };

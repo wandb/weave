@@ -132,9 +132,9 @@ async function runTurn(
 async function main() {
   await weave.init('examples');
 
-  const session = weave.startSession({agentName: 'research-bot'});
+  const session = weave.startConversation({agentName: 'research-bot'});
   try {
-    console.log(`session_id = ${session.sessionId}\n`);
+    console.log(`conversation_id = ${session.conversationId}\n`);
     const history: Message[] = [
       {
         role: 'system',

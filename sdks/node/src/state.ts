@@ -44,7 +44,7 @@ type State = {
 
     /**
      * Process-wide fallback container used when no `runIsolated()` frame is
-     * active. Lets users call `weave.startSession(...)` etc. directly without
+     * active. Lets users call `weave.startConversation(...)` etc. directly without
      * any wrapper — the casual, sequential single-flight path. Shared across
      * the whole process, so it is NOT safe for concurrent independent
      * sessions; those need `runIsolated()`.
@@ -118,7 +118,7 @@ function defaultState(): State {
       provider: null,
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
-      defaultState: {session: null, turn: null, llm: null},
+      defaultState: {conversation: null, turn: null, llm: null},
     },
 
     evalLink: {
