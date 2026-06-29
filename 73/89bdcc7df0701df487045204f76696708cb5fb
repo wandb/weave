@@ -1,0 +1,1 @@
+Release commit for v0.53.0 (minor bump from the 0.52.x dev line). This commit is tagged v0.53.0 and is what gets released. Part of a manual 3-commit minor release; full context in the note on a502523f66 (incl. the patch-bump mistake that was reverted first). Not yet pushed.
