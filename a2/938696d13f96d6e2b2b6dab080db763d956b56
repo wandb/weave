@@ -1,1 +1,3 @@
 Release commit for v0.53.0 (minor bump); tag v0.53.0 points here. Rebased onto origin/master b9a8184d7c (pre-rebase hash 7389bdcc7d). Full context: note on 095c556414. Tag NOT pushed yet — if the PR is squash-merged, re-point v0.53.0 to the squashed master commit.
+
+UPDATE: split into a 3-PR Graphite stack (repo is squash-merge only, so a single 3-commit PR would collapse the 0.53.0 commit). Stack: #7446 hatchery/adept (chore, base master) <- #7447 hatchery/adept-release (this commit, ->0.53.0) <- #7448 hatchery/adept-postbump (->0.53.1-dev0). Merge bottom-up; apply tag v0.53.0 to #7447's squashed master commit after it merges (local tag here is a placeholder).
