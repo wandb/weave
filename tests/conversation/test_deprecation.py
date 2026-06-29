@@ -33,6 +33,28 @@ def test_session_class_maps_old_fields_and_warns() -> None:
     assert s.conversation_name == "d2"
 
 
+def test_session_instance_supports_old_field_read_and_write() -> None:
+    """``session_id`` / ``session_name`` work as instance properties.
+
+    The original ``Session`` had these as model fields, so old code that reads
+    or assigns them on an instance must keep working; they proxy to the
+    ``conversation_*`` fields in both directions.
+    """
+    with pytest.warns(DeprecationWarning, match="Session"):
+        s = weave.Session(session_id="c5", session_name="d5")
+
+    assert s.session_id == "c5"
+    assert s.session_name == "d5"
+
+    s.session_id = "c5-updated"
+    s.session_name = "d5-updated"
+
+    assert s.session_id == "c5-updated"
+    assert s.session_name == "d5-updated"
+    assert s.conversation_id == "c5-updated"
+    assert s.conversation_name == "d5-updated"
+
+
 def test_end_and_get_current_session_warn() -> None:
     with pytest.warns(DeprecationWarning, match="start_session"):
         s = weave.start_session(session_id="c3")

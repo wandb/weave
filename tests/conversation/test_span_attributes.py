@@ -173,7 +173,9 @@ def test_conversation_attributes_on_every_streaming_span(
 ) -> None:
     """A conversation's attributes land on the turn root and every child span."""
     attrs = {"weave.integration.name": "wb-agent", "custom.tier": "gold"}
-    with Conversation(conversation_id="s", attributes=attrs) as conversation:
+    with Conversation(
+        conversation_id="convo-attrs-streaming", attributes=attrs
+    ) as conversation:
         turn = conversation.start_turn(agent_name="bot")
         with turn:
             with turn.llm(model="gpt-4o"):
@@ -200,7 +202,7 @@ def test_conversation_attributes_on_every_batch_span(
 ) -> None:
     """log_turn applies attributes to the turn and its child spans."""
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-attrs-batch",
         agent_name="bot",
         spans=[LLM(model="gpt-4o"), Tool(name="Edit")],
         attributes={"weave.integration.name": "wb-agent"},
@@ -220,7 +222,7 @@ def test_conversation_attributes_on_every_log_conversation_span(
             Turn(agent_name="bot", spans=[LLM(model="gpt-4o")]),
             Turn(agent_name="bot", spans=[Tool(name="Edit")]),
         ],
-        conversation_id="s",
+        conversation_id="convo-attrs-log-conversation",
         attributes={"weave.integration.name": "wb-agent"},
     )
     spans = otel_spans.get_finished_spans()
@@ -232,7 +234,7 @@ def test_conversation_attributes_on_every_log_conversation_span(
 def test_no_conversation_attributes_by_default(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    with Conversation(conversation_id="s") as conversation:
+    with Conversation(conversation_id="convo-attrs-default") as conversation:
         with conversation.start_turn(agent_name="bot"):
             pass
     span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")

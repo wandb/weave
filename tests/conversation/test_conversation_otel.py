@@ -74,7 +74,7 @@ def _emit_llm_with(
     """
     otel_spans.clear()
     with (
-        start_conversation(agent_name="bot", conversation_id="sess") as s,
+        start_conversation(agent_name="bot", conversation_id="convo-llm-chain") as s,
         s.start_turn(),
     ):
         with start_llm(model=model, provider_name=provider_name) as llm:
@@ -294,8 +294,8 @@ class TestLLMAttributes:
         ]
 
     def test_conversation_id(self) -> None:
-        attrs = llm_attributes(model="gpt-4o", conversation_id="sess-abc")
-        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+        attrs = llm_attributes(model="gpt-4o", conversation_id="convo-abc")
+        assert attrs["gen_ai.conversation.id"] == "convo-abc"
 
     def test_empty_conversation_id_omitted(self) -> None:
         attrs = llm_attributes(model="gpt-4o", conversation_id="")
@@ -548,8 +548,8 @@ class TestExecuteToolAttributes:
         assert attrs["gen_ai.tool.call.result"] == '{"temp": "75F"}'
 
     def test_conversation_id(self) -> None:
-        attrs = execute_tool_attributes(tool_name="search", conversation_id="sess-abc")
-        assert attrs["gen_ai.conversation.id"] == "sess-abc"
+        attrs = execute_tool_attributes(tool_name="search", conversation_id="convo-abc")
+        assert attrs["gen_ai.conversation.id"] == "convo-abc"
 
     def test_empty_conversation_id_omitted(self) -> None:
         attrs = execute_tool_attributes(tool_name="search", conversation_id="")
@@ -900,7 +900,7 @@ class TestOTelSpanEmission:
     ) -> None:
         with Conversation(
             agent_name="weather-bot",
-            conversation_id="sess-1",
+            conversation_id="convo-1",
             conversation_name="Weather Chat",
         ) as s:
             with s.start_turn(user_message="What's the weather?") as turn:
@@ -913,13 +913,13 @@ class TestOTelSpanEmission:
         attrs = dict(span.attributes or {})
         assert attrs["gen_ai.operation.name"] == "invoke_agent"
         assert attrs["gen_ai.agent.name"] == "weather-bot"
-        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.id"] == "convo-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
 
     def test_turn_system_instructions_emitted_on_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        with Conversation(agent_name="weather-bot", conversation_id="sess-si") as s:
+        with Conversation(agent_name="weather-bot", conversation_id="convo-si") as s:
             with s.start_turn(user_message="hi") as turn:
                 turn.system_instructions = ["You are a weather bot"]
 
@@ -935,7 +935,7 @@ class TestOTelSpanEmission:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         with Conversation(
-            agent_name="bot", conversation_id="sess-si2", include_content=False
+            agent_name="bot", conversation_id="convo-si2", include_content=False
         ) as s:
             with s.start_turn() as turn:
                 turn.system_instructions = ["secret prompt"]
@@ -950,7 +950,7 @@ class TestOTelSpanEmission:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         with Conversation(
-            agent_name="weather-bot", conversation_id="sess-si-param"
+            agent_name="weather-bot", conversation_id="convo-si-param"
         ) as s:
             with s.start_turn(system_instructions=["You are a weather bot"]):
                 pass
@@ -970,7 +970,7 @@ class TestOTelSpanEmission:
         assert turn.system_instructions == ["You are a weather bot"]
 
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
-        with Conversation(agent_name="bot", conversation_id="sess-llm") as s:
+        with Conversation(agent_name="bot", conversation_id="convo-llm") as s:
             with s.start_turn() as turn:
                 with turn.llm(model="gpt-4o", provider_name="openai") as llm:
                     llm.usage = Usage(input_tokens=100, output_tokens=50)
@@ -984,14 +984,14 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.operation.name"] == "chat"
         assert attrs["gen_ai.request.model"] == "gpt-4o"
         assert attrs["gen_ai.provider.name"] == "openai"
-        assert attrs["gen_ai.conversation.id"] == "sess-llm"
+        assert attrs["gen_ai.conversation.id"] == "convo-llm"
         assert attrs["gen_ai.usage.input_tokens"] == 100
         assert attrs["gen_ai.usage.output_tokens"] == 50
 
     def test_tool_creates_execute_tool_span(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        with Conversation(agent_name="bot", conversation_id="sess-tool") as s:
+        with Conversation(agent_name="bot", conversation_id="convo-tool") as s:
             with s.start_turn() as turn:
                 with turn.tool(
                     name="get_weather",
@@ -1006,7 +1006,7 @@ class TestOTelSpanEmission:
         attrs = dict(tool_spans[0].attributes or {})
         assert attrs["gen_ai.operation.name"] == "execute_tool"
         assert attrs["gen_ai.tool.name"] == "get_weather"
-        assert attrs["gen_ai.conversation.id"] == "sess-tool"
+        assert attrs["gen_ai.conversation.id"] == "convo-tool"
         assert attrs["gen_ai.tool.call.id"] == "tc_1"
         assert attrs["gen_ai.tool.call.arguments"] == '{"city":"Tokyo"}'
         assert attrs["gen_ai.tool.call.result"] == "75F"
@@ -1130,7 +1130,7 @@ class TestOTelSpanEmission:
     def test_start_tool_creates_child_of_turn(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        with start_conversation(agent_name="bot", conversation_id="sess-st") as s:
+        with start_conversation(agent_name="bot", conversation_id="convo-st") as s:
             with s.start_turn() as turn:
                 with start_tool(
                     name="get_weather",
@@ -1152,7 +1152,7 @@ class TestOTelSpanEmission:
         attrs = dict(tool_spans[0].attributes or {})
         assert attrs["gen_ai.operation.name"] == "execute_tool"
         assert attrs["gen_ai.tool.name"] == "get_weather"
-        assert attrs["gen_ai.conversation.id"] == "sess-st"
+        assert attrs["gen_ai.conversation.id"] == "convo-st"
         assert attrs["gen_ai.tool.call.id"] == "tc_1"
 
     def test_two_turns_have_different_trace_ids(
@@ -1339,7 +1339,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         result = log_turn(
-            conversation_id="sess-1",
+            conversation_id="convo-1",
             agent_name="weather-bot",
             conversation_name="Weather Chat",
             messages=[Message(role="user", content="What's the weather?")],
@@ -1354,13 +1354,13 @@ class TestLogTurn:
         attrs = dict(sp.attributes or {})
         assert attrs["gen_ai.operation.name"] == "invoke_agent"
         assert attrs["gen_ai.agent.name"] == "weather-bot"
-        assert attrs["gen_ai.conversation.id"] == "sess-1"
+        assert attrs["gen_ai.conversation.id"] == "convo-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
         assert sp.start_time == int(_ts(0).timestamp() * 1_000_000_000)
         assert sp.end_time == int(_ts(3).timestamp() * 1_000_000_000)
 
         assert isinstance(result, LogResult)
-        assert result.conversation_id == "sess-1"
+        assert result.conversation_id == "convo-1"
         assert len(result.trace_ids) == 1
         assert len(result.root_span_ids) == 1
         assert result.span_count == 1
@@ -1370,7 +1370,7 @@ class TestLogTurn:
 
     def test_with_llm_and_tool_children(self, otel_spans: InMemorySpanExporter) -> None:
         result = log_turn(
-            conversation_id="sess-2",
+            conversation_id="convo-2",
             agent_name="bot",
             messages=[Message(role="user", content="Search for X")],
             spans=[
@@ -1421,7 +1421,7 @@ class TestLogTurn:
 
     def test_with_subagent_child(self, otel_spans: InMemorySpanExporter) -> None:
         log_turn(
-            conversation_id="sess-3",
+            conversation_id="convo-3",
             agent_name="orchestrator",
             spans=[
                 SubAgent(
@@ -1446,7 +1446,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_turn(
-            conversation_id="sess-ident",
+            conversation_id="convo-ident",
             agent_name="bot",
             agent_id="agent-7",
             agent_description="A helpful bot",
@@ -1466,7 +1466,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_turn(
-            conversation_id="sess-sa-si",
+            conversation_id="convo-sa-si",
             agent_name="orchestrator",
             spans=[
                 SubAgent(
@@ -1491,7 +1491,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_turn(
-            conversation_id="sess-sa-si2",
+            conversation_id="convo-sa-si2",
             agent_name="orchestrator",
             include_content=False,
             spans=[
@@ -1519,7 +1519,7 @@ class TestLogTurn:
             outer_trace_id = outer.get_span_context().trace_id
             outer_span_id = outer.get_span_context().span_id
             log_turn(
-                conversation_id="sess-4",
+                conversation_id="convo-4",
                 agent_name="bot",
                 started_at=_ts(0),
                 ended_at=_ts(1),
@@ -1539,7 +1539,7 @@ class TestLogTurn:
         with tracer.start_as_current_span("outer-request") as outer:
             outer_trace_id = outer.get_span_context().trace_id
             log_turn(
-                conversation_id="sess-5",
+                conversation_id="convo-5",
                 agent_name="bot",
                 started_at=_ts(0),
                 ended_at=_ts(1),
@@ -1553,7 +1553,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_turn(
-            conversation_id="sess-6",
+            conversation_id="convo-6",
             agent_name="bot",
             messages=[Message(role="user", content="secret")],
             spans=[
@@ -1593,7 +1593,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_turn(
-            conversation_id="sess-si-batch",
+            conversation_id="convo-si-batch",
             agent_name="bot",
             system_instructions=["You are a weather bot"],
             started_at=_ts(0),
@@ -1610,7 +1610,7 @@ class TestLogTurn:
 
     def test_no_spans_just_emits_turn(self, otel_spans: InMemorySpanExporter) -> None:
         result = log_turn(
-            conversation_id="sess-7",
+            conversation_id="convo-7",
             agent_name="bot",
             started_at=_ts(0),
             ended_at=_ts(1),
@@ -1624,7 +1624,7 @@ class TestLogTurn:
     ) -> None:
         # Turn timestamps not provided — should derive from children
         log_turn(
-            conversation_id="sess-8",
+            conversation_id="convo-8",
             agent_name="bot",
             spans=[
                 LLM(model="gpt-4o", started_at=_ts(0), ended_at=_ts(1)),
@@ -1641,7 +1641,7 @@ class TestLogTurn:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         result = log_turn(
-            conversation_id="sess-9",
+            conversation_id="convo-9",
             agent_name="bot",
             started_at=_ts(0),
             ended_at=_ts(1),
@@ -1660,13 +1660,13 @@ class TestLogTurnNoOtel:
 
         monkeypatch.setattr(conversation_mod, "_OTEL_AVAILABLE", False)
         result = log_turn(
-            conversation_id="sess-noop",
+            conversation_id="convo-noop",
             agent_name="bot",
             started_at=_ts(0),
             ended_at=_ts(1),
         )
         assert isinstance(result, LogResult)
-        assert result.conversation_id == "sess-noop"
+        assert result.conversation_id == "convo-noop"
         assert result.trace_ids == []
         assert result.root_span_ids == []
         assert result.span_count == 0
@@ -1680,7 +1680,7 @@ class TestLogTurnNoOtel:
 class TestLogConversation:
     def test_emits_one_trace_per_turn(self, otel_spans: InMemorySpanExporter) -> None:
         result = log_conversation(
-            conversation_id="sess-multi",
+            conversation_id="convo-multi",
             agent_name="bot",
             turns=[
                 Turn(
@@ -1706,7 +1706,7 @@ class TestLogConversation:
         assert len(result.trace_ids) == 2
         assert len(result.root_span_ids) == 2
         assert result.span_count == 2
-        assert result.conversation_id == "sess-multi"
+        assert result.conversation_id == "convo-multi"
 
     def test_auto_generates_conversation_id_when_empty(
         self, otel_spans: InMemorySpanExporter
@@ -1727,7 +1727,7 @@ class TestLogConversation:
         with tracer.start_as_current_span("outer-request") as outer:
             outer_trace_id = outer.get_span_context().trace_id
             log_conversation(
-                conversation_id="sess-nested",
+                conversation_id="convo-nested",
                 turns=[
                     Turn(agent_name="bot", started_at=_ts(0), ended_at=_ts(1)),
                     Turn(agent_name="bot", started_at=_ts(2), ended_at=_ts(3)),
@@ -1744,7 +1744,7 @@ class TestLogConversation:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         log_conversation(
-            conversation_id="sess-children",
+            conversation_id="convo-children",
             turns=[
                 Turn(
                     agent_name="bot",
@@ -1771,7 +1771,7 @@ class TestLogConversation:
         # log_conversation emits the Turn it is handed, so every field survives —
         # not just the subset log_turn historically accepted as kwargs.
         log_conversation(
-            conversation_id="sess-fields",
+            conversation_id="convo-fields",
             turns=[
                 Turn(
                     agent_name="bot",
@@ -1805,7 +1805,7 @@ class TestLogConversation:
         # mutated in place would break this.
         turn = Turn(started_at=_ts(0), ended_at=_ts(1))  # no agent_name / model
         log_conversation(
-            conversation_id="sess-no-mutate",
+            conversation_id="convo-no-mutate",
             agent_name="conversation-bot",
             model="gpt-4o",
             continue_parent_trace=True,
@@ -1818,8 +1818,8 @@ class TestLogConversation:
     def test_empty_turns_returns_empty_log_result(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
-        result = log_conversation(turns=[], conversation_id="sess-empty")
-        assert result.conversation_id == "sess-empty"
+        result = log_conversation(turns=[], conversation_id="convo-empty")
+        assert result.conversation_id == "convo-empty"
         assert result.trace_ids == []
         assert result.root_span_ids == []
         assert result.span_count == 0
@@ -1866,7 +1866,9 @@ class TestToolStructuredPayloads:
         if field == "arguments":
             kwargs["arguments"] = value
         with (
-            start_conversation(agent_name="bot", conversation_id="sess") as s,
+            start_conversation(
+                agent_name="bot", conversation_id="convo-tool-payload"
+            ) as s,
             s.start_turn(),
         ):
             with start_tool(**kwargs) as t:
@@ -2124,7 +2126,7 @@ class TestTurnRecord:
         self, otel_spans: InMemorySpanExporter
     ) -> None:
         """End-to-end: record() values flow through to the OTel attrs."""
-        with Conversation(conversation_id="sess-turn-record") as s:
+        with Conversation(conversation_id="convo-turn-record") as s:
             with s.start_turn(agent_name="weather-bot") as turn:
                 turn.record(
                     system_instructions=["You are a weather bot"],

@@ -94,7 +94,9 @@ def _spans_with_prefix(otel_spans: InMemorySpanExporter, prefix: str) -> list[An
 
 def test_disabled_streaming_emits_no_spans(otel_spans: InMemorySpanExporter):
     with override_settings(disabled=True):
-        with start_conversation(agent_name="a", conversation_id="s") as s:
+        with start_conversation(
+            agent_name="a", conversation_id="convo-disabled-streaming"
+        ) as s:
             with s.start_turn() as t:
                 with t.llm(model="gpt-4o"):
                     pass
@@ -105,7 +107,7 @@ def test_disabled_streaming_emits_no_spans(otel_spans: InMemorySpanExporter):
 
 def _user_func_log_turn() -> Any:
     return log_turn(
-        conversation_id="s",
+        conversation_id="convo-disabled-log-turn",
         agent_name="a",
         messages=[Message(role="user", content="hi")],
     )
@@ -114,7 +116,7 @@ def _user_func_log_turn() -> Any:
 def _user_func_log_conversation() -> Any:
     return log_conversation(
         turns=[Turn(agent_name="a", messages=[Message(role="user", content="hi")])],
-        conversation_id="s",
+        conversation_id="convo-disabled-log-conversation",
     )
 
 
@@ -145,14 +147,20 @@ def test_disabled_batch_emits_no_spans(
 
 
 def _streaming_tool_with_pii() -> None:
-    with start_conversation(conversation_id="s") as sess, sess.start_turn() as t:
+    with (
+        start_conversation(conversation_id="convo-pii-streaming-tool") as sess,
+        sess.start_turn() as t,
+    ):
         with t.tool(name="lookup") as tool:
             tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
             tool.result = f"found {_PII_EMAIL}"
 
 
 def _streaming_llm_messages_with_pii() -> None:
-    with start_conversation(conversation_id="s") as sess, sess.start_turn() as t:
+    with (
+        start_conversation(conversation_id="convo-pii-streaming-llm-messages") as sess,
+        sess.start_turn() as t,
+    ):
         with t.llm(
             model="gpt-4o", system_instructions=[f"contact {_PII_EMAIL}"]
         ) as llm:
@@ -164,21 +172,24 @@ def _streaming_llm_messages_with_pii() -> None:
 
 def _streaming_llm_reasoning_with_pii() -> None:
     """Regression case for the pre-existing leak: reasoning bypassing redaction."""
-    with start_conversation(conversation_id="s") as sess, sess.start_turn() as t:
+    with (
+        start_conversation(conversation_id="convo-pii-streaming-llm-reasoning") as sess,
+        sess.start_turn() as t,
+    ):
         with t.llm(model="gpt-4o") as llm:
             llm.reasoning = Reasoning(content=f"think about {_PII_EMAIL}")
             llm.output_messages = [Message(role="assistant", content="ok")]
 
 
 def _streaming_turn_with_pii() -> None:
-    with start_conversation(conversation_id="s") as sess:
+    with start_conversation(conversation_id="convo-pii-streaming-turn") as sess:
         with sess.start_turn(user_message=_PII_EMAIL):
             pass
 
 
 def _batch_turn_messages_with_pii() -> None:
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-pii-batch-turn-messages",
         agent_name="a",
         messages=[Message(role="user", content=_PII_EMAIL)],
     )
@@ -186,7 +197,7 @@ def _batch_turn_messages_with_pii() -> None:
 
 def _batch_child_llm_with_pii() -> None:
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-pii-batch-child-llm",
         agent_name="a",
         spans=[
             LLM(
@@ -199,7 +210,7 @@ def _batch_child_llm_with_pii() -> None:
 
 def _batch_child_tool_with_pii() -> None:
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-pii-batch-child-tool",
         agent_name="a",
         spans=[Tool(name="lookup", arguments=f'{{"email":"{_PII_EMAIL}"}}')],
     )
@@ -281,14 +292,18 @@ def test_redact_pii_applied(
 
 
 def _content_off_tool() -> None:
-    with start_conversation(conversation_id="s", include_content=False) as sess:
+    with start_conversation(
+        conversation_id="convo-content-off-tool", include_content=False
+    ) as sess:
         with sess.start_turn() as t:
             with t.tool(name="lookup") as tool:
                 tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
 
 
 def _content_off_llm() -> None:
-    with start_conversation(conversation_id="s", include_content=False) as sess:
+    with start_conversation(
+        conversation_id="convo-content-off-llm", include_content=False
+    ) as sess:
         with sess.start_turn() as t:
             with t.llm(model="gpt-4o") as llm:
                 llm.input_messages = [Message(role="user", content=_PII_EMAIL)]
@@ -296,14 +311,16 @@ def _content_off_llm() -> None:
 
 
 def _content_off_turn() -> None:
-    with start_conversation(conversation_id="s", include_content=False) as sess:
+    with start_conversation(
+        conversation_id="convo-content-off-turn", include_content=False
+    ) as sess:
         with sess.start_turn(user_message=_PII_EMAIL):
             pass
 
 
 def _content_off_log_turn() -> None:
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-content-off-log-turn",
         agent_name="a",
         include_content=False,
         messages=[Message(role="user", content=_PII_EMAIL)],
@@ -336,7 +353,9 @@ def test_include_content_false_skips_presidio(
 
 
 def _reasoning_content_off_streaming() -> None:
-    with start_conversation(conversation_id="s", include_content=False) as sess:
+    with start_conversation(
+        conversation_id="convo-reasoning-off-streaming", include_content=False
+    ) as sess:
         with sess.start_turn() as t:
             with t.llm(model="gpt-4o") as llm:
                 llm.reasoning = Reasoning(content="sensitive reasoning")
@@ -344,7 +363,7 @@ def _reasoning_content_off_streaming() -> None:
 
 def _reasoning_content_off_batch() -> None:
     log_turn(
-        conversation_id="s",
+        conversation_id="convo-reasoning-off-batch",
         agent_name="a",
         include_content=False,
         spans=[LLM(model="gpt-4o", reasoning=Reasoning(content="sensitive"))],
@@ -416,7 +435,7 @@ def test_capture_info_settings(
     with override_settings(
         capture_client_info=client_info, capture_system_info=system_info
     ):
-        with start_conversation(conversation_id="s") as sess:
+        with start_conversation(conversation_id="convo-capture-info") as sess:
             with sess.start_turn() as t:
                 with t.tool(name="x"):
                     pass
@@ -438,7 +457,7 @@ def test_capture_info_on_batch_path(otel_spans: InMemorySpanExporter):
     """Batch (log_turn) path uses a separate emit path — same invariant."""
     with override_settings(capture_client_info=True):
         log_turn(
-            conversation_id="s",
+            conversation_id="convo-capture-info-batch",
             agent_name="a",
             spans=[LLM(model="gpt-4o")],
         )
@@ -459,7 +478,10 @@ def test_settings_independent(otel_spans: InMemorySpanExporter, fake_presidio: N
     with override_settings(
         redact_pii=True, capture_client_info=False, capture_system_info=False
     ):
-        with start_conversation(conversation_id="s") as sess, sess.start_turn() as t:
+        with (
+            start_conversation(conversation_id="convo-settings-independent") as sess,
+            sess.start_turn() as t,
+        ):
             with t.tool(name="lookup") as tool:
                 tool.arguments = _PII_EMAIL
 
@@ -472,7 +494,10 @@ def test_settings_independent(otel_spans: InMemorySpanExporter, fake_presidio: N
 def test_defaults_skip_redaction(otel_spans: InMemorySpanExporter):
     """With defaults (redact_pii=False), Presidio engines are never loaded."""
     with patch("weave.utils.pii_redaction._get_engines") as mock_get_engines:
-        with start_conversation(conversation_id="s") as sess, sess.start_turn() as t:
+        with (
+            start_conversation(conversation_id="convo-defaults-skip-redaction") as sess,
+            sess.start_turn() as t,
+        ):
             with t.tool(name="x") as tool:
                 tool.arguments = _PII_EMAIL
     mock_get_engines.assert_not_called()

@@ -120,7 +120,10 @@ class Session(Conversation):
     """Deprecated alias of :class:`weave.Conversation`.
 
     Accepts the old ``session_id`` / ``session_name`` constructor fields and
-    maps them to ``conversation_id`` / ``conversation_name``.
+    also exposes them as read/write properties that proxy to
+    ``conversation_id`` / ``conversation_name``. The original ``Session`` had
+    these as model fields, so old code that reads or assigns ``s.session_id``
+    keeps working.
     """
 
     def __init__(self, **data: Any) -> None:
@@ -130,3 +133,21 @@ class Session(Conversation):
         if "session_name" in data:
             data.setdefault("conversation_name", data.pop("session_name"))
         super().__init__(**data)
+
+    @property
+    def session_id(self) -> str:
+        """Deprecated alias of :attr:`conversation_id`."""
+        return self.conversation_id
+
+    @session_id.setter
+    def session_id(self, value: str) -> None:
+        self.conversation_id = value
+
+    @property
+    def session_name(self) -> str:
+        """Deprecated alias of :attr:`conversation_name`."""
+        return self.conversation_name
+
+    @session_name.setter
+    def session_name(self, value: str) -> None:
+        self.conversation_name = value
