@@ -2395,8 +2395,7 @@ def test_total_storage_size_calls_complete(with_filter: bool):
                 SELECT calls_complete.id AS id
                 FROM calls_complete
                 PREWHERE calls_complete.project_id = {pb_2:String}
-                WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
-                    OR (calls_complete.op_name IS NULL))
+                WHERE calls_complete.op_name IN {pb_1:Array(String)}
                     AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
                 LIMIT 50
             )
@@ -2427,8 +2426,7 @@ def test_total_storage_size_calls_complete(with_filter: bool):
             GROUP BY trace_id) AS rolled_up_cms
             ON calls_complete.trace_id = rolled_up_cms.trace_id
             PREWHERE calls_complete.project_id = {pb_2:String}
-            WHERE ((calls_complete.op_name IN {pb_5:Array(String)})
-                OR (calls_complete.op_name IS NULL))
+            WHERE calls_complete.op_name IN {pb_5:Array(String)}
                 AND (calls_complete.deleted_at = {pb_4:DateTime64(3)})
             LIMIT 50
             """,
@@ -3899,8 +3897,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.ended_at AS ended_at
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE ((calls_complete.op_name IN {pb_3:Array(String)})
-                OR (calls_complete.op_name IS NULL))
+        WHERE calls_complete.op_name IN {pb_3:Array(String)}
             AND (calls_complete.trace_id = {pb_4:String})
         AND (
             ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
@@ -4522,8 +4519,7 @@ def test_stats_query_calls_complete_flat_count_with_filter() -> None:
         SELECT count() AS count, toUInt8(0) AS has_more
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_2:String}
-        WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
-               OR (calls_complete.op_name IS NULL))
+        WHERE calls_complete.op_name IN {pb_1:Array(String)}
           AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
         """,
         {
