@@ -1,0 +1,21 @@
+## Conversation
+User: "Start the weave release process." Ran the bump-version skill. When asked whether to proceed with the default PATCH bump (-> 0.52.44, tag v0.52.44), the AskUserQuestion answer was "Bump to 0.53.0" = a MINOR release. I missed it and ran patch anyway; user corrected: "This is wrong. You need to do a minor bump to 0.53.0." Then: "Use gt and push these up."
+
+## Actions
+- Mistakenly ran scripts/bump_python_sdk_version.py (patch): made 0.52.44 + 0.52.45-dev0 commits and tag v0.52.44. Reverted: git tag -d v0.52.44; git reset --hard 97e85ac0ea (old origin/master).
+- Minor-bump precedent: cf371ffd50 "chore(weave): Bump to 0.52.0" (manual chore commit to X.Y.0-dev0, then normal release flow). Followed it.
+- Built 3 commits (pre-rebase hashes a502523f66/7389bdcc7d/e7042b1d63): chore (0.52.44-dev0 -> 0.53.0-dev0), release (-> 0.53.0, tag v0.53.0), next-dev (-> 0.53.1-dev0).
+- origin/master moved mid-session (97e85ac0ea -> b9a8184d7c, +2 unrelated commits). Rebased the 3 onto b9a8184d7c (clean; pyproject edits were in different regions than current_version). NEW hashes: 095c556414 (chore=this), a2938696d1 (release+tag v0.53.0), cbec1620bd (next-dev). Notes didn't survive rebase; re-attached.
+
+## Errors & mistakes
+- Patch vs minor: misread user intent; fully reverted before redoing.
+- First redo attempt stored the uvx cmd in a shell var (\$BMV); zsh doesn't word-split unquoted vars and >= collides with redirection -> "command not found", nothing mutated. Fixed by inlining uvx --from 'bump-my-version>=0.28.0' bump-my-version ... with --from single-quoted.
+
+## Hints & warnings
+- bump-my-version updates BOTH pyproject [tool.bumpversion] current_version AND ./weave/version.py.
+- bump_version.yaml GitHub Action only does PATCH; minor/major are manual.
+- Multi-worktree Graphite setup: local master (main worktree /Users/andrew/Hatchery/repos/weave) is stale/behind origin/master, and gt keys restacks off LOCAL master. So do NOT 'gt sync' (would disturb ~8 sibling agent branches) and do NOT 'gt submit --restack'. Rebased manually onto origin/master; gt submit restack is opt-in (default off).
+- uv/uvx/gt live at /opt/homebrew/bin, not on the default shell PATH.
+
+## Open questions
+- TAG PUSH: gt pushes branch+PR only, NOT the tag. v0.53.0 must mark whatever commit lands on master. If the release PR is SQUASH-merged, the local tag (-> a2938696d1) is orphaned and must be re-pointed to the squashed master commit. Decide tag handling at merge time.
