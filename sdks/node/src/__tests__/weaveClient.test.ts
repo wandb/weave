@@ -894,7 +894,7 @@ describe('WeaveClient', () => {
     });
   });
 
-  describe('getAgentCustomAttrsSchema', () => {
+  describe('getAgentCustomAttributes', () => {
     it('forwards all options to the server', async () => {
       const schema = {
         attributes: [
@@ -928,7 +928,7 @@ describe('WeaveClient', () => {
         },
       };
 
-      const result = await client.getAgentCustomAttrsSchema({
+      const result = await client.getAgentCustomAttributes({
         query,
         startedAfter: '2026-06-15T00:00:00Z',
         startedBefore: '2026-06-23T00:00:00Z',
@@ -956,7 +956,7 @@ describe('WeaveClient', () => {
         {data: {attributes: []}} as any
       );
 
-      await client.getAgentCustomAttrsSchema({});
+      await client.getAgentCustomAttributes({});
 
       expect(
         mockTraceServerApi.agents
@@ -976,9 +976,7 @@ describe('WeaveClient', () => {
         new Error('boom')
       );
 
-      await expect(client.getAgentCustomAttrsSchema({})).rejects.toThrow(
-        'boom'
-      );
+      await expect(client.getAgentCustomAttributes({})).rejects.toThrow('boom');
     });
   });
 
