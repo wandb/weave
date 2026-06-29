@@ -59,6 +59,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
 )
 from weave.trace_server.query_builder.agent_trace_attribution import (
     attributed_spans_source,
+    trace_id_scope_subquery,
 )
 
 
@@ -93,13 +94,22 @@ class _AttrSrc:
         project_id: str = "p1",
         started_after: datetime.datetime | None = None,
         started_before: datetime.datetime | None = None,
+        scope_trace_ids: list[str] | None = None,
     ) -> None:
         pb = ParamBuilder("genai")
+        scope = (
+            trace_id_scope_subquery(
+                pb, project_id=project_id, trace_ids=scope_trace_ids
+            )
+            if scope_trace_ids is not None
+            else None
+        )
         sql = attributed_spans_source(
             pb,
             project_id=project_id,
             started_after=started_after,
             started_before=started_before,
+            trace_scope_subquery=scope,
         )
         self.sql = re.sub(
             r"genai_(\d+)", lambda m: f"genai_{int(m.group(1)) + offset}", sql
@@ -258,6 +268,94 @@ class TestMakeSpansListQuery:
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_single_trace_read_scopes_attribution_fallback(self) -> None:
+        """A non-identity `trace_id = X` read scopes the attribution fallback to
+        that trace, so the `tf` rollup stops scanning the whole project. The
+        fallback still GROUPs BY trace_id over every span of the scoped trace,
+        so per-trace attribution is identical to the unscoped scan.
+        """
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                query=Query.model_validate(
+                    {"$expr": {"$eq": [{"$getField": "trace_id"}, {"$literal": "t1"}]}}
+                ),
+            ),
+        )
+
+        src = _AttrSrc(4, scope_trace_ids=["t1"])
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            AND (s.trace_id = {{genai_1:String}})
+            ORDER BY started_at DESC
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "t1",
+            "genai_2": 100,
+            "genai_3": 0,
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_identity_filtered_read_leaves_fallback_unscoped(self) -> None:
+        """Filtering on an attributed column (`agent.name`) must NOT scope the
+        fallback: the scope subquery runs against raw spans, where the
+        attributed `agent_name` does not yet exist, so scoping there would
+        corrupt attribution. The `trace_id` conjunct is ignored for scoping.
+        """
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                query=Query.model_validate(
+                    {
+                        "$expr": {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "trace_id"},
+                                        {"$literal": "t1"},
+                                    ]
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "agent.name"},
+                                        {"$literal": "bot"},
+                                    ]
+                                },
+                            ]
+                        }
+                    }
+                ),
+            ),
+        )
+
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            AND ((s.trace_id = {{genai_1:String}}) AND (s.agent_name = {{genai_2:String}}))
+            ORDER BY started_at DESC
+            LIMIT {{genai_3:UInt64}} OFFSET {{genai_4:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "t1",
+            "genai_2": "bot",
+            "genai_3": 100,
+            "genai_4": 0,
+            **src.params,
+        }
         assert_sql(expected, expected_params, query, pb.get_params())
 
     def test_projects_and_sorts_selected_custom_attr_columns(self) -> None:

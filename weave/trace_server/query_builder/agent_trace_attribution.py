@@ -119,6 +119,7 @@ def attributed_spans_source(
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
     base_relation: str = "spans",
+    trace_scope_subquery: str | None = None,
 ) -> str:
     """Return a parenthesized subquery that stands in for the `spans` table.
 
@@ -136,10 +137,19 @@ def attributed_spans_source(
     The inner scan is bounded to `project_id` and the outer time window so it
     prunes by primary key; the fallback scan is bounded to the same window
     widened by one trace-duration of slack so edge spans still resolve.
+
+    `trace_scope_subquery` further restricts the fallback scan to
+    `trace_id IN ({subquery})`. The subquery must select trace_ids from raw
+    `spans` using ONLY non-identity predicates (the caller is responsible for
+    that gate). The fallback still GROUPs BY trace_id over every span of each
+    scoped trace, so per-trace attribution is identical to the unscoped scan
+    (lossless); it just skips traces the consuming query cannot return.
     """
     pid_slot = pb.add(project_id, param_type="String")
 
     fallback_conds = [f"project_id = {pid_slot}"]
+    if trace_scope_subquery is not None:
+        fallback_conds.append(f"trace_id IN ({trace_scope_subquery})")
     base_conds = [f"s0.project_id = {pid_slot}"]
     if started_after is not None:
         fb_after = pb.add(
@@ -207,3 +217,106 @@ def attributed_spans_source(
     WHERE {" AND ".join(base_conds)}
   )
 )"""
+
+
+def extract_scopable_trace_ids(query: tsi_query.Query | None) -> list[str] | None:
+    """Pull concrete `trace_id` values a query restricts to, when provably safe.
+
+    Returns the sorted trace_ids iff the query is a top-level AND-chain (or a
+    single comparison) whose `trace_id` constraints are all `trace_id = '<lit>'`
+    / `trace_id IN ['<lit>', ...]` against string literals AND it references no
+    attributed identity column. Any `$or` / `$not` / `$contains`, a non-literal
+    trace_id comparison, or a missing trace_id constraint yields None, so the
+    fallback stays unscoped (current behavior).
+
+    A trace_id predicate filters the *raw* span identically before and after
+    attribution (trace_id is never attributed), so narrowing the fallback to
+    these traces is lossless.
+    """
+    if query is None or query_references_identity(query):
+        return None
+    operands = _top_level_and_operands(query.expr_)
+    found: set[str] = set()
+    for operand in operands:
+        values = _trace_id_literals(operand)
+        if values is not None:
+            found.update(values)
+    return sorted(found) if found else None
+
+
+def trace_id_scope_subquery(
+    pb: ParamBuilder, *, project_id: str, trace_ids: list[str]
+) -> str:
+    """Build `SELECT trace_id FROM spans WHERE project + trace_id IN (...)`.
+
+    Uses only non-identity raw columns so it is safe to feed as the
+    `trace_scope_subquery` of `attributed_spans_source`.
+    """
+    pid_slot = pb.add(project_id, param_type="String")
+    ids_slot = pb.add(trace_ids, param_type="Array(String)")
+    return (
+        f"SELECT trace_id FROM spans "
+        f"WHERE project_id = {pid_slot} AND trace_id IN {ids_slot}"
+    )
+
+
+def _top_level_and_operands(op: tsi_query.Operation) -> list[tsi_query.Operand]:
+    """The conjuncts of a top-level `$and`, or the single op as a one-element list.
+
+    Only a flat top-level AND is unwrapped; a bare comparison is treated as a
+    single conjunct. Anything else (an OR/NOT at the root) returns itself as the
+    sole operand and will simply not yield trace_id literals.
+    """
+    if isinstance(op, tsi_query.AndOperation):
+        return list(op.and_)
+    return [op]
+
+
+def _trace_id_literals(operand: tsi_query.Operand) -> list[str] | None:
+    """String literals a single `trace_id = X` / `trace_id IN [...]` restricts to.
+
+    Returns None when `operand` is not such a comparison or any operand is not
+    a `trace_id` field vs. string literal(s).
+    """
+    if isinstance(operand, tsi_query.EqOperation):
+        lhs, rhs = operand.eq_
+        field, literal = _field_and_str_literal(lhs, rhs)
+        if field == "trace_id" and literal is not None:
+            return [literal]
+        return None
+    if isinstance(operand, tsi_query.InOperation):
+        field_operand, list_operand = operand.in_
+        if _get_field_name(field_operand) != "trace_id":
+            return None
+        values: list[str] = []
+        for item in list_operand:
+            literal = _str_literal(item)
+            if literal is None:
+                return None
+            values.append(literal)
+        return values or None
+    return None
+
+
+def _field_and_str_literal(
+    lhs: tsi_query.Operand, rhs: tsi_query.Operand
+) -> tuple[str | None, str | None]:
+    """Resolve a comparison to (field_name, str_literal) regardless of side."""
+    field = _get_field_name(lhs)
+    if field is not None:
+        return field, _str_literal(rhs)
+    return _get_field_name(rhs), _str_literal(lhs)
+
+
+def _get_field_name(operand: tsi_query.Operand) -> str | None:
+    if isinstance(operand, tsi_query.GetFieldOperator):
+        return operand.get_field_
+    return None
+
+
+def _str_literal(operand: tsi_query.Operand) -> str | None:
+    if isinstance(operand, tsi_query.LiteralOperation) and isinstance(
+        operand.literal_, str
+    ):
+        return operand.literal_
+    return None
