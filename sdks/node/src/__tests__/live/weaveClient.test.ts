@@ -1902,11 +1902,11 @@ describe('WeaveClient', () => {
     });
   });
 
-  describe('getAgentCustomAttrsSchema', () => {
+  describe('getAgentCustomAttributes', () => {
     vcrTest('gets the custom attrs schema for the project', async () => {
       await authenticate();
       const client = await init('example');
-      const resp = await client.getAgentCustomAttrsSchema({});
+      const resp = await client.getAgentCustomAttributes({});
       expect(resp.data).toMatchInlineSnapshot(`
         {
           "attributes": [
@@ -2059,7 +2059,7 @@ describe('WeaveClient', () => {
     vcrTest('filters by time window', async () => {
       await authenticate();
       const client = await init('example');
-      const resp = await client.getAgentCustomAttrsSchema({
+      const resp = await client.getAgentCustomAttributes({
         startedAfter: '2026-06-15T00:00:00Z',
         startedBefore: '2026-06-23T00:00:00Z',
       });
@@ -2137,7 +2137,7 @@ describe('WeaveClient', () => {
     vcrTest('filters by query', async () => {
       await authenticate();
       const client = await init('example');
-      const resp = await client.getAgentCustomAttrsSchema({
+      const resp = await client.getAgentCustomAttributes({
         query: {
           $expr: {
             $eq: [
@@ -2180,7 +2180,7 @@ describe('WeaveClient', () => {
       await authenticate();
       const client = await init('example');
 
-      const first = await client.getAgentCustomAttrsSchema({limit: 1});
+      const first = await client.getAgentCustomAttributes({limit: 1});
       expect(first.data).toMatchInlineSnapshot(`
         {
           "attributes": [
@@ -2197,7 +2197,7 @@ describe('WeaveClient', () => {
         }
       `);
 
-      const second = await client.getAgentCustomAttrsSchema({
+      const second = await client.getAgentCustomAttributes({
         limit: 1,
         offset: 1,
       });
@@ -2221,7 +2221,7 @@ describe('WeaveClient', () => {
     vcrTest('returns no attributes for a window with no data', async () => {
       await authenticate();
       const client = await init('example');
-      const resp = await client.getAgentCustomAttrsSchema({
+      const resp = await client.getAgentCustomAttributes({
         startedAfter: '2000-01-01T00:00:00Z',
         startedBefore: '2000-01-02T00:00:00Z',
       });
@@ -2239,7 +2239,7 @@ describe('WeaveClient', () => {
       await authenticate();
       const client = await init('nonexistent-project');
 
-      expect(client.getAgentCustomAttrsSchema({})).rejects.toMatchObject({
+      expect(client.getAgentCustomAttributes({})).rejects.toMatchObject({
         data: null,
         error: {
           detail: 'Project not found',
