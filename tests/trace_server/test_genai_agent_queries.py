@@ -429,6 +429,157 @@ def test_two_pass_list_attribution_matches_full_attribution(ch_server):
     assert all(_identity(s) == tp[s.span_id] for s in page.spans)
 
 
+def test_two_pass_page_cut_inside_started_at_tie(ch_server):
+    """When the page cut falls inside a `started_at` tie, the `span_id`
+    tiebreaker gives a well-defined page and inheritance holds across the cut.
+
+    The two-pass references the page twice (base relation + the fallback's
+    trace_id scope); a `started_at`-only order is not total, so the page is
+    contractually defined only once `span_id` completes the sort key (see the
+    SQL snapshot tests for the tiebreaker itself). Here the cut splits a tie and
+    a child's identity-bearing root sorts below it, so the page takes the child
+    but not the root; the trace_id-scoped fallback still attributes it.
+    """
+    project_id = _make_project_id("two_pass_ties")
+    tied = datetime.datetime(2026, 3, 1, tzinfo=datetime.timezone.utc)
+
+    # All spans share one `started_at`; `span_id DESC` alone orders the page.
+    # t1's root sorts BELOW its child, so a page of 3 takes the child and cuts
+    # the root off (straddle within the tie); t1's child must still inherit.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_root",
+            operation_name="invoke_agent",
+            agent_name="Gamma",
+            agent_version="gv",
+            agent_id="gid",
+            conversation_id="cg",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_root",
+            operation_name="invoke_agent",
+            agent_name="Theta",
+            agent_version="tv",
+            agent_id="tid",
+            conversation_id="ct",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="f0",
+            span_id="f0",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # span_id DESC over the tie: t2_zchild, t2_root, t1_zchild, t1_root, f0.
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, limit=3)
+    )
+    assert [s.span_id for s in page.spans] == ["t2_zchild", "t2_root", "t1_zchild"]
+    ident = {s.span_id: _identity(s) for s in page.spans}
+    assert ident["t2_zchild"] == ("Theta", "tv", "tid", "ct")
+    assert ident["t2_root"] == ("Theta", "tv", "tid", "ct")
+    # The straddle-in-tie span: inherits Gamma though t1_root is below the cut.
+    assert ident["t1_zchild"] == ("Gamma", "gv", "gid", "cg")
+
+
+def test_two_pass_inherits_root_outside_window_via_slack(ch_server):
+    """The two-pass fallback widens by slack, so an in-window child inherits an
+    identity-bearing root that started just before the query window.
+
+    The page base scan is bounded to the window (the root is off-page), but the
+    trace_id-scoped fallback rollup widens the window by one trace-duration, so
+    the root still resolves and the child inherits across the window edge.
+    """
+    project_id = _make_project_id("two_pass_slack")
+    after = datetime.datetime(2026, 4, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    before = after + datetime.timedelta(minutes=10)
+
+    # root starts 5min before the window (inside the 1h fallback slack); child
+    # starts inside the window. A lone in-window span anchors the page.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="root",
+            operation_name="invoke_agent",
+            agent_name="Sigma",
+            agent_version="sv",
+            agent_id="sid",
+            conversation_id="cs",
+            started_at=after - datetime.timedelta(minutes=5),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="child",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=1),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="other",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id, started_after=after, started_before=before
+        )
+    )
+    by_id = {s.span_id: _identity(s) for s in page.spans}
+    # root is off-page (outside the window) but still resolves the child.
+    assert "root" not in by_id
+    assert by_id["child"] == ("Sigma", "sv", "sid", "cs")
+    assert by_id["other"] == ("", "", "", "")
+
+
 def test_unset_span_inherits_a_coherent_agent_triple(ch_server):
     """An inherited identity is one real agent, never a mix of two.
 

@@ -267,7 +267,7 @@ class TestMakeSpansListQuery:
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
-            order_by="started_at DESC",
+            order_by="started_at DESC, span_id DESC",
             projection=SPANS_LIST_COLS,
             attr_sql=src.sql,
         )
@@ -288,7 +288,7 @@ class TestMakeSpansListQuery:
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
-            order_by="input_tokens asc",
+            order_by="input_tokens asc, span_id asc",
             projection=SPANS_LIST_COLS,
             attr_sql=src.sql,
         )
@@ -311,7 +311,7 @@ class TestMakeSpansListQuery:
         )
 
         src = _AttrSrc(5, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
-        order_by = "if(mapContains(s.custom_attrs_float, {genai_3:String}), toFloat64(s.custom_attrs_float[{genai_3:String}]), NULL) desc"
+        order_by = "if(mapContains(s.custom_attrs_float, {genai_3:String}), toFloat64(s.custom_attrs_float[{genai_3:String}]), NULL) desc, span_id desc"
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -376,7 +376,7 @@ class TestMakeSpansListQuery:
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
-            order_by="started_at DESC",
+            order_by="started_at DESC, span_id DESC",
             projection=f"{SPANS_LIST_COLS}, {SPANS_DETAILS_COLS}",
             attr_sql=src.sql,
         )
@@ -401,7 +401,7 @@ class TestMakeSpansListQuery:
             SELECT {SPANS_LIST_COLS}
             FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
-            ORDER BY agent_name asc
+            ORDER BY agent_name asc, span_id asc
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
         """
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
@@ -430,7 +430,7 @@ class TestMakeSpansListQuery:
             SELECT {SPANS_LIST_COLS}
             FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}} AND (s.agent_name = {{genai_1:String}})
-            ORDER BY started_at DESC
+            ORDER BY started_at DESC, span_id DESC
             LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
         """
         expected_params = {
@@ -466,7 +466,7 @@ class TestMakeSpansListQuery:
             SELECT {SPANS_LIST_COLS}
             FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}} AND (s.trace_id = {{genai_1:String}})
-            ORDER BY started_at DESC
+            ORDER BY started_at DESC, span_id DESC
             LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
         """
         expected_params = {
@@ -501,7 +501,7 @@ class TestMakeSpansListQuery:
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String} AND (s.operation_name = {genai_1:String})",
-            order_by="started_at DESC",
+            order_by="started_at DESC, span_id DESC",
             projection=SPANS_LIST_COLS,
             attr_sql=src.sql,
             limit_slot="{genai_2:UInt64}",
@@ -541,7 +541,7 @@ class TestMakeSpansListQuery:
         expected = _two_pass_expected(
             base=cost_source,
             where="s.project_id = {genai_0:String}",
-            order_by="started_at DESC",
+            order_by="started_at DESC, span_id DESC",
             projection=f"{SPANS_LIST_COLS}, {SPANS_COST_COLS}",
             attr_sql=attributed,
         )

@@ -884,6 +884,21 @@ def _sort_references_identity(sort_by: list[AgentSortBy] | None) -> bool:
     return agent_trace_attribution.fields_reference_identity([s.field for s in sort_by])
 
 
+def _with_span_tiebreaker(order_by: str, sort_by: list[AgentSortBy] | None) -> str:
+    """Append `span_id` so the list order is total (a deterministic page).
+
+    The two-pass references the page CTE twice (as the base relation and as the
+    fallback's trace_id scope); a non-total `ORDER BY ... LIMIT` could resolve
+    ties differently per reference and leave a span without its fallback row,
+    blanking an inherited identity. `span_id` completes the table's
+    `(project_id, started_at, span_id)` sort key, so a `started_at`-led page
+    still reads in primary-key order; the tiebreaker direction matches the
+    leading sort term to keep that alignment.
+    """
+    direction = sort_by[0].direction if sort_by else "DESC"
+    return f"{order_by}, span_id {direction}"
+
+
 def _spans_list_two_pass_applies(req: AgentSpansQueryReq) -> bool:
     """Whether the ungrouped list read can use the page-prefetch two-pass.
 
@@ -905,6 +920,11 @@ def _spans_list_two_pass_applies(req: AgentSpansQueryReq) -> bool:
     return not _sort_references_identity(req.sort_by)
 
 
+def _base_relation(pb: ParamBuilder, project_id: str, *, include_costs: bool) -> str:
+    """The bare relation a spans read scans: cost-augmented source or raw `spans`."""
+    return cost_augmented_source_sql(pb, project_id) if include_costs else "spans"
+
+
 def _spans_source(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -921,7 +941,7 @@ def _spans_source(
     `agent_trace_attribution`); otherwise the base is used directly so
     non-identity queries skip the extra trace scan.
     """
-    base = cost_augmented_source_sql(pb, req.project_id) if include_costs else "spans"
+    base = _base_relation(pb, req.project_id, include_costs=include_costs)
     if not attribute:
         return base
     return agent_trace_attribution.attributed_spans_source(
@@ -952,9 +972,7 @@ def _two_pass_spans_list_query(
     before its LIMIT. No outer LIMIT: the page already holds exactly the
     displayed rows and the trace_id join is 1:1.
     """
-    base = (
-        cost_augmented_source_sql(pb, req.project_id) if req.include_costs else "spans"
-    )
+    base = _base_relation(pb, req.project_id, include_costs=req.include_costs)
     attributed_page = agent_trace_attribution.attributed_spans_source(
         pb,
         project_id=req.project_id,
@@ -1113,11 +1131,14 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         sortable = SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys()))
         if req.include_costs:
             sortable = sortable.union(_SPAN_COST_SORTABLE_COLS)
-        order_by = build_order_by(
+        order_by = _with_span_tiebreaker(
+            build_order_by(
+                req.sort_by,
+                sortable,
+                "started_at DESC",
+                column_exprs=custom_sort_exprs,
+            ),
             req.sort_by,
-            sortable,
-            "started_at DESC",
-            column_exprs=custom_sort_exprs,
         )
         custom_attr_projection = _custom_attr_map_projection(
             pb, req.custom_attr_columns

@@ -153,6 +153,10 @@ def attributed_spans_source(
     unchanged. Used by the page-prefetch two-pass list read to scope the rollup
     to the page's traces.
 
+    `base_relation` and `fallback_trace_id_scope` are interpolated as raw SQL and
+    must be trusted, internal fragments (a relation name / a literal subquery),
+    never user input; user-derived values still flow through `pb` params.
+
     The inner scan is bounded to `project_id` and the outer time window so it
     prunes by primary key; the fallback scan is bounded to the same window
     widened by one trace-duration of slack so edge spans still resolve.
