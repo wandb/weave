@@ -2143,6 +2143,36 @@ def test_unsupported_summary_field_raises_invalid_field_error() -> None:
         cq.as_sql(ParamBuilder())
 
 
+def test_negative_json_array_index_raises_invalid_field_error() -> None:
+    """A negative array index in a dynamic field path must surface as
+    InvalidFieldError (HTTP 422), not a ClickHouse BAD_ARGUMENTS 502.
+
+    ClickHouse's JSON_VALUE JSONPath grammar cannot parse `[-1]`, so a getField
+    like `inputs.turn.user_prompt_parts.-1` (filter or sort) 502'd the whole
+    /calls/query_stats request. We reject it at compile time instead.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.user_prompt_parts.-1"},
+                    {"$literal": "hi"},
+                ]
+            }
+        )
+    )
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        cq.as_sql(ParamBuilder())
+
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_order("inputs.turn.user_prompt_parts.-1", "desc")
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        cq.as_sql(ParamBuilder())
+
+
 def test_unselectable_columns_raise_invalid_field_error() -> None:
     """Selecting columns that the SQL builder can't materialize as a select expression
     must surface as InvalidFieldError (403), not NotImplementedError (500). Regression
