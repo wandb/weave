@@ -1,20 +1,7 @@
-"""Trace-server observability helpers (DogStatsD counters + OTel span tags).
+"""DogStatsD counter emission + DD-flavored OTel span-tag helpers.
 
-Historical name `datadog.py` kept because 11 internal modules import from
-it; renaming is a mechanical follow-up. The module no longer depends on
-ddtrace — it provides:
-
-  1. `db_insert_path` / `tag_db_insert_path` / `record_db_insert` —
-     emit DogStatsD counters for trace-server DB inserts. The wire
-     format `weave_trace_server.db_inserts:N|c|#table:T,path:P` and the
-     metric name are preserved so existing DD dashboards keep working.
-
-  2. `set_current_span_dd_tags` — set attributes on the current OTel span.
-
-Why inline DogStatsD instead of the `datadog` PyPI package or an OTel
-Counter: keeps the wire format under our control, adds zero new deps, and
-avoids entangling these counters with the isolated OTel MeterProvider
-used elsewhere for runtime metrics.
+Emits a single counter (`weave_trace_server.db_inserts`) over a UDP socket.
+Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
 """
 
 from __future__ import annotations
@@ -24,6 +11,7 @@ import contextlib
 import logging
 import os
 import socket
+import threading
 from collections.abc import Callable, Generator
 from contextvars import ContextVar
 from functools import wraps
@@ -32,72 +20,125 @@ from urllib.parse import urlparse
 
 from opentelemetry import trace as _otel_trace
 
-from weave.trace_server.local_root import get_local_root
+from weave.trace_server.tracing_root import get_local_root
 
 logger = logging.getLogger(__name__)
 
 DB_INSERT_METRIC = "weave_trace_server.db_inserts"
 DB_INSERT_PATH_UNKNOWN = "unknown"
 
+_DEFAULT_HOST = "localhost"
+_DEFAULT_PORT = 8125
+
 _db_insert_path: ContextVar[str] = ContextVar(
     "_db_insert_path", default=DB_INSERT_PATH_UNKNOWN
 )
 
 
-def _resolve_dogstatsd_addr() -> tuple[str, int]:
-    """Resolve `DD_DOGSTATSD_URL` / `DD_AGENT_HOST` / defaults to (host, port).
+def _parse_port(raw: str | None, *, default: int = _DEFAULT_PORT) -> int:
+    """Parse a port string, falling back to `default` for missing or invalid.
 
-    Honors `DD_DOGSTATSD_URL` (e.g. `udp://datadog.datadog:8125`) first,
-    then falls back to `DD_AGENT_HOST:DD_DOGSTATSD_PORT`, then
-    `localhost:8125`. A malformed URL falls back to localhost rather than
-    crashing the process at import time.
+    A non-numeric `DD_DOGSTATSD_PORT` must not crash the process at import
+    time — this module is imported by ~11 callers, and one bad env var
+    would take the whole trace server down.
+    """
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid port %r; falling back to %d", raw, default)
+        return default
+
+
+def _resolve_dogstatsd_addr() -> tuple[str, int]:
+    """Honor `DD_DOGSTATSD_URL` (`udp://host:port`), then
+    `DD_AGENT_HOST` + `DD_DOGSTATSD_PORT`, then `localhost:8125`.
     """
     url = os.environ.get("DD_DOGSTATSD_URL")
     if url:
         try:
             parsed = urlparse(url if "://" in url else f"udp://{url}")
             if parsed.hostname:
-                return parsed.hostname, parsed.port or 8125
+                return parsed.hostname, parsed.port or _DEFAULT_PORT
         except ValueError:
             logger.warning(
-                "Could not parse DD_DOGSTATSD_URL=%r; falling back to localhost:8125",
+                "Could not parse DD_DOGSTATSD_URL=%r; falling back to %s:%d",
                 url,
+                _DEFAULT_HOST,
+                _DEFAULT_PORT,
             )
-    host = os.environ.get("DD_AGENT_HOST", "localhost")
-    port = int(os.environ.get("DD_DOGSTATSD_PORT", "8125"))
+    host = os.environ.get("DD_AGENT_HOST", _DEFAULT_HOST)
+    port = _parse_port(os.environ.get("DD_DOGSTATSD_PORT"))
     return host, port
 
 
-_ADDR: tuple[str, int] = _resolve_dogstatsd_addr()
-_SOCK: socket.socket | None = None
-_SOCK_FAILED: bool = False  # don't retry creation after one failure
-
-
-def _emit_statsd(metric: str, value: int, tags: list[str]) -> None:
-    """Send a single DogStatsD counter packet.
-
-    Best-effort: a socket-creation or send failure never interrupts the
-    caller. We lazy-create the UDP socket on first emission so importing
-    this module has zero side effects.
-    """
-    global _SOCK, _SOCK_FAILED  # noqa: PLW0603 — lazy singleton init
-    if _SOCK_FAILED:
-        return
-    if _SOCK is None:
-        try:
-            _SOCK = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            _SOCK.setblocking(False)
-        except OSError:
-            logger.warning("DogStatsD socket creation failed; metric emission disabled")
-            _SOCK_FAILED = True
-            return
+def format_packet(metric: str, value: int, tags: list[str]) -> bytes:
+    """Format a DogStatsD counter packet. Public so tests can pin the wire format."""
     tag_suffix = f"|#{','.join(tags)}" if tags else ""
-    packet = f"{metric}:{value}|c{tag_suffix}".encode()
-    try:
-        _SOCK.sendto(packet, _ADDR)
-    except OSError:
-        # Don't let a transient stats failure interrupt the caller.
-        pass
+    return f"{metric}:{value}|c{tag_suffix}".encode()
+
+
+class _StatsDClient:
+    """Best-effort, fire-and-forget DogStatsD UDP client.
+
+    Resolves the address once and connects the socket, so each `emit`
+    is a single non-blocking `send()` — no per-call DNS, no per-call
+    address lookup. A failed `connect()` (e.g. DNS resolution failure
+    at startup) disables the client; subsequent emits are no-ops.
+    """
+
+    def __init__(self, host: str, port: int) -> None:
+        self._addr = (host, port)
+        self._sock: socket.socket | None = None
+        self._init_failed = False
+        self._lock = threading.Lock()
+
+    def _ensure_socket(self) -> socket.socket | None:
+        # Fast path: already initialized.
+        if self._sock is not None:
+            return self._sock
+        if self._init_failed:
+            return None
+        with self._lock:
+            # Re-check under lock — another thread may have set it up.
+            if self._sock is not None:
+                return self._sock
+            if self._init_failed:
+                return None
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setblocking(False)
+                # `connect()` resolves the hostname once and binds the
+                # UDP socket's default destination — eliminates per-call
+                # DNS on `sendto` (which `setblocking(False)` does NOT
+                # make non-blocking).
+                sock.connect(self._addr)
+            except OSError as exc:
+                logger.warning(
+                    "DogStatsD init failed for %s:%d (%s); metrics disabled",
+                    self._addr[0],
+                    self._addr[1],
+                    exc,
+                )
+                self._init_failed = True
+                return None
+            self._sock = sock
+            return sock
+
+    def emit(self, metric: str, value: int, tags: list[str]) -> None:
+        sock = self._ensure_socket()
+        if sock is None:
+            return
+        try:
+            sock.send(format_packet(metric, value, tags))
+        except OSError:
+            # Transient send failures don't interrupt the caller. We do
+            # not log here — a noisy agent restart would flood logs.
+            pass
+
+
+_client = _StatsDClient(*_resolve_dogstatsd_addr())
 
 
 @contextlib.contextmanager
@@ -125,10 +166,10 @@ def db_insert_path(path: str) -> Generator[None, None, None]:
 def tag_db_insert_path(
     path: str,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorator: tag DB inserts done inside `func` with `path:<path>`.
+    """Decorator form of `db_insert_path`.
 
-    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry the
-    contextvar, so a caller handing CH writes to an executor must
+    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry
+    the contextvar, so a caller handing CH writes to an executor must
     `copy_context().run`.
     """
 
@@ -153,16 +194,16 @@ def tag_db_insert_path(
 
 
 def record_db_insert(*, table: str, count: int, path: str | None = None) -> None:
-    """Emit a dogstatsd counter for rows inserted into the trace-server DB.
+    """Emit a counter for rows inserted into the trace-server DB.
 
     `path` falls back to the current `db_insert_path()` contextvar if
-    not provided; pass it explicitly from background flushers where the
+    not provided; pass explicitly from background flushers where the
     contextvar may not be set.
     """
     if count <= 0:
         return
     resolved_path = path if path is not None else _db_insert_path.get()
-    _emit_statsd(
+    _client.emit(
         DB_INSERT_METRIC,
         count,
         [f"table:{table}", f"path:{resolved_path}"],
@@ -170,24 +211,17 @@ def record_db_insert(*, table: str, count: int, path: str | None = None) -> None
 
 
 def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set attributes on the currently active OTel span.
-
-    No-op if no span is recording. Replaces the historical
-    `ddtrace.tracer.current_span().set_tags(...)`.
-    """
+    """Set attributes on the currently active OTel span. No-op if none recording."""
     span = _otel_trace.get_current_span()
     if span.is_recording():
         span.set_attributes(tags)
 
 
 def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set attributes on the local root span — the entry-point span recorded
-    by `local_root_scope` at the request / batch boundary.
+    """Set attributes on the local root span (the entry-point span recorded
+    by `local_root_scope` at the request / batch boundary).
 
-    Replaces the historical `ddtrace.tracer.current_root_span().set_tags(...)`.
-    OTel has no built-in current-root-span accessor; the request middleware
-    must call `local_root_scope(request_span)` for `get_local_root()` to
-    return the right span. No-op if no `local_root_scope` is active.
+    No-op if no `local_root_scope` is active.
     """
     span = get_local_root()
     if span is None:

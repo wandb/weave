@@ -1,4 +1,4 @@
-"""Tests for `weave.trace_server.local_root`."""
+"""Tests for `weave.trace_server.tracing_root`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 
 from opentelemetry.sdk.trace import TracerProvider
 
-from weave.trace_server.local_root import (
+from weave.trace_server.tracing_root import (
     get_local_root,
     local_root_scope,
 )
