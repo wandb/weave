@@ -79,6 +79,77 @@ def test_object_ref_filter_simple() -> None:
     )
 
 
+def test_object_ref_filter_contains_token() -> None:
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsTokenOperation.model_validate(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "output.model.name"},
+                    "substr": {"$literal": "gpt4"},
+                }
+            }
+        )
+    )
+    cq.add_order("started_at", "desc")
+    cq.set_expand_columns(["output.model"])
+    assert_sql(
+        cq,
+        """
+        WITH obj_filter_0 AS
+          (SELECT digest,
+                  concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+           FROM object_versions
+           WHERE project_id = {pb_0:String}
+             AND hasToken(JSON_VALUE(val_dump, {pb_1:String}), {pb_2:String})
+           GROUP BY project_id,
+                    object_id,
+                    digest
+
+           UNION ALL
+
+           SELECT digest,
+                  digest as ref
+           FROM table_rows
+           WHERE project_id = {pb_0:String}
+             AND hasToken(JSON_VALUE(val_dump, {pb_1:String}), {pb_2:String})
+           GROUP BY project_id,
+                    digest),
+             filtered_calls AS
+          (SELECT calls_merged.id AS id
+           FROM calls_merged
+           PREWHERE calls_merged.project_id = {pb_0:String}
+           WHERE (length(calls_merged.output_refs) > 0
+                  OR calls_merged.ended_at IS NULL)
+           GROUP BY (calls_merged.project_id,
+                     calls_merged.id)
+           HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), '') GLOBAL IN
+                      (SELECT ref
+                       FROM obj_filter_0)
+                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.output_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
+                      (SELECT ref
+                       FROM obj_filter_0)))
+                   AND ((any(calls_merged.deleted_at) IS NULL))
+                   AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+           ORDER BY any(calls_merged.started_at) DESC)
+        SELECT calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id,
+                  calls_merged.id)
+        ORDER BY any(calls_merged.started_at) DESC
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."name"',
+            "pb_2": "gpt4",
+            "pb_3": '$."model"',
+        },
+    )
+
+
 def test_object_ref_filter_lt() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")

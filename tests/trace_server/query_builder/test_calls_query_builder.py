@@ -1403,6 +1403,146 @@ def test_calls_query_with_like_optimization_contains_calls_complete() -> None:
     )
 
 
+def test_calls_query_contains_token_case_sensitive() -> None:
+    """$containsToken on a JSON field compiles to hasToken + a hasToken prefilter."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsTokenOperation.model_validate(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "inputs.param"},
+                    "substr": {"$literal": "hello"},
+                }
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE ((hasToken(calls_merged.inputs_dump, {pb_1:String}) OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            (hasToken(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": "project",
+        },
+    )
+
+
+def test_calls_query_contains_token_case_insensitive() -> None:
+    """Case-insensitive $containsToken compiles to hasTokenCaseInsensitive."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsTokenOperation.model_validate(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "inputs.param"},
+                    "substr": {"$literal": "hello"},
+                    "case_insensitive": True,
+                }
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE ((hasTokenCaseInsensitive(calls_merged.inputs_dump, {pb_1:String}) OR calls_merged.inputs_dump IS NULL))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (
+            (hasTokenCaseInsensitive(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_0:String}), 'null'), ''), {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+        )
+        """,
+        {
+            "pb_0": '$."param"',
+            "pb_1": "hello",
+            "pb_2": "project",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("case_insensitive", "expected_fn"),
+    [
+        (False, "hasToken"),
+        (True, "hasTokenCaseInsensitive"),
+    ],
+)
+def test_calls_query_contains_token_multi_value_feedback(
+    case_insensitive, expected_fn
+) -> None:
+    """$containsToken on a multi-value feedback field uses arrayExists(hasToken)."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_condition(
+        tsi_query.ContainsTokenOperation.model_validate(
+            {
+                "$containsToken": {
+                    "input": {"$getField": "feedback.[wandb.note.1].payload.note"},
+                    "substr": {"$literal": "hello"},
+                    "case_insensitive": case_insensitive,
+                }
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        f"""
+        SELECT
+            calls_merged.id AS id
+        FROM
+            calls_merged
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {{pb_3:String}}
+            ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///',
+            {{pb_3:String}},
+            '/call/',
+            calls_merged.id))
+        PREWHERE
+            calls_merged.project_id = {{pb_3:String}}
+        GROUP BY
+            (calls_merged.project_id,
+            calls_merged.id)
+        HAVING
+            ((arrayExists(x -> {expected_fn}(x, {{pb_2:String}}),
+            groupArrayIf(coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {{pb_1:String}}), 'null'), ''),
+            feedback.feedback_type = {{pb_0:String}}
+            AND coalesce(nullIf(JSON_VALUE(feedback.payload_dump,
+            {{pb_1:String}}), 'null'), '') != '')))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "wandb.note.1",
+            "pb_1": '$."note"',
+            "pb_2": "hello",
+            "pb_3": "project",
+        },
+    )
+
+
 def test_calls_query_with_like_optimization_in_calls_complete() -> None:
     """Test that IN LIKE optimization on calls_complete does NOT include null checks."""
     cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)

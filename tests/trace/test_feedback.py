@@ -711,6 +711,33 @@ def test_agent_monitor_feedback_filters(client: WeaveClient) -> None:
     )
     assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a", "upper"}
 
+    # $containsToken on scorer_tags also uses array membership (whole-token).
+    matches = _query(
+        {
+            "$expr": {
+                "$containsToken": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a"}
+
+    # Case-insensitive $containsToken matches the upper-cased tag too.
+    matches = _query(
+        {
+            "$expr": {
+                "$containsToken": {
+                    "input": {"$getField": "scorer_tags"},
+                    "substr": {"$literal": "nsfw"},
+                    "case_insensitive": True,
+                }
+            }
+        }
+    )
+    assert {m["weave_ref"].rsplit("/", 1)[-1] for m in matches} == {"a", "upper"}
+
     # Map value lookup with numeric comparison.
     matches = _query(
         {

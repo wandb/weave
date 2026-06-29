@@ -1,6 +1,7 @@
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     Column,
     ParamBuilder,
@@ -590,6 +591,97 @@ def test_feedback_query_in_homogeneous_literal_list_casts_field() -> None:
         "WHERE (toInt64OrNull(JSON_VALUE(payload_dump, {pb_0:String})) "
         "IN ({pb_1:Int64},{pb_2:Int64},{pb_3:Int64}))"
     )
+
+
+def _token_table() -> Table:
+    return Table(
+        "calls",
+        [
+            Column("id", "string"),
+            Column("op_name", "string"),
+            Column("input_refs", "array_string"),
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_cond"),
+    [
+        # String field, case-sensitive -> hasToken (no `> 0`).
+        (
+            {
+                "$containsToken": {
+                    "input": {"$getField": "op_name"},
+                    "substr": {"$literal": "predict"},
+                }
+            },
+            "hasToken(op_name, {pb_0:String})",
+        ),
+        # String field, case-insensitive -> hasTokenCaseInsensitive.
+        (
+            {
+                "$containsToken": {
+                    "input": {"$getField": "op_name"},
+                    "substr": {"$literal": "predict"},
+                    "case_insensitive": True,
+                }
+            },
+            "hasTokenCaseInsensitive(op_name, {pb_0:String})",
+        ),
+        # Array(String) field, case-sensitive -> array membership (has).
+        (
+            {
+                "$containsToken": {
+                    "input": {"$getField": "input_refs"},
+                    "substr": {"$literal": "predict"},
+                }
+            },
+            "has(input_refs, {pb_0:String})",
+        ),
+        # Array(String) field, case-insensitive -> arrayExists(lower(...)).
+        (
+            {
+                "$containsToken": {
+                    "input": {"$getField": "input_refs"},
+                    "substr": {"$literal": "predict"},
+                    "case_insensitive": True,
+                }
+            },
+            "arrayExists(x -> lower(x) = lower({pb_0:String}), input_refs)",
+        ),
+    ],
+)
+def test_contains_token_compiles_to_has_token(query, expected_cond) -> None:
+    """$containsToken compiles to hasToken on strings and array membership on
+    Array(String) columns, mirroring $contains' array branch.
+    """
+    select = _token_table().select().fields(["id"]).where(tsi.Query(**{"$expr": query}))
+    prepared = _prepare_clickhouse(select)
+    assert prepared.sql == ("SELECT id\nFROM calls\nWHERE " + expected_cond)
+    assert prepared.parameters == {"pb_0": "predict"}
+
+
+def test_contains_token_multi_token_needle_raises() -> None:
+    """A needle spanning token separators is rejected before SQL generation."""
+    select = (
+        _token_table()
+        .select()
+        .fields(["id"])
+        .where(
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$containsToken": {
+                            "input": {"$getField": "op_name"},
+                            "substr": {"$literal": "two words"},
+                        }
+                    }
+                }
+            )
+        )
+    )
+    with pytest.raises(InvalidRequest, match="single token"):
+        _prepare_clickhouse(select)
 
 
 def test_feedback_query_inference_threads_through_and_or_not() -> None:

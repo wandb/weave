@@ -287,6 +287,97 @@ def test_heavy_field_contains_inside_not_skips_optimization() -> None:
     assert result is None
 
 
+@pytest.mark.parametrize(
+    ("case_insensitive", "expected_fn"),
+    [
+        (False, "hasToken"),
+        (True, "hasTokenCaseInsensitive"),
+    ],
+)
+def test_heavy_field_contains_token_prefilter(case_insensitive, expected_fn) -> None:
+    """$containsToken on a heavy field emits a hasToken pre-aggregation prefilter."""
+    pb = ParamBuilder("pb")
+    processor = HeavyFieldOptimizationProcessor(pb, "calls_merged", use_null_check=True)
+
+    op = tsi_query.ContainsTokenOperation.model_validate(
+        {
+            "$containsToken": {
+                "input": {"$getField": "inputs.param"},
+                "substr": {"$literal": "hello"},
+                "case_insensitive": case_insensitive,
+            }
+        }
+    )
+    result = apply_processor(processor, op)
+
+    assert result == (
+        f"({expected_fn}(calls_merged.inputs_dump, {{pb_0:String}}) "
+        "OR calls_merged.inputs_dump IS NULL)"
+    )
+    assert pb.get_params() == {"pb_0": "hello"}
+
+
+@pytest.mark.parametrize(
+    "op_dict",
+    [
+        # Input is not a bare field -> no prefilter.
+        {
+            "$containsToken": {
+                "input": {"$literal": "x"},
+                "substr": {"$literal": "hello"},
+            }
+        },
+        # Substr is not a string literal -> no prefilter.
+        {
+            "$containsToken": {
+                "input": {"$getField": "inputs.param"},
+                "substr": {"$getField": "inputs.other"},
+            }
+        },
+        # Empty substr -> no prefilter.
+        {
+            "$containsToken": {
+                "input": {"$getField": "inputs.param"},
+                "substr": {"$literal": ""},
+            }
+        },
+        # Non-heavy field -> no prefilter.
+        {
+            "$containsToken": {
+                "input": {"$getField": "id"},
+                "substr": {"$literal": "hello"},
+            }
+        },
+    ],
+)
+def test_heavy_field_contains_token_prefilter_skips(op_dict) -> None:
+    """$containsToken shapes that can't safely prefilter return None."""
+    pb = ParamBuilder("pb")
+    processor = HeavyFieldOptimizationProcessor(pb, "calls_merged", use_null_check=True)
+    op = tsi_query.ContainsTokenOperation.model_validate(op_dict)
+    assert apply_processor(processor, op) is None
+
+
+def test_heavy_field_contains_token_inside_not_skips_optimization() -> None:
+    """$containsToken on a heavy field inside NOT skips optimization (superset trap)."""
+    pb = ParamBuilder()
+    processor = HeavyFieldOptimizationProcessor(pb, "calls_merged", use_null_check=True)
+
+    op = tsi_query.NotOperation.model_validate(
+        {
+            "$not": [
+                {
+                    "$containsToken": {
+                        "input": {"$getField": "attributes.key"},
+                        "substr": {"$literal": "val"},
+                    }
+                }
+            ]
+        }
+    )
+    assert apply_processor(processor, op) is None
+
+
 def test_heavy_field_in_inside_not_skips_optimization() -> None:
     """IN on a heavy field inside NOT also skips optimization."""
     pb = ParamBuilder()
