@@ -612,8 +612,8 @@ def _content_refs(span: AgentSpanSchema) -> list[str]:
 
 
 # Content part types that reference uploaded media by ref rather than inlining
-# text. The session SDK emits attached media as ``uri`` parts (see
-# weave/session/session_otel.py::_media_to_part); ``blob``/``file`` are accepted
+# text. The conversation SDK emits attached media as ``uri`` parts (see
+# weave/conversation/conversation_otel.py::_media_to_part); ``blob``/``file`` are accepted
 # defensively in case other producers use a ref-bearing variant.
 _MEDIA_PART_TYPES = {"uri", "blob", "file"}
 

@@ -1,4 +1,4 @@
-"""Weave Session SDK — structured logging for agent conversations.
+"""Weave Conversation SDK — structured logging for agent conversations.
 
 Provides Python classes and functions for logging agent conversations
 to Weave's Agents tab. All data flows through OpenTelemetry — the SDK
@@ -20,12 +20,12 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 from typing_extensions import Self
 
-from weave.session.session_otel import (
+from weave.conversation.conversation_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
 )
-from weave.session.types import (
+from weave.conversation.types import (
     BlobPart,
     FilePart,
     JSONString,
@@ -67,11 +67,12 @@ if TYPE_CHECKING:
 
 
 # Re-export types for backwards compatibility with existing imports of
-# `weave.session.session.Message` etc. The data classes themselves live
-# in `weave.session.types` to break the import cycle with `session_otel`.
+# `weave.conversation.conversation.Message` etc. The data classes themselves live
+# in `weave.conversation.types` to break the import cycle with `conversation_otel`.
 __all__ = [
     "LLM",
     "BlobPart",
+    "Conversation",
     "FilePart",
     "LogResult",
     "MediaAttachment",
@@ -79,7 +80,6 @@ __all__ = [
     "MessagePart",
     "Reasoning",
     "ReasoningPart",
-    "Session",
     "SubAgent",
     "TextPart",
     "Tool",
@@ -88,16 +88,16 @@ __all__ = [
     "Turn",
     "UriPart",
     "Usage",
+    "end_conversation",
     "end_llm",
-    "end_session",
     "end_turn",
+    "get_current_conversation",
     "get_current_llm",
-    "get_current_session",
     "get_current_turn",
-    "log_session",
+    "log_conversation",
     "log_turn",
+    "start_conversation",
     "start_llm",
-    "start_session",
     "start_subagent",
     "start_tool",
     "start_turn",
@@ -109,8 +109,8 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
-# OTel tracer name — identifies the Session SDK as the source of these spans.
-_TRACER_NAME = "weave.session"
+# OTel tracer name — identifies the Conversation SDK as the source of these spans.
+_TRACER_NAME = "weave.conversation"
 
 logger = logging.getLogger(__name__)
 
@@ -158,12 +158,12 @@ class _SpanBase(BaseModel):
         self._otel_token = otel_context.attach(
             otel_trace.set_span_in_context(self._otel_span)
         )
-        # Stamp the active session's attributes on every span. Read from the
-        # session contextvar (not OTel context) so they reach the root turn
+        # Stamp the active conversation's attributes on every span. Read from the
+        # conversation contextvar (not OTel context) so they reach the root turn
         # span too, which starts in a fresh OTel Context to force a new trace.
-        session = get_current_session()
-        if session is not None and session.attributes:
-            self._otel_span.set_attributes(session.attributes)
+        conversation = get_current_conversation()
+        if conversation is not None and conversation.attributes:
+            self._otel_span.set_attributes(conversation.attributes)
 
     def _end_otel_span(
         self, attrs: dict[str, Any], *, end_time_ns: int | None = None
@@ -237,7 +237,7 @@ class _SpanBase(BaseModel):
         Must be called between span start and span end — i.e. inside a
         ``with`` block. Outside that window the call is a no-op and logs
         a warning. For batch ingest, populate the object's declared fields
-        directly and pass it to ``log_turn`` / ``log_session``.
+        directly and pass it to ``log_turn`` / ``log_conversation``.
         """
         if span := self._recording_span("set_attributes", list(attributes)):
             span.set_attributes(attributes)
@@ -329,7 +329,7 @@ class Tool(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+    def _build_attrs(self, *, conversation_id: str, include_content: bool) -> dict[str, Any]:
         """Build the full OTel attribute dict for this tool span.
 
         Single chokepoint shared by streaming (``end``) and batch
@@ -348,7 +348,7 @@ class Tool(_SpanBase):
             result = ""
         attrs = execute_tool_attributes(
             tool_name=self.name,
-            conversation_id=session_id,
+            conversation_id=conversation_id,
             tool_call_arguments=arguments,
             tool_call_result=result,
             tool_call_id=self.tool_call_id,
@@ -369,10 +369,10 @@ class Tool(_SpanBase):
             elapsed = self.ended_at - self.started_at
             self.duration_ms = int(elapsed.total_seconds() * 1000)
 
-        session = get_current_session()
+        conversation = get_current_conversation()
         attrs = self._build_attrs(
-            session_id=session.session_id if session else "",
-            include_content=session.include_content if session else True,
+            conversation_id=conversation.conversation_id if conversation else "",
+            include_content=conversation.include_content if conversation else True,
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
@@ -487,7 +487,7 @@ class LLM(_SpanBase):
                 "file_id": file_id,
                 "mime_type": mime_type,
             },
-            name="weave-session-media-upload",
+            name="weave-conversation-media-upload",
             daemon=True,
         )
         thread.start()
@@ -599,7 +599,7 @@ class LLM(_SpanBase):
             self.output_type = output_type
         return self
 
-    def _build_attrs(self, *, session_id: str, include_content: bool) -> dict[str, Any]:
+    def _build_attrs(self, *, conversation_id: str, include_content: bool) -> dict[str, Any]:
         """Build the full OTel attribute dict for this chat span.
 
         Single chokepoint shared by streaming (``end``) and batch
@@ -642,7 +642,7 @@ class LLM(_SpanBase):
         attrs = llm_attributes(
             model=self.model,
             provider_name=self.provider_name,
-            conversation_id=session_id,
+            conversation_id=conversation_id,
             input_messages=input_messages,
             output_messages=output_messages,
             media_attachments=media_attachments,
@@ -672,10 +672,10 @@ class LLM(_SpanBase):
         if self.ended_at is None:
             self.ended_at = datetime.now(timezone.utc)
 
-        session = get_current_session()
+        conversation = get_current_conversation()
         attrs = self._build_attrs(
-            session_id=session.session_id if session else "",
-            include_content=session.include_content if session else True,
+            conversation_id=conversation.conversation_id if conversation else "",
+            include_content=conversation.include_content if conversation else True,
         )
 
         if self._token is not None:
@@ -747,7 +747,7 @@ class SubAgent(_SpanBase):
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
-    def _build_attrs(self, *, session_id: str, session_name: str) -> dict[str, Any]:
+    def _build_attrs(self, *, conversation_id: str, conversation_name: str) -> dict[str, Any]:
         """Build the full OTel attribute dict for this sub-agent span.
 
         Sub-agents have no content fields — the dispatch only needs
@@ -757,8 +757,8 @@ class SubAgent(_SpanBase):
         attrs = invoke_agent_attributes(
             agent_name=self.name,
             model=self.model,
-            conversation_id=session_id,
-            conversation_name=session_name,
+            conversation_id=conversation_id,
+            conversation_name=conversation_name,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
@@ -773,10 +773,10 @@ class SubAgent(_SpanBase):
         if self.ended_at is None:
             self.ended_at = datetime.now(timezone.utc)
 
-        session = get_current_session()
+        conversation = get_current_conversation()
         attrs = self._build_attrs(
-            session_id=session.session_id if session else "",
-            session_name=session.session_name if session else "",
+            conversation_id=conversation.conversation_id if conversation else "",
+            conversation_name=conversation.conversation_name if conversation else "",
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
@@ -800,7 +800,7 @@ class SubAgent(_SpanBase):
 
 
 # ---------------------------------------------------------------------------
-# Turn and Session
+# Turn and Conversation
 # ---------------------------------------------------------------------------
 
 
@@ -809,7 +809,7 @@ class Turn(_SpanBase):
 
     By default each turn starts its own OTel trace (``continue_parent_trace=False``)
     so the Agents tab shows one trace per turn. Set ``continue_parent_trace=True``
-    on the Session (or directly on the Turn) when an outer trace is already
+    on the Conversation (or directly on the Turn) when an outer trace is already
     active and you want the agent invocation to nest inside it — e.g. inside
     a fastapi-instrumented request.
     """
@@ -866,7 +866,7 @@ class Turn(_SpanBase):
         return SubAgent(name=name, model=model or self.model)
 
     def _build_attrs(
-        self, *, session_id: str, session_name: str, include_content: bool
+        self, *, conversation_id: str, conversation_name: str, include_content: bool
     ) -> dict[str, Any]:
         """Build the full OTel attribute dict for this turn span.
 
@@ -883,8 +883,8 @@ class Turn(_SpanBase):
             messages = None
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
-            conversation_id=session_id,
-            conversation_name=session_name,
+            conversation_id=conversation_id,
+            conversation_name=conversation_name,
             model=self.model,
             input_messages=messages,
             agent_id=self.agent_id,
@@ -901,11 +901,11 @@ class Turn(_SpanBase):
         if self.ended_at is None:
             self.ended_at = datetime.now(timezone.utc)
 
-        session = get_current_session()
+        conversation = get_current_conversation()
         attrs = self._build_attrs(
-            session_id=session.session_id if session else "",
-            session_name=session.session_name if session else "",
-            include_content=session.include_content if session else True,
+            conversation_id=conversation.conversation_id if conversation else "",
+            conversation_name=conversation.conversation_name if conversation else "",
+            include_content=conversation.include_content if conversation else True,
         )
 
         if self._token is not None:
@@ -941,11 +941,11 @@ class Turn(_SpanBase):
         return False
 
 
-class Session(BaseModel):
-    """A conversation session. Groups turns by conversation_id (no span).
+class Conversation(BaseModel):
+    """A conversation. Groups turns by conversation_id (no span).
 
     ``continue_parent_trace`` controls trace isolation for the turns this
-    session creates. Default ``False`` means each turn starts its own OTel
+    conversation creates. Default ``False`` means each turn starts its own OTel
     trace (the right choice for the standalone Agents tab view). Set ``True``
     when the application has an outer trace (e.g. a fastapi-instrumented
     request) that should contain the agent invocation.
@@ -953,24 +953,24 @@ class Session(BaseModel):
 
     model_config = ConfigDict(protected_namespaces=())
 
-    session_id: str = ""
-    session_name: str = ""
+    conversation_id: str = ""
+    conversation_name: str = ""
     agent_name: str = ""
     model: str = ""
     include_content: bool = True
     continue_parent_trace: bool = False
-    # Attributes stamped on every span this session emits (e.g. an integration
+    # Attributes stamped on every span this conversation emits (e.g. an integration
     # identity). dict[str, Any] like set_attributes — Attributes is a
     # TYPE_CHECKING-only import, but Pydantic resolves field types at runtime.
     attributes: dict[str, Any] = Field(default_factory=dict)
 
     _ended: bool = PrivateAttr(default=False)
-    _token: Token[Session | None] | None = PrivateAttr(default=None)
+    _token: Token[Conversation | None] | None = PrivateAttr(default=None)
     _current_turn: Turn | None = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
-        if not self.session_id:
-            self.session_id = str(uuid.uuid4())
+        if not self.conversation_id:
+            self.conversation_id = str(uuid.uuid4())
 
     def start_turn(
         self,
@@ -983,7 +983,7 @@ class Session(BaseModel):
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
-        Propagates ``continue_parent_trace`` from this session.
+        Propagates ``continue_parent_trace`` from this conversation.
         """
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
@@ -1005,12 +1005,12 @@ class Session(BaseModel):
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
         if self._token is not None:
-            _current_session.reset(self._token)
+            _current_conversation.reset(self._token)
             self._token = None
 
     def __enter__(self) -> Self:
         if self._token is None:
-            self._token = _current_session.set(self)
+            self._token = _current_conversation.set(self)
         return self
 
     def __exit__(
@@ -1027,8 +1027,8 @@ class Session(BaseModel):
 # Contextvars
 # ---------------------------------------------------------------------------
 
-_current_session: ContextVar[Session | None] = ContextVar(
-    "_current_session", default=None
+_current_conversation: ContextVar[Conversation | None] = ContextVar(
+    "_current_conversation", default=None
 )
 _current_turn: ContextVar[Turn | None] = ContextVar("_current_turn", default=None)
 _current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
@@ -1039,36 +1039,36 @@ _current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
 # ---------------------------------------------------------------------------
 
 
-def start_session(
+def start_conversation(
     *,
     agent_name: str = "",
     model: str = "",
-    session_id: str = "",
-    session_name: str = "",
+    conversation_id: str = "",
+    conversation_name: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
     attributes: Attributes = None,
-) -> Session:
-    """Create and activate a session. Sets the contextvar for cross-module access.
+) -> Conversation:
+    """Create and activate a conversation. Sets the contextvar for cross-module access.
 
-    ``attributes`` are stamped on every span this session emits (e.g. an
+    ``attributes`` are stamped on every span this conversation emits (e.g. an
     integration identity like ``weave.integration.*``). Use custom,
     non-semconv keys: set semantic-convention fields via the typed params
-    (``session_name``, ``model``, ...). A key that collides with a span's
+    (``conversation_name``, ``model``, ...). A key that collides with a span's
     own ``gen_ai.*`` / ``weave.*`` attribute is unsupported; which value
     wins is path-dependent (streaming vs ``log_turn``).
     """
-    session = Session(
+    conversation = Conversation(
         agent_name=agent_name,
         model=model,
-        session_id=session_id,
-        session_name=session_name,
+        conversation_id=conversation_id,
+        conversation_name=conversation_name,
         include_content=include_content,
         continue_parent_trace=continue_parent_trace,
         attributes=attributes or {},
     )
-    session._token = _current_session.set(session)
-    return session
+    conversation._token = _current_conversation.set(conversation)
+    return conversation
 
 
 def start_turn(
@@ -1077,16 +1077,16 @@ def start_turn(
     model: str = "",
     agent_name: str = "",
 ) -> Turn:
-    """Create and activate a turn. Uses the current session if available.
+    """Create and activate a turn. Uses the current conversation if available.
 
-    If no session is active, returns a disconnected Turn that is NOT set
+    If no conversation is active, returns a disconnected Turn that is NOT set
     in the contextvar. This means ``get_current_turn()`` will return None.
-    Use ``session.start_turn()`` instead if you need contextvar-based
+    Use ``conversation.start_turn()`` instead if you need contextvar-based
     cross-module access.
     """
-    session = get_current_session()
-    if session is not None:
-        return session.start_turn(
+    conversation = get_current_conversation()
+    if conversation is not None:
+        return conversation.start_turn(
             user_message=user_message, model=model, agent_name=agent_name
         )
     turn = Turn(agent_name=agent_name, model=model)
@@ -1130,7 +1130,7 @@ def start_tool(*, name: str, arguments: str = "", tool_call_id: str = "") -> Too
     The Tool's OTel span automatically becomes a child of whatever span is
     current in OTel context — typically a Turn span if one is active. No
     explicit turn delegation is needed: parent-child propagation happens
-    via OTel context, not via the Session SDK contextvars.
+    via OTel context, not via the Conversation SDK contextvars.
     """
     return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
@@ -1146,11 +1146,11 @@ def start_subagent(*, name: str, model: str = "") -> SubAgent:
     return SubAgent(name=name, model=model)
 
 
-def end_session() -> None:
-    """End the current session (from contextvar)."""
-    session = get_current_session()
-    if session is not None:
-        session.end()
+def end_conversation() -> None:
+    """End the current conversation (from contextvar)."""
+    conversation = get_current_conversation()
+    if conversation is not None:
+        conversation.end()
 
 
 def end_turn() -> None:
@@ -1167,9 +1167,9 @@ def end_llm() -> None:
         llm.end()
 
 
-def get_current_session() -> Session | None:
-    """Return the active session from contextvar, or None."""
-    return _current_session.get()
+def get_current_conversation() -> Conversation | None:
+    """Return the active conversation from contextvar, or None."""
+    return _current_conversation.get()
 
 
 def get_current_turn() -> Turn | None:
@@ -1207,7 +1207,7 @@ def _emit_span_now(
 ) -> Any:
     """Emit a fully-formed span without touching contextvars.
 
-    Used by the batch-logging path (``log_turn`` / ``log_session``) to
+    Used by the batch-logging path (``log_turn`` / ``log_conversation``) to
     create children of a parent span without attaching them to the calling
     thread's OTel context. Returns the finished Span so the caller can
     read trace_id / span_id, or None if OTel is unavailable.
@@ -1255,8 +1255,8 @@ def _resolve_turn_timestamps(
 def _attrs_for_span(
     span: LLM | Tool | SubAgent,
     *,
-    session_id: str,
-    session_name: str,
+    conversation_id: str,
+    conversation_name: str,
     include_content: bool,
 ) -> tuple[str, dict[str, Any]]:
     """Build (otel_span_name, attribute_dict) for a child span.
@@ -1266,22 +1266,22 @@ def _attrs_for_span(
     """
     if isinstance(span, LLM):
         return f"chat {span.model}", span._build_attrs(
-            session_id=session_id, include_content=include_content
+            conversation_id=conversation_id, include_content=include_content
         )
     if isinstance(span, Tool):
         return f"execute_tool {span.name}", span._build_attrs(
-            session_id=session_id, include_content=include_content
+            conversation_id=conversation_id, include_content=include_content
         )
     return f"invoke_agent {span.name}", span._build_attrs(
-        session_id=session_id, session_name=session_name
+        conversation_id=conversation_id, conversation_name=conversation_name
     )
 
 
 def log_turn(
     *,
-    session_id: str,
+    conversation_id: str,
     agent_name: str = "",
-    session_name: str = "",
+    conversation_name: str = "",
     model: str = "",
     messages: list[Message] | None = None,
     spans: list[LLM | Tool | SubAgent] | None = None,
@@ -1300,12 +1300,12 @@ def log_turn(
     the turn doesn't supply its own.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
-    these from the active session instead. Use custom, non-semconv keys: a
+    these from the active conversation instead. Use custom, non-semconv keys: a
     key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
     is unsupported (which value wins is path-dependent).
     """
     if not _OTEL_AVAILABLE or should_disable_weave():
-        return LogResult(session_id=session_id)
+        return LogResult(conversation_id=conversation_id)
 
     resolved_spans = spans or []
     turn_started_at, turn_ended_at = _resolve_turn_timestamps(
@@ -1324,8 +1324,8 @@ def log_turn(
     )
 
     turn_attrs = turn._build_attrs(
-        session_id=session_id,
-        session_name=session_name,
+        conversation_id=conversation_id,
+        conversation_name=conversation_name,
         include_content=include_content,
     )
     if attributes:
@@ -1340,14 +1340,14 @@ def log_turn(
         attrs=turn_attrs,
     )
     if turn_span is None:
-        return LogResult(session_id=session_id)
+        return LogResult(conversation_id=conversation_id)
 
     child_ctx = otel_trace.set_span_in_context(turn_span)
     for child in turn.spans:
         name, attrs = _attrs_for_span(
             child,
-            session_id=session_id,
-            session_name=session_name,
+            conversation_id=conversation_id,
+            conversation_name=conversation_name,
             include_content=include_content,
         )
         if attributes:
@@ -1361,44 +1361,44 @@ def log_turn(
         )
 
     return LogResult(
-        session_id=session_id,
+        conversation_id=conversation_id,
         trace_ids=[_format_trace_id(turn_span.context.trace_id)],
         root_span_ids=[_format_span_id(turn_span.context.span_id)],
         span_count=1 + len(turn.spans),
     )
 
 
-def log_session(
+def log_conversation(
     *,
     turns: list[Turn],
-    session_id: str = "",
-    session_name: str = "",
+    conversation_id: str = "",
+    conversation_name: str = "",
     agent_name: str = "",
     model: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
     attributes: Attributes = None,
 ) -> LogResult:
-    """Imperatively emit a complete session.
+    """Imperatively emit a complete conversation.
 
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
-    ``session_id`` if empty. By default each turn gets its own OTel trace.
+    ``conversation_id`` if empty. By default each turn gets its own OTel trace.
 
     ``attributes`` are stamped on every emitted span. Use custom, non-semconv
     keys: a key that collides with a span's own ``gen_ai.*`` / ``weave.*``
     attribute is unsupported (which value wins is path-dependent).
     """
-    sid = session_id or str(uuid.uuid4())
+    sid = conversation_id or str(uuid.uuid4())
     if not _OTEL_AVAILABLE or should_disable_weave():
-        return LogResult(session_id=sid)
+        return LogResult(conversation_id=sid)
 
     trace_ids: list[str] = []
     root_span_ids: list[str] = []
     span_count = 0
     for turn in turns:
         result = log_turn(
-            session_id=sid,
-            session_name=session_name,
+            conversation_id=sid,
+            conversation_name=conversation_name,
             agent_name=turn.agent_name or agent_name,
             model=turn.model or model,
             messages=turn.messages,
@@ -1414,7 +1414,7 @@ def log_session(
         span_count += result.span_count
 
     return LogResult(
-        session_id=sid,
+        conversation_id=sid,
         trace_ids=trace_ids,
         root_span_ids=root_span_ids,
         span_count=span_count,

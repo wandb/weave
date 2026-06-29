@@ -139,7 +139,7 @@ USAGE_REASONING_TOKENS = Attribute(
         # at our floor of 0.62b1; switch to importing the constant once it
         # ships.
         "gen_ai.usage.reasoning.output_tokens",
-        # Earlier Weave-internal name emitted by the Session SDK before the
+        # Earlier Weave-internal name emitted by the Conversation SDK before the
         # upstream spec landed; spans on the wire still use this form.
         "gen_ai.usage.reasoning_tokens",
         # What ADK emits natively before our integration enriches the span.

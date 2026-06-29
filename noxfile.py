@@ -207,14 +207,14 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
         "trace_calls_merged_only": [
             "tests/trace/",
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
         "trace_no_server": [
             "tests/trace/",
@@ -222,7 +222,7 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/compat/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
     }
 

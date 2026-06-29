@@ -1,8 +1,8 @@
-"""Provider adapters for the Weave Session SDK.
+"""Provider adapters for the Weave Conversation SDK.
 
 These modules convert provider-specific wire formats (OpenAI Responses,
 Anthropic Messages, etc.) into the provider-agnostic types defined in
-``weave.session.types``. Each adapter is a leaf module — it imports
+``weave.conversation.types``. Each adapter is a leaf module — it imports
 types but is not imported by them, so ``types.py`` stays free of
 provider knowledge.
 
