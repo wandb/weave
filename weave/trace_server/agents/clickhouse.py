@@ -13,8 +13,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
-import ddtrace
-
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import (
     add_optional_cost,
@@ -85,6 +83,7 @@ from weave.trace_server.agents.types import (
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
+from weave.trace_server.tracing import traced
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -905,7 +904,7 @@ class AgentWriteHandler:
         """
         self.insert_spans([span])
 
-    @ddtrace.tracer.wrap(name="agents.clickhouse.insert_spans")
+    @traced(name="agents.clickhouse.insert_spans")
     def insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
         """Bulk-insert pre-built span rows in one round-trip; traced for APM.
 
