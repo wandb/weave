@@ -13,8 +13,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
-import ddtrace
-
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents.chat_view import (
     add_optional_cost,
@@ -124,6 +122,7 @@ from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
 )
+from weave.trace_server.tracing import traced
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -905,7 +904,7 @@ class AgentWriteHandler:
         """
         self.insert_spans([span])
 
-    @ddtrace.tracer.wrap(name="agents.clickhouse.insert_spans")
+    @traced(name="agents.clickhouse.insert_spans")
     def insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
         """Bulk-insert pre-built span rows in one round-trip; traced for APM.
 

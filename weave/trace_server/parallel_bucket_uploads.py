@@ -44,8 +44,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-import ddtrace
-
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable
@@ -57,6 +55,7 @@ from weave.trace_server.file_storage import (
     key_for_project_digest,
     store_in_bucket,
 )
+from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,7 @@ class BucketUploadBatch:
     def __bool__(self) -> bool:
         return bool(self._pending)
 
-    @ddtrace.tracer.wrap(name="bucket_upload_batch.flush")
+    @traced(name="bucket_upload_batch.flush")
     def flush(
         self, client: FileStorageClient | None
     ) -> list[FileChunkCreateCHInsertable]:

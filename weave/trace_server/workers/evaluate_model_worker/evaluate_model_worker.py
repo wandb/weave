@@ -1,8 +1,6 @@
 import asyncio
 from abc import ABC, abstractmethod
 
-import ddtrace
-
 import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
@@ -13,6 +11,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
     LLMStructuredCompletionModel,
 )
 from weave.trace_server.trace_server_interface import EvaluateModelArgs
+from weave.trace_server.tracing import traced
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
@@ -34,7 +33,7 @@ def evaluate_model(args: EvaluateModelArgs) -> None:
     _evaluate_model(args)
 
 
-@ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model")
+@traced(name="evaluate_model_worker.evaluate_model")
 def _evaluate_model(args: EvaluateModelArgs) -> None:
     # This worker reconstructs user-supplied objects; it must never deserialize
     # code-bearing custom objects (Op / load_op). The secure client locks the decode
@@ -51,7 +50,7 @@ def _evaluate_model(args: EvaluateModelArgs) -> None:
     _run_evaluation(loaded_evaluation, loaded_model, args.evaluation_call_id)
 
 
-@ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model.get_valid_evaluation")
+@traced(name="evaluate_model_worker.evaluate_model.get_valid_evaluation")
 def _get_valid_evaluation(client: WeaveClient, evaluation_ref: str) -> Evaluation:
     loaded_evaluation = client.get(Ref.parse_uri(evaluation_ref))
 
@@ -73,7 +72,7 @@ def _get_valid_evaluation(client: WeaveClient, evaluation_ref: str) -> Evaluatio
     return loaded_evaluation
 
 
-@ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model.get_valid_model")
+@traced(name="evaluate_model_worker.evaluate_model.get_valid_model")
 def _get_valid_model(
     client: WeaveClient, model_ref: str
 ) -> LLMStructuredCompletionModel:
@@ -87,7 +86,7 @@ def _get_valid_model(
     return loaded_model
 
 
-@ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model.run_evaluation")
+@traced(name="evaluate_model_worker.evaluate_model.run_evaluation")
 def _run_evaluation(
     loaded_evaluation: Evaluation,
     loaded_model: LLMStructuredCompletionModel,
