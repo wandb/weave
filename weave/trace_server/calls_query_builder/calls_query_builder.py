@@ -1385,7 +1385,9 @@ class CallsQuery(BaseModel):
         # all rows returned at least have a call start. op_name is the orphan-end
         # signal (start-only) because started_at now rides on call_end rows too.
 
-        op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        op_name = process_op_name_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, self.read_table
+        )
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -2491,6 +2493,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -2532,8 +2535,10 @@ def process_op_name_filter_to_sql(
     if not or_conditions:
         return ""
 
-    # Account for unmerged call parts by including null op_name (call ends)
-    or_conditions += [f"{op_field_sql} IS NULL"]
+    # calls_merged's call-end rows carry a NULL op_name, so the OR-IS-NULL arm
+    # keeps them; calls_complete's op_name is non-nullable, so skip the dead arm.
+    if read_table == ReadTable.CALLS_MERGED:
+        or_conditions.append(f"{op_field_sql} IS NULL")
 
     return " AND " + combine_conditions(or_conditions, "OR")
 

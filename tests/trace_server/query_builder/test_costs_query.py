@@ -701,8 +701,7 @@ def test_query_calls_complete_with_costs_light_fields() -> None:
           (SELECT calls_complete.id AS id,
                   calls_complete.started_at AS started_at
            FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
-           WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
-                  OR (calls_complete.op_name IS NULL))
+           WHERE calls_complete.op_name IN {pb_1:Array(String)}
              AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})),
              llm_usage AS
           (-- From the all_calls we get the usage data for LLMs
