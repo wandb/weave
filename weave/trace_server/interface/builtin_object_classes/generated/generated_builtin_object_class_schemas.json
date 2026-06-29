@@ -1,5 +1,143 @@
 {
   "$defs": {
+    "AgentsListViewDefinition": {
+      "description": "Saved view for the agents list tab.\n\nThe agents tab sorts by a single field name (a fixed dropdown), not a\n`{field, dir}` object, and carries a `hidden_agents` diff rather than a\ncolumn-visibility diff \u2014 hence its own variant rather than the table base.",
+      "properties": {
+        "tab": {
+          "const": "agents",
+          "default": "agents",
+          "title": "Tab",
+          "type": "string"
+        },
+        "time_window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort Field"
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filters"
+        },
+        "numeric_ranges": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/NumericRange"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Ranges"
+        },
+        "hidden_agents": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColsDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "AgentsListViewDefinition",
+      "type": "object"
+    },
+    "AgentsSavedView": {
+      "description": "A persisted, named configuration of one agents-panel tab.\n\nPersisted as a generic Weave object (`builtin_object_class=\"AgentsSavedView\"`)\nvia `obj_create` / `obj_read` / `objs_query`. The active tab lives in\n`definition.tab` (the union discriminator), so listing \"all spans views\"\nmeans filtering objects of this class by `definition.tab == \"spans\"`.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "discriminator": {
+            "mapping": {
+              "agents": "#/$defs/AgentsListViewDefinition",
+              "conversations": "#/$defs/ConversationsViewDefinition",
+              "spans": "#/$defs/SpansViewDefinition"
+            },
+            "propertyName": "tab"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SpansViewDefinition"
+            },
+            {
+              "$ref": "#/$defs/ConversationsViewDefinition"
+            },
+            {
+              "$ref": "#/$defs/AgentsListViewDefinition"
+            }
+          ],
+          "title": "Definition"
+        }
+      },
+      "required": [
+        "label",
+        "definition"
+      ],
+      "title": "AgentsSavedView",
+      "type": "object"
+    },
     "AlertSpec": {
       "properties": {
         "name": {
@@ -74,7 +212,7 @@
                 "$ref": "#/$defs/ConvertOperation"
               },
               {
-                "$ref": "#/$defs/AndOperation"
+                "title": "AndOperation"
               },
               {
                 "$ref": "#/$defs/OrOperation"
@@ -469,6 +607,27 @@
       "title": "ChartConfig",
       "type": "object"
     },
+    "ColsDiff": {
+      "description": "Column-visibility diff from a tab's default hidden set.\n\nMirrors the URL representation: `hide` lists columns hidden beyond the\ndefaults, `show` lists default-hidden columns the user re-enabled. Storing\nthe diff (not an absolute hidden list) keeps a saved view resilient to\nlater changes in the page's default columns. Also used for the agents-tab\n`hidden_agents` selection, which is the same hide/show diff shape.",
+      "properties": {
+        "hide": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Hide",
+          "type": "array"
+        },
+        "show": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Show",
+          "type": "array"
+        }
+      },
+      "title": "ColsDiff",
+      "type": "object"
+    },
     "Column": {
       "properties": {
         "path": {
@@ -611,7 +770,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -638,7 +797,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Input"
@@ -655,7 +814,7 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -682,7 +841,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Substr"
@@ -705,6 +864,169 @@
         "substr"
       ],
       "title": "ContainsSpec",
+      "type": "object"
+    },
+    "ConversationCustomAttr": {
+      "description": "A conversations-tab custom-attribute column selection.\n\n`attr_id` is the `<source>:<key>` id used elsewhere in the agents panel;\n`mode` is how the column is aggregated across a conversation.",
+      "properties": {
+        "attr_id": {
+          "title": "Attr Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "distribution",
+            "avg",
+            "min",
+            "max",
+            "count",
+            "count_true",
+            "count_false",
+            "count_distinct"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attr_id",
+        "mode"
+      ],
+      "title": "ConversationCustomAttr",
+      "type": "object"
+    },
+    "ConversationsViewDefinition": {
+      "description": "Saved view for the conversations tab.",
+      "properties": {
+        "time_window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ViewSort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filters"
+        },
+        "numeric_ranges": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/NumericRange"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Ranges"
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColsDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "custom_cols": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Cols"
+        },
+        "view": {
+          "anyOf": [
+            {
+              "enum": [
+                "table",
+                "split"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "View"
+        },
+        "volume_collapsed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Volume Collapsed"
+        },
+        "tab": {
+          "const": "conversations",
+          "default": "conversations",
+          "title": "Tab",
+          "type": "string"
+        },
+        "conv_custom_attrs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ConversationCustomAttr"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Conv Custom Attrs"
+        }
+      },
+      "title": "ConversationsViewDefinition",
       "type": "object"
     },
     "ConvertOperation": {
@@ -732,10 +1054,10 @@
               "$ref": "#/$defs/GetFieldOperator"
             },
             {
-              "$ref": "#/$defs/ConvertOperation"
+              "title": "ConvertOperation"
             },
             {
-              "$ref": "#/$defs/AndOperation"
+              "title": "AndOperation"
             },
             {
               "$ref": "#/$defs/OrOperation"
@@ -762,7 +1084,7 @@
               "$ref": "#/$defs/InOperation"
             },
             {
-              "$ref": "#/$defs/ContainsOperation"
+              "title": "ContainsOperation"
             }
           ],
           "title": "Input"
@@ -934,10 +1256,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -946,7 +1268,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -964,7 +1286,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -977,10 +1299,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -989,7 +1311,7 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
                   "$ref": "#/$defs/GtOperation"
@@ -1007,7 +1329,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1052,10 +1374,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1064,10 +1386,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
                   "$ref": "#/$defs/LtOperation"
@@ -1082,7 +1404,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1095,10 +1417,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1107,10 +1429,10 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
                   "$ref": "#/$defs/LtOperation"
@@ -1125,7 +1447,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1156,10 +1478,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1168,16 +1490,16 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
                   "$ref": "#/$defs/LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
                   "$ref": "#/$defs/LteOperation"
@@ -1186,7 +1508,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1199,10 +1521,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1211,16 +1533,16 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
                   "$ref": "#/$defs/LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
                   "$ref": "#/$defs/LteOperation"
@@ -1229,7 +1551,7 @@
                   "$ref": "#/$defs/InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1260,10 +1582,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1272,25 +1594,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
                   "$ref": "#/$defs/LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
                   "$ref": "#/$defs/LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1304,10 +1626,10 @@
                     "$ref": "#/$defs/GetFieldOperator"
                   },
                   {
-                    "$ref": "#/$defs/ConvertOperation"
+                    "title": "ConvertOperation"
                   },
                   {
-                    "$ref": "#/$defs/AndOperation"
+                    "title": "AndOperation"
                   },
                   {
                     "$ref": "#/$defs/OrOperation"
@@ -1316,25 +1638,25 @@
                     "$ref": "#/$defs/NotOperation"
                   },
                   {
-                    "$ref": "#/$defs/EqOperation"
+                    "title": "EqOperation"
                   },
                   {
-                    "$ref": "#/$defs/GtOperation"
+                    "title": "GtOperation"
                   },
                   {
                     "$ref": "#/$defs/LtOperation"
                   },
                   {
-                    "$ref": "#/$defs/GteOperation"
+                    "title": "GteOperation"
                   },
                   {
                     "$ref": "#/$defs/LteOperation"
                   },
                   {
-                    "$ref": "#/$defs/InOperation"
+                    "title": "InOperation"
                   },
                   {
-                    "$ref": "#/$defs/ContainsOperation"
+                    "title": "ContainsOperation"
                   }
                 ]
               },
@@ -1651,13 +1973,13 @@
             },
             {
               "additionalProperties": {
-                "$ref": "#/$defs/LiteralOperation"
+                "title": "LiteralOperation"
               },
               "type": "object"
             },
             {
               "items": {
-                "$ref": "#/$defs/LiteralOperation"
+                "title": "LiteralOperation"
               },
               "type": "array"
             },
@@ -1690,10 +2012,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1702,25 +2024,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/LtOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
                   "$ref": "#/$defs/LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1733,10 +2055,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1745,25 +2067,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/LtOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
                   "$ref": "#/$defs/LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1794,10 +2116,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1806,25 +2128,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/LtOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
-                  "$ref": "#/$defs/LteOperation"
+                  "title": "LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             },
@@ -1837,10 +2159,10 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
@@ -1849,25 +2171,25 @@
                   "$ref": "#/$defs/NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/LtOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
-                  "$ref": "#/$defs/LteOperation"
+                  "title": "LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -1968,37 +2290,37 @@
                   "$ref": "#/$defs/GetFieldOperator"
                 },
                 {
-                  "$ref": "#/$defs/ConvertOperation"
+                  "title": "ConvertOperation"
                 },
                 {
-                  "$ref": "#/$defs/AndOperation"
+                  "title": "AndOperation"
                 },
                 {
                   "$ref": "#/$defs/OrOperation"
                 },
                 {
-                  "$ref": "#/$defs/NotOperation"
+                  "title": "NotOperation"
                 },
                 {
-                  "$ref": "#/$defs/EqOperation"
+                  "title": "EqOperation"
                 },
                 {
-                  "$ref": "#/$defs/GtOperation"
+                  "title": "GtOperation"
                 },
                 {
-                  "$ref": "#/$defs/LtOperation"
+                  "title": "LtOperation"
                 },
                 {
-                  "$ref": "#/$defs/GteOperation"
+                  "title": "GteOperation"
                 },
                 {
-                  "$ref": "#/$defs/LteOperation"
+                  "title": "LteOperation"
                 },
                 {
-                  "$ref": "#/$defs/InOperation"
+                  "title": "InOperation"
                 },
                 {
-                  "$ref": "#/$defs/ContainsOperation"
+                  "title": "ContainsOperation"
                 }
               ]
             }
@@ -2011,6 +2333,25 @@
         "$not"
       ],
       "title": "NotOperation",
+      "type": "object"
+    },
+    "NumericRange": {
+      "description": "Inclusive `[min, max]` range for a numeric histogram filter.",
+      "properties": {
+        "min": {
+          "title": "Min",
+          "type": "number"
+        },
+        "max": {
+          "title": "Max",
+          "type": "number"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "title": "NumericRange",
       "type": "object"
     },
     "ObjectConfig": {
@@ -2152,37 +2493,37 @@
                 "$ref": "#/$defs/GetFieldOperator"
               },
               {
-                "$ref": "#/$defs/ConvertOperation"
+                "title": "ConvertOperation"
               },
               {
-                "$ref": "#/$defs/AndOperation"
+                "title": "AndOperation"
               },
               {
-                "$ref": "#/$defs/OrOperation"
+                "title": "OrOperation"
               },
               {
-                "$ref": "#/$defs/NotOperation"
+                "title": "NotOperation"
               },
               {
-                "$ref": "#/$defs/EqOperation"
+                "title": "EqOperation"
               },
               {
-                "$ref": "#/$defs/GtOperation"
+                "title": "GtOperation"
               },
               {
-                "$ref": "#/$defs/LtOperation"
+                "title": "LtOperation"
               },
               {
-                "$ref": "#/$defs/GteOperation"
+                "title": "GteOperation"
               },
               {
-                "$ref": "#/$defs/LteOperation"
+                "title": "LteOperation"
               },
               {
-                "$ref": "#/$defs/InOperation"
+                "title": "InOperation"
               },
               {
-                "$ref": "#/$defs/ContainsOperation"
+                "title": "ContainsOperation"
               }
             ]
           },
@@ -2636,6 +2977,125 @@
       "title": "SortBy",
       "type": "object"
     },
+    "SpansViewDefinition": {
+      "description": "Saved view for the spans tab.",
+      "properties": {
+        "time_window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ViewSort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filters"
+        },
+        "numeric_ranges": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/NumericRange"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numeric Ranges"
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColsDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "custom_cols": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Cols"
+        },
+        "view": {
+          "anyOf": [
+            {
+              "enum": [
+                "table",
+                "split"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "View"
+        },
+        "volume_collapsed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Volume Collapsed"
+        },
+        "tab": {
+          "const": "spans",
+          "default": "spans",
+          "title": "Tab",
+          "type": "string"
+        }
+      },
+      "title": "SpansViewDefinition",
+      "type": "object"
+    },
     "TestOnlyExample": {
       "properties": {
         "name": {
@@ -2783,6 +3243,91 @@
         "b"
       ],
       "title": "TestOnlyNestedBaseObject",
+      "type": "object"
+    },
+    "TimeWindow": {
+      "description": "The active time window for a tab, in epoch milliseconds.\n\n`unit` + `quantity` describe the window size (e.g. 24 hours); `start_ms`\npins its left edge; `selection` is an optional brushed sub-range. Mirrors\n`TimeWindowState` on the frontend.",
+      "properties": {
+        "unit": {
+          "enum": [
+            "second",
+            "minute",
+            "hour",
+            "day",
+            "week"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "quantity": {
+          "minimum": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindowSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "unit",
+        "quantity",
+        "start_ms"
+      ],
+      "title": "TimeWindow",
+      "type": "object"
+    },
+    "TimeWindowSelection": {
+      "description": "A brushed sub-selection within a time window, in epoch milliseconds.",
+      "properties": {
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "end_ms": {
+          "title": "End Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "TimeWindowSelection",
+      "type": "object"
+    },
+    "ViewSort": {
+      "description": "A single sort directive: a field and a direction.\n\nField name (rather than `sort_by`) and the `sort` key match the frontend\n`AgentsSort` shape so the URL-state layer can round-trip it directly.",
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "sort": {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Sort",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "sort"
+      ],
+      "title": "ViewSort",
       "type": "object"
     },
     "WeaveMetricThresholdSpec": {
@@ -2947,6 +3492,9 @@
     "SavedView": {
       "$ref": "#/$defs/SavedView"
     },
+    "AgentsSavedView": {
+      "$ref": "#/$defs/AgentsSavedView"
+    },
     "ComparisonView": {
       "$ref": "#/$defs/ComparisonView"
     },
@@ -2967,6 +3515,7 @@
     "Provider",
     "ProviderModel",
     "SavedView",
+    "AgentsSavedView",
     "ComparisonView",
     "LLMStructuredCompletionModel",
     "ChartConfig"
