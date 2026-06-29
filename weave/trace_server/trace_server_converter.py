@@ -17,6 +17,7 @@ does not round-trip dataclasses safely through getattr / setattr.
 """
 
 import dataclasses
+import logging
 from collections.abc import Callable
 from typing import Any, NamedTuple, TypeVar, cast
 
@@ -24,6 +25,8 @@ from pydantic import BaseModel
 
 from weave.shared import refs_internal as ri
 from weave.trace_server.errors import InvalidExternalRef
+
+logger = logging.getLogger(__name__)
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -131,6 +134,7 @@ D = TypeVar("D")
 def universal_int_to_ext_ref_converter(
     obj: C,
     convert_int_to_ext_project_id: Callable[[str], str | None],
+    tolerate_external_refs: bool = False,
 ) -> C:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
@@ -141,6 +145,10 @@ def universal_int_to_ext_ref_converter(
         obj: The object to convert.
         convert_int_to_ext_project_id: A function that takes an internal
             project ID and returns the external project ID.
+        tolerate_external_refs: When True, a ref already in external
+            (`weave:///`) form is logged and passed through instead of
+            raising. Used by agent reads, whose ingest path does not fully
+            convert refs and can therefore persist external refs.
 
     Returns:
         The object with all internal references replaced with external
@@ -170,13 +178,11 @@ def universal_int_to_ext_ref_converter(
             if obj.startswith(weave_internal_prefix):
                 return cast(D, replace_ref(obj))
             elif obj.startswith(weave_prefix):
-                # It is important to raise here as this would be the result of
-                # incorrectly storing an external ref at the database layer,
-                # rather than an internal ref. There is a possibility in the
-                # future that a programming error leads to this situation, in
-                # which case reading this object would consistently fail. We
-                # might want to instead return a private ref in this case.
-                raise InvalidInternalRef("Encountered unexpected ref format.")
+                # External ref stored where an internal one belongs. Agent reads
+                # tolerate it (already external-shaped); other paths raise loudly.
+                if not tolerate_external_refs:
+                    raise InvalidInternalRef("Encountered unexpected ref format.")
+                logger.error("Returning stored external ref unchanged: %s", obj)
         return obj
 
     return _map_values(obj, mapper)

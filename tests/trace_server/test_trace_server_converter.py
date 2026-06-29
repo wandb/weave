@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 
 import pytest
 from pydantic import BaseModel, ConfigDict
@@ -8,8 +9,10 @@ from weave.trace.refs import ObjectRef
 from weave.trace_server.errors import InvalidExternalRef
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_converter import (
+    InvalidInternalRef,
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
+    universal_int_to_ext_ref_converter,
 )
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
@@ -227,3 +230,44 @@ def test_replace_external_weave_ref_rejects_malformed_tail():
     """
     with pytest.raises(InvalidExternalRef):
         replace_external_weave_ref("weave:///just-entity", lambda p: p)
+
+
+@pytest.mark.disable_logging_error_check
+def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
+    """Egress: internal refs externalize and unresolvable projects fall back to
+    a private ref. A stored external ref raises by default (surfacing
+    corruption), but is logged and passed through when tolerate_external_refs is
+    set, so agent reads don't 500 on a ref their ingest path left external.
+    """
+    internal_project_id = "internal-project"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/name:digest"
+    external_ref = "weave:///entity/project/object/name:digest"
+    private_internal_ref = "weave-trace-internal:///private-project/object/name:digest"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project" if project_id == internal_project_id else None
+
+    # Strict default: a stored external ref is a contract violation -> raise.
+    with pytest.raises(InvalidInternalRef):
+        universal_int_to_ext_ref_converter({"bad": external_ref}, int_to_ext)
+
+    payload = {
+        "resolved": internal_ref,
+        "private": private_internal_ref,
+        "stored_external": external_ref,
+        "plain": "no-ref-here",
+    }
+
+    with caplog.at_level(logging.ERROR):
+        converted = universal_int_to_ext_ref_converter(
+            payload, int_to_ext, tolerate_external_refs=True
+        )
+
+    assert converted == {
+        "resolved": external_ref,
+        "private": "weave-private://///object/name:digest",
+        "stored_external": external_ref,
+        "plain": "no-ref-here",
+    }
+    assert "Returning stored external ref unchanged" in caplog.text
+    assert external_ref in caplog.text
