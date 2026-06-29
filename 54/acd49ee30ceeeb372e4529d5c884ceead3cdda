@@ -1,0 +1,28 @@
+## Conversation
+User asked (in two turns): first "scan the repo for the main functions that should be doctest'd" — I produced a ranked report and discovered doctests are NOT run in CI, plus several already-broken doctests. Then user asked to "Make a stack of PRs for this: 1. Add doctest to CI, nox, etc. 2. Fix the broken doctests 3. Add relevant new doctests." This commit is PR1 (stack base).
+
+## Actions
+- Confirmed no `--doctest-modules` / doctest config anywhere (grep of pyproject/pytest/nox/workflows) → doctests never ran in CI.
+- Built a Python 3.12.9 venv (`uv venv --python 3.12 --clear`; the pre-existing .venv was 3.14 and could not import weave) and `uv sync --frozen --group test --group trace_server`.
+- Classified ~15 candidate modules with `pytest --doctest-modules`. 8 pass clean → seeded DOCTEST_MODULES. Broken ones deferred to PR2.
+- Added `doctest` nox session (noxfile.py) + `doctest` CI job (test.yaml, mirrors `lint`, py3.12).
+- Verified `nox -e doctest` green (14 doctests). ruff check + format clean. test.yaml parses.
+
+## Errors & mistakes
+- Initial tool probe used `ls` (aliased to missing `eza`) so `ls /opt/homebrew/bin/X` reported MISSING falsely. Re-probed with `test -x`: uv/gt/gh/jj are at /opt/homebrew/bin, nox at ~/.local/bin — just off PATH. Always `export PATH=/opt/homebrew/bin:$HOME/.local/bin:$PATH`.
+- `python` is not on PATH (only `python3`); activate `.venv` for `python`.
+
+## Codebase discoveries
+- Doctests genuinely rot here: scan agents claimed iterators.py::first and sanitize.py::add_redact_key "already work" — both FAIL under --doctest-modules (sanitize calls weave.init() → network/auth; first([]) raises StopIteration with no Traceback block). These go in PR2.
+- 8 green seed modules: utils/project_id, utils/dict_utils, trace/view_utils, trace_server/{call_stats_helpers, clickhouse/utilities, trace_server_common, feedback_payload_schema, orm}.
+- The doctest session syncs `test` + `trace_server` groups (seed spans trace_server modules). langchain/scorers modules need heavier extras and are intentionally excluded.
+
+## Hints & warnings
+- Allowlist is intentional, not laziness: a repo-wide --doctest-modules sweep breaks dozens of illustrative `>>>` blocks (scorer class docstrings download models; stream_metrics references undefined ChatCompletionChunk). Grow DOCTEST_MODULES one verified module per PR.
+- Every module added to DOCTEST_MODULES MUST pass `nox -e doctest` (or `pytest --doctest-modules <file>`).
+
+## VCS context (important for the stack)
+- gt (Graphite) IS installed but the env is a shared Hatchery repo with 7 worktrees; local `master` (0b76cad8f3) is checked out in the primary worktree and stale vs origin/master (ea0fdf3c89). gt sync would risk other worktrees, so the stack is built on plain git branches off origin/master and PRs opened with `gh --base`. This branch (andrew/doctest-ci-setup) is based at ea0fdf3c89.
+
+## Dead ends / Open questions
+- None. PR2 (fix broken) and PR3 (new doctests) follow as stacked children.

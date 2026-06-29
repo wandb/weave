@@ -1,0 +1,25 @@
+## Conversation
+TS half of the Session->Conversation rename. User: "break up ts and py into their own branches and stack with gt", "put this PR up as draft, then start the ts impl and stack it on top". Back-compat aliases requested for both SDKs. Stacked on hatchery/greater-spire (the Python rename branch, PR #7437).
+
+## Actions
+- git mv sdks/node/src/genai/session.ts->conversation.ts and session.test.ts->conversation.test.ts.
+- Blanket sed session->conversation / Session->Conversation in src/genai/**, src/__tests__/genai/**, src/state.ts (all our SDK). AGENT_SESSIONS->AGENT_CONVERSATIONS fixed by hand (all-caps, sed missed).
+- Surgical src/index.ts: renamed genai exports + re-added deprecated names; left patchRealtimeSession.
+- genai/index.ts: added deprecated re-exports. Created genai/deprecated.ts (startSession/endSession/getCurrentSession wrappers + Session/SessionInit type aliases; map sessionId->conversationId; one-time process.emitWarning, code WEAVE_CONVERSATION_RENAMED). Added genai/deprecated.test.ts. Updated examples/agent.ts to new API. prettier --write on api.test.ts + agent.ts.
+
+## Errors & mistakes
+- node is symlinked to bun here (/opt/homebrew/bin/node -> bun). jest 30 cannot run under bun (ERR_INVALID_THIS / readonly-property in jest-runtime). No real node (no nvm/volta/fnm/mise). Ran suites via 'bun test' instead: 72 genai tests pass. CI runs jest under real node.
+- pnpm install prepare/build failed (esbuild postinstall blocked by pnpm 10). Not needed: validated via 'pnpm typecheck:esm' (tsc --noEmit, exit 0) + bun test + eslint + prettier.
+
+## Dead ends
+- 'node node_modules/jest/bin/jest.js' to dodge bun — node IS bun, same crash.
+
+## Hints & warnings
+- Local TS test cmd: 'bun test src/__tests__/genai/' (NOT jest; node is bun-aliased). Typecheck: 'pnpm typecheck:esm'.
+- Session/SessionInit are TYPE-ONLY top-level exports (construction private) -> deprecated Session is a type alias; only start/end/getCurrent wrappers are runtime.
+- Node genai SDK already emitted gen_ai.conversation.id / used conversationId internally; rename aligned the public surface (same as Python).
+- Provider-native session untouched: claude_agent_sdk msg.session_id (otelTracer maps to conversationId), Google ADK session.id, OpenAI RealtimeSession, pi agent session manager.
+- gt fast-forwarded local master during the py submit -> sibling worktrees (dragoon/raven/ghost-academy-v3) show 'needs restack'; benign, not mine.
+
+## Open questions
+- Deprecation = input compat only (old names + sessionId->conversationId), mirroring Python; no output-side shims. jest harness unrun locally (bun-only env); relies on CI.

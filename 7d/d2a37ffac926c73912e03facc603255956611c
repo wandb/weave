@@ -1,0 +1,87 @@
+## Conversation
+User: "Help resolve: https://coreweave.atlassian.net/browse/VULNMGMT-2132". Open-ended.
+Ticket = HackerOne 3734390 (reporter db666): client-side RCE via Weave CustomWeaveType
+load_op/Op deserialization during ordinary object fetch. AppSec (Bill McLaughlin)
+triaged TRUE POSITIVE, High, NOT fixed for the client threat model; explicitly said the
+client default is a design decision the Weave team must own. I asked the user to pick the
+default policy via AskUserQuestion; they chose ENTITY-SCOPED (vs global fail-closed). Then
+"Continue from where you left off" twice -> I implemented, verified, and committed locally
+(my stated default). NOT pushed, Jira NOT touched (both pending user confirmation).
+
+## Actions
+- Pulled the Jira issue via MCP (output was 58k chars -> saved to a tool-results file;
+  extracted summary/description/2 comments with jq + a python ADF-flattener).
+- Read the full code path: custom_objs.py (_decode_custom_obj gate), serialize.from_json,
+  weave_client.get (L500-560: from_json(data, project_id=ref's project, server)),
+  op_type.load_instance (L635 __import__), context.require_secure_weave_client,
+  settings.allow_unsafe_custom_obj_decode, evaluate_model_worker.
+- Confirmed from_json is ALWAYS called with the ORIGIN object's project_id
+  (weave_client.get, vals.py x3, call.py x2) -> source entity is recoverable at decode.
+- Confirmed TEST_ENTITY="shawn" (tests/trace/server_utils.py); client fixture =
+  shawn/test-project, so same-entity decode keeps working in tests.
+- Implemented entity-scoping (see commit msg). Files: custom_objs.py, serialize.py,
+  settings.py, weave_client.py, tests/trace/test_custom_objs.py,
+  tests/trace_server/workers/test_evaluate_model_worker.py, AGENTS.md.
+
+## Errors & mistakes
+- I removed is_safe_to_decode() but it was imported + unit-tested in
+  tests/trace_server/workers/test_evaluate_model_worker.py (test_is_safe_to_decode).
+  Caught via repo-wide grep AFTER editing; removed that obsolete test + the `import pytest`
+  it needed (file is now 17 lines, keeps only test_safe_custom_weave_types_in_sync).
+- Local env was unusable: worktree .venv is Python 3.14-freethreaded and broken (can't
+  import weave, no pytest); `uv run --group test` against it tried to BUILD tiktoken from
+  source and failed (no Rust). FIX: built an isolated 3.12 env via
+  `UV_PROJECT_ENVIRONMENT=/tmp/weave-twilight-venv uv run --python 3.12 --group test ...`
+  (235 pkgs, wheels exist for 3.12 -> no Rust). uv/nox are NOT on the sandbox PATH; they
+  live at /opt/homebrew/bin and ~/.local/bin (prepend both).
+- Conversation-start git status listed the 7 files as already "M". Verified via
+  `git show HEAD:...` that HEAD contained the exact pre-edit baseline (is_safe_to_decode,
+  allow_unsafe=(, default True) and that 6d6d6a11 (PR #7004) is an ancestor of HEAD -> the
+  markers were freshly-checked-out-worktree noise, NOT prior WIP. No clobber.
+
+## Dead ends
+- Codex MCP never connected this session -> did the design analysis solo (user CLAUDE.md
+  normally wants Codex consultation for architecture forks; note for next time).
+- Considered global fail-closed (one-line default flip) — rejected by user; breaks
+  fetching your own ops. Considered "same trust boundary as fetched object" (the triage's
+  alt phrasing) — rejected because it does NOT block the headline attack (attacker object
+  + attacker code are in the same boundary). Anchoring on the CLIENT's own entity is the
+  only model that blocks "victim fetches attacker's public object".
+
+## Hints & warnings
+- The gate now lives at the TWO code-execution sites, not up-front: Op import (origin =
+  _entity_of_project_id(source_project_id)) and load_op fallback (origin =
+  ObjectRef.parse_uri(load_op_uri).entity, NOT the source project — this blocks the
+  cross-entity redirect even from your own object). Data-only KNOWN types are never gated
+  (they reconstruct in-process). Invariant: KNOWN_TYPES == SAFE_CUSTOM_WEAVE_TYPES ∪ {Op}.
+- BEHAVIOR CHANGE: cross-entity code-bearing fetch now raises UnsafeDeserializationError
+  by default. Opt back in with WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=true.
+- CAPABILITY NARROWING: previously WEAVE_ALLOW_UNSAFE_CUSTOM_OBJ_DECODE=false meant
+  "refuse ALL code-bearing"; false is now the DEFAULT and means "entity-scoped"
+  (same-entity allowed). The only fully-fail-closed path left is the worker
+  (require_secure_weave_client). If someone needs a refuse-all-even-same-entity env knob,
+  that's a follow-up (would need a separate setting).
+- _assert_code_decode_allowed reads client._allow_unsafe_custom_obj_decode (the worker
+  kill-switch, checked FIRST) and client.entity. Keep that ordering: worker fail-closed
+  must win over the cross-entity opt-in.
+
+## Codebase discoveries
+- evaluate_model_worker is the ONLY require_secure_weave_client caller; it does NOT run
+  ops (deliberately) -> full fail-closed is correct there. Tests:
+  tests/trace_server/test_trace_server_evaluation_apis.py
+  ::test_evaluate_model_rejects_unsafe_dataset_row / ::..._op_ref_as_eval_or_model_ref.
+- weave.utils.project_id.from_project_id is a pure leaf module (no weave imports) -> safe
+  to import into custom_objs.py, no circular import.
+
+## Verification
+ruff clean + py_compile (3.12). On --trace-server=fake: test_custom_objs (13),
+worker+eval-api+settings (44), op_versioning (24), client_trace (131), dataset (11) — all
+green. NOT run: full ClickHouse-backed trace/trace_server shards (need Docker) -> CI must.
+
+## Open questions
+- Push + PR to master? (not done — needs explicit go.)
+- Jira VULNMGMT-2132: comment/transition? (not done.)
+- Node SDK has an analogous CustomWeaveType/load_op decode at
+  sdks/node/src/weaveClient.ts:846 — separate review/follow-up (out of scope here).
+- Pre-existing (unrelated): op_type.load_instance leaks a sys.path entry on import
+  exception (inserts at 633, pop at 640 only on success).
