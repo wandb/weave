@@ -1,0 +1,20 @@
+## Conversation
+PR3 of the user's 3-PR stack ("Add relevant new doctests"). Builds on PR2 (andrew/doctest-fix-broken). Targets came from the doctest-candidate scan in the first turn (pure, deterministic, high-value, non-obvious behavior).
+
+## Actions
+- Probed every candidate in the venv (imports + exact repr outputs) BEFORE writing doctests, so expected values are verified, not guessed. All 8 new modules import under the test+trace_server groups (no scorers/flow/langchain extras needed).
+- Added `>>>` examples to ~19 functions across 9 files; added the 4 not-yet-listed modules (shared/refs_internal, trace/refs, flow/util, scorers/classification_scorer) to DOCTEST_MODULES (the other 4 were already enforced from PR1/PR2).
+- Verified: 43 doctests pass via `pytest --doctest-modules` and via the full `nox -e doctest`. ruff check + format clean on all 9 files.
+
+## Errors & mistakes
+- safe_get: my first draft asserted `safe_get({"a": {}}, ["a", "x"], default=0) == 0`. WRONG — it returns None. safe_get only returns `default` when traversal hits a NON-DICT mid-path; a key that's simply absent at the FINAL step bottoms out at `safe_get(None, [], default)` which returns `obj` (None), not default. Fixed to `safe_get({...}, ["a", "x", "c"], default=0) -> 0` (here "x" misses mid-path, leaving ["c"], so obj=None is non-dict and default is returned). The probe had already shown None; caught before committing.
+- p_r_f1(8,2,2) gives f1=0.8000000000000002 (float noise) — unusable in a doctest. Used the clean (1,1,1)->(0.5,0.5,0.5) and (0,0,0)->(0,0,0) cases instead.
+- Two Edits failed with "File has not been read yet" (object_creation_utils in PR2, classification_scorer here) because I'd only viewed them via Bash `sed`, not the Read tool. The Read tool gate is per-file; always Read before Edit even if you've grepped/sed'd it.
+
+## Hints & warnings
+- set_nested_key returns None and mutates in place; the doctest shows the dict on a separate line after each call. The second call `set_nested_key(d, "a.b.c", "f")` overwrites the scalar at d["a"]["b"] with a new dict (verified -> {'a': {'b': {'c': 'f'}}}).
+- refs.py: ObjectRef.uri/_digest can be concurrent.futures.Future; doctested parse_name_version (pure string fn) only, NOT the uri builders, to stay deterministic.
+- Doctests for functions that previously had NO docstring (zip_dicts, combine_conditions, quote_json_path_parts, transpose, short_str, extra_value_quoter, parse_name_version, empty_str_to_none) passed ruff D-rules as written — summary line + blank + Examples block satisfies pydocstyle here.
+
+## Open questions / Dead ends
+None. Next: push the 3-branch stack and open PRs (andrew/doctest-ci-setup -> -fix-broken -> -add-new).
