@@ -48,13 +48,11 @@ def test_cte_chain_calls_merged() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -145,8 +143,7 @@ def test_cte_chain_calls_complete() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -280,8 +277,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -410,13 +406,11 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -510,13 +504,11 @@ def test_full_query_calls_merged() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -737,8 +729,7 @@ def test_filter_logic_operator_or_produces_match_any() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -867,8 +858,7 @@ def test_filter_logic_operator_and_produces_match_all() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -978,7 +968,7 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
         filter_logic_operator="or",
     )
     # Even with OR logic, same-eval conditions stay AND'd within the single
-    # eval group, wrapped in parens; the only OR is the op_name match.
+    # eval group, wrapped in parens.
     assert_raw_sql(
         cte,
         """
@@ -996,8 +986,7 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -1092,8 +1081,7 @@ def test_full_query_calls_complete() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
