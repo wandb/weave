@@ -38,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `getAgentTurn` ([#7288](https://github.com/wandb/weave/pull/7288))
   - `getAgentTurns` ([#7290](https://github.com/wandb/weave/pull/7290))
   - `getAgentSpanStats` ([#7417](https://github.com/wandb/weave/pull/7417))
-  - `getAgentCustomAttrsSchema` ([#7418](https://github.com/wandb/weave/pull/7418))
+  - `getAgentCustomAttributes` ([#7418](https://github.com/wandb/weave/pull/7418), [#7433](https://github.com/wandb/weave/pull/7433))
   - `searchAgents` ([#7416](https://github.com/wandb/weave/pull/7416))
 - Add `weave.integration` metadata on integrations ([#7103](https://github.com/wandb/weave/pull/7103))
 - send `trace_id` on call-end ingest messages ([#7257](https://github.com/wandb/weave/pull/7257))
