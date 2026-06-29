@@ -568,6 +568,7 @@ class WhereFilters(BaseModel):
 
     id_mask: str = ""
     id_subquery: str = ""
+    page_range: str = ""
     sortable_datetime: str = ""
     wb_run_id: str = ""
     trace_roots_only: str = ""
@@ -588,6 +589,7 @@ class WhereFilters(BaseModel):
         filters = [
             self.id_mask,
             self.id_subquery,
+            self.page_range,
             self.sortable_datetime,
             self.wb_run_id,
             self.trace_roots_only,
@@ -1075,6 +1077,33 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
+    def _has_payload_select(self) -> bool:
+        """Whether a selected field is a large base-table payload dump.
+
+        These (inputs/output/attributes/summary dumps) are what the
+        calls_complete page two-pass defers; JOIN-derived heavy fields (storage,
+        feedback) are read in the page pass anyway and do not qualify.
+        """
+        return any(
+            isinstance(field, CallsMergedDynamicField) for field in self.select_fields
+        )
+
+    def _ordered_by_started_at(self) -> bool:
+        """Whether ordering is by the started_at sort-key prefix (optionally id).
+
+        The calls_complete page two-pass bounds the heavy-payload scan by the
+        page's started_at window, which only prunes when the page is ordered by
+        started_at; any other primary sort makes the window span the project.
+        """
+        if not self.order_fields:
+            return False
+        if getattr(self.order_fields[0].field, "field", None) != "started_at":
+            return False
+        return all(
+            getattr(of.field, "field", None) in {"started_at", "id"}
+            for of in self.order_fields
+        )
+
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
@@ -1250,13 +1279,32 @@ class CallsQuery(BaseModel):
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
             return base_sql
 
-        # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
-        # where it reduces rows before expensive GROUP BY aggregation.
-        # For calls_complete (one row per call, no GROUP BY), always use a
-        # single-pass query — it's both simpler and significantly faster.
-        use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
-        )
+        # Two-pass: narrow to a page of ids (light columns) first, then load
+        # heavy payloads only for that page.
+        #  - calls_merged: also reduces rows before GROUP BY aggregation.
+        #  - calls_complete (one row per call, no GROUP BY): a single pass still
+        #    materializes heavy payload dumps for every row the sort scans, so
+        #    deferring them cuts peak memory. Gated to a payload-dump SELECT
+        #    ordered by started_at, so the page's started_at window prunes the
+        #    outer scan (id-IN alone does not prune reliably). Costs/object-ref
+        #    keep their own CTE paths.
+        if self.read_table == ReadTable.CALLS_COMPLETE:
+            cc_page_two_pass = (
+                should_use_filter_cte
+                and self._has_payload_select()
+                and self._ordered_by_started_at()
+                and self.limit is not None
+                and not self.include_costs
+                and not object_ref_conditions
+            )
+            use_filter_cte = cc_page_two_pass
+        else:
+            cc_page_two_pass = False
+            use_filter_cte = (
+                should_use_filter_cte
+                or self.include_costs
+                or bool(object_ref_conditions)
+            )
 
         if use_filter_cte:
             # Build two queries: a filter CTE that narrows rows by light
@@ -1273,6 +1321,10 @@ class CallsQuery(BaseModel):
             )
 
             filter_query.add_field("id")
+            if cc_page_two_pass:
+                # The page CTE also exposes started_at so the outer scan can be
+                # bounded to the page's started_at window.
+                filter_query.add_field("started_at")
             for field in self.select_fields:
                 select_query.select_fields.append(field)
 
@@ -1285,6 +1337,10 @@ class CallsQuery(BaseModel):
             filter_query.offset = self.offset
             # SUPER IMPORTANT: still need to re-sort the final query
             select_query.order_fields = self.order_fields
+            if cc_page_two_pass:
+                # id IN (page) already bounds the result to the page; the outer
+                # LIMIT is a safety cap (offset is consumed by the page CTE).
+                select_query.limit = self.limit
 
             # When using the CTE pattern with costs, ensure all fields used in
             # ordering are selected in select_query so they're available in the
@@ -1304,7 +1360,8 @@ class CallsQuery(BaseModel):
             base_sql = select_query._as_sql_base_format(
                 pb,
                 table_alias_resolved,
-                id_subquery_name=CTE_FILTERED_CALLS,
+                id_subquery_name=None if cc_page_two_pass else CTE_FILTERED_CALLS,
+                page_range_cte_name=CTE_FILTERED_CALLS if cc_page_two_pass else None,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -1363,6 +1420,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         id_subquery_name: str | None = None,
+        page_range_cte_name: str | None = None,
     ) -> WhereFilters:
         """Build all WHERE clause optimization filters.
 
@@ -1434,6 +1492,19 @@ class CallsQuery(BaseModel):
         if id_subquery_name is not None:
             id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
 
+        # Page-range scope (calls_complete two-pass): bound the heavy-payload
+        # scan to the page's started_at window so the (project_id, started_at)
+        # sort-key prefix prunes, then narrow to the page's ids. Lossless: the
+        # window is exactly [min, max] of the page's started_at and id IN keeps
+        # only the page rows.
+        page_range = ""
+        if page_range_cte_name is not None:
+            page_range = (
+                f"AND ({table_alias}.started_at >= (SELECT min(started_at) FROM {page_range_cte_name}))"
+                f"\n        AND ({table_alias}.started_at <= (SELECT max(started_at) FROM {page_range_cte_name}))"
+                f"\n        AND ({table_alias}.id IN (SELECT id FROM {page_range_cte_name}))"
+            )
+
         # call_ids is handled exclusively here (not in process_calls_filter_to_conditions)
         # to avoid duplicate id IN filters in the generated SQL.
         id_mask = ""
@@ -1446,6 +1517,7 @@ class CallsQuery(BaseModel):
         return WhereFilters(
             id_mask=id_mask,
             id_subquery=id_subquery,
+            page_range=page_range,
             op_name=op_name,
             trace_id=trace_id,
             thread_id=thread_id,
@@ -1736,6 +1808,7 @@ class CallsQuery(BaseModel):
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
         storage_scope_id_cte: str | None = None,
+        page_range_cte_name: str | None = None,
     ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
@@ -1759,7 +1832,7 @@ class CallsQuery(BaseModel):
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         where_filters = self._build_where_clause_optimizations(
-            pb, table_alias, expand_columns, id_subquery_name
+            pb, table_alias, expand_columns, id_subquery_name, page_range_cte_name
         )
         order_result = self._build_order_limit_offset(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
@@ -1891,6 +1964,7 @@ class CallsQuery(BaseModel):
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
         storage_scope_id_cte: str | None = None,
+        page_range_cte_name: str | None = None,
     ) -> str:
         """Build the base SQL query format.
 
@@ -1922,6 +1996,7 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map,
             expand_columns,
             storage_scope_id_cte,
+            page_range_cte_name,
         )
         # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
         distinct = ""
