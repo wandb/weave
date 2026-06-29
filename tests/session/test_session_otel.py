@@ -1435,6 +1435,26 @@ class TestLogTurn:
         assert len(turn_spans) == 1
         assert sa_spans[0].parent.span_id == turn_spans[0].context.span_id
 
+    def test_agent_identity_fields_emitted(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        log_turn(
+            session_id="sess-ident",
+            agent_name="bot",
+            agent_id="agent-7",
+            agent_description="A helpful bot",
+            agent_version="v3",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.agent.id"] == "agent-7"
+        assert attrs["gen_ai.agent.description"] == "A helpful bot"
+        assert attrs["gen_ai.agent.version"] == "v3"
+
     def test_subagent_system_instructions_emitted(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
@@ -1740,6 +1760,54 @@ class TestLogSession:
         # 2 turns + 2 LLMs + 1 tool = 5
         assert len(spans) == 5
 
+    def test_forwards_all_turn_fields(self, otel_spans: InMemorySpanExporter) -> None:
+        # log_session emits the Turn it is handed, so every field survives —
+        # not just the subset log_turn historically accepted as kwargs.
+        log_session(
+            session_id="sess-fields",
+            turns=[
+                Turn(
+                    agent_name="bot",
+                    agent_id="agent-123",
+                    agent_description="A helpful bot",
+                    agent_version="v2",
+                    system_instructions=["You are a weather bot"],
+                    started_at=_ts(0),
+                    ended_at=_ts(1),
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert attrs["gen_ai.agent.id"] == "agent-123"
+        assert attrs["gen_ai.agent.description"] == "A helpful bot"
+        assert attrs["gen_ai.agent.version"] == "v2"
+
+    def test_does_not_mutate_caller_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # log_session applies session-level defaults / continue_parent_trace to
+        # a model_copy of each Turn, not the caller's instance. Locks in the
+        # "without mutating the caller's object" contract that model_copy exists
+        # to guarantee — a future _emit_turn edit that mutated in place would
+        # break this.
+        turn = Turn(started_at=_ts(0), ended_at=_ts(1))  # no agent_name / model
+        log_session(
+            session_id="sess-no-mutate",
+            agent_name="session-bot",
+            model="gpt-4o",
+            continue_parent_trace=True,
+            turns=[turn],
+        )
+        assert turn.agent_name == ""
+        assert turn.model == ""
+        assert turn.continue_parent_trace is False
+
     def test_empty_turns_returns_empty_log_result(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
@@ -2005,6 +2073,125 @@ class TestLLMRecord:
             {"type": "reasoning", "content": "thinking..."},
             {"type": "text", "content": "hello"},
         ]
+
+
+class TestTurnRecord:
+    """Turn.record(...) collapses N attribute assignments into one call."""
+
+    def test_partial_record_preserves_existing(self) -> None:
+        """Fields not passed (None) keep their existing values."""
+        turn = Turn(agent_name="bot")
+        turn.agent_id = "preset"
+        turn.record(system_instructions=["You are a bot"])
+        assert turn.agent_id == "preset"
+        assert turn.agent_name == "bot"
+        assert turn.system_instructions == ["You are a bot"]
+
+    def test_sets_all_fields(self) -> None:
+        turn = Turn()
+        turn.record(
+            messages=[Message.user("hi")],
+            system_instructions=["sys"],
+            agent_name="bot",
+            model="gpt-4o",
+            agent_id="id-1",
+            agent_description="desc",
+            agent_version="v1",
+        )
+        assert turn.messages == [Message.user("hi")]
+        assert turn.system_instructions == ["sys"]
+        assert turn.agent_name == "bot"
+        assert turn.model == "gpt-4o"
+        assert turn.agent_id == "id-1"
+        assert turn.agent_description == "desc"
+        assert turn.agent_version == "v1"
+
+    def test_returns_self_for_chaining(self) -> None:
+        turn = Turn()
+        assert turn.record(agent_id="x") is turn
+
+    def test_recorded_fields_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """End-to-end: record() values flow through to the OTel attrs."""
+        with Session(session_id="sess-turn-record") as s:
+            with s.start_turn(agent_name="weather-bot") as turn:
+                turn.record(
+                    system_instructions=["You are a weather bot"],
+                    agent_id="agent-9",
+                    agent_description="A helpful bot",
+                    agent_version="v4",
+                )
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent weather-bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert attrs["gen_ai.agent.id"] == "agent-9"
+        assert attrs["gen_ai.agent.description"] == "A helpful bot"
+        assert attrs["gen_ai.agent.version"] == "v4"
+
+
+class TestSubAgentRecord:
+    """SubAgent.record(...) collapses N attribute assignments into one call."""
+
+    def test_partial_record_preserves_existing(self) -> None:
+        """Fields not passed (None) keep their existing values."""
+        sa = SubAgent(name="research-bot")
+        sa.agent_id = "preset"
+        sa.record(system_instructions=["You research things"])
+        assert sa.agent_id == "preset"
+        assert sa.name == "research-bot"
+        assert sa.system_instructions == ["You research things"]
+
+    def test_sets_all_fields(self) -> None:
+        sa = SubAgent()
+        sa.record(
+            name="research-bot",
+            model="gpt-4o-mini",
+            system_instructions=["sys"],
+            agent_id="id-1",
+            agent_description="desc",
+            agent_version="v1",
+        )
+        assert sa.name == "research-bot"
+        assert sa.model == "gpt-4o-mini"
+        assert sa.system_instructions == ["sys"]
+        assert sa.agent_id == "id-1"
+        assert sa.agent_description == "desc"
+        assert sa.agent_version == "v1"
+
+    def test_returns_self_for_chaining(self) -> None:
+        sa = SubAgent()
+        assert sa.record(agent_id="x") is sa
+
+    def test_recorded_fields_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """End-to-end: record() values flow through to the OTel attrs."""
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(name="research-bot") as sa:
+                    sa.record(
+                        system_instructions=["You research things"],
+                        agent_id="agent-9",
+                        agent_description="A research bot",
+                        agent_version="v4",
+                    )
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
+        assert attrs["gen_ai.agent.id"] == "agent-9"
+        assert attrs["gen_ai.agent.description"] == "A research bot"
+        assert attrs["gen_ai.agent.version"] == "v4"
 
 
 class TestUsageFromOpenAIResponses:
