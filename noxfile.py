@@ -47,6 +47,48 @@ def lint(session: nox.Session):
         session.run("prek", "run", "--hook-stage=pre-push")
 
 
+# Doctest coverage is opt-in per module via this allowlist rather than a
+# repo-wide `pytest --doctest-modules` sweep. Most modules either have no
+# doctests or carry illustrative `>>>` blocks that intentionally don't execute
+# (they construct models, hit the network, or download weights). An explicit
+# list keeps the run green and lets coverage grow deliberately, one reviewed
+# module at a time. Every module listed here must pass `pytest
+# --doctest-modules`; the `doctest` CI job enforces it.
+DOCTEST_MODULES = [
+    "weave/utils/project_id.py",
+    "weave/utils/dict_utils.py",
+    "weave/trace/view_utils.py",
+    "weave/trace_server/call_stats_helpers.py",
+    "weave/trace_server/clickhouse/utilities.py",
+    "weave/trace_server/trace_server_common.py",
+    "weave/trace_server/feedback_payload_schema.py",
+    "weave/trace_server/orm.py",
+]
+
+
+@nox.session
+def doctest(session: nox.Session):
+    """Run doctests for the modules in the DOCTEST_MODULES allowlist.
+
+    Pass file paths as posargs to run a subset, e.g.
+        nox -e doctest -- weave/utils/dict_utils.py
+    """
+    session.run(
+        "uv",
+        "sync",
+        "--active",
+        "--group",
+        "test",
+        "--group",
+        "trace_server",
+        "--frozen",
+    )
+    targets = session.posargs or DOCTEST_MODULES
+    # `-p no:ddtrace` mirrors the tests session: the ddtrace pytest plugin can
+    # hang during initialization.
+    session.run("pytest", "--doctest-modules", "-p", "no:ddtrace", *targets)
+
+
 # Shards that don't have corresponding optional dependencies in pyproject.toml
 # Note: _test/_tests shards are dependency groups, not optional dependencies
 SHARDS_WITHOUT_EXTRAS = {
