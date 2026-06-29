@@ -6,7 +6,7 @@ emitted OTel span carried now() regardless of what the SDK object held.
 SubAgent.__enter__ did the same for started_at.
 
 Post-fix: streaming end() emits OTel spans byte-identical to the batch
-path (log_turn / log_session) for the same inputs.
+path (log_turn / log_conversation) for the same inputs.
 """
 
 from __future__ import annotations
@@ -16,7 +16,14 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from weave.session.session import LLM, Session, SubAgent, Tool, Turn, log_turn
+from weave.conversation.conversation import (
+    LLM,
+    Conversation,
+    SubAgent,
+    Tool,
+    Turn,
+    log_turn,
+)
 
 
 def _at(seconds_offset: int) -> datetime:
@@ -80,7 +87,7 @@ def test_otel_span_times_match_caller_values(
 ) -> None:
     """Emitted OTel span's ``start_time`` and ``end_time`` match caller values."""
     started_at, ended_at = _at(0), _at(3)
-    with Session(session_id="test-session"):
+    with Conversation(conversation_id="test-conversation"):
         span_obj = factory(started_at=started_at, ended_at=ended_at)
         with span_obj:
             pass
@@ -109,7 +116,7 @@ def test_streaming_matches_batch_for_llm(otel_spans: InMemorySpanExporter) -> No
 
     otel_spans.clear()
     with (
-        Session(session_id="test-session"),
+        Conversation(conversation_id="test-conversation"),
         Turn(agent_name="weather-bot", started_at=started_at, ended_at=ended_at),
     ):
         with LLM(
@@ -123,7 +130,7 @@ def test_streaming_matches_batch_for_llm(otel_spans: InMemorySpanExporter) -> No
 
     otel_spans.clear()
     log_turn(
-        session_id="test-session",
+        conversation_id="test-conversation",
         agent_name="weather-bot",
         started_at=started_at,
         ended_at=ended_at,

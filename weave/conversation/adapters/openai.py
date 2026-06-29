@@ -1,4 +1,4 @@
-"""Adapters from OpenAI's wire format to the Weave Session SDK types.
+"""Adapters from OpenAI's wire format to the Weave Conversation SDK types.
 
 Use these when manually instrumenting calls to ``client.responses.create``
 (the autopatched OpenAI integration handles conversion automatically).
@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from weave.session.session import _publish_media_content
-from weave.session.types import (
+from weave.conversation.conversation import _publish_media_content
+from weave.conversation.types import (
     MediaAttachment,
     Message,
     Reasoning,

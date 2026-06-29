@@ -108,11 +108,11 @@ def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None
         return None
 
 
-def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> None:
-    """Configure OTel TracerProvider for the Session SDK using weave credentials.
+def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) -> None:
+    """Configure OTel TracerProvider for the Conversation SDK using weave credentials.
 
     Called automatically by init_weave() once version checks have passed.
-    Sets the global OTel TracerProvider so that ``trace.get_tracer("weave.session")``
+    Sets the global OTel TracerProvider so that ``trace.get_tracer("weave.conversation")``
     returns a real tracer.
 
     No-ops if the trace server URL is not configured. Logs a warning and
@@ -131,7 +131,7 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
         from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
     except ImportError as e:
         logger.warning(
-            "Session SDK tracing skipped: opentelemetry not available (%s)", e
+            "Conversation SDK tracing skipped: opentelemetry not available (%s)", e
         )
         return
 
@@ -157,7 +157,7 @@ def _setup_session_tracing(entity: str, project: str, api_key: str | None) -> No
 
     resource = Resource.create(
         {
-            "service.name": "weave-session-sdk",
+            "service.name": "weave-conversation-sdk",
             "wandb.entity": entity,
             "wandb.project": project,
         }
@@ -269,11 +269,11 @@ def init_weave(
     ):
         return init_weave_disabled()
 
-    # Configure Session SDK OTel tracing using the same server credentials.
+    # Configure Conversation SDK OTel tracing using the same server credentials.
     # Placed after the version checks so a disabled init never installs a
     # global TracerProvider that would keep exporting spans to an
     # incompatible server.
-    _setup_session_tracing(entity_name, project_name, api_key)
+    _setup_conversation_tracing(entity_name, project_name, api_key)
 
     init_message.print_init_message(
         username, entity_name, project_name, read_only=not ensure_project_exists
