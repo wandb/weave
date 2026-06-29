@@ -748,6 +748,44 @@ class SubAgent(_SpanBase):
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
+    def record(
+        self,
+        *,
+        name: str | None = None,
+        model: str | None = None,
+        system_instructions: list[str] | None = None,
+        agent_id: str | None = None,
+        agent_description: str | None = None,
+        agent_version: str | None = None,
+    ) -> SubAgent:
+        """Set multiple sub-agent fields in one call.
+
+        Collapses the per-field assignments a manually-instrumented agent
+        otherwise makes on a sub-agent (``system_instructions``, ``agent_id``,
+        ...) into a single keyword call. Only fields explicitly passed
+        (non-``None``) are applied — existing values are preserved. Returns
+        ``self`` for chaining. Mirrors ``Turn.record`` / ``LLM.record``.
+
+        Note: on the streaming (``with``) path the sub-agent span is named
+        from ``name`` at ``__enter__``, so set ``name`` via ``start_subagent``
+        / ``turn.subagent`` rather than ``record`` if you need the span name
+        to reflect it; ``record`` still updates the ``gen_ai.agent.name``
+        attribute.
+        """
+        if name is not None:
+            self.name = name
+        if model is not None:
+            self.model = model
+        if system_instructions is not None:
+            self.system_instructions = system_instructions
+        if agent_id is not None:
+            self.agent_id = agent_id
+        if agent_description is not None:
+            self.agent_description = agent_description
+        if agent_version is not None:
+            self.agent_version = agent_version
+        return self
+
     def _build_attrs(
         self, *, session_id: str, session_name: str, include_content: bool
     ) -> dict[str, Any]:

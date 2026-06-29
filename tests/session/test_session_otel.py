@@ -2115,6 +2115,65 @@ class TestTurnRecord:
         assert attrs["gen_ai.agent.version"] == "v4"
 
 
+class TestSubAgentRecord:
+    """SubAgent.record(...) collapses N attribute assignments into one call."""
+
+    def test_partial_record_preserves_existing(self) -> None:
+        """Fields not passed (None) keep their existing values."""
+        sa = SubAgent(name="research-bot")
+        sa.agent_id = "preset"
+        sa.record(system_instructions=["You research things"])
+        assert sa.agent_id == "preset"
+        assert sa.name == "research-bot"
+        assert sa.system_instructions == ["You research things"]
+
+    def test_sets_all_fields(self) -> None:
+        sa = SubAgent()
+        sa.record(
+            name="research-bot",
+            model="gpt-4o-mini",
+            system_instructions=["sys"],
+            agent_id="id-1",
+            agent_description="desc",
+            agent_version="v1",
+        )
+        assert sa.name == "research-bot"
+        assert sa.model == "gpt-4o-mini"
+        assert sa.system_instructions == ["sys"]
+        assert sa.agent_id == "id-1"
+        assert sa.agent_description == "desc"
+        assert sa.agent_version == "v1"
+
+    def test_returns_self_for_chaining(self) -> None:
+        sa = SubAgent()
+        assert sa.record(agent_id="x") is sa
+
+    def test_recorded_fields_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """End-to-end: record() values flow through to the OTel attrs."""
+        with Session(agent_name="orchestrator") as s:
+            with s.start_turn() as turn:
+                with turn.subagent(name="research-bot") as sa:
+                    sa.record(
+                        system_instructions=["You research things"],
+                        agent_id="agent-9",
+                        agent_description="A research bot",
+                        agent_version="v4",
+                    )
+
+        spans = otel_spans.get_finished_spans()
+        sa_spans = [sp for sp in spans if sp.name == "invoke_agent research-bot"]
+        assert len(sa_spans) == 1
+        attrs = dict(sa_spans[0].attributes or {})
+        assert json.loads(attrs["gen_ai.system_instructions"]) == [
+            {"type": "text", "content": "You research things"},
+        ]
+        assert attrs["gen_ai.agent.id"] == "agent-9"
+        assert attrs["gen_ai.agent.description"] == "A research bot"
+        assert attrs["gen_ai.agent.version"] == "v4"
+
+
 class TestUsageFromOpenAIResponses:
     """``usage_from_openai_responses`` populates ``gen_ai.usage.*`` on the chat span.
 
