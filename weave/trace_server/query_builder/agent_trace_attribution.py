@@ -87,10 +87,9 @@ def _collect_get_fields(node: object) -> set[str]:
     return found
 
 
-def _names_hit_identity(names: set[str]) -> bool:
+def _names_hit(names: set[str], columns: frozenset[str]) -> bool:
     return any(
-        semconv.FILTERABLE_KEY_TO_COLUMN.get(name, name) in _IDENTITY_COLUMN_SET
-        for name in names
+        semconv.FILTERABLE_KEY_TO_COLUMN.get(name, name) in columns for name in names
     )
 
 
@@ -104,12 +103,25 @@ def query_references_identity(query: tsi_query.Query | None) -> bool:
     if query is None:
         return False
     names = _collect_get_fields(query.model_dump(by_alias=True))
-    return _names_hit_identity(names)
+    return _names_hit(names, _IDENTITY_COLUMN_SET)
+
+
+def query_references_trace_id(query: tsi_query.Query | None) -> bool:
+    """Whether a Query filter references `trace_id`, the trace-fallback join key.
+
+    A `trace_id` filter is pushed by ClickHouse straight into the fallback
+    rollup, so the current path is already optimal; the page-prefetch two-pass
+    would only add a redundant scan.
+    """
+    if query is None:
+        return False
+    names = _collect_get_fields(query.model_dump(by_alias=True))
+    return _names_hit(names, frozenset({"trace_id"}))
 
 
 def fields_reference_identity(field_names: list[str]) -> bool:
     """Whether any public field name resolves to an identity column."""
-    return _names_hit_identity(set(field_names))
+    return _names_hit(set(field_names), _IDENTITY_COLUMN_SET)
 
 
 def attributed_spans_source(

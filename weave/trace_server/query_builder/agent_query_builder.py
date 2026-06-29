@@ -891,10 +891,16 @@ def _spans_list_two_pass_applies(req: AgentSpansQueryReq) -> bool:
     group_by, and neither the filter nor the sort references an attributed
     identity column. Otherwise page membership/order would depend on the very
     attribution we want to defer, so fall back to the always-attribute path.
+
+    Also falls back on a `trace_id` filter: ClickHouse pushes that predicate
+    into the fallback rollup, so the current path is already optimal and the
+    two-pass would only add a redundant scan.
     """
     if req.group_by:
         return False
     if agent_trace_attribution.query_references_identity(req.query):
+        return False
+    if agent_trace_attribution.query_references_trace_id(req.query):
         return False
     return not _sort_references_identity(req.sort_by)
 

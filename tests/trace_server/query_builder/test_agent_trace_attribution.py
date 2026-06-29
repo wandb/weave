@@ -15,6 +15,7 @@ from weave.trace_server.query_builder.agent_trace_attribution import (
     attributed_spans_source,
     fields_reference_identity,
     query_references_identity,
+    query_references_trace_id,
 )
 
 
@@ -145,3 +146,15 @@ def test_fields_reference_identity() -> None:
     assert fields_reference_identity(["operation_name", "agent_id"])
     assert not fields_reference_identity(["operation_name", "request_model"])
     assert not fields_reference_identity([])
+
+
+def test_query_references_trace_id() -> None:
+    def q(field: str) -> Query:
+        return Query.model_validate(
+            {"$expr": {"$eq": [{"$getField": field}, {"$literal": "x"}]}}
+        )
+
+    assert query_references_trace_id(q("trace_id"))
+    assert not query_references_trace_id(q("operation_name"))
+    assert not query_references_trace_id(q("agent_name"))
+    assert not query_references_trace_id(None)

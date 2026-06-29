@@ -442,6 +442,42 @@ class TestMakeSpansListQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_trace_id_filter_keeps_full_attribution(self) -> None:
+        # A trace_id filter is pushed into the fallback rollup by ClickHouse, so
+        # the current path is already optimal -> two-pass falls back (avoids the
+        # redundant scan that regresses the single-trace read).
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$eq": [{"$getField": "trace_id"}, {"$literal": "t1"}]
+                        }
+                    }
+                ),
+            ),
+        )
+
+        src = _AttrSrc(4)
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}} AND (s.trace_id = {{genai_1:String}})
+            ORDER BY started_at DESC
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "t1",
+            "genai_2": 100,
+            "genai_3": 0,
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_non_identity_filter_uses_two_pass(self) -> None:
         pb = ParamBuilder("genai")
         query = make_spans_list_query(
