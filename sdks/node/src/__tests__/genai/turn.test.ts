@@ -67,7 +67,23 @@ describe('Turn.systemInstructions', () => {
     turn.end();
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    // Same TextPart array shape as the chat span (per semconv).
+    // TextPart array shape (`[{type:'text', content}]`) per the GenAI semconv.
+    expect(
+      JSON.parse(span.attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] as string)
+    ).toEqual([
+      {type: 'text', content: 'Be helpful'},
+      {type: 'text', content: 'Be concise'},
+    ]);
+  });
+
+  it('accepts systemInstructions via the create() factory', () => {
+    const turn = Turn.create({
+      agentName: 'weather-bot',
+      systemInstructions: ['Be helpful', 'Be concise'],
+    });
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(
       JSON.parse(span.attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] as string)
     ).toEqual([

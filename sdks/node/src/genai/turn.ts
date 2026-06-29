@@ -26,6 +26,8 @@ import {Tool, type ToolInit} from './tool';
 export interface TurnInit extends SpanInitBase {
   agentName?: string;
   model?: string;
+  /** The agent's system prompt. See {@link Turn.systemInstructions}. */
+  systemInstructions?: string[];
 }
 
 /**
@@ -52,11 +54,16 @@ export interface TurnInit extends SpanInitBase {
  */
 export class Turn extends SpanBase {
   /**
-   * The agent's system prompt. Flushed to `gen_ai.system_instructions` on
-   * `end()` as a TextPart array (the same shape the chat span uses, per
-   * semconv) so the Agents tab can surface it on the agent-start marker.
-   * Empty → the attribute is omitted. Mirrors the Python SDK's
-   * `Turn.system_instructions`.
+   * The agent's system prompt. Set directly
+   * (`turn.systemInstructions = [...]`) or via the factory
+   * (`weave.startTurn({systemInstructions: [...]})`). Flushed to
+   * `gen_ai.system_instructions` on `end()` as a TextPart array
+   * (`[{type: 'text', content}]`) per the GenAI semconv, so the Agents tab can
+   * surface it on the agent-start marker. Empty → the attribute is omitted.
+   * Mirrors the Python SDK's `Turn.system_instructions`.
+   *
+   * Note: unlike the Python SDK, the TS SDK has no `include_content` / PII
+   * redaction layer, so the prompt is emitted verbatim when set.
    */
   systemInstructions: string[] = [];
 
@@ -106,6 +113,7 @@ export class Turn extends SpanBase {
       opts.agentName ?? '',
       opts.model ?? ''
     );
+    turn.systemInstructions = opts.systemInstructions ?? [];
     state.turn = turn;
     return turn;
   }
