@@ -4,6 +4,14 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.1] - 2026-06-29
+
+### Changed
+
+- Rename GenAI `Session` API → `Conversation`. Renames `startSession`/`endSession`/`getCurrentSession` → `startConversation`/`endConversation`/`getCurrentConversation`, the `Session` class → `Conversation`, `SessionInit` → `ConversationInit`, and the `sessionId` field/property → `conversationId`. ([#7436](https://github.com/wandb/weave/pull/7436))
+- Print link to Weave on `weave.init()`. ([#7427](https://github.com/wandb/weave/pull/7427))
+
+
 ## [0.16.0] - 2026-06-26
 
 ### Added

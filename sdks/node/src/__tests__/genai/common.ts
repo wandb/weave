@@ -43,7 +43,7 @@ export function resetProviderSingleton(): void {
 // Reach into the GenAI default-state singleton and null out its slots so each
 // test body starts clean even when prior tests in the same worker mutated it.
 export function resetGenaiDefaultState(): void {
-  state.genAi.defaultState.session = null;
+  state.genAi.defaultState.conversation = null;
   state.genAi.defaultState.turn = null;
   state.genAi.defaultState.llm = null;
 }
