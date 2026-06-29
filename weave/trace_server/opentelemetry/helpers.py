@@ -296,6 +296,12 @@ def convert_numeric_keys_to_list(
 
     If all keys in a dictionary are numeric strings (0, 1, 2, ...),
     convert it to a list. Recursively processes nested dictionaries.
+
+    Examples:
+        >>> convert_numeric_keys_to_list({"0": "a", "1": "b"})
+        ['a', 'b']
+        >>> convert_numeric_keys_to_list({"x": 1, "y": 2})
+        {'x': 1, 'y': 2}
     """
     # Process all nested dictionaries first
     for key, value in obj.items():

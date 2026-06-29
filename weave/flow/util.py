@@ -20,6 +20,12 @@ _shown_warnings = set()
 
 
 def transpose(rows: list[dict]) -> dict[str, list]:
+    """Convert a list of row dicts into a dict of column lists.
+
+    Examples:
+        >>> transpose([{"a": 1, "b": 2}, {"a": 3, "b": 4}])
+        {'a': [1, 3], 'b': [2, 4]}
+    """
     cols = defaultdict(list)
     for row in rows:
         for k, v in row.items():
@@ -265,6 +271,14 @@ def make_memorable_name() -> str:
 
 
 def short_str(obj: Any, limit: int = DEFAULT_SHORT_STR_LIMIT) -> str:
+    """Stringify ``obj`` and truncate to ``limit`` chars, appending "..." if cut.
+
+    Examples:
+        >>> short_str("hello", 25)
+        'hello'
+        >>> short_str("x" * 30, 10)
+        'xxxxxxxxxx...'
+    """
     str_val = str(obj)
     if len(str_val) > limit:
         return str_val[:limit] + "..."

@@ -204,16 +204,27 @@ def make_derived_summary_fields(
 
 
 def empty_str_to_none(val: str | None) -> str | None:
+    """Map the empty string to None, passing every other value through.
+
+    Examples:
+        >>> empty_str_to_none("") is None
+        True
+        >>> empty_str_to_none("hi")
+        'hi'
+    """
     return val if val != "" else None
 
 
 def get_nested_key(d: dict[str, Any], col: str) -> Any | None:
     """Get a nested key from a dict. None if not found.
 
-    Example:
-    get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
-    get_nested_key({"a": {"b": {"c": "d"}}}, "a.b") -> {"c": "d"}
-    get_nested_key({"a": {"b": {"c": "d"}}}, "foobar") -> None
+    Examples:
+        >>> get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c")
+        'd'
+        >>> get_nested_key({"a": {"b": {"c": "d"}}}, "a.b")
+        {'c': 'd'}
+        >>> get_nested_key({"a": {"b": {"c": "d"}}}, "foobar") is None
+        True
     """
 
     def _get(data: Any | None, key: str) -> Any | None:
@@ -229,11 +240,19 @@ def get_nested_key(d: dict[str, Any], col: str) -> Any | None:
 
 
 def set_nested_key(d: dict[str, Any], col: str, val: Any) -> None:
-    """Set a nested key in a dict.
+    """Set a nested key in a dict, creating intermediate dicts as needed.
 
-    Example:
-    set_nested_key({"a": {"b": "c"}}, "a.b", "e") -> {"a": {"b": "e"}}
-    set_nested_key({"a": {"b": "e"}}, "a.b.c", "e") -> {"a": {"b": {"c": "e"}}}
+    Mutates ``d`` in place; a malformed trailing-dot path (e.g. ``"a.b."``) is
+    a no-op.
+
+    Examples:
+        >>> d = {"a": {"b": "c"}}
+        >>> set_nested_key(d, "a.b", "e")
+        >>> d
+        {'a': {'b': 'e'}}
+        >>> set_nested_key(d, "a.b.c", "f")
+        >>> d
+        {'a': {'b': {'c': 'f'}}}
     """
     keys = col.split(".")
     if not keys[-1]:
@@ -290,8 +309,10 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
     """Check if a digest is a version like string.
 
     Examples:
-    - v1 -> True, 1
-    - oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8 -> False, -1
+        >>> digest_is_version_like("v1")
+        (True, 1)
+        >>> digest_is_version_like("oioZ7zgsCq4K7tfFQZRubx3ZGPXmFyaeoeWHHd8KUl8")
+        (False, -1)
     """
     if not digest.startswith("v"):
         return (False, -1)

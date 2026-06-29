@@ -68,6 +68,14 @@ class InvalidInternalRef(ValueError):
 
 
 def extra_value_quoter(s: str) -> str:
+    """Percent-encode a ref ``extra`` path segment.
+
+    Everything except alphanumerics and ``_.-~`` is escaped, including ``/``.
+
+    Examples:
+        >>> extra_value_quoter("a b/c")
+        'a%20b%2Fc'
+    """
     # Here, we encode all non alpha-numerics or `_.-~`.
     return urllib.parse.quote(s, safe="")
 
@@ -388,6 +396,14 @@ def extract_row_digest_from_ref_path(s: str) -> str | None:
 
     Returns:
         str | None: The row digest if valid, else None.
+
+    Examples:
+        >>> extract_row_digest_from_ref_path(
+        ...     "weave-trace-internal:///p/object/n:v/attr/rows/id/abc"
+        ... )
+        'abc'
+        >>> extract_row_digest_from_ref_path("weave-trace-internal:///p/object/n:v") is None
+        True
     """
     if DATASET_ROW_REF_PATH_SUFFIX not in s:
         return None

@@ -16,6 +16,12 @@ def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
 
     Returns:
         tuple[float, float, float]: A tuple containing (precision, recall, f1) scores.
+
+    Examples:
+        >>> p_r_f1(tp=1, fp=1, fn=1)
+        (0.5, 0.5, 0.5)
+        >>> p_r_f1(tp=0, fp=0, fn=0)
+        (0, 0, 0)
     """
     precision: float = 0
     if tp or fp:
