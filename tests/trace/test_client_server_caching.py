@@ -26,6 +26,11 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 
+# diskcache's volume() is a page_count-based estimate; SQLite can keep a few
+# un-checkpointed WAL pages past the soft size_limit, so the estimate jitters a
+# couple pages above it. The on-disk cache.db file is the real footprint bound.
+DISK_CACHE_VOLUME_SLACK_BYTES = 4 * 4096
+
 
 def create_random_pil_image():
     im = PIL.Image.new("RGB", (100, 100), color=(255, 255, 255))
@@ -187,7 +192,10 @@ def test_server_cache_size_limit():
             )
 
             # Internally, the cache estimates its own size
-            assert caching_server.disk_cache_volume() <= limit * 1.1
+            assert (
+                caching_server.disk_cache_volume()
+                <= limit + DISK_CACHE_VOLUME_SLACK_BYTES
+            )
 
             # Allows us to test the on-disk size
             sizes = get_cache_sizes(temp_dir)
