@@ -1,16 +1,16 @@
 import {
   endLLM,
-  endSession,
+  endConversation,
   endTurn,
   startLLM,
-  startSession,
+  startConversation,
   startSubagent,
   startTool,
   startTurn,
 } from '../../genai/api';
 import {
   getCurrentLLM,
-  getCurrentSession,
+  getCurrentConversation,
   getCurrentTurn,
   runIsolated,
 } from '../../genai/context';
@@ -31,10 +31,10 @@ describe('genai api (top-level functions)', () => {
   // Happy path
   // -------------------------------------------------------------------------
 
-  it('startSession → startTurn → startLLM → startTool wires up the full chain', () => {
-    const session = startSession({
+  it('startConversation → startTurn → startLLM → startTool wires up the full chain', () => {
+    const conversation = startConversation({
       agentName: 'weather-bot',
-      sessionId: 'conv-1',
+      conversationId: 'conv-1',
     });
     const turn = startTurn({});
     const llm = startLLM({model: 'gpt-4o'});
@@ -42,7 +42,7 @@ describe('genai api (top-level functions)', () => {
     tool.end();
     llm.end();
     turn.end();
-    session.end();
+    conversation.end();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(3);
@@ -60,17 +60,17 @@ describe('genai api (top-level functions)', () => {
   // getCurrent* accessors
   // -------------------------------------------------------------------------
 
-  it('getCurrentSession / Turn / LLM reflect the active instances', () => {
-    expect(getCurrentSession()).toBeUndefined();
+  it('getCurrentConversation / Turn / LLM reflect the active instances', () => {
+    expect(getCurrentConversation()).toBeUndefined();
     expect(getCurrentTurn()).toBeUndefined();
     expect(getCurrentLLM()).toBeUndefined();
 
-    const session = startSession({});
-    expect(getCurrentSession()).toBe(session);
+    const conversation = startConversation({});
+    expect(getCurrentConversation()).toBe(conversation);
 
     const turn = startTurn({});
     expect(getCurrentTurn()).toBe(turn);
-    expect(getCurrentSession()).toBe(session);
+    expect(getCurrentConversation()).toBe(conversation);
 
     const llm = startLLM({model: 'gpt-4o'});
     expect(getCurrentLLM()).toBe(llm);
@@ -79,8 +79,8 @@ describe('genai api (top-level functions)', () => {
     expect(getCurrentLLM()).toBeUndefined();
     turn.end();
     expect(getCurrentTurn()).toBeUndefined();
-    session.end();
-    expect(getCurrentSession()).toBeUndefined();
+    conversation.end();
+    expect(getCurrentConversation()).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
@@ -129,9 +129,11 @@ describe('genai api (top-level functions)', () => {
     expect(() => startSubagent({name: 'foo'})).toThrow(/active Turn or LLM/);
   });
 
-  it('starting a Session / Turn / LLM while one is already active throws', () => {
-    startSession({});
-    expect(() => startSession({})).toThrow(/Session is already active/);
+  it('starting a Conversation / Turn / LLM while one is already active throws', () => {
+    startConversation({});
+    expect(() => startConversation({})).toThrow(
+      /Conversation is already active/
+    );
 
     startTurn({});
     expect(() => startTurn({})).toThrow(/Turn is already active/);
@@ -144,36 +146,36 @@ describe('genai api (top-level functions)', () => {
   // runIsolated — isolation for parallel work
   // -------------------------------------------------------------------------
 
-  it('runIsolated isolates concurrent Sessions in Promise.all', async () => {
-    const sessionIds: string[] = [];
+  it('runIsolated isolates concurrent Conversations in Promise.all', async () => {
+    const conversationIds: string[] = [];
     await Promise.all([
       runIsolated(async () => {
-        const s = startSession({sessionId: 'parallel-a'});
+        const s = startConversation({conversationId: 'parallel-a'});
         await new Promise(r => setTimeout(r, 5));
-        sessionIds.push(getCurrentSession()!.sessionId);
+        conversationIds.push(getCurrentConversation()!.conversationId);
         s.end();
       }),
       runIsolated(async () => {
-        const s = startSession({sessionId: 'parallel-b'});
+        const s = startConversation({conversationId: 'parallel-b'});
         await new Promise(r => setTimeout(r, 5));
-        sessionIds.push(getCurrentSession()!.sessionId);
+        conversationIds.push(getCurrentConversation()!.conversationId);
         s.end();
       }),
     ]);
-    expect(sessionIds.sort()).toEqual(['parallel-a', 'parallel-b']);
+    expect(conversationIds.sort()).toEqual(['parallel-a', 'parallel-b']);
     // Neither leaks to the outer chain.
-    expect(getCurrentSession()).toBeUndefined();
+    expect(getCurrentConversation()).toBeUndefined();
   });
 
-  it('runIsolated supports a full Session → Turn → LLM stack per frame', async () => {
+  it('runIsolated supports a full Conversation → Turn → LLM stack per frame', async () => {
     const results = await Promise.all([
       runIsolated(async () => {
-        const s = startSession({sessionId: 'chain-a'});
+        const s = startConversation({conversationId: 'chain-a'});
         const t = startTurn({});
         const l = startLLM({model: 'gpt-4o'});
         await new Promise(r => setTimeout(r, 5));
         const snapshot = {
-          session: getCurrentSession()!.sessionId,
+          conversation: getCurrentConversation()!.conversationId,
           turn: getCurrentTurn() === t,
           llm: getCurrentLLM() === l,
         };
@@ -183,12 +185,12 @@ describe('genai api (top-level functions)', () => {
         return snapshot;
       }),
       runIsolated(async () => {
-        const s = startSession({sessionId: 'chain-b'});
+        const s = startConversation({conversationId: 'chain-b'});
         const t = startTurn({});
         const l = startLLM({model: 'gpt-4o'});
         await new Promise(r => setTimeout(r, 5));
         const snapshot = {
-          session: getCurrentSession()!.sessionId,
+          conversation: getCurrentConversation()!.conversationId,
           turn: getCurrentTurn() === t,
           llm: getCurrentLLM() === l,
         };
@@ -199,32 +201,34 @@ describe('genai api (top-level functions)', () => {
       }),
     ]);
     expect(results).toEqual([
-      {session: 'chain-a', turn: true, llm: true},
-      {session: 'chain-b', turn: true, llm: true},
+      {conversation: 'chain-a', turn: true, llm: true},
+      {conversation: 'chain-b', turn: true, llm: true},
     ]);
   });
 
-  it('parallel sessions WITHOUT runIsolated clash on the default state and throw', async () => {
+  it('parallel conversations WITHOUT runIsolated clash on the default state and throw', async () => {
     // Without runIsolated, both async branches mutate the same default state
-    // object. One installs its session; the other sees state.session != null
+    // object. One installs its conversation; the other sees state.conversation != null
     // and the nesting guard throws.
     const results = await Promise.allSettled([
       (async () => {
-        const s = startSession({sessionId: 'shared-a'});
+        const s = startConversation({conversationId: 'shared-a'});
         await new Promise(r => setTimeout(r, 5));
         s.end();
       })(),
       (async () => {
         await new Promise(r => setTimeout(r, 1));
-        // By now the first branch has installed its session on the default
+        // By now the first branch has installed its conversation on the default
         // state. This call hits the nesting guard.
-        startSession({sessionId: 'shared-b'});
+        startConversation({conversationId: 'shared-b'});
       })(),
     ]);
     expect(results[0].status).toBe('fulfilled');
     expect(results[1].status).toBe('rejected');
     if (results[1].status === 'rejected') {
-      expect(String(results[1].reason)).toMatch(/Session is already active/);
+      expect(String(results[1].reason)).toMatch(
+        /Conversation is already active/
+      );
     }
   });
 
@@ -232,55 +236,55 @@ describe('genai api (top-level functions)', () => {
   // end* are idempotent no-ops when no instance is active
   // -------------------------------------------------------------------------
 
-  it('endSession / endTurn / endLLM are no-ops when nothing is active', () => {
-    expect(() => endSession()).not.toThrow();
+  it('endConversation / endTurn / endLLM are no-ops when nothing is active', () => {
+    expect(() => endConversation()).not.toThrow();
     expect(() => endTurn()).not.toThrow();
     expect(() => endLLM()).not.toThrow();
   });
 
-  it('endLLM / endTurn / endSession clear their current instances', () => {
-    const session = startSession({});
+  it('endLLM / endTurn / endConversation clear their current instances', () => {
+    const conversation = startConversation({});
     const turn = startTurn({});
     startLLM({model: 'gpt-4o'});
 
     endLLM();
     expect(getCurrentLLM()).toBeUndefined();
     expect(getCurrentTurn()).toBe(turn);
-    expect(getCurrentSession()).toBe(session);
+    expect(getCurrentConversation()).toBe(conversation);
 
     endTurn();
     expect(getCurrentTurn()).toBeUndefined();
-    expect(getCurrentSession()).toBe(session);
+    expect(getCurrentConversation()).toBe(conversation);
 
-    endSession();
-    expect(getCurrentSession()).toBeUndefined();
-    // Turn + LLM each emit a span on end; Session does not emit its own.
+    endConversation();
+    expect(getCurrentConversation()).toBeUndefined();
+    // Turn + LLM each emit a span on end; Conversation does not emit its own.
     expect(getExporter().getFinishedSpans()).toHaveLength(2);
   });
 
-  it('endSession cascades — ends any active LLM and Turn before clearing Session', () => {
-    startSession({});
+  it('endConversation cascades — ends any active LLM and Turn before clearing Conversation', () => {
+    startConversation({});
     startTurn({});
     startLLM({model: 'gpt-4o'});
 
-    endSession();
+    endConversation();
 
-    expect(getCurrentSession()).toBeUndefined();
+    expect(getCurrentConversation()).toBeUndefined();
     expect(getCurrentTurn()).toBeUndefined();
     expect(getCurrentLLM()).toBeUndefined();
     // Turn + LLM spans were closed by the cascade.
     expect(getExporter().getFinishedSpans()).toHaveLength(2);
   });
 
-  it('endSession passes options when implicitly ending LLM and Turn', () => {
+  it('endConversation passes options when implicitly ending LLM and Turn', () => {
     const startedAt = new Date('2026-05-29T10:00:00.000Z');
     const endedAt = new Date('2026-05-29T10:00:01.700Z');
 
-    startSession({});
+    startConversation({});
     startTurn({startTime: startedAt});
     startLLM({model: 'gpt-4o', startTime: startedAt});
 
-    endSession({endTime: endedAt});
+    endConversation({endTime: endedAt});
 
     const spans = getExporter().getFinishedSpans();
     const turnSpan = findSpan(spans, 'invoke_agent');
@@ -312,8 +316,8 @@ describe('genai api (top-level functions)', () => {
     expectSpanTimesToMatch(llmSpan, startedAt, endedAt);
   });
 
-  test('startSession stamps custom attributes on every emitted span', () => {
-    startSession({
+  test('startConversation stamps custom attributes on every emitted span', () => {
+    startConversation({
       attributes: {
         'weave.integration.name': 'wb-agent',
         'weave.custom.run_id': 42,
@@ -324,7 +328,7 @@ describe('genai api (top-level functions)', () => {
     const tool = startTool({name: 'get_weather'});
     tool.end();
     endLLM();
-    endSession();
+    endConversation();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans.map(s => s.name).sort()).toEqual([
@@ -339,12 +343,12 @@ describe('genai api (top-level functions)', () => {
   });
 
   test('custom attributes do not override the emitter`s own semconv keys', () => {
-    startSession({
+    startConversation({
       attributes: {'gen_ai.operation.name': 'custom-loses'},
     });
     startTurn({});
     endTurn();
-    endSession();
+    endConversation();
 
     const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(turnSpan.attributes['gen_ai.operation.name']).toBe('invoke_agent');

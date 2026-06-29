@@ -34,7 +34,7 @@ export interface TurnInit extends SpanInitBase {
  * never accidentally inherits a parent from another OTel-instrumented
  * library.
  *
- * Created by `weave.startTurn()` (or `session.startTurn()`) and
+ * Created by `weave.startTurn()` (or `conversation.startTurn()`) and
  * terminated with `end()`. Only one Turn may be active in an async chain.
  * Children (LLM, Tool, SubAgent) attach via the `startLLM`, `startTool`,
  * `startSubagent` methods.
@@ -69,7 +69,7 @@ export class Turn extends SpanBase {
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {
-      ...(state.session?.attributes ?? {}),
+      ...(state.conversation?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
     if (opts.agentName) {

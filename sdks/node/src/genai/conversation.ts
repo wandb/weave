@@ -5,14 +5,14 @@ import {getGenaiState} from './context';
 import {Turn, type TurnInit} from './turn';
 import type {SpanEndOptions} from './spanBase';
 
-export interface SessionInit {
+export interface ConversationInit {
   agentName?: string;
   model?: string;
-  /** Conversation ID propagated to every span under this session as
+  /** Conversation ID propagated to every span under this conversation as
    *  `gen_ai.conversation.id`. Auto-generated if omitted. */
-  sessionId?: string;
+  conversationId?: string;
   /**
-   * Custom attributes stamped on every span the session emits.
+   * Custom attributes stamped on every span the conversation emits.
    *
    * A key here that collides with a span's own `gen_ai.*` / `weave.*`
    * attribute is unsupported; the span's value wins.
@@ -21,34 +21,34 @@ export interface SessionInit {
 }
 
 /**
- * A Session groups Turns under a single `gen_ai.conversation.id`. It is not
+ * A Conversation groups Turns under a single `gen_ai.conversation.id`. It is not
  * itself an OTel span — children stamp the conversation id onto theirs.
  */
-export class Session {
+export class Conversation {
   private _ended = false;
 
   private constructor(
     public readonly agentName: string,
     public readonly model: string,
-    public readonly sessionId: string,
+    public readonly conversationId: string,
     public readonly attributes: Attributes
   ) {}
 
-  static create(opts: SessionInit = {}): Session {
+  static create(opts: ConversationInit = {}): Conversation {
     const state = getGenaiState();
-    if (state.session !== null) {
+    if (state.conversation !== null) {
       throw new Error(
-        'A Session is already active in this async chain. End it before starting a new one.'
+        'A Conversation is already active in this async chain. End it before starting a new one.'
       );
     }
-    const session = new Session(
+    const conversation = new Conversation(
       opts.agentName ?? '',
       opts.model ?? '',
-      opts.sessionId ?? uuidv7(),
+      opts.conversationId ?? uuidv7(),
       opts.attributes ?? {}
     );
-    state.session = session;
-    return session;
+    state.conversation = conversation;
+    return conversation;
   }
 
   startTurn(opts: TurnInit = {}): Turn {
@@ -56,7 +56,7 @@ export class Session {
       ...opts,
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
-      conversationId: this.sessionId,
+      conversationId: this.conversationId,
     });
   }
 
@@ -74,8 +74,8 @@ export class Session {
     if (state.turn) {
       state.turn.end(opts);
     }
-    if (state.session === this) {
-      state.session = null;
+    if (state.conversation === this) {
+      state.conversation = null;
     }
   }
 }

@@ -47,7 +47,7 @@ export class SubAgent extends SpanBase {
     const state = getGenaiState();
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {
-      ...(state.session?.attributes ?? {}),
+      ...(state.conversation?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
       [ATTR_GEN_AI_AGENT_NAME]: opts.name,
     };

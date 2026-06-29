@@ -2,22 +2,22 @@ import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
 } from '../../genai/semconv';
-import {Session} from '../../genai/session';
+import {Conversation} from '../../genai/conversation';
 
 import {setupExporterPerTest, setupGenAITestEnvironment} from './common';
 
-describe('Session', () => {
+describe('Conversation', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('emits no span of its own but propagates sessionId as gen_ai.conversation.id', () => {
-    const session = Session.create({
+  it('emits no span of its own but propagates conversationId as gen_ai.conversation.id', () => {
+    const conversation = Conversation.create({
       agentName: 'weather-bot',
-      sessionId: 's-1',
+      conversationId: 's-1',
     });
-    const turn = session.startTurn();
+    const turn = conversation.startTurn();
     turn.end();
-    session.end();
+    conversation.end();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(1); // only the turn span
@@ -26,8 +26,8 @@ describe('Session', () => {
     expect(spans[0].attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
   });
 
-  it('auto-generates a sessionId when none is supplied', () => {
-    const session = Session.create({});
-    expect(session.sessionId).toBeTruthy();
+  it('auto-generates a conversationId when none is supplied', () => {
+    const conversation = Conversation.create({});
+    expect(conversation.conversationId).toBeTruthy();
   });
 });

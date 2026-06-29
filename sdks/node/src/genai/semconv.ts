@@ -96,5 +96,5 @@ export const ATTR_GEN_AI_EVENT_CONTENT = 'gen_ai.event.content';
 // ---------------------------------------------------------------------------
 
 /** Instrumentation-library name passed to `getWeaveTracer` by every emitter
- *  in the GenAI session SDK. */
+ *  in the GenAI conversation SDK. */
 export const WEAVE_GENAI_TRACER_NAME = 'weave-genai';

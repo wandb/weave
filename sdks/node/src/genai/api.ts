@@ -1,34 +1,34 @@
 import {getGenaiState} from './context';
 import {type LLM, type LLMInit} from './llm';
-import {Session, type SessionInit} from './session';
+import {Conversation, type ConversationInit} from './conversation';
 import type {SpanEndOptions} from './spanBase';
 import {type SubAgent, type SubAgentInit} from './subagent';
 import {type Tool, type ToolInit} from './tool';
 import {Turn, type TurnInit} from './turn';
 
 /**
- * Start a new Session and install it as the current session.
+ * Start a new Conversation and install it as the current conversation.
  * Subsequent calls to `startTurn` will pick it up automatically.
  *
  * Pass `attributes` to stamp custom (non-semconv) attributes on every
- * span the session emits.
+ * span the conversation emits.
  *
  * @example
- * weave.startSession({agentName: 'research-bot'});
+ * weave.startConversation({agentName: 'research-bot'});
  *
  * @example
- * weave.startSession({
+ * weave.startConversation({
  *   agentName: 'research-bot',
- *   sessionId: '019efa53-8a65-711c-b4c1-7c1cb72c0bb7',
+ *   conversationId: '019efa53-8a65-711c-b4c1-7c1cb72c0bb7',
  *   attributes: {'myagent.version': '1.23'},
  * });
  */
-export function startSession(opts: SessionInit = {}): Session {
-  return Session.create(opts);
+export function startConversation(opts: ConversationInit = {}): Conversation {
+  return Conversation.create(opts);
 }
 
 /**
- * Start a new Turn. If a Session is active, the turn inherits its
+ * Start a new Turn. If a Conversation is active, the turn inherits its
  * `conversationId`; otherwise the turn has no conversation id.
  *
  * @example
@@ -41,9 +41,9 @@ export function startSession(opts: SessionInit = {}): Session {
  * });
  */
 export function startTurn(opts: TurnInit = {}): Turn {
-  const session = getGenaiState().session;
-  if (session) {
-    return session.startTurn(opts);
+  const conversation = getGenaiState().conversation;
+  if (conversation) {
+    return conversation.startTurn(opts);
   }
   return Turn.create(opts);
 }
@@ -135,18 +135,18 @@ export function startSubagent(opts: SubAgentInit): SubAgent {
 }
 
 /**
- * End the current Session. No-op if no Session is active.
+ * End the current Conversation. No-op if no Conversation is active.
  *
  * @example
- * weave.endSession();
+ * weave.endConversation();
  *
  * @example
- * weave.endSession({endTime: new Date('2026-05-29T10:00:01.700Z')});
+ * weave.endConversation({endTime: new Date('2026-05-29T10:00:01.700Z')});
  */
-export function endSession(opts?: SpanEndOptions): void {
-  const session = getGenaiState().session;
-  if (session) {
-    session.end(opts);
+export function endConversation(opts?: SpanEndOptions): void {
+  const conversation = getGenaiState().conversation;
+  if (conversation) {
+    conversation.end(opts);
   }
 }
 

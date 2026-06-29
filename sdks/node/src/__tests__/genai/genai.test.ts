@@ -273,7 +273,7 @@ async function runAgentLoop(
 }
 
 async function run(agent: Agent, prompts: string[]): Promise<string[]> {
-  const session = weave.startSession({
+  const conversation = weave.startConversation({
     agentName: agent.name,
     attributes: {
       'myagent.region': 'ORD',
@@ -285,7 +285,7 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
     const answers: string[] = [];
     for (const prompt of prompts) {
       messages.push({role: 'user', content: prompt});
-      const turn = session.startTurn({agentName: agent.name});
+      const turn = conversation.startTurn({agentName: agent.name});
       try {
         answers.push(await runAgentLoop(agent, messages, turn));
       } finally {
@@ -294,7 +294,7 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
     }
     return answers;
   } finally {
-    session.end();
+    conversation.end();
   }
 }
 
@@ -535,7 +535,7 @@ describe('GenAI', () => {
     `);
   });
 
-  const AGENT_SESSIONS = [
+  const AGENT_CONVERSATIONS = [
     {
       agentName: agent.name,
       instructions: agent.instructions,
@@ -561,14 +561,14 @@ describe('GenAI', () => {
 
   // tests backfilling data via our explicit handle-based APIs, eg:
   //
-  // const turn = session.startTurn({startTime: '...' });
+  // const turn = conversation.startTurn({startTime: '...' });
   // // ...
   // turn.end({endTime: '...'});
   //
   test('allows backfilling data (via handle-based APIs)', async () => {
-    for (const recordedSession of AGENT_SESSIONS) {
-      const session = weave.startSession({
-        agentName: recordedSession.agentName,
+    for (const recordedConversation of AGENT_CONVERSATIONS) {
+      const conversation = weave.startConversation({
+        agentName: recordedConversation.agentName,
         attributes: {
           'myagent.region': 'ORD',
           'myagent.version': '4.21',
@@ -576,15 +576,15 @@ describe('GenAI', () => {
       });
 
       const messages: Message[] = [
-        {role: 'system', content: recordedSession.instructions},
+        {role: 'system', content: recordedConversation.instructions},
       ];
-      for (const recordedTurn of recordedSession.turns) {
+      for (const recordedTurn of recordedConversation.turns) {
         const responses = recordedTurn.responses;
 
         messages.push({role: 'user', content: recordedTurn.prompt});
 
-        const turn = session.startTurn({
-          agentName: recordedSession.agentName,
+        const turn = conversation.startTurn({
+          agentName: recordedConversation.agentName,
           startTime: recordedTurn.startedAt,
         });
 
@@ -653,7 +653,7 @@ describe('GenAI', () => {
 
         turn.end({endTime: toDate(responses[responses.length - 1])});
       }
-      session.end();
+      conversation.end();
     }
 
     const spans = await emittedSpans({maskTimestamps: false});
@@ -933,9 +933,9 @@ describe('GenAI', () => {
   // weave.endTurn({endTime: '...'});
   //
   test('allows backfilling data (via top-level context-based APIs)', async () => {
-    for (const recordedSession of AGENT_SESSIONS) {
-      weave.startSession({
-        agentName: recordedSession.agentName,
+    for (const recordedConversation of AGENT_CONVERSATIONS) {
+      weave.startConversation({
+        agentName: recordedConversation.agentName,
         attributes: {
           'myagent.region': 'ORD',
           'myagent.version': '4.21',
@@ -943,15 +943,15 @@ describe('GenAI', () => {
       });
 
       const messages: Message[] = [
-        {role: 'system', content: recordedSession.instructions},
+        {role: 'system', content: recordedConversation.instructions},
       ];
-      for (const recordedTurn of recordedSession.turns) {
+      for (const recordedTurn of recordedConversation.turns) {
         const responses = recordedTurn.responses;
 
         messages.push({role: 'user', content: recordedTurn.prompt});
 
         weave.startTurn({
-          agentName: recordedSession.agentName,
+          agentName: recordedConversation.agentName,
           startTime: recordedTurn.startedAt,
         });
 
@@ -1020,7 +1020,7 @@ describe('GenAI', () => {
 
         weave.endTurn({endTime: toDate(responses[responses.length - 1])});
       }
-      weave.endSession();
+      weave.endConversation();
     }
 
     const spans = await emittedSpans({maskTimestamps: false});
