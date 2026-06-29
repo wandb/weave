@@ -88,7 +88,6 @@ def json_dump_field_as_sql(
     root_field_sanitized: str,
     extra_path: list[str] | None = None,
     cast: tsi_query.CastTo | None = None,
-    use_agg_fn: bool = True,
     agg_fn: str | None = None,
 ) -> str:
     """Build SQL for JSON field access with optional type conversion.
@@ -99,7 +98,6 @@ def json_dump_field_as_sql(
         root_field_sanitized: The root field name (already sanitized)
         extra_path: Optional list of JSON path components
         cast: Optional type to cast the result to
-        use_agg_fn: Whether to use aggregate functions
         agg_fn: When set, `root_field_sanitized` is the raw (un-aggregated)
             column and the aggregate wraps the extracted scalar, not the dump:
             `{agg_fn}If(JSON_VALUE(col, path), col IS NOT NULL)`. This keeps
@@ -117,9 +115,6 @@ def json_dump_field_as_sql(
         'toFloat64(JSON_VALUE(any(inputs_dump), {param_1:String}))'
     """
     if cast != "exists":
-        if cast is None and not use_agg_fn and not extra_path:
-            return f"{root_field_sanitized}"
-
         path_str = "'$'"
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
