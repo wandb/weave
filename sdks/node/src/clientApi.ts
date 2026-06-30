@@ -1,4 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
+import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
 import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
@@ -121,6 +122,7 @@ export async function init(
       baseApiParams: {
         headers: {
           'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
+          [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
           Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
         },
       },
@@ -135,7 +137,7 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);
-    console.log(`Initializing project: ${projectId}`);
+    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);

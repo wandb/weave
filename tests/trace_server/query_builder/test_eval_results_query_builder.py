@@ -48,13 +48,18 @@ def test_cte_chain_calls_merged() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -145,8 +150,7 @@ def test_cte_chain_calls_complete() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -280,8 +284,7 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -410,13 +413,18 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -510,13 +518,18 @@ def test_full_query_calls_merged() -> None:
                 WHERE (calls_merged.parent_id IN {pb_1:Array(String)}
                     OR calls_merged.parent_id IS NULL)
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_merged.op_name, {pb_2:String}) > 0
-                        OR position(calls_merged.op_name, {pb_3:String}) > 0
+                    AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (position(any(calls_merged.op_name), {pb_2:String}) > 0
-                        OR position(any(calls_merged.op_name), {pb_3:String}) > 0)
+                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
                     AND any(calls_merged.deleted_at) IS NULL
                     AND any(calls_merged.started_at) IS NOT NULL
             ),
@@ -737,8 +750,7 @@ def test_filter_logic_operator_or_produces_match_any() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -867,8 +879,7 @@ def test_filter_logic_operator_and_produces_match_all() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 
@@ -977,13 +988,87 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
         read_table="calls_complete",
         filter_logic_operator="or",
     )
-    # Even with OR logic, same-eval conditions should be AND'd together within the group
-    # The HAVING should contain: ((condition1 AND condition2)) - wrapped in parens
-    assert " AND " in cte
-    # With only one eval group, the OR doesn't appear
-    assert (
-        " OR " not in cte or "OR position" in cte
-    )  # "OR position" is from op_name matching
+    # Even with OR logic, same-eval conditions stay AND'd within the single
+    # eval group, wrapped in parens.
+    assert_raw_sql(
+        cte,
+        """
+            predict_and_score_calls AS (
+                SELECT calls_complete.id AS call_id,
+                    calls_complete.parent_id AS eval_call_id,
+                    calls_complete.inputs_dump,
+                    calls_complete.output_dump,
+                    CASE
+                        WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
+                            THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
+                        ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
+                    END AS row_digest
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_0:String}
+                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
+                    AND calls_complete.id NOT IN {pb_1:Array(String)}
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
+                    AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
+            ),
+
+            predict_and_score_calls_resolved AS (
+                SELECT * FROM predict_and_score_calls
+            ),
+
+            ranked_digests AS (
+                SELECT row_digest,
+                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
+                FROM predict_and_score_calls_resolved
+                GROUP BY row_digest
+                HAVING 1=1
+                    AND (((toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_6:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) >= {pb_7:Float64})
+                    AND (toFloat64OrNull(any(CASE WHEN eval_call_id = {pb_6:String} THEN multiIf(coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'true', '1', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '') = 'false', '0', coalesce(nullIf(JSON_VALUE(output_dump, {pb_5:String}), 'null'), '')) ELSE NULL END)) <= {pb_8:Float64})))
+            ),
+
+            ranked_digest_count AS (
+                SELECT count(*) AS total_rows FROM ranked_digests
+            ),
+
+            page_digests AS (
+                SELECT row_digest, row_order
+                FROM ranked_digests
+                ORDER BY row_order
+                LIMIT 10
+                OFFSET 0
+            ),
+
+            page_resolved_inputs AS (
+                SELECT digest, any(val_dump) AS val_dump
+                FROM table_rows
+                PREWHERE project_id = {pb_0:String}
+                WHERE digest IN (SELECT row_digest FROM page_digests)
+                GROUP BY digest
+            ),
+
+            page_rows AS (
+                SELECT predict_and_score_calls_resolved.call_id AS call_id,
+                    predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
+                    predict_and_score_calls_resolved.row_digest AS row_digest,
+                    page_digests.row_order AS row_order,
+                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                FROM predict_and_score_calls_resolved
+                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
+                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
+            )
+            """,
+        pb.get_params(),
+        {
+            "pb_0": "proj-1",
+            "pb_1": ["eval-1"],
+            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
+            "pb_4": SENTINEL_EPOCH,
+            "pb_5": '$."scores"."accuracy"',
+            "pb_6": "eval-1",
+            "pb_7": 0.5,
+            "pb_8": 0.9,
+        },
+    )
 
 
 def test_full_query_calls_complete() -> None:
@@ -1017,8 +1102,7 @@ def test_full_query_calls_complete() -> None:
                 PREWHERE calls_complete.project_id = {pb_0:String}
                 WHERE calls_complete.parent_id IN {pb_1:Array(String)}
                     AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (position(calls_complete.op_name, {pb_2:String}) > 0
-                        OR position(calls_complete.op_name, {pb_3:String}) > 0)
+                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
                     AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
             ),
 

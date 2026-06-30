@@ -3,7 +3,6 @@ import socket
 import zlib
 from typing import Any
 
-import ddtrace
 from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
@@ -28,6 +27,7 @@ from weave.trace_server.environment import (
     kafka_producer_max_buffer_size,
     wf_kafka_project_id_bucket_count,
 )
+from weave.trace_server.tracing import traced
 
 CALL_ENDED_TOPIC = "weave.call_ended"
 SCORE_CALLS_TOPIC = "weave.score_calls"
@@ -148,7 +148,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         if flush_immediately:
             self.flush(0)
 
-    @ddtrace.tracer.wrap(name="kafka_producer.produce_score_agent_spans")
+    @traced(name="kafka_producer.produce_score_agent_spans")
     def produce_score_agent_spans(self, event: ScoreAgentSpansEvent) -> None:
         """Produce a weave.score_agent_spans event to Kafka.
 

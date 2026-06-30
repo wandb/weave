@@ -42,6 +42,7 @@ There are two ways to authenticate with Azure Blob Storage:
 
 import logging
 import socket
+import threading
 from abc import abstractmethod
 from collections.abc import Callable
 from typing import TypeVar, cast
@@ -51,6 +52,7 @@ from azure.core.exceptions import HttpResponseError, ResourceExistsError
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cachetools import LRUCache
 from google.api_core import exceptions as gcp_exceptions
 from google.auth import default as google_auth_default
 from google.auth.credentials import with_scopes_if_required
@@ -106,6 +108,17 @@ GCS_TCP_KEEPALIVE_COUNT = 5
 # uploads reuse warm keep-alive connections instead of churning new ones.
 GCS_POOL_MAXSIZE = 40
 
+# Keep-alive only probes IDLE sockets; an in-flight request whose peer goes silent
+# rides TCP retransmit backoff (~23s, under the read timeout). TCP_USER_TIMEOUT caps
+# unacked data so the socket errors fast and the retry decorator hits a fresh conn.
+GCS_TCP_USER_TIMEOUT_MS = 8000
+
+# Per-pod memo of content-addressed bucket keys already confirmed stored, so a
+# repeat write skips the redundant create that the provider rejects (GCS 412).
+STORED_KEY_CACHE_SIZE = 100_000
+_stored_key_cache: LRUCache[str, bool] = LRUCache(maxsize=STORED_KEY_CACHE_SIZE)
+_stored_key_cache_lock = threading.Lock()
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -150,13 +163,20 @@ class FileStorageClient:
 def store_in_bucket(
     client: FileStorageClient, path: str, data: bytes
 ) -> FileStorageURI:
-    """Store a file in a storage bucket."""
+    """Store a file in a storage bucket, deduping repeat content-addressed writes."""
+    target_file_storage_uri = client.base_uri.with_path(path)
+    uri_str = target_file_storage_uri.to_uri_str()
+    with _stored_key_cache_lock:
+        already_stored = uri_str in _stored_key_cache
+    if already_stored:
+        return target_file_storage_uri
     try:
-        target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
         raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
+    with _stored_key_cache_lock:
+        _stored_key_cache[uri_str] = True
     return target_file_storage_uri
 
 
@@ -174,6 +194,12 @@ def read_from_bucket(
 
 
 ### Everything below here is internal
+
+
+def reset_stored_key_cache() -> None:
+    """Clear the per-pod stored-key cache (used by tests)."""
+    with _stored_key_cache_lock:
+        _stored_key_cache.clear()
 
 
 def key_for_project_digest(project_id: str, digest: str) -> str:
@@ -425,11 +451,13 @@ class _KeepAliveHTTPAdapter(HTTPAdapter):
         ]
         # TCP_KEEPIDLE (Linux) and TCP_KEEPALIVE (macOS/BSD) are the same idle knob;
         # only the platform's own constant exists, so getattr-guard each.
+        # TCP_USER_TIMEOUT (Linux, milliseconds) bounds in-flight unacked data.
         for opt_name, value in (
             ("TCP_KEEPIDLE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPALIVE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPINTVL", GCS_TCP_KEEPALIVE_INTERVAL),
             ("TCP_KEEPCNT", GCS_TCP_KEEPALIVE_COUNT),
+            ("TCP_USER_TIMEOUT", GCS_TCP_USER_TIMEOUT_MS),
         ):
             opt: int | None = getattr(socket, opt_name, None)
             if opt is not None:

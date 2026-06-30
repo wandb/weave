@@ -319,8 +319,9 @@ def build_agent_span_stats_query(
         )
 
     granularity_seconds = _resolve_granularity(req, start, end)
-    start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
-    end_epoch = end.replace(tzinfo=datetime.timezone.utc).timestamp()
+    # Whole unix seconds: a fractional float trips ClickHouse Int64 param parsing.
+    start_epoch = int(start.replace(tzinfo=datetime.timezone.utc).timestamp())
+    end_epoch = int(end.replace(tzinfo=datetime.timezone.utc).timestamp())
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)
@@ -668,7 +669,8 @@ def _aggregation_output(
         aggregate_sql = f"countIf({valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_DISTINCT:
-        aggregate_sql = f"uniqExactIf({metric_col}, {valid_col})"
+        # uniq (approx, memory-bounded); uniqExact OOMs on large projects.
+        aggregate_sql = f"uniqIf({metric_col}, {valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_TRUE:
         aggregate_sql = f"countIf({valid_col} AND {metric_col} = 1)"

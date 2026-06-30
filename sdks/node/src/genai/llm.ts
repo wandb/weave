@@ -1,7 +1,13 @@
-import {type Context, type Span, SpanKind, trace} from '@opentelemetry/api';
+import {
+  type Attributes,
+  type Context,
+  type Span,
+  SpanKind,
+  trace,
+} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
-import {_getGenaiState} from './context';
+import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
@@ -95,14 +101,15 @@ export class LLM extends SpanBase {
   }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.llm !== null) {
       throw new Error(
         'An LLM is already active in this async chain. End it before starting a new one.'
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(state.conversation?.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
       [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
     };
@@ -289,7 +296,7 @@ export class LLM extends SpanBase {
     }
 
     this._closeSpan(opts);
-    const state = _getGenaiState();
+    const state = getGenaiState();
     if (state.llm === this) {
       state.llm = null;
     }
