@@ -2428,11 +2428,19 @@ def test_total_storage_size_calls_complete(with_filter: bool):
                 WHERE calls_complete.op_name IN {pb_1:Array(String)}
                     AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
                 LIMIT 50
+            ),
+            filtered_calls AS (
+                SELECT calls_complete.id AS id
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE calls_complete.op_name IN {pb_4:Array(String)}
+                    AND (calls_complete.deleted_at = {pb_3:DateTime64(3)})
+                LIMIT 50
             )
             SELECT
                 calls_complete.id AS id,
                 CASE
-                    WHEN calls_complete.parent_id = {pb_3:String}
+                    WHEN calls_complete.parent_id = {pb_5:String}
                     THEN rolled_up_cms.total_storage_size_bytes
                     ELSE NULL
                 END AS total_storage_size_bytes
@@ -2442,31 +2450,24 @@ def test_total_storage_size_calls_complete(with_filter: bool):
                 sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_complete_stats
             WHERE project_id = {pb_2:String}
-            AND id IN (
-                SELECT id
+            AND trace_id IN (
+                SELECT trace_id
                 FROM calls_complete
                 WHERE project_id = {pb_2:String}
-                AND trace_id IN (
-                    SELECT trace_id
-                    FROM calls_complete
-                    WHERE project_id = {pb_2:String}
-                    AND id IN storage_scope_ids
-                )
+                AND id IN filtered_calls
             )
             GROUP BY trace_id) AS rolled_up_cms
             ON calls_complete.trace_id = rolled_up_cms.trace_id
             PREWHERE calls_complete.project_id = {pb_2:String}
-            WHERE calls_complete.op_name IN {pb_5:Array(String)}
-                AND (calls_complete.deleted_at = {pb_4:DateTime64(3)})
-            LIMIT 50
+            WHERE (calls_complete.id IN filtered_calls)
             """,
             {
                 "pb_0": SENTINEL_EPOCH,
                 "pb_1": ["a", "b"],
                 "pb_2": "test/project",
-                "pb_3": "",
-                "pb_4": SENTINEL_EPOCH,
-                "pb_5": ["a", "b"],
+                "pb_3": SENTINEL_EPOCH,
+                "pb_4": ["a", "b"],
+                "pb_5": "",
             },
         )
     else:
@@ -2485,11 +2486,18 @@ def test_total_storage_size_calls_complete(with_filter: bool):
                 PREWHERE calls_complete.project_id = {pb_2:String}
                 WHERE 1
                     AND (((calls_complete.id = {pb_0:String}))
-                        AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)}))))
+                        AND ((calls_complete.deleted_at = {pb_1:DateTime64(3)})))),
+            filtered_calls AS (
+                SELECT calls_complete.id AS id
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE 1
+                    AND (((calls_complete.id = {pb_0:String}))
+                        AND ((calls_complete.deleted_at = {pb_3:DateTime64(3)}))))
             SELECT
                 calls_complete.id AS id,
                 CASE
-                    WHEN calls_complete.parent_id = {pb_3:String}
+                    WHEN calls_complete.parent_id = {pb_4:String}
                     THEN rolled_up_cms.total_storage_size_bytes
                     ELSE NULL
                 END AS total_storage_size_bytes,
@@ -2500,30 +2508,23 @@ def test_total_storage_size_calls_complete(with_filter: bool):
                 sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0) + COALESCE(otel_size_bytes,0)) AS total_storage_size_bytes
             FROM calls_complete_stats
             WHERE project_id = {pb_2:String}
-            AND id IN (
-                SELECT id
+            AND trace_id IN (
+                SELECT trace_id
                 FROM calls_complete
                 WHERE project_id = {pb_2:String}
-                AND trace_id IN (
-                    SELECT trace_id
-                    FROM calls_complete
-                    WHERE project_id = {pb_2:String}
-                    AND id IN storage_scope_ids
-                )
+                AND id IN filtered_calls
             )
             GROUP BY trace_id) AS rolled_up_cms
             ON calls_complete.trace_id = rolled_up_cms.trace_id
             PREWHERE calls_complete.project_id = {pb_2:String}
-            WHERE 1
-                AND (((calls_complete.id = {pb_0:String}))
-                    AND ((calls_complete.deleted_at = {pb_4:DateTime64(3)})))
+            WHERE (calls_complete.id IN filtered_calls)
             """,
             {
                 "pb_0": "my_id",
                 "pb_1": SENTINEL_EPOCH,
                 "pb_2": "test/project",
-                "pb_3": "",
-                "pb_4": SENTINEL_EPOCH,
+                "pb_3": SENTINEL_EPOCH,
+                "pb_4": "",
             },
         )
 
@@ -3884,10 +3885,9 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
 ):
     """Test calls_complete table with hardcoded filter, JSON condition, and summary field ordering.
 
-    This test demonstrates that for calls_complete, even when there is a hardcoded filter
-    (op_names, trace_ids) plus a JSON condition on summary, we use a single query pass
-    instead of the two-step CTE pattern. calls_complete has one row per call (no GROUP BY),
-    so a single query is both simpler and significantly faster.
+    Heavy select fields plus a usable hardcoded filter trigger the two-pass
+    filtered_calls CTE: pass 1 resolves the page's ids on light columns with the
+    order + limit, pass 2 loads the columns for those ids and re-sorts.
     Additionally, it tests ordering by summary.weave.status which uses direct column
     access without any() aggregation functions (unlike calls_merged).
     """
@@ -3920,6 +3920,29 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
     assert_sql(
         cq,
         """
+        WITH filtered_calls AS (
+            SELECT calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_12:String}
+            WHERE calls_complete.op_name IN {pb_3:Array(String)}
+                AND (calls_complete.trace_id = {pb_4:String})
+            AND (
+                ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
+                AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
+            )
+            ORDER BY CASE
+                WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
+                WHEN IFNULL(
+                    toInt64OrNull(
+                        coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
+                    ),
+                    0
+                ) > 0 THEN {pb_9:String}
+                WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
+                ELSE {pb_8:String}
+                END ASC
+            LIMIT 100
+        )
         SELECT
             calls_complete.id AS id,
             calls_complete.started_at AS started_at,
@@ -3927,24 +3950,18 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             calls_complete.ended_at AS ended_at
         FROM calls_complete
         PREWHERE calls_complete.project_id = {pb_12:String}
-        WHERE calls_complete.op_name IN {pb_3:Array(String)}
-            AND (calls_complete.trace_id = {pb_4:String})
-        AND (
-            ((toInt64OrNull(coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_0:String}), 'null'), '')) > {pb_1:Int64}))
-            AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)}))
-        )
+        WHERE (calls_complete.id IN filtered_calls)
         ORDER BY CASE
-            WHEN calls_complete.exception != {pb_10:String} THEN {pb_6:String}
+            WHEN calls_complete.exception != {pb_13:String} THEN {pb_6:String}
             WHEN IFNULL(
                 toInt64OrNull(
                     coalesce(nullIf(JSON_VALUE(calls_complete.summary_dump, {pb_5:String}), 'null'), '')
                 ),
                 0
             ) > 0 THEN {pb_9:String}
-            WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
+            WHEN calls_complete.ended_at = {pb_14:DateTime64(6)} THEN {pb_7:String}
             ELSE {pb_8:String}
             END ASC
-        LIMIT 100
         """,
         {
             "pb_0": '$."latency"',
@@ -3960,6 +3977,8 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
             "pb_10": "",
             "pb_11": SENTINEL_EPOCH,
             "pb_12": "project",
+            "pb_13": "",
+            "pb_14": SENTINEL_EPOCH,
         },
     )
 

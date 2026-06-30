@@ -1250,12 +1250,14 @@ class CallsQuery(BaseModel):
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
             return base_sql
 
-        # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
-        # where it reduces rows before expensive GROUP BY aggregation.
-        # For calls_complete (one row per call, no GROUP BY), always use a
-        # single-pass query — it's both simpler and significantly faster.
-        use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
+        # Two-pass filtered_calls CTE: pass 1 narrows ids on light columns, pass 2
+        # loads heavy *_dump columns only for the page. For calls_complete this reads
+        # the page's payloads instead of every scanned row's (prod: 28 GiB -> 1.7 GiB
+        # on a fat-payload list read). calls_merged additionally uses it for costs /
+        # object-ref pushdown ahead of its GROUP BY.
+        use_filter_cte = should_use_filter_cte or (
+            self.read_table != ReadTable.CALLS_COMPLETE
+            and (self.include_costs or bool(object_ref_conditions))
         )
 
         if use_filter_cte:
