@@ -7,14 +7,18 @@
 """Bump the Python SDK version for release.
 
 This script replicates the GitHub Actions workflow `bump-python-sdk-version`.
-It performs two steps:
+It performs two steps (three for a minor/major release):
 1. Drop the pre-release tag (e.g., X.Y.Z-dev0 -> X.Y.Z) and tag this commit
 2. Bump to the next pre-release version (e.g., X.Y.Z -> X.Y.(Z+1)-dev0)
 
+For a minor/major release, a prior step first moves the dev base to the new
+segment (e.g., X.Y.Z-dev0 -> X.(Y+1).0-dev0).
+
 Usage:
-    uv run scripts/bump_python_sdk_version.py [--dry-run]
+    uv run scripts/bump_python_sdk_version.py [patch|minor|major] [--dry-run]
 
 Options:
+    bump_type   Which semver segment to release (default: patch)
     --dry-run   Show what would happen without making changes
 """
 
@@ -40,6 +44,13 @@ def main() -> None:
         description="Bump the Python SDK version for release."
     )
     parser.add_argument(
+        "bump_type",
+        nargs="?",
+        choices=("patch", "minor", "major"),
+        default="patch",
+        help="Which semver segment to release (default: patch)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would happen without making changes",
@@ -47,6 +58,22 @@ def main() -> None:
     args = parser.parse_args()
 
     dry_run_flag = ["--dry-run"] if args.dry_run else []
+
+    if args.bump_type in {"minor", "major"}:
+        print(f"Step 0: Move the dev base to the next {args.bump_type} segment")
+        print("        (e.g., X.Y.Z-dev0 -> X.(Y+1).0-dev0).")
+        run_command(
+            [
+                "bump-my-version",
+                "bump",
+                args.bump_type,
+                "./weave/version.py",
+                "--commit",
+                *dry_run_flag,
+            ],
+            dry_run=False,  # Let bump-my-version handle --dry-run
+        )
+        print()
 
     print("Step 1: Drop pre-release tag (e.g., X.Y.Z-dev0 -> X.Y.Z)")
     print("        This creates the release commit and tag.")
@@ -85,7 +112,8 @@ def main() -> None:
         print("Version bump complete!")
         print()
         print("Next steps:")
-        print("  1. Review the commits: git log -2")
+        num_commits = 3 if args.bump_type in {"minor", "major"} else 2
+        print(f"  1. Review the commits: git log -{num_commits}")
         print("  2. Push changes: git push && git push --tags")
 
 
