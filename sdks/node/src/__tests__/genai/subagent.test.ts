@@ -1,15 +1,13 @@
 import type {ReadableSpan} from '@opentelemetry/sdk-trace-base';
 
-import {
-  ATTR_GEN_AI_AGENT_NAME,
-  ATTR_GEN_AI_REQUEST_MODEL,
-} from '../../genai/semconv';
+import {ATTR_GEN_AI_AGENT_NAME} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {
   expectSpanTimesToMatch,
   setupExporterPerTest,
   setupGenAITestEnvironment,
+  spanSnapshot,
 } from './common';
 
 describe('SubAgent', () => {
@@ -18,7 +16,11 @@ describe('SubAgent', () => {
 
   it('emits a nested invoke_agent span as a child of the turn', () => {
     const turn = Turn.create({agentName: 'parent'});
-    const sub = turn.startSubagent({name: 'child-bot', model: 'gpt-4o'});
+    const sub = turn.startSubagent({
+      name: 'child-bot',
+      model: 'gpt-4o',
+      systemInstructions: ['Be helpful', 'Be concise'],
+    });
     sub.end();
     turn.end();
 
@@ -37,7 +39,19 @@ describe('SubAgent', () => {
     expect(subSpan).toBeDefined();
     expect(parentTurnSpan).toBeDefined();
     expect(subSpan!.parentSpanId).toBe(parentTurnSpan!.spanContext().spanId);
-    expect(subSpan!.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
+
+    expect(spanSnapshot(subSpan!)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.name": "child-bot",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
   });
 
   const findSub = (spans: ReadableSpan[]) => {

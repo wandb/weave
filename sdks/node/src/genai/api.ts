@@ -120,12 +120,13 @@ export function startTool(opts: ToolInit): Tool {
  * Start a SubAgent span. Same parent-resolution rules as `startTool`.
  *
  * @example
- * weave.startSubagent({name: 'critic', model: 'gpt-4o'});
+ * weave.startSubagent({name: 'critic'});
  *
  * @example
  * weave.startSubagent({
  *   name: 'critic',
  *   model: 'gpt-4o',
+ *   systemInstructions: ['Critique the proposed plan.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
  */
