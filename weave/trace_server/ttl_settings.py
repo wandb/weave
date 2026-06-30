@@ -23,6 +23,7 @@ from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server.ch_sentinel_values import to_ch_value
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.redis_client import get_redis_client
 from weave.trace_server.tracing import _tracer, traced
@@ -39,6 +40,11 @@ REDIS_TTL_EXPIRY_SECS = 300
 # Stored retention_days value meaning "no TTL configured for this project".
 # Used as the on-disk encoding for "unset" since the column is non-null.
 RETENTION_DAYS_NO_TTL = 0
+
+# Objects can outlive the calls that reference them; scaling the shared
+# per-project retention keeps a reused dataset's val_dump alive past its
+# calls. 1 = objects expire on the same schedule as their calls.
+OBJECT_RETENTION_MULTIPLIER = 1
 
 # Global cache shared across all threads. Keyed by project_id.
 # Value is retention_days (int). RETENTION_DAYS_NO_TTL means no TTL.
@@ -89,6 +95,16 @@ def get_project_retention_days(
         return retention_days
 
 
+def get_object_retention_days(project_id: str, ch_client: CHClient) -> int:
+    """Per-project retention for stored objects: calls retention x multiplier.
+
+    RETENTION_DAYS_NO_TTL (0) stays 0 (no TTL); see OBJECT_RETENTION_MULTIPLIER.
+    """
+    return (
+        get_project_retention_days(project_id, ch_client) * OBJECT_RETENTION_MULTIPLIER
+    )
+
+
 def compute_expire_at(
     retention_days: int, started_at: datetime.datetime
 ) -> datetime.datetime | None:
@@ -109,6 +125,19 @@ def compute_expire_at(
         return anchor + datetime.timedelta(days=retention_days)
     # Negative values encode minutes-based retention (e.g. -5 = 5 minutes) for admin/testing use only
     return anchor + datetime.timedelta(minutes=-retention_days)
+
+
+def compute_expire_at_for_insert(
+    retention_days: int, anchor: datetime.datetime
+) -> datetime.datetime:
+    """expire_at for non-null sentinel columns (objects, table_rows, files).
+
+    Unlike calls, these rows insert via the generic path that does not apply
+    sentinels, so collapse None (no TTL) to EXPIRE_AT_NEVER here at the boundary.
+    """
+    value = to_ch_value("expire_at", compute_expire_at(retention_days, anchor))
+    assert isinstance(value, datetime.datetime)
+    return value
 
 
 def invalidate_ttl_cache(project_id: str) -> None:

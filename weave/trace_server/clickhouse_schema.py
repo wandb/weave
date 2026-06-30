@@ -185,6 +185,7 @@ class ObjCHInsertable(BaseModel):
     refs: list[str]
     val_dump: str
     digest: str
+    expire_at: datetime.datetime | None = None
 
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
