@@ -22,6 +22,7 @@ class ErrorCode:
     """
 
     CALLS_COMPLETE_MODE_REQUIRED = "CALLS_COMPLETE_MODE_REQUIRED"
+    QUERY_TOO_EXPENSIVE = "QUERY_TOO_EXPENSIVE"
 
 
 # =============================================================================
@@ -129,6 +130,22 @@ class QueryTimeoutExceededError(Error):
     """Raised when a query timeout is exceeded."""
 
     pass
+
+
+class QueryTooExpensiveError(Error):
+    """Raised when a query is too expensive to run on the target dataset.
+
+    Covers ClickHouse's pre-emptive scan guards: the estimated-time projection
+    guard (code 160, TOO_SLOW) and, when configured, the row/byte read caps
+    (TOO_MANY_ROWS_OR_BYTES). The query is well-formed but would scan too much
+    data; the outcome is deterministic for a given query + dataset, so it is a
+    4xx the client must fix by narrowing scope -- never a 5xx the SDK retries.
+
+    Carries a machine-readable error_code so clients can detect it without
+    parsing the human-readable message.
+    """
+
+    error_code: str = ErrorCode.QUERY_TOO_EXPENSIVE
 
 
 class InsertTooLarge(Error):
@@ -322,6 +339,10 @@ class ErrorRegistry:
         self.register(InvalidIdFormat, 400)
         # A malformed query value is a client request error, not an authz failure.
         self.register(BadQueryParameterError, 400)
+        # A query that would scan too much data to finish in time (CH TOO_SLOW /
+        # read caps) is deterministic for a given query+dataset, so it's a fixable
+        # client error -- 400 the SDK won't retry, not a 5xx it retries in vain.
+        self.register(QueryTooExpensiveError, 400)
 
         # 403
         self.register(QueryIllegalTypeofArgumentError, 403)
@@ -425,6 +446,8 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         QueryMemoryLimitExceededError: When the query exceeds memory limits
         QueryNoCommonTypeError: When there's a type mismatch in the query
         QueryTimeoutExceededError: When the query exceeds timeout limits
+        QueryTooExpensiveError: When the query is predicted to scan too much data
+            (ClickHouse TOO_SLOW projection guard / read caps)
         Exception: Re-raises the original exception if no known pattern matches
     """
     error_str = str(e)
@@ -441,6 +464,14 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     if "TIMEOUT_EXCEEDED" in error_str:
         raise QueryTimeoutExceededError(
             "Query timeout exceeded. " + limit_scope_message
+        ) from e
+    if "TOO_SLOW" in error_str:
+        # ClickHouse's estimated-time projection guard (code 160) aborts a query
+        # it predicts will be too slow. This is deterministic for a given query +
+        # dataset, so it's a client error to fix by narrowing scope (a 4xx the SDK
+        # won't retry), not a generic DatabaseError 502 it would retry in vain.
+        raise QueryTooExpensiveError(
+            "Query is too expensive to run on this dataset. " + limit_scope_message
         ) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
