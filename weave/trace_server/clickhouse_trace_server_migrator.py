@@ -1645,8 +1645,13 @@ class SQLPatterns:
     INSERT_SELECT_STMT: Pattern = re.compile(
         r"\bINSERT\s+INTO\b.*\bSELECT\b", re.IGNORECASE | re.DOTALL
     )
+    # Column-level TTL (MODIFY COLUMN <name> ... TTL) is local-only like table
+    # TTL: distributed tables reject TTL, so it must skip the distributed twin.
+    # The (?!TTL) lookahead excludes a column literally named `ttl`; a TTL token
+    # inside a DEFAULT string literal is not distinguished (no such migration).
     LOCAL_ONLY_OPS: Pattern = re.compile(
-        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b|\b(MODIFY|REMOVE)\s+TTL\b",
+        r"\b(ADD|DROP)\s+INDEX\b|\b(DELETE|UPDATE)\b|\b(MODIFY|REMOVE)\s+TTL\b"
+        r"|\bMODIFY\s+COLUMN\s+(?!TTL\b)\w+[^;]*\bTTL\b",
         re.IGNORECASE,
     )
 

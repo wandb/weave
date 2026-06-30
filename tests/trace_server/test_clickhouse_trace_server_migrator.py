@@ -1875,3 +1875,35 @@ def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
             f"  old ({len(old_norm)}): {old_norm}\n"
             f"  new ({len(new_norm)}): {new_norm}"
         )
+
+
+@pytest.mark.parametrize(
+    ("command", "expected_local_only"),
+    [
+        # Column TTL (migration 036) must skip the distributed twin.
+        (
+            "ALTER TABLE object_versions MODIFY COLUMN val_dump String TTL toDateTime(expire_at)",
+            True,
+        ),
+        ("ALTER TABLE object_versions MODIFY COLUMN val_dump REMOVE TTL", True),
+        # Table TTL and indexes/mutations stay local-only as before.
+        ("ALTER TABLE files MODIFY TTL toDateTime(expire_at) DELETE", True),
+        ("ALTER TABLE files REMOVE TTL", True),
+        ("ALTER TABLE calls_merged ADD INDEX idx id TYPE bloom_filter", True),
+        ("ALTER TABLE calls_merged DELETE WHERE id = 'x'", True),
+        # Column add and plain type change apply to both local and distributed.
+        (
+            "ALTER TABLE object_versions ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3)",
+            False,
+        ),
+        ("ALTER TABLE object_versions MODIFY COLUMN val_dump String", False),
+        ("ALTER TABLE files DROP COLUMN expire_at", False),
+        # A column literally named `ttl` must not be mistaken for a TTL clause.
+        ("ALTER TABLE x MODIFY COLUMN ttl Int32", False),
+    ],
+)
+def test_is_local_only_operation_classifies_column_ttl(command, expected_local_only):
+    assert (
+        DistributedClickHouseTraceServerMigrator._is_local_only_operation(command)
+        is expected_local_only
+    )
