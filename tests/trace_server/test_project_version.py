@@ -210,6 +210,35 @@ def test_empty_residence_expires_after_ttl(client, trace_server, monkeypatch):
 @pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
 )
+def test_cached_empty_does_not_mask_write(client, trace_server):
+    """A read that cached EMPTY must not hide a subsequent write's data.
+
+    A read caches EMPTY (routing reads to calls_complete); a legacy V1 write then
+    lands in calls_merged. The write resolution evicts the cached EMPTY so the next
+    read re-probes and routes to calls_merged (read-your-writes).
+    """
+    ch_server = trace_server._internal_trace_server
+    resolver = ch_server.table_routing_resolver
+    resolver._mode = CallsStorageServerMode.AUTO
+
+    proj = make_project_id("cached_empty_then_write")
+    assert (
+        resolver.resolve_read_table(proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
+    assert (
+        resolver.resolve_v1_write_target(proj, ch_server.ch_client)
+        == WriteTarget.CALLS_MERGED
+    )
+    insert_call(ch_server.ch_client, "calls_merged", proj)
+    assert (
+        resolver.resolve_read_table(proj, ch_server.ch_client) == ReadTable.CALLS_MERGED
+    )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_mode_off_and_force_legacy(client, trace_server):
 
     ch_server = trace_server._internal_trace_server

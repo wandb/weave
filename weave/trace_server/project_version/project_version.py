@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 PROJECT_RESIDENCE_CACHE_SIZE = 10_000
 # Populated residence is immutable per project, so it is cached without expiry.
-# EMPTY is cached only briefly: a stale EMPTY routes reads to calls_complete while
-# a legacy (V1) first write lands in calls_merged, so the read misses fresh data
-# until the entry expires. The short TTL bounds that window; the miss self-heals.
+# EMPTY is cached (read path only) so cold projects stop re-probing CH. Writes
+# evict it, so same-process reads see fresh data; the short TTL bounds staleness
+# on other replicas that cached EMPTY but did not serve the write.
 EMPTY_RESIDENCE_CACHE_TTL_SECS = 10
 
 # Global caches shared across all resolvers and threads, keyed by project_id.
@@ -55,11 +55,11 @@ class TableRoutingResolver:
         self._mode = CallsStorageServerMode.from_env()
 
     def _get_residence(
-        self, project_id: str, ch_client: CHClient
+        self, project_id: str, ch_client: CHClient, *, cache_empty: bool = True
     ) -> ProjectDataResidence:
         with _project_residence_cache_lock:
             cached = _project_residence_cache.get(project_id)
-            if cached is None:
+            if cached is None and cache_empty:
                 cached = _empty_residence_cache.get(project_id)
         if cached is not None:
             return cached
@@ -85,13 +85,16 @@ class TableRoutingResolver:
                     }
                 )
 
-            # Populated residence is immutable -> long-lived cache; EMPTY is
-            # cached briefly (short TTL) so cold projects stop re-probing CH.
+            # Populated residence is immutable -> long-lived cache. EMPTY is cached
+            # (short TTL) only on the read path; a write resolution instead evicts any
+            # read-cached EMPTY, so the post-write read re-probes and sees the new data.
             with _project_residence_cache_lock:
-                if residence == ProjectDataResidence.EMPTY:
+                if residence != ProjectDataResidence.EMPTY:
+                    _project_residence_cache[project_id] = residence
+                elif cache_empty:
                     _empty_residence_cache[project_id] = residence
                 else:
-                    _project_residence_cache[project_id] = residence
+                    _empty_residence_cache.pop(project_id, None)
 
             return residence
 
@@ -156,7 +159,7 @@ class TableRoutingResolver:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
-        residence = self._get_residence(project_id, ch_client)
+        residence = self._get_residence(project_id, ch_client, cache_empty=False)
         set_current_span_dd_tags(
             {
                 "project_version.residence": residence.value,
@@ -205,7 +208,7 @@ class TableRoutingResolver:
         if self._mode == CallsStorageServerMode.OFF:
             return WriteTarget.CALLS_MERGED
 
-        residence = self._get_residence(project_id, ch_client)
+        residence = self._get_residence(project_id, ch_client, cache_empty=False)
         set_current_span_dd_tags(
             {
                 "project_version.residence": residence.value,
