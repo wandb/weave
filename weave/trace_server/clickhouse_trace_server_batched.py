@@ -2624,6 +2624,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("table_create")
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        # One expire_at for the whole table so a digest never partially expires.
+        expire_at = compute_expire_at_for_insert(
+            get_object_retention_days(req.table.project_id, self.ch_client),
+            datetime.datetime.now(datetime.timezone.utc),
+        )
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -2638,6 +2643,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     row_digest,
                     extract_refs_from_values(r),
                     row_json,
+                    expire_at,
                 )
             )
 
@@ -2652,7 +2658,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert(
             "table_rows",
             data=insert_rows,
-            column_names=["project_id", "digest", "refs", "val_dump"],
+            column_names=["project_id", "digest", "refs", "val_dump", "expire_at"],
         )
 
         self._insert(
@@ -2678,6 +2684,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         final_row_digests: list[str] = row_digest_result_query.result_rows[0][2]
         new_rows_needed_to_insert = []
         known_digests = set(final_row_digests)
+        expire_at = compute_expire_at_for_insert(
+            get_object_retention_days(req.project_id, self.ch_client),
+            datetime.datetime.now(datetime.timezone.utc),
+        )
 
         def add_new_row_needed_to_insert(row_data: Any) -> str:
             if not isinstance(row_data, dict):
@@ -2691,6 +2701,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         row_digest,
                         extract_refs_from_values(row_data),
                         row_json,
+                        expire_at,
                     )
                 )
                 known_digests.add(row_digest)
@@ -2723,7 +2734,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._insert(
                 "table_rows",
                 data=new_rows_needed_to_insert,
-                column_names=["project_id", "digest", "refs", "val_dump"],
+                column_names=["project_id", "digest", "refs", "val_dump", "expire_at"],
             )
 
         digest = compute_table_digest(final_row_digests)
@@ -2873,6 +2884,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         res = self._query_stream(query, parameters=pb.get_params())
 
         for row in res:
+            # A TTL-cleared val_dump is '' (a live row always dumps to at least
+            # '{}'), so an empty payload means the row expired: skip it.
+            if not row[1]:
+                continue
             yield tsi.TableRowSchema(
                 digest=row[0], val=json.loads(row[1]), original_index=row[2]
             )
