@@ -197,6 +197,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    resolve_feedback_conversation_id,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -213,7 +214,10 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    AGENT_SPAN_FEEDBACK_TYPES,
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -6626,10 +6630,50 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.CostPurgeRes()
 
+    def _make_span_lookup(self, project_id: str):
+        """Return a span_lookup callable for resolve_feedback_conversation_id.
+
+        The returned function point-queries `spans` by `trace_id` or `span_id`
+        using bloom-indexed columns, returning `conversation_id` or '' if not found.
+        Only used for agent feedback types to avoid unnecessary span lookups.
+        """
+
+        def _lookup(trace_id: str, span_id: str) -> str:
+            if trace_id:
+                rows = self._query(
+                    "SELECT conversation_id FROM spans "
+                    "WHERE project_id = {pid:String} AND trace_id = {tid:String} "
+                    "AND conversation_id != '' LIMIT 1",
+                    {"pid": project_id, "tid": trace_id},
+                ).result_rows
+            elif span_id:
+                rows = self._query(
+                    "SELECT conversation_id FROM spans "
+                    "WHERE project_id = {pid:String} AND span_id = {sid:String} "
+                    "AND conversation_id != '' LIMIT 1",
+                    {"pid": project_id, "sid": span_id},
+                ).result_rows
+            else:
+                return ""
+            return rows[0][0] if rows else ""
+
+        return _lookup
+
     @tag_db_insert_path("feedback_create")
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
+
+        if req.feedback_type in AGENT_SPAN_FEEDBACK_TYPES:
+            req = req.model_copy(
+                update={
+                    "conversation_id": resolve_feedback_conversation_id(
+                        req.weave_ref,
+                        req.conversation_id,
+                        self._make_span_lookup(req.project_id),
+                    )
+                }
+            )
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
@@ -6658,6 +6702,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
+
+            if feedback_req.feedback_type in AGENT_SPAN_FEEDBACK_TYPES:
+                feedback_req = feedback_req.model_copy(
+                    update={
+                        "conversation_id": resolve_feedback_conversation_id(
+                            feedback_req.weave_ref,
+                            feedback_req.conversation_id,
+                            self._make_span_lookup(feedback_req.project_id),
+                        )
+                    }
+                )
 
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
