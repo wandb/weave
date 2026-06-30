@@ -15,13 +15,16 @@ the URL becomes unwieldy and unshareable. A saved view persists that per-tab
 configuration to the backend so it can be named, reloaded, and shared by a
 short id instead of an exploding query string.
 
-Type-safety note: this module is the single source of truth for the persisted
-shape. `scripts/generate_base_object_schemas.py` turns every registered
-builtin object class into JSON schema, which the frontend's
-`generate-schemas.sh` compiles into zod (`generatedBuiltinObjectClasses.zod.ts`).
-So adding a field here flows automatically into a zod-validated frontend type;
-the agents URL-state layer should consume that generated type rather than
-re-declaring the shape by hand.
+Backend is intentionally decoupled from the UI's tab structure. Mirroring the
+calls `SavedView` (whose `view_type` is a free-form `str` "for extensibility"),
+`tab` here is a plain string and `definition` is a single flat, all-optional
+superset of every tab's fields. The set of tabs and which fields are valid for
+each one live entirely in the frontend, which enforces them with a zod
+discriminated union on `tab`. So adding, renaming, or removing a tab — or a
+future dashboard tab — is a frontend-only change and never touches this schema.
+Type-safety note: this module is the source of truth for field *shapes*;
+`scripts/generate_base_object_schemas.py` turns it into JSON schema, which the
+frontend compiles into zod leaf types.
 
 What is (and isn't) persisted: a saved view captures the *configuration* of a
 tab — filters, sort, numeric ranges, time window, column visibility, custom
@@ -29,27 +32,13 @@ columns, view mode — mirroring `agentsUrlState`'s tab-scoped params. It does
 not capture transient navigation (the selected agent, a highlighted message,
 chat pagination); those stay in the URL only, the same way the calls
 `SavedView` persists filters/columns/sort but not the selected row.
-
-Future dashboards: the dashboard tab is hard-set today, but users will
-eventually be able to compose their own dashboards (choose charts, drag/drop,
-resize). The discriminated-union-on-`tab` design below is exactly the seam for
-that: a `DashboardViewDefinition` member (carrying widget specs + grid
-geometry) can be added to `AgentsSavedViewDefinition` later without touching
-any existing tab variant or the persistence/codegen plumbing. We intentionally
-do not model any dashboard/chart shapes yet.
 """
 
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
-
-# The agents-panel tabs that support saved views today. `dashboard` and
-# `signals` are intentionally absent: `dashboard` is hard-set pending the
-# custom-dashboards work (see the module docstring) and `signals` has no
-# user-configurable view state yet. Both slot in as new union members later.
-AgentsViewTab = Literal["spans", "conversations", "agents"]
 
 SortDirection = Literal["asc", "desc"]
 
@@ -138,18 +127,25 @@ class ConversationCustomAttr(BaseModel):
     mode: ConversationCustomAttrMode
 
 
-class _TableTabViewBase(BaseModel):
-    """Shared configuration for the table-style tabs (spans, conversations).
+class AgentsSavedViewDefinition(BaseModel):
+    """Flat, all-optional configuration for one agents-panel tab.
 
-    Holds the subset of `agentsUrlState` that is genuinely *view config*. All
-    fields are optional so a saved view stores only the user's diff from the
-    tab defaults — an empty definition means "the default view".
+    Mirrors the calls `SavedViewDefinition`: a single superset bag whose fields
+    are populated per tab by the frontend, rather than a backend-side
+    discriminated union. The backend validates field *shapes*; the frontend
+    enforces which fields are valid for which `tab`.
     """
 
+    # Which agents-panel tab this view configures (e.g. "spans",
+    # "conversations", "agents"). Free-form on purpose — like calls
+    # `view_type`, the set of tabs is owned by the frontend so it can change
+    # without a backend change.
+    tab: str
+
+    # --- shared table-tab config (spans, conversations) ---
     time_window: TimeWindow | None = Field(default=None)
     sort: ViewSort | None = Field(default=None)
-    # Categorical filters keyed by column id (e.g. `agent_name`), mirroring the
-    # URL `filters` record.
+    # Categorical filters keyed by column id (e.g. `agent_name`).
     filters: dict[str, str] | None = Field(default=None)
     # Numeric histogram filters keyed by column id.
     numeric_ranges: dict[str, NumericRange] | None = Field(default=None)
@@ -160,53 +156,22 @@ class _TableTabViewBase(BaseModel):
     # Whether the page-wide volume histogram is collapsed.
     volume_collapsed: bool | None = Field(default=None)
 
-
-class SpansViewDefinition(_TableTabViewBase):
-    """Saved view for the spans tab."""
-
-    tab: Literal["spans"] = "spans"
-
-
-class ConversationsViewDefinition(_TableTabViewBase):
-    """Saved view for the conversations tab."""
-
-    tab: Literal["conversations"] = "conversations"
+    # --- conversations tab ---
     conv_custom_attrs: list[ConversationCustomAttr] | None = Field(default=None)
 
-
-class AgentsListViewDefinition(BaseModel):
-    """Saved view for the agents list tab.
-
-    The agents tab sorts by a single field name (a fixed dropdown), not a
-    `{field, dir}` object, and carries a `hidden_agents` diff rather than a
-    column-visibility diff — hence its own variant rather than the table base.
-    """
-
-    tab: Literal["agents"] = "agents"
-    time_window: TimeWindow | None = Field(default=None)
+    # --- agents list tab ---
     sort_field: str | None = Field(default=None)
-    filters: dict[str, str] | None = Field(default=None)
-    numeric_ranges: dict[str, NumericRange] | None = Field(default=None)
     # Diff (hide/show) from the default set of excluded agents.
     hidden_agents: ColsDiff | None = Field(default=None)
-
-
-# Discriminated on `tab` so each tab gets exactly the fields it can use and so
-# new tabs (notably a future `dashboard` variant) can be added without
-# disturbing existing members. See the module docstring.
-AgentsSavedViewDefinition = Annotated[
-    SpansViewDefinition | ConversationsViewDefinition | AgentsListViewDefinition,
-    Field(discriminator="tab"),
-]
 
 
 class AgentsSavedView(base_object_def.BaseObject):
     """A persisted, named configuration of one agents-panel tab.
 
     Persisted as a generic Weave object (`builtin_object_class="AgentsSavedView"`)
-    via `obj_create` / `obj_read` / `objs_query`. The active tab lives in
-    `definition.tab` (the union discriminator), so listing "all spans views"
-    means filtering objects of this class by `definition.tab == "spans"`.
+    via `obj_create` / `obj_read` / `objs_query`. The tab lives in
+    `definition.tab`, so listing one tab's views = filtering objects of this
+    class by `definition.tab`.
     """
 
     # Human-facing title for the view (object_id is the stable id; label is the

@@ -2,10 +2,10 @@
 
 AgentsSavedView is persisted through the same generic obj_create / obj_read /
 objs_query plumbing as every other builtin object class, so these tests focus
-on the agents-specific contract: the per-tab discriminated definition
-round-trips losslessly, views are listable by their builtin object class, and
-the server rejects definitions for tabs we have not modeled yet (e.g. the
-future dashboard tab) and malformed fields.
+on the agents-specific contract: the flat per-tab definition round-trips
+losslessly, views are listable by their builtin object class and filterable by
+`definition.tab`, `tab` is free-form (the set of tabs is owned by the
+frontend), and field shapes (e.g. sort direction) are still validated.
 """
 
 import time
@@ -38,8 +38,6 @@ def test_agents_saved_view_roundtrip(client: WeaveClient):
         label="Slow planner spans",
         definition=SPANS_DEFINITION,
     )
-    # The discriminated union resolves to the concrete spans variant.
-    assert type(view.definition).__name__ == "SpansViewDefinition"
     assert view.definition.tab == "spans"
 
     ref = weave.publish(view)
@@ -51,11 +49,10 @@ def test_agents_saved_view_roundtrip(client: WeaveClient):
     assert isinstance(gotten, base_objects.AgentsSavedView)
     # Full-object equality: the persisted view is byte-for-byte the same model.
     assert gotten.model_dump(by_alias=True) == view.model_dump(by_alias=True)
-    assert type(gotten.definition).__name__ == "SpansViewDefinition"
 
 
-def test_agents_saved_view_lists_by_class_with_each_tab(client: WeaveClient):
-    """All three tab variants persist and are listable by their object class."""
+def test_agents_saved_view_lists_by_class_and_tab(client: WeaveClient):
+    """Views persist and are listable by object class, filterable by tab."""
     spans = base_objects.AgentsSavedView(label="spans view", definition={"tab": "spans"})
     conversations = base_objects.AgentsSavedView(
         label="conversations view",
@@ -68,11 +65,7 @@ def test_agents_saved_view_lists_by_class_with_each_tab(client: WeaveClient):
     )
     agents = base_objects.AgentsSavedView(
         label="agents view",
-        definition={
-            "tab": "agents",
-            "sort_field": "total_cost_usd",
-            "hidden_agents": {"hide": ["noisy-agent"], "show": []},
-        },
+        definition={"tab": "agents", "sort_field": "total_cost_usd"},
     )
 
     for view in (spans, conversations, agents):
@@ -92,33 +85,23 @@ def test_agents_saved_view_lists_by_class_with_each_tab(client: WeaveClient):
     assert sorted(by_tab) == ["agents", "conversations", "spans"]
     assert by_tab["agents"]["label"] == "agents view"
     assert by_tab["agents"]["definition"]["sort_field"] == "total_cost_usd"
-    # Nested models are stored with serialization annotations (_class_name,
-    # _bases, _type), so pin the meaningful fields rather than the whole dict.
     conv_attr = by_tab["conversations"]["definition"]["conv_custom_attrs"][0]
     assert conv_attr["attr_id"] == "custom_attrs_int:retries"
     assert conv_attr["mode"] == "avg"
 
 
-def test_agents_saved_view_definition_validation():
-    """Backend-agnostic: the discriminated definition enforces its contract.
-
-    Server-side enforcement on obj_create only runs on ClickHouse (the fake
-    backend stores vals unvalidated), so the model-level guarantees are pinned
-    here independently of the backend under test.
+def test_agents_saved_view_tab_is_free_form():
+    """`tab` accepts any string — the tab set lives in the frontend, so the
+    backend must not reject tabs it hasn't heard of (e.g. a future dashboard).
     """
-    # Discriminates to the concrete per-tab variant.
-    spans = base_objects.AgentsSavedView(label="s", definition={"tab": "spans"})
-    assert type(spans.definition).__name__ == "SpansViewDefinition"
-    conv = base_objects.AgentsSavedView(label="c", definition={"tab": "conversations"})
-    assert type(conv.definition).__name__ == "ConversationsViewDefinition"
-    agents = base_objects.AgentsSavedView(label="a", definition={"tab": "agents"})
-    assert type(agents.definition).__name__ == "AgentsListViewDefinition"
+    view = base_objects.AgentsSavedView(
+        label="future tab", definition={"tab": "dashboard"}
+    )
+    assert view.definition.tab == "dashboard"
 
-    # A tab we have not modeled yet (the future dashboard tab) is rejected.
-    with pytest.raises(ValidationError):
-        base_objects.AgentsSavedView(label="d", definition={"tab": "dashboard"})
 
-    # Invalid sort direction is rejected.
+def test_agents_saved_view_validates_field_shapes():
+    """Field shapes are still validated even though `tab` is free-form."""
     with pytest.raises(ValidationError):
         base_objects.AgentsSavedView(
             label="bad",
@@ -126,32 +109,8 @@ def test_agents_saved_view_definition_validation():
         )
 
 
-def test_agents_saved_view_rejects_unmodeled_tab(client: WeaveClient):
-    """The ClickHouse server rejects an unmodeled tab at obj_create time."""
-    if not client_is_clickhouse(client):
-        pytest.skip("builtin object class validation only runs on ClickHouse")
-    with pytest.raises(ValidationError):
-        client.server.obj_create(
-            tsi.ObjCreateReq.model_validate(
-                {
-                    "obj": {
-                        "project_id": client.project_id,
-                        "object_id": "dashboard_view",
-                        # Bare val (no _class_name/_bases) so the server
-                        # validates it against AgentsSavedView, mirroring the
-                        # frontend create path.
-                        "val": {
-                            "label": "dashboard",
-                            "definition": {"tab": "dashboard"},
-                        },
-                        "builtin_object_class": "AgentsSavedView",
-                    }
-                }
-            )
-        )
-
-
-def test_agents_saved_view_rejects_bad_sort_direction(client: WeaveClient):
+def test_agents_saved_view_server_rejects_bad_field_shape(client: WeaveClient):
+    """The ClickHouse server rejects a malformed field at obj_create time."""
     if not client_is_clickhouse(client):
         pytest.skip("builtin object class validation only runs on ClickHouse")
     with pytest.raises(ValidationError):
@@ -161,6 +120,9 @@ def test_agents_saved_view_rejects_bad_sort_direction(client: WeaveClient):
                     "obj": {
                         "project_id": client.project_id,
                         "object_id": "bad_sort_view",
+                        # Bare val (no _class_name/_bases) so the server
+                        # validates it against AgentsSavedView, mirroring the
+                        # frontend create path.
                         "val": {
                             "label": "bad sort",
                             "definition": {
