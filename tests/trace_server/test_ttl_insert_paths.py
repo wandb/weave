@@ -20,6 +20,7 @@ import pytest
 from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import ttl_settings
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import InvalidRequest, NotFoundError
@@ -857,3 +858,32 @@ def test_ttl_file_expired_row_is_deleted_and_reads_404(internal_server):
 
     with pytest.raises(NotFoundError):
         server.file_content_read(tsi.FileContentReadReq(project_id=pid, digest=digest))
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: D1 retention multiplier split"
+)
+def test_object_retention_multiplier_splits_objects_from_files(
+    internal_server, monkeypatch
+):
+    """D1: objects scale retention by OBJECT_RETENTION_MULTIPLIER; files use it raw."""
+    monkeypatch.setattr(ttl_settings, "OBJECT_RETENTION_MULTIPLIER", 3)
+    server = internal_server
+    _, pid = _make_project("d1_split")
+    _set_retention_days(server, pid, 10)
+
+    before = datetime.datetime.now(datetime.timezone.utc)
+    obj = server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=pid, object_id="o", val={"v": 1})
+        )
+    )
+    file = server.file_create(
+        tsi.FileCreateReq(project_id=pid, name="f.bin", content=b"x")
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+
+    [obj_expire] = _read_object_expire_at(server, pid, "o")
+    _assert_expire_at_in_window(obj_expire, before, after, datetime.timedelta(days=30))
+    for value in _read_file_expire_at(server, pid, file.digest):
+        _assert_expire_at_in_window(value, before, after, datetime.timedelta(days=10))

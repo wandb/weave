@@ -40,6 +40,7 @@ There are two ways to authenticate with Azure Blob Storage:
     - `WF_FILE_STORAGE_AZURE_ACCOUNT_URL`: (optional) the account url for the azure account - defaults to `https://<account>.blob.core.windows.net/`
 """
 
+import datetime
 import logging
 import socket
 import threading
@@ -87,9 +88,14 @@ from weave.trace_server.file_storage_uris import (
     GCSFileStorageURI,
     S3FileStorageURI,
 )
+from weave.trace_server.ttl_settings import RETENTION_DAYS_NO_TTL
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+# Blob object tag (S3/Azure) keying native lifecycle rules to a retention bucket;
+# GCS instead uses the blob's custom_time. One source of truth for the rules.
+RETENTION_TAG_KEY = "weave-retention-days"
 
 # Default timeout values (in seconds)
 DEFAULT_CONNECT_TIMEOUT = 10
@@ -150,8 +156,19 @@ class FileStorageClient:
         self.base_uri = base_uri
 
     @abstractmethod
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
-        """Store data at the specified URI location in cloud storage."""
+    def store(
+        self,
+        uri: FileStorageURI,
+        data: bytes,
+        retention_days: int = RETENTION_DAYS_NO_TTL,
+        expire_at: datetime.datetime | None = None,
+    ) -> None:
+        """Store data at the specified URI location in cloud storage.
+
+        retention_days/expire_at stamp the blob for native object-store lifecycle
+        expiry (GCS custom_time, S3/Azure retention-days tag). RETENTION_DAYS_NO_TTL
+        stamps nothing so the blob is never matched by a lifecycle rule.
+        """
         pass
 
     @abstractmethod
@@ -161,7 +178,11 @@ class FileStorageClient:
 
 
 def store_in_bucket(
-    client: FileStorageClient, path: str, data: bytes
+    client: FileStorageClient,
+    path: str,
+    data: bytes,
+    retention_days: int = RETENTION_DAYS_NO_TTL,
+    expire_at: datetime.datetime | None = None,
 ) -> FileStorageURI:
     """Store a file in a storage bucket, deduping repeat content-addressed writes."""
     target_file_storage_uri = client.base_uri.with_path(path)
@@ -171,7 +192,12 @@ def store_in_bucket(
     if already_stored:
         return target_file_storage_uri
     try:
-        client.store(target_file_storage_uri, data)
+        client.store(
+            target_file_storage_uri,
+            data,
+            retention_days=retention_days,
+            expire_at=expire_at,
+        )
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
         raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
@@ -306,7 +332,13 @@ class S3StorageClient(FileStorageClient):
         )
 
     @create_retry_decorator("s3_storage")
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
+    def store(
+        self,
+        uri: FileStorageURI,
+        data: bytes,
+        retention_days: int = RETENTION_DAYS_NO_TTL,
+        expire_at: datetime.datetime | None = None,
+    ) -> None:
         """Store data in S3 bucket with automatic retries on failure."""
         assert isinstance(uri, S3FileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
@@ -317,6 +349,10 @@ class S3StorageClient(FileStorageClient):
         if self.kms_key:
             put_object_params["ServerSideEncryption"] = "aws:kms"
             put_object_params["SSEKMSKeyId"] = self.kms_key
+
+        # Tag the retention bucket so a per-N lifecycle rule expires the blob.
+        if retention_days != RETENTION_DAYS_NO_TTL:
+            put_object_params["Tagging"] = f"{RETENTION_TAG_KEY}={retention_days}"
 
         self.client.put_object(**put_object_params)
 
@@ -341,7 +377,13 @@ class GCSStorageClient(FileStorageClient):
         self.client = _build_keepalive_gcs_client(credentials)
 
     @create_retry_decorator("gcs_storage")
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
+    def store(
+        self,
+        uri: FileStorageURI,
+        data: bytes,
+        retention_days: int = RETENTION_DAYS_NO_TTL,
+        expire_at: datetime.datetime | None = None,
+    ) -> None:
         """Store data in GCS bucket with automatic retries on failure.
 
         Use if_generation_match=0 to skip writing if the object already exists.
@@ -350,6 +392,12 @@ class GCSStorageClient(FileStorageClient):
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
+        # custom_time drives the `daysSinceCustomTime: 0` lifecycle rule.
+        if retention_days != RETENTION_DAYS_NO_TTL:
+            assert expire_at is not None, (
+                "expire_at required when retention_days is set"
+            )
+            blob.custom_time = expire_at
         try:
             # if_generation_match=0 means "only write if object doesn't exist"
             # This prevents rate limiting from multiple pods writing the same object
@@ -411,7 +459,13 @@ class AzureStorageClient(FileStorageClient):
             )
 
     @create_retry_decorator("azure_storage")
-    def store(self, uri: FileStorageURI, data: bytes) -> None:
+    def store(
+        self,
+        uri: FileStorageURI,
+        data: bytes,
+        retention_days: int = RETENTION_DAYS_NO_TTL,
+        expire_at: datetime.datetime | None = None,
+    ) -> None:
         """Store data in Azure container with automatic retries on failure.
 
         Uses `overwrite=False` so content-addressable blobs are write-once:
@@ -423,8 +477,14 @@ class AzureStorageClient(FileStorageClient):
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
+        # Index tag keys a per-N lifecycle rule to expire the blob.
+        tags = (
+            {RETENTION_TAG_KEY: str(retention_days)}
+            if retention_days != RETENTION_DAYS_NO_TTL
+            else None
+        )
         try:
-            blob_client.upload_blob(data, overwrite=False)
+            blob_client.upload_blob(data, overwrite=False, tags=tags)
         except ResourceExistsError:
             logger.debug("Object already exists at %s, skipping write", uri)
 

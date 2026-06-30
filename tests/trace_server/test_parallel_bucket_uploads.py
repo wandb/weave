@@ -27,16 +27,18 @@ def _req(content: bytes, name: str = "f.bin") -> FileCreateReq:
 
 def test_stage_dedup_raises_on_duplicate_key() -> None:
     batch = BucketUploadBatch()
-    batch.stage(_req(b"hello"), digest="d1", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"hello"), digest="d1", expire_at=EXPIRE_AT, retention_days=0)
     with pytest.raises(ValueError, match="called twice"):
-        batch.stage(_req(b"hello"), digest="d1", expire_at=EXPIRE_AT)
+        batch.stage(_req(b"hello"), digest="d1", expire_at=EXPIRE_AT, retention_days=0)
 
 
 def test_stage_rejects_when_total_exceeds_max_bytes() -> None:
     """One oversized payload trips the guard immediately."""
     batch = BucketUploadBatch(max_bytes=1024)
     with pytest.raises(RequestTooLarge, match="max_bytes=1024"):
-        batch.stage(_req(b"x" * 2048), digest="d1", expire_at=EXPIRE_AT)
+        batch.stage(
+            _req(b"x" * 2048), digest="d1", expire_at=EXPIRE_AT, retention_days=0
+        )
     # Nothing was staged after the rejection.
     assert not batch
     assert not batch.has("entity/project", "d1")
@@ -45,10 +47,12 @@ def test_stage_rejects_when_total_exceeds_max_bytes() -> None:
 def test_stage_rejects_when_cumulative_exceeds_max_bytes() -> None:
     """The guard accumulates across items, not just per-item."""
     batch = BucketUploadBatch(max_bytes=1024)
-    batch.stage(_req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT)
-    batch.stage(_req(b"y" * 400), digest="d2", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT, retention_days=0)
+    batch.stage(_req(b"y" * 400), digest="d2", expire_at=EXPIRE_AT, retention_days=0)
     with pytest.raises(RequestTooLarge):
-        batch.stage(_req(b"z" * 100), digest="d3", expire_at=EXPIRE_AT)
+        batch.stage(
+            _req(b"z" * 100), digest="d3", expire_at=EXPIRE_AT, retention_days=0
+        )
     # First two items remain staged; the rejected third is not.
     assert batch.has("entity/project", "d1")
     assert batch.has("entity/project", "d2")
@@ -58,18 +62,20 @@ def test_stage_rejects_when_cumulative_exceeds_max_bytes() -> None:
 def test_duplicate_stage_does_not_consume_budget() -> None:
     """Dedup hits raise ValueError before incrementing the byte counter."""
     batch = BucketUploadBatch(max_bytes=1024)
-    batch.stage(_req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT, retention_days=0)
     with pytest.raises(ValueError, match="called twice"):
-        batch.stage(_req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT)
+        batch.stage(
+            _req(b"x" * 600), digest="d1", expire_at=EXPIRE_AT, retention_days=0
+        )
     # Budget should still allow another 400 bytes.
-    batch.stage(_req(b"y" * 400), digest="d2", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"y" * 400), digest="d2", expire_at=EXPIRE_AT, retention_days=0)
 
 
 def test_flush_resets_byte_counter(monkeypatch: pytest.MonkeyPatch) -> None:
     """After flush(), staged bytes drop to zero so the next batch starts fresh."""
     monkeypatch.setattr(pbu, "_upload_one", lambda p, client: [])
     batch = BucketUploadBatch(max_bytes=1024)
-    batch.stage(_req(b"x" * 900), digest="d1", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"x" * 900), digest="d1", expire_at=EXPIRE_AT, retention_days=0)
     batch.flush(client=cast(FileStorageClient, object()))
-    batch.stage(_req(b"y" * 900), digest="d2", expire_at=EXPIRE_AT)
+    batch.stage(_req(b"y" * 900), digest="d2", expire_at=EXPIRE_AT, retention_days=0)
     assert batch.has("entity/project", "d2")

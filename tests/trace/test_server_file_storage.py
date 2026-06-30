@@ -6,6 +6,7 @@ specific setup requirements.
 """
 
 import base64
+import datetime
 import os
 import socket
 from unittest import mock
@@ -317,7 +318,13 @@ class _CountingStorageClient(file_storage.FileStorageClient):
         super().__init__(base_uri)
         self.store_calls = 0
 
-    def store(self, uri: file_storage.FileStorageURI, data: bytes) -> None:
+    def store(
+        self,
+        uri: file_storage.FileStorageURI,
+        data: bytes,
+        retention_days: int = file_storage.RETENTION_DAYS_NO_TTL,
+        expire_at: datetime.datetime | None = None,
+    ) -> None:
         self.store_calls += 1
 
     def read(self, uri: file_storage.FileStorageURI) -> bytes:
@@ -741,3 +748,77 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
         FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
+
+
+# --- Blob retention stamping (migration 036 / TTL) -------------------------
+
+S3_TEST_CREDS = {
+    "access_key_id": "test-key",
+    "secret_access_key": "test-secret",
+    "session_token": None,
+    "region": "us-east-1",
+}
+
+
+def test_s3_store_tags_retention_bucket_and_skips_when_no_ttl():
+    """S3 store tags the retention bucket for lifecycle; no-TTL stamps nothing."""
+    base = file_storage.FileStorageURI.parse_uri_str(f"s3://{TEST_BUCKET}")
+    with mock_aws():
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id="test-key",
+            aws_secret_access_key="test-secret",
+            region_name="us-east-1",
+        )
+        s3.create_bucket(Bucket=TEST_BUCKET)
+        client = file_storage.S3StorageClient(base, S3_TEST_CREDS)
+
+        client.store(base.with_path("ttl"), b"data", retention_days=30)
+        ttl_tags = s3.get_object_tagging(Bucket=TEST_BUCKET, Key="ttl")["TagSet"]
+        assert ttl_tags == [{"Key": file_storage.RETENTION_TAG_KEY, "Value": "30"}]
+
+        client.store(base.with_path("none"), b"data", retention_days=0)
+        none_tags = s3.get_object_tagging(Bucket=TEST_BUCKET, Key="none")["TagSet"]
+        assert none_tags == []
+
+
+def test_gcs_store_sets_custom_time_and_skips_when_no_ttl():
+    """GCS store sets custom_time for lifecycle; no-TTL leaves it unset."""
+    base = file_storage.FileStorageURI.parse_uri_str("gs://test-bucket")
+    mock_client = mock.MagicMock()
+    with mock.patch.object(
+        file_storage, "_build_keepalive_gcs_client", return_value=mock_client
+    ):
+        client = file_storage.GCSStorageClient(base)
+
+    expire_at = datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc)
+    ttl_blob = mock.MagicMock()
+    mock_client.bucket.return_value.blob.return_value = ttl_blob
+    client.store(base.with_path("ttl"), b"data", retention_days=30, expire_at=expire_at)
+    assert ttl_blob.custom_time == expire_at
+
+    none_blob = mock.MagicMock()
+    mock_client.bucket.return_value.blob.return_value = none_blob
+    client.store(base.with_path("none"), b"data", retention_days=0)
+    assert not isinstance(none_blob.custom_time, datetime.datetime)
+
+
+def test_azure_store_tags_retention_bucket_and_skips_when_no_ttl():
+    """Azure store sets the retention index tag; no-TTL passes tags=None."""
+    base = file_storage.FileStorageURI.parse_uri_str("az://acct/container")
+    client = file_storage.AzureStorageClient(base, {"connection_string": "x"})
+
+    captured: list[dict] = []
+    blob_client = mock.MagicMock()
+    blob_client.upload_blob.side_effect = lambda data, overwrite=False, **kw: (
+        captured.append(kw)
+    )
+    service = mock.MagicMock()
+    service.get_container_client.return_value.get_blob_client.return_value = blob_client
+
+    with mock.patch.object(client, "_get_client", return_value=service):
+        client.store(base.with_path("ttl"), b"data", retention_days=14)
+        client.store(base.with_path("none"), b"data", retention_days=0)
+
+    assert captured[0]["tags"] == {file_storage.RETENTION_TAG_KEY: "14"}
+    assert captured[1]["tags"] is None
