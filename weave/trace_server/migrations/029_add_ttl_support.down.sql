@@ -111,7 +111,7 @@ ALTER TABLE call_parts DROP COLUMN expire_at;
 ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
 
 -- Step 8b: Re-apply TTL expression after column rename.
-ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE;
+ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 9: Drop project_ttl_settings table
 DROP TABLE IF EXISTS project_ttl_settings;
