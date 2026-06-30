@@ -37,6 +37,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -860,6 +861,56 @@ def _spans_filter_sql(
 
         where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
     return _FilterSQL(where=" AND ".join(where_conditions))
+
+
+_OP_TO_SQL: dict[str, str] = {
+    "gte": ">=",
+    "gt": ">",
+    "lte": "<=",
+    "lt": "<",
+    "eq": "=",
+}
+
+
+def build_signal_filter_subquery(
+    pb: ParamBuilder,
+    project_id: str,
+    signal_filters: AgentSignalFilter | None,
+) -> str | None:
+    """Subquery selecting conversation_ids that carry the requested signals.
+
+    Returns None when there is no signal filter, so callers omit the semi-join
+    entirely (zero overhead for unfiltered queries). The feedback table is
+    project-partitioned and tag-indexed, so this scan is selective; it is NOT
+    time-constrained because a signal's timestamp is not the conversation's.
+    """
+    if signal_filters is None or signal_filters.is_empty():
+        return None
+
+    pid_slot = pb.add(project_id, param_type="String")
+    conditions: list[str] = [
+        f"project_id = {pid_slot}",
+        "feedback_type IN ('wandb.agent_user_feedback', 'wandb.agent_monitor')",
+    ]
+
+    if signal_filters.tags:
+        tags_slot = pb.add(signal_filters.tags, param_type="Array(String)")
+        conditions.append(f"hasAny(scorer_tags, {tags_slot})")
+
+    for cond in signal_filters.ratings:
+        key_slot = pb.add(cond.scorer_key, param_type="String")
+        val_slot = pb.add(cond.value, param_type="Float64")
+        op = _OP_TO_SQL[cond.op]
+        # mapContains guard: Map access returns 0.0 for an absent key, which
+        # would spuriously pass a `>= 0` test.
+        conditions.append(
+            f"(mapContains(scorer_ratings, {key_slot}) "
+            f"AND scorer_ratings[{key_slot}] {op} {val_slot})"
+        )
+
+    conditions.append("conversation_id != ''")
+    where = " AND ".join(conditions)
+    return f"SELECT conversation_id FROM feedback WHERE {where}"
 
 
 def _group_by_references_identity(group_by: list[AgentGroupByRef] | None) -> bool:
