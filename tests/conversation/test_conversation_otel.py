@@ -969,6 +969,78 @@ class TestOTelSpanEmission:
         turn = start_turn(system_instructions=["You are a weather bot"])
         assert turn.system_instructions == ["You are a weather bot"]
 
+    def test_conversation_agent_identity_propagates_to_turn_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # agent_id/description/version set once on the Conversation land on every
+        # turn's invoke_agent span — no need to repeat them per turn.
+        with Conversation(
+            agent_name="bot",
+            conversation_id="convo-ident",
+            agent_id="agent-7",
+            agent_description="A helpful bot",
+            agent_version="v3",
+        ) as s:
+            with s.start_turn():
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.agent.id"] == "agent-7"
+        assert attrs["gen_ai.agent.description"] == "A helpful bot"
+        assert attrs["gen_ai.agent.version"] == "v3"
+
+    def test_turn_overrides_conversation_agent_identity(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # A turn served by a different agent (multi-agent routing) or after a
+        # version bump overrides the conversation default via turn.record(...).
+        with Conversation(
+            agent_name="bot",
+            conversation_id="convo-ident-override",
+            agent_id="agent-7",
+            agent_version="v3",
+        ) as s:
+            with s.start_turn() as turn:
+                turn.record(agent_id="agent-8", agent_version="v4")
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.agent.id"] == "agent-8"
+        assert attrs["gen_ai.agent.version"] == "v4"
+
+    def test_start_turn_kwargs_override_conversation_agent_identity(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # start_turn takes agent_id/description/version directly (like
+        # log_turn/log_conversation), so a turn can override the conversation
+        # default at creation without a follow-up turn.record(...).
+        with Conversation(
+            agent_name="bot",
+            conversation_id="convo-ident-start-kwargs",
+            agent_id="agent-7",
+            agent_description="Default desc",
+            agent_version="v3",
+        ) as s:
+            with s.start_turn(
+                agent_id="agent-8",
+                agent_description="Override desc",
+                agent_version="v4",
+            ):
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.agent.id"] == "agent-8"
+        assert attrs["gen_ai.agent.description"] == "Override desc"
+        assert attrs["gen_ai.agent.version"] == "v4"
+
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Conversation(agent_name="bot", conversation_id="convo-llm") as s:
             with s.start_turn() as turn:
@@ -1794,6 +1866,38 @@ class TestLogConversation:
         assert attrs["gen_ai.agent.id"] == "agent-123"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
         assert attrs["gen_ai.agent.version"] == "v2"
+
+    def test_agent_identity_defaults_applied(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # Conversation-level identity defaults fill in turns that leave a field
+        # empty; a turn's own value wins, per-field.
+        log_conversation(
+            conversation_id="convo-ident-defaults",
+            agent_name="bot",
+            agent_id="agent-default",
+            agent_description="Default desc",
+            agent_version="v1",
+            turns=[
+                Turn(started_at=_ts(0), ended_at=_ts(1)),  # inherits all defaults
+                Turn(  # overrides agent_id only; desc/version still inherited
+                    agent_id="agent-override",
+                    started_at=_ts(2),
+                    ended_at=_ts(3),
+                ),
+            ],
+        )
+        spans = otel_spans.get_finished_spans()
+        ident_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(ident_spans) == 2
+        by_id = {
+            dict(sp.attributes or {})["gen_ai.agent.id"]: dict(sp.attributes or {})
+            for sp in ident_spans
+        }
+        assert by_id["agent-default"]["gen_ai.agent.description"] == "Default desc"
+        assert by_id["agent-default"]["gen_ai.agent.version"] == "v1"
+        assert by_id["agent-override"]["gen_ai.agent.description"] == "Default desc"
+        assert by_id["agent-override"]["gen_ai.agent.version"] == "v1"
 
     def test_does_not_mutate_caller_turn(
         self, otel_spans: InMemorySpanExporter
