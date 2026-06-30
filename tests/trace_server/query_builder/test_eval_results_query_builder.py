@@ -50,6 +50,13 @@ def test_cte_chain_calls_merged() -> None:
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
                     AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
@@ -408,6 +415,13 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
                     AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
@@ -506,6 +520,13 @@ def test_full_query_calls_merged() -> None:
                     AND calls_merged.id NOT IN {pb_1:Array(String)}
                     AND (multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
                         OR calls_merged.op_name IS NULL)
+                    AND calls_merged.sortable_datetime >= coalesce(
+                        (SELECT min(roots.started_at) - toIntervalSecond(300)
+                            FROM calls_merged AS roots
+                            PREWHERE roots.project_id = {pb_0:String}
+                            WHERE roots.id IN {pb_1:Array(String)}
+                        ),
+                        toDateTime64(0, 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
                 HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
                     AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
