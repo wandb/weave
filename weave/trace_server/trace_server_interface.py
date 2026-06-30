@@ -684,6 +684,8 @@ class CallsQueryStatsReq(BaseModelStrict):
     query: Query | None = None
     limit: int | None = None
     include_total_storage_size: bool | None = False
+    # When False, has_more is computed via a limit+1 probe instead of an exact count.
+    include_exact_count: bool = True
     # List of columns that include refs to objects or table rows that require
     # expansion during filtering or ordering. Required when filtering
     # on reffed fields.

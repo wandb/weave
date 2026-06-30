@@ -3022,6 +3022,14 @@ def build_calls_stats_query(
     #   Fast:  SELECT count() FROM calls_complete WHERE ...
     #   Slow:  SELECT count() FROM (SELECT id FROM calls_complete WHERE ...)
     if read_table == ReadTable.CALLS_COMPLETE:
+        if (
+            req.limit is not None
+            and not req.include_exact_count
+            and not req.include_total_storage_size
+        ):
+            probe_query = _build_calls_complete_has_more_probe_query(req, param_builder)
+            if probe_query is not None:
+                return (probe_query, aggregated_columns.keys(), settings)
         query = _build_calls_complete_stats_query(
             req, param_builder, aggregated_columns
         )
@@ -3131,6 +3139,52 @@ def _build_calls_complete_stats_query(
     raw_sql = f"""
     SELECT {stats_select}
     {body_result.sql}
+    """
+    return safely_format_sql(raw_sql, logger)
+
+
+def _build_calls_complete_has_more_probe_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+) -> str | None:
+    """Build a limit+1 probe answering has_more without an exact filtered count.
+
+    Scans only up to limit+1 matching ids instead of counting the whole
+    project, which on a heavy *_dump filter avoids decompressing the full
+    column. Returns None to fall back to the exact count when a feedback JOIN
+    is present (it can duplicate rows and break the simple count).
+    """
+    if req.limit is None:
+        return None
+    limit = req.limit
+    table_name = get_calls_table_name(ReadTable.CALLS_COMPLETE)
+    cq = _build_stats_calls_query(req, ReadTable.CALLS_COMPLETE)
+
+    # See _build_calls_complete_stats_query: inject the deleted_at sentinel that
+    # as_sql() would otherwise add, using None so process_operation types it.
+    cq.add_condition(
+        tsi_query.EqOperation.model_validate(
+            {
+                "$eq": [
+                    {"$getField": "deleted_at"},
+                    {"$literal": None},
+                ]
+            }
+        )
+    )
+
+    # The body already emits LIMIT {req.limit}; clear it so we append limit+1.
+    cq.limit = None
+    body_result = cq._build_query_body(param_builder, table_name)
+    if body_result.needs_feedback_join:
+        return None
+
+    inner_sql = f"""SELECT {table_name}.id
+    {body_result.sql}
+    LIMIT {limit + 1}"""
+    raw_sql = f"""
+    SELECT count() AS count, toUInt8(count() > {limit}) AS has_more
+    FROM ({inner_sql})
     """
     return safely_format_sql(raw_sql, logger)
 

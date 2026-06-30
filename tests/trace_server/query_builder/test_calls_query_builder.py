@@ -4640,6 +4640,70 @@ def test_stats_query_calls_complete_with_feedback_filter_uses_count_distinct() -
     )
 
 
+def test_stats_query_calls_complete_include_exact_count_toggle() -> None:
+    """include_exact_count picks exact filtered count() vs a limit+1 has_more probe.
+
+    Both share identical filter SQL/params; only the SELECT and limit differ.
+    The probe scans up to limit+1 ids instead of decompressing the whole
+    heavy *_dump column for an exact count.
+    """
+    heavy_filter_query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$contains": {
+                    "input": {"$getField": "inputs.foo"},
+                    "substr": {"$literal": "bar"},
+                }
+            }
+        }
+    )
+    exact_req = tsi.CallsQueryStatsReq(
+        project_id="project",
+        query=heavy_filter_query,
+        limit=100,
+        include_exact_count=True,
+    )
+    expected_params = {
+        "pb_0": '$."foo"',
+        "pb_1": "bar",
+        "pb_2": SENTINEL_EPOCH,
+        "pb_3": '%"%bar%"%',
+        "pb_4": "project",
+    }
+    assert_stats_sql(
+        exact_req,
+        """
+        SELECT count() AS count, toUInt8(0) AS has_more
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_4:String}
+        WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
+          AND ((position(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+               AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+        LIMIT 100
+        """,
+        expected_params,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+    probe_req = exact_req.model_copy(update={"include_exact_count": False})
+    assert_stats_sql(
+        probe_req,
+        """
+        SELECT count() AS count, toUInt8(count() > 100) AS has_more
+        FROM (
+          SELECT calls_complete.id
+          FROM calls_complete
+          PREWHERE calls_complete.project_id = {pb_4:String}
+          WHERE (calls_complete.inputs_dump LIKE {pb_3:String})
+            AND ((position(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_0:String}), 'null'), ''), {pb_1:String}) > 0)
+                 AND ((calls_complete.deleted_at = {pb_2:DateTime64(3)})))
+          LIMIT 101)
+        """,
+        expected_params,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+
 def test_stats_query_calls_merged_unfiltered_limit_1_stays_with_pattern_1() -> None:
     """limit=1 with no filter is the project-existence check (Pattern 1),
     which uses `LIMIT 1` and is strictly cheaper than starting a uniqUpTo
