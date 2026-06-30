@@ -1,0 +1,67 @@
+## Conversation
+User: "Update the bump tool to support minor and major version bumps." Then
+"minimize text churn" — my first pass was an over-engineered 195-line full
+rewrite (plan_versions + --new-version pinning on every step + a new test
+file); user pushed back, so I reverted to a minimal native-bump delta. Then
+"put up this PR as draft".
+
+## Actions
+- Read scripts/bump_python_sdk_version.py, .github/workflows/bump_version.yaml,
+  .claude/skills/bump-version/SKILL.md, weave/version.py, pyproject.toml
+  [tool.bumpversion], and the existing bump_ts_sdk_version.yaml (already had a
+  bump_type choice input — the pattern to mirror).
+- Probed bump-my-version in /tmp sandboxes (uvx bump-my-version): confirmed
+  native `bump minor` on X.Y.Z-dev0 -> X.(Y+1).0-dev0 and `bump major` ->
+  (X+1).0.0-dev0 (resets lower segments + pre_l/pre_n to dev/0); `bump pre_l`
+  on -dev0 drops to X.Y.Z; `bump patch` -> X.Y.(Z+1)-dev0.
+- Final impl: bump_type positional (choices patch/minor/major, default patch);
+  conditional "Step 0" runs `bump-my-version bump <segment> ./weave/version.py
+  --commit` for minor/major; existing two steps unchanged; git-log hint count
+  is 3 for minor/major else 2.
+- Verified the minimal script end-to-end in a git sandbox: real minor run ->
+  tag v0.53.0, commits 0.53.0-dev0 / ->0.53.0 / ->0.53.1-dev0, version.py +
+  pyproject both synced; patch path unchanged. ruff check + format clean.
+- Workflow: added bump_type choice input + bump_release_segment step gated on
+  `if: inputs.bump_type != 'patch'`. Validated YAML structure with pyyaml.
+- Updated the user's release memory note (outside the repo) to drop the
+  "patch only" claim.
+
+## Errors & mistakes
+- First version was 195 lines (over-engineered). Reverted per "minimize churn".
+- ruff PLR6201: `in ("minor","major")` -> `in {"minor","major"}` (set literal).
+- bump-my-version refuses to run with a dirty working tree even under
+  --dry-run (allow_dirty=false), so dry-running against the live repo while my
+  edits were uncommitted failed; verified in clean sandboxes instead.
+
+## Dead ends
+- --new-version pinning on every step + a Python plan_versions() helper + a
+  pytest self-check file (scripts/test_bump_python_sdk_version.py). It made the
+  dry-run preview byte-accurate but tripled the diff. Deleted; native
+  bump-my-version computation is correct and needs no Python math, so there is
+  no non-trivial logic left to unit-test.
+
+## Hints & warnings
+- The part-arg is mandatory: `bump-my-version bump --new-version X ./file`
+  errors ("Unknown version component: ./file") because the file positional is
+  taken as the version part. Keep `bump <part> <file>`.
+- minor/major --dry-run preview: Step 0 shows the real segment target, but the
+  drop/tag and next-dev steps preview from the CURRENT version (the pre-step
+  isn't applied in dry-run), so they show patch-style numbers. The real run is
+  correct because each step sees the prior commit. Documented in the memory note.
+- The Action uses native bump (default "Release version: A -> B" commit
+  message), consistent with its other commits. The earlier manual 0.53.0 minor
+  used "chore(weave): Bump to 0.53.0" (commits 7293299318 + ebaa175f44); same
+  version outcomes.
+- uv / uvx / gh all live at /opt/homebrew/bin, not on the default shell PATH.
+- `ls` is aliased to `eza` in this shell (not installed) — use find/Read.
+
+## Codebase discoveries
+- pyproject [tool.bumpversion]: pre_l part values ["dev","final"],
+  optional_value "final"; serialize drops the suffix when final. version.py
+  VERSION is the source of truth, synced with pyproject current_version on
+  every bump. Repo is currently at 0.53.0 (post-minor final state, not -dev0).
+- scripts/ has no __init__/conftest and no testpaths in pytest config, so it is
+  not collected by the nox shards.
+
+## Open questions
+None.
