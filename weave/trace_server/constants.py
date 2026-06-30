@@ -48,6 +48,11 @@ SCORE_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 WEAVE_ATTRIBUTES_NAMESPACE = "weave"
 
 # OTel span attribute keys for eval context
+EVAL_RUN_ID_SPAN_ATTR = "weave.eval.run_id"
 EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR = "weave.eval.predict_and_score_call_id"
 EVAL_PROJECT_ID_SPAN_ATTR = "weave.eval.project_id"
+EVAL_KIND_SPAN_ATTR = "weave.eval.kind"
+EVAL_ROW_DIGEST_SPAN_ATTR = "weave.eval.row_digest"
+EVAL_EXAMPLE_ID_SPAN_ATTR = "weave.eval.example_id"
+EVAL_TRIAL_INDEX_SPAN_ATTR = "weave.eval.trial_index"
 EVAL_EVALUATION_NAME_SPAN_ATTR = "weave.eval.evaluation_name"
