@@ -35,7 +35,10 @@ async function callSomeLLM(_args: unknown): Promise<ChatCompletion> {
 }
 
 type Agent = {
+  id: string;
   name: string;
+  description: string;
+  version: string;
   instructions: string;
   tools: Tool[];
 };
@@ -91,9 +94,13 @@ const calculateTool: Tool = {
 };
 
 const agent: Agent = {
+  id: '62e4a66c-c22f-4ef2-8fce-b573e499a182',
   name: 'Reasearch Assistant',
   instructions:
     'You are a research assistant. Use the available tools when appropriate to answer questions accurately.',
+  description:
+    'Research assistant that is so advanced it has a typo in its name',
+  version: '1.14.3',
   tools: [calculateTool, getWeatherTool],
 };
 
@@ -310,7 +317,10 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
     for (const prompt of prompts) {
       messages.push({role: 'user', content: prompt});
       const turn = conversation.startTurn({
+        agentId: agent.id,
         agentName: agent.name,
+        agentDescription: agent.description,
+        agentVersion: agent.version,
         userMessage: prompt,
         systemInstructions: [agent.instructions],
       });
@@ -424,7 +434,10 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How warm is Tokyo?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
@@ -499,7 +512,10 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What about San Francisco and London?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
@@ -559,7 +575,10 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
             "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How much warmer is Tokyo than San Francisco?"}]}]",
             "gen_ai.operation.name": "invoke_agent",

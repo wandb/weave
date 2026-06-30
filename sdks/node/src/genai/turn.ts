@@ -13,7 +13,10 @@ import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
+  ATTR_GEN_AI_AGENT_DESCRIPTION,
+  ATTR_GEN_AI_AGENT_ID,
   ATTR_GEN_AI_AGENT_NAME,
+  ATTR_GEN_AI_AGENT_VERSION,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -27,9 +30,12 @@ import type {Message} from './types';
 
 export interface TurnInit extends SpanInitBase {
   model?: string;
-  agentName?: string;
   systemInstructions?: string[];
   userMessage?: string;
+  agentId?: string;
+  agentName?: string;
+  agentDescription?: string;
+  agentVersion?: string;
 }
 
 /**
@@ -59,6 +65,9 @@ export interface TurnInit extends SpanInitBase {
  * const turn = weave.startTurn({
  *   model: 'gpt-4o',
  *   agentName: 'research-bot',
+ *   agentId: 'research-bot-prod',
+ *   agentDescription: 'Looks up facts on Wikipedia.',
+ *   agentVersion: '1.4.2',
  *   userMessage: 'What is the weather in Tokyo?',
  *   systemInstructions: ['You are a helpful weather bot.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
@@ -83,7 +92,10 @@ type Opts = {
 export class Turn extends SpanBase {
   private _context: Context;
   private _conversationId: string;
+  private _agentId: string;
   private _agentName: string;
+  private _agentDescription: string;
+  private _agentVersion: string;
   private _model: string;
   private _messages: Message[];
   private _systemInstructions: string[];
@@ -100,7 +112,10 @@ export class Turn extends SpanBase {
     super(opts.span);
     this._context = opts.context;
     this._conversationId = opts.conversationId;
+    this._agentId = opts.agentId;
     this._agentName = opts.agentName;
+    this._agentDescription = opts.agentDescription;
+    this._agentVersion = opts.agentVersion;
     this._messages = opts.messages;
     this._model = opts.model;
     this._systemInstructions = opts.systemInstructions;
@@ -126,6 +141,15 @@ export class Turn extends SpanBase {
     }
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
+    }
+    if (opts.agentId) {
+      attributes[ATTR_GEN_AI_AGENT_ID] = opts.agentId;
+    }
+    if (opts.agentDescription) {
+      attributes[ATTR_GEN_AI_AGENT_DESCRIPTION] = opts.agentDescription;
+    }
+    if (opts.agentVersion) {
+      attributes[ATTR_GEN_AI_AGENT_VERSION] = opts.agentVersion;
     }
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
@@ -154,6 +178,9 @@ export class Turn extends SpanBase {
       agentName: opts.agentName ?? '',
       messages,
       systemInstructions: opts.systemInstructions ?? [],
+      agentId: opts.agentId ?? '',
+      agentDescription: opts.agentDescription ?? '',
+      agentVersion: opts.agentVersion ?? '',
     });
     state.turn = turn;
     return turn;
