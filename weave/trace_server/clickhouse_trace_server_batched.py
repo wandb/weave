@@ -322,6 +322,8 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server.tracing import traced, traced_generator
 from weave.trace_server.ttl_settings import (
     RETENTION_DAYS_NO_TTL,
+    compute_expire_at_for_insert,
+    get_object_retention_days,
     get_project_retention_days,
     invalidate_ttl_cache,
 )
@@ -2062,6 +2064,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             new_base_object_class=digest_result.base_object_class,
         )
 
+        retention_days = get_object_retention_days(req.obj.project_id, self.ch_client)
+        expire_at = compute_expire_at_for_insert(
+            retention_days, datetime.datetime.now(datetime.timezone.utc)
+        )
         ch_obj = ObjCHInsertable(
             project_id=req.obj.project_id,
             object_id=req.obj.object_id,
@@ -2072,6 +2078,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
+            expire_at=expire_at,
         )
 
         self._insert(
@@ -2152,6 +2159,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"obj_create_batch only supports updating a single project. Supplied projects: {unique_projects}"
             )
 
+        # Single project, single insert: one expire_at for the whole batch.
+        retention_days = get_object_retention_days(batch[0].project_id, self.ch_client)
+        expire_at = compute_expire_at_for_insert(
+            retention_days, datetime.datetime.now(datetime.timezone.utc)
+        )
+
         alias_rows: list[tuple[str, str, str, str]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
@@ -2171,6 +2184,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 refs=extract_refs_from_values(processed_val),
                 val_dump=json_val,
                 digest=digest,
+                expire_at=expire_at,
             )
             insert_data = list(ch_obj.model_dump().values())
             # Add the data to be inserted
@@ -2325,6 +2339,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         delete_insertables = []
         now = datetime.datetime.now(datetime.timezone.utc)
+        # Tombstone re-anchors expire_at at delete time; deleted_at, not
+        # expire_at, governs read visibility, so the created_at tie with the
+        # original row is harmless.
+        retention_days = get_object_retention_days(req.project_id, self.ch_client)
+        expire_at = compute_expire_at_for_insert(retention_days, now)
         for obj in object_versions:
             original_created_at = ensure_datetimes_have_tz_strict(obj.created_at)
             delete_insertables.append(
@@ -2341,6 +2360,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     wb_user_id=obj.wb_user_id,
                     # Keep the original created_at timestamp
                     created_at=original_created_at,
+                    expire_at=expire_at,
                 )
             )
 

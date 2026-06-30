@@ -456,3 +456,103 @@ def test_migration_036_ttl_clauses_present(internal_server):
         "TTL toDateTime(expire_at)\n"
         "SETTINGS index_granularity = 8192"
     )
+
+
+def _read_object_expire_at(
+    server: ClickHouseTraceServer, internal_project_id: str, object_id: str
+) -> list[datetime.datetime]:
+    """Raw-read expire_at for an object's version rows in object_versions."""
+    result = server.ch_client.query(
+        "SELECT expire_at FROM object_versions "
+        "WHERE project_id = {project_id:String} AND object_id = {object_id:String} "
+        "ORDER BY expire_at",
+        parameters={"project_id": internal_project_id, "object_id": object_id},
+    )
+    return [row[0] for row in result.result_rows]
+
+
+def _assert_expire_at_in_window(
+    value: datetime.datetime,
+    before: datetime.datetime,
+    after: datetime.datetime,
+    expected_delta: datetime.timedelta | None,
+) -> None:
+    """Server-anchored expire_at falls in [before+delta, after+delta] (or sentinel)."""
+    actual = _as_utc(value)
+    if expected_delta is None:
+        assert actual == _as_utc(EXPIRE_AT_NEVER)
+        return
+    # 1s slack absorbs DateTime64(3) millisecond truncation.
+    low = _as_utc(before) + expected_delta - datetime.timedelta(seconds=1)
+    high = _as_utc(after) + expected_delta + datetime.timedelta(seconds=1)
+    assert low <= actual <= high, f"expire_at {actual} not in [{low}, {high}]"
+
+
+@pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
+def test_ttl_object_writes_set_expire_at(
+    internal_server, retention_days, expected_delta
+):
+    """obj_create and obj_create_batch stamp expire_at (sentinel when no TTL)."""
+    server = internal_server
+    _, internal_project_id = _make_project("objects")
+    _set_retention_days(server, internal_project_id, retention_days)
+
+    before = datetime.datetime.now(datetime.timezone.utc)
+    server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=internal_project_id, object_id="single", val={"a": 1}
+            )
+        )
+    )
+    server.obj_create_batch(
+        [
+            tsi.ObjSchemaForInsert(
+                project_id=internal_project_id, object_id="batch_a", val={"a": 1}
+            ),
+            tsi.ObjSchemaForInsert(
+                project_id=internal_project_id, object_id="batch_b", val={"b": 2}
+            ),
+        ]
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+
+    for object_id in ("single", "batch_a", "batch_b"):
+        values = _read_object_expire_at(server, internal_project_id, object_id)
+        assert len(values) == 1, f"{object_id}: expected one row, got {values!r}"
+        _assert_expire_at_in_window(values[0], before, after, expected_delta)
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
+def test_ttl_obj_delete_stamps_tombstone_expire_at(internal_server):
+    """obj_delete's tombstone row carries a computed expire_at, never NULL."""
+    server = internal_server
+    _, pid = _make_project("obj_delete")
+    _set_retention_days(server, pid, 30)
+    res = server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=pid, object_id="o", val={"a": 1})
+        )
+    )
+
+    before = datetime.datetime.now(datetime.timezone.utc)
+    server.obj_delete(
+        tsi.ObjDeleteReq(project_id=pid, object_id="o", digests=[res.digest])
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+
+    # Original row + tombstone row; every row carries a future expire_at.
+    values = _read_object_expire_at(server, pid, "o")
+    assert len(values) == 2
+    for value in values:
+        _assert_expire_at_in_window(
+            value,
+            before - datetime.timedelta(seconds=5),
+            after,
+            datetime.timedelta(days=30),
+        )
