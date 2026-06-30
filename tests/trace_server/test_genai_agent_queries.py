@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -42,6 +43,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentTraceChatReq,
     GenAIOTelExportReq,
+    RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.interface.feedback_types import (
@@ -3042,3 +3044,132 @@ def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_serve
         )
     )
     assert res.result == [{"conversation_id": conv_id, "scorer_tags": ["low-quality"]}]
+
+
+# ---------------------------------------------------------------------------
+# Test: signal filtering on agent conversations (Task 7)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.flaky(reruns=3)
+def test_filter_conversations_by_signal(ch_server):
+    """E2E proof of signal filter union semantics and mutation-correctness.
+
+    Seeds two conversations (conv-A, conv-B). Tags a turn in conv-A and a
+    conversation-level tag in conv-B. Verifies:
+    - Tag filter returns only the tagged conversation.
+    - Rating filter returns only the rated conversation.
+    - No filter returns both.
+    - Conv-level tag matches the other union arm.
+    - Purging the feedback removes it from the filter result.
+    """
+    project_id = _make_project_id("signal-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_a = uuid.uuid4().hex
+    trace_b = uuid.uuid4().hex
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    # Seed one span per conversation so each appears in grouped query results.
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                trace_id=trace_a,
+                conversation_id=conv_a,
+                operation_name="invoke_agent",
+                started_at=now,
+            ),
+            _make_span(
+                project_id,
+                trace_id=trace_b,
+                conversation_id=conv_b,
+                operation_name="invoke_agent",
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+        ],
+    )
+
+    # Helper: run grouped query and return sorted conversation_ids.
+    def filtered_ids(signal_filters: AgentSignalFilter | None) -> list[str]:
+        res = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        )
+        return sorted(
+            g.group_keys["conversation_id"]
+            for g in res.groups
+            if g.group_keys.get("conversation_id") in {conv_a, conv_b}
+        )
+
+    # Baseline: no signal filter returns both conversations.
+    assert filtered_ids(None) == sorted([conv_a, conv_b])
+
+    # Tag a TURN in conv-A (turn-level signal resolves up to conv-A).
+    turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
+    fb_a = ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_MONITOR_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u1",
+            runnable_ref=ri.InternalOpRef(
+                project_id=project_id, name="scorer", version="v1"
+            ).uri,
+            call_ref=ri.InternalCallRef(project_id=project_id, id=trace_a).uri,
+            trigger_ref=ri.InternalObjectRef(
+                project_id=project_id, name="monitor", version="v1"
+            ).uri,
+            scorer_tags=["flagged"],
+            scorer_ratings={"_rating_": 0.9},
+        )
+    )
+
+    # Tag filter selects only conv-A (turn-level signal resolves up to conversation).
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == [conv_a]
+
+    # Rating filter selects conv-A (0.9 >= 0.8).
+    assert filtered_ids(
+        AgentSignalFilter(
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)]
+        )
+    ) == [conv_a]
+
+    # Arm 2 of the union: conversation-level tag on conv-B.
+    conv_b_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_b
+    ).uri
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_b_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u2",
+            scorer_tags=["reviewed"],
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["reviewed"])) == [conv_b]
+
+    # Mutation-correctness: purge the conv-A turn feedback; tag filter returns [].
+    ch_server.feedback_purge(
+        tsi.FeedbackPurgeReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": fb_a.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == []
