@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AgentsSavedView": {
-      "description": "A persisted, named configuration of one agents-panel tab.\n\nPersisted as a generic Weave object (`builtin_object_class=\"AgentsSavedView\"`)\nvia `obj_create` / `obj_read` / `objs_query`. The tab lives in\n`definition.tab`, so listing one tab's views = filtering objects of this\nclass by `definition.tab`.",
+      "description": "A persisted, named configuration of one agents-panel view.",
       "properties": {
         "name": {
           "anyOf": [
@@ -28,6 +28,7 @@
           "title": "Description"
         },
         "label": {
+          "description": "Editable display name for the view.",
           "title": "Label",
           "type": "string"
         },
@@ -43,10 +44,11 @@
       "type": "object"
     },
     "AgentsSavedViewDefinition": {
-      "description": "Flat, all-optional configuration for one agents-panel tab.\n\nMirrors the calls `SavedViewDefinition`: a single superset bag whose fields\nare populated per tab by the frontend, rather than a backend-side\ndiscriminated union. The backend validates field *shapes*; the frontend\nenforces which fields are valid for which `tab`.",
+      "description": "Flat, all-optional config for one agents-panel view (per `view_type`).",
       "properties": {
-        "tab": {
-          "title": "Tab",
+        "view_type": {
+          "description": "Which view this configures (e.g. 'spans'). Free-form; the set of views is owned by the frontend, so it can change without a backend change.",
+          "title": "View Type",
           "type": "string"
         },
         "time_window": {
@@ -58,7 +60,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Active time window."
         },
         "sort": {
           "anyOf": [
@@ -69,7 +72,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Sort directive."
         },
         "filters": {
           "anyOf": [
@@ -84,6 +88,7 @@
             }
           ],
           "default": null,
+          "description": "Categorical filters keyed by column id.",
           "title": "Filters"
         },
         "numeric_ranges": {
@@ -99,6 +104,7 @@
             }
           ],
           "default": null,
+          "description": "Numeric histogram filters keyed by column id.",
           "title": "Numeric Ranges"
         },
         "cols": {
@@ -110,7 +116,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Column-visibility diff."
         },
         "custom_cols": {
           "anyOf": [
@@ -125,6 +132,7 @@
             }
           ],
           "default": null,
+          "description": "Custom-attribute column ids (`<source>:<key>`) on the grid.",
           "title": "Custom Cols"
         },
         "view": {
@@ -141,6 +149,7 @@
             }
           ],
           "default": null,
+          "description": "Table layout (full table vs split chart view).",
           "title": "View"
         },
         "volume_collapsed": {
@@ -153,6 +162,7 @@
             }
           ],
           "default": null,
+          "description": "Whether the volume histogram is collapsed.",
           "title": "Volume Collapsed"
         },
         "conv_custom_attrs": {
@@ -168,6 +178,7 @@
             }
           ],
           "default": null,
+          "description": "Conversations view: custom-attribute column selections.",
           "title": "Conv Custom Attrs"
         },
         "sort_field": {
@@ -180,6 +191,7 @@
             }
           ],
           "default": null,
+          "description": "Agents view: single sort field.",
           "title": "Sort Field"
         },
         "hidden_agents": {
@@ -191,11 +203,12 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Agents view: diff from the default excluded-agents set."
         }
       },
       "required": [
-        "tab"
+        "view_type"
       ],
       "title": "AgentsSavedViewDefinition",
       "type": "object"
@@ -670,9 +683,10 @@
       "type": "object"
     },
     "ColsDiff": {
-      "description": "Column-visibility diff from a tab's default hidden set.\n\nMirrors the URL representation: `hide` lists columns hidden beyond the\ndefaults, `show` lists default-hidden columns the user re-enabled. Storing\nthe diff (not an absolute hidden list) keeps a saved view resilient to\nlater changes in the page's default columns. Also used for the agents-tab\n`hidden_agents` selection, which is the same hide/show diff shape.",
+      "description": "Column-visibility diff from a view's default hidden set.",
       "properties": {
         "hide": {
+          "description": "Columns hidden beyond the defaults.",
           "items": {
             "type": "string"
           },
@@ -680,6 +694,7 @@
           "type": "array"
         },
         "show": {
+          "description": "Default-hidden columns the user re-enabled.",
           "items": {
             "type": "string"
           },
@@ -929,13 +944,14 @@
       "type": "object"
     },
     "ConversationCustomAttr": {
-      "description": "A conversations-tab custom-attribute column selection.\n\n`attr_id` is the `<source>:<key>` id used elsewhere in the agents panel;\n`mode` is how the column is aggregated across a conversation.",
       "properties": {
         "attr_id": {
+          "description": "The `<source>:<key>` custom-attribute id.",
           "title": "Attr Id",
           "type": "string"
         },
         "mode": {
+          "description": "How the attribute is aggregated across a conversation.",
           "enum": [
             "distribution",
             "avg",
@@ -2264,7 +2280,6 @@
       "type": "object"
     },
     "NumericRange": {
-      "description": "Inclusive `[min, max]` range for a numeric histogram filter.",
       "properties": {
         "min": {
           "title": "Min",
@@ -3055,7 +3070,6 @@
       "type": "object"
     },
     "TimeWindow": {
-      "description": "The active time window for a tab, in epoch milliseconds.\n\n`unit` + `quantity` describe the window size (e.g. 24 hours); `start_ms`\npins its left edge; `selection` is an optional brushed sub-range. Mirrors\n`TimeWindowState` on the frontend.",
       "properties": {
         "unit": {
           "enum": [
@@ -3069,11 +3083,13 @@
           "type": "string"
         },
         "quantity": {
+          "description": "Number of units in the window.",
           "minimum": 1,
           "title": "Quantity",
           "type": "integer"
         },
         "start_ms": {
+          "description": "Left edge of the window, epoch ms.",
           "title": "Start Ms",
           "type": "integer"
         },
@@ -3086,7 +3102,8 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "description": "Optional brushed sub-range."
         }
       },
       "required": [
@@ -3098,7 +3115,6 @@
       "type": "object"
     },
     "TimeWindowSelection": {
-      "description": "A brushed sub-selection within a time window, in epoch milliseconds.",
       "properties": {
         "start_ms": {
           "title": "Start Ms",
@@ -3117,7 +3133,6 @@
       "type": "object"
     },
     "ViewSort": {
-      "description": "A single sort directive: a field and a direction.\n\nField name (rather than `sort_by`) and the `sort` key match the frontend\n`AgentsSort` shape so the URL-state layer can round-trip it directly.",
       "properties": {
         "field": {
           "title": "Field",
