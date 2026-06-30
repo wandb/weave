@@ -21,7 +21,7 @@ connection); ``gen_ai.conversation.id`` carries the API's conversation_id,
 falling back to the session id when absent (e.g. Beta).
 
 Audio is published as a Weave ``Content`` object and referenced from the
-message by a ``weave://`` ``UriPart``, as the Session SDK handles media.
+message by a ``weave://`` ``UriPart``, as the Conversation SDK handles media.
 """
 
 from __future__ import annotations
@@ -36,6 +36,20 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 from pydantic import PrivateAttr
 
+from weave.conversation.agent_context import resolve_agent_name
+from weave.conversation.conversation_otel import (
+    execute_tool_attributes,
+    invoke_agent_attributes,
+    llm_attributes,
+)
+from weave.conversation.types import (
+    Message,
+    TextPart,
+    ToolCallPart,
+    ToolCallResponsePart,
+    UriPart,
+    Usage,
+)
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
 from weave.integrations.openai_realtime.state_exporter import (
@@ -43,20 +57,6 @@ from weave.integrations.openai_realtime.state_exporter import (
     OUTPUT_AUDIO_TYPES,
     SessionSpan,
     StateExporter,
-)
-from weave.session.agent_context import resolve_agent_name
-from weave.session.session_otel import (
-    execute_tool_attributes,
-    invoke_agent_attributes,
-    llm_attributes,
-)
-from weave.session.types import (
-    Message,
-    TextPart,
-    ToolCallPart,
-    ToolCallResponsePart,
-    UriPart,
-    Usage,
 )
 from weave.trace import urls
 from weave.trace.api import publish

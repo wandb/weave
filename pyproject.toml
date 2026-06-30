@@ -50,7 +50,7 @@ dependencies = [
   # Remove once license content filtering is upstreamed
   "polyfile-weave>=0.5.9",
 
-  # Session SDK — uses OTel GenAI semantic conventions for span emission
+  # Conversation SDK — uses OTel GenAI semantic conventions for span emission
   "opentelemetry-api>=1.28.0",
   "opentelemetry-sdk>=1.28.0",
   "opentelemetry-exporter-otlp-proto-http>=1.28.0",
@@ -78,7 +78,6 @@ rich = ["rich"]           # Optional dependency for enhanced console output
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 # default dependencies as well.
 trace_server = [
-  "ddtrace>=2.7.0",
   # BYOB - S3
   "boto3>=1.34.0",
   # BYOB - Azure
@@ -357,7 +356,7 @@ reportCallIssue = false
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "tests", "examples"]
+exclude = [".*pyi$", "tests", "examples", "skills"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -366,7 +365,7 @@ disallow_untyped_defs = true
 disallow_untyped_calls = true
 
 [tool.bumpversion]
-current_version = "0.52.44-dev0"
+current_version = "0.53.1-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -420,7 +419,6 @@ dev = [
 ]
 trace_server = [
   # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
-  "ddtrace>=2.7.0",
   # BYOB - S3
   "boto3>=1.34.0",
   # BYOB - Azure
@@ -602,6 +600,7 @@ forbidden_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",
@@ -647,6 +646,7 @@ source_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",
@@ -748,6 +748,7 @@ forbidden_modules = [
   "weave.agent",
   "weave.chat",
   "weave.compat",
+  "weave.conversation",
   "weave.dataset",
   "weave.durability",
   "weave.evaluation",

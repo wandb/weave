@@ -1,4 +1,4 @@
-"""Tests for the Session SDK API surface."""
+"""Tests for the Conversation SDK API surface."""
 
 from __future__ import annotations
 
@@ -7,24 +7,24 @@ from unittest.mock import patch
 
 import pytest
 
-from weave.session.session import (
+from weave.conversation.conversation import (
     LLM,
+    Conversation,
     LogResult,
     Message,
     Reasoning,
-    Session,
     SubAgent,
     Tool,
     Turn,
     Usage,
+    end_conversation,
     end_llm,
-    end_session,
     end_turn,
+    get_current_conversation,
     get_current_llm,
-    get_current_session,
     get_current_turn,
+    start_conversation,
     start_llm,
-    start_session,
     start_tool,
     start_turn,
 )
@@ -44,8 +44,8 @@ def _reset_contextvars():
         llm.end()
     if (turn := get_current_turn()) is not None:
         turn.end()
-    if (session := get_current_session()) is not None:
-        session.end()
+    if (conversation := get_current_conversation()) is not None:
+        conversation.end()
 
 
 # ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ class TestReasoning:
 class TestLogResult:
     def test_defaults(self) -> None:
         lr = LogResult()
-        assert lr.session_id == ""
+        assert lr.conversation_id == ""
         assert lr.trace_ids == []
         assert lr.root_span_ids == []
         assert lr.span_count == 0
@@ -157,7 +157,7 @@ class TestLLM:
 
     def test_attach_media_returns_self(self) -> None:
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=_fake_publish_media_content,
         ):
             c = LLM(model="gpt-4o")
@@ -179,7 +179,7 @@ class TestAttachMedia:
     @pytest.fixture(autouse=True)
     def _mock_publish(self) -> None:
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=_fake_publish_media_content,
         ):
             yield  # type: ignore[misc]
@@ -250,7 +250,7 @@ class TestAttachMediaAsync:
             return "weave:///e/p/object/content:done"
 
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=slow_publish,
         ):
             llm = LLM(model="gpt-4o")
@@ -276,7 +276,7 @@ class TestAttachMediaAsync:
             return "weave:///e/p/object/content:v1"
 
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=publish,
         ):
             llm = LLM(model="gpt-4o")
@@ -297,7 +297,7 @@ class TestAttachMediaAsync:
             raise RuntimeError("upload failed")
 
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=boom,
         ):
             llm = LLM(model="gpt-4o")
@@ -309,7 +309,7 @@ class TestAttachMediaAsync:
     def test_end_awaits_uploads(self) -> None:
         """Refs are populated by the time the span is built at end()."""
         with patch(
-            "weave.session.session._publish_media_content",
+            "weave.conversation.conversation._publish_media_content",
             side_effect=_fake_publish_media_content,
         ):
             llm = LLM(model="gpt-4o")
@@ -358,7 +358,7 @@ class TestSubAgent:
 
 
 # ---------------------------------------------------------------------------
-# Turn and Session
+# Turn and Conversation
 # ---------------------------------------------------------------------------
 
 
@@ -417,26 +417,26 @@ class TestTurn:
         assert t.ended_at is not None
 
 
-class TestSession:
-    def test_auto_generates_session_id(self) -> None:
-        s = Session()
-        assert s.session_id != ""
-        assert len(s.session_id) == 36  # UUID format
+class TestConversation:
+    def test_auto_generates_conversation_id(self) -> None:
+        s = Conversation()
+        assert s.conversation_id != ""
+        assert len(s.conversation_id) == 36  # UUID format
 
-    def test_explicit_session_id(self) -> None:
-        s = Session(session_id="my-session-123")
-        assert s.session_id == "my-session-123"
+    def test_explicit_conversation_id(self) -> None:
+        s = Conversation(conversation_id="my-conversation-123")
+        assert s.conversation_id == "my-conversation-123"
 
     def test_include_content_default_true(self) -> None:
-        s = Session()
+        s = Conversation()
         assert s.include_content is True
 
     def test_include_content_false(self) -> None:
-        s = Session(include_content=False)
+        s = Conversation(include_content=False)
         assert s.include_content is False
 
     def test_start_turn_returns_turn(self) -> None:
-        s = Session(agent_name="weather-bot", model="gpt-4o")
+        s = Conversation(agent_name="weather-bot", model="gpt-4o")
         t = s.start_turn(user_message="What's the weather?")
         assert isinstance(t, Turn)
         assert t.agent_name == "weather-bot"
@@ -446,27 +446,27 @@ class TestSession:
         assert t.messages[0].content == "What's the weather?"
 
     def test_start_turn_inherits_and_overrides_agent_name(self) -> None:
-        s = Session(agent_name="weather-bot")
+        s = Conversation(agent_name="weather-bot")
         t = s.start_turn()
         assert t.agent_name == "weather-bot"
         t2 = s.start_turn(agent_name="custom-bot")
         assert t2.agent_name == "custom-bot"
 
     def test_start_turn_no_user_message(self) -> None:
-        s = Session()
+        s = Conversation()
         t = s.start_turn()
         assert t.messages == []
 
     def test_start_turn_auto_ends_previous(self) -> None:
-        s = Session()
+        s = Conversation()
         t1 = s.start_turn()
         t2 = s.start_turn()
         assert t1._ended is True
         assert t2._ended is False
 
     def test_context_manager(self) -> None:
-        with Session(agent_name="bot") as s:
-            assert s.session_id != ""
+        with Conversation(agent_name="bot") as s:
+            assert s.conversation_id != ""
 
 
 # ---------------------------------------------------------------------------
@@ -477,40 +477,40 @@ class TestSession:
 class TestContextVars:
     """Test contextvar-based cross-module tracing."""
 
-    def test_start_session_sets_contextvar(self) -> None:
-        s = start_session(agent_name="bot")
+    def test_start_conversation_sets_contextvar(self) -> None:
+        s = start_conversation(agent_name="bot")
         try:
-            assert get_current_session() is s
+            assert get_current_conversation() is s
         finally:
             s.end()
-        assert get_current_session() is None
+        assert get_current_conversation() is None
 
-    def test_session_context_manager_sets_contextvar(self) -> None:
-        with Session(agent_name="bot") as s:
-            assert get_current_session() is s
-        assert get_current_session() is None
+    def test_conversation_context_manager_sets_contextvar(self) -> None:
+        with Conversation(agent_name="bot") as s:
+            assert get_current_conversation() is s
+        assert get_current_conversation() is None
 
     def test_start_turn_sets_contextvar(self) -> None:
-        s = start_session(agent_name="bot")
+        s = start_conversation(agent_name="bot")
         try:
             t = start_turn(user_message="hi")
             assert get_current_turn() is t
             assert len(t.messages) == 1
             assert t.messages[0].content == "hi"
-            assert t.agent_name == "bot"  # inherited from session
+            assert t.agent_name == "bot"  # inherited from conversation
             t.end()
             assert get_current_turn() is None
         finally:
             s.end()
 
-    def test_start_turn_without_session_returns_disconnected(self) -> None:
+    def test_start_turn_without_conversation_returns_disconnected(self) -> None:
         t = start_turn(user_message="hi", agent_name="standalone")
         assert t.agent_name == "standalone"
         assert t.messages[0].content == "hi"
         assert get_current_turn() is None  # not set in contextvar
 
     def test_start_llm_sets_contextvar(self) -> None:
-        s = start_session(agent_name="bot")
+        s = start_conversation(agent_name="bot")
         try:
             t = start_turn()
             try:
@@ -530,24 +530,24 @@ class TestContextVars:
         assert get_current_llm() is None  # not set in contextvar
 
     def test_end_convenience_functions(self) -> None:
-        s = start_session()
+        s = start_conversation()
         start_turn()
         start_llm(model="gpt-4o")
         end_llm()
         assert get_current_llm() is None
         end_turn()
         assert get_current_turn() is None
-        end_session()
-        assert get_current_session() is None
+        end_conversation()
+        assert get_current_conversation() is None
 
     def test_end_when_nothing_active(self) -> None:
         # Should not raise
         end_llm()
         end_turn()
-        end_session()
+        end_conversation()
 
     def test_full_context_manager_pattern(self) -> None:
-        with start_session(agent_name="weather-bot") as s:
+        with start_conversation(agent_name="weather-bot") as s:
             with s.start_turn(user_message="What's the weather?") as turn:
                 with turn.llm(model="gpt-4o") as llm:
                     llm.output("Let me check.")
@@ -561,7 +561,7 @@ class TestContextVars:
                 with turn.llm(model="gpt-4o") as llm:
                     llm.output("It's 75F in Tokyo!")
 
-        assert get_current_session() is None
+        assert get_current_conversation() is None
         assert get_current_turn() is None
         assert get_current_llm() is None
 

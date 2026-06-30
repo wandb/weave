@@ -1,4 +1,4 @@
-"""Shared fixtures for Session SDK tests."""
+"""Shared fixtures for Conversation SDK tests."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from weave.session.session import (
+from weave.conversation.conversation import (
+    get_current_conversation,
     get_current_llm,
-    get_current_session,
     get_current_turn,
 )
 
@@ -23,8 +23,8 @@ def _reset_contextvars():
         llm.end()
     if (turn := get_current_turn()) is not None:
         turn.end()
-    if (session := get_current_session()) is not None:
-        session.end()
+    if (conversation := get_current_conversation()) is not None:
+        conversation.end()
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""Adapters from Anthropic's wire format to the Weave Session SDK types.
+"""Adapters from Anthropic's wire format to the Weave Conversation SDK types.
 
 Use these when manually instrumenting calls to ``client.messages.create``
 (the autopatched Anthropic integration handles conversion automatically).
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from weave.session.types import Usage
+from weave.conversation.types import Usage
 
 if TYPE_CHECKING:
     from anthropic.types import Message as AnthropicMessage

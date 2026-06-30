@@ -1,7 +1,7 @@
-"""Data types for the Weave Session SDK.
+"""Data types for the Weave Conversation SDK.
 
-Lives in its own module to break the import cycle between session.py
-(span classes) and session_otel.py (attribute builders). Both modules
+Lives in its own module to break the import cycle between conversation.py
+(span classes) and conversation_otel.py (attribute builders). Both modules
 import from here.
 """
 
@@ -256,7 +256,7 @@ class MediaAttachment(BaseModel):
 class LogResult(BaseModel):
     """Result of a batch log_* call."""
 
-    session_id: str = ""
+    conversation_id: str = ""
     trace_ids: list[str] = Field(default_factory=list)
     root_span_ids: list[str] = Field(default_factory=list)
     span_count: int = 0
