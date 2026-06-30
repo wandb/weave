@@ -60,6 +60,7 @@ export class Tool extends SpanBase {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {
       ...(state.conversation?.attributes ?? {}),
+      ...(opts.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: opts.name,
     };

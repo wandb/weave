@@ -65,6 +65,10 @@ export class Conversation {
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
       conversationId: this.conversationId,
+      // Forward the conversation's attributes so they ride the handle chain to
+      // the turn and every child, even across runIsolated frames. Per-turn opts
+      // override on key collision.
+      attributes: {...this.attributes, ...(opts.attributes ?? {})},
     });
   }
 
