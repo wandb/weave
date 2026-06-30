@@ -6129,27 +6129,40 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._bucket_uploads.has(req.project_id, digest):
             return tsi.FileCreateRes(digest=digest)
 
+        # Files share the plain per-project retention (co-created with their
+        # call); the identical expire_at is stamped on every chunk row.
+        expire_at = compute_expire_at_for_insert(
+            get_project_retention_days(req.project_id, self.ch_client),
+            datetime.datetime.now(datetime.timezone.utc),
+        )
+
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client)
+                self._file_create_bucket(req, digest, client, expire_at)
             except FileStorageWriteError:
-                self._file_create_clickhouse(req, digest)
+                self._file_create_clickhouse(req, digest, expire_at)
         else:
-            self._file_create_clickhouse(req, digest)
+            self._file_create_clickhouse(req, digest, expire_at)
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @traced(name="clickhouse_trace_server_batched._file_create_clickhouse")
-    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+    def _file_create_clickhouse(
+        self, req: tsi.FileCreateReq, digest: str, expire_at: datetime.datetime
+    ) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
-        self._insert_file_chunks(file_chunks_for(req, digest))
+        self._insert_file_chunks(file_chunks_for(req, digest, expire_at))
 
     @traced(name="clickhouse_trace_server_batched._file_create_bucket")
     def _file_create_bucket(
-        self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
+        self,
+        req: tsi.FileCreateReq,
+        digest: str,
+        client: FileStorageClient,
+        expire_at: datetime.datetime,
     ) -> None:
         if not self._flush_immediately:
             # Inside call_batch(): stage for the parallel flush at the end so
@@ -6158,7 +6171,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # handled inside _upload_one, not by the caller's except arm; root-
             # span attribution is deferred to bucket_upload_batch.flush so the
             # tag matches where the bytes actually land.
-            self._bucket_uploads.stage(req, digest)
+            self._bucket_uploads.stage(req, digest, expire_at)
             return
         set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
@@ -6175,6 +6188,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     val_bytes=b"",
                     bytes_stored=len(req.content),
                     file_storage_uri=target_file_storage_uri.to_uri_str(),
+                    expire_at=expire_at,
                 )
             ]
         )
@@ -6200,7 +6214,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             chunk_dump = chunk.model_dump()
             row = []
             for col in ALL_FILE_CHUNK_INSERT_COLUMNS:
-                row.append(chunk_dump.get(col, None))
+                # Sentinel-convert so a None expire_at (no TTL) inserts the
+                # far-future value instead of failing the non-null column.
+                row.append(
+                    ch_sentinel_values.to_ch_value(col, chunk_dump.get(col, None))
+                )
             data.append(row)
 
         if data:

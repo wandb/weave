@@ -782,3 +782,78 @@ def test_ttl_table_query_skips_ttl_cleared_rows(internal_server):
     returned = {row.digest: row.val for row in result.rows}
     assert expired_digest not in returned
     assert returned == {created.row_digests[1]: {"b": 2}}
+
+
+def _read_file_expire_at(
+    server: ClickHouseTraceServer, internal_project_id: str, digest: str
+) -> list[datetime.datetime]:
+    """Raw-read expire_at for every chunk of a file, ordered by chunk_index."""
+    result = server.ch_client.query(
+        "SELECT expire_at FROM files "
+        "WHERE project_id = {project_id:String} AND digest = {digest:String} "
+        "ORDER BY chunk_index",
+        parameters={"project_id": internal_project_id, "digest": digest},
+    )
+    return [row[0] for row in result.result_rows]
+
+
+@pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
+def test_ttl_file_create_sets_expire_at(
+    internal_server, retention_days, expected_delta
+):
+    """A multi-chunk file stamps one identical expire_at on every chunk."""
+    server = internal_server
+    _, pid = _make_project("files")
+    _set_retention_days(server, pid, retention_days)
+
+    # 250KB > 2x FILE_CHUNK_SIZE (100KB) so the inline path writes 3 chunks.
+    content = b"x" * 250_000
+    before = datetime.datetime.now(datetime.timezone.utc)
+    res = server.file_create(
+        tsi.FileCreateReq(project_id=pid, name="f.bin", content=content)
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+
+    values = _read_file_expire_at(server, pid, res.digest)
+    assert len(values) == 3
+    # No chunk of a file expires before another.
+    assert len({_as_utc(v) for v in values}) == 1
+    for value in values:
+        _assert_expire_at_in_window(value, before, after, expected_delta)
+
+
+@pytest.mark.skipif(NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: row TTL deletion")
+def test_ttl_file_expired_row_is_deleted_and_reads_404(internal_server):
+    """An expired file row is dropped by the row TTL; the read is a clean 404."""
+    server = internal_server
+    _, pid = _make_project("file_exp")
+    digest = "deadbeef"
+    past = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    server.ch_client.insert(
+        "files",
+        [[pid, digest, 0, 1, "f.bin", b"hello", 5, past]],
+        column_names=[
+            "project_id",
+            "digest",
+            "chunk_index",
+            "n_chunks",
+            "name",
+            "val_bytes",
+            "bytes_stored",
+            "expire_at",
+        ],
+    )
+
+    server.ch_client.command("OPTIMIZE TABLE files FINAL")
+    remaining = server.ch_client.query(
+        "SELECT count() FROM files "
+        "WHERE project_id = {project_id:String} AND digest = {digest:String}",
+        parameters={"project_id": pid, "digest": digest},
+    ).result_rows[0][0]
+    assert remaining == 0
+
+    with pytest.raises(NotFoundError):
+        server.file_content_read(tsi.FileContentReadReq(project_id=pid, digest=digest))
