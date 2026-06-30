@@ -6,8 +6,10 @@ specific setup requirements.
 """
 
 import base64
+import datetime
 import os
 import socket
+import uuid
 from unittest import mock
 
 import boto3
@@ -22,7 +24,14 @@ from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings, file_storage
-from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
+from weave.trace_server.trace_server_interface import (
+    CallEndV2Req,
+    CallStartV2Req,
+    EndedCallSchemaForInsertWithStartedAt,
+    FileContentReadReq,
+    FileCreateReq,
+    StartedCallSchemaForInsert,
+)
 
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
@@ -741,3 +750,113 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
         FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
+
+
+def _data_uri(mimetype: str, size: int) -> str:
+    """Build a distinct data URI whose decoded body exceeds AUTO_CONVERSION_MIN_SIZE."""
+    raw = (mimetype + "_" + "x" * size).encode()
+    return f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+def test_call_start_v2_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs
+):
+    """Eager call_start_v2 with many inline data-URI inputs fans the
+    auto-extracted attachment uploads out across the bucket pool instead of
+    one serial PUT each. The barrier of 2 makes the parallel floor
+    deterministic; the pre-fix serial path only ever had one upload in flight.
+    """
+    gcs.state.expected_concurrency = 2
+    # Distinct mimetype+size keeps every content and metadata digest unique, so
+    # dedup can't collapse the upload set below the barrier width.
+    inputs = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    res = client.server.call_start_v2(
+        CallStartV2Req(
+            start=StartedCallSchemaForInsert(
+                project_id=client.project_id,
+                id=str(uuid.uuid4()),
+                trace_id=str(uuid.uuid4()),
+                op_name="test_op",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs=inputs,
+            )
+        )
+    )
+
+    assert res.id
+    assert res.trace_id
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+def test_call_end_v2_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs
+):
+    """Eager call_end_v2 fans its output-attachment uploads across the bucket
+    pool too (and, for calls_complete projects, finishes them before the end
+    UPDATE references them). Barrier of 2 pins the parallel floor; the pre-fix
+    serial path peaked at 1.
+    """
+    call_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    client.server.call_start_v2(
+        CallStartV2Req(
+            start=StartedCallSchemaForInsert(
+                project_id=client.project_id,
+                id=call_id,
+                trace_id=str(uuid.uuid4()),
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # Set the barrier only now so it gates the end's uploads, not the empty start.
+    gcs.state.expected_concurrency = 2
+    output = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    client.server.call_end_v2(
+        CallEndV2Req(
+            end=EndedCallSchemaForInsertWithStartedAt(
+                project_id=client.project_id,
+                id=call_id,
+                started_at=started_at,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+                output=output,
+                summary={},
+            )
+        )
+    )
+
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
