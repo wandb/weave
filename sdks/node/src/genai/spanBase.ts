@@ -73,10 +73,7 @@ export abstract class SpanBase {
    *
    * @deprecated Record this data via {@link setAttributes} instead.
    * OpenTelemetry is phasing out the Span Event API (`Span.addEvent`; OTEP
-   * 4430) in favor of log-based events, but Weave has no Logs API surface yet,
-   * so prefer span attributes — which Weave already surfaces — for the
-   * marker/lifecycle data this recorded. This method still works and existing
-   * span-event data stays valid.
+   * 4430). This method still works and existing span-event data stays valid.
    *
    * @example
    * span.addEvent('context_compacted', {removedMessages: 12});
