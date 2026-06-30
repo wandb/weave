@@ -269,6 +269,7 @@ class FileChunkCreateCHInsertable(BaseModel):
     val_bytes: bytes
     bytes_stored: int
     file_storage_uri: str | None
+    expire_at: datetime.datetime | None = None
 
 
 ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(FileChunkCreateCHInsertable.model_fields.keys())

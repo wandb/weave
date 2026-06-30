@@ -10,7 +10,7 @@ This module owns the deferred-upload buffer and the fan-out step:
 
     bucket_uploads = BucketUploadBatch()
     ...
-    bucket_uploads.stage(req, digest)        # cheap, in-memory only
+    bucket_uploads.stage(req, digest, expire_at)  # cheap, in-memory only
     ...
     rows = bucket_uploads.flush(client)      # parallel upload -> CH rows
     self._file_batch.extend(rows)
@@ -40,6 +40,7 @@ content-addressable and consistent.
 
 from __future__ import annotations
 
+import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -75,6 +76,7 @@ MAX_BUCKET_UPLOAD_BATCH_BYTES = 256 * 1024 * 1024
 class _Pending:
     req: tsi.FileCreateReq
     digest: str
+    expire_at: datetime.datetime
 
 
 class BucketUploadBatch:
@@ -91,7 +93,9 @@ class BucketUploadBatch:
         self._seen: set[tuple[str, str]] = set()
         self._total_bytes = 0
 
-    def stage(self, req: tsi.FileCreateReq, digest: str) -> None:
+    def stage(
+        self, req: tsi.FileCreateReq, digest: str, expire_at: datetime.datetime
+    ) -> None:
         """Defer a bucket upload until `flush()`.
 
         Caller computes the digest, validates `expected_digest`, and dedups
@@ -117,7 +121,7 @@ class BucketUploadBatch:
                 f"BucketUploadBatch would exceed max_bytes={self._max_bytes}: "
                 f"staged={self._total_bytes}, new={size}"
             )
-        self._pending.append(_Pending(req=req, digest=digest))
+        self._pending.append(_Pending(req=req, digest=digest, expire_at=expire_at))
         self._seen.add(key)
         self._total_bytes += size
 
@@ -199,7 +203,7 @@ def _upload_one(
             client, key_for_project_digest(p.req.project_id, p.digest), p.req.content
         )
     except FileStorageWriteError:
-        return file_chunks_for(p.req, p.digest)
+        return file_chunks_for(p.req, p.digest, p.expire_at)
     return [
         FileChunkCreateCHInsertable(
             project_id=p.req.project_id,
@@ -210,17 +214,19 @@ def _upload_one(
             val_bytes=b"",
             bytes_stored=len(p.req.content),
             file_storage_uri=uri.to_uri_str(),
+            expire_at=p.expire_at,
         )
     ]
 
 
 def file_chunks_for(
-    req: tsi.FileCreateReq, digest: str
+    req: tsi.FileCreateReq, digest: str, expire_at: datetime.datetime
 ) -> list[FileChunkCreateCHInsertable]:
     """Split a file_create payload into inline ClickHouse chunk rows.
 
     Shared between the synchronous file_create path and the bucket-upload
     `FileStorageWriteError` fallback so the chunking shape stays in one place.
+    Every chunk of a file carries the same expire_at so it never partially expires.
     """
     pieces = [
         req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
@@ -236,6 +242,7 @@ def file_chunks_for(
             val_bytes=chunk,
             bytes_stored=len(chunk),
             file_storage_uri=None,
+            expire_at=expire_at,
         )
         for i, chunk in enumerate(pieces)
     ]
