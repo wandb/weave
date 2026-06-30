@@ -443,8 +443,13 @@ FROM object_versions_with_index AS {main_table_alias}
 def make_objects_val_query_and_parameters(
     project_id: str, object_ids: list[str], digests: list[str]
 ) -> tuple[str, dict[str, Any]]:
+    # argMax over the (val_dump, expire_at) tuple so both come from the SAME
+    # latest row; two independent argMax could diverge on a created_at tie.
     query = """
-        SELECT object_id, digest, argMax(val_dump, created_at)
+        SELECT
+            object_id,
+            digest,
+            argMax((val_dump, expire_at), created_at) AS val_and_expire
         FROM object_versions
         WHERE project_id = {project_id: String} AND
             object_id IN {object_ids: Array(String)} AND

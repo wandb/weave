@@ -22,7 +22,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.ttl_settings import reset_ttl_cache
 
@@ -556,3 +556,113 @@ def test_ttl_obj_delete_stamps_tombstone_expire_at(internal_server):
             after,
             datetime.timedelta(days=30),
         )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: object read-gate determinism"
+)
+def test_ttl_object_read_gate_republish_keeps_value_live(internal_server):
+    """Re-publish extends lifetime (latest expire_at wins) and reads stay live."""
+    server = internal_server
+    _, pid = _make_project("obj_live")
+    _set_retention_days(server, pid, 30)
+    req = tsi.ObjCreateReq(
+        obj=tsi.ObjSchemaForInsert(project_id=pid, object_id="o", val={"v": 1})
+    )
+    res1 = server.obj_create(req)
+    res2 = server.obj_create(req)
+    assert res1.digest == res2.digest
+
+    server.ch_client.command("OPTIMIZE TABLE object_versions FINAL")
+    values = _read_object_expire_at(server, pid, "o")
+    assert len(values) == 1
+    assert _as_utc(values[0]) > datetime.datetime.now(datetime.timezone.utc)
+
+    read = server.obj_read(
+        tsi.ObjReadReq(project_id=pid, object_id="o", digest=res1.digest)
+    )
+    assert read.obj.val == {"v": 1}
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: object read-gate tombstone"
+)
+def test_ttl_object_read_gate_tombstones_expired_payload(internal_server):
+    """Gate on expire_at < now, not on empty val_dump: a non-empty but expired
+    payload still 404s instead of deserializing.
+    """
+    server = internal_server
+    _, pid = _make_project("obj_exp")
+    res = server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=pid, object_id="o", val={"v": 1})
+        )
+    )
+
+    # Newer row (later created_at) with content intact but a past expire_at:
+    # argMax picks the past expire_at, so the read must tombstone.
+    past = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    newer_created = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        minutes=1
+    )
+    server.ch_client.insert(
+        "object_versions",
+        [[pid, "object", "o", [], '{"v": 1}', res.digest, newer_created, past]],
+        column_names=[
+            "project_id",
+            "kind",
+            "object_id",
+            "refs",
+            "val_dump",
+            "digest",
+            "created_at",
+            "expire_at",
+        ],
+    )
+
+    with pytest.raises(NotFoundError):
+        server.obj_read(
+            tsi.ObjReadReq(project_id=pid, object_id="o", digest=res.digest)
+        )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: object read-gate listing"
+)
+def test_ttl_objs_query_tombstones_expired_value(internal_server):
+    """A listing keeps the expired version's metadata row but tombstones its value
+    to None (the metadata row survives; obj_read 404s the value).
+    """
+    server = internal_server
+    _, pid = _make_project("obj_query_exp")
+    res = server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(project_id=pid, object_id="o", val={"v": 1})
+        )
+    )
+    past = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    newer_created = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        minutes=1
+    )
+    server.ch_client.insert(
+        "object_versions",
+        [[pid, "object", "o", [], '{"v": 1}', res.digest, newer_created, past]],
+        column_names=[
+            "project_id",
+            "kind",
+            "object_id",
+            "refs",
+            "val_dump",
+            "digest",
+            "created_at",
+            "expire_at",
+        ],
+    )
+
+    result = server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=pid, filter=tsi.ObjectVersionFilter(object_ids=["o"])
+        )
+    )
+    assert len(result.objs) == 1
+    assert result.objs[0].val is None
