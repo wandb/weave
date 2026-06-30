@@ -3051,6 +3051,7 @@ def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_serve
 # ---------------------------------------------------------------------------
 
 
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to the immediate read.
 @pytest.mark.flaky(reruns=3)
 def test_filter_conversations_by_signal(ch_server):
     """E2E proof of signal filter union semantics and mutation-correctness.

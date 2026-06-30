@@ -107,7 +107,12 @@ def test_resolve_feedback_conversation_id():
         (turn_uri, "", "c-from-turn"),
         (span_uri, "", "c-from-span"),
         (turn_uri, "explicit", "explicit"),   # caller wins
-        ("weave-trace-internal:///ent/proj/call/x", "", ""),  # non-agent ref
+        # `call` is a known ref kind; parse_internal_uri returns InternalCallRef and
+        # the resolver falls through to the final `return ""` (not the except branch).
+        ("weave-trace-internal:///ent/proj/call/x", "", ""),
+        # Completely invalid scheme — parse_internal_uri raises InvalidInternalRef;
+        # this covers the `except InvalidInternalRef: return ""` branch.
+        ("not-a-valid-ref:///whatever", "", ""),
     ]
     for weave_ref, supplied, expected in cases:
         assert resolve_feedback_conversation_id(weave_ref, supplied, lookup) == expected
