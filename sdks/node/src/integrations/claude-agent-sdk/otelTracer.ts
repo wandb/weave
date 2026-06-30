@@ -129,7 +129,7 @@ function toolResultText(content: ToolResultBlock['content']): string {
   }
   // `content` is an array of content blocks here; keep the text parts.
   const text = content
-    .map(block => (block.type === 'text' ? block.text : ''))
+    .map((block: any) => (block.type === 'text' ? block.text : ''))
     .filter(Boolean)
     .join('\n');
   return text || JSON.stringify(content);
