@@ -14,6 +14,9 @@ from functools import partial
 
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.optimization_builder import (
+    DATETIME_BUFFER_TIME_SECONDS,
+)
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
@@ -43,6 +46,26 @@ END"""
 def _or_any_prefix_matches(op_name_expr: str, op_prefix_params: list[str]) -> str:
     """`multiSearchAny(op_name, [prefixes])`: matches if any prefix is a substring (engages idx_op_name ngrambf index)."""
     return f"multiSearchAny({op_name_expr}, [{', '.join(op_prefix_params)}])"
+
+
+def _build_eval_start_lower_bound(
+    project_id_param: str, eval_root_ids_param: str
+) -> str:
+    """sortable_datetime floor for the calls_merged scan, as a scalar subquery.
+
+    Predict-and-score calls start at/after their eval root, so bounding by the
+    roots' earliest start (minus a buffer) engages the sortable_datetime minmax
+    index and prunes granules. Falls back to epoch if the root start is NULL.
+    """
+    return f"""coalesce(
+        (
+            SELECT min(roots.started_at) - toIntervalSecond({DATETIME_BUFFER_TIME_SECONDS})
+            FROM calls_merged AS roots
+            PREWHERE roots.project_id = {project_id_param}
+            WHERE roots.id IN {eval_root_ids_param}
+        ),
+        toDateTime64(0, 3)
+    )"""
 
 
 def _sort_filter_uses_inputs(
@@ -96,6 +119,9 @@ def build_predict_and_score_calls_cte(
     )
 
     if read_table == "calls_merged":
+        eval_start_lower_bound = _build_eval_start_lower_bound(
+            project_id_param, eval_root_ids_param
+        )
         return f"""predict_and_score_calls AS (
     SELECT
         calls_merged.id AS call_id,
@@ -114,6 +140,7 @@ def build_predict_and_score_calls_cte(
         {op_match_where}
         OR calls_merged.op_name IS NULL
     )
+    AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
     HAVING any(calls_merged.parent_id) IN {eval_root_ids_param}
         AND ({op_match_having})
