@@ -19,6 +19,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -28,6 +29,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    RatingCondition,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
@@ -2054,3 +2056,17 @@ class TestBuildOrderBy:
             build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
             == "started_at desc, input_tokens asc"
         )
+
+
+def test_signal_filter_round_trip() -> None:
+    req = AgentSpansQueryReq(
+        project_id="ent/proj",
+        signal_filters=AgentSignalFilter(
+            tags=["a", "b"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert req.signal_filters.tags == ["a", "b"]
+    assert req.signal_filters.ratings[0].op == "gte"
+    assert AgentSignalFilter().is_empty() is True
+    assert req.signal_filters.is_empty() is False

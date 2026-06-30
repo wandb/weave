@@ -748,6 +748,20 @@ class AgentSpanGroupRow(BaseModel):
     )
 
 
+class RatingCondition(BaseModel):
+    scorer_key: str
+    op: Literal["gte", "gt", "lte", "lt", "eq"]
+    value: float
+
+
+class AgentSignalFilter(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+    ratings: list[RatingCondition] = Field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        return not self.tags and not self.ratings
+
+
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
@@ -784,6 +798,7 @@ class AgentSpansQueryReq(BaseModel):
     offset: int = Field(default=0, ge=0)
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
+    signal_filters: AgentSignalFilter | None = None
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
