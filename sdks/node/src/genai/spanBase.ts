@@ -72,8 +72,8 @@ export abstract class SpanBase {
    * no-ops after `end()`. Mirrors OTel `Span.addEvent`.
    *
    * @deprecated Record this data via {@link setAttributes} instead.
-   * OpenTelemetry is phasing out the Span Event API (`Span.addEvent`; OTEP
-   * 4430). This method still works and existing span-event data stays valid.
+   * OpenTelemetry is phasing out the Span Event API (`Span.addEvent`). This
+   * method still works and existing span-event data stays valid.
    * See https://opentelemetry.io/blog/2026/deprecating-span-events/
    *
    * @example

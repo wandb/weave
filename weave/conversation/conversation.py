@@ -125,13 +125,13 @@ def _capture_info_attrs() -> dict[str, str]:
 
 
 # Forward-looking deprecation: OpenTelemetry is phasing out the Span Event API
-# (``Span.add_event``; OTEP 4430), so we steer callers to ``set_attributes``,
+# (``Span.add_event``), so we steer callers to ``set_attributes``,
 # which Weave already records and surfaces in the Agents tab. ``add_event``
 # still works and existing span-event data stays valid.
 # https://opentelemetry.io/blog/2026/deprecating-span-events/
 _ADD_EVENT_DEPRECATION_MESSAGE = (
     "`add_event` is deprecated; record this data with `set_attributes` instead. "
-    "OpenTelemetry is phasing out the Span Event API (`Span.add_event`; OTEP 4430)."
+    "OpenTelemetry is phasing out the Span Event API (`Span.add_event`)."
 )
 
 
@@ -265,7 +265,7 @@ class _SpanBase(BaseModel):
 
         .. deprecated::
             Record this data with ``set_attributes`` instead. OpenTelemetry is
-            phasing out the Span Event API (``Span.add_event``; OTEP 4430).
+            phasing out the Span Event API (``Span.add_event``).
             ``add_event`` still works and existing span-event data stays valid.
             See https://opentelemetry.io/blog/2026/deprecating-span-events/.
 
