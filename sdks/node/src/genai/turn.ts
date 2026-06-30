@@ -25,6 +25,10 @@ import {Tool, type ToolInit} from './tool';
 export interface TurnInit extends SpanInitBase {
   agentName?: string;
   model?: string;
+  /** Custom attributes stamped on this turn and propagated to every child span
+   *  (chat, tool, subagent). Use for a rootless turn with no Conversation; a
+   *  Conversation forwards its own `attributes` here automatically. */
+  attributes?: Attributes;
 }
 
 /**
@@ -54,6 +58,7 @@ export class Turn extends SpanBase {
     span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
+    private readonly attributes: Attributes,
     public readonly agentName: string,
     public readonly model: string
   ) {
@@ -68,8 +73,15 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {
+    // The propagating set: conversation attributes (when the conversation is
+    // ambient) merged with any threaded/explicit turn attributes. Stored on the
+    // turn so its children inherit it via the handle chain.
+    const propagated: Attributes = {
       ...(state.conversation?.attributes ?? {}),
+      ...(opts.attributes ?? {}),
+    };
+    const attributes: Attributes = {
+      ...propagated,
       [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
     };
     if (opts.agentName) {
@@ -93,6 +105,7 @@ export class Turn extends SpanBase {
       span,
       trace.setSpan(ROOT_CONTEXT, span),
       opts.conversationId ?? '',
+      propagated,
       opts.agentName ?? '',
       opts.model ?? ''
     );
@@ -106,6 +119,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      attributes: this.attributes,
     });
   }
 
@@ -115,6 +129,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      attributes: this.attributes,
     });
   }
 
@@ -124,6 +139,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      attributes: this.attributes,
     });
   }
 
