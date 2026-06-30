@@ -60,6 +60,7 @@ TABLE_FEEDBACK = Table(
         Column("span_agent_name", "string"),
         Column("span_agent_version", "string"),
         Column("span_status_code", "string"),
+        Column("conversation_id", "string"),
     ],
 )
 
@@ -321,6 +322,7 @@ def format_feedback_to_row(
         "span_agent_name": feedback_req.span_agent_name,
         "span_agent_version": feedback_req.span_agent_version,
         "span_status_code": feedback_req.span_status_code,
+        "conversation_id": feedback_req.conversation_id,
     }
 
 

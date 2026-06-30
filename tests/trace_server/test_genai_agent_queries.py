@@ -2221,3 +2221,76 @@ def test_query_dsl_typed_custom_attr_comparison(ch_server):
     )
     assert res.total_count == 1
     assert len(res.spans) == 1
+
+
+# ---------------------------------------------------------------------------
+# Tests: conversation_id persisted on agent feedback create
+# ---------------------------------------------------------------------------
+
+
+def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
+    """Feedback targeting a conversation ref resolves conversation_id from the ref itself."""
+    project_id = _make_project_id("fb-conv-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["conversation_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [{"conversation_id": conv_id, "scorer_tags": ["hallucination"]}]
+
+
+def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_server):
+    """Feedback targeting a turn ref resolves conversation_id via the spans table."""
+    project_id = _make_project_id("fb-turn-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_id = uuid.uuid4().hex
+
+    # Seed a span with the conversation_id so the lookup can resolve it.
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                trace_id=trace_id,
+                operation_name="invoke_agent",
+                conversation_id=conv_id,
+            )
+        ],
+    )
+
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["low-quality"],
+            wb_user_id="u2",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["conversation_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [{"conversation_id": conv_id, "scorer_tags": ["low-quality"]}]
