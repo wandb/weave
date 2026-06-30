@@ -888,6 +888,71 @@ class TestMakeGroupedSpansListQuery:
                 ),
             )
 
+    def test_grouped_query_without_signal_filters_unchanged(self) -> None:
+        """Grouped query with no signal_filters produces no semi-join."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            ),
+        )
+
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_grouped_query_with_signal_filter_adds_semijoin(self) -> None:
+        """Grouped query with signal_filters appends AND s.conversation_id IN (...)."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            ),
+        )
+
+        # Signal subquery params: genai_3 = project_id, genai_4 = tags array
+        # Source params start at genai_5
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.conversation_id IN (SELECT conversation_id
+                                        FROM feedback
+                                        WHERE project_id = {{genai_3:String}}
+                                          AND feedback_type IN ('wandb.agent_user_feedback',
+                                                                'wandb.agent_monitor')
+                                          AND hasAny(scorer_tags, {{genai_4:Array(String)}})
+                                          AND conversation_id != '')
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "p1",
+            "genai_4": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_span_group_*_distribution_query

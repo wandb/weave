@@ -1150,13 +1150,19 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
+    signal_subquery = build_signal_filter_subquery(pb, req.project_id, req.signal_filters)
+    grouped_where = span_filters.where
+    if signal_subquery is not None:
+        grouped_where = (
+            f"{grouped_where} AND s.conversation_id IN ({signal_subquery})"
+        )
     source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
         SELECT {select_group_cols},
                {aggregate_selects}
         FROM {source} s
-        WHERE {span_filters.where}
+        WHERE {grouped_where}
         GROUP BY {group_by_clause}
         {having_sql}
         ORDER BY {order_by}
