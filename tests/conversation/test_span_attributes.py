@@ -121,14 +121,14 @@ def test_add_event_no_op_after_end(
 def test_add_event_emits_deprecation_warning(
     otel_spans: InMemorySpanExporter,
 ) -> None:
-    """``add_event`` is deprecated (OTel Span Event API / OTEP 4430) yet still records.
+    """``add_event`` is deprecated in favor of ``set_attributes`` yet still records.
 
     The deprecation lives on ``_SpanBase`` so a single span class exercises it,
     matching the warning tests below. The event is still emitted — deprecation
     only marks direction; the method keeps working.
     """
     with Conversation(conversation_id="test-conversation"), Tool(name="t") as tool:
-        with pytest.warns(DeprecationWarning, match="Span Event API"):
+        with pytest.warns(DeprecationWarning, match="set_attributes"):
             tool.add_event("weave.evt", {"event_key": "event_value"})
     finished_span = _only_span(otel_spans.get_finished_spans(), "execute_tool t")
     assert len(finished_span.events) == 1
