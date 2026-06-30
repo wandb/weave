@@ -1073,11 +1073,12 @@ class Conversation(BaseModel):
 
     conversation_id: str = ""
     conversation_name: str = ""
+    # Conversation-level defaults: each turn inherits these, its own value
+    # winning per-field. system_instructions is intentionally excluded — it's
+    # gated/redacted content that varies per turn, so it stays a per-turn /
+    # per-LLM field.
     agent_name: str = ""
     model: str = ""
-    # Agent-identity defaults; each turn inherits these (its own value wins).
-    # system_instructions is excluded — gated/redacted content that varies
-    # per turn, so it stays a per-turn / per-LLM field.
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
@@ -1108,9 +1109,9 @@ class Conversation(BaseModel):
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
-        Propagates ``continue_parent_trace`` and the agent-identity defaults
-        (``agent_id`` / ``agent_description`` / ``agent_version``) from this
-        conversation; override any of them per turn via ``turn.record(...)``.
+        Propagates ``continue_parent_trace`` and the conversation's
+        ``agent_id`` / ``agent_description`` / ``agent_version`` defaults to the
+        new turn; override any of them per turn via ``turn.record(...)``.
 
         ``system_instructions`` (the agent's system prompt) is carried on the
         turn's invoke_agent span; it can also be set later via attribute
@@ -1518,8 +1519,8 @@ def log_turn(
     queue workers). Each child span passed in should have ``started_at`` /
     ``ended_at`` set; the emitted OTel span timestamps come from those fields.
     Falls back to the earliest/latest child timestamp, then ``now()``, when
-    the turn doesn't supply its own. The agent-identity fields (``agent_id`` /
-    ``agent_description`` / ``agent_version``) mirror the streaming path.
+    the turn doesn't supply its own. ``agent_id`` / ``agent_description`` /
+    ``agent_version`` mirror the streaming path.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
     these from the active conversation instead. Use custom, non-semconv keys: a
@@ -1578,10 +1579,9 @@ def log_conversation(
 
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
     ``conversation_id`` if empty. By default each turn gets its own OTel trace.
-    ``agent_name`` / ``model`` and the agent-identity defaults (``agent_id`` /
-    ``agent_description`` / ``agent_version``) are conversation-level defaults — a
-    Turn's own value wins; the conversation value only fills in when the Turn leaves
-    it empty. The conversation's ``continue_parent_trace`` applies to every turn (a
+    ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description`` /
+    ``agent_version`` are conversation-level defaults — a Turn's own value wins;
+    the conversation value only fills in when the Turn leaves it empty. The conversation's ``continue_parent_trace`` applies to every turn (a
     per-Turn ``continue_parent_trace`` is intentionally superseded here).
 
     ``attributes`` are stamped on every emitted span. Use custom, non-semconv
