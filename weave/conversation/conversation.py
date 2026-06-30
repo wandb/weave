@@ -1073,10 +1073,8 @@ class Conversation(BaseModel):
 
     conversation_id: str = ""
     conversation_name: str = ""
-    # Conversation-level defaults: each turn inherits these, its own value
-    # winning per-field. system_instructions is intentionally excluded — it's
-    # gated/redacted content that varies per turn, so it stays a per-turn /
-    # per-LLM field.
+    # Conversation-level defaults each turn inherits (its own value wins).
+    # system_instructions is excluded — it varies per turn.
     agent_name: str = ""
     model: str = ""
     agent_id: str = ""
@@ -1103,15 +1101,19 @@ class Conversation(BaseModel):
         user_message: str = "",
         model: str = "",
         agent_name: str = "",
+        agent_id: str = "",
+        agent_description: str = "",
+        agent_version: str = "",
         system_instructions: list[str] | None = None,
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
-        Propagates ``continue_parent_trace`` and the conversation's
-        ``agent_id`` / ``agent_description`` / ``agent_version`` defaults to the
-        new turn; override any of them per turn via ``turn.record(...)``.
+        Each of ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description``
+        / ``agent_version`` falls back to the conversation's default when left
+        empty; ``continue_parent_trace`` is inherited. Override any of them later
+        via ``turn.record(...)``.
 
         ``system_instructions`` (the agent's system prompt) is carried on the
         turn's invoke_agent span; it can also be set later via attribute
@@ -1122,9 +1124,9 @@ class Conversation(BaseModel):
         turn = Turn(
             agent_name=agent_name or self.agent_name,
             model=model or self.model,
-            agent_id=self.agent_id,
-            agent_description=self.agent_description,
-            agent_version=self.agent_version,
+            agent_id=agent_id or self.agent_id,
+            agent_description=agent_description or self.agent_description,
+            agent_version=agent_version or self.agent_version,
             system_instructions=system_instructions or [],
             continue_parent_trace=self.continue_parent_trace,
         )

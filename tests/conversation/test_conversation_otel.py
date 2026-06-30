@@ -1013,6 +1013,34 @@ class TestOTelSpanEmission:
         assert attrs["gen_ai.agent.id"] == "agent-8"
         assert attrs["gen_ai.agent.version"] == "v4"
 
+    def test_start_turn_kwargs_override_conversation_agent_identity(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        # start_turn takes agent_id/description/version directly (like
+        # log_turn/log_conversation), so a turn can override the conversation
+        # default at creation without a follow-up turn.record(...).
+        with Conversation(
+            agent_name="bot",
+            conversation_id="convo-ident-start-kwargs",
+            agent_id="agent-7",
+            agent_description="Default desc",
+            agent_version="v3",
+        ) as s:
+            with s.start_turn(
+                agent_id="agent-8",
+                agent_description="Override desc",
+                agent_version="v4",
+            ):
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.agent.id"] == "agent-8"
+        assert attrs["gen_ai.agent.description"] == "Override desc"
+        assert attrs["gen_ai.agent.version"] == "v4"
+
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Conversation(agent_name="bot", conversation_id="convo-llm") as s:
             with s.start_turn() as turn:
