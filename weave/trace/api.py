@@ -190,6 +190,7 @@ def publish(
     name: str | None = None,
     tags: list[str] | None = None,
     aliases: list[str] | None = None,
+    disable_logging: bool = False
 ) -> ObjectRef:
     """Save and version a Python object.
 
@@ -254,16 +255,17 @@ def publish(
                 ref.digest,
             )
         # Ensure logger level is up to date before logging
-        update_logger_level()
-        msg = f"{TRACE_OBJECT_EMOJI} Published to {url}"
-        if tags or aliases:
-            extras = []
-            if tags:
-                extras.append(f"tags: {', '.join(tags)}")
-            if aliases:
-                extras.append(f"aliases: {', '.join(aliases)}")
-            msg += f" ({'; '.join(extras)})"
-        logger.info(msg)
+        if disable_logging:
+            update_logger_level()
+            msg = f"{TRACE_OBJECT_EMOJI} Published to {url}"
+            if tags or aliases:
+                extras = []
+                if tags:
+                    extras.append(f"tags: {', '.join(tags)}")
+                if aliases:
+                    extras.append(f"aliases: {', '.join(aliases)}")
+                msg += f" ({'; '.join(extras)})"
+            logger.info(msg)
     return ref
 
 
