@@ -6479,6 +6479,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             validate_feedback_create_req(feedback_req, self)
 
             if feedback_req.feedback_type in AGENT_SPAN_FEEDBACK_TYPES:
+                # TODO: batch span lookups by trace_id when batch sizes grow
                 feedback_req = feedback_req.model_copy(
                     update={
                         "conversation_id": resolve_feedback_conversation_id(
