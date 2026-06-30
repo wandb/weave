@@ -1242,19 +1242,30 @@ def test_select_objs_query_partial_value_miss_returns_empty():
 
     assert result == []
 
-    # Sanity: when the value row is present, we get a populated result.
+    # Sanity: when the value row is present, we get a populated result. The
+    # value query projects argMax((val_dump, expire_at)) as one tuple column;
+    # a far-future expire_at is live.
     with patch.object(
         chts.ClickHouseTraceServer,
         "_query_stream",
         side_effect=[
             iter([metadata_row]),
-            iter([("obj-id-1", "digest-abc", '{"x": 1}')]),
+            iter(
+                [
+                    (
+                        "obj-id-1",
+                        "digest-abc",
+                        ('{"x": 1}', datetime(2100, 1, 1, tzinfo=timezone.utc)),
+                    )
+                ]
+            ),
         ],
     ):
         result = server._select_objs_query(builder, metadata_only=False)
 
     assert len(result) == 1
     assert result[0].val_dump == '{"x": 1}'
+    assert result[0].expired is False
 
 
 def test_file_content_read_retries_eventual_consistency():

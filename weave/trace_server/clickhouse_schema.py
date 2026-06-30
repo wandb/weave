@@ -218,6 +218,9 @@ class SelectableCHObjSchema(BaseModel):
     is_latest: int
     deleted_at: datetime.datetime | None = None
     size_bytes: int | None = None
+    # True when the version's payload has expired (argMax(expire_at) < now); the
+    # metadata row survives but val_dump is treated as gone, not deserialized.
+    expired: bool = False
 
 
 CallCHInsertable = (

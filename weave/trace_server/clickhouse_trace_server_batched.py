@@ -2256,6 +2256,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"{req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
                 deleted_at=obj.deleted_at,
             )
+        if obj.expired:
+            raise NotFoundError(f"Obj {req.object_id}:{req.digest} payload expired")
 
         obj_schema = ch_obj_to_obj_schema(obj)
         if req.include_tags_and_aliases:
@@ -3791,6 +3793,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Op {req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
                 deleted_at=obj.deleted_at,
             )
+        if obj.expired:
+            raise NotFoundError(f"Op {req.object_id}:{req.digest} payload expired")
 
         # For ops, the object_id is the function name since ops don't have
         # a "name" field in their val object. Ops are stored as CustomWeaveType
@@ -7175,11 +7179,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digests=list({row.digest for row in metadata_result}),
         )
         query_result = self._query_stream(value_query, value_parameters)
-        # Map (object_id, digest) to val_dump
-        object_values: dict[tuple[str, str], Any] = {}
+        # Map (object_id, digest) to (val_dump, expire_at). expire_at gates
+        # expiry deterministically under ReplacingMergeTree dedup: argMax picks
+        # the latest version's expire_at, so a re-publish extends the lifetime.
+        now = datetime.datetime.now(datetime.timezone.utc)
+        object_values: dict[tuple[str, str], tuple[str, bool]] = {}
         for row in query_result:
-            (object_id, digest, val_dump) = row
-            object_values[object_id, digest] = val_dump
+            (object_id, digest, (val_dump, expire_at)) = row
+            expired = ensure_datetimes_have_tz_strict(expire_at) < now
+            # Tombstone expired payloads: never hand a TTL-cleared (or stale)
+            # val_dump to the deserializer; "null" reads back as None.
+            object_values[object_id, digest] = (
+                ("null", True) if expired else (val_dump, False)
+            )
 
         # All-or-nothing: if any metadata row is missing its value row (e.g. due
         # to ClickHouse replication lag), return empty so callers raise
@@ -7190,7 +7202,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not all_value_rows_found:
             return []
         for obj in metadata_result:
-            obj.val_dump = object_values[obj.object_id, obj.digest]
+            obj.val_dump, obj.expired = object_values[obj.object_id, obj.digest]
         return metadata_result
 
     def _run_migrations(self) -> None:
