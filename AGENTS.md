@@ -73,6 +73,14 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Agent Span Eval Linkage
+
+Agent spans promote selected `weave.eval.*` attributes into first-class
+`spans` columns for efficient agent/eval queries. Keep
+`weave/trace_server/agents/semconv.py`, `agents/schema.py`,
+`agents/types.py`, OTel extraction, query-builder allowlists, and ClickHouse
+migrations in sync when adding or renaming these fields.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).

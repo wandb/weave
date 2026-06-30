@@ -448,6 +448,13 @@ class AgentSpanSchema(BaseModel):
     agent_id: str | None = None
     agent_description: str | None = None
     agent_version: str | None = None
+    eval_run_id: str | None = None
+    eval_predict_and_score_call_id: str | None = None
+    eval_kind: str | None = None
+    eval_row_digest: str | None = None
+    eval_example_id: str | None = None
+    eval_trial_index: int | None = None
+    eval_evaluation_name: str | None = None
     request_model: str | None = None
     response_model: str | None = None
     response_id: str | None = None
