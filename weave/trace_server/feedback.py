@@ -1,5 +1,6 @@
 import datetime
 import json
+from collections.abc import Callable
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -321,6 +322,33 @@ def format_feedback_to_row(
         "span_agent_version": feedback_req.span_agent_version,
         "span_status_code": feedback_req.span_status_code,
     }
+
+
+def resolve_feedback_conversation_id(
+    weave_ref: str,
+    supplied_conversation_id: str,
+    span_lookup: Callable[[str, str], str],
+) -> str:
+    """Resolve the conversation a feedback row belongs to for denormalization.
+
+    Caller-supplied value wins. Otherwise derive from the target ref: a
+    conversation ref is self-sufficient; a turn/span ref is resolved to its
+    conversation via `span_lookup`. Returns '' when unknown (row stays
+    invisible to the signal filter until a backfill runs).
+    """
+    if supplied_conversation_id:
+        return supplied_conversation_id
+    try:
+        ref = ri.parse_internal_uri(weave_ref)
+    except ri.InvalidInternalRef:
+        return ""
+    if isinstance(ref, ri.InternalAgentConversationRef):
+        return ref.conversation_id
+    if isinstance(ref, ri.InternalAgentTurnRef):
+        return span_lookup(ref.trace_id, "")
+    if isinstance(ref, ri.InternalAgentSpanRef):
+        return span_lookup("", ref.span_id)
+    return ""
 
 
 def format_feedback_to_res(row: Row) -> tsi.FeedbackCreateRes:
