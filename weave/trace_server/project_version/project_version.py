@@ -1,7 +1,7 @@
 import logging
 import threading
 
-from cachetools import LRUCache
+from cachetools import LRUCache, TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server.datadog import (
@@ -22,23 +22,27 @@ from weave.trace_server.tracing import _tracer
 logger = logging.getLogger(__name__)
 
 PROJECT_RESIDENCE_CACHE_SIZE = 10_000
+# Populated residence is immutable per project, so it is cached without expiry.
+# EMPTY is cached only briefly: a stale EMPTY routes reads to calls_complete while
+# a legacy (V1) first write lands in calls_merged, so the read misses fresh data
+# until the entry expires. The short TTL bounds that window; the miss self-heals.
+EMPTY_RESIDENCE_CACHE_TTL_SECS = 10
 
-# Global cache shared across all resolvers
+# Global caches shared across all resolvers and threads, keyed by project_id.
 _project_residence_cache: LRUCache[str, ProjectDataResidence] = LRUCache(
     maxsize=PROJECT_RESIDENCE_CACHE_SIZE
+)
+_empty_residence_cache: TTLCache[str, ProjectDataResidence] = TTLCache(
+    maxsize=PROJECT_RESIDENCE_CACHE_SIZE, ttl=EMPTY_RESIDENCE_CACHE_TTL_SECS
 )
 _project_residence_cache_lock = threading.Lock()
 
 
 def reset_project_residence_cache() -> None:
-    """Clear the cached project data residence entries.
-
-    Examples:
-        >>> reset_project_residence_cache()
-
-    """
+    """Clear the cached project data residence entries."""
     with _project_residence_cache_lock:
         _project_residence_cache.clear()
+        _empty_residence_cache.clear()
 
 
 class TableRoutingResolver:
@@ -55,6 +59,8 @@ class TableRoutingResolver:
     ) -> ProjectDataResidence:
         with _project_residence_cache_lock:
             cached = _project_residence_cache.get(project_id)
+            if cached is None:
+                cached = _empty_residence_cache.get(project_id)
         if cached is not None:
             return cached
 
@@ -79,9 +85,12 @@ class TableRoutingResolver:
                     }
                 )
 
-            # Don't cache if project is empty, we could write to either table.
-            if residence != ProjectDataResidence.EMPTY:
-                with _project_residence_cache_lock:
+            # Populated residence is immutable -> long-lived cache; EMPTY is
+            # cached briefly (short TTL) so cold projects stop re-probing CH.
+            with _project_residence_cache_lock:
+                if residence == ProjectDataResidence.EMPTY:
+                    _empty_residence_cache[project_id] = residence
+                else:
                     _project_residence_cache[project_id] = residence
 
             return residence
