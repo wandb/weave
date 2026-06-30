@@ -42,6 +42,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
+    build_signal_filter_subquery,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -1743,3 +1744,39 @@ def test_signal_filter_round_trip() -> None:
     assert req.signal_filters.ratings[0].op == "gte"
     assert AgentSignalFilter().is_empty() is True
     assert req.signal_filters.is_empty() is False
+
+
+def test_build_signal_filter_subquery() -> None:
+    # Empty / None -> None
+    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", None) is None
+    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", AgentSignalFilter()) is None
+
+    # Tags + rating -> full parameterized subquery
+    pb = ParamBuilder()
+    sql = build_signal_filter_subquery(
+        pb,
+        "ent/proj",
+        AgentSignalFilter(
+            tags=["x", "y"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert sql is not None
+    params = pb.get_params()
+    # Assert the complete normalized SQL (collapsed whitespace) and all params.
+    # feedback_type IN (...) is hardcoded SQL — no param slot for it.
+    normalized = " ".join(sql.split())
+    pid_p, tags_p, key_p, val_p = list(params.keys())
+    assert normalized == (
+        f"SELECT conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_user_feedback', 'wandb.agent_monitor') "
+        f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
+        f"AND (mapContains(scorer_ratings, {{{key_p}:String}}) "
+        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) "
+        f"AND conversation_id != ''"
+    )
+    assert params[pid_p] == "ent/proj"
+    assert params[tags_p] == ["x", "y"]
+    assert params[key_p] == "_rating_"
+    assert params[val_p] == 0.8
