@@ -666,3 +666,119 @@ def test_ttl_objs_query_tombstones_expired_value(internal_server):
     )
     assert len(result.objs) == 1
     assert result.objs[0].val is None
+
+
+def _read_table_rows_expire_at(
+    server: ClickHouseTraceServer, internal_project_id: str
+) -> list[datetime.datetime]:
+    """Raw-read expire_at for every table_rows row in a project."""
+    result = server.ch_client.query(
+        "SELECT expire_at FROM table_rows WHERE project_id = {project_id:String} "
+        "ORDER BY digest",
+        parameters={"project_id": internal_project_id},
+    )
+    return [row[0] for row in result.result_rows]
+
+
+@pytest.mark.parametrize(("retention_days", "expected_delta"), RETENTION_CASES)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
+def test_ttl_table_create_sets_expire_at(
+    internal_server, retention_days, expected_delta
+):
+    """table_create stamps one identical expire_at across all rows (sentinel when no TTL)."""
+    server = internal_server
+    _, pid = _make_project("table_rows")
+    _set_retention_days(server, pid, retention_days)
+
+    before = datetime.datetime.now(datetime.timezone.utc)
+    server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=pid, rows=[{"a": 1}, {"b": 2}, {"c": 3}]
+            )
+        )
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+
+    values = _read_table_rows_expire_at(server, pid)
+    assert len(values) == 3
+    # Every row of a table digest shares the same expire_at (no partial expiry).
+    assert len({_as_utc(v) for v in values}) == 1
+    for value in values:
+        _assert_expire_at_in_window(value, before, after, expected_delta)
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw expire_at table reads"
+)
+def test_ttl_table_update_stamps_appended_rows(internal_server):
+    """table_update appends rows that also carry a computed expire_at."""
+    server = internal_server
+    _, pid = _make_project("table_update")
+    _set_retention_days(server, pid, 30)
+
+    created = server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=pid, rows=[{"a": 1}])
+        )
+    )
+    server.table_update(
+        tsi.TableUpdateReq(
+            project_id=pid,
+            base_digest=created.digest,
+            updates=[
+                tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row={"b": 2}))
+            ],
+        )
+    )
+
+    values = _read_table_rows_expire_at(server, pid)
+    assert len(values) == 2
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for value in values:
+        assert _as_utc(value) > now
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: table read-gate on TTL-cleared rows",
+)
+def test_ttl_table_query_skips_ttl_cleared_rows(internal_server):
+    """A val_dump emptied by column TTL is dropped on read, never json.loads('')'d
+    into a 500. argMax(val_dump, created_at) picks the newer cleared copy.
+    """
+    server = internal_server
+    _, pid = _make_project("table_ttl_clear")
+    created = server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(project_id=pid, rows=[{"a": 1}, {"b": 2}])
+        )
+    )
+    expired_digest = created.row_digests[0]
+    past = datetime.datetime(2000, 1, 1, tzinfo=datetime.timezone.utc)
+    newer_created = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
+        minutes=1
+    )
+    # Simulate the post-TTL state: a newer row for the same digest with val_dump
+    # cleared to '' and a past expire_at.
+    server.ch_client.insert(
+        "table_rows",
+        [[pid, expired_digest, [], "", newer_created, past]],
+        column_names=[
+            "project_id",
+            "digest",
+            "refs",
+            "val_dump",
+            "created_at",
+            "expire_at",
+        ],
+    )
+
+    result = server.table_query(
+        tsi.TableQueryReq(project_id=pid, digest=created.digest)
+    )
+    returned = {row.digest: row.val for row in result.rows}
+    assert expired_digest not in returned
+    assert returned == {created.row_digests[1]: {"b": 2}}

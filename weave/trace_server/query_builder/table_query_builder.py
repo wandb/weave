@@ -66,10 +66,11 @@ def make_natural_sort_table_query(
         ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
     ) AS t
     INNER JOIN (
-        SELECT digest, val_dump
+        SELECT digest, argMax(val_dump, created_at) AS val_dump
         FROM table_rows
         WHERE project_id = {{{project_id_name}: String}}
           AND digest IN (SELECT arrayJoin(arr) FROM digests_arr)
+        GROUP BY digest
     ) AS tr ON tr.digest = t.row_digest
     ORDER BY original_index ASC
     """
@@ -156,11 +157,12 @@ def make_standard_table_query(
             ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
         ) AS t
         INNER JOIN (
-            SELECT digest, val_dump
+            SELECT digest, argMax(val_dump, created_at) AS val_dump
             FROM table_rows
             WHERE project_id = {{{project_id_name}: String}}
               {sql_safe_digest_pushdown}
               AND digest IN (SELECT arrayJoin(arr) FROM digests_arr)
+            GROUP BY digest
         ) AS tr ON tr.digest = t.row_digest
         {sql_safe_filter_clause}
     ) AS tr
@@ -244,14 +246,15 @@ def make_table_rows_read_batch_query(
 ) -> str:
     """Generate a query to batch-read table_rows by digest.
 
-    Returns one row per digest with the resolved val_dump.
-    Uses any() because table_rows is a ReplacingMergeTree and
-    may have duplicate rows per digest.
+    Returns one row per digest with the resolved val_dump. Uses
+    argMax(val_dump, created_at) so the freshest insert wins: this both
+    dedupes the ReplacingMergeTree and prefers a live row over a copy
+    whose val_dump TTL has cleared it.
     """
     project_param = pb.add(project_id, None, "String")
     digests_param = pb.add(digests, None, "Array(String)")
     return f"""
-        SELECT digest, any(val_dump) AS val_dump
+        SELECT digest, argMax(val_dump, created_at) AS val_dump
         FROM table_rows
         PREWHERE project_id = {project_param}
         WHERE digest IN {digests_param}
