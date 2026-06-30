@@ -10,7 +10,7 @@ This module owns the deferred-upload buffer and the fan-out step:
 
     bucket_uploads = BucketUploadBatch()
     ...
-    bucket_uploads.stage(req, digest, expire_at)  # cheap, in-memory only
+    bucket_uploads.stage(req, digest, expire_at, retention_days)  # in-memory only
     ...
     rows = bucket_uploads.flush(client)      # parallel upload -> CH rows
     self._file_batch.extend(rows)
@@ -77,6 +77,7 @@ class _Pending:
     req: tsi.FileCreateReq
     digest: str
     expire_at: datetime.datetime
+    retention_days: int
 
 
 class BucketUploadBatch:
@@ -94,7 +95,11 @@ class BucketUploadBatch:
         self._total_bytes = 0
 
     def stage(
-        self, req: tsi.FileCreateReq, digest: str, expire_at: datetime.datetime
+        self,
+        req: tsi.FileCreateReq,
+        digest: str,
+        expire_at: datetime.datetime,
+        retention_days: int,
     ) -> None:
         """Defer a bucket upload until `flush()`.
 
@@ -121,7 +126,14 @@ class BucketUploadBatch:
                 f"BucketUploadBatch would exceed max_bytes={self._max_bytes}: "
                 f"staged={self._total_bytes}, new={size}"
             )
-        self._pending.append(_Pending(req=req, digest=digest, expire_at=expire_at))
+        self._pending.append(
+            _Pending(
+                req=req,
+                digest=digest,
+                expire_at=expire_at,
+                retention_days=retention_days,
+            )
+        )
         self._seen.add(key)
         self._total_bytes += size
 
@@ -200,7 +212,11 @@ def _upload_one(
 ) -> list[FileChunkCreateCHInsertable]:
     try:
         uri = store_in_bucket(
-            client, key_for_project_digest(p.req.project_id, p.digest), p.req.content
+            client,
+            key_for_project_digest(p.req.project_id, p.digest),
+            p.req.content,
+            retention_days=p.retention_days,
+            expire_at=p.expire_at,
         )
     except FileStorageWriteError:
         return file_chunks_for(p.req, p.digest, p.expire_at)

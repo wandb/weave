@@ -6130,10 +6130,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.FileCreateRes(digest=digest)
 
         # Files share the plain per-project retention (co-created with their
-        # call); the identical expire_at is stamped on every chunk row.
+        # call); the identical expire_at is stamped on every chunk row, and
+        # retention_days tags the bucket blob for native lifecycle expiry.
+        retention_days = get_project_retention_days(req.project_id, self.ch_client)
         expire_at = compute_expire_at_for_insert(
-            get_project_retention_days(req.project_id, self.ch_client),
-            datetime.datetime.now(datetime.timezone.utc),
+            retention_days, datetime.datetime.now(datetime.timezone.utc)
         )
 
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
@@ -6141,7 +6142,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client, expire_at)
+                self._file_create_bucket(req, digest, client, expire_at, retention_days)
             except FileStorageWriteError:
                 self._file_create_clickhouse(req, digest, expire_at)
         else:
@@ -6163,6 +6164,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         digest: str,
         client: FileStorageClient,
         expire_at: datetime.datetime,
+        retention_days: int,
     ) -> None:
         if not self._flush_immediately:
             # Inside call_batch(): stage for the parallel flush at the end so
@@ -6171,11 +6173,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # handled inside _upload_one, not by the caller's except arm; root-
             # span attribution is deferred to bucket_upload_batch.flush so the
             # tag matches where the bytes actually land.
-            self._bucket_uploads.stage(req, digest, expire_at)
+            self._bucket_uploads.stage(req, digest, expire_at, retention_days)
             return
         set_root_span_dd_tags({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
-            client, key_for_project_digest(req.project_id, digest), req.content
+            client,
+            key_for_project_digest(req.project_id, digest),
+            req.content,
+            retention_days=retention_days,
+            expire_at=expire_at,
         )
         self._insert_file_chunks(
             [
