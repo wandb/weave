@@ -127,6 +127,94 @@ def test_spans_insert_and_query(ch_server):
     assert all(s.agent_name == "agent-A" for s in res_filtered.spans)
 
 
+def test_eval_span_fields_are_queryable(ch_server):
+    """Eval metadata is first-class span data, not custom attrs."""
+    project_id = _make_project_id("eval_spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-1",
+            eval_predict_and_score_call_id="pas-1",
+            eval_kind="agent",
+            eval_row_digest="row-a",
+            eval_example_id="example-a",
+            eval_trial_index=0,
+            eval_evaluation_name="agent eval",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-1",
+            eval_predict_and_score_call_id="pas-2",
+            eval_kind="agent",
+            eval_row_digest="row-b",
+            eval_example_id="example-b",
+            eval_trial_index=1,
+            eval_evaluation_name="agent eval",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-2",
+            eval_predict_and_score_call_id="pas-3",
+            eval_kind="standard",
+            eval_row_digest="row-c",
+            eval_example_id="example-c",
+            eval_trial_index=0,
+            eval_evaluation_name="standard eval",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    run_1 = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "eval.run_id"},
+                            {"$literal": "eval-run-1"},
+                        ]
+                    }
+                }
+            ),
+            sort_by=[AgentSortBy(field="eval_trial_index", direction="asc")],
+        )
+    )
+    assert run_1.total_count == 2
+    assert [
+        (
+            span.eval_run_id,
+            span.eval_predict_and_score_call_id,
+            span.eval_kind,
+            span.eval_row_digest,
+            span.eval_example_id,
+            span.eval_trial_index,
+            span.eval_evaluation_name,
+        )
+        for span in run_1.spans
+    ] == [
+        ("eval-run-1", "pas-1", "agent", "row-a", "example-a", 0, "agent eval"),
+        ("eval-run-1", "pas-2", "agent", "row-b", "example-b", 1, "agent eval"),
+    ]
+
+    grouped = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="field", key="eval.kind")],
+            sort_by=[AgentSortBy(field="span_count", direction="desc")],
+        )
+    )
+    assert grouped.total_count == 2
+    assert {
+        group.group_keys["eval_kind"]: group.span_count for group in grouped.groups
+    } == {"agent": 2, "standard": 1}
+
+
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
     """`AgentWriteHandler.insert_spans` bulk-writes every span in one insert
     (the scoring-worker batch path); empty input is a no-op.

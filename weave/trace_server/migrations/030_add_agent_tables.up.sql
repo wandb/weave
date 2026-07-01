@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS spans (
     agent_description   String DEFAULT '',
     agent_version       String DEFAULT '',
 
+    eval_run_id                       String DEFAULT '',
+    eval_predict_and_score_call_id    String DEFAULT '',
+    eval_kind                         String DEFAULT '',
+    eval_row_digest                   String DEFAULT '',
+    eval_example_id                   String DEFAULT '',
+    eval_trial_index                  Int64 DEFAULT -1,
+    eval_evaluation_name              String DEFAULT '',
+
     request_model       String DEFAULT '',
     response_model      String DEFAULT '',
     response_id         String DEFAULT '',
@@ -110,6 +118,13 @@ CREATE TABLE IF NOT EXISTS spans (
     INDEX idx_response_model response_model TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     INDEX idx_agent_name agent_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     INDEX idx_agent_version agent_version TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
+    INDEX idx_eval_run_id eval_run_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_eval_predict_and_score_call_id eval_predict_and_score_call_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_eval_row_digest eval_row_digest TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_eval_example_id eval_example_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_eval_trial_index eval_trial_index TYPE set(128) GRANULARITY 1,
+    INDEX idx_eval_kind eval_kind TYPE set(16) GRANULARITY 1,
+    INDEX idx_eval_evaluation_name eval_evaluation_name TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1,
     INDEX idx_error_type error_type TYPE ngrambf_v1(8, 10000, 3, 0) GRANULARITY 1
 ) ENGINE = ReplacingMergeTree(created_at)
 PARTITION BY toYYYYMM(started_at)
