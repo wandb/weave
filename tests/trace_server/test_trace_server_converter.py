@@ -271,3 +271,260 @@ def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
     }
     assert "Returning stored external ref unchanged" in caplog.text
     assert external_ref in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Embedded refs inside JSON-serialized string leaves
+#
+# Agent message payloads store content as a JSON string (e.g.
+# NormalizedMessage.content, tool_call_arguments, raw_span_dump). Refs buried
+# inside those strings must convert with the SAME semantics as top-level ref
+# leaves, or internal refs leak to external consumers on read and external refs
+# leak into the DB on write.
+# ---------------------------------------------------------------------------
+
+
+def test_universal_int_to_ext_converts_ref_embedded_in_json_string():
+    """A ref inside a JSON-string content field converts int->ext and the
+    surrounding non-ref JSON is preserved.
+    """
+    internal_project_id = "internal-project"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/img:abc"
+    external_ref = "weave:///entity/project/object/img:abc"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project" if project_id == internal_project_id else None
+
+    content = json.dumps(
+        [
+            {"type": "image", "url": internal_ref},
+            {"type": "text", "text": "hello world"},
+        ]
+    )
+    converted = universal_int_to_ext_ref_converter({"content": content}, int_to_ext)
+
+    assert json.loads(converted["content"]) == [
+        {"type": "image", "url": external_ref},
+        {"type": "text", "text": "hello world"},
+    ]
+
+
+def test_universal_ext_to_int_converts_ref_embedded_in_json_string():
+    """A ref inside a JSON-string content field converts ext->int and the
+    surrounding non-ref JSON is preserved.
+    """
+    project_id = "entity/project"
+    internal_project_id = "internal-project"
+    external_ref = f"weave:///{project_id}/object/img:abc"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/img:abc"
+
+    content = json.dumps(
+        [
+            {"type": "image", "url": external_ref},
+            {"type": "text", "text": "hello world"},
+        ]
+    )
+    converted = universal_ext_to_int_ref_converter(
+        {"content": content}, lambda project: internal_project_id
+    )
+
+    assert json.loads(converted["content"]) == [
+        {"type": "image", "url": internal_ref},
+        {"type": "text", "text": "hello world"},
+    ]
+
+
+def test_universal_int_to_ext_converts_all_refs_in_nested_json_containers():
+    """Every ref in a nested list/dict inside a JSON string converts."""
+    internal_project_id = "internal-project"
+    ref_a = f"weave-trace-internal:///{internal_project_id}/object/a:1"
+    ref_b = f"weave-trace-internal:///{internal_project_id}/object/b:2"
+    ext_a = "weave:///entity/project/object/a:1"
+    ext_b = "weave:///entity/project/object/b:2"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project" if project_id == internal_project_id else None
+
+    content = json.dumps(
+        {
+            "parts": [
+                {"type": "image", "url": ref_a},
+                {"nested": {"deep": ref_b}},
+                {"type": "text", "text": "plain"},
+            ]
+        }
+    )
+    converted = universal_int_to_ext_ref_converter({"content": content}, int_to_ext)
+
+    assert json.loads(converted["content"]) == {
+        "parts": [
+            {"type": "image", "url": ext_a},
+            {"nested": {"deep": ext_b}},
+            {"type": "text", "text": "plain"},
+        ]
+    }
+
+
+def test_universal_int_to_ext_converts_ref_nested_two_json_levels():
+    """A ref buried in a JSON string nested inside another JSON string converts
+    (JSON-in-JSON within the depth cap).
+    """
+    internal_project_id = "internal-project"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/x:d"
+    external_ref = "weave:///entity/project/object/x:d"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project" if project_id == internal_project_id else None
+
+    inner = json.dumps({"url": internal_ref})
+    outer = json.dumps({"raw": inner})
+
+    converted = universal_int_to_ext_ref_converter(
+        {"attributes_dump": outer}, int_to_ext
+    )
+
+    result = json.loads(converted["attributes_dump"])
+    assert json.loads(result["raw"]) == {"url": external_ref}
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        "see weave-trace-internal:///internal-project/object/x:d for the image",
+        "see weave:///entity/project/object/x:d for the image",
+    ],
+)
+def test_embedded_path_leaves_non_json_prose_unchanged(prose):
+    """A plain (non-JSON) string that merely contains a ref-like substring does
+    not parse as JSON, so it is passed through unchanged (identity preserved).
+    """
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project"
+
+    payload = {"note": prose}
+    converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
+
+    assert converted is payload
+    assert converted["note"] is prose
+
+
+def test_json_string_without_refs_is_not_reserialized():
+    """A JSON string with no ref never reaches json.loads (the substring guard
+    fails) and is returned byte-identical (identity preserved, no re-dump).
+    """
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project"
+
+    blob = '[{"type": "text", "text": "hello"}]'
+    payload = {"content": blob}
+    converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
+
+    assert converted is payload
+    assert converted["content"] is blob
+
+
+@pytest.mark.disable_logging_error_check
+def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(caplog):
+    """When an embedded ref does not change (already-external + tolerate), the
+    ORIGINAL string is returned with no re-serialization (spacing preserved).
+    """
+    external_ref = "weave:///entity/project/object/x:d"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project"
+
+    # Non-canonical spacing (indent) so a gratuitous re-dump would change bytes.
+    blob = json.dumps([{"type": "image", "url": external_ref}], indent=2)
+    payload = {"content": blob}
+
+    with caplog.at_level(logging.ERROR):
+        converted = universal_int_to_ext_ref_converter(
+            payload, int_to_ext, tolerate_external_refs=True
+        )
+
+    assert converted is payload
+    assert converted["content"] is blob
+    assert "Returning stored external ref unchanged" in caplog.text
+
+
+@pytest.mark.disable_logging_error_check
+def test_embedded_external_ref_respects_tolerate_flag_int_to_ext(caplog):
+    """An embedded external ref obeys the same tolerate/raise policy as a
+    top-level external ref on the int->ext path.
+    """
+    external_ref = "weave:///entity/project/object/x:d"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project"
+
+    content = json.dumps([{"type": "image", "url": external_ref}])
+    payload = {"content": content}
+
+    # Strict default: embedded external ref raises, same as top-level.
+    with pytest.raises(InvalidInternalRef):
+        universal_int_to_ext_ref_converter(payload, int_to_ext)
+
+    # Tolerant: passed through + logged, embedded JSON preserved unchanged.
+    with caplog.at_level(logging.ERROR):
+        converted = universal_int_to_ext_ref_converter(
+            payload, int_to_ext, tolerate_external_refs=True
+        )
+
+    assert json.loads(converted["content"]) == [
+        {"type": "image", "url": external_ref}
+    ]
+    assert "Returning stored external ref unchanged" in caplog.text
+
+
+def test_embedded_internal_ref_requires_verification_ext_to_int():
+    """An embedded internal ref on the ext->int path goes through the same
+    verify_internal_project_id gate as a top-level internal ref.
+    """
+    internal_project_id = "internal-project"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/x:d"
+    content = json.dumps([{"type": "image", "url": internal_ref}])
+    payload = {"content": content}
+
+    # No verify callback -> embedded internal ref rejected, same as top-level.
+    with pytest.raises(InvalidExternalRef):
+        universal_ext_to_int_ref_converter(
+            payload,
+            lambda project: "should-not-be-called",
+            verify_internal_project_id=None,
+        )
+
+    # verify accepts -> embedded internal ref passed through unchanged.
+    converted = universal_ext_to_int_ref_converter(
+        payload,
+        lambda project: "unused",
+        verify_internal_project_id=lambda pid: pid == internal_project_id,
+    )
+    assert json.loads(converted["content"]) == [
+        {"type": "image", "url": internal_ref}
+    ]
+
+
+def test_deeply_nested_json_in_json_terminates_without_recursion_error():
+    """Deeply nested JSON-in-JSON hits the depth cap and terminates without
+    raising RecursionError (a ref below the cap simply is not descended into).
+    """
+    internal_project_id = "internal-project"
+    ref = f"weave-trace-internal:///{internal_project_id}/object/x:d"
+
+    def int_to_ext(project_id: str) -> str | None:
+        return "entity/project" if project_id == internal_project_id else None
+
+    # Nest well beyond the depth cap. Each json.dumps of a string only escapes
+    # quotes/backslashes, so this stays small while nesting deeply.
+    nested = ref
+    for _ in range(12):
+        nested = json.dumps(nested)
+    payload = {"content": nested}
+
+    converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
+
+    # Termination + no RecursionError is the contract; the buried ref is below
+    # the cap so the string comes back unchanged.
+    assert converted["content"] == nested
