@@ -26,6 +26,26 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 )
 
 
+def _count_result(n: int) -> Mock:
+    """Mock a `SELECT count()` query result with a single row/column of `n`."""
+    res = Mock()
+    res.result_rows = [(n,)]
+    return res
+
+
+def _stub_divergence_precheck(sql: str) -> Mock | None:
+    """Stub the divergence pre-check queries in `_apply_migrations_locked`.
+
+    A row in the migrations table (count 1) makes the guard a no-op, so tests
+    that mock the inner migration methods reach the path they exercise.
+    """
+    if "system.tables" in sql:
+        return _count_result(0)
+    if "count()" in sql and ".migrations" in sql:
+        return _count_result(1)
+    return None
+
+
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases queries.
 
@@ -42,6 +62,9 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     def _query_side_effect(sql, *args, **kwargs):
         if "system.databases" in sql:
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -62,6 +85,9 @@ def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> M
             else:
                 engine_result.result_rows = []
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
