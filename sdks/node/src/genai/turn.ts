@@ -129,39 +129,10 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {
-      ...(state.conversation?.attributes ?? {}),
-      [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
-    };
-    if (opts.agentName) {
-      attributes[ATTR_GEN_AI_AGENT_NAME] = opts.agentName;
-    }
-    if (opts.model) {
-      attributes[ATTR_GEN_AI_REQUEST_MODEL] = opts.model;
-    }
-    if (opts.conversationId) {
-      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
-    }
-    if (opts.agentId) {
-      attributes[ATTR_GEN_AI_AGENT_ID] = opts.agentId;
-    }
-    if (opts.agentDescription) {
-      attributes[ATTR_GEN_AI_AGENT_DESCRIPTION] = opts.agentDescription;
-    }
-    if (opts.agentVersion) {
-      attributes[ATTR_GEN_AI_AGENT_VERSION] = opts.agentVersion;
-    }
+    const attributes: Attributes = {...(state.conversation?.attributes ?? {})};
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];
-    if (messages.length > 0) {
-      attributes[ATTR_GEN_AI_INPUT_MESSAGES] = JSON.stringify(messages);
-    }
-    if (opts.systemInstructions && opts.systemInstructions.length > 0) {
-      attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] = JSON.stringify(
-        opts.systemInstructions.map(content => ({type: 'text', content}))
-      );
-    }
     // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
     // accidentally inherits a parent from some other OTel-instrumented
     // library's active context.
@@ -224,14 +195,90 @@ export class Turn extends SpanBase {
   }
 
   /**
-   * Close the Turn span. Idempotent. Pass `error` to mark it as failed; pass
-   * `endTime` to backdate the close.
+   * Bulk-set any subset of the mutable fields. Replaces (does not merge).
+   * Useful for assigning everything at once after a provider call returns.
+   */
+  record(opts: {
+    messages?: Message[];
+    model?: string;
+    systemInstructions?: string[];
+    agentId?: string;
+    agentName?: string;
+    agentDescription?: string;
+    agentVersion?: string;
+  }): this {
+    if (this._warnIfEnded('record')) return this;
+
+    if (opts.messages !== undefined) {
+      this._messages = opts.messages;
+    }
+    if (opts.model !== undefined) {
+      this._model = opts.model;
+    }
+    if (opts.systemInstructions !== undefined) {
+      this._systemInstructions = opts.systemInstructions;
+    }
+    if (opts.agentId !== undefined) {
+      this._agentId = opts.agentId;
+    }
+    if (opts.agentName !== undefined) {
+      this._agentName = opts.agentName;
+    }
+    if (opts.agentDescription !== undefined) {
+      this._agentDescription = opts.agentDescription;
+    }
+    if (opts.agentVersion !== undefined) {
+      this._agentVersion = opts.agentVersion;
+    }
+    return this;
+  }
+
+  /**
+   * Read current field values (to reflect mutations made via `record()`
+   * since `start`) and close the span. Idempotent. Pass `error` to mark
+   * it as failed; pass `endTime` to backdate the close.
    */
   end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
+    this.span.setAttribute(ATTR_GEN_AI_OPERATION_NAME, 'invoke_agent');
+    if (this._agentName) {
+      this.span.setAttribute(ATTR_GEN_AI_AGENT_NAME, this._agentName);
+    }
+    if (this._model) {
+      this.span.setAttribute(ATTR_GEN_AI_REQUEST_MODEL, this._model);
+    }
+    if (this._conversationId) {
+      this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this._conversationId);
+    }
+    if (this._agentId) {
+      this.span.setAttribute(ATTR_GEN_AI_AGENT_ID, this._agentId);
+    }
+    if (this._agentDescription) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_AGENT_DESCRIPTION,
+        this._agentDescription
+      );
+    }
+    if (this._agentVersion) {
+      this.span.setAttribute(ATTR_GEN_AI_AGENT_VERSION, this._agentVersion);
+    }
+    if (this._messages.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_INPUT_MESSAGES,
+        JSON.stringify(this._messages)
+      );
+    }
+    if (this._systemInstructions.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+        JSON.stringify(
+          this._systemInstructions.map(content => ({type: 'text', content}))
+        )
+      );
+    }
     this._closeSpan(opts);
     const state = getGenaiState();
     if (state.turn === this) {

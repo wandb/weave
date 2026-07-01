@@ -41,13 +41,6 @@ export type AttachMediaOpts =
   | {uri: string; modality: Modality}
   | {fileId: string; modality: Modality; mimeType?: string};
 
-export interface LLMRecordOpts {
-  inputMessages?: Message[];
-  outputMessages?: Message[];
-  usage?: Usage;
-  reasoning?: Reasoning;
-}
-
 /**
  * An LLM call. Emits a `chat` span with `gen_ai.*` attributes.
  *
@@ -218,7 +211,12 @@ export class LLM extends SpanBase {
    * Bulk-set any subset of the mutable fields. Replaces (does not merge).
    * Useful for assigning everything at once after a provider call returns.
    */
-  record(opts: LLMRecordOpts): this {
+  record(opts: {
+    inputMessages?: Message[];
+    outputMessages?: Message[];
+    usage?: Usage;
+    reasoning?: Reasoning;
+  }): this {
     if (this._warnIfEnded('record')) {
       return this;
     }

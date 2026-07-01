@@ -114,7 +114,14 @@ export class SubAgent extends SpanBase {
   /**
    * Bulk-set any fields. Replaces (does not merge).
    */
-  record(opts: Partial<Omit<SubAgentInit, keyof SpanInitBase>>): this {
+  record(opts: {
+    name?: string;
+    model?: string;
+    systemInstructions?: string[];
+    agentId?: string;
+    agentDescription?: string;
+    agentVersion?: string;
+  }): this {
     if (this._warnIfEnded('record')) return this;
 
     if (opts.name !== undefined) {
