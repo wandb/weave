@@ -8,6 +8,9 @@ can't silently drift them.
 
 from __future__ import annotations
 
+import socket
+from pathlib import Path
+
 import pytest
 
 from weave.trace_server import datadog
@@ -47,55 +50,68 @@ def test_format_packet_wire_format(
 
 
 # ---------------------------------------------------------------------------
-# Address resolution — env-var fallback chain
+# Target resolution — family + address from the env-var fallback chain
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_addr_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No env vars set → `localhost:8125`."""
-    monkeypatch.delenv("DD_DOGSTATSD_URL", raising=False)
-    monkeypatch.delenv("DD_AGENT_HOST", raising=False)
-    monkeypatch.delenv("DD_DOGSTATSD_PORT", raising=False)
-    assert datadog._resolve_dogstatsd_addr() == ("localhost", 8125)
-
-
-def test_resolve_addr_url_with_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`DD_DOGSTATSD_URL=udp://host:port` is the documented prod form."""
-    monkeypatch.setenv("DD_DOGSTATSD_URL", "udp://datadog.datadog:8125")
-    assert datadog._resolve_dogstatsd_addr() == ("datadog.datadog", 8125)
-
-
-def test_resolve_addr_url_without_scheme(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Bare `host:port` (no `udp://`) is also accepted."""
-    monkeypatch.setenv("DD_DOGSTATSD_URL", "my-agent:9125")
-    assert datadog._resolve_dogstatsd_addr() == ("my-agent", 9125)
-
-
-def test_resolve_addr_url_no_port_defaults_to_8125(
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        # No env vars → localhost UDP default.
+        ({}, (socket.AF_INET, ("localhost", 8125))),
+        # `udp://host:port` is the documented single-tenant prod form.
+        (
+            {"DD_DOGSTATSD_URL": "udp://datadog.datadog:8125"},
+            (socket.AF_INET, ("datadog.datadog", 8125)),
+        ),
+        # Bare `host:port` (no scheme) is accepted as UDP.
+        ({"DD_DOGSTATSD_URL": "my-agent:9125"}, (socket.AF_INET, ("my-agent", 9125))),
+        # UDP URL without a port defaults to 8125.
+        (
+            {"DD_DOGSTATSD_URL": "udp://datadog.datadog"},
+            (socket.AF_INET, ("datadog.datadog", 8125)),
+        ),
+        # Garbage URL must NOT raise; falls back to localhost.
+        (
+            {"DD_DOGSTATSD_URL": "://this-is-broken::"},
+            (socket.AF_INET, ("localhost", 8125)),
+        ),
+        # No URL → DD_AGENT_HOST + DD_DOGSTATSD_PORT.
+        (
+            {"DD_AGENT_HOST": "agent.example.com", "DD_DOGSTATSD_PORT": "9999"},
+            (socket.AF_INET, ("agent.example.com", 9999)),
+        ),
+        # Non-numeric port must NOT crash import; falls back to the default.
+        (
+            {"DD_AGENT_HOST": "agent.example.com", "DD_DOGSTATSD_PORT": "abc"},
+            (socket.AF_INET, ("agent.example.com", 8125)),
+        ),
+        # UDS schemes → AF_UNIX with the socket path. This is the SaaS-prod
+        # Agent form that PR #7268 regressed (its UDP-only client dropped it).
+        (
+            {"DD_DOGSTATSD_URL": "unix:///var/run/datadog/dsd.socket"},
+            (socket.AF_UNIX, "/var/run/datadog/dsd.socket"),
+        ),
+        (
+            {"DD_DOGSTATSD_URL": "unixgram:///var/run/datadog/dsd.socket"},
+            (socket.AF_UNIX, "/var/run/datadog/dsd.socket"),
+        ),
+        (
+            {"DD_DOGSTATSD_URL": "uds:///var/run/datadog/dsd.socket"},
+            (socket.AF_UNIX, "/var/run/datadog/dsd.socket"),
+        ),
+    ],
+)
+def test_resolve_dogstatsd_target(
+    env: dict[str, str],
+    expected: tuple[int, str | tuple[str, int]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("DD_DOGSTATSD_URL", "udp://datadog.datadog")
-    assert datadog._resolve_dogstatsd_addr() == ("datadog.datadog", 8125)
-
-
-def test_resolve_addr_url_malformed_falls_back(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A garbage URL must NOT raise; fall back to localhost."""
-    monkeypatch.setenv("DD_DOGSTATSD_URL", "://this-is-broken::")
-    monkeypatch.delenv("DD_AGENT_HOST", raising=False)
-    monkeypatch.delenv("DD_DOGSTATSD_PORT", raising=False)
-    assert datadog._resolve_dogstatsd_addr() == ("localhost", 8125)
-
-
-def test_resolve_addr_falls_back_to_host_and_port_env(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """No URL set → `DD_AGENT_HOST` + `DD_DOGSTATSD_PORT`."""
-    monkeypatch.delenv("DD_DOGSTATSD_URL", raising=False)
-    monkeypatch.setenv("DD_AGENT_HOST", "agent.example.com")
-    monkeypatch.setenv("DD_DOGSTATSD_PORT", "9999")
-    assert datadog._resolve_dogstatsd_addr() == ("agent.example.com", 9999)
+    for var in ("DD_DOGSTATSD_URL", "DD_AGENT_HOST", "DD_DOGSTATSD_PORT"):
+        monkeypatch.delenv(var, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert datadog._resolve_dogstatsd_target() == expected
 
 
 # ---------------------------------------------------------------------------
@@ -121,14 +137,29 @@ def test_parse_port_non_numeric_falls_back(
     assert datadog._parse_port("not-a-port") == 8125
 
 
-def test_parse_port_non_numeric_does_not_raise_at_import(
-    monkeypatch: pytest.MonkeyPatch,
+# ---------------------------------------------------------------------------
+# Unix-domain-socket emit — the path PR #7268 regressed in SaaS prod
+# ---------------------------------------------------------------------------
+
+
+def test_statsd_client_emits_over_unix_socket(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The whole resolution path stays safe even with a bad port env var."""
-    monkeypatch.delenv("DD_DOGSTATSD_URL", raising=False)
-    monkeypatch.setenv("DD_AGENT_HOST", "agent.example.com")
-    monkeypatch.setenv("DD_DOGSTATSD_PORT", "abc")
-    # Must not raise.
-    host, port = datadog._resolve_dogstatsd_addr()
-    assert host == "agent.example.com"
-    assert port == 8125  # fell back to default
+    """A real AF_UNIX datagram server receives the exact wire bytes.
+
+    Uses a relative socket name under a chdir'd tmp dir to stay well under
+    the platform's AF_UNIX path-length limit.
+    """
+    monkeypatch.chdir(tmp_path)
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    server.bind("dsd.socket")
+    server.settimeout(2.0)
+    try:
+        client = datadog._StatsDClient(socket.AF_UNIX, "dsd.socket")
+        client.emit("weave_trace_server.db_inserts", 3, ["table:calls", "path:otel"])
+        assert (
+            server.recv(4096)
+            == b"weave_trace_server.db_inserts:3|c|#table:calls,path:otel"
+        )
+    finally:
+        server.close()

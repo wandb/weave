@@ -1,7 +1,7 @@
 """DogStatsD counter emission + DD-flavored OTel span-tag helpers.
 
-Emits a single counter (`weave_trace_server.db_inserts`) over a UDP socket.
-Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
+Emits a single counter (`weave_trace_server.db_inserts`) over UDP or a Unix
+domain socket. Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
 """
 
 from __future__ import annotations
@@ -29,6 +29,9 @@ DB_INSERT_PATH_UNKNOWN = "unknown"
 
 _DEFAULT_HOST = "localhost"
 _DEFAULT_PORT = 8125
+# DD_DOGSTATSD_URL schemes that denote a Unix domain socket (the SaaS-prod
+# Agent form); anything else is treated as UDP host:port.
+_UDS_SCHEMES = frozenset({"unix", "unixgram", "uds"})
 
 _db_insert_path: ContextVar[str] = ContextVar(
     "_db_insert_path", default=DB_INSERT_PATH_UNKNOWN
@@ -51,26 +54,30 @@ def _parse_port(raw: str | None, *, default: int = _DEFAULT_PORT) -> int:
         return default
 
 
-def _resolve_dogstatsd_addr() -> tuple[str, int]:
-    """Honor `DD_DOGSTATSD_URL` (`udp://host:port`), then
-    `DD_AGENT_HOST` + `DD_DOGSTATSD_PORT`, then `localhost:8125`.
+def _resolve_dogstatsd_target() -> tuple[int, str | tuple[str, int]]:
+    """Resolve the DogStatsD socket family + address.
+
+    Honors `DD_DOGSTATSD_URL` (`unix://`/`unixgram://`/`uds://` path for a
+    Unix domain socket, else `udp://host:port`), then `DD_AGENT_HOST` +
+    `DD_DOGSTATSD_PORT`, then `localhost:8125`. SaaS-prod Agents expose
+    DogStatsD over a Unix socket, so UDS support is load-bearing.
     """
     url = os.environ.get("DD_DOGSTATSD_URL")
     if url:
         try:
             parsed = urlparse(url if "://" in url else f"udp://{url}")
+            if parsed.scheme in _UDS_SCHEMES and parsed.path:
+                return socket.AF_UNIX, parsed.path
             if parsed.hostname:
-                return parsed.hostname, parsed.port or _DEFAULT_PORT
+                return socket.AF_INET, (parsed.hostname, parsed.port or _DEFAULT_PORT)
         except ValueError:
             logger.warning(
-                "Could not parse DD_DOGSTATSD_URL=%r; falling back to %s:%d",
+                "Could not parse DD_DOGSTATSD_URL=%r; falling back to host/port env",
                 url,
-                _DEFAULT_HOST,
-                _DEFAULT_PORT,
             )
     host = os.environ.get("DD_AGENT_HOST", _DEFAULT_HOST)
     port = _parse_port(os.environ.get("DD_DOGSTATSD_PORT"))
-    return host, port
+    return socket.AF_INET, (host, port)
 
 
 def format_packet(metric: str, value: int, tags: list[str]) -> bytes:
@@ -80,16 +87,17 @@ def format_packet(metric: str, value: int, tags: list[str]) -> bytes:
 
 
 class _StatsDClient:
-    """Best-effort, fire-and-forget DogStatsD UDP client.
+    """Best-effort, fire-and-forget DogStatsD client over UDP or a Unix socket.
 
-    Resolves the address once and connects the socket, so each `emit`
-    is a single non-blocking `send()` — no per-call DNS, no per-call
-    address lookup. A failed `connect()` (e.g. DNS resolution failure
-    at startup) disables the client; subsequent emits are no-ops.
+    Resolves the target once and connects the socket, so each `emit` is a
+    single non-blocking `send()` — no per-call DNS or address lookup. A
+    failed `connect()` (bad host, missing socket file) disables the client;
+    subsequent emits are no-ops.
     """
 
-    def __init__(self, host: str, port: int) -> None:
-        self._addr = (host, port)
+    def __init__(self, family: int, addr: str | tuple[str, int]) -> None:
+        self._family = family
+        self._addr = addr
         self._sock: socket.socket | None = None
         self._init_failed = False
         self._lock = threading.Lock()
@@ -107,18 +115,17 @@ class _StatsDClient:
             if self._init_failed:
                 return None
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock = socket.socket(self._family, socket.SOCK_DGRAM)
                 sock.setblocking(False)
-                # `connect()` resolves the hostname once and binds the
-                # UDP socket's default destination — eliminates per-call
-                # DNS on `sendto` (which `setblocking(False)` does NOT
-                # make non-blocking).
+                # `connect()` binds the datagram socket's default
+                # destination once (resolving the host for UDP), so each
+                # `emit` is a bare non-blocking `send()` with no per-call
+                # lookup.
                 sock.connect(self._addr)
             except OSError as exc:
                 logger.warning(
-                    "DogStatsD init failed for %s:%d (%s); metrics disabled",
-                    self._addr[0],
-                    self._addr[1],
+                    "DogStatsD init failed for %r (%s); metrics disabled",
+                    self._addr,
                     exc,
                 )
                 self._init_failed = True
@@ -138,7 +145,7 @@ class _StatsDClient:
             pass
 
 
-_client = _StatsDClient(*_resolve_dogstatsd_addr())
+_client = _StatsDClient(*_resolve_dogstatsd_target())
 
 
 @contextlib.contextmanager
