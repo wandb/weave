@@ -809,13 +809,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
+                    # Mirror the non-OTel calls path: strip inline base64 /
+                    # base64 data-URIs into Content refs. Converting the span
+                    # attributes in place (before deriving the call) also
+                    # strips the lossless otel_dump the call carries.
+                    span.attributes = replace_base64_with_content_objects(
+                        span.attributes, req.project_id, self
+                    )
                     start_call, end_call = span.to_call(
                         req.project_id,
                         wb_user_id=req.wb_user_id,
                         wb_run_id=wb_run_id,
                     )
-                    # Mirror the non-OTel calls path: strip inline base64 /
-                    # base64 data-URIs from inputs and output into Content refs.
+                    # Also convert the derived inputs/output: base64 nested in a
+                    # JSON-encoded message attribute only surfaces as a leaf
+                    # after to_call parses it.
                     start_call.inputs = replace_base64_with_content_objects(
                         start_call.inputs, req.project_id, self
                     )

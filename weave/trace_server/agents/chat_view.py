@@ -589,12 +589,18 @@ def _display_text(content: str) -> str:
         return content
     texts: list[str] = []
     for p in parts:
-        if isinstance(p, dict) and isinstance(p.get("content"), str):
+        if isinstance(p, dict):
             # Reasoning is rendered separately via `reasoning_content`;
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
-            texts.append(p["content"])
+            # Support both the weave parts model (``content``) and the
+            # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
+            # images) carry neither and are skipped for display.
+            if isinstance(p.get("content"), str):
+                texts.append(p["content"])
+            elif isinstance(p.get("text"), str):
+                texts.append(p["text"])
         elif isinstance(p, str):
             texts.append(p)
     return "\n".join(texts)

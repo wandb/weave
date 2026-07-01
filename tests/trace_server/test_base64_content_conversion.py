@@ -20,12 +20,34 @@ from weave.trace_server.trace_server_interface import (
     CallStartReq,
     EndedCallSchemaForInsert,
     FileCreateRes,
+    ObjCreateRes,
     StartedCallSchemaForInsert,
 )
 from weave.type_wrappers.Content.content import Content
 
 # Test data size larger than AUTO_CONVERSION_MIN_SIZE to trigger conversion
 LARGE_TEST_DATA_SIZE = AUTO_CONVERSION_MIN_SIZE + 10
+
+# Object digest returned by the mocked ``obj_create`` when content is published.
+_OBJ_DIGEST = "obj_digest"
+
+
+def _mock_obj_create(trace_server: MagicMock) -> None:
+    """Mock ``obj_create`` so auto-conversion can publish a Content object.
+
+    ``replace_base64_with_content_objects`` publishes each converted blob as a
+    weave object and embeds its ref, so any test that converts must stub this.
+    """
+    trace_server.obj_create = MagicMock(
+        return_value=ObjCreateRes(digest=_OBJ_DIGEST)
+    )
+
+
+def _assert_content_ref(value: object, project_id: str) -> None:
+    """Assert *value* is an internal weave object ref to a published Content."""
+    assert isinstance(value, str)
+    assert value.startswith(f"weave-trace-internal:///{project_id}/object/")
+    assert value.endswith(f":{_OBJ_DIGEST}")
 
 
 class TestBase64AndDataURIDetection:
@@ -110,6 +132,7 @@ class TestBase64Replacement:
                 FileCreateRes(digest="metadata_digest2"),
             ]
         )
+        _mock_obj_create(trace_server)
 
         test_data = b"a" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
@@ -130,13 +153,8 @@ class TestBase64Replacement:
         # Check standalone base64 is NOT replaced
         assert result["field2"] == b64_data
 
-        # Check data URI was replaced
-        assert isinstance(result["nested"]["field3"], dict)
-        assert result["nested"]["field3"]["_type"] == "CustomWeaveType"
-        assert set(result["nested"]["field3"]["files"].keys()) == {
-            "content",
-            "metadata.json",
-        }
+        # Check data URI was replaced with a published-object ref
+        _assert_content_ref(result["nested"]["field3"], "test_project")
 
     def test_replace_data_uri_in_list_only(self):
         """Only base64 data URIs are replaced in lists; raw base64 is left untouched."""
@@ -150,6 +168,7 @@ class TestBase64Replacement:
                 FileCreateRes(digest="metadata_digest2"),
             ]
         )
+        _mock_obj_create(trace_server)
 
         test_data = b"a" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
@@ -169,8 +188,7 @@ class TestBase64Replacement:
         assert result[0] == "normal string"
         # Raw base64 remains a string
         assert result[1] == b64_data
-        assert isinstance(result[2]["nested"], dict)
-        assert result[2]["nested"]["_type"] == "CustomWeaveType"
+        _assert_content_ref(result[2]["nested"], "test_project")
 
     def test_process_call_req_to_content_start_and_end(self):
         """Test the main entry point for processing CallStartReq and CallEndReq."""
@@ -185,6 +203,7 @@ class TestBase64Replacement:
                 FileCreateRes(digest="metadata_digest_end"),
             ]
         )
+        _mock_obj_create(trace_server)
 
         test_data = b"x" * LARGE_TEST_DATA_SIZE
         b64_data = base64.b64encode(test_data).decode("ascii")
@@ -205,8 +224,7 @@ class TestBase64Replacement:
 
         processed_start = process_call_req_to_content(start_req, trace_server)
         assert processed_start.start.inputs["text"] == "Some normal text"
-        assert isinstance(processed_start.start.inputs["image"], dict)
-        assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
+        _assert_content_ref(processed_start.start.inputs["image"], "proj")
 
         long_bytes = b"y" * LARGE_TEST_DATA_SIZE
         long_b64 = base64.b64encode(long_bytes).decode("ascii")
@@ -282,6 +300,7 @@ class TestStandaloneBase64Detection:
                 FileCreateRes(digest="metadata_digest"),
             ]
         )
+        _mock_obj_create(trace_server)
 
         # Create a minimal valid WAV file (larger than AUTO_CONVERSION_MIN_SIZE)
         # WAV format: RIFF header + fmt chunk + data chunk
@@ -331,16 +350,8 @@ class TestStandaloneBase64Detection:
             input_data, "test_project", trace_server
         )
 
-        # The WAV file should be converted to Content object
-        assert isinstance(result["audio_field"], dict)
-        assert result["audio_field"]["_type"] == "CustomWeaveType"
-        assert (
-            result["audio_field"]["weave_type"]["type"]
-            == "weave.type_wrappers.Content.content.Content"
-        )
-        assert "files" in result["audio_field"]
-        assert "content" in result["audio_field"]["files"]
-        assert "metadata.json" in result["audio_field"]["files"]
+        # The WAV file should be converted to a published-object ref
+        _assert_content_ref(result["audio_field"], "test_project")
 
         # Normal string should be unchanged
         assert result["other_field"] == "normal string"
@@ -419,6 +430,7 @@ class TestThresholdAndStructuralIdentity:
                 FileCreateRes(digest="metadata_digest"),
             ]
         )
+        _mock_obj_create(trace_server)
         png_data_uri = "data:image/png;base64," + base64.b64encode(
             b"\x89PNG\r\n\x1a\n" + b"\x00" * 12000
         ).decode("ascii")
@@ -460,6 +472,7 @@ class TestThresholdAndStructuralIdentity:
                 FileCreateRes(digest="metadata_digest"),
             ]
         )
+        _mock_obj_create(trace_server)
         png_data_uri = "data:image/png;base64," + base64.b64encode(
             b"\x89PNG\r\n\x1a\n" + b"\x00" * 12000
         ).decode("ascii")
@@ -531,6 +544,7 @@ class TestReplaceBase64InRawMessages:
         trace_server.file_create = MagicMock(
             side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
         )
+        _mock_obj_create(trace_server)
         return trace_server
 
     @staticmethod
@@ -560,10 +574,9 @@ class TestReplaceBase64InRawMessages:
         assert isinstance(result, list)
         parts = result[0]["parts"]
         assert parts[0] == {"type": "text", "content": "describe this"}
-        # The data-URI field value (not the whole part) becomes the Content ref.
+        # The data-URI field value (not the whole part) becomes a Content ref.
         assert parts[1]["type"] == "image"
-        assert parts[1]["url"]["_type"] == "CustomWeaveType"
-        assert set(parts[1]["url"]["files"].keys()) == {"content", "metadata.json"}
+        _assert_content_ref(parts[1]["url"], "proj")
         assert trace_server.file_create.call_count == 2
 
     def test_structured_list_messages_converted(self):
@@ -573,7 +586,7 @@ class TestReplaceBase64InRawMessages:
 
         result = replace_base64_in_raw_messages(messages, "proj", trace_server)
 
-        assert result[0]["parts"][0]["url"]["_type"] == "CustomWeaveType"
+        _assert_content_ref(result[0]["parts"][0]["url"], "proj")
         assert trace_server.file_create.call_count == 2
 
     def test_no_base64_is_noop(self):

@@ -25,7 +25,11 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.base64_content_conversion import replace_base64_in_raw_messages
-from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
+from weave.trace_server.opentelemetry.helpers import (
+    get_attribute,
+    to_json_serializable,
+    try_convert_numeric_keys_to_list,
+)
 from weave.trace_server.opentelemetry.python_spans import Span
 from weave.trace_server.query_builder.agent_query_builder import (
     safe_float,
@@ -235,20 +239,6 @@ def extract_tool_call_result(
 # ---------------------------------------------------------------------------
 
 
-def _text_from_parts(parts: list[Any]) -> str:
-    """Concatenate text from a list of message parts."""
-    texts: list[str] = []
-    for p in parts:
-        if isinstance(p, str):
-            texts.append(p)
-        elif isinstance(p, dict):
-            if "content" in p and isinstance(p["content"], str):
-                texts.append(p["content"])
-            elif "text" in p and isinstance(p["text"], str):
-                texts.append(p["text"])
-    return "\n".join(texts)
-
-
 def _normalize_single_message(
     msg: dict[str, Any], *, default_role: str = ""
 ) -> NormalizedMessage:
@@ -268,7 +258,11 @@ def _normalize_single_message(
     elif isinstance(msg.get("content"), str):
         content = msg["content"]
     elif isinstance(msg.get("content"), list):
-        content = _text_from_parts(msg["content"])
+        # Multimodal content (e.g. OpenAI-style ``[{text}, {image_url}]``) is
+        # preserved as a JSON parts array so the full payload — including
+        # non-text parts such as converted images — survives. Flattening to
+        # text here silently dropped image/blob parts.
+        content = _json_str(msg["content"])
 
     return NormalizedMessage(
         role=role,
@@ -335,31 +329,40 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 
 def _extract_raw_input(attrs: dict[str, Any]) -> Any:
-    """Return raw input messages from attrs."""
-    return _get(
-        attrs,
-        *semconv.INPUT_MESSAGES.lookup_keys,
-        "weave.prompt",
-        "gen_ai.prompt",
+    """Return raw input messages from attrs.
+
+    Legacy indexed conventions (``gen_ai.prompt.{i}.*``) unflatten to a
+    numeric-keyed dict (``{"0": {...}}``); ``try_convert_numeric_keys_to_list``
+    turns that back into a message list, matching how the non-agents path
+    normalizes inputs in ``parse_weave_values``.
+    """
+    return try_convert_numeric_keys_to_list(
+        _get(
+            attrs,
+            *semconv.INPUT_MESSAGES.lookup_keys,
+            "weave.prompt",
+            "gen_ai.prompt",
+        )
     )
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Return raw output messages from attrs, legacy completion attrs, or events."""
+    """Return raw output messages from attrs, legacy completion attrs, or events.
+
+    Numeric-keyed dicts from indexed conventions (``gen_ai.completion.{i}.*``)
+    are converted back to a message list, as in the non-agents path.
+    """
     val = _get(attrs, *semconv.OUTPUT_MESSAGES.lookup_keys)
-    if val is not None:
-        return val
-
-    val = _get(attrs, *semconv.COMPLETION.lookup_keys)
-    if val is not None:
-        return val
-
-    for event in events:
-        if event.get("name") == "gen_ai.content.completion":
-            event_attrs = event.get("attributes", {})
-            val = get_attribute(event_attrs, "gen_ai.completion")
-            if val is not None:
-                return val
+    if val is None:
+        val = _get(attrs, *semconv.COMPLETION.lookup_keys)
+    if val is None:
+        for event in events:
+            if event.get("name") == "gen_ai.content.completion":
+                event_attrs = event.get("attributes", {})
+                val = get_attribute(event_attrs, "gen_ai.completion")
+                if val is not None:
+                    break
+    return try_convert_numeric_keys_to_list(val)
 
     return None
 
