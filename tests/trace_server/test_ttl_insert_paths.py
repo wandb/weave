@@ -385,3 +385,74 @@ def test_project_ttl_settings_endpoints_round_trip(trace_server):
                 wb_user_id=None,
             )
         )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: SHOW CREATE TABLE TTL clauses"
+)
+def test_migration_036_ttl_clauses_present(internal_server):
+    """object_versions/table_rows clear val_dump via column TTL; files row-TTLs.
+
+    Asserts the full SHOW CREATE DDL of each table: objects/table_rows carry a
+    column TTL on val_dump + the expire_at sentinel column, files carries the
+    expire_at column + a table-level row TTL (no column TTL on val_bytes).
+    """
+    server = internal_server
+    db = server.ch_client.database
+
+    def show_create(table: str) -> str:
+        return server.ch_client.query(f"SHOW CREATE TABLE {table}").result_rows[0][0]
+
+    assert show_create("object_versions") == (
+        f"CREATE TABLE {db}.object_versions\n"
+        "(\n"
+        "    `project_id` String,\n"
+        "    `object_id` String,\n"
+        "    `kind` Enum8('op' = 1, 'object' = 2),\n"
+        "    `base_object_class` Nullable(String),\n"
+        "    `refs` Array(String),\n"
+        "    `val_dump` String TTL toDateTime(expire_at),\n"
+        "    `digest` String,\n"
+        "    `created_at` DateTime64(3) DEFAULT now64(3),\n"
+        "    `deleted_at` Nullable(DateTime64(3)) DEFAULT NULL,\n"
+        "    `wb_user_id` Nullable(String) DEFAULT NULL,\n"
+        "    `leaf_object_class` Nullable(String) DEFAULT NULL,\n"
+        "    `expire_at` DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3)\n"
+        ")\n"
+        "ENGINE = ReplacingMergeTree\n"
+        "ORDER BY (project_id, kind, object_id, digest)\n"
+        "SETTINGS index_granularity = 8192"
+    )
+    assert show_create("table_rows") == (
+        f"CREATE TABLE {db}.table_rows\n"
+        "(\n"
+        "    `project_id` String,\n"
+        "    `digest` String,\n"
+        "    `refs` Array(String),\n"
+        "    `val_dump` String TTL toDateTime(expire_at),\n"
+        "    `created_at` DateTime64(3) DEFAULT now64(3),\n"
+        "    `expire_at` DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3)\n"
+        ")\n"
+        "ENGINE = ReplacingMergeTree\n"
+        "ORDER BY (project_id, digest)\n"
+        "SETTINGS index_granularity = 8192"
+    )
+    assert show_create("files") == (
+        f"CREATE TABLE {db}.files\n"
+        "(\n"
+        "    `project_id` String,\n"
+        "    `digest` String,\n"
+        "    `chunk_index` UInt32,\n"
+        "    `n_chunks` UInt32,\n"
+        "    `name` String,\n"
+        "    `val_bytes` String,\n"
+        "    `created_at` DateTime64(3) DEFAULT now64(3),\n"
+        "    `bytes_stored` Nullable(UInt32),\n"
+        "    `file_storage_uri` Nullable(String),\n"
+        "    `expire_at` DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3)\n"
+        ")\n"
+        "ENGINE = ReplacingMergeTree\n"
+        "ORDER BY (project_id, digest, chunk_index)\n"
+        "TTL toDateTime(expire_at)\n"
+        "SETTINGS index_granularity = 8192"
+    )
