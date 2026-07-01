@@ -407,7 +407,14 @@ class BaseClickHouseTraceServerMigrator(ABC):
         )
 
     def _initialize_migration_db(self) -> None:
-        """Initialize the management database, migrations table, and lock table."""
+        """Create the management database, migrations table, and lock table.
+
+        Runs on every construction (every init-container startup), and the DDL
+        is `ON CLUSTER` in replicated/distributed mode, so skip it once the
+        objects exist rather than re-enqueue distributed DDL on every deploy.
+        """
+        if self._management_db_ready():
+            return
         self._ensure_database(self.management_db)
         create_table_sql = self._create_management_table_sql()
         self._run_ddl_with_retry(create_table_sql)
@@ -416,6 +423,36 @@ class BaseClickHouseTraceServerMigrator(ABC):
         # Evolve lock tables created before `heartbeat_at` existed. Idempotent
         # (ADD COLUMN IF NOT EXISTS), so it is a no-op on fresh tables.
         self._run_ddl_with_retry(self._evolve_lock_table_sql())
+
+    def _management_db_ready(self) -> bool:
+        """Whether everything `_initialize_migration_db` sets up already exists.
+
+        Includes the lock table's `heartbeat_at` column (its one schema
+        evolution); any new evolution added there must be reflected here.
+        """
+        return (
+            self._management_table_exists("migrations")
+            and self._management_table_exists(LOCK_TABLE)
+            and self._management_column_exists(LOCK_TABLE, "heartbeat_at")
+        )
+
+    def _management_table_exists(self, table: str) -> bool:
+        """Whether `table` exists in the management database."""
+        res = self.ch_client.query(
+            "SELECT count() FROM system.tables "
+            "WHERE database = %(db)s AND name = %(table)s",
+            parameters={"db": self.management_db, "table": table},
+        )
+        return res.result_rows[0][0] > 0
+
+    def _management_column_exists(self, table: str, column: str) -> bool:
+        """Whether `column` exists on a management-database table."""
+        res = self.ch_client.query(
+            "SELECT count() FROM system.columns "
+            "WHERE database = %(db)s AND table = %(table)s AND name = %(column)s",
+            parameters={"db": self.management_db, "table": table, "column": column},
+        )
+        return res.result_rows[0][0] > 0
 
     def _create_lock_table_sql(self) -> str:
         """Generate SQL for the migration lock table.
@@ -1064,82 +1101,89 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         curr_db = self.ch_client.database
         self.ch_client.database = target_db
         try:
-            command_for_match = SQLPatterns.LINE_COMMENT.sub("", command)
-
-            # Skip MATERIALIZE commands (not supported by distributed tables)
-            if SQLPatterns.MATERIALIZE.search(command_for_match):
-                logger.warning(
-                    "Skipping MATERIALIZE command (not supported in distributed mode): %s",
-                    command,
-                )
-                return
-
-            # Run INSERT ... VALUES seeds (the Distributed engine fans rows to
-            # shards); skip INSERT ... SELECT backfills, which need per-shard handling.
-            if SQLPatterns.INSERT_STMT.search(command_for_match):
-                if SQLPatterns.INSERT_SELECT_STMT.search(command_for_match):
-                    logger.warning(
-                        "Skipping INSERT ... SELECT backfill (not supported in distributed mode): %s...",
-                        command[:_COMMAND_PREVIEW_LENGTH],
-                    )
-                    return
-                self._run_distributed_insert(command)
-                return
-
-            # Handle RENAME TABLE (local rename + drop/recreate distributed table)
-            if SQLPatterns.RENAME_TABLE_STMT.search(command_for_match):
-                self._execute_distributed_rename(command)
-                return
-
-            # Handle CREATE MATERIALIZED VIEW: rewrite to create only the
-            # local-source / local-target variant. See module docstring.
-            if SQLPatterns.CREATE_MATERIALIZED_VIEW_STMT.search(command_for_match):
-                if self._uses_replicated_db_engine(target_db):
-                    self._run_ddl_with_retry(command)
-                else:
-                    self._execute_materialized_view_create(command)
-                return
-
-            # Handle CREATE VIEW (non-materialized) / DROP VIEW: just add ON CLUSTER.
-            if SQLPatterns.CREATE_VIEW_STMT.search(
-                command_for_match
-            ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
-                # When the DB uses ENGINE = Replicated, it auto-converts MergeTree
-                # and handles DDL replication — skip explicit engine conversion and ON CLUSTER.
-                if self._uses_replicated_db_engine(target_db):
-                    formatted_command = command
-                    self._run_ddl_with_retry(formatted_command)
-                    return
-                formatted_command = self._format_replicated_sql(command)
-                formatted_command = self._add_on_cluster_clause(
-                    formatted_command, target_db=target_db
-                )
-                self._run_ddl_with_retry(formatted_command)
-                # For DROP VIEW: also drop the `_local` twin in case this was a
-                # materialized view. IF EXISTS makes it a no-op for plain views.
-                if SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
-                    self._drop_local_view_twin(command_for_match, target_db)
-                return
-
-            # Engine handling matrix for distributed local tables:
-            # - distributed + Atomic DB: explicit ZK args plus ON CLUSTER
-            # - distributed + Replicated DB: Replicated*MergeTree() with no
-            #   explicit ZK args and no ON CLUSTER
-            if self._uses_replicated_db_engine(target_db):
-                formatted_command = self._format_replicated_sql(command)
-            else:
-                formatted_command = self._format_replicated_sql_distributed(
-                    command, target_db
-                )
-
-            # Handle ALTER TABLE
-            if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
-                self._execute_distributed_alter(formatted_command)
-            else:
-                # Handle CREATE TABLE and other DDL
-                self._execute_distributed_ddl(formatted_command)
+            self._dispatch_distributed_command(target_db, command)
         finally:
             self.ch_client.database = curr_db
+
+    def _dispatch_distributed_command(self, target_db: str, command: str) -> None:
+        """Route one migration command to its distributed-mode handler.
+
+        Runs with `self.ch_client.database` already pointed at `target_db`.
+        """
+        command_for_match = SQLPatterns.LINE_COMMENT.sub("", command)
+
+        # Skip MATERIALIZE commands (not supported by distributed tables)
+        if SQLPatterns.MATERIALIZE.search(command_for_match):
+            logger.warning(
+                "Skipping MATERIALIZE command (not supported in distributed mode): %s",
+                command,
+            )
+            return
+
+        # Run INSERT ... VALUES seeds (the Distributed engine fans rows to
+        # shards); skip INSERT ... SELECT backfills, which need per-shard handling.
+        if SQLPatterns.INSERT_STMT.search(command_for_match):
+            if SQLPatterns.INSERT_SELECT_STMT.search(command_for_match):
+                logger.warning(
+                    "Skipping INSERT ... SELECT backfill (not supported in distributed mode): %s...",
+                    command[:_COMMAND_PREVIEW_LENGTH],
+                )
+                return
+            self._run_distributed_insert(command)
+            return
+
+        # Handle RENAME TABLE (local rename + drop/recreate distributed table)
+        if SQLPatterns.RENAME_TABLE_STMT.search(command_for_match):
+            self._execute_distributed_rename(command)
+            return
+
+        # Handle CREATE MATERIALIZED VIEW: rewrite to create only the
+        # local-source / local-target variant. See module docstring.
+        if SQLPatterns.CREATE_MATERIALIZED_VIEW_STMT.search(command_for_match):
+            if self._uses_replicated_db_engine(target_db):
+                self._run_ddl_with_retry(command)
+            else:
+                self._execute_materialized_view_create(command)
+            return
+
+        # Handle CREATE VIEW (non-materialized) / DROP VIEW: just add ON CLUSTER.
+        if SQLPatterns.CREATE_VIEW_STMT.search(
+            command_for_match
+        ) or SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
+            # When the DB uses ENGINE = Replicated, it auto-converts MergeTree
+            # and handles DDL replication -> skip explicit engine conversion and ON CLUSTER.
+            if self._uses_replicated_db_engine(target_db):
+                formatted_command = command
+                self._run_ddl_with_retry(formatted_command)
+                return
+            formatted_command = self._format_replicated_sql(command)
+            formatted_command = self._add_on_cluster_clause(
+                formatted_command, target_db=target_db
+            )
+            self._run_ddl_with_retry(formatted_command)
+            # For DROP VIEW: also drop the `_local` twin in case this was a
+            # materialized view. IF EXISTS makes it a no-op for plain views.
+            if SQLPatterns.DROP_VIEW_STMT.search(command_for_match):
+                self._drop_local_view_twin(command_for_match, target_db)
+            return
+
+        # Engine handling matrix for distributed local tables:
+        # - distributed + Atomic DB: explicit ZK args plus ON CLUSTER
+        # - distributed + Replicated DB: Replicated*MergeTree() with no
+        #   explicit ZK args and no ON CLUSTER
+        if self._uses_replicated_db_engine(target_db):
+            formatted_command = self._format_replicated_sql(command)
+        else:
+            formatted_command = self._format_replicated_sql_distributed(
+                command, target_db
+            )
+
+        # Handle ALTER TABLE
+        if SQLPatterns.ALTER_TABLE_STMT.search(command_for_match):
+            self._execute_distributed_alter(formatted_command)
+        else:
+            # Handle CREATE TABLE and other DDL
+            self._execute_distributed_ddl(formatted_command)
 
     def _format_replicated_sql_distributed(self, sql_query: str, target_db: str) -> str:
         """Format SQL query to use replicated engines with explicit paths for distributed mode."""

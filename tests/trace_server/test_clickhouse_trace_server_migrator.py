@@ -25,12 +25,20 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 )
 
 
+def _count_result(count: int) -> Mock:
+    """Mock a single-cell `SELECT count()` result."""
+    res = Mock()
+    res.result_rows = [(count,)]
+    return res
+
+
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases queries.
 
-    Only `system.databases` queries are stubbed; all other `query()` calls
-    fall through to the default Mock behaviour so they don't silently return
-    engine data for unrelated code paths.
+    `system.databases` engine queries and the management-DB readiness reads
+    (`system.tables` / `system.columns`) are stubbed; the readiness reads
+    return 0 so `_initialize_migration_db` treats the DB as absent and runs
+    its DDL. All other `query()` calls fall through to the default Mock.
     """
     ch_client = Mock()
     ch_client.database = "test_db"
@@ -41,6 +49,8 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     def _query_side_effect(sql, *args, **kwargs):
         if "system.databases" in sql:
             return engine_result
+        if "system.tables" in sql or "system.columns" in sql:
+            return _count_result(0)
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -61,6 +71,8 @@ def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> M
             else:
                 engine_result.result_rows = []
             return engine_result
+        if "system.tables" in sql or "system.columns" in sql:
+            return _count_result(0)
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -606,12 +618,14 @@ def test_create_db_sql(mock_costs):
 
 def test_engine_discovery_init_behavior():
     """Cloud mode skips system.databases; replicated mode queries it and is configurable."""
-    # Cloud mode never touches system.databases
-    cloud_client = Mock()
+    # Cloud mode never queries system.databases (only the readiness reads).
+    cloud_client = _make_ch_client()
     CloudClickHouseTraceServerMigrator(
         cloud_client, migration_dir=DEFAULT_MIGRATION_DIR
     )
-    cloud_client.query.assert_not_called()
+    assert not any(
+        "system.databases" in c.args[0] for c in cloud_client.query.call_args_list
+    )
 
     # Replicated mode uses ENGINE_DISCOVERY_MAX_WAIT_SECONDS constant
     ReplicatedClickHouseTraceServerMigrator(
@@ -621,8 +635,16 @@ def test_engine_discovery_init_behavior():
     )
 
     # Replicated mode surfaces a clear error when system.databases is inaccessible
-    denied_client = Mock()
-    denied_client.query.side_effect = DatabaseError("access denied to system.databases")
+    denied_client = _make_ch_client()
+
+    def _deny_system_databases(sql, *args, **kwargs):
+        if "system.databases" in sql:
+            raise DatabaseError("access denied to system.databases")
+        if "system.tables" in sql or "system.columns" in sql:
+            return _count_result(0)
+        return Mock()
+
+    denied_client.query.side_effect = _deny_system_databases
     with pytest.raises(
         MigrationError, match="require SELECT access to system.databases"
     ):
@@ -666,18 +688,23 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     """Engine discovery retries until visible, then uses the result for DDL.
     When it never appears, the error includes the CREATE DATABASE statement.
     """
-    # Succeeds after retries: engine becomes visible on the 3rd query
+    # Succeeds after retries: engine becomes visible on the 3rd system.databases query
     ch_client = Mock()
     ch_client.database = "original_db"
     query_result_empty = Mock()
     query_result_empty.result_rows = []
     query_result_replicated = Mock()
     query_result_replicated.result_rows = [("Replicated",)]
-    ch_client.query.side_effect = [
-        query_result_empty,
-        query_result_empty,
-        query_result_replicated,
-    ]
+    engine_results = [query_result_empty, query_result_empty, query_result_replicated]
+
+    def _engine_after_retries(sql, *args, **kwargs):
+        if "system.databases" in sql:
+            return engine_results.pop(0)
+        if "system.tables" in sql or "system.columns" in sql:
+            return _count_result(0)
+        return Mock()
+
+    ch_client.query.side_effect = _engine_after_retries
 
     migrator = ReplicatedClickHouseTraceServerMigrator(
         ch_client,
@@ -708,7 +735,13 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     # Times out: engine never becomes visible, error includes the SQL context
     timeout_client = Mock()
     timeout_client.database = "original_db"
-    timeout_client.query.return_value = query_result_empty
+
+    def _engine_never_visible(sql, *args, **kwargs):
+        if "system.tables" in sql or "system.columns" in sql:
+            return _count_result(0)
+        return query_result_empty
+
+    timeout_client.query.side_effect = _engine_never_visible
 
     with (
         patch(
