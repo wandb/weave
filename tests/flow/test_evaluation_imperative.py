@@ -507,7 +507,9 @@ async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, sco
     assert len(calls) == expected_num_calls * 2
 
 
-def test_passing_dict_requires_name_with_scorer(weave_active):
+@pytest.mark.disable_logging_error_check
+def test_passing_dict_requires_name(weave_active):
+    """A dict scorer or dict model must carry a `name`; with one it is accepted."""
     ev = weave.EvaluationLogger()
     pred = ev.log_prediction(inputs={}, output=None)
     with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
@@ -516,11 +518,8 @@ def test_passing_dict_requires_name_with_scorer(weave_active):
     pred.log_score(scorer={"name": "my_scorer"}, score=0.5)
     ev.finish()
 
-
-@pytest.mark.disable_logging_error_check
-def test_passing_dict_requires_name_with_model(weave_active):
     with pytest.raises(ValueError, match="Your dict must contain a `name` key."):
-        ev = weave.EvaluationLogger(model={"something": "else"})
+        weave.EvaluationLogger(model={"something": "else"})
 
     ev2 = weave.EvaluationLogger(model={"name": "my_model"})
     ev2.finish()
@@ -709,8 +708,8 @@ def test_evaluation_logger_uses_passed_output_not_model_predict(client):
 
 
 @pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
-def test_evaluation_invalid_model_name_fixable(model_name):
-    # Should not raise
+def test_evaluation_invalid_model_name_fixable(weave_active, model_name):
+    # Should not raise: names are sanitized into a valid class name.
     weave.EvaluationLogger(model=model_name)
 
 
@@ -1061,34 +1060,39 @@ def test_log_score_context_manager_with_nested_ops(client):
     assert predict_and_score_call.output["scores"]["length_check"] is True
 
 
-def test_log_example_basic(client):
-    """Test basic functionality of log_example method."""
+@pytest.mark.parametrize(
+    ("inputs", "output", "scores", "finalize"),
+    [
+        (
+            {"question": "What is 2+2?"},
+            "4",
+            {"correctness": 1.0, "fluency": 0.9},
+            "summary",
+        ),
+        ({"input": "test"}, "result", {}, "finish"),
+    ],
+)
+def test_log_example_basic(client, inputs, output, scores, finalize):
+    """A single log_example records inputs/output/scores, including empty scores."""
     ev = EvaluationLogger()
+    ev.log_example(inputs=inputs, output=output, scores=scores)
 
-    # Log a complete example with inputs, output, and scores
-    ev.log_example(
-        inputs={"question": "What is 2+2?"},
-        output="4",
-        scores={"correctness": 1.0, "fluency": 0.9},
-    )
-
-    ev.log_summary({"avg_score": 0.95})
+    if finalize == "summary":
+        ev.log_summary({"avg_score": 0.95})
+    elif finalize == "finish":
+        ev.finish()
+    else:
+        raise ValueError(f"unhandled finalize: {finalize}")
     client.flush()
 
-    calls = client.get_calls()
-
-    # Find the predict_and_score call
-    predict_and_score_call = None
-    for call in calls:
-        if op_name_from_call(call) == "Evaluation.predict_and_score":
-            predict_and_score_call = call
-            break
-
-    assert predict_and_score_call is not None
-    assert predict_and_score_call.inputs["example"] == {"question": "What is 2+2?"}
-    assert predict_and_score_call.output["output"] == "4"
-    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
-    assert predict_and_score_call.output["scores"]["fluency"] == 0.9
+    predict_and_score_call = next(
+        c
+        for c in client.get_calls()
+        if op_name_from_call(c) == "Evaluation.predict_and_score"
+    )
+    assert predict_and_score_call.inputs["example"] == inputs
+    assert predict_and_score_call.output["output"] == output
+    assert predict_and_score_call.output["scores"] == scores
 
 
 def test_log_example_multiple_examples(client):
@@ -1125,75 +1129,24 @@ def test_log_example_multiple_examples(client):
             assert call.output["scores"][scorer_name] == score_value
 
 
-def test_log_example_with_empty_scores(client):
-    """Test log_example with empty scores dictionary."""
+@pytest.mark.parametrize("finalize", ["finish", "log_summary"])
+def test_log_example_after_finalization_raises_error(weave_active, finalize):
+    """log_example after either finalization path (finish/log_summary) raises."""
     ev = EvaluationLogger()
 
-    # Log example with no scores
-    ev.log_example(
-        inputs={"input": "test"},
-        output="result",
-        scores={},
-    )
-
-    ev.finish()
-    client.flush()
-
-    calls = client.get_calls()
-    predict_and_score_call = None
-    for call in calls:
-        if op_name_from_call(call) == "Evaluation.predict_and_score":
-            predict_and_score_call = call
-            break
-
-    assert predict_and_score_call is not None
-    assert predict_and_score_call.inputs["example"] == {"input": "test"}
-    assert predict_and_score_call.output["output"] == "result"
-    # Scores should be empty
-    assert predict_and_score_call.output["scores"] == {}
-
-
-def test_log_example_after_finalization_raises_error(weave_active):
-    """Test that log_example raises ValueError when called after finalization."""
-    ev = EvaluationLogger()
-
-    # Log one example successfully
     ev.log_example(
         inputs={"q": "test"},
         output="answer",
         scores={"score": 1.0},
     )
 
-    # Finalize the evaluation
-    ev.finish()
+    if finalize == "finish":
+        ev.finish()
+    elif finalize == "log_summary":
+        ev.log_summary({"total": 1})
+    else:
+        raise ValueError(f"unhandled finalize: {finalize}")
 
-    # Attempting to log another example should raise an error
-    with pytest.raises(
-        ValueError,
-        match="Cannot log example after evaluation has been finalized",
-    ):
-        ev.log_example(
-            inputs={"q": "another test"},
-            output="another answer",
-            scores={"score": 0.5},
-        )
-
-
-def test_log_example_after_log_summary_raises_error(weave_active):
-    """Test that log_example raises ValueError when called after log_summary."""
-    ev = EvaluationLogger()
-
-    # Log one example successfully
-    ev.log_example(
-        inputs={"q": "test"},
-        output="answer",
-        scores={"score": 1.0},
-    )
-
-    # Call log_summary (which also finalizes)
-    ev.log_summary({"total": 1})
-
-    # Attempting to log another example should raise an error
     with pytest.raises(
         ValueError,
         match="Cannot log example after evaluation has been finalized",
