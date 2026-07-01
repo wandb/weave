@@ -1,0 +1,83 @@
+## Conversation
+User task: "Improve Weave Python SDK error UX: weave.init() with a bad/insufficient
+API key raises a raw, confusing traceback." Based on Jamie Rasmussen's report
+(2026-06-24) of a raw server error ending in an 'upsertModel' PERMISSION_ERROR
+traceback. Asked to (1) reproduce, (2) catch the specific permission/auth error at
+the boundary and re-raise a clear, actionable Weave error naming causes + fixes,
+preserving __cause__ via `from err`, keeping try/except narrow, and (3) test at the
+external-service boundary only. Explicitly: do NOT push, do NOT open a PR.
+
+## Actions
+- git fetch --all; searched for existing branches/PRs on init error handling.
+- Traced init flow: weave/trace/api.py init() -> weave/trace/weave_init.py init_weave()
+  -> WeaveClient.__init__ (weave/trace/weave_client.py:479-482, `if ensure_project_exists:
+  self.server.ensure_project_exists(...)`) -> remote_http_trace_server.ensure_project_exists
+  -> weave/wandb_interface/project_creator.py:ensure_project_exists (the real boundary).
+- KEY DISCOVERY: PR #7373 (6c3ed17fd2, Griffin, merged 2026-06-24 13:05 — SAME DAY as
+  Jamie's report) already converts the raw TransportQueryError PERMISSION_ERROR into a
+  friendly UnableToCreateProjectError in _raise_project_access_error(). So the raw
+  traceback was already largely fixed upstream before this task ran.
+- Set up env: `uv venv --python 3.12 --clear` then `uv sync --group test`. NOTE: default
+  python here is 3.14 freethreaded, which fails to build tiktoken (PyO3 max 3.13) — MUST
+  pin 3.12.
+- Reproduced current behavior with .context/repro_perm_error.py (gitignored): mocks only
+  the wandb.Api boundary (same seam as the tests) to raise a TransportQueryError with an
+  upsertModel PERMISSION_ERROR extension, then calls the real ensure_project_exists.
+  Confirmed post-#7373: message names only team membership; __cause__ is None (from None).
+- Edited weave/wandb_interface/project_creator.py:_raise_project_access_error — expanded
+  the UnableToCreateProjectError message (numbered causes + fixes) and changed `from None`
+  -> `from exception`.
+- Updated tests/wandb_interface/test_project_creator.py::test_ensure_project_exists_permission_denied
+  to assert the full new message (==, whole string) and `__cause__ is permission_error`.
+
+## Errors & mistakes
+- First `uv sync` used python 3.14 (freethreaded) -> tiktoken build failed with PyO3
+  "configured Python interpreter version (3.14) is newer than PyO3's maximum supported
+  version (3.13)". Fixed by recreating the venv with `--python 3.12 --clear`.
+- Bash classifier was briefly "temporarily unavailable"; retried and it worked.
+
+## Dead ends / scope decisions (deliberately NOT done)
+- Did NOT broaden detection to TransportServerError 401/403 or wandb.AuthenticationError.
+  Rationale: per the in-code comment (and confirmed shape), gorilla returns PERMISSION_ERROR
+  (a TransportQueryError) for BOTH "forbidden" and "not-logged-in", so both the no-access
+  and invalid/absent-key cases already funnel through the existing _is_permission_denied
+  check. Broadening would also drag in retry-semantics changes (_is_retryable_project_exception
+  retries TransportServerError) and relies on unverifiable assumptions about whether the
+  server returns HTTP 4xx vs 200-with-errors. Kept the change minimal and narrow.
+- Did NOT create a weave/errors.py. The task referenced it but it does not exist; the
+  established type for this boundary is UnableToCreateProjectError (added by #7373) in
+  project_creator.py. Reused it. It is NOT re-exported at weave top level (users catch it
+  via weave.wandb_interface.project_creator).
+
+## Hints & warnings
+- TRADEOFF (flag for reviewer): #7373 used `from None` intentionally to "suppress the raw
+  gql traceback". The task explicitly asked for `from err`, so this commit reverses that:
+  the gql TransportQueryError now shows above the friendly message on an uncaught error
+  ("The above exception was the direct cause..."). The friendly UnableToCreateProjectError
+  is still the LAST/most-prominent frame, and the cause is now available for debugging. If
+  the team prefers the cleaner no-traceback UX, revert just the `from exception` -> `from None`
+  and the test's __cause__ assertion.
+- test_ensure_project_exists_authentication_error (line ~124) still asserts a raw
+  AuthenticationError propagates — left as-is. AuthenticationError is a login-time error
+  (weave.login in weave_init.py), a DIFFERENT boundary from ensure_project_exists; in the
+  real ensure_project_exists path gql raises Transport* errors, not AuthenticationError.
+- Assert on the WHOLE message string (repo rule: no substring/`in` checks). If you tweak
+  the message wording, update the test's full == block.
+
+## Codebase discoveries
+- The permission boundary is weave/wandb_interface/project_creator.py, not weave_init.py:279
+  (that line is just print_init_message). weave_init.py:279's read_only flag is unrelated.
+- Env: pin python 3.12; run tests via `uv run --group test python -m pytest <path>`; lint
+  via `uvx ruff check <paths>` (ruff not in any dep group). These boundary tests mock
+  wandb.Api and need neither ClickHouse nor network.
+
+## Open questions
+- Should UnableToCreateProjectError be re-exported at the weave top level so users can
+  `except weave.UnableToCreateProjectError`? Currently only reachable via the internal module.
+- Not verified against a live server whether every deployment returns PERMISSION_ERROR as a
+  200-with-errors TransportQueryError vs an HTTP 4xx TransportServerError. If the latter is
+  ever seen in the wild, add a narrow TransportServerError(401/403) branch to _is_permission_denied.
+
+## State
+Committed on branch hatchery/reaver as 3e3dff21a7. NOT pushed, no PR (per instructions).
+8/8 tests pass in tests/wandb_interface/test_project_creator.py; ruff clean on both files.
