@@ -1,11 +1,4 @@
-import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
-
-import {
-  ATTR_GEN_AI_AGENT_NAME,
-  ATTR_GEN_AI_CONVERSATION_ID,
-  ATTR_GEN_AI_OPERATION_NAME,
-  ATTR_GEN_AI_REQUEST_MODEL,
-} from '../../genai/semconv';
+import {SpanStatusCode} from '@opentelemetry/api';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -13,6 +6,7 @@ import {
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
+  spanSnapshot,
 } from './common';
 
 describe('Turn', () => {
@@ -21,19 +15,35 @@ describe('Turn', () => {
 
   it('emits an invoke_agent span with GenAI agent / model attributes', () => {
     const turn = Turn.create({
-      agentName: 'weather-bot',
       model: 'gpt-4o',
+      agentId: '12345',
+      agentName: 'weather-bot',
+      agentDescription: 'Finds the most accurate weather',
+      agentVersion: '1.2.3',
       conversationId: 'conv-1',
+      userMessage: "What's the weather?",
+      systemInstructions: ['Be helpful', 'Be concise'],
     });
     turn.end();
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.kind).toBe(SpanKind.CLIENT);
-    expect(span.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
-    expect(span.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('weather-bot');
-    expect(span.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
-    expect(span.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
-    expect(span.parentSpanId).toBeUndefined();
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.description": "Finds the most accurate weather",
+          "gen_ai.agent.id": "12345",
+          "gen_ai.agent.name": "weather-bot",
+          "gen_ai.agent.version": "1.2.3",
+          "gen_ai.conversation.id": "<uuid>",
+          "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
   });
 
   it('end() is idempotent', () => {
@@ -50,6 +60,81 @@ describe('Turn', () => {
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.status.message).toBe('boom');
     expect(span.events.some(e => e.name === 'exception')).toBe(true);
+  });
+
+  it('record() updates fields, which are emitted at end()', () => {
+    const turn = Turn.create({agentName: 'weather-bot'});
+    turn.record({
+      agentId: 'weather-bot-prod',
+      agentDescription: 'Looks up the weather',
+      agentVersion: '1.4.2',
+      systemInstructions: ['Be helpful'],
+    });
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.description": "Looks up the weather",
+          "gen_ai.agent.id": "weather-bot-prod",
+          "gen_ai.agent.name": "weather-bot",
+          "gen_ai.agent.version": "1.4.2",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
+  });
+
+  it('record() preserves untouched fields', () => {
+    const turn = Turn.create({
+      agentName: 'weather-bot',
+      agentId: 'preset',
+      agentVersion: 'v1',
+      systemInstructions: ['initial'],
+    });
+    turn.record({agentVersion: 'v2'});
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(spanSnapshot(span)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.agent.id": "preset",
+          "gen_ai.agent.name": "weather-bot",
+          "gen_ai.agent.version": "v2",
+          "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.system_instructions": "[{"type":"text","content":"initial"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
+  });
+
+  it('record() is chainable', () => {
+    const turn = Turn.create({});
+    expect(turn.record({agentId: 'x'}).record({agentDescription: 'foo'})).toBe(
+      turn
+    );
+    turn.end();
+  });
+
+  it('record() warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    turn.end();
+    turn.record({agentId: 'after-end'});
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes['gen_ai.agent.id']).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Turn.record() called after end()')
+    );
+    warnSpy.mockRestore();
   });
 });
 

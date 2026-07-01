@@ -1937,6 +1937,109 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
     assert tool.tool_call.tool_result == '{"ok":true}'
 
 
+def test_conversation_chat_excludes_foreign_conversation_sharing_trace_id(ch_server):
+    """A reused trace_id must not bleed foreign conversations into the chat view.
+
+    Agent-eval workloads reuse trace_id across conversations, so the page of
+    turn trace_ids matches spans from other conversations too. The chat view
+    must never return another conversation's tagged spans.
+
+    Untagged children are a known limitation: producers tag conversation_id
+    only on the root span, so a foreign conversation's untagged children on a
+    shared trace_id cannot be attributed and still bleed (see PR #7450).
+    """
+    project_id = _make_project_id("conv_chat_bleed")
+    conv_a = f"conv-a-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-b-{uuid.uuid4().hex[:8]}"
+    shared_trace = uuid.uuid4().hex  # reused by both conversations
+    a_only_trace = uuid.uuid4().hex  # conv A's second turn, its own trace
+    root_a = uuid.uuid4().hex
+    root_b = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_a,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-shared")],
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_a,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childA-text")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_b,
+            conversation_id=conv_b,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userB-foreign")],
+            output_messages=[
+                NormalizedMessage(role="assistant", content="assistantB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_b,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=a_only_trace,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-only")],
+            started_at=now + datetime.timedelta(minutes=1),
+            ended_at=now + datetime.timedelta(minutes=1, seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(project_id=project_id, conversation_id=conv_a)
+    )
+
+    assert res.total_turns == 2
+    assert {turn.trace_id for turn in res.turns} == {shared_trace, a_only_trace}
+
+    texts = [
+        payload.text
+        for turn in res.turns
+        for msg in turn.messages
+        for payload in (msg.user_message, msg.assistant_message)
+        if payload is not None
+    ]
+    assert "userA-shared" in texts
+    assert "childA-text" in texts
+    assert "userA-only" in texts
+    # conv B's tagged root is excluded by conversation_id scoping.
+    assert "userB-foreign" not in texts
+    assert "assistantB-foreign" not in texts
+    # Known limitation (PR #7450 discussion): conv B's untagged child shares
+    # the trace_id, so it currently bleeds. Flip to `not in` when fixed.
+    assert "childB-foreign" in texts
+
+
 # ---------------------------------------------------------------------------
 # Test: Message search
 # ---------------------------------------------------------------------------

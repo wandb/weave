@@ -1,7 +1,7 @@
 name: bump-python-sdk-version
 
 # This workflow is used to bump the version of the Weave Python SDK.
-# It will take 2 steps:
+# It will take 2 steps (3 for a minor/major release, which first moves the dev base):
 # 1. Drop the pre-release tag and push a new commit to the main branch.
 # 2. Bump the version to the next pre-release version and push a new commit to the main branch.
 #
@@ -9,10 +9,20 @@ name: bump-python-sdk-version
 
 on:
   workflow_dispatch:
+    inputs:
+      bump_type:
+        description: "Semver segment to release"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
 
 jobs:
   build-assets:
-    name: Bump and Tag Python SDK Patch Version
+    name: Bump and Tag Python SDK Version
     runs-on: ubuntu-8core
     timeout-minutes: 10
     environment:
@@ -41,6 +51,12 @@ jobs:
           git config --global user.email weave@wandb.com
       - id: install_bump
         run: pip install --upgrade bump-my-version
+      - id: bump_release_segment
+        # For minor/major, first move the dev base onto the new segment
+        # (e.g. X.Y.Z-dev0 -> X.(Y+1).0-dev0) before dropping the pre-release tag.
+        if: inputs.bump_type != 'patch'
+        run: |
+          bump-my-version bump ${{ inputs.bump_type }} ./weave/version.py --commit
       - id: drop_pre_release
         # First we drop the pre-release tag since X.Y.Z-dev0 has lower precedence than X.Y.Z
         # This is the commit we will release from

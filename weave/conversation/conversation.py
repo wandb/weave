@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from weave.conversation.conversation_otel import (
     execute_tool_attributes,
@@ -122,6 +122,17 @@ def _capture_info_attrs() -> dict[str, str]:
     every emit, matching ``@op`` semantics in ``weave_client.py``.
     """
     return {f"weave.{k}": v for k, v in get_capture_info().items()}
+
+
+# Forward-looking deprecation: OpenTelemetry is phasing out the Span Event API
+# (``Span.add_event``), so we steer callers to ``set_attributes``,
+# which Weave already records and surfaces in the Agents tab. ``add_event``
+# still works and existing span-event data stays valid.
+# https://opentelemetry.io/blog/2026/deprecating-span-events/
+_ADD_EVENT_DEPRECATION_MESSAGE = (
+    "`add_event` is deprecated; record this data with `set_attributes` instead. "
+    "OpenTelemetry is phasing out the Span Event API (`Span.add_event`)."
+)
 
 
 class _SpanBase(BaseModel):
@@ -243,6 +254,7 @@ class _SpanBase(BaseModel):
             span.set_attributes(attributes)
         return self
 
+    @deprecated(_ADD_EVENT_DEPRECATION_MESSAGE)
     def add_event(
         self,
         name: str,
@@ -250,6 +262,12 @@ class _SpanBase(BaseModel):
         timestamp: datetime | None = None,
     ) -> Self:
         """Record an OTel span event at a point in time within this span.
+
+        .. deprecated::
+            Record this data with ``set_attributes`` instead. OpenTelemetry is
+            phasing out the Span Event API (``Span.add_event``).
+            ``add_event`` still works and existing span-event data stays valid.
+            See https://opentelemetry.io/blog/2026/deprecating-span-events/.
 
         Use for marker / lifecycle data — permission prompts (e.g.
         ``weave.permission_request``), lifecycle transitions (e.g.

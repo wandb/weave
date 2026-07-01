@@ -35,7 +35,10 @@ async function callSomeLLM(_args: unknown): Promise<ChatCompletion> {
 }
 
 type Agent = {
+  id: string;
   name: string;
+  description: string;
+  version: string;
   instructions: string;
   tools: Tool[];
 };
@@ -91,9 +94,13 @@ const calculateTool: Tool = {
 };
 
 const agent: Agent = {
+  id: '62e4a66c-c22f-4ef2-8fce-b573e499a182',
   name: 'Reasearch Assistant',
   instructions:
     'You are a research assistant. Use the available tools when appropriate to answer questions accurately.',
+  description:
+    'Research assistant that is so advanced it has a typo in its name',
+  version: '1.14.3',
   tools: [calculateTool, getWeatherTool],
 };
 
@@ -203,8 +210,9 @@ async function runAgentLoop(
     const llm = turn.startLLM({
       model: 'some-model',
       providerName: 'some-provider',
+      systemInstructions: [agent.instructions],
     });
-    llm.inputMessages = [...messages];
+    llm.record({inputMessages: [...messages]});
 
     const resp = await callSomeLLM({
       model: 'some-model',
@@ -230,12 +238,15 @@ async function runAgentLoop(
       });
     }
     const assistantMessage: Message = {role: 'assistant', parts};
-    llm.outputMessages = [assistantMessage];
     llm.record({
+      outputMessages: [assistantMessage],
       usage: {
         inputTokens: resp.usage?.prompt_tokens,
         outputTokens: resp.usage?.completion_tokens,
       },
+      responseId: resp.id,
+      responseModel: resp.model,
+      finishReasons: [choice.finish_reason],
     });
     llm.end();
     messages.push(assistantMessage);
@@ -249,6 +260,29 @@ async function runAgentLoop(
       if (!toolDef) {
         throw new Error(`unknown tool: ${tc.function.name}`);
       }
+      if (tc.function.name === 'calculate') {
+        const sub = turn.startSubagent({
+          name: 'calculator-bot',
+          model: 'gpt-4o-mini',
+          systemInstructions: ['Evaluate arithmetic expressions.'],
+        });
+        try {
+          const result = await toolDef.execute(
+            JSON.parse(tc.function.arguments)
+          );
+          sub.end();
+          messages.push({
+            role: 'tool',
+            toolCallId: tc.id,
+            content: JSON.stringify(result),
+          });
+        } catch (err) {
+          sub.end({error: err as Error});
+          throw err;
+        }
+        continue;
+      }
+
       const tool = turn.startTool({
         name: tc.function.name,
         args: tc.function.arguments,
@@ -285,7 +319,14 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
     const answers: string[] = [];
     for (const prompt of prompts) {
       messages.push({role: 'user', content: prompt});
-      const turn = conversation.startTurn({agentName: agent.name});
+      const turn = conversation.startTurn({
+        agentId: agent.id,
+        agentName: agent.name,
+        agentDescription: agent.description,
+        agentVersion: agent.version,
+        userMessage: prompt,
+        systemInstructions: [agent.instructions],
+      });
       try {
         answers.push(await runAgentLoop(agent, messages, turn));
       } finally {
@@ -354,6 +395,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t1-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
             "myagent.region": "ORD",
@@ -384,6 +431,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t1-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
             "myagent.region": "ORD",
@@ -394,9 +447,14 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How warm is Tokyo?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -411,6 +469,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t2-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
             "myagent.region": "ORD",
@@ -455,6 +519,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t2-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
             "myagent.region": "ORD",
@@ -465,9 +535,14 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What about San Francisco and London?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -482,6 +557,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t3","toolName":"calculate","arguments":"{\\"expression\\":\\"28 - 18\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t3-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
             "myagent.region": "ORD",
@@ -492,12 +573,11 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.name": "calculator-bot",
             "gen_ai.conversation.id": "<uuid>",
-            "gen_ai.operation.name": "execute_tool",
-            "gen_ai.tool.call.arguments": "{"expression":"28 - 18"}",
-            "gen_ai.tool.call.id": "call_t3",
-            "gen_ai.tool.call.result": ""28 - 18 = 10"",
-            "gen_ai.tool.name": "calculate",
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"Evaluate arithmetic expressions."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -512,6 +592,12 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 10°C warmer than San Francisco."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t3-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
             "myagent.region": "ORD",
@@ -522,9 +608,14 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.description": "Research assistant that is so advanced it has a typo in its name",
+            "gen_ai.agent.id": "62e4a66c-c22f-4ef2-8fce-b573e499a182",
             "gen_ai.agent.name": "Reasearch Assistant",
+            "gen_ai.agent.version": "1.14.3",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How much warmer is Tokyo than San Francisco?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -597,7 +688,7 @@ describe('GenAI', () => {
             providerName: 'some-provider',
             startTime: toDate(resp),
           });
-          llm.inputMessages = [...messages];
+          llm.record({inputMessages: [...messages]});
 
           const choice = resp.choices[0];
           const toolCalls = (choice.message.tool_calls ?? []).filter(
@@ -617,8 +708,8 @@ describe('GenAI', () => {
             });
           }
           const assistantMessage: Message = {role: 'assistant', parts};
-          llm.outputMessages = [assistantMessage];
           llm.record({
+            outputMessages: [assistantMessage],
             usage: {
               inputTokens: resp.usage?.prompt_tokens,
               outputTokens: resp.usage?.completion_tokens,
@@ -964,7 +1055,7 @@ describe('GenAI', () => {
             providerName: 'some-provider',
             startTime: toDate(resp),
           });
-          llm.inputMessages = [...messages];
+          llm.record({inputMessages: [...messages]});
 
           const choice = resp.choices[0];
           const toolCalls = (choice.message.tool_calls ?? []).filter(
@@ -984,8 +1075,8 @@ describe('GenAI', () => {
             });
           }
           const assistantMessage: Message = {role: 'assistant', parts};
-          llm.outputMessages = [assistantMessage];
           llm.record({
+            outputMessages: [assistantMessage],
             usage: {
               inputTokens: resp.usage?.prompt_tokens,
               outputTokens: resp.usage?.completion_tokens,
