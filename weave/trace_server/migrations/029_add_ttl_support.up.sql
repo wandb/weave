@@ -7,7 +7,7 @@
 -- Stores the per-project retention duration as an append-only audit trail.
 -- Use argMax(retention_days, updated_at) to read the latest setting.
 -- retention_days = 0 means "no TTL" (infinite retention).
-CREATE TABLE project_ttl_settings (
+CREATE TABLE IF NOT EXISTS project_ttl_settings (
     project_id      String,
     retention_days  Int32,
     updated_at      DateTime64(3) DEFAULT now64(3),
@@ -19,7 +19,7 @@ SETTINGS
     enable_block_offset_column = 1;
 
 -- Step 1b: Rename ttl_at to expire_at on calls_complete
-ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
+ALTER TABLE calls_complete RENAME COLUMN IF EXISTS ttl_at TO expire_at;
 
 -- Step 1c: Re-apply TTL expression after column rename.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
@@ -29,11 +29,11 @@ ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE SETTINGS mate
 
 -- Step 2: Add expire_at to call_parts
 ALTER TABLE call_parts
-    ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+    ADD COLUMN IF NOT EXISTS expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 3: Add expire_at to calls_merged
 ALTER TABLE calls_merged
-    ADD COLUMN expire_at SimpleAggregateFunction(min, DateTime64(3))
+    ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 4: Update calls_merged_view to propagate expire_at from call_parts

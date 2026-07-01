@@ -1,5 +1,5 @@
 ALTER TABLE feedback 
-    DROP COLUMN annotation_ref,
-    DROP COLUMN runnable_ref,
-    DROP COLUMN call_ref,
-    DROP COLUMN trigger_ref;
+    DROP COLUMN IF EXISTS annotation_ref,
+    DROP COLUMN IF EXISTS runnable_ref,
+    DROP COLUMN IF EXISTS call_ref,
+    DROP COLUMN IF EXISTS trigger_ref;

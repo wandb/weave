@@ -4,6 +4,7 @@ Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
 import os
+import re
 import uuid
 
 import clickhouse_connect
@@ -11,6 +12,7 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
+    MigrationError,
     get_clickhouse_trace_server_migrator,
 )
 
@@ -64,6 +66,77 @@ def _get_latest_migration_version(migration_dir: str) -> int:
     ]
     assert versions, f"No up migrations found in {migration_dir}"
     return max(versions)
+
+
+def _reset_migration_version(
+    ch_client, mgmt_db: str, target_db: str, version: int
+) -> None:
+    """Rewind the recorded migration version so apply_migrations re-runs the ups.
+
+    Mirrors the migrator's own status write (ALTER ... UPDATE, mutations_sync=2),
+    which is synchronous, so the next version read is immediately consistent.
+    """
+    ch_client.command(
+        f"ALTER TABLE {mgmt_db}.migrations "
+        f"UPDATE curr_version = {version}, partially_applied_version = NULL "
+        f"WHERE db_name = '{target_db}' SETTINGS mutations_sync = 2"
+    )
+
+
+def _table_swap_versions(migration_dir: str) -> list[int]:
+    """Versions whose up.sql performs a bare `RENAME TABLE`.
+
+    A table swap is one-shot by nature: the RENAME errors once its target
+    exists, and auto-retrying a swap can lose data on a partial-failure
+    interleaving (live rows stranded under the backup name). This is why the
+    migrator errors on partial application rather than re-running. Such
+    migrations are excluded from the idempotency re-run; their forward run is
+    covered by test_all_production_migrations_*.
+    """
+    swaps = []
+    for fname in os.listdir(migration_dir):
+        if not fname.endswith(".up.sql"):
+            continue
+        sql = open(os.path.join(migration_dir, fname), encoding="utf-8").read()
+        without_comments = re.sub(r"(?m)^\s*--.*$", "", sql)
+        if re.search(r"\bRENAME\s+TABLE\b", without_comments, re.IGNORECASE):
+            swaps.append(int(fname.split("_", 1)[0]))
+    return sorted(swaps)
+
+
+def _rerunnable_segments(latest: int, excluded: list[int]) -> list[tuple[int, int]]:
+    """Contiguous (reset_to, apply_to) ranges of re-runnable migrations.
+
+    Splits 1..latest around the excluded versions. reset_to is the version to
+    rewind curr_version to; apply_to is the target_version to migrate up to.
+    """
+    segments = []
+    lo = 1
+    for boundary in [*excluded, latest + 1]:
+        if boundary - 1 >= lo:
+            segments.append((lo - 1, boundary - 1))
+        lo = boundary + 1
+    return segments
+
+
+def _schema_snapshot(ch_client, db_name: str) -> tuple[list, list]:
+    """Table engines and (table, column, type) triples for a database.
+
+    Comparing this before and after a re-run upgrades the idempotency check from
+    'no error' to 'schema unchanged', so an IF NOT EXISTS guard that silently
+    skips a needed change (or a re-run that alters something) is caught rather
+    than masked. Column type/existence is the drift IF NOT EXISTS can hide;
+    view query text is intentionally not compared (the re-run reverts and
+    restores it across segments).
+    """
+    tables = ch_client.query(
+        f"SELECT name, engine FROM system.tables WHERE database = '{db_name}' ORDER BY name"
+    ).result_rows
+    columns = ch_client.query(
+        f"SELECT table, name, type FROM system.columns WHERE database = '{db_name}' "
+        "ORDER BY table, name"
+    ).result_rows
+    return [tuple(r) for r in tables], [tuple(r) for r in columns]
 
 
 def _table_exists(ch_client, db_name: str, table_name: str) -> bool:
@@ -569,3 +642,122 @@ def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
         for db in (target_db, mgmt_db):
             client.command(f"DROP DATABASE IF EXISTS {db}")
         client.close()
+
+
+@pytest.mark.parametrize(
+    ("case_name", "replicated", "use_distributed"),
+    [
+        pytest.param("cloud", False, False, id="cloud"),
+        pytest.param("replicated", True, False, id="replicated"),
+        pytest.param("distributed", True, True, id="distributed"),
+    ],
+)
+def test_production_migrations_are_idempotent(
+    ch_client, case_name: str, replicated: bool, use_distributed: bool
+):
+    """Re-running the migration stack on an already-migrated DB is a safe no-op.
+
+    Partial-failure recovery re-runs a migration after the operator clears the
+    partial flag, so every migration's statements must tolerate re-execution.
+    This applies all migrations, then rewinds the recorded version and
+    re-applies the ups through each shape's SQL rewriter. Table-swap migrations
+    (see _table_swap_versions) are one-shot and excluded from the re-run; the
+    006 seed re-inserts without erroring.
+    """
+    mgmt_db = _unique_name(f"db_mgmt_idem_{case_name}")
+    target_db = _unique_name(f"idem_{case_name}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    kwargs = {
+        "replicated": replicated,
+        "use_distributed": use_distributed,
+        "management_db": mgmt_db,
+        "migration_dir": _PROD_MIGRATION_DIR,
+        "post_migration_hook": None,
+    }
+    if replicated:
+        kwargs["replicated_cluster"] = _CLUSTER
+        kwargs["replicated_path"] = _REPLICATED_PATH
+    migrator = get_clickhouse_trace_server_migrator(ch_client, **kwargs)
+
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    migrator.apply_migrations(target_db)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+
+    # 024 is the only table-swap; a new one must be a deliberate decision, not a
+    # silent addition, so pin the set. See _table_swap_versions for why swaps
+    # are one-shot.
+    swaps = _table_swap_versions(_PROD_MIGRATION_DIR)
+    assert swaps == [24], (
+        f"unexpected table-swap migration(s) {swaps}; a RENAME TABLE is one-shot, "
+        "so reassess idempotency and update this assertion deliberately"
+    )
+
+    # Re-apply every re-runnable migration by rewinding the recorded version and
+    # migrating back up through each contiguous segment around the swap(s). The
+    # schema must be byte-for-byte unchanged, so a guard that silently skips a
+    # needed change is caught rather than masked.
+    before = _schema_snapshot(ch_client, target_db)
+    for reset_to, apply_to in _rerunnable_segments(latest, swaps):
+        _reset_migration_version(ch_client, mgmt_db, target_db, reset_to)
+        migrator.apply_migrations(target_db, target_version=apply_to)
+
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+    assert _schema_snapshot(ch_client, target_db) == before, (
+        "re-running migrations changed the table/column schema"
+    )
+
+
+@pytest.mark.parametrize(
+    ("case_name", "replicated", "use_distributed"),
+    [
+        pytest.param("cloud", False, False, id="cloud"),
+        pytest.param("replicated", True, False, id="replicated"),
+    ],
+)
+def test_migrations_refuse_populated_db_without_history(
+    ch_client, case_name: str, replicated: bool, use_distributed: bool
+):
+    """Refuse to migrate a populated data DB whose migration history is absent.
+
+    Simulates a diverged management DB (e.g. a renamed management_db): the data
+    DB already has tables, but a fresh management DB has no row for it. Without
+    this guard the IF [NOT] EXISTS migrations would silently re-run from version
+    0 against tables of unknown schema.
+    """
+
+    def make_migrator(mgmt_db: str):
+        kwargs = {
+            "replicated": replicated,
+            "use_distributed": use_distributed,
+            "management_db": mgmt_db,
+            "migration_dir": _PROD_MIGRATION_DIR,
+            "post_migration_hook": None,
+        }
+        if replicated:
+            kwargs["replicated_cluster"] = _CLUSTER
+            kwargs["replicated_path"] = _REPLICATED_PATH
+        return get_clickhouse_trace_server_migrator(ch_client, **kwargs)
+
+    target_db = _unique_name(f"orphan_{case_name}")
+    mgmt_a = _unique_name(f"db_mgmt_orphan_a_{case_name}")
+    mgmt_b = _unique_name(f"db_mgmt_orphan_b_{case_name}")
+    for db in (target_db, mgmt_a, mgmt_b):
+        ch_client.track_db(db)
+
+    make_migrator(mgmt_a).apply_migrations(target_db)
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    assert _get_migration_version(ch_client, mgmt_a, target_db) == latest
+
+    # A fresh management DB has no history for the already-populated data DB.
+    with pytest.raises(MigrationError, match="no history"):
+        make_migrator(mgmt_b).apply_migrations(target_db)
+
+    # The guard refused before touching anything: the real history is intact and
+    # no version-0 row was seeded into the fresh management DB.
+    assert _get_migration_version(ch_client, mgmt_a, target_db) == latest
+    orphan_rows = ch_client.query(
+        f"SELECT count() FROM {mgmt_b}.migrations WHERE db_name = '{target_db}'"
+    ).result_rows[0][0]
+    assert orphan_rows == 0

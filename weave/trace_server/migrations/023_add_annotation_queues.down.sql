@@ -11,7 +11,7 @@ Feedback records are stored separately and will not be deleted.
 
 -- Remove queue_id column from feedback table
 ALTER TABLE feedback
-    DROP COLUMN queue_id;
+    DROP COLUMN IF EXISTS queue_id;
 
 -- Drop tables in reverse dependency order
 DROP TABLE IF EXISTS annotator_queue_items_progress;

@@ -1,10 +1,10 @@
 -- Add wb_run_step to raw call parts table
 ALTER TABLE call_parts
-    ADD COLUMN wb_run_step Nullable(UInt64) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS wb_run_step Nullable(UInt64) DEFAULT NULL;
 
 -- Add wb_run_step to aggregated calls table
 ALTER TABLE calls_merged
-    ADD COLUMN wb_run_step SimpleAggregateFunction(any, Nullable(UInt64));
+    ADD COLUMN IF NOT EXISTS wb_run_step SimpleAggregateFunction(any, Nullable(UInt64));
 
 -- Update materialized view to include wb_run_step
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -34,7 +34,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Add wb_run_step to stats table
 ALTER TABLE calls_merged_stats
-    ADD COLUMN wb_run_step SimpleAggregateFunction(any, Nullable(UInt64));
+    ADD COLUMN IF NOT EXISTS wb_run_step SimpleAggregateFunction(any, Nullable(UInt64));
 
 -- Update stats materialized view
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
