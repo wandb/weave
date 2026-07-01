@@ -6,11 +6,43 @@ import {Turn, type TurnInit} from './turn';
 import type {SpanEndOptions} from './spanBase';
 
 export interface ConversationInit {
-  agentName?: string;
   model?: string;
-  /** Conversation ID propagated to every span under this conversation as
-   *  `gen_ai.conversation.id`. Auto-generated if omitted. */
+
+  /**
+   * Stable agent identifier. Propagated as the default `agentId` to every
+   * `Turn` created via `startTurn()` unless the turn sets its own; emitted
+   * on each turn's `invoke_agent` span as `gen_ai.agent.id`.
+   */
+  agentId?: string;
+
+  /**
+   * Agent name. Propagated as the default `agentName` to every `Turn`
+   * created via `startTurn()` unless the turn sets its own; emitted on
+   * each turn's `invoke_agent` span as `gen_ai.agent.name`.
+   */
+  agentName?: string;
+
+  /**
+   * Human-readable agent description. Propagated as the default
+   * `agentDescription` to every `Turn` created via `startTurn()` unless
+   * the turn sets its own; emitted on each turn's `invoke_agent` span as
+   * `gen_ai.agent.description`.
+   */
+  agentDescription?: string;
+
+  /**
+   * Agent version string. Propagated as the default `agentVersion` to
+   * every `Turn` created via `startTurn()` unless the turn sets its own;
+   * emitted on each turn's `invoke_agent` span as `gen_ai.agent.version`.
+   */
+  agentVersion?: string;
+
+  /**
+   * Conversation ID propagated to every span under this conversation as
+   * `gen_ai.conversation.id`. Auto-generated if omitted.
+   */
   conversationId?: string;
+
   /**
    * Custom attributes stamped on every span the conversation emits.
    *
@@ -34,7 +66,10 @@ export class Conversation {
     public readonly agentName: string,
     public readonly model: string,
     public readonly conversationId: string,
-    public readonly attributes: Attributes
+    public readonly attributes: Attributes,
+    private readonly _agentId: string,
+    private readonly _agentDescription: string,
+    private readonly _agentVersion: string
   ) {}
 
   /** @deprecated Use {@link Conversation.conversationId} instead. */
@@ -53,7 +88,10 @@ export class Conversation {
       opts.agentName ?? '',
       opts.model ?? '',
       opts.conversationId ?? opts.sessionId ?? uuidv7(),
-      opts.attributes ?? {}
+      opts.attributes ?? {},
+      opts.agentId ?? '',
+      opts.agentDescription ?? '',
+      opts.agentVersion ?? ''
     );
     state.conversation = conversation;
     return conversation;
@@ -61,8 +99,9 @@ export class Conversation {
 
   /**
    * Start a new `Turn` under this `Conversation`. The turn inherits the
-   * conversation's `conversationId`; `agentName` and `model` fall back to
-   * the conversation's values when not provided on `opts`.
+   * conversation's `conversationId`; `agentName`, `agentId`, `agentDescription`,
+   * `agentVersion` and `model` fall back to the conversation's values when not
+   * provided on `opts`.
    *
    * @example
    * const turn = conversation.startTurn();
@@ -84,6 +123,9 @@ export class Conversation {
       ...opts,
       agentName: opts.agentName ?? this.agentName,
       model: opts.model ?? this.model,
+      agentId: opts.agentId ?? this._agentId,
+      agentDescription: opts.agentDescription ?? this._agentDescription,
+      agentVersion: opts.agentVersion ?? this._agentVersion,
       conversationId: this.conversationId,
     });
   }

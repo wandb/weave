@@ -63,13 +63,19 @@ describe('Conversation', () => {
 
   it('startTurn emits given data on `invoke_agent` span', () => {
     const conversation = Conversation.create({
-      agentName: 'dispatcher',
       model: 'some-model',
+      agentId: 'dispatcher-prod',
+      agentName: 'dispatcher',
+      agentDescription: 'Routes queries to specialist agents.',
+      agentVersion: '2.0.1',
       conversationId: 'c-2',
     });
     const turn = conversation.startTurn({
-      agentName: 'weather-bot',
       model: 'gpt-4o',
+      agentId: 'weather-prod',
+      agentName: 'weather-bot',
+      agentDescription: 'Finds the most accurate weather',
+      agentVersion: '3.1.2',
       userMessage: "What's the weather?",
       systemInstructions: ['Be helpful', 'Be concise'],
     });
@@ -80,7 +86,10 @@ describe('Conversation', () => {
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
+          "gen_ai.agent.description": "Finds the most accurate weather",
+          "gen_ai.agent.id": "weather-prod",
           "gen_ai.agent.name": "weather-bot",
+          "gen_ai.agent.version": "3.1.2",
           "gen_ai.conversation.id": "<uuid>",
           "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
           "gen_ai.operation.name": "invoke_agent",
@@ -95,8 +104,11 @@ describe('Conversation', () => {
 
   it('startTurn falls back to conversation data when not given', () => {
     const conversation = Conversation.create({
-      agentName: 'dispatcher',
       model: 'some-model',
+      agentId: 'dispatcher-prod',
+      agentName: 'dispatcher',
+      agentDescription: 'Routes queries to specialist agents.',
+      agentVersion: '2.0.1',
       conversationId: 'c-3',
     });
     const turn = conversation.startTurn();
@@ -107,7 +119,10 @@ describe('Conversation', () => {
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
+          "gen_ai.agent.description": "Routes queries to specialist agents.",
+          "gen_ai.agent.id": "dispatcher-prod",
           "gen_ai.agent.name": "dispatcher",
+          "gen_ai.agent.version": "2.0.1",
           "gen_ai.conversation.id": "<uuid>",
           "gen_ai.operation.name": "invoke_agent",
           "gen_ai.request.model": "some-model",
