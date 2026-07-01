@@ -21,7 +21,7 @@ export interface PiModel {
 // Usage
 // ---------------------------------------------------------------------------
 
-export interface PiUsage {
+interface PiUsage {
   /** Prompt / input tokens */
   input: number;
   /** Completion / output tokens */
@@ -133,7 +133,7 @@ export interface PiExtensionContext {
 // Extension API
 // ---------------------------------------------------------------------------
 
-export type PiExtensionHandler<E> = (
+type PiExtensionHandler<E> = (
   event: E,
   ctx: PiExtensionContext
 ) => Promise<void> | void;
