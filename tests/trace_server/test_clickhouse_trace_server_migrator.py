@@ -8,6 +8,7 @@ import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
@@ -205,8 +206,14 @@ def test_apply_migrations_with_target_version(
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
         [
-            call("CREATE TABLE test1 (id Int32)", settings=None),
-            call("CREATE TABLE test2 (id Int32)", settings=None),
+            call(
+                "CREATE TABLE test1 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+            call(
+                "CREATE TABLE test2 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
         ]
     )
 
@@ -477,7 +484,8 @@ def test_execute_migration_command(migrator):
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
     migrator.ch_client.command.assert_called_once_with(
-        "CREATE TABLE test (id Int32)", settings=None
+        "CREATE TABLE test (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
     )
 
 
@@ -485,7 +493,9 @@ def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig, settings=None)
+    migrator.ch_client.command.assert_called_once_with(
+        orig, settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS
+    )
 
 
 def test_update_migration_status(migrator):
@@ -499,14 +509,14 @@ def test_update_migration_status(migrator):
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
-        settings={"mutations_sync": 2},
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
-        settings={"mutations_sync": 2},
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
 
@@ -1875,3 +1885,31 @@ def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
             f"  old ({len(old_norm)}): {old_norm}\n"
             f"  new ({len(new_norm)}): {new_norm}"
         )
+
+
+def test_run_ddl_with_retry_passes_migration_ddl_settings(migrator):
+    migrator._run_ddl_with_retry("CREATE TABLE t (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE t (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
+
+
+def test_run_ddl_with_retry_merges_caller_settings(migrator):
+    migrator._run_ddl_with_retry("SELECT 1", settings={"mutations_sync": 2})
+    migrator.ch_client.command.assert_called_once_with(
+        "SELECT 1",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
+    )
+
+
+def test_migration_timeout_ladder_invariants():
+    # The client read timeout must outlast both the ON CLUSTER DDL wait and the
+    # server's replicated-DDL wait (database_replicated_initial_query_timeout_sec,
+    # default 300s) so the client always gets a response rather than the read
+    # timeout that stranded the migration mid-DDL in the incident.
+    client = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+    ddl_task = ch_settings.MIGRATION_DDL_QUERY_SETTINGS["distributed_ddl_task_timeout"]
+    server_replicated_ddl_default = 300
+    assert client > ddl_task
+    assert client > server_replicated_ddl_default
