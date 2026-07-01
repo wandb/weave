@@ -1,0 +1,92 @@
+## Conversation
+User (relaying Adi Mehta, 2026-04-29): a user put @weave.op on a function
+defined inside a hot loop, creating a new op per iteration — ~127k op versions
+in 28h, bloating storage, no warning. Task: add a NON-BREAKING, opt-out
+client-side guardrail that emits a SINGLE throttled warning when many distinct
+op versions are published from the same code location/qualname in one process.
+Do NOT drop/dedupe or change ingestion. Behavior-level tests. If a robust
+client-side signal wasn't cleanly feasible, STOP and propose a server-side
+approach instead. Do NOT push / open PR — commit locally with a git note.
+
+## Actions
+- git fetch --all; searched commits/branches for prior op-version-explosion work — none.
+- Read weave/trace/op.py op() decorator (~1237) and weave_client.py create_call
+  (1375), op_name_future path (~1458), _save_op (2823), _save_object_basic (2699).
+- Read settings.py end-to-end for the field/mirror/accessor pattern + drift test.
+- Confirmed throttle helper (weave/trace/util.py:21 log_once), warn mechanism
+  (logger.warning is used widely and is NOT failed by the autouse
+  logging_error_check fixture, which only fails on ERROR — tests/conftest.py:230).
+- Confirmed Op comes from weave.trace.op_protocol (light module) — used for the
+  TYPE_CHECKING import to avoid pulling in the heavy op module.
+- Implemented weave/trace/op_version_guard.py (new): process-global
+  dict[(co_filename, co_firstlineno, name)] -> count + warned-set + Lock;
+  note_op_publish(op) called from _save_op. Threshold 50, bounded to 10k tracked
+  locations (ponytail-noted best-effort cap).
+- settings.py: added field check_op_version_explosion (default True), mirrored in
+  _SettingsOverrides, added should_check_op_version_explosion() accessor →
+  WEAVE_CHECK_OP_VERSION_EXPLOSION.
+- Tests: tests/trace/test_op_version_guard.py (loop→warns once; module-scope→no
+  warn; disabled setting→no warn) with an autouse _reset_for_testing fixture.
+
+## Why this hook / signal (feasibility)
+- _save_op is the single choke point for op publishing (create_call:1412 and
+  _save_object:2574 / weave.publish). Least invasive: one call added.
+- Gate on get_ref(op) is None BEFORE _save_object_basic sets the ref. A
+  module-scope op is saved once (set_ref runs synchronously in _save_object_basic
+  even though the digest is a Future), so subsequent create_calls short-circuit
+  via map_to_refs and never re-count → zero false positives. A loop-decorated op
+  is a NEW ref-less wrapper each iteration → same key accumulates.
+- Key on op.resolve_fn.__code__ (the USER function), NOT the wrapper — every
+  wrapper shares op.py wrapper code. Include op.name because anonymous ops
+  (_build_anonymous_op) all share one resolve_fn code location and must not
+  collide by name. resolve_fn/__code__ missing → skip (handles builtins).
+- Counting *distinct digests* (true versions) client-side is NOT cleanly
+  feasible: digests are Futures; reading them blocks on the server. Publish-count
+  per location is the robust proxy — if digests differ it's real explosion; if
+  the server dedupes it's still wasteful round-trips, and the same fix applies.
+  So the client-side signal IS feasible without fragile heuristics; did not need
+  the server-side fallback.
+- Cheapest filter first (get_ref) so steady-state traced calls pay only one
+  getattr; settings read and locking happen only on genuinely fresh publishes.
+
+## Errors & mistakes
+- uv venv defaulted to Python 3.14 freethreaded → tiktoken (via litellm) failed
+  to build (PyO3 max 3.13). Fix: `uv venv --python 3.12` then `uv sync --group test`.
+- Docker not running → ran tests with `--trace-server=fake` (fast in-memory backend).
+- mypy (disallow_untyped_defs on weave.*) flagged _op_location return: the
+  3-arg getattr stub returns `Any | _T`, so `getattr(op,'name',None)` is
+  `Any | None` and the `or` didn't narrow None away. Fixed by annotating
+  filename/lineno locals and coercing `str(name)` in the return tuple.
+- pytest shard plugin ran "0 items" when a nonexistent test id was mixed into the
+  arg list; harmless — reran with valid ids.
+
+## Verification
+- Mutation check: temporarily set threshold=1 in-process and ran the
+  module-scope test — it FAILED (warned once, count=1), proving the module-scope
+  op IS published exactly once and the negative test genuinely detects false
+  positives (i.e. it's not vacuous). Reverted (only the real threshold ships).
+- test_op_version_guard.py: 3 passed. test_trace_settings.py: 40 passed (incl.
+  the dynamic _SettingsOverrides drift test, which picks up the new field
+  automatically). test_op_versioning + test_anonymous_ops +
+  test_op_decorator_behaviour: 55 passed / 3 skipped (clickhouse-gated).
+  test_client_trace::test_simple_op passed. mypy clean; ruff clean.
+
+## Hints & warnings
+- Threshold=50 is deliberately far above hand-written re-decoration but far below
+  127k; a count that high from ONE source line is unambiguously a loop. Test
+  imports OP_VERSION_EXPLOSION_WARN_THRESHOLD so it tracks the constant.
+- State is process-global (module-level) and mutated under a Lock without any
+  `global` rebinding (avoids PLW0603). It survives across weave.init() calls;
+  that's fine (a module-scope op contributes count 1 per client, well under
+  threshold).
+- Notebook cell re-runs / heavily-parametrized tests that redefine an op at the
+  SAME source line >50 times will legitimately trip the (advisory) warning —
+  acceptable and opt-out.
+- Did NOT need to touch the op() decorator (op.py) — counting definitions there
+  would over-warn (defines that are never called publish nothing) and has no
+  client. Publishing is the correct place.
+
+## Open questions
+- Server-side rate-limit/dedupe was offered as a fallback if the client signal
+  were infeasible; it wasn't needed. A server-side cap could still be a good
+  defense-in-depth follow-up but is out of scope here.
