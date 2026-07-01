@@ -7,6 +7,7 @@ import {
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
@@ -20,6 +21,7 @@ import {
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
+  spanSnapshot,
 } from './common';
 
 describe('LLM (via Turn.startLLM)', () => {
@@ -28,7 +30,11 @@ describe('LLM (via Turn.startLLM)', () => {
 
   it("emits a 'chat' span as a child of the turn's invoke_agent span", () => {
     const turn = Turn.create({agentName: 'a', conversationId: 'conv-1'});
-    const llm = turn.startLLM({model: 'gpt-4o', providerName: 'openai'});
+    const llm = turn.startLLM({
+      model: 'gpt-4o',
+      providerName: 'openai',
+      systemInstructions: ['Be helpful', 'Be concise'],
+    });
     llm.end();
     turn.end();
 
@@ -37,12 +43,22 @@ describe('LLM (via Turn.startLLM)', () => {
     const turnSpan = findSpan(spans, 'invoke_agent');
 
     expect(llmSpan.kind).toBe(SpanKind.CLIENT);
-    expect(llmSpan.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
-    expect(llmSpan.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('gpt-4o');
-    expect(llmSpan.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('openai');
-    expect(llmSpan.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
     expect(llmSpan.spanContext().traceId).toBe(turnSpan.spanContext().traceId);
+
+    expect(spanSnapshot(llmSpan)).toMatchInlineSnapshot(`
+      {
+        "attributes": {
+          "gen_ai.conversation.id": "<uuid>",
+          "gen_ai.operation.name": "chat",
+          "gen_ai.provider.name": "openai",
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+        },
+        "endTime": "<timestamp>",
+        "startTime": "<timestamp>",
+      }
+    `);
   });
 
   it('serializes input/output messages and usage at end()', () => {

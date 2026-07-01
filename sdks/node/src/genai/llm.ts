@@ -17,6 +17,7 @@ import {
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
@@ -31,6 +32,7 @@ import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 export interface LLMInit extends SpanInitBase {
   model: string;
   providerName?: string;
+  systemInstructions?: string[];
 }
 
 /** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
@@ -60,11 +62,26 @@ export interface LLMRecordOpts {
  *
  * @example
  * const llm = weave.startLLM({model: 'gpt-4o-mini', providerName: 'openai'});
+ *
  * try {
  *   llm.inputMessages = [{role: 'user', content: prompt}];
  *   const resp = await openai.chat.completions.create({...});
  *   llm.output(resp.choices[0].message.content ?? '');
  *   llm.record({usage: {inputTokens: resp.usage?.prompt_tokens}});
+ * } finally {
+ *   llm.end();
+ * }
+ *
+ * @example
+ * const llm = weave.startLLM({
+ *   model: 'gpt-4o-mini',
+ *   providerName: 'openai',
+ *   systemInstructions: ['You are a helpful weather bot.'],
+ *   startTime: new Date('2026-05-29T10:00:00.000Z'),
+ * });
+ *
+ * try {
+ *   // ... call the LLM, populate llm.outputMessages / usage ...
  * } finally {
  *   llm.end();
  * }
@@ -118,6 +135,11 @@ export class LLM extends SpanBase {
     }
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
+    }
+    if (opts.systemInstructions && opts.systemInstructions.length > 0) {
+      attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] = JSON.stringify(
+        opts.systemInstructions.map(content => ({type: 'text', content}))
+      );
     }
     const span = tracer.startSpan(
       'chat',

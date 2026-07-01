@@ -203,6 +203,7 @@ async function runAgentLoop(
     const llm = turn.startLLM({
       model: 'some-model',
       providerName: 'some-provider',
+      systemInstructions: [agent.instructions],
     });
     llm.inputMessages = [...messages];
 
@@ -381,6 +382,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
             "myagent.region": "ORD",
@@ -411,6 +413,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
             "myagent.region": "ORD",
@@ -440,6 +443,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
             "myagent.region": "ORD",
@@ -484,6 +488,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
             "myagent.region": "ORD",
@@ -513,6 +518,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t3","toolName":"calculate","arguments":"{\\"expression\\":\\"28 - 18\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
             "myagent.region": "ORD",
@@ -542,6 +548,7 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 10°C warmer than San Francisco."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
             "myagent.region": "ORD",
