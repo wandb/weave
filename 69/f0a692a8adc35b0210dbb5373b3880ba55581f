@@ -1,0 +1,81 @@
+## Conversation
+User asked for a specific perf fix: make the async batch processor wake on
+item arrival instead of sleeping a fixed min_batch_interval, removing the ~1s
+trace-visibility latency floor. The prompt described the exact fix (blocking
+get on first item + non-blocking drain), a list of hard invariants to
+preserve, and required a latency regression test + a prompt-shutdown test.
+Commit locally only; do NOT push / open a PR.
+
+## Actions
+- Read weave/trace_server_bindings/async_batch_processor.py (_get_next_batch
+  L167-176, _process_batches L178-211 pre-change) and the existing tests in
+  tests/trace_server_bindings/test_async_batch_processor.py.
+- Grepped for AsyncBatchProcessor usages/subclasses: found CallBatchProcessor
+  (call_batch_processor.py) subclasses it but does NOT override _process_batches
+  or _get_next_batch (it only supplies processor_fn=_process_mixed_batch and
+  overrides enqueue/enqueue_start/stop_accepting_new_work_and_flush_queue).
+  http_utils.py aliases BatchProcessor = AsyncBatchProcessor. So the base-class
+  change benefits both and no override needed patching.
+- TDD: wrote the two new tests + rewrote test_min_batch_interval FIRST, ran the
+  two new ones against unmodified source -> both failed for the right reason
+  (item not processed within 1s @ mbi=5s; shutdown took 5.01s). Then applied
+  the source fix and re-ran: 11/11 pass, 5x stable (~4.1s/run).
+- Ran neighbors that use the base loop: test_call_batch_processor.py (12 pass),
+  test_http_utils.py (3 pass), test_trace_server_bindings.py (9 pass).
+- Lint: uvx ruff check + ruff format --check on both files -> clean.
+
+## The change
+- New module constant IDLE_POLL_INTERVAL = 0.25s.
+- _get_next_batch: blocks on queue.get(timeout=min(min_batch_interval,
+  IDLE_POLL_INTERVAL)) for the first item (Empty -> return []), then drains the
+  rest with get_nowait up to max_batch_size. Wakes immediately on arrival.
+- _process_batches: removed the trailing 'if not stop: time.sleep(mbi)'. The
+  blocking get is now the wait/poll. Everything else (task_done per item on all
+  3 paths, exception handling, shutdown drain+exit check) unchanged.
+
+## Errors & mistakes
+- First test run used `uv run --group test` with no --python; uv picked system
+  Python 3.14 and the tiktoken/PyO3 build failed (PyO3 0.22 max is 3.13). Fixed
+  by pinning `uv run --python 3.12` (matches the CI shard). Do this for all
+  local runs here.
+
+## Dead ends / decisions weighed
+- The prompt literally said get(timeout=self.min_batch_interval) AND 'shutdown
+  must NOT block a full interval on an empty queue'. Those conflict in the
+  TOCTOU race where shutdown is signalled while the thread is already blocked in
+  get() on an empty queue: a plain get(timeout=min_batch_interval) would hang up
+  to a full interval (same worst case as the OLD trailing sleep). Chose to cap
+  the block at IDLE_POLL_INTERVAL (the prompt's own 'use a short timeout'
+  remedy) so shutdown is prompt regardless of how large min_batch_interval is.
+  This is why the shutdown test can use mbi=5s and still assert <1s. Considered
+  and rejected: a pre-block `if stop: get_nowait` check alone (leaves the TOCTOU
+  hang) and a wake-up sentinel on the queue (pollutes task_done accounting and
+  the queue.empty() shutdown check).
+- The cap means the idle re-check cadence for the default mbi=1.0 is 0.25s
+  rather than 1.0s. This is invisible to callers: latency is wake-on-arrival
+  (~ms) and it's negligible CPU; it only makes shutdown prompter. min_batch_
+  interval remains the max-latency upper bound.
+
+## Test notes (timing robustness)
+- Old test_min_batch_interval asserted the REMOVED behavior (3 time-separated
+  enqueues coalesced into one call thanks to the fixed sleep). It cannot pass
+  under wake-on-arrival, so it was renamed to test_available_items_are_coalesced
+  and now enqueues a single burst -> one batch (the surviving coalescing
+  behavior; same reliance on atomic enqueue-under-lock as test_max_batch_size).
+- Latency test uses mbi=5.0 + a sleep(0.1) so the thread is idle-blocked before
+  enqueue (guarantees it fails on old code), then polls (<=1s) for processing
+  and asserts latency < 0.5s. Generous margins vs the ~ms actual latency ->
+  not flaky (5x stable).
+- Shutdown test uses mbi=5.0, enqueues 3, asserts shutdown < 1.0s and the batch
+  was processed. Reliably fails on old code (~5s) and passes on new (<0.25s).
+
+## Hints & warnings
+- Every item pulled from the queue must get exactly one task_done(); this is
+  handled by _process_batches iterating current_batch on all paths, so keeping
+  the pulled first item inside current_batch preserves it. Don't add a get()
+  outside that accounting.
+- `import time` is still required (used by _write_item_to_disk -> time.time()),
+  even though the sleep was removed.
+
+## Open questions
+None.
