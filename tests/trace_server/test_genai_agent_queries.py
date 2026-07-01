@@ -3000,10 +3000,13 @@ def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["conversation_id", "scorer_tags"],
+            fields=["conversation_id", "trace_id", "scorer_tags"],
         )
     )
-    assert res.result == [{"conversation_id": conv_id, "scorer_tags": ["hallucination"]}]
+    # Conversation-targeted feedback: conversation from the ref, no single turn.
+    assert res.result == [
+        {"conversation_id": conv_id, "trace_id": "", "scorer_tags": ["hallucination"]}
+    ]
 
 
 def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_server):
@@ -3040,10 +3043,17 @@ def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_serve
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["conversation_id", "scorer_tags"],
+            fields=["conversation_id", "trace_id", "scorer_tags"],
         )
     )
-    assert res.result == [{"conversation_id": conv_id, "scorer_tags": ["low-quality"]}]
+    # Turn-targeted feedback: trace_id from the ref, conversation via the spans lookup.
+    assert res.result == [
+        {
+            "conversation_id": conv_id,
+            "trace_id": trace_id,
+            "scorer_tags": ["low-quality"],
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------

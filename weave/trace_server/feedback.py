@@ -1,7 +1,7 @@
 import datetime
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -61,6 +61,7 @@ TABLE_FEEDBACK = Table(
         Column("span_agent_version", "string"),
         Column("span_status_code", "string"),
         Column("conversation_id", "string"),
+        Column("trace_id", "string"),
     ],
 )
 
@@ -323,34 +324,56 @@ def format_feedback_to_row(
         "span_agent_version": feedback_req.span_agent_version,
         "span_status_code": feedback_req.span_status_code,
         "conversation_id": feedback_req.conversation_id,
+        "trace_id": feedback_req.trace_id,
     }
 
 
-def resolve_feedback_conversation_id(
+class ResolvedAgentTargets(NamedTuple):
+    """The conversation and turn a feedback row is attributed to.
+
+    `trace_id` is '' for conversation-targeted feedback (no single turn) and for
+    anything unresolved; consumers treat '' as "invisible to that grain's
+    signal filter until a backfill runs".
+    """
+
+    conversation_id: str
+    trace_id: str
+
+
+def resolve_feedback_agent_targets(
     weave_ref: str,
     supplied_conversation_id: str,
-    span_lookup: Callable[[str, str], str],
-) -> str:
-    """Resolve the conversation a feedback row belongs to for denormalization.
+    supplied_trace_id: str,
+    span_lookup: Callable[[str, str], ResolvedAgentTargets],
+) -> ResolvedAgentTargets:
+    """Resolve the conversation and turn a feedback row belongs to, for denormalization.
 
-    Caller-supplied value wins. Otherwise derive from the target ref: a
-    conversation ref is self-sufficient; a turn/span ref is resolved to its
-    conversation via `span_lookup`. Returns '' when unknown (row stays
-    invisible to the signal filter until a backfill runs).
+    Caller-supplied values win per field. Otherwise derive from the target ref:
+    a conversation ref gives the conversation but no single turn; a turn ref
+    gives the trace_id directly and resolves the conversation via `span_lookup`;
+    a span ref resolves both via `span_lookup`. Missing fields stay '' .
     """
-    if supplied_conversation_id:
-        return supplied_conversation_id
+    conversation_id = supplied_conversation_id
+    trace_id = supplied_trace_id
+    if conversation_id and trace_id:
+        return ResolvedAgentTargets(conversation_id, trace_id)
     try:
         ref = ri.parse_internal_uri(weave_ref)
     except ri.InvalidInternalRef:
-        return ""
+        return ResolvedAgentTargets(conversation_id, trace_id)
     if isinstance(ref, ri.InternalAgentConversationRef):
-        return ref.conversation_id
-    if isinstance(ref, ri.InternalAgentTurnRef):
-        return span_lookup(ref.trace_id, "")
-    if isinstance(ref, ri.InternalAgentSpanRef):
-        return span_lookup("", ref.span_id)
-    return ""
+        conversation_id = conversation_id or ref.conversation_id
+    elif isinstance(ref, ri.InternalAgentTurnRef):
+        trace_id = trace_id or ref.trace_id
+        if not conversation_id:
+            conversation_id = span_lookup(ref.trace_id, "").conversation_id
+    elif isinstance(ref, ri.InternalAgentSpanRef) and (
+        not conversation_id or not trace_id
+    ):
+        resolved = span_lookup("", ref.span_id)
+        conversation_id = conversation_id or resolved.conversation_id
+        trace_id = trace_id or resolved.trace_id
+    return ResolvedAgentTargets(conversation_id, trace_id)
 
 
 def format_feedback_to_res(row: Row) -> tsi.FeedbackCreateRes:
