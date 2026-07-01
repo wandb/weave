@@ -1741,10 +1741,11 @@ def make_conversation_chat_spans_query(
     # Always cost-augmented so the multi-turn chat view can render per-message
     # and per-turn cost; bounded to one conversation's turns, so cheap.
     source = cost_augmented_source_sql(pb, req.project_id)
+    # Scope to this conversation's spans + untagged children. The duplicate
+    # `trace_id IN (turn_page)` is the index prune CH won't derive from the
+    # JOIN; keep turn_page's total ORDER BY so both inlined scans agree.
     return f"""
-        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-        FROM {source} s
-        INNER JOIN (
+        WITH turn_page AS (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
             WHERE {_project_filter_sql("project_id", pid)}
@@ -1752,8 +1753,13 @@ def make_conversation_chat_spans_query(
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
-        ) t ON s.trace_id = t.trace_id
+        )
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+        FROM {source} s
+        INNER JOIN turn_page t ON s.trace_id = t.trace_id
         WHERE {_project_filter_sql("s.project_id", pid)}
+          AND s.trace_id IN (SELECT trace_id FROM turn_page)
+          AND s.conversation_id IN ({cid}, '')
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 

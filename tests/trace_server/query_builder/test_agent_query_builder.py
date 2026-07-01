@@ -1608,9 +1608,7 @@ class TestMakeConversationChatSpansQuery:
         expected_pb.add(0, param_type="UInt64")  # genai_3: offset
         source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-            FROM {source} s
-            INNER JOIN (
+            WITH turn_page AS (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
                 WHERE project_id = {{genai_0:String}}
@@ -1618,8 +1616,13 @@ class TestMakeConversationChatSpansQuery:
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
-            ) t ON s.trace_id = t.trace_id
+            )
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
+            INNER JOIN turn_page t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id IN (SELECT trace_id FROM turn_page)
+            AND s.conversation_id IN ({{genai_1:String}}, '')
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
@@ -1640,9 +1643,7 @@ class TestMakeConversationChatSpansQuery:
         expected_pb.add(20, param_type="UInt64")  # genai_3: offset
         source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-            FROM {source} s
-            INNER JOIN (
+            WITH turn_page AS (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
                 WHERE project_id = {{genai_0:String}}
@@ -1650,8 +1651,13 @@ class TestMakeConversationChatSpansQuery:
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
-            ) t ON s.trace_id = t.trace_id
+            )
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
+            INNER JOIN turn_page t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id IN (SELECT trace_id FROM turn_page)
+            AND s.conversation_id IN ({{genai_1:String}}, '')
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
