@@ -993,6 +993,53 @@ def test_input_media_attaches_to_user_message_not_assistant() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
+    """Server-side content conversion embeds an internal weave ref directly in
+    the message part (e.g. an OpenAI ``image_url``) with no span-level
+    ``content_refs``. The recursive inline-ref sweep surfaces it so the image
+    still renders on the user bubble.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-describer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("What is in this image?")),
+                }
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_internal}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+            # No span-level content_refs — the ref lives only inline in the part.
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    assert _user_payload(user).content_refs == [image_internal]
+    assert _assistant_payload(assistant).content_refs == []
+
+
 def test_output_media_attaches_to_assistant_message() -> None:
     """Model-generated media is a part on the output message and renders on
     the assistant bubble (mirror image of the input case).
