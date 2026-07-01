@@ -81,6 +81,9 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
+from weave.trace_server.base64_content_conversion import (
+    replace_base64_with_content_objects,
+)
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
@@ -850,6 +853,15 @@ class AgentWriteHandler:
                         rejected += 1
                         errors.append(str(e))
                         continue
+
+                    # Mirror the non-OTel calls path: strip inline base64 /
+                    # base64 data-URIs into Content refs. Converting the span
+                    # attributes in place strips the lossless attributes_dump /
+                    # raw_span_dump as well as the extracted messages.
+                    if self._trace_server is not None:
+                        span.attributes = replace_base64_with_content_objects(
+                            span.attributes, req.project_id, self._trace_server
+                        )
 
                     try:
                         genai_row = extract_genai_span(

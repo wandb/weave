@@ -605,7 +605,7 @@ def test_calls_complete_routing_both_residence_state(
 def test_calls_complete_converts_data_uri_inputs_and_outputs(
     trace_server, clickhouse_trace_server
 ):
-    """Verify data URIs in inputs/outputs are converted to CustomWeaveType."""
+    """Verify data URIs in inputs/outputs are converted to a published weave ref."""
     project_id = f"{TEST_ENTITY}/calls_complete_base64"
     internal_project_id = b64(project_id)
     raw_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
@@ -633,15 +633,24 @@ def test_calls_complete_converts_data_uri_inputs_and_outputs(
         internal_project_id,
         call_id,
     )
-    assert inputs_dump["image"]["_type"] == "CustomWeaveType"
-    assert output_dump["image"]["_type"] == "CustomWeaveType"
+    # Stored value is a compact internal object ref, not an inline object.
+    assert isinstance(inputs_dump["image"], str)
+    assert inputs_dump["image"].startswith(
+        f"weave-trace-internal:///{internal_project_id}/object/"
+    )
+    assert isinstance(output_dump["image"], str)
+    assert output_dump["image"].startswith(
+        f"weave-trace-internal:///{internal_project_id}/object/"
+    )
 
-    # Verify read-side also returns the converted type
+    # Read-side converts the internal ref to the external form.
     calls = _fetch_calls_stream(trace_server, project_id)
     assert len(calls) == 1
     fetched_call = calls[0]
-    assert fetched_call.inputs["image"]["_type"] == "CustomWeaveType"
-    assert fetched_call.output["image"]["_type"] == "CustomWeaveType"
+    assert isinstance(fetched_call.inputs["image"], str)
+    assert fetched_call.inputs["image"].startswith(f"weave:///{project_id}/object/")
+    assert isinstance(fetched_call.output["image"], str)
+    assert fetched_call.output["image"].startswith(f"weave:///{project_id}/object/")
 
 
 def test_call_start_end_v2_updates_calls_complete(
