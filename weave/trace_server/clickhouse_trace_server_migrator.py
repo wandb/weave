@@ -341,6 +341,29 @@ class BaseClickHouseTraceServerMigrator(ABC):
             > 0
         )
 
+    def _migration_row_exists(self, db_name: str) -> bool:
+        """Whether the migrations table already tracks `db_name`."""
+        res = self.ch_client.query(
+            f"SELECT count() FROM {self.management_db}.migrations "
+            f"WHERE db_name = %(db_name)s",
+            parameters={"db_name": db_name},
+        )
+        return res.result_rows[0][0] > 0
+
+    def _target_db_initialized(self, db_name: str) -> bool:
+        """Whether `db_name` already holds migration-managed tables.
+
+        `call_parts` is created by migration 001 and never dropped by an up
+        migration, so its presence marks a database migrations have already run
+        against.
+        """
+        res = self.ch_client.query(
+            "SELECT count() FROM system.tables "
+            "WHERE database = %(db_name)s AND name = 'call_parts'",
+            parameters={"db_name": db_name},
+        )
+        return res.result_rows[0][0] > 0
+
     def _read_migration_status(self, db_name: str) -> MigrationStatus:
         """Read migration status without writing.
 
@@ -364,6 +387,24 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self, target_db: str, target_version: int | None = None
     ) -> None:
         """Inner migration logic, called while holding the migration lock."""
+        # Refuse to migrate a database we have no history for but that already
+        # holds migration-managed tables: no row in the migrations table means we
+        # would start from version 0, yet the tables exist, so the management and
+        # data databases have diverged (a renamed management_db, a restore of one
+        # without the other). Running from 0 would re-apply DDL against tables of
+        # unknown schema; the IF NOT EXISTS guards would let it pass silently.
+        if not self._migration_row_exists(target_db) and self._target_db_initialized(
+            target_db
+        ):
+            raise MigrationError(
+                f"`{target_db}` already contains migration-managed tables but has no "
+                f"history in `{self.management_db}.migrations`. The management and "
+                f"data databases have diverged (e.g. a renamed management_db, or a "
+                f"restore of one without the other). Refusing to run migrations from "
+                f"scratch to avoid applying DDL to tables of unknown schema. To adopt "
+                f"this database deliberately, insert a row into "
+                f"`{self.management_db}.migrations` with its true curr_version."
+            )
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:

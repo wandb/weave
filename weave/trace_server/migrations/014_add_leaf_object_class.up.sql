@@ -1,8 +1,8 @@
 ALTER TABLE object_versions
-    ADD COLUMN leaf_object_class Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS leaf_object_class Nullable(String) DEFAULT NULL;
 
 ALTER TABLE object_versions_stats
-    ADD COLUMN leaf_object_class SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS leaf_object_class SimpleAggregateFunction(any, Nullable(String));
 
 ALTER TABLE object_versions_stats_view MODIFY QUERY
 SELECT

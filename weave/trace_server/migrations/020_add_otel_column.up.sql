@@ -1,10 +1,10 @@
 -- Add otel_dump to raw call parts table
 ALTER TABLE call_parts
-    ADD COLUMN otel_dump Nullable(String);
+    ADD COLUMN IF NOT EXISTS otel_dump Nullable(String);
 
 -- Add otel_dump to aggregated calls table
 ALTER TABLE calls_merged
-    ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS otel_dump SimpleAggregateFunction(any, Nullable(String));
 
 -- Update materialized view to include otel_dump
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -38,7 +38,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Add otel_dump to stats table
 ALTER TABLE calls_merged_stats
-    ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS otel_dump SimpleAggregateFunction(any, Nullable(String));
 
 -- Update stats materialized view
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

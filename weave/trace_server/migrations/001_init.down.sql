@@ -1,15 +1,15 @@
-DROP TABLE call_parts;
-DROP TABLE calls_merged;
-DROP VIEW calls_merged_view;
+DROP TABLE IF EXISTS call_parts;
+DROP TABLE IF EXISTS calls_merged;
+DROP VIEW IF EXISTS calls_merged_view;
 
-DROP TABLE object_versions;
-DROP VIEW object_versions_deduped;
+DROP TABLE IF EXISTS object_versions;
+DROP VIEW IF EXISTS object_versions_deduped;
 
-DROP TABLE tables;
-DROP VIEW tables_deduped;
+DROP TABLE IF EXISTS tables;
+DROP VIEW IF EXISTS tables_deduped;
 
-DROP TABLE table_rows;
-DROP VIEW table_rows_deduped;
+DROP TABLE IF EXISTS table_rows;
+DROP VIEW IF EXISTS table_rows_deduped;
 
-DROP TABLE files;
-DROP VIEW files_deduped;
+DROP TABLE IF EXISTS files;
+DROP VIEW IF EXISTS files_deduped;

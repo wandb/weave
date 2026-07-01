@@ -6,11 +6,12 @@ DROP TABLE IF EXISTS calls_complete_stats;
 DROP VIEW IF EXISTS calls_complete_migration_view;
 DROP TABLE IF EXISTS calls_complete;
 
--- Restore from backup if available
+-- Restore from backup if available. One-shot: this RENAME is not idempotent
+-- (fails once calls_complete_old is consumed), matching the up migration's swap.
 RENAME TABLE calls_complete_old TO calls_complete;
 
 -- Recreate original stats table
-CREATE TABLE calls_complete_stats
+CREATE TABLE IF NOT EXISTS calls_complete_stats
 (
     project_id String,
     id String,
@@ -37,7 +38,7 @@ CREATE TABLE calls_complete_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
 
-CREATE MATERIALIZED VIEW calls_complete_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_complete_stats_view
 TO calls_complete_stats
 AS
 SELECT
