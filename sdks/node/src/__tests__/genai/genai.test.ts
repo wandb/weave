@@ -249,6 +249,29 @@ async function runAgentLoop(
       if (!toolDef) {
         throw new Error(`unknown tool: ${tc.function.name}`);
       }
+      if (tc.function.name === 'calculate') {
+        const sub = turn.startSubagent({
+          name: 'calculator-bot',
+          model: 'gpt-4o-mini',
+          systemInstructions: ['Evaluate arithmetic expressions.'],
+        });
+        try {
+          const result = await toolDef.execute(
+            JSON.parse(tc.function.arguments)
+          );
+          sub.end();
+          messages.push({
+            role: 'tool',
+            toolCallId: tc.id,
+            content: JSON.stringify(result),
+          });
+        } catch (err) {
+          sub.end({error: err as Error});
+          throw err;
+        }
+        continue;
+      }
+
       const tool = turn.startTool({
         name: tc.function.name,
         args: tc.function.arguments,
@@ -500,12 +523,11 @@ describe('GenAI', () => {
         },
         {
           "attributes": {
+            "gen_ai.agent.name": "calculator-bot",
             "gen_ai.conversation.id": "<uuid>",
-            "gen_ai.operation.name": "execute_tool",
-            "gen_ai.tool.call.arguments": "{"expression":"28 - 18"}",
-            "gen_ai.tool.call.id": "call_t3",
-            "gen_ai.tool.call.result": ""28 - 18 = 10"",
-            "gen_ai.tool.name": "calculate",
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.request.model": "gpt-4o-mini",
+            "gen_ai.system_instructions": "[{"type":"text","content":"Evaluate arithmetic expressions."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },

@@ -9,12 +9,14 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 
 export interface SubAgentInit extends SpanInitBase {
   name: string;
   model?: string;
+  systemInstructions?: string[];
 }
 
 /**
@@ -23,11 +25,26 @@ export interface SubAgentInit extends SpanInitBase {
  * `invoke_agent` span tagged with the sub-agent's name and (optionally)
  * its model.
  *
- * Created by `weave.startSubagent()` (or `turn.startAgent()`, or
- * `llm.startAgent()`) and terminated with `end()`.
+ * Created by `weave.startSubagent()` (or `turn.startSubagent()`, or
+ * `llm.startSubagent()`) and terminated with `end()`.
  *
  * @example
- * const sub = weave.startSubagent({name: 'researcher', model: 'gpt-4o'});
+ * const sub = weave.startSubagent({name: 'researcher'});
+ *
+ * try {
+ *   // ... orchestrate the sub-agent's LLM/Tool calls ...
+ * } finally {
+ *   sub.end();
+ * }
+ *
+ * @example
+ * const sub = weave.startSubagent({
+ *   name: 'researcher',
+ *   model: 'gpt-4o',
+ *   systemInstructions: ['Find authoritative sources before answering.'],
+ *   startTime: new Date('2026-05-29T10:00:00.000Z'),
+ * });
+ *
  * try {
  *   // ... orchestrate the sub-agent's LLM/Tool calls ...
  * } finally {
@@ -56,6 +73,11 @@ export class SubAgent extends SpanBase {
     }
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
+    }
+    if (opts.systemInstructions && opts.systemInstructions.length > 0) {
+      attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] = JSON.stringify(
+        opts.systemInstructions.map(content => ({type: 'text', content}))
+      );
     }
     const span = tracer.startSpan(
       'invoke_agent',
