@@ -28,7 +28,7 @@ def force_optimize(ch_client: CHClient, table: str) -> None:
     if wf_env.wf_clickhouse_use_distributed_tables():
         cluster = wf_env.wf_clickhouse_replicated_cluster()
         ch_client.command(f"OPTIMIZE TABLE {table}_local ON CLUSTER {cluster} FINAL")
-        ch_client.command(f"SYSTEM SYNC REPLICA {table}_local ON CLUSTER {cluster}")
+        ch_client.command(f"SYSTEM SYNC REPLICA ON CLUSTER {cluster} {table}_local")
     else:
         ch_client.command(f"OPTIMIZE TABLE {table} FINAL")
 
