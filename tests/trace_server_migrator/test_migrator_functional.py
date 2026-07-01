@@ -530,3 +530,49 @@ def test_all_production_down_migrations_distributed(ch_client):
 
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)
+
+
+@pytest.mark.parametrize(
+    ("case_name", "replicated", "use_distributed"),
+    [
+        pytest.param("cloud", False, False, id="cloud"),
+        pytest.param("replicated", True, False, id="replicated"),
+        pytest.param("distributed", True, True, id="distributed"),
+    ],
+)
+def test_initialize_migration_db_skips_ddl_when_ready(
+    ch_client, monkeypatch, case_name: str, replicated: bool, use_distributed: bool
+):
+    """A subsequent init-container startup issues no management-DB DDL.
+
+    The management/lock tables' (ON CLUSTER in replicated/distributed mode) DDL
+    should run once; once present, _initialize_migration_db must short-circuit
+    rather than re-enqueue distributed DDL on every replica of every deploy.
+    """
+    mgmt_db = _unique_name(f"db_mgmt_ready_{case_name}")
+    ch_client.track_db(mgmt_db)
+
+    kwargs = {
+        "replicated": replicated,
+        "use_distributed": use_distributed,
+        "management_db": mgmt_db,
+        "migration_dir": _PROD_MIGRATION_DIR,
+        "post_migration_hook": None,
+    }
+    if replicated:
+        kwargs["replicated_cluster"] = _CLUSTER
+        kwargs["replicated_path"] = _REPLICATED_PATH
+    migrator = get_clickhouse_trace_server_migrator(ch_client, **kwargs)
+
+    # First construction created the management DB and its tables.
+    assert _table_exists(ch_client, mgmt_db, "migrations")
+    assert _table_exists(ch_client, mgmt_db, "migration_lock")
+    assert migrator._management_db_ready()
+
+    # A second startup against the ready management DB issues no DDL.
+    issued: list = []
+    monkeypatch.setattr(
+        migrator, "_run_ddl_with_retry", lambda sql, *a, **k: issued.append(sql)
+    )
+    migrator._initialize_migration_db()
+    assert issued == []
