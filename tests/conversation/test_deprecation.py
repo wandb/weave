@@ -72,6 +72,54 @@ def test_log_session_forwards_and_warns() -> None:
     assert result.conversation_id == "c4"
 
 
+def test_turn_span_method_aliases_forward_and_warn() -> None:
+    turn = weave.Turn(model="gpt-4o")
+
+    with pytest.warns(DeprecationWarning, match="Turn.llm"):
+        llm = turn.llm(provider_name="openai", system_instructions=["be brief"])
+    assert isinstance(llm, weave.LLM)
+    assert llm.model == "gpt-4o"
+    assert llm.provider_name == "openai"
+    assert llm.system_instructions == ["be brief"]
+    llm.end()
+
+    with pytest.warns(DeprecationWarning, match="Turn.tool"):
+        tool = turn.tool(
+            name="get_weather", arguments='{"city":"Tokyo"}', tool_call_id="tc_1"
+        )
+    assert isinstance(tool, weave.Tool)
+    assert tool.name == "get_weather"
+    assert tool.arguments == '{"city":"Tokyo"}'
+    assert tool.tool_call_id == "tc_1"
+
+    with pytest.warns(DeprecationWarning, match="Turn.subagent"):
+        subagent = turn.subagent(name="research-bot")
+    assert isinstance(subagent, weave.SubAgent)
+    assert subagent.name == "research-bot"
+    assert subagent.model == "gpt-4o"
+
+
+def test_subagent_span_method_aliases_forward_and_warn() -> None:
+    subagent = weave.SubAgent(name="research-bot", model="gpt-4o-mini")
+
+    with pytest.warns(DeprecationWarning, match="SubAgent.llm"):
+        llm = subagent.llm(provider_name="openai", system_instructions=["research"])
+    assert isinstance(llm, weave.LLM)
+    assert llm.model == "gpt-4o-mini"
+    assert llm.provider_name == "openai"
+    assert llm.system_instructions == ["research"]
+    llm.end()
+
+    with pytest.warns(DeprecationWarning, match="SubAgent.tool"):
+        tool = subagent.tool(
+            name="web_search", arguments='{"q":"X"}', tool_call_id="tc_2"
+        )
+    assert isinstance(tool, weave.Tool)
+    assert tool.name == "web_search"
+    assert tool.arguments == '{"q":"X"}'
+    assert tool.tool_call_id == "tc_2"
+
+
 def test_legacy_import_path_warns_and_reexports() -> None:
     import weave.session as legacy
 

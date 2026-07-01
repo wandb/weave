@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import types
 import uuid
+import warnings
 from contextvars import ContextVar, Token
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
@@ -113,6 +114,16 @@ __all__ = [
 _TRACER_NAME = "weave.conversation"
 
 logger = logging.getLogger(__name__)
+
+
+def _warn_method_rename(old: str, new: str) -> None:
+    """Emit a ``DeprecationWarning`` for a renamed Conversation SDK method."""
+    warnings.warn(
+        f"{old} is deprecated and will be removed in a future release; "
+        f"use {new} instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def _capture_info_attrs() -> dict[str, str]:
@@ -746,7 +757,7 @@ class SubAgent(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def llm(
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -766,9 +777,33 @@ class SubAgent(_SpanBase):
         llm._token = _current_llm.set(llm)
         return llm
 
-    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias of :meth:`start_llm`."""
+        _warn_method_rename("SubAgent.llm", "SubAgent.start_llm")
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+        """Deprecated alias of :meth:`start_tool`."""
+        _warn_method_rename("SubAgent.tool", "SubAgent.start_tool")
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
 
     def record(
         self,
@@ -790,7 +825,7 @@ class SubAgent(_SpanBase):
 
         Note: on the streaming (``with``) path the sub-agent span is named
         from ``name`` at ``__enter__``, so set ``name`` via ``start_subagent``
-        / ``turn.subagent`` rather than ``record`` if you need the span name
+        / ``turn.start_subagent`` rather than ``record`` if you need the span name
         to reflect it; ``record`` still updates the ``gen_ai.agent.name``
         attribute.
         """
@@ -913,7 +948,7 @@ class Turn(_SpanBase):
         self.messages.append(Message(role="user", content=content))
         return self
 
-    def llm(
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -933,11 +968,13 @@ class Turn(_SpanBase):
         llm._token = _current_llm.set(llm)
         return llm
 
-    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
         """Start a tool execution (execute_tool span, child of this turn)."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
-    def subagent(
+    def start_subagent(
         self,
         *,
         name: str,
@@ -949,6 +986,43 @@ class Turn(_SpanBase):
             name=name,
             model=model or self.model,
             system_instructions=system_instructions or [],
+        )
+
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias of :meth:`start_llm`."""
+        _warn_method_rename("Turn.llm", "Turn.start_llm")
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+        """Deprecated alias of :meth:`start_tool`."""
+        _warn_method_rename("Turn.tool", "Turn.start_tool")
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
+
+    def subagent(
+        self,
+        *,
+        name: str,
+        model: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> SubAgent:
+        """Deprecated alias of :meth:`start_subagent`."""
+        _warn_method_rename("Turn.subagent", "Turn.start_subagent")
+        return self.start_subagent(
+            name=name,
+            model=model,
+            system_instructions=system_instructions,
         )
 
     def record(
@@ -1276,7 +1350,7 @@ def start_llm(
     """
     turn = get_current_turn()
     if turn is not None:
-        return turn.llm(
+        return turn.start_llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,

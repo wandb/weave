@@ -1044,7 +1044,7 @@ class TestOTelSpanEmission:
     def test_llm_creates_chat_span(self, otel_spans: InMemorySpanExporter) -> None:
         with Conversation(agent_name="bot", conversation_id="convo-llm") as s:
             with s.start_turn() as turn:
-                with turn.llm(model="gpt-4o", provider_name="openai") as llm:
+                with turn.start_llm(model="gpt-4o", provider_name="openai") as llm:
                     llm.usage = Usage(input_tokens=100, output_tokens=50)
                     llm.output("Hello!")
 
@@ -1065,7 +1065,7 @@ class TestOTelSpanEmission:
     ) -> None:
         with Conversation(agent_name="bot", conversation_id="convo-tool") as s:
             with s.start_turn() as turn:
-                with turn.tool(
+                with turn.start_tool(
                     name="get_weather",
                     arguments='{"city":"Tokyo"}',
                     tool_call_id="tc_1",
@@ -1088,7 +1088,9 @@ class TestOTelSpanEmission:
     ) -> None:
         with Conversation(agent_name="orchestrator") as s:
             with s.start_turn() as turn:
-                with turn.subagent(name="research-bot", model="gpt-4o-mini") as sa:
+                with turn.start_subagent(
+                    name="research-bot", model="gpt-4o-mini"
+                ) as sa:
                     pass
 
         spans = otel_spans.get_finished_spans()
@@ -1106,7 +1108,7 @@ class TestOTelSpanEmission:
     ) -> None:
         with Conversation(agent_name="orchestrator") as s:
             with s.start_turn() as turn:
-                with turn.subagent(
+                with turn.start_subagent(
                     name="research-bot",
                     system_instructions=["You research things"],
                 ):
@@ -1124,9 +1126,9 @@ class TestOTelSpanEmission:
         """LLM and Tool are both children of Turn (flat model)."""
         with Conversation(agent_name="bot") as s:
             with s.start_turn() as turn:
-                with turn.llm(model="gpt-4o") as llm:
+                with turn.start_llm(model="gpt-4o") as llm:
                     llm.output("checking...")
-                with turn.tool(name="search", arguments='{"q":"X"}') as tool:
+                with turn.start_tool(name="search", arguments='{"q":"X"}') as tool:
                     tool.result = "found"
 
         spans = otel_spans.get_finished_spans()
@@ -1158,9 +1160,9 @@ class TestOTelSpanEmission:
         monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", NoOpTracerProvider())
         with Conversation(agent_name="bot") as s:
             with s.start_turn() as turn:
-                with turn.llm(model="gpt-4o") as llm:
+                with turn.start_llm(model="gpt-4o") as llm:
                     llm.output("Hello")
-                with turn.tool(name="search") as tool:
+                with turn.start_tool(name="search") as tool:
                     tool.result = "done"
         # Should not raise — just silently use no-op spans
 
@@ -1169,11 +1171,11 @@ class TestOTelSpanEmission:
     ) -> None:
         with Conversation(agent_name="bot", include_content=False) as s:
             with s.start_turn(user_message="secret input") as turn:
-                with turn.llm(model="gpt-4o") as llm:
+                with turn.start_llm(model="gpt-4o") as llm:
                     llm.input_messages.append(Message(role="user", content="secret"))
                     llm.output("secret output")
                     llm.system_instructions = ["be helpful"]
-                with turn.tool(name="search", arguments='{"q":"secret"}') as tool:
+                with turn.start_tool(name="search", arguments='{"q":"secret"}') as tool:
                     tool.result = "secret result"
 
         spans = otel_spans.get_finished_spans()
@@ -1252,7 +1254,7 @@ class TestErrorRecording:
         with start_conversation(agent_name="bot") as conversation:
             with conversation.start_turn() as turn:
                 try:
-                    with turn.llm(model="gpt-4o") as llm:
+                    with turn.start_llm(model="gpt-4o") as llm:
                         raise ValueError("LLM call failed")
                 except ValueError:
                     pass
@@ -1269,7 +1271,7 @@ class TestErrorRecording:
         with start_conversation(agent_name="bot") as conversation:
             with conversation.start_turn() as turn:
                 try:
-                    with turn.tool(name="search") as tool:
+                    with turn.start_tool(name="search") as tool:
                         raise RuntimeError("tool broke")
                 except RuntimeError:
                     pass
@@ -1300,7 +1302,7 @@ class TestErrorRecording:
         with start_conversation(agent_name="bot") as conversation:
             with conversation.start_turn() as turn:
                 try:
-                    with turn.subagent(name="sub") as sa:
+                    with turn.start_subagent(name="sub") as sa:
                         raise RuntimeError("sub broke")
                 except RuntimeError:
                     pass
@@ -1382,7 +1384,7 @@ class TestStartTimeFromLogicalConstruction:
     ) -> None:
         with start_conversation(agent_name="bot") as s:
             with s.start_turn() as turn:
-                llm = turn.llm(model="gpt-4o")
+                llm = turn.start_llm(model="gpt-4o")
                 assert llm.started_at is not None
                 expected_ns = int(llm.started_at.timestamp() * 1_000_000_000)
                 time.sleep(0.05)
@@ -2290,7 +2292,7 @@ class TestSubAgentRecord:
         """End-to-end: record() values flow through to the OTel attrs."""
         with Conversation(agent_name="orchestrator") as s:
             with s.start_turn() as turn:
-                with turn.subagent(name="research-bot") as sa:
+                with turn.start_subagent(name="research-bot") as sa:
                     sa.record(
                         system_instructions=["You research things"],
                         agent_id="agent-9",
