@@ -1250,12 +1250,14 @@ class CallsQuery(BaseModel):
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
             return base_sql
 
-        # Use the filtered_calls CTE (two-pass) pattern only for calls_merged
-        # where it reduces rows before expensive GROUP BY aggregation.
-        # For calls_complete (one row per call, no GROUP BY), always use a
-        # single-pass query — it's both simpler and significantly faster.
-        use_filter_cte = self.read_table != ReadTable.CALLS_COMPLETE and (
-            should_use_filter_cte or self.include_costs or bool(object_ref_conditions)
+        # Two-pass filtered_calls CTE: pass 1 narrows ids on light columns, pass 2
+        # loads heavy *_dump columns only for the page. For calls_complete this reads
+        # the page's payloads instead of every scanned row's (prod: 28 GiB -> 1.7 GiB
+        # on a fat-payload list read). calls_merged additionally uses it for costs /
+        # object-ref pushdown ahead of its GROUP BY.
+        use_filter_cte = should_use_filter_cte or (
+            self.read_table != ReadTable.CALLS_COMPLETE
+            and (self.include_costs or bool(object_ref_conditions))
         )
 
         if use_filter_cte:
@@ -1272,7 +1274,19 @@ class CallsQuery(BaseModel):
                 read_table=self.read_table,
             )
 
+            # Plain calls_complete two-pass: carry started_at through pass 1 so pass 2
+            # can bound on the page's time range and PK-prune (see _build_where_clause_optimizations).
+            page_started_at_bound = (
+                self.read_table == ReadTable.CALLS_COMPLETE
+                and not self.include_costs
+                and not object_ref_conditions
+                and not self.include_storage_size
+                and not self.include_total_storage_size
+            )
+
             filter_query.add_field("id")
+            if page_started_at_bound:
+                filter_query.add_field("started_at")
             for field in self.select_fields:
                 select_query.select_fields.append(field)
 
@@ -1307,6 +1321,7 @@ class CallsQuery(BaseModel):
                 id_subquery_name=CTE_FILTERED_CALLS,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
+                page_started_at_bound=page_started_at_bound,
             )
         else:
             # Single-pass: the full query (with all filters, ordering, and
@@ -1363,6 +1378,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: list[str] | None,
         id_subquery_name: str | None = None,
+        page_started_at_bound: bool = False,
     ) -> WhereFilters:
         """Build all WHERE clause optimization filters.
 
@@ -1434,7 +1450,16 @@ class CallsQuery(BaseModel):
 
         id_subquery = ""
         if id_subquery_name is not None:
-            id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
+            if page_started_at_bound:
+                # Bound pass-2 on the page's started_at range so it prunes on the
+                # (project_id, started_at) PK prefix, not just idx_id (which fails for non-time-ordered ids).
+                id_subquery = (
+                    f"AND ({table_alias}.id IN (SELECT id FROM {id_subquery_name}))\n"
+                    f"        AND ({table_alias}.started_at >= (SELECT min(started_at) FROM {id_subquery_name}))\n"
+                    f"        AND ({table_alias}.started_at <= (SELECT max(started_at) FROM {id_subquery_name}))"
+                )
+            else:
+                id_subquery = f"AND ({table_alias}.id IN {id_subquery_name})"
 
         # call_ids is handled exclusively here (not in process_calls_filter_to_conditions)
         # to avoid duplicate id IN filters in the generated SQL.
@@ -1738,6 +1763,7 @@ class CallsQuery(BaseModel):
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
         storage_scope_id_cte: str | None = None,
+        page_started_at_bound: bool = False,
     ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
@@ -1761,7 +1787,7 @@ class CallsQuery(BaseModel):
             pb, table_alias, expand_columns, field_to_object_join_alias_map
         )
         where_filters = self._build_where_clause_optimizations(
-            pb, table_alias, expand_columns, id_subquery_name
+            pb, table_alias, expand_columns, id_subquery_name, page_started_at_bound
         )
         order_result = self._build_order_limit_offset(
             pb, table_alias, expand_columns, field_to_object_join_alias_map
@@ -1893,6 +1919,7 @@ class CallsQuery(BaseModel):
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
         storage_scope_id_cte: str | None = None,
+        page_started_at_bound: bool = False,
     ) -> str:
         """Build the base SQL query format.
 
@@ -1924,6 +1951,7 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map,
             expand_columns,
             storage_scope_id_cte,
+            page_started_at_bound,
         )
         # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
         distinct = ""

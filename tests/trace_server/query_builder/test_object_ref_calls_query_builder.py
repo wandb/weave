@@ -1095,22 +1095,27 @@ def test_object_ref_filter_calls_complete_mixed_conditions() -> None:
            WHERE project_id = {pb_0:String}
              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
            GROUP BY project_id,
-                    digest)
+                    digest),
+             filtered_calls AS
+          (SELECT calls_complete.id AS id
+           FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
+           WHERE (calls_complete.parent_id = {pb_7:String})
+             AND (length(calls_complete.input_refs) > 0)
+             AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') GLOBAL IN
+                        (SELECT ref
+                         FROM obj_filter_0)
+                      OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
+                        (SELECT ref
+                         FROM obj_filter_0)))
+                    OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
+                  AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)})))
+           ORDER BY calls_complete.started_at DESC
+           LIMIT 10)
         SELECT calls_complete.id AS id,
                calls_complete.inputs_dump AS inputs_dump
         FROM calls_complete PREWHERE calls_complete.project_id = {pb_0:String}
-        WHERE (calls_complete.parent_id = {pb_7:String})
-          AND (length(calls_complete.input_refs) > 0)
-          AND (((((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), '') GLOBAL IN
-                     (SELECT ref
-                      FROM obj_filter_0)
-                   OR regexpExtract(coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN
-                     (SELECT ref
-                      FROM obj_filter_0)))
-                OR ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String}))))
-              AND ((calls_complete.deleted_at = {pb_6:DateTime64(3)})))
+        WHERE (calls_complete.id IN filtered_calls)
         ORDER BY calls_complete.started_at DESC
-        LIMIT 10
         """,
         {
             "pb_0": "project",
