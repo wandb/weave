@@ -55,6 +55,16 @@ export interface ConversationInit {
   sessionId?: string;
 }
 
+type Opts = {
+  agentName: string;
+  model: string;
+  conversationId: string;
+  attributes: Attributes;
+  agentId: string;
+  agentDescription: string;
+  agentVersion: string;
+};
+
 /**
  * A Conversation groups Turns under a single `gen_ai.conversation.id`. It is
  * not itself an OTel span — children stamp the conversation id onto theirs.
@@ -62,19 +72,44 @@ export interface ConversationInit {
 export class Conversation {
   private _ended = false;
 
-  private constructor(
-    public readonly agentName: string,
-    public readonly model: string,
-    public readonly conversationId: string,
-    public readonly attributes: Attributes,
-    private readonly _agentId: string,
-    private readonly _agentDescription: string,
-    private readonly _agentVersion: string
-  ) {}
+  private _model: string;
+  private _conversationId: string;
+  private _agentId: string;
+  private _agentName: string;
+  private _agentDescription: string;
+  private _agentVersion: string;
+
+  private _attributes: Attributes;
+
+  private constructor(opts: Opts) {
+    this._model = opts.model;
+    this._conversationId = opts.conversationId;
+    this._attributes = opts.attributes;
+    this._agentId = opts.agentId;
+    this._agentName = opts.agentName;
+    this._agentDescription = opts.agentDescription;
+    this._agentVersion = opts.agentVersion;
+  }
+
+  public get agentName() {
+    return this._agentName;
+  }
+
+  public get model() {
+    return this._model;
+  }
+
+  public get conversationId() {
+    return this._conversationId;
+  }
+
+  public get attributes() {
+    return this._attributes;
+  }
 
   /** @deprecated Use {@link Conversation.conversationId} instead. */
   get sessionId(): string {
-    return this.conversationId;
+    return this._conversationId;
   }
 
   static create(opts: ConversationInit = {}): Conversation {
@@ -84,15 +119,15 @@ export class Conversation {
         'A Conversation is already active in this async chain. End it before starting a new one.'
       );
     }
-    const conversation = new Conversation(
-      opts.agentName ?? '',
-      opts.model ?? '',
-      opts.conversationId ?? opts.sessionId ?? uuidv7(),
-      opts.attributes ?? {},
-      opts.agentId ?? '',
-      opts.agentDescription ?? '',
-      opts.agentVersion ?? ''
-    );
+    const conversation = new Conversation({
+      model: opts.model ?? '',
+      agentId: opts.agentId ?? '',
+      agentName: opts.agentName ?? '',
+      agentDescription: opts.agentDescription ?? '',
+      agentVersion: opts.agentVersion ?? '',
+      conversationId: opts.conversationId ?? opts.sessionId ?? uuidv7(),
+      attributes: opts.attributes ?? {},
+    });
     state.conversation = conversation;
     return conversation;
   }
@@ -121,12 +156,12 @@ export class Conversation {
   startTurn(opts: TurnInit = {}): Turn {
     return Turn.create({
       ...opts,
-      agentName: opts.agentName ?? this.agentName,
-      model: opts.model ?? this.model,
+      agentName: opts.agentName ?? this._agentName,
+      model: opts.model ?? this._model,
       agentId: opts.agentId ?? this._agentId,
       agentDescription: opts.agentDescription ?? this._agentDescription,
       agentVersion: opts.agentVersion ?? this._agentVersion,
-      conversationId: this.conversationId,
+      conversationId: this._conversationId,
     });
   }
 
