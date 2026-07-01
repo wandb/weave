@@ -15,8 +15,11 @@ describe('Turn', () => {
 
   it('emits an invoke_agent span with GenAI agent / model attributes', () => {
     const turn = Turn.create({
-      agentName: 'weather-bot',
       model: 'gpt-4o',
+      agentId: '12345',
+      agentName: 'weather-bot',
+      agentDescription: 'Finds the most accurate weather',
+      agentVersion: '1.2.3',
       conversationId: 'conv-1',
       userMessage: "What's the weather?",
       systemInstructions: ['Be helpful', 'Be concise'],
@@ -27,7 +30,10 @@ describe('Turn', () => {
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
+          "gen_ai.agent.description": "Finds the most accurate weather",
+          "gen_ai.agent.id": "12345",
           "gen_ai.agent.name": "weather-bot",
+          "gen_ai.agent.version": "1.2.3",
           "gen_ai.conversation.id": "<uuid>",
           "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
           "gen_ai.operation.name": "invoke_agent",

@@ -41,7 +41,10 @@ export const startSession = startConversation;
  *
  * @example
  * weave.startTurn({
+ *   agentId: 'research-bot-prod',
  *   agentName: 'research-bot',
+ *   agentDescription: 'Looks up facts on Wikipedia.',
+ *   agentVersion: '1.4.2',
  *   model: 'gpt-4o',
  *   userMessage: 'What is the weather in Tokyo?',
  *   systemInstructions: ['You are a helpful weather bot.'],

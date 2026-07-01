@@ -71,6 +71,9 @@ export class Conversation {
    * const turn = conversation.startTurn({
    *   model: 'gpt-4o',
    *   agentName: 'research-bot',
+   *   agentId: 'research-bot-prod',
+   *   agentDescription: 'Looks up facts on Wikipedia.',
+   *   agentVersion: '1.4.2',
    *   userMessage: 'What is the weather in Tokyo?',
    *   systemInstructions: ['You are a helpful weather bot.'],
    *   startTime: new Date('2026-05-29T10:00:00.000Z'),
