@@ -1,0 +1,62 @@
+## Conversation
+User pasted a Slack link (wandb #weave-related channel, msg 1782850357.302689).
+Dan Gilbert asked whether we still planned to rename inconsistent instance
+methods on the Python Conversation SDK; Andrew Truong replied "oh yeah we should
+fix that". User then said "Please fix" + "put up a draft pr". Requested renames:
+Turn.llm->start_llm, Turn.tool->start_tool, Turn.subagent->start_subagent,
+SubAgent.llm->start_llm, SubAgent.tool->start_tool. Rationale (Dan): every
+top-level fn already has the start_ prefix, as does Conversation.start_turn.
+
+## Actions
+- Read Slack thread via claude_ai_Slack MCP (slack_read_thread).
+- Located classes in weave/conversation/conversation.py: SubAgent (l.714),
+  Turn (l.864), Conversation (l.1062). LLM class has NO llm/tool methods;
+  SubAgent has NO subagent method -> Dan's 5-item list is the complete set.
+- Confirmed TS SDK (sdks/node/src) already uses startLlm/startTool/startSubagent
+  on turn/llm -> target names give Python/TS parity.
+- Renamed 5 methods + 1 internal caller (start_llm() top-level fn body, was
+  turn.llm(...)) + 1 docstring ref (SubAgent.record note: turn.subagent ->
+  turn.start_subagent). Used Edit replace_all for the two byte-identical
+  signatures (def llm / def tool appear once per class).
+- Updated 43 test call sites across tests/conversation/{test_conversation,
+  test_conversation_otel,test_conversation_settings,test_span_attributes}.py
+  via: perl -pi -e 's/\b(t|turn|sa)\.(llm|tool|subagent)\(/$1.start_$2(/g'.
+- Verified: ruff clean; 302 conversation tests pass (--trace-server=fake);
+  import smoke test confirms new methods present, old removed, full chain works.
+
+## Errors & mistakes
+- First test run used `uv run --group test` which re-resolved to Python 3.14
+  (freethreaded) and tried to BUILD tiktoken 0.8.0 -> PyO3 0.22.6 max-supported
+  is 3.13, build failed (code 101). The pre-existing .venv symlinked to
+  cpython-3.14+freethreaded and was broken (no typing_extensions, weave import
+  failed). Fixed by pinning `uv run --python 3.12` which recreated .venv as a
+  working 3.12 env (235 pkgs from cache, wheels only). .venv is gitignored.
+- First perl/grep invocation passed a $FILES shell var unquoted; zsh does NOT
+  word-split unquoted vars, so the whole string was treated as one filename
+  ("No such file or directory"). No files were modified. Redid with explicit
+  file args. Lesson for this repo/shell: never rely on word-splitting in zsh.
+
+## Dead ends
+None.
+
+## Hints & warnings
+- Do NOT touch tests/integrations/fastmcp/fastmcp_test.py `@mcp.tool()` — that's
+  the FastMCP decorator, unrelated to the SDK rename.
+- The receiver-variable rename is only safe because Tool/LLM have no
+  .llm()/.tool()/.subagent() methods: any t.tool( / t.llm( in passing tests must
+  have t as a Turn (t is also used as a Tool var in TestTool, but never as a
+  receiver of these methods). Verified before applying.
+- No backcompat/deprecation aliases were added. Deliberate: SDK just renamed
+  from Session (#7437), still being shaped, no external callers. If reviewers
+  want shims, add deprecated llm/tool/subagent that forward to start_*.
+- Top-level start_llm/start_tool/start_subagent functions were already correctly
+  named and unchanged; only instance methods moved.
+
+## Codebase discoveries
+- weave.session is a deprecated shim forwarding to weave.conversation (emits
+  DeprecationWarning). Instance methods are not in any __all__, so the rename
+  needed no export changes.
+- Conversation test suite runs fully on the in-memory fake backend in ~1s.
+
+## Open questions
+- Whether reviewers want deprecation aliases for the old method names.
