@@ -20,6 +20,7 @@ from weave.trace_server.trace_server_interface import (
     CallsDeleteReq,
     CallsQueryReq,
     CallStartReq,
+    CostCreateReq,
     EndedCallSchemaForInsert,
     EvalResultsFilter,
     EvalResultsQueryReq,
@@ -1053,6 +1054,273 @@ def test_eval_results_summary_predict_total_tokens_counts_zero(client):
     )
     assert res.summary is not None
     assert res.summary.evaluations[0].predict_total_tokens == 0
+
+
+# Known prices for the cost tests below. Custom (project-level) prices keep the
+# expected dollar amounts deterministic regardless of the default cost table.
+_PREDICT_PRICE = {"prompt_token_cost": 0.001, "completion_token_cost": 0.002}
+_JUDGE_PRICE = {"prompt_token_cost": 0.01, "completion_token_cost": 0.02}
+# 100 prompt + 50 completion tokens at the predict price -> a per-trial cost.
+_PREDICT_USAGE = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+_JUDGE_USAGE = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+_PREDICT_COST_PER_TRIAL = 100 * 0.001 + 50 * 0.002  # = 0.2
+
+
+def _create_eval_run_with_cost_trials(client, trials, *, eval_name):
+    """Create an eval run whose trials carry predict/scorer usage.
+
+    `trials` is a list of (predict_usage, scorer_usage) pairs keyed by model id,
+    e.g. ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}). A None
+    usage means that child call is omitted. Mirrors the predict_total_tokens
+    setup but with prompt/completion tokens so a cost can be computed.
+    """
+    project_id = client.project_id
+    model_ref = f"model://{eval_name}"
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation=f"eval://{eval_name}",
+            model=model_ref,
+        )
+    )
+    for i, (predict_usage, scorer_usage) in enumerate(trials):
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        pas_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=run.evaluation_run_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=now,
+                    attributes={},
+                    inputs={"example": {"idx": i}, "model": model_ref},
+                )
+            )
+        )
+        predict_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_id,
+                    trace_id=run.evaluation_run_id,
+                    parent_id=pas_id,
+                    op_name="Model.predict",
+                    started_at=now,
+                    attributes={},
+                    inputs={"self": model_ref, "example": {"idx": i}},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=predict_id,
+                    ended_at=now + datetime.timedelta(seconds=1),
+                    output=f"answer_{i}",
+                    summary={"usage": predict_usage} if predict_usage else {},
+                )
+            )
+        )
+        if scorer_usage:
+            scorer_id = generate_id()
+            client.server.call_start(
+                CallStartReq(
+                    start=StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=scorer_id,
+                        trace_id=run.evaluation_run_id,
+                        parent_id=pas_id,
+                        op_name="my_scorer.score",
+                        started_at=now + datetime.timedelta(seconds=1),
+                        attributes={},
+                        inputs={"output": f"answer_{i}"},
+                    )
+                )
+            )
+            client.server.call_end(
+                CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=scorer_id,
+                        ended_at=now + datetime.timedelta(seconds=2),
+                        output={"score": 1},
+                        summary={"usage": scorer_usage},
+                    )
+                )
+            )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    ended_at=now + datetime.timedelta(seconds=3),
+                    output={"output": f"answer_{i}", "scores": {}},
+                    summary={},
+                )
+            )
+        )
+    return run.evaluation_run_id
+
+
+def test_eval_results_summary_predict_total_cost(client):
+    """Summary predict_total_cost sums per-trial predict cost, excluding scorer cost."""
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={"predict-llm": _PREDICT_PRICE, "judge-llm": _JUDGE_PRICE},
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    # Two trials, each with a priced predict child and a (more expensive) priced
+    # judge child. A third trial's predict has no usage: it reports no cost and
+    # is skipped, not counted as 0.
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [
+            ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
+            ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
+            (None, {"judge-llm": _JUDGE_USAGE}),
+        ],
+        eval_name="predict-cost",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+            include_costs=True,
+        )
+    )
+    assert res.summary is not None
+    # 2 priced predict trials; the judge cost and the usage-less trial are excluded.
+    assert res.summary.evaluations[0].predict_total_cost == pytest.approx(
+        2 * _PREDICT_COST_PER_TRIAL
+    )
+
+
+def test_eval_results_summary_predict_total_cost_requires_include_costs(client):
+    """Without include_costs the predict_total_cost is None (cost is opt-in)."""
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={"predict-llm": _PREDICT_PRICE},
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [({"predict-llm": _PREDICT_USAGE}, None)],
+        eval_name="cost-opt-in",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+            # include_costs omitted -> defaults to False
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_cost is None
+
+
+def test_eval_results_summary_predict_total_cost_none_when_absent(client):
+    """predict_total_cost is None when no trial reports cost (e.g. unpriced models)."""
+    eval_id, _ = _create_eval_with_scores(
+        client, [{"accuracy": 0.5}], eval_name="no-cost"
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=client.project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            include_costs=True,
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_cost is None
+
+
+def test_eval_results_summary_predict_total_cost_counts_zero(client):
+    """A predict model priced at $0 reports 0.0, not None (mirrors the token zero case)."""
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={
+                "free-llm": {"prompt_token_cost": 0.0, "completion_token_cost": 0.0}
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [({"free-llm": _PREDICT_USAGE}, None)],
+        eval_name="cost-zero",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+            include_costs=True,
+        )
+    )
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_cost == 0.0
+
+
+def test_eval_results_summary_predict_total_cost_sums_multiple_models(client):
+    """When a predict call spans multiple priced models, their costs are summed."""
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={
+                "predict-llm": _PREDICT_PRICE,
+                "predict-llm-b": {
+                    "prompt_token_cost": 0.003,
+                    "completion_token_cost": 0.004,
+                },
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [({"predict-llm": _PREDICT_USAGE, "predict-llm-b": _PREDICT_USAGE}, None)],
+        eval_name="cost-multimodel",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=False,
+            include_summary=True,
+            include_predict_and_score_children=True,
+            include_costs=True,
+        )
+    )
+    assert res.summary is not None
+    # model a: 100*0.001 + 50*0.002 = 0.2; model b: 100*0.003 + 50*0.004 = 0.5.
+    cost_b = 100 * 0.003 + 50 * 0.004
+    assert res.summary.evaluations[0].predict_total_cost == pytest.approx(
+        _PREDICT_COST_PER_TRIAL + cost_b
+    )
 
 
 def test_eval_results_resolved_inputs_inline(client):

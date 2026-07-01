@@ -5662,6 +5662,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(parent_ids=batch),
                     columns=child_columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    include_costs=req.include_costs,
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
