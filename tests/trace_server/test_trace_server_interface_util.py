@@ -488,3 +488,91 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     # One call for `req.project_id` translation + exactly one more for the
     # rewrite cache (not 6 — one per ref).
     assert converter.ext_to_int_calls == ["ent/proj", "ent/proj"]
+
+
+# --- otel_export (non-agents OTel calls path) mirrors the same span-attribute
+# ref rewriting: its raw protobuf ResourceSpans is equally opaque to the
+# `_ref_apply` walker, so embedded/whole external refs must be converted to
+# internal before reaching the inner server. ---
+
+
+def _otel_export_req_with_string_attr(
+    attr_key: str,
+    attr_value: str,
+    *,
+    project_id: str = "ent/proj",
+) -> tsi.OTelExportReq:
+    """Build a plain (non-agents) `OTelExportReq` with a single string span attr,
+    reusing the GenAI helper's span-building.
+    """
+    genai = _make_otel_export_req_with_string_attr(
+        attr_key, attr_value, project_id=project_id
+    )
+    return tsi.OTelExportReq(
+        processed_spans=genai.processed_spans, project_id=project_id, wb_user_id=None
+    )
+
+
+def _capture_otel_export_req(req: tsi.OTelExportReq) -> tsi.OTelExportReq:
+    """Run an `OTelExportReq` through the adapter and return the req the inner
+    trace server actually received (mirror of `_capture_genai_otel_export_req`).
+    """
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.otel_export.return_value = tsi.OTelExportRes(partial_success=None)
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+    adapter.otel_export(req)
+    assert inner.otel_export.call_count == 1
+    return inner.otel_export.call_args.args[0]
+
+
+def test_otel_export_rewrites_ref_embedded_in_message_json() -> None:
+    """An external ref buried inside a `gen_ai.input.messages` JSON string is
+    rewritten to internal on the non-agents OTel calls path before the request
+    reaches the inner server; the surrounding JSON structure is preserved.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "ref": "weave:///ent/proj/object/ds:DIG"},
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+    req = _otel_export_req_with_string_attr(
+        "gen_ai.input.messages", json.dumps(messages)
+    )
+
+    forwarded = _capture_otel_export_req(req)
+
+    forwarded_json = json.loads(_string_attr_value(forwarded, "gen_ai.input.messages"))
+    assert forwarded_json == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "ref": f"weave-trace-internal:///{internal_proj}/object/ds:DIG",
+                },
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+
+
+def test_otel_export_rewrites_whole_ref_string_attr() -> None:
+    """A whole-value external ref string attribute is forwarded as the internal
+    whole ref on the non-agents OTel calls path.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    req = _otel_export_req_with_string_attr(
+        "gen_ai.output.dataset_ref", "weave:///ent/proj/object/ds:DIG"
+    )
+
+    forwarded = _capture_otel_export_req(req)
+
+    assert (
+        _string_attr_value(forwarded, "gen_ai.output.dataset_ref")
+        == f"weave-trace-internal:///{internal_proj}/object/ds:DIG"
+    )

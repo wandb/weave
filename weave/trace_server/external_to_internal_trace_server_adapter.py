@@ -202,6 +202,49 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
         return verify
 
+    def _rewrite_processed_spans_refs_inplace(
+        self,
+        processed_spans: Iterable[Any],
+        internal_project_id: str,
+    ) -> None:
+        """Convert external weave refs in OTel span attributes to internal form.
+
+        Both ``otel_export`` and ``genai_otel_export`` receive a raw protobuf
+        ``ResourceSpans`` payload that ``_ref_apply``'s universal walker cannot
+        descend into (it is an ``arbitrary_types_allowed`` field), so refs
+        carried in span attributes — the typed
+        ``weave.{content,artifact,object}_refs`` arrays AND refs embedded in
+        ordinary string attributes such as the ``gen_ai.{input,output}.messages``
+        JSON — escape the standard ext→int conversion. Rewrite them in place so
+        the inner trace server always sees internal-ref form, matching the
+        invariant every other resolver relies on.
+
+        A single memoized closure funnels every ext→int project lookup so
+        ``ext_to_int_project_id`` runs at most once per distinct entity/project
+        pair across the whole batch. ``internal_project_id`` is the request's
+        already-converted project, so the verifier accepts the request's own
+        project plus access-checked cross-project internal refs — exactly what
+        ``_ref_apply`` does.
+        """
+        project_id_cache: dict[str, str] = {}
+
+        def cached_ext_to_int(project_key: str) -> str:
+            if project_key not in project_id_cache:
+                project_id_cache[project_key] = self._idc.ext_to_int_project_id(
+                    project_key
+                )
+            return project_id_cache[project_key]
+
+        verify_internal_project_id = self._make_project_verifier(internal_project_id)
+        for processed_span in processed_spans:
+            for scope_spans in processed_span.resource_spans.scope_spans:
+                for span in scope_spans.spans:
+                    _rewrite_otel_ref_attrs_inplace(
+                        span.attributes,
+                        cached_ext_to_int,
+                        verify_internal_project_id,
+                    )
+
     def _ref_apply(
         self,
         method: Callable[[A], B],
@@ -286,6 +329,11 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+
+        # Convert refs carried in the raw protobuf span attributes (embedded in
+        # message content, typed ref arrays, etc.) — `_ref_apply` below can't
+        # descend into `ResourceSpans`. See `_rewrite_processed_spans_refs_inplace`.
+        self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
 
         return self._ref_apply(
             self._internal_trace_server.otel_export, req, req.project_id
@@ -1372,46 +1420,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def genai_otel_export(
         self, req: tsi.agent_types.GenAIOTelExportReq
     ) -> tsi.agent_types.GenAIOTelExportRes:
-        # Convert `req.project_id` DIRECTLY (not through the memoized wrapper
-        # below): this is the request's own project translation and must
-        # always hit the id converter once.
+        # Convert `req.project_id` DIRECTLY: this is the request's own project
+        # translation and must always hit the id converter once.
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
-        # `_ref_apply`'s universal walker can't descend into the raw
-        # protobuf `ResourceSpans` payload, so refs carried in span
-        # attributes escape the standard ext→int conversion. Rewrite them
-        # in-place here so the inner trace server sees a request that's
-        # already in internal-ref form, matching the invariant every other
-        # resolver relies on. This covers both the typed ref-array columns
-        # (`weave.content_refs` / `weave.artifact_refs` / `weave.object_refs`)
-        # AND refs embedded in ordinary string attributes (e.g. a dataset ref
-        # inside the `gen_ai.input.messages` / `gen_ai.output.messages` JSON).
-        #
-        # A SINGLE memoized closure funnels every ext→int project lookup
-        # (array items AND embedded string refs) so `ext_to_int_project_id`
-        # runs at most once per distinct entity/project pair across the whole
-        # batch. `req.project_id` is already internal here, so the verifier
-        # accepts the request's own project plus access-checked cross-project
-        # internal refs — exactly what `_ref_apply` does.
-        project_id_cache: dict[str, str] = {}
-
-        def cached_ext_to_int(project_key: str) -> str:
-            if project_key not in project_id_cache:
-                project_id_cache[project_key] = self._idc.ext_to_int_project_id(
-                    project_key
-                )
-            return project_id_cache[project_key]
-
-        verify_internal_project_id = self._make_project_verifier(req.project_id)
-        for processed_span in req.processed_spans:
-            for scope_spans in processed_span.resource_spans.scope_spans:
-                for span in scope_spans.spans:
-                    _rewrite_otel_ref_attrs_inplace(
-                        span.attributes,
-                        cached_ext_to_int,
-                        verify_internal_project_id,
-                    )
+        # This path doesn't use `_ref_apply`, so rewrite refs carried in the raw
+        # protobuf span attributes here. See `_rewrite_processed_spans_refs_inplace`.
+        self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
         return self._internal_trace_server.genai_otel_export(req)
 
     def agent_spans_query(
