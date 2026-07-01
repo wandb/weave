@@ -9,13 +9,17 @@ import logging
 import re
 from typing import Any, TypeVar
 
+from weave.shared.refs_internal import InternalObjectRef
 from weave.trace_server.content.content import Content
+from weave.trace_server.object_creation_utils import make_object_id
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
     CallStartReq,
     CompletedCallSchemaForInsert,
     FileCreateReq,
+    ObjCreateReq,
+    ObjSchemaForInsert,
     TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
@@ -109,6 +113,36 @@ def store_content_object(
     }
 
 
+@traced(name="store_content_object_ref")
+def store_content_object_ref(
+    content_obj: Content,
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> str:
+    """Store a Content object, publish it, and return its internal weave ref.
+
+    ``store_content_object`` returns the inline ``CustomWeaveType`` dict (the
+    object *value*); this publishes that value as a weave object so callers can
+    embed a compact ``weave-trace-internal:///…`` ref in the payload instead of
+    the inline object. The version is the server-computed object digest, so
+    identical content dedupes to the same ref.
+    """
+    obj_val = store_content_object(content_obj, project_id, trace_server)
+    object_id = make_object_id(content_obj.filename, "content")
+    res = trace_server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=project_id, object_id=object_id, val=obj_val
+            )
+        )
+    )
+    # Coerce to a plain ``str``: ``.uri`` is a str subclass (``_CallableStr``)
+    # that exact-type checks (JSON/serialization/ref extraction) can reject.
+    return str(
+        InternalObjectRef(project_id=project_id, name=object_id, version=res.digest).uri
+    )
+
+
 T = TypeVar("T")
 
 
@@ -162,8 +196,8 @@ def replace_base64_with_content_objects(
             # Check for data URI pattern first
             if is_data_uri(val):
                 try:
-                    # Create proper Content object structure
-                    return store_content_object(
+                    # Publish the content and replace the base64 with its ref.
+                    return store_content_object_ref(
                         Content.from_data_url(val),
                         project_id,
                         trace_server,
@@ -186,7 +220,7 @@ def replace_base64_with_content_objects(
                         "text/plain",
                         "application/octet-stream",
                     }:
-                        return store_content_object(
+                        return store_content_object_ref(
                             content,
                             project_id,
                             trace_server,
@@ -252,3 +286,30 @@ def process_complete_call_to_content(
         complete_call.output, complete_call.project_id, trace_server
     )
     return complete_call
+
+
+def replace_base64_in_raw_messages(
+    raw: Any,
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> Any:
+    """Strip inline base64 / base64 data-URIs from raw GenAI message payloads.
+
+    Mirrors the non-OTel calls path (``replace_base64_with_content_objects``
+    applied to ``inputs``/``output``) for the OTel *agents* path, where the
+    message payload frequently arrives as a JSON-encoded string. The string is
+    parsed into structured form first so that any inline base64 becomes a leaf
+    value the walker can detect, then the shared conversion runs.
+
+    Returns the (possibly converted) structured messages, or the input
+    unchanged when it is neither a message container nor JSON-decodable.
+    """
+    if not isinstance(raw, (str, list, dict)):
+        return raw
+    parsed = raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return raw
+    return replace_base64_with_content_objects(parsed, project_id, trace_server)

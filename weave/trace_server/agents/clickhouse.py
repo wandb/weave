@@ -81,6 +81,9 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
+from weave.trace_server.base64_content_conversion import (
+    replace_base64_with_content_objects,
+)
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
@@ -121,6 +124,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
+    TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
 
@@ -806,10 +810,13 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper.
+    Optionally takes a `trace_server` used for file storage when stripping
+    inline base64 out of GenAI message payloads into Content refs.
     """
 
     _ch_client: CHClient
     _insert_settings: dict[str, Any] | None = None
+    _trace_server: TraceServerInterface | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -847,12 +854,19 @@ class AgentWriteHandler:
                         errors.append(str(e))
                         continue
 
+                    # strip inline base64/data-URIs into weave refs.
+                    if self._trace_server is not None:
+                        span.attributes = replace_base64_with_content_objects(
+                            span.attributes, req.project_id, self._trace_server
+                        )
+
                     try:
                         genai_row = extract_genai_span(
                             span,
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id or "",
                             wb_run_id=processed_span.run_id or "",
+                            trace_server=self._trace_server,
                         )
                     except Exception as e:
                         error_type = type(e).__name__

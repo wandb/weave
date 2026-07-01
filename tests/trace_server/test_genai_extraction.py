@@ -7,11 +7,16 @@ success-path test that exercises every extractor plus one error-status
 test since that's a separate code path (Status object vs attributes).
 """
 
+import base64
 import datetime
 import json
 from typing import Any
+from unittest.mock import MagicMock
 
 from weave.trace_server.agents import semconv
+from weave.trace_server.base64_content_conversion import (
+    replace_base64_with_content_objects,
+)
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.python_spans import (
     Resource,
@@ -20,6 +25,7 @@ from weave.trace_server.opentelemetry.python_spans import (
     Status,
     StatusCode,
 )
+from weave.trace_server.trace_server_interface import FileCreateRes, ObjCreateRes
 
 
 def _make_span(
@@ -415,3 +421,156 @@ def test_extract_custom_attrs_skips_non_finite_floats() -> None:
         assert key not in result.custom_attrs_float
         assert key not in result.custom_attrs_string
         assert key not in result.custom_attrs_int
+
+
+def _mock_trace_server() -> MagicMock:
+    trace_server = MagicMock()
+    trace_server.file_create = MagicMock(
+        side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
+    )
+    # Auto-conversion publishes each converted blob as a weave object and embeds
+    # its ref, so obj_create must be stubbed with a deterministic digest.
+    trace_server.obj_create = MagicMock(return_value=ObjCreateRes(digest="obj_digest"))
+    return trace_server
+
+
+def test_extract_genai_span_strips_base64_when_trace_server_given() -> None:
+    """With a trace_server, inline base64 in messages is stripped to a ref.
+
+    Mirrors the non-OTel calls path. The image field value becomes a compact
+    weave object ref inside the JSON-serialized NormalizedMessage content.
+    """
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "describe this"},
+                        {"type": "image", "url": data_uri},
+                    ],
+                }
+            ]
+        )
+    }
+    trace_server = _mock_trace_server()
+
+    result = extract_genai_span(
+        _make_span(attrs=attrs), project_id="p1", trace_server=trace_server
+    )
+
+    content = json.loads(result.input_messages[0].content)
+    assert content[0] == {"type": "text", "content": "describe this"}
+    assert content[1]["url"].startswith("weave-trace-internal:///p1/object/")
+    assert content[1]["url"].endswith(":obj_digest")
+    assert b64 not in result.input_messages[0].content
+    assert trace_server.file_create.call_count == 2
+
+
+def test_extract_genai_span_leaves_base64_when_no_trace_server() -> None:
+    """Without a trace_server (the default), base64 is left inline untouched."""
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [{"role": "user", "parts": [{"type": "image", "url": data_uri}]}]
+        )
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    assert data_uri in result.input_messages[0].content
+
+
+def test_extract_genai_span_preserves_multimodal_content_parts() -> None:
+    """OpenAI-style list ``content`` (text + image) is preserved as a JSON parts
+    array; non-text parts must not be dropped during normalization.
+    """
+    attrs = {
+        "gen_ai.input.messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://example.com/x.png"},
+                    },
+                ],
+            }
+        ]
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    parts = json.loads(result.input_messages[0].content)
+    assert parts == [
+        {"type": "text", "text": "What is in this image?"},
+        {"type": "image_url", "image_url": {"url": "https://example.com/x.png"}},
+    ]
+
+
+def test_extract_genai_span_normalizes_indexed_prompt_dict() -> None:
+    """Legacy ``gen_ai.prompt.{i}`` / ``gen_ai.completion.{i}`` unflatten to a
+    numeric-keyed dict; it must be converted to a message list (as the
+    non-agents path does) so input/output messages are populated.
+    """
+    attrs = {
+        "gen_ai": {
+            "prompt": {
+                "0": {"role": "user", "content": "hello"},
+                "1": {"role": "assistant", "content": "hi there"},
+            },
+            "completion": {"0": {"role": "assistant", "content": "done"}},
+        }
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    assert [m.role for m in result.input_messages] == ["user", "assistant"]
+    assert result.input_messages[0].content == "hello"
+    assert result.input_messages[1].content == "hi there"
+    assert [m.role for m in result.output_messages] == ["assistant"]
+    assert result.output_messages[0].content == "done"
+
+
+def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
+    """Replicates AgentWriteHandler.insert_otel_spans: converting span.attributes
+    before extraction strips base64 from the lossless attributes_dump /
+    raw_span_dump columns (the OpenLLMetry ``gen_ai.prompt.{i}`` shape unflattens
+    to a numeric-keyed dict with a structured content array).
+    """
+    b64 = base64.b64encode(b"a" * 15000).decode("ascii")
+    attrs = {
+        "gen_ai": {
+            "prompt": {
+                "0": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What is in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        },
+                    ],
+                }
+            }
+        }
+    }
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
+
+    # AgentWriteHandler converts span.attributes in place before extraction.
+    span.attributes = replace_base64_with_content_objects(
+        span.attributes, "p1", trace_server
+    )
+    result = extract_genai_span(span, project_id="p1", trace_server=trace_server)
+
+    assert b64 not in result.attributes_dump
+    assert b64 not in result.raw_span_dump
+    # Base64 is replaced by a compact weave object ref, not an inline object.
+    assert "weave-trace-internal:///p1/object/" in result.attributes_dump
+    assert "CustomWeaveType" not in result.attributes_dump
+    assert trace_server.file_create.call_count == 2
