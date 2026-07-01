@@ -73,6 +73,24 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Integration update checks
+
+`scripts/check_integration_updates.py` is the deterministic detector behind the
+`integration-updater` skill (`.claude/skills/integration-updater/`). For a given
+integration it reads the current pin from `[project.optional-dependencies]`,
+resolves the distribution via `library_integration(distribution_name=...)`,
+queries PyPI for the latest release, and — with the library installed —
+live-resolves every `SymbolPatcher` target to catch a monkey-patch that has
+silently stopped resolving. It complements Dependabot, which bumps minor/patch
+pins but ignores majors and never touches integration code.
+
+```bash
+uv run scripts/check_integration_updates.py <name> --json                       # version + static targets
+uv run --with '<dist>==<latest>' scripts/check_integration_updates.py <name>    # + live symbol check
+```
+
+Use the `integration-updater` skill to act on the findings (decide + implement).
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
