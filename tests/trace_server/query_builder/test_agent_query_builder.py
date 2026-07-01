@@ -360,6 +360,44 @@ class TestMakeSpansListQuery:
                 include_details=True,
             )
 
+    def test_with_signal_tags(self) -> None:
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(project_id="p1", signal_tags=["lowquality"]),
+        )
+
+        feedback_sub = (
+            "SELECT weave_ref FROM feedback "
+            "WHERE project_id = {genai_2:String} "
+            "AND feedback_type = {genai_3:String} "
+            "AND hasAny(scorer_tags, {genai_1:Array(String)})"
+        )
+        src = _AttrSrc(9)
+        expected = f"""
+            SELECT {SPANS_LIST_COLS}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND (concat({{genai_4:String}}, s.trace_id) IN ({feedback_sub})
+              OR concat({{genai_5:String}}, encodeURLComponent(s.conversation_id)) IN ({feedback_sub})
+              OR concat({{genai_6:String}}, s.span_id) IN ({feedback_sub}))
+            ORDER BY started_at DESC
+            LIMIT {{genai_7:UInt64}} OFFSET {{genai_8:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": ["lowquality"],
+            "genai_2": "p1",
+            "genai_3": "wandb.agent_monitor",
+            "genai_4": "weave-trace-internal:///p1/agent_turn/",
+            "genai_5": "weave-trace-internal:///p1/agent_conversation/",
+            "genai_6": "weave-trace-internal:///p1/agent_span/",
+            "genai_7": 100,
+            "genai_8": 0,
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_count_query (grouped)

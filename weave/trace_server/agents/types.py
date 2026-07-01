@@ -784,6 +784,10 @@ class AgentSpansQueryReq(BaseModel):
     offset: int = Field(default=0, ge=0)
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
+    # Keep only spans carrying online-scorer (signal) feedback whose
+    # scorer_tags contain any of these values, matched via the feedback's
+    # weave_ref against the span / its trace / its conversation.
+    signal_tags: list[str] | None = None
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:

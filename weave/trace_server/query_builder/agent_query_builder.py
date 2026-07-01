@@ -17,6 +17,7 @@ from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple, TypeAlias, TypeVar
 
+from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     MAX_CONVERSATION_SPANS,
@@ -52,6 +53,7 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryReq,
     group_by_ref_alias,
 )
+from weave.trace_server.interface.feedback_types import AGENT_MONITOR_FEEDBACK_TYPE
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
@@ -841,6 +843,43 @@ def _and_conditions(*conditions: str) -> str:
     return " AND ".join(condition for condition in conditions if condition)
 
 
+def _signal_tags_filter_sql(
+    pb: ParamBuilder, project_id: str, signal_tags: Sequence[str]
+) -> str:
+    """Keep spans carrying online-scorer feedback with any of `signal_tags`.
+
+    Feedback links to its target by `weave_ref`, a `weave-trace-internal:///`
+    URI whose kind segment is `agent_turn` (trace_id), `agent_conversation`
+    (URL-encoded conversation_id), or `agent_span` (span_id). A span matches
+    when one of its three reconstructed refs is in the set of matching-feedback
+    refs, so feedback attached at span, trace, or conversation level all count.
+    """
+    tags_slot = pb.add(list(signal_tags), param_type="Array(String)")
+    pid_slot = pb.add(project_id, param_type="String")
+    type_slot = pb.add(AGENT_MONITOR_FEEDBACK_TYPE, param_type="String")
+    turn_prefix = pb.add(
+        f"{WEAVE_INTERNAL_SCHEME}:///{project_id}/agent_turn/", param_type="String"
+    )
+    conv_prefix = pb.add(
+        f"{WEAVE_INTERNAL_SCHEME}:///{project_id}/agent_conversation/",
+        param_type="String",
+    )
+    span_prefix = pb.add(
+        f"{WEAVE_INTERNAL_SCHEME}:///{project_id}/agent_span/", param_type="String"
+    )
+    subquery = (
+        f"SELECT weave_ref FROM feedback "
+        f"WHERE project_id = {pid_slot} "
+        f"AND feedback_type = {type_slot} "
+        f"AND hasAny(scorer_tags, {tags_slot})"
+    )
+    return (
+        f"(concat({turn_prefix}, s.trace_id) IN ({subquery}) "
+        f"OR concat({conv_prefix}, encodeURLComponent(s.conversation_id)) IN ({subquery}) "
+        f"OR concat({span_prefix}, s.span_id) IN ({subquery}))"
+    )
+
+
 def _spans_filter_sql(
     pb: ParamBuilder,
     req: AgentSpansQueryReq | AgentCustomAttrsSchemaReq,
@@ -859,6 +898,11 @@ def _spans_filter_sql(
         from weave.trace_server.query_builder import agent_query_compiler
 
         where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
+    signal_tags = getattr(req, "signal_tags", None)
+    if signal_tags:
+        where_conditions.append(
+            _signal_tags_filter_sql(pb, req.project_id, signal_tags)
+        )
     return _FilterSQL(where=" AND ".join(where_conditions))
 
 
