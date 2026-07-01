@@ -118,6 +118,7 @@ def store_content_object_ref(
     content_obj: Content,
     project_id: str,
     trace_server: TraceServerInterface,
+    wb_user_id: str | None = None,
 ) -> str:
     """Store a Content object, publish it, and return its internal weave ref.
 
@@ -132,7 +133,10 @@ def store_content_object_ref(
     res = trace_server.obj_create(
         ObjCreateReq(
             obj=ObjSchemaForInsert(
-                project_id=project_id, object_id=object_id, val=obj_val
+                project_id=project_id,
+                object_id=object_id,
+                val=obj_val,
+                wb_user_id=wb_user_id,
             )
         )
     )
@@ -150,6 +154,7 @@ def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
     trace_server: TraceServerInterface,
+    wb_user_id: str | None = None,
 ) -> T:
     """Recursively replace base64 content with Content objects.
 
@@ -201,6 +206,7 @@ def replace_base64_with_content_objects(
                         Content.from_data_url(val),
                         project_id,
                         trace_server,
+                        wb_user_id,
                     )
                 except Exception as e:
                     logger.warning(
@@ -224,6 +230,7 @@ def replace_base64_with_content_objects(
                             content,
                             project_id,
                             trace_server,
+                            wb_user_id,
                         )
                 except Exception as e:
                     logger.warning(
@@ -256,9 +263,17 @@ def process_call_req_to_content(
     """
     if isinstance(req, CallStartReq):
         req.start.inputs = replace_base64_with_content_objects(
-            req.start.inputs, req.start.project_id, trace_server
+            req.start.inputs,
+            req.start.project_id,
+            trace_server,
+            req.start.wb_user_id,
         )
     elif isinstance(req, (CallEndReq, CallEndV2Req)):
+        # NOTE: EndedCallSchemaForInsert has no ``wb_user_id`` field, so Content
+        # objects created from base64 in a call-end ``output`` cannot be
+        # user-attributed on this path without a schema change. This falls back
+        # to the ``wb_user_id=None`` default (unattributed) — see the report /
+        # PR discussion for the required follow-up.
         req.end.output = replace_base64_with_content_objects(
             req.end.output, req.end.project_id, trace_server
         )
@@ -280,10 +295,16 @@ def process_complete_call_to_content(
         CompletedCallSchemaForInsert with base64 content replaced by Content objects.
     """
     complete_call.inputs = replace_base64_with_content_objects(
-        complete_call.inputs, complete_call.project_id, trace_server
+        complete_call.inputs,
+        complete_call.project_id,
+        trace_server,
+        complete_call.wb_user_id,
     )
     complete_call.output = replace_base64_with_content_objects(
-        complete_call.output, complete_call.project_id, trace_server
+        complete_call.output,
+        complete_call.project_id,
+        trace_server,
+        complete_call.wb_user_id,
     )
     return complete_call
 
@@ -292,6 +313,7 @@ def replace_base64_in_raw_messages(
     raw: Any,
     project_id: str,
     trace_server: TraceServerInterface,
+    wb_user_id: str | None = None,
 ) -> Any:
     """Strip inline base64 / base64 data-URIs from raw GenAI message payloads.
 
@@ -312,4 +334,6 @@ def replace_base64_in_raw_messages(
             parsed = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
             return raw
-    return replace_base64_with_content_objects(parsed, project_id, trace_server)
+    return replace_base64_with_content_objects(
+        parsed, project_id, trace_server, wb_user_id
+    )

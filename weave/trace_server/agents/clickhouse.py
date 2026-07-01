@@ -858,7 +858,10 @@ class AgentWriteHandler:
                     # pure extraction transform runs.
                     if self._trace_server is not None:
                         strip_inline_blobs_from_span(
-                            span, req.project_id, self._trace_server
+                            span,
+                            req.project_id,
+                            self._trace_server,
+                            wb_user_id=req.wb_user_id,
                         )
 
                     try:

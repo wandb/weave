@@ -466,6 +466,7 @@ def _strip_message_attr(
     lookup_keys: tuple[str, ...],
     project_id: str,
     trace_server: "TraceServerInterface",
+    wb_user_id: str | None = None,
 ) -> None:
     """Strip base64 from the first present message-payload attribute key.
 
@@ -481,7 +482,9 @@ def _strip_message_attr(
         if value is None:
             continue
         if isinstance(value, str):
-            stripped = replace_base64_in_raw_messages(value, project_id, trace_server)
+            stripped = replace_base64_in_raw_messages(
+                value, project_id, trace_server, wb_user_id
+            )
             # Mirror ``get_attribute``'s flat-vs-nested resolution: write back to
             # the flat dotted key if present, otherwise into the nested tree.
             if key in attrs:
@@ -495,6 +498,7 @@ def strip_inline_blobs_from_span(
     span: Span,
     project_id: str,
     trace_server: "TraceServerInterface",
+    wb_user_id: str | None = None,
 ) -> None:
     """Strip inline base64 / base64 data-URIs from a span into stored Content refs.
 
@@ -523,13 +527,21 @@ def strip_inline_blobs_from_span(
        is now a stripped structure).
     """
     span.attributes = replace_base64_with_content_objects(
-        span.attributes, project_id, trace_server
+        span.attributes, project_id, trace_server, wb_user_id
     )
     _strip_message_attr(
-        span.attributes, semconv.INPUT_MESSAGES.lookup_keys, project_id, trace_server
+        span.attributes,
+        semconv.INPUT_MESSAGES.lookup_keys,
+        project_id,
+        trace_server,
+        wb_user_id,
     )
     _strip_message_attr(
-        span.attributes, semconv.OUTPUT_MESSAGES.lookup_keys, project_id, trace_server
+        span.attributes,
+        semconv.OUTPUT_MESSAGES.lookup_keys,
+        project_id,
+        trace_server,
+        wb_user_id,
     )
 
 

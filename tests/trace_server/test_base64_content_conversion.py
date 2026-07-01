@@ -188,6 +188,33 @@ class TestBase64Replacement:
         assert result[1] == b64_data
         _assert_content_ref(result[2]["nested"], "test_project")
 
+    def test_wb_user_id_reaches_obj_create(self):
+        """The ``wb_user_id`` passed to ``replace_base64_with_content_objects``
+        is forwarded onto the ``ObjSchemaForInsert`` that publishes the Content
+        object, so server-side (in-process) conversions are user-attributed.
+        """
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        _mock_obj_create(trace_server)
+
+        test_data = b"a" * LARGE_TEST_DATA_SIZE
+        b64_data = base64.b64encode(test_data).decode("ascii")
+        input_data = {"image": f"data:image/png;base64,{b64_data}"}
+
+        result = replace_base64_with_content_objects(
+            input_data, "proj", trace_server, wb_user_id="user-123"
+        )
+
+        _assert_content_ref(result["image"], "proj")
+        assert trace_server.obj_create.call_count == 1
+        obj_create_req = trace_server.obj_create.call_args.args[0]
+        assert obj_create_req.obj.wb_user_id == "user-123"
+
     def test_process_call_req_to_content_start_and_end(self):
         """Test the main entry point for processing CallStartReq and CallEndReq."""
         # Mock trace server

@@ -814,7 +814,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     # attributes in place (before deriving the call) also
                     # strips the lossless otel_dump the call carries.
                     span.attributes = replace_base64_with_content_objects(
-                        span.attributes, req.project_id, self
+                        span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
                     )
                     start_call, end_call = span.to_call(
                         req.project_id,
@@ -825,10 +825,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     # JSON-encoded message attribute only surfaces as a leaf
                     # after to_call parses it.
                     start_call.inputs = replace_base64_with_content_objects(
-                        start_call.inputs, req.project_id, self
+                        start_call.inputs, req.project_id, self, wb_user_id=req.wb_user_id
                     )
                     end_call.output = replace_base64_with_content_objects(
-                        end_call.output, req.project_id, self
+                        end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
                     )
                     calls.append((start_call, end_call))
 

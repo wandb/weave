@@ -572,3 +572,29 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
     assert "weave-trace-internal:///p1/object/" in result.attributes_dump
     assert "CustomWeaveType" not in result.attributes_dump
     assert trace_server.file_create.call_count == 2
+
+
+def test_strip_inline_blobs_attributes_obj_create_to_wb_user_id() -> None:
+    """The OTel agents path attributes converted Content objects to the caller.
+
+    ``strip_inline_blobs_from_span``'s ``wb_user_id`` must reach the
+    ``ObjSchemaForInsert`` used to publish each Content object via ``obj_create``.
+    Here the base64 is buried inside a JSON-encoded ``gen_ai.input.messages``
+    string, so the conversion happens on the message-payload pass
+    (``_strip_message_attr`` -> ``replace_base64_in_raw_messages``).
+    """
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [{"role": "user", "parts": [{"type": "image", "url": data_uri}]}]
+        )
+    }
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
+
+    strip_inline_blobs_from_span(span, "p1", trace_server, wb_user_id="u-9")
+
+    assert trace_server.obj_create.call_count == 1
+    obj_create_req = trace_server.obj_create.call_args.args[0]
+    assert obj_create_req.obj.wb_user_id == "u-9"
