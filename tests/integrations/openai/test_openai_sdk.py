@@ -7,9 +7,10 @@ import weave
 from weave.integrations.openai.openai_sdk import (
     create_wrapper_async,
     create_wrapper_sync,
+    get_openai_patcher,
     openai_on_input_handler,
 )
-from weave.trace.autopatch import OpSettings
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 
 @dataclass
@@ -219,3 +220,18 @@ async def test_stream_options_not_injected_for_non_openai_base_url_async() -> No
     await wrapped(DummyCompletion("https://api.mistral.ai"), stream=True)
 
     assert "stream_options" not in captured
+
+
+def test_openai_patcher_targets_resolve_against_installed_sdk() -> None:
+    """Every openai SymbolPatcher target must resolve against the installed SDK.
+
+    Regression: the ``beta.chat.completions`` parse patchers silently no-op'd on
+    openai >= 1.92.0 (the module was removed upstream) while our supported floor
+    is >= 1.99.9, so ``attempt_patch`` reported failure and those calls went
+    untraced. Surfaced by ``scripts/check_integration_updates.py``.
+    """
+    patcher = get_openai_patcher(IntegrationSettings(enabled=True))
+    try:
+        assert patcher.attempt_patch() is True
+    finally:
+        patcher.undo_patch()

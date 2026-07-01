@@ -883,21 +883,6 @@ def get_openai_patcher(
                 "AsyncCompletions.parse",
                 create_wrapper_async(settings=async_completions_parse_settings),
             ),
-            # Beta methods were removed in 1.92.0
-            SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
-                "Completions.parse",
-                create_wrapper_sync(settings=completions_parse_settings),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
-                "AsyncCompletions.parse",
-                create_wrapper_async(settings=async_completions_parse_settings),
-            ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.moderations"),
                 "Moderations.create",
