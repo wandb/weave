@@ -15,16 +15,21 @@ import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
+import type {Message} from './types';
 
 export interface TurnInit extends SpanInitBase {
-  agentName?: string;
   model?: string;
+  agentName?: string;
+  systemInstructions?: string[];
+  userMessage?: string;
 }
 
 /**
@@ -40,24 +45,65 @@ export interface TurnInit extends SpanInitBase {
  * `startSubagent` methods.
  *
  * @example
- * const turn = weave.startTurn({agentName: 'research-bot', model: MODEL});
+ * const turn = weave.startTurn();
+ *
  * try {
- *   const llm = turn.startLLM({model: MODEL, providerName: 'openai'});
+ *   const llm = turn.startLLM({model: 'gpt-4o', providerName: 'openai'});
+ *   // ...
+ *   llm.end();
+ * } finally {
+ *   turn.end();
+ * }
+ *
+ * @example
+ * const turn = weave.startTurn({
+ *   model: 'gpt-4o',
+ *   agentName: 'research-bot',
+ *   userMessage: 'What is the weather in Tokyo?',
+ *   systemInstructions: ['You are a helpful weather bot.'],
+ *   startTime: new Date('2026-05-29T10:00:00.000Z'),
+ * });
+ *
+ * try {
+ *   const llm = turn.startLLM({model: 'gpt-4o', providerName: 'openai'});
  *   // ...
  *   llm.end();
  * } finally {
  *   turn.end();
  * }
  */
+
+type Opts = {
+  conversationId: string;
+  messages: Message[];
+  span: Span;
+  context: Context;
+} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
+
 export class Turn extends SpanBase {
-  private constructor(
-    span: Span,
-    private readonly context: Context,
-    private readonly conversationId: string,
-    public readonly agentName: string,
-    public readonly model: string
-  ) {
-    super(span);
+  private _context: Context;
+  private _conversationId: string;
+  private _agentName: string;
+  private _model: string;
+  private _messages: Message[];
+  private _systemInstructions: string[];
+
+  public get agentName() {
+    return this._agentName;
+  }
+
+  public get model() {
+    return this._model;
+  }
+
+  private constructor(opts: Opts) {
+    super(opts.span);
+    this._context = opts.context;
+    this._conversationId = opts.conversationId;
+    this._agentName = opts.agentName;
+    this._messages = opts.messages;
+    this._model = opts.model;
+    this._systemInstructions = opts.systemInstructions;
   }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
@@ -81,6 +127,17 @@ export class Turn extends SpanBase {
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
     }
+    const messages: Message[] = opts.userMessage
+      ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
+      : [];
+    if (messages.length > 0) {
+      attributes[ATTR_GEN_AI_INPUT_MESSAGES] = JSON.stringify(messages);
+    }
+    if (opts.systemInstructions && opts.systemInstructions.length > 0) {
+      attributes[ATTR_GEN_AI_SYSTEM_INSTRUCTIONS] = JSON.stringify(
+        opts.systemInstructions.map(content => ({type: 'text', content}))
+      );
+    }
     // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
     // accidentally inherits a parent from some other OTel-instrumented
     // library's active context.
@@ -89,13 +146,15 @@ export class Turn extends SpanBase {
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
       ROOT_CONTEXT
     );
-    const turn = new Turn(
+    const turn = new Turn({
       span,
-      trace.setSpan(ROOT_CONTEXT, span),
-      opts.conversationId ?? '',
-      opts.agentName ?? '',
-      opts.model ?? ''
-    );
+      context: trace.setSpan(ROOT_CONTEXT, span),
+      conversationId: opts.conversationId ?? '',
+      model: opts.model ?? '',
+      agentName: opts.agentName ?? '',
+      messages,
+      systemInstructions: opts.systemInstructions ?? [],
+    });
     state.turn = turn;
     return turn;
   }
@@ -104,8 +163,8 @@ export class Turn extends SpanBase {
   startLLM(opts: LLMInit): LLM {
     return LLM.create({
       ...opts,
-      parentContext: this.context,
-      conversationId: this.conversationId,
+      parentContext: this._context,
+      conversationId: this._conversationId,
     });
   }
 
@@ -113,8 +172,8 @@ export class Turn extends SpanBase {
   startTool(opts: ToolInit): Tool {
     return Tool.create({
       ...opts,
-      parentContext: this.context,
-      conversationId: this.conversationId,
+      parentContext: this._context,
+      conversationId: this._conversationId,
     });
   }
 
@@ -122,8 +181,8 @@ export class Turn extends SpanBase {
   startSubagent(opts: SubAgentInit): SubAgent {
     return SubAgent.create({
       ...opts,
-      parentContext: this.context,
-      conversationId: this.conversationId,
+      parentContext: this._context,
+      conversationId: this._conversationId,
     });
   }
 

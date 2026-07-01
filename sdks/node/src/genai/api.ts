@@ -37,11 +37,14 @@ export const startSession = startConversation;
  * `conversationId`; otherwise the turn has no conversation id.
  *
  * @example
- * weave.startTurn({agentName: 'research-bot'});
+ * weave.startTurn();
  *
  * @example
  * weave.startTurn({
  *   agentName: 'research-bot',
+ *   model: 'gpt-4o',
+ *   userMessage: 'What is the weather in Tokyo?',
+ *   systemInstructions: ['You are a helpful weather bot.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
  */

@@ -285,7 +285,11 @@ async function run(agent: Agent, prompts: string[]): Promise<string[]> {
     const answers: string[] = [];
     for (const prompt of prompts) {
       messages.push({role: 'user', content: prompt});
-      const turn = conversation.startTurn({agentName: agent.name});
+      const turn = conversation.startTurn({
+        agentName: agent.name,
+        userMessage: prompt,
+        systemInstructions: [agent.instructions],
+      });
       try {
         answers.push(await runAgentLoop(agent, messages, turn));
       } finally {
@@ -396,7 +400,9 @@ describe('GenAI', () => {
           "attributes": {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How warm is Tokyo?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -467,7 +473,9 @@ describe('GenAI', () => {
           "attributes": {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What about San Francisco and London?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
@@ -524,7 +532,9 @@ describe('GenAI', () => {
           "attributes": {
             "gen_ai.agent.name": "Reasearch Assistant",
             "gen_ai.conversation.id": "<uuid>",
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"How much warmer is Tokyo than San Francisco?"}]}]",
             "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "myagent.region": "ORD",
             "myagent.version": "4.21",
           },
