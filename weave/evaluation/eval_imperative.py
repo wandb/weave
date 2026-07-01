@@ -14,12 +14,13 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import Any, TypeVar, cast, overload
 
 from typing_extensions import Self
 
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import (
+    EvalSpanContext,
     Evaluation,
     _active_eval_prediction_context,
     default_evaluation_display_name,
@@ -30,6 +31,7 @@ from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.object.obj import Object
+from weave.shared.digest import compute_row_digest
 from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
@@ -40,9 +42,6 @@ from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
 from weave.type_wrappers.Content.content import Content
 from weave.utils.sentinel import NOT_SET, _NotSetType
-
-if TYPE_CHECKING:
-    from weave.trace.call import Call
 
 DEFAULT_SCORER_CACHE_SIZE = 1000
 
@@ -91,6 +90,13 @@ IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
 
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
     return {EVAL_META_KEY: eval_meta}
+
+
+def _compute_default_row_digest(inputs: dict[str, Any]) -> str | None:
+    try:
+        return compute_row_digest(inputs)
+    except (TypeError, ValueError):
+        return None
 
 
 @contextmanager
@@ -268,7 +274,7 @@ class _LogScoreContext:
 
     @property
     def value(self) -> ScoreType | None:
-        """Get the current score value."""
+        """Current score value."""
         return self._score_value
 
     @value.setter
@@ -363,11 +369,13 @@ class ScoreLogger:
         evaluate_call: Call,
         predict_call: Call,
         predefined_scorers: list[str] | None = None,
+        eval_span_context: EvalSpanContext | None = None,
     ) -> None:
         self.predict_and_score_call = predict_and_score_call
         self.evaluate_call = evaluate_call
         self.predict_call = predict_call
         self.predefined_scorers = predefined_scorers
+        self._eval_span_context = eval_span_context
         self._score_meta = IMPERATIVE_SCORE_META_MARKER
 
         self._captured_scores: dict[str, ScoreType] = {}
@@ -529,7 +537,7 @@ class ScoreLogger:
         # Otherwise, log the score immediately
         # When in an active asyncio test environment (like pytest.mark.asyncio),
         # we need special handling to avoid "already running" errors
-        try:
+        try:  # noqa: PLW0717
             loop = asyncio.get_running_loop()
             if asyncio.current_task() is None:
                 # We're not in an async context, but a loop exists
@@ -541,7 +549,7 @@ class ScoreLogger:
 
             def run_in_new_loop() -> None:
                 nonlocal result, exception
-                try:
+                try:  # noqa: PLW0717
                     # Create a new event loop for this thread
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
@@ -603,7 +611,7 @@ class ScoreLogger:
 
     @property
     def output(self) -> Any:
-        """Get the current output value."""
+        """Current output value."""
         return self._predict_output
 
     @output.setter
@@ -614,7 +622,8 @@ class ScoreLogger:
     def __enter__(self) -> Self:
         """Enter context manager and set call stack to predict_call."""
         self._eval_prediction_context = _active_eval_prediction_context(
-            self.predict_and_score_call
+            self.predict_and_score_call,
+            self._eval_span_context,
         )
         self._eval_prediction_context.__enter__()
         self._call_stack_context = call_context.set_call_stack([self.predict_call])
@@ -711,6 +720,7 @@ class EvaluationLogger:
         # Private state
         self._is_finalized: bool = False
         self._accumulated_predictions: list[ScoreLogger] = []
+        self._trial_counts_by_row_digest: dict[str, int] = {}
 
         # Register this instance in the global registry for atexit cleanup
         _active_evaluation_loggers.append(self)
@@ -841,6 +851,30 @@ class EvaluationLogger:
     def attributes(self) -> dict[str, Any]:
         return self.eval_attributes | _as_call_attributes(self._eval_meta)
 
+    def _resolve_eval_row_metadata(
+        self,
+        inputs: dict[str, Any],
+        row_digest: str | None,
+        trial_index: int | None,
+    ) -> tuple[str | None, int | None]:
+        resolved_row_digest = (
+            row_digest if row_digest is not None else _compute_default_row_digest(inputs)
+        )
+        if resolved_row_digest is None:
+            return None, trial_index
+
+        next_trial_index = self._trial_counts_by_row_digest.get(
+            resolved_row_digest, 0
+        )
+        resolved_trial_index = (
+            trial_index if trial_index is not None else next_trial_index
+        )
+        self._trial_counts_by_row_digest[resolved_row_digest] = max(
+            next_trial_index,
+            resolved_trial_index + 1,
+        )
+        return resolved_row_digest, resolved_trial_index
+
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
             return
@@ -874,7 +908,16 @@ class EvaluationLogger:
 
         self._is_finalized = True
 
-    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
+    def log_prediction(
+        self,
+        inputs: dict[str, Any],
+        output: Any = None,
+        *,
+        example_id: str | None = None,
+        row_digest: str | None = None,
+        trial_index: int | None = None,
+        eval_kind: str | None = "agent",
+    ) -> ScoreLogger:
         """Log a prediction to the Evaluation.
 
         Returns a ScoreLogger that can be used directly or as a context manager.
@@ -882,6 +925,10 @@ class EvaluationLogger:
         Args:
             inputs: The input data for the prediction
             output: The output value. Defaults to None. Can be set later using pred.output.
+            example_id: Optional caller-provided example identifier for OTel spans.
+            row_digest: Optional stable row identity. Defaults to a digest of inputs.
+            trial_index: Optional zero-based trial index for this row digest.
+            eval_kind: Optional eval kind for OTel spans. Defaults to "agent".
 
         Returns:
             ScoreLogger for logging scores and optionally finishing the prediction.
@@ -934,11 +981,32 @@ class EvaluationLogger:
         # Set the output on the predict_call now so it's available for apply_scorer
         predict_call.output = output
 
+        resolved_row_digest, resolved_trial_index = self._resolve_eval_row_metadata(
+            inputs,
+            row_digest,
+            trial_index,
+        )
+        evaluation_name = (
+            self._evaluate_call.display_name
+            if isinstance(self._evaluate_call.display_name, str)
+            else self.name
+        )
+        eval_span_context = EvalSpanContext(
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=self._evaluate_call,
+            eval_kind=eval_kind,
+            row_digest=resolved_row_digest,
+            example_id=example_id,
+            trial_index=resolved_trial_index,
+            evaluation_name=evaluation_name,
+        )
+
         pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
             predefined_scorers=self.scorers,
+            eval_span_context=eval_span_context,
         )
         pred._apply_eval_meta(self._eval_meta)
         # Store the output so we can use it when finishing the predict_call

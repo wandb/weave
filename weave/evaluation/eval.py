@@ -5,6 +5,7 @@ import traceback
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime
 from itertools import chain, repeat
 from typing import Any, Literal
@@ -43,7 +44,6 @@ from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
 from weave.trace_server import constants
-from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
 
@@ -65,49 +65,49 @@ _current_eval_predict_and_score_call: ContextVar[Call | None] = ContextVar(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class EvalSpanContext:
+    """Eval metadata available to OTel span processors during predictions."""
+
+    predict_and_score_call: Call
+    evaluate_call: Call | None = None
+    eval_kind: str | None = None
+    row_digest: str | None = None
+    example_id: str | None = None
+    trial_index: int | None = None
+    evaluation_name: str | None = None
+
+
+_current_eval_span_context: ContextVar[EvalSpanContext | None] = ContextVar(
+    "current_eval_span_context", default=None
+)
+
+
 @contextmanager
-def _active_eval_prediction_context(call: Call | None) -> Iterator[None]:
-    """Set _current_eval_predict_and_score_call for the duration of a block.
+def _active_eval_prediction_context(
+    call: Call | None,
+    span_context: EvalSpanContext | None = None,
+) -> Iterator[None]:
+    """Set active eval prediction metadata for the duration of a block.
 
     This needs to be explicitly set in the imperative path because the EvaluationLogger
     creates synthetic ops, so there is no call stack to walk to find the actual
-    predict_and_score call.
+    predict_and_score call. ``span_context`` carries the richer eval metadata
+    needed by OTel span processors.
     """
     if call is None:
         yield
         return
 
-    token = _current_eval_predict_and_score_call.set(call)
+    call_token = _current_eval_predict_and_score_call.set(call)
+    span_context_token = _current_eval_span_context.set(
+        span_context or EvalSpanContext(predict_and_score_call=call)
+    )
     try:
         yield
     finally:
-        _current_eval_predict_and_score_call.reset(token)
-
-
-def _attach_genai_span_ref_to_call_summary(
-    call: Call,
-    genai_span_ref: tsi.GenAISpanRef,
-) -> None:
-    """Append a GenAISpanRef into call.summary so eval results can find it.
-
-    Our EvalLinkSpanProcessor calls this to attach GenAISpanRef to an Eval
-    call. The trace server can then extract span refs from call summaries
-    by looking for the presence of the GenAISpanRef attribute key.
-    """
-    if call.summary is None:
-        call.summary = {}
-
-    if constants.WEAVE_ATTRIBUTES_NAMESPACE not in call.summary:
-        call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE] = {}
-
-    weave_summary = call.summary[constants.WEAVE_ATTRIBUTES_NAMESPACE]
-
-    new_ref = genai_span_ref.model_dump()
-    existing = weave_summary.get(constants.GENAI_SPAN_REF_ATTR_KEY)
-    if isinstance(existing, list):
-        existing.append(new_ref)
-    else:
-        weave_summary[constants.GENAI_SPAN_REF_ATTR_KEY] = [new_ref]
+        _current_eval_span_context.reset(span_context_token)
+        _current_eval_predict_and_score_call.reset(call_token)
 
 
 def _find_call_on_stack(op_names: str | tuple[str, ...]) -> Call | None:

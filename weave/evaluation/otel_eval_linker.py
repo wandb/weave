@@ -1,12 +1,9 @@
-"""Auto-link GenAI OTel spans to eval predictions.
+"""Stamp eval metadata onto OTel spans created during eval predictions.
 
-When a GenAI OTel span ends during an active ``Evaluation.predict_and_score``
-call, the :class:`EvalLinkSpanProcessor` automatically populates a
-:class:`GenAISpanRef` on the predict_and_score call summary — no user code
-required.
-
-It also injects eval metadata (call ID, evaluation name, project) onto the
-span so the agent traces UI can deep-link and filter by eval run.
+When an OTel span starts during an active ``Evaluation.predict_and_score`` call,
+the :class:`EvalLinkSpanProcessor` injects eval metadata (call IDs, evaluation
+name, project, row identity, trial index, and kind) onto the span so the agent
+traces UI can find eval traces by querying promoted span columns.
 
 Register this processor alongside the ``BatchSpanProcessor`` during
 ``_setup_conversation_tracing`` in ``weave_init.py``.
@@ -14,38 +11,27 @@ Register this processor alongside the ``BatchSpanProcessor`` during
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
 from weave.evaluation.eval import (
-    _attach_genai_span_ref_to_call_summary,
+    EvalSpanContext,
     _current_eval_predict_and_score_call,
+    _current_eval_span_context,
     _find_current_evaluate_call,
     _find_current_predict_and_score_call,
 )
 from weave.trace_server import constants
-from weave.trace_server import trace_server_interface as tsi
 
 if TYPE_CHECKING:
     from opentelemetry.context import Context
 
     from weave.trace.call import Call
 
-logger = logging.getLogger(__name__)
 
-# GenAI semantic convention attribute that identifies a span as a GenAI operation.
-# It is available as GEN_AI_OPERATION_NAME in opentelemetry.semconv._incubating, but
-# given it's a private module and subject to change, I don't want to depend on it for
-# now.
-# TODO: Use the official semconv when this standard moves out of _incubating
-_GENAI_OPERATION_NAME_ATTR = "gen_ai.operation.name"
-
-
-def _get_evaluation_name() -> str | None:
+def _get_evaluation_name(call: Call | None) -> str | None:
     """Find the parent evaluate call and return the eval display name."""
-    call = _find_current_evaluate_call()
     if call is None:
         return None
     name = call.display_name
@@ -53,15 +39,11 @@ def _get_evaluation_name() -> str | None:
 
 
 class EvalLinkSpanProcessor(SpanProcessor):
-    """OTel SpanProcessor that auto-links GenAI spans to eval predictions.
+    """OTel SpanProcessor that stamps eval metadata onto prediction spans.
 
     When ``on_start`` the processor injects eval context attributes (call ID,
     evaluation name, project) onto the span for reverse lookup and filtering
     in the agent traces UI.
-
-    When ``on_end`` fires, it attaches a ``GenAISpanRef`` (trace_id + span_id)
-    to the predict_and_score call summary so eval results can navigate to the
-    underlying GenAI span.
     """
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
@@ -73,36 +55,54 @@ class EvalLinkSpanProcessor(SpanProcessor):
         not available at start time.  The query side can intersect with gen_ai.operation.name
         to narrow to GenAI spans.
         """
-        call = self._find_predict_and_score_call()
-        if call is None:
+        eval_context = self._find_eval_span_context()
+        if eval_context is None:
             return
 
-        span.set_attribute(constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR, call.id)
-        span.set_attribute(constants.EVAL_PROJECT_ID_SPAN_ATTR, call.project_id)
+        predict_and_score_call = eval_context.predict_and_score_call
+        if predict_and_score_call.id is not None:
+            span.set_attribute(
+                constants.EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR,
+                predict_and_score_call.id,
+            )
+        span.set_attribute(
+            constants.EVAL_PROJECT_ID_SPAN_ATTR, predict_and_score_call.project_id
+        )
 
-        eval_name = _get_evaluation_name()
+        if (
+            eval_context.evaluate_call is not None
+            and eval_context.evaluate_call.id is not None
+        ):
+            span.set_attribute(
+                constants.EVAL_RUN_ID_SPAN_ATTR,
+                eval_context.evaluate_call.id,
+            )
+        if eval_context.eval_kind is not None:
+            span.set_attribute(constants.EVAL_KIND_SPAN_ATTR, eval_context.eval_kind)
+        if eval_context.row_digest is not None:
+            span.set_attribute(
+                constants.EVAL_ROW_DIGEST_SPAN_ATTR,
+                eval_context.row_digest,
+            )
+        if eval_context.example_id is not None:
+            span.set_attribute(
+                constants.EVAL_EXAMPLE_ID_SPAN_ATTR,
+                eval_context.example_id,
+            )
+        if eval_context.trial_index is not None:
+            span.set_attribute(
+                constants.EVAL_TRIAL_INDEX_SPAN_ATTR,
+                eval_context.trial_index,
+            )
+
+        eval_name = eval_context.evaluation_name or _get_evaluation_name(
+            eval_context.evaluate_call
+        )
         if eval_name:
             span.set_attribute(constants.EVAL_EVALUATION_NAME_SPAN_ATTR, eval_name)
 
     def on_end(self, span: ReadableSpan) -> None:
-        """Auto-populate GenAISpanRef when a GenAI span ends during an eval."""
-        attrs = span.attributes or {}
-        if _GENAI_OPERATION_NAME_ATTR not in attrs:
-            return
-
-        call = self._find_predict_and_score_call()
-        if call is None:
-            return
-
-        ctx = span.context
-        if ctx is None or not ctx.is_valid:
-            return
-
-        trace_id = format(ctx.trace_id, "032x")
-        span_id = format(ctx.span_id, "016x")
-
-        ref = tsi.GenAISpanRef(trace_id=trace_id, span_id=span_id)
-        _attach_genai_span_ref_to_call_summary(call, ref)
+        return None
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return True
@@ -124,4 +124,22 @@ class EvalLinkSpanProcessor(SpanProcessor):
         return (
             _current_eval_predict_and_score_call.get()
             or _find_current_predict_and_score_call()
+        )
+
+    @staticmethod
+    def _find_eval_span_context() -> EvalSpanContext | None:
+        """Find structured eval span context, with legacy stack fallback."""
+        if (eval_context := _current_eval_span_context.get()) is not None:
+            return eval_context
+
+        predict_and_score_call = EvalLinkSpanProcessor._find_predict_and_score_call()
+        if predict_and_score_call is None:
+            return None
+
+        evaluate_call = _find_current_evaluate_call()
+        return EvalSpanContext(
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=evaluate_call,
+            eval_kind="standard" if evaluate_call is not None else None,
+            evaluation_name=_get_evaluation_name(evaluate_call),
         )

@@ -81,6 +81,14 @@ Agent spans promote selected `weave.eval.*` attributes into first-class
 `agents/types.py`, OTel extraction, query-builder allowlists, and ClickHouse
 migrations in sync when adding or renaming these fields.
 
+`EvaluationLogger.log_prediction(...)` creates an `EvalSpanContext` while its
+returned `ScoreLogger` context is active. `EvalLinkSpanProcessor` reads that
+context to stamp OTel spans with eval run, row, example, trial, and kind
+metadata. The SDK should not write new `genai_span_ref` entries for this bridge;
+the UI can read historical refs when present, but new agent eval linking should
+query spans through the promoted eval columns. Agent spans should not depend on
+op-tracing call trees.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
