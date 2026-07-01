@@ -25,13 +25,19 @@ from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings, file_storage
 from weave.trace_server.trace_server_interface import (
+    CallEndReq,
     CallEndV2Req,
+    CallStartReq,
+    CallStartRes,
     CallStartV2Req,
+    CallStartV2Res,
+    EndedCallSchemaForInsert,
     EndedCallSchemaForInsertWithStartedAt,
     FileContentReadReq,
     FileCreateReq,
     StartedCallSchemaForInsert,
 )
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
@@ -763,13 +769,14 @@ def _data_uri(mimetype: str, size: int) -> str:
 @pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
 )
-def test_call_start_v2_offloads_attachments_to_bucket_in_parallel(
-    client: WeaveClient, gcs
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_start_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
 ):
-    """Eager call_start_v2 with many inline data-URI inputs fans the
-    auto-extracted attachment uploads out across the bucket pool instead of
-    one serial PUT each. The barrier of 2 makes the parallel floor
-    deterministic; the pre-fix serial path only ever had one upload in flight.
+    """Eager call/start (v1 and v2) with many inline data-URI inputs fans the
+    auto-extracted attachment uploads across the bucket pool instead of one
+    serial PUT each. The barrier of 2 makes the parallel floor deterministic;
+    the pre-fix serial path only ever had one upload in flight.
     """
     gcs.state.expected_concurrency = 2
     # Distinct mimetype+size keeps every content and metadata digest unique, so
@@ -779,18 +786,18 @@ def test_call_start_v2_offloads_attachments_to_bucket_in_parallel(
         "jpeg": _data_uri("image/jpeg", 30_000),
         "bin": _data_uri("application/octet-stream", 40_000),
     }
-    res = client.server.call_start_v2(
-        CallStartV2Req(
-            start=StartedCallSchemaForInsert(
-                project_id=client.project_id,
-                id=str(uuid.uuid4()),
-                trace_id=str(uuid.uuid4()),
-                op_name="test_op",
-                started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={},
-                inputs=inputs,
-            )
-        )
+    res = _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=str(uuid.uuid4()),
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+            attributes={},
+            inputs=inputs,
+        ),
     )
 
     assert res.id
@@ -809,28 +816,29 @@ def test_call_start_v2_offloads_attachments_to_bucket_in_parallel(
 @pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
 )
-def test_call_end_v2_offloads_attachments_to_bucket_in_parallel(
-    client: WeaveClient, gcs
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_end_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
 ):
-    """Eager call_end_v2 fans its output-attachment uploads across the bucket
-    pool too (and, for calls_complete projects, finishes them before the end
-    UPDATE references them). Barrier of 2 pins the parallel floor; the pre-fix
-    serial path peaked at 1.
+    """Eager call/end (v1 and v2) fans its output-attachment uploads across the
+    bucket pool too (and, for calls_complete projects, finishes them before the
+    end UPDATE references them). Barrier of 2 pins the parallel floor; the
+    pre-fix serial path peaked at 1.
     """
     call_id = str(uuid.uuid4())
     started_at = datetime.datetime.now(datetime.timezone.utc)
-    client.server.call_start_v2(
-        CallStartV2Req(
-            start=StartedCallSchemaForInsert(
-                project_id=client.project_id,
-                id=call_id,
-                trace_id=str(uuid.uuid4()),
-                op_name="test_op",
-                started_at=started_at,
-                attributes={},
-                inputs={},
-            )
-        )
+    _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=call_id,
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=started_at,
+            attributes={},
+            inputs={},
+        ),
     )
 
     # Set the barrier only now so it gates the end's uploads, not the empty start.
@@ -840,17 +848,14 @@ def test_call_end_v2_offloads_attachments_to_bucket_in_parallel(
         "jpeg": _data_uri("image/jpeg", 30_000),
         "bin": _data_uri("application/octet-stream", 40_000),
     }
-    client.server.call_end_v2(
-        CallEndV2Req(
-            end=EndedCallSchemaForInsertWithStartedAt(
-                project_id=client.project_id,
-                id=call_id,
-                started_at=started_at,
-                ended_at=started_at + datetime.timedelta(seconds=1),
-                output=output,
-                summary={},
-            )
-        )
+    _end_call(
+        client.server,
+        version,
+        project_id=client.project_id,
+        call_id=call_id,
+        started_at=started_at,
+        ended_at=started_at + datetime.timedelta(seconds=1),
+        output=output,
     )
 
     assert gcs.state.concurrent_peak >= 2, (
@@ -860,3 +865,56 @@ def test_call_end_v2_offloads_attachments_to_bucket_in_parallel(
     expected_prefix = f"weave/projects/{project_b64}/files/"
     assert gcs.state.blob_data
     assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+def _start_call(
+    server: TraceServerClientInterface,
+    version: str,
+    start: StartedCallSchemaForInsert,
+) -> CallStartRes | CallStartV2Res:
+    """Dispatch a single eager call/start to the v1 or v2 write path."""
+    if version == "v1":
+        return server.call_start(CallStartReq(start=start))
+    if version == "v2":
+        return server.call_start_v2(CallStartV2Req(start=start))
+    raise ValueError(f"unknown call version: {version}")
+
+
+def _end_call(
+    server: TraceServerClientInterface,
+    version: str,
+    *,
+    project_id: str,
+    call_id: str,
+    started_at: datetime.datetime,
+    ended_at: datetime.datetime,
+    output: dict[str, str],
+) -> None:
+    """Dispatch a single eager call/end to the v1 or v2 write path."""
+    if version == "v1":
+        server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    elif version == "v2":
+        server.call_end_v2(
+            CallEndV2Req(
+                end=EndedCallSchemaForInsertWithStartedAt(
+                    project_id=project_id,
+                    id=call_id,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    else:
+        raise ValueError(f"unknown call version: {version}")
