@@ -1043,6 +1043,58 @@ def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+@pytest.mark.xfail(
+    reason=(
+        "Known limitation (PR #7489 discussion): the inline-ref sweep "
+        "(_iter_internal_refs) surfaces ANY internal weave ref, not only "
+        "Content/media refs. A message that legitimately carries a ref to a "
+        "non-media object (prompt/model/dataset) in a structured field leaks "
+        "into content_refs and renders as broken media. A media ref is "
+        "indistinguishable from a prompt ref at the string level and the part "
+        "shapes are not normalized, so scoping the sweep is deferred to a "
+        "follow-up (e.g. record converted media refs authoritatively at "
+        "ingest, or scope the sweep to media part positions)."
+    ),
+    strict=False,
+)
+def test_inline_sweep_excludes_non_media_internal_refs() -> None:
+    """The inline-ref sweep must surface only Content/media refs. A message that
+    legitimately carries a ref to a non-media object (a prompt, model, dataset)
+    in a structured field must NOT land in ``content_refs``, or the UI renders
+    it as broken media. Content objects are stored under a sanitized-filename
+    object_id, so a media ref is indistinguishable at the string level from a
+    prompt ref — the walker needs to scope the match.
+    """
+    image_ref = "weave-trace-internal:///PID/object/gift_basket_png:IMGDIGEST"
+    prompt_ref = "weave-trace-internal:///PID/object/describe_image_prompt:PROMPTDIGEST"
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_ref}},
+                        # Agent quoting the prompt object it ran under — not media.
+                        {"type": "tool_use", "input": {"prompt_ref": prompt_ref}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the media ref should render; the prompt ref is a false positive today.
+    assert _user_payload(user).content_refs == [image_ref]
+
+
 def test_output_media_attaches_to_assistant_message() -> None:
     """Model-generated media is a part on the output message and renders on
     the assistant bubble (mirror image of the input case).
