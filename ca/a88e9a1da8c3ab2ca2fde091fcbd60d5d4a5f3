@@ -1,0 +1,24 @@
+## Conversation
+Second PR in the stack the user asked for ("the next PR fixes openai using this agent"). PR1 = the integration-updater agent; this PR = the openai fix the agent surfaced.
+
+## Actions
+- Ran `uv run --with openai scripts/check_integration_updates.py openai` (the agent's live symbol check). It reported status=broken_symbols: 12/14 targets resolve against installed openai 2.44.0; the two openai.resources.beta.chat.completions parse targets fail with ModuleNotFoundError.
+- git blame confirmed the patchers date to 2024-12-11 (0525621c503); Jamie's 2025-08-28 comment (f1957fbe67d) already documented "Beta methods were removed in 1.92.0". With floor >=1.99.9 they are unconditionally dead. Chesterton's Fence cleared.
+- Removed the comment + both beta SymbolPatchers (was openai_sdk.py lines 886-900). The completions_parse_settings / async_completions_parse_settings vars remain used by the non-beta parse patchers, so no orphaned variables.
+- Added tests/integrations/openai/test_openai_sdk.py::test_openai_patcher_targets_resolve_against_installed_sdk asserting get_openai_patcher(IntegrationSettings(enabled=True)).attempt_patch() is True. Chose this because MultiPatcher.attempt_patch returns True only if every SymbolPatcher resolves; the dead beta targets made it return False.
+
+## Errors & mistakes
+- `uv run --group test --extra openai` first defaulted to Python 3.14, where tiktoken (via litellm via weave[trace-server]) fails to build (PyO3 0.22.6 max is 3.13). Fixed by `uv run --python 3.13`. Side effect: this recreated the worktree .venv as 3.13 (it was 3.14). .venv is gitignored; harmless but worth knowing.
+
+## Dead ends
+- None.
+
+## Hints & warnings
+- Verified fail-before/pass-after: with the fix stashed, the new test FAILS (attempt_patch False); with the fix, all 10 tests in the file pass; detector now reports 12/12 resolved.
+- Did NOT bump the openai pin to 2.x. The detector still flags major_update (2.44.0 available), but validating the whole openai 2.x surface + re-recording cassettes is a separate, larger change — deliberately out of scope for this dead-code fix.
+
+## Codebase discoveries
+- get_openai_patcher memoizes in module global _openai_patcher; attempt_patch is idempotent (already-patched sub-patchers short-circuit), so the regression test is safe to call without resetting internals.
+
+## Open questions
+- Should a follow-up validate + adopt openai 2.x? Left for a human/product decision.
