@@ -255,7 +255,7 @@ describe('LLM (via Turn.startLLM)', () => {
       ]);
     });
 
-    it('record(opts) replaces the data fields', () => {
+    it('record() updates fields, which are emitted at end()', () => {
       const turn = Turn.create({});
       const llm = turn.startLLM({model: 'gpt-4o'});
       llm.inputMessages = [{role: 'user', content: 'will be replaced'}];
@@ -264,6 +264,13 @@ describe('LLM (via Turn.startLLM)', () => {
         outputMessages: [{role: 'assistant', content: 'hello'}],
         usage: {inputTokens: 7, outputTokens: 3},
         reasoning: {content: 'thinking'},
+        outputType: 'text',
+        responseId: 'resp-abc',
+        responseModel: 'gpt-4o-2024-08-06',
+        mediaAttachments: [
+          {uri: 'https://example.com/a.png', modality: 'image'},
+        ],
+        finishReasons: ['stop'],
       });
       expect(llm.inputMessages).toEqual([{role: 'user', content: 'hi'}]);
       expect(llm.outputMessages).toEqual([
@@ -273,6 +280,28 @@ describe('LLM (via Turn.startLLM)', () => {
       expect(llm.reasoning).toEqual({content: 'thinking'});
       llm.end();
       turn.end();
+
+      const llmSpan = findSpan(getExporter().getFinishedSpans(), 'chat');
+      expect(spanSnapshot(llmSpan)).toMatchInlineSnapshot(`
+        {
+          "attributes": {
+            "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"hi"},{"type":"uri","uri":"https://example.com/a.png","modality":"image"}]}]",
+            "gen_ai.operation.name": "chat",
+            "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"hello"},{"type":"reasoning","content":"thinking"}]}]",
+            "gen_ai.output.type": "text",
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "resp-abc",
+            "gen_ai.response.model": "gpt-4o-2024-08-06",
+            "gen_ai.usage.input_tokens": 7,
+            "gen_ai.usage.output_tokens": 3,
+          },
+          "endTime": "<timestamp>",
+          "startTime": "<timestamp>",
+        }
+      `);
     });
 
     it('chains: output / think / attachMedia / record all return `this`', () => {

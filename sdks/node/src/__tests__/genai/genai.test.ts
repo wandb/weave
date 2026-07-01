@@ -212,7 +212,7 @@ async function runAgentLoop(
       providerName: 'some-provider',
       systemInstructions: [agent.instructions],
     });
-    llm.inputMessages = [...messages];
+    llm.record({inputMessages: [...messages]});
 
     const resp = await callSomeLLM({
       model: 'some-model',
@@ -238,12 +238,15 @@ async function runAgentLoop(
       });
     }
     const assistantMessage: Message = {role: 'assistant', parts};
-    llm.outputMessages = [assistantMessage];
     llm.record({
+      outputMessages: [assistantMessage],
       usage: {
         inputTokens: resp.usage?.prompt_tokens,
         outputTokens: resp.usage?.completion_tokens,
       },
+      responseId: resp.id,
+      responseModel: resp.model,
+      finishReasons: [choice.finish_reason],
     });
     llm.end();
     messages.push(assistantMessage);
@@ -392,6 +395,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t1","toolName":"get_weather","arguments":"{\\"city\\":\\"Tokyo\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t1-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 42,
             "gen_ai.usage.output_tokens": 10,
@@ -423,6 +431,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 28°C and humid."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t1-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 70,
             "gen_ai.usage.output_tokens": 9,
@@ -456,6 +469,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t2_sf","toolName":"get_weather","arguments":"{\\"city\\":\\"San Francisco\\"}"},{"type":"tool_call","toolCallId":"call_t2_ldn","toolName":"get_weather","arguments":"{\\"city\\":\\"London\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t2-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 90,
             "gen_ai.usage.output_tokens": 16,
@@ -501,6 +519,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"San Francisco is 18°C and foggy. London is 12°C and cloudy."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t2-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 140,
             "gen_ai.usage.output_tokens": 18,
@@ -534,6 +557,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"tool_call","toolCallId":"call_t3","toolName":"calculate","arguments":"{\\"expression\\":\\"28 - 18\\"}"}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "tool_calls",
+            ],
+            "gen_ai.response.id": "chatcmpl-t3-plan",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 170,
             "gen_ai.usage.output_tokens": 12,
@@ -564,6 +592,11 @@ describe('GenAI', () => {
             "gen_ai.output.messages": "[{"role":"assistant","parts":[{"type":"text","content":"Tokyo is 10°C warmer than San Francisco."}]}]",
             "gen_ai.provider.name": "some-provider",
             "gen_ai.request.model": "some-model",
+            "gen_ai.response.finish_reasons": [
+              "stop",
+            ],
+            "gen_ai.response.id": "chatcmpl-t3-answer",
+            "gen_ai.response.model": "gpt-4o-mini",
             "gen_ai.system_instructions": "[{"type":"text","content":"You are a research assistant. Use the available tools when appropriate to answer questions accurately."}]",
             "gen_ai.usage.input_tokens": 200,
             "gen_ai.usage.output_tokens": 12,
@@ -655,7 +688,7 @@ describe('GenAI', () => {
             providerName: 'some-provider',
             startTime: toDate(resp),
           });
-          llm.inputMessages = [...messages];
+          llm.record({inputMessages: [...messages]});
 
           const choice = resp.choices[0];
           const toolCalls = (choice.message.tool_calls ?? []).filter(
@@ -675,8 +708,8 @@ describe('GenAI', () => {
             });
           }
           const assistantMessage: Message = {role: 'assistant', parts};
-          llm.outputMessages = [assistantMessage];
           llm.record({
+            outputMessages: [assistantMessage],
             usage: {
               inputTokens: resp.usage?.prompt_tokens,
               outputTokens: resp.usage?.completion_tokens,
@@ -1022,7 +1055,7 @@ describe('GenAI', () => {
             providerName: 'some-provider',
             startTime: toDate(resp),
           });
-          llm.inputMessages = [...messages];
+          llm.record({inputMessages: [...messages]});
 
           const choice = resp.choices[0];
           const toolCalls = (choice.message.tool_calls ?? []).filter(
@@ -1042,8 +1075,8 @@ describe('GenAI', () => {
             });
           }
           const assistantMessage: Message = {role: 'assistant', parts};
-          llm.outputMessages = [assistantMessage];
           llm.record({
+            outputMessages: [assistantMessage],
             usage: {
               inputTokens: resp.usage?.prompt_tokens,
               outputTokens: resp.usage?.completion_tokens,
