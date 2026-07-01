@@ -18,3 +18,6 @@ Conversation SDK deprecation compatibility already exists for the Session to Con
 
 ## Open questions
 None.
+
+## Finalization
+Fetched origin/master at b7b7796fd0 and rebased the commit onto it. Rebase rewrote the commit to 3f3416726b; copied this note from the pre-rebase commit so the final pushed commit has agent context.
