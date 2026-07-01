@@ -1285,25 +1285,44 @@ class TestMakeCustomAttrsSchemaQuery:
         )
 
         expected = """
-            SELECT tupleElement(attr, 1) AS source,
-                   tupleElement(attr, 2) AS key,
-                   tupleElement(attr, 3) AS value_type,
-                   count() AS span_count
+            SELECT source, key, value_type, span_count
             FROM (
-                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
-                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
-                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
-                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                SELECT 'custom_attrs_string' AS source,
+                       'string' AS value_type,
+                       key,
+                       count() AS span_count
                 FROM spans s
+                ARRAY JOIN s.custom_attrs_string.keys AS key
                 WHERE s.project_id = {genai_0:String}
-            ) filtered
-            ARRAY JOIN arrayConcat(
-                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
-                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
-                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
-                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
-            ) AS attr
-            GROUP BY source, key, value_type
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_int' AS source,
+                       'int' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_int.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_float' AS source,
+                       'float' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_float.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_bool' AS source,
+                       'bool' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+            )
             ORDER BY span_count DESC, key ASC, source ASC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
@@ -1338,27 +1357,52 @@ class TestMakeCustomAttrsSchemaQuery:
         )
 
         expected = """
-            SELECT tupleElement(attr, 1) AS source,
-                   tupleElement(attr, 2) AS key,
-                   tupleElement(attr, 3) AS value_type,
-                   count() AS span_count
+            SELECT source, key, value_type, span_count
             FROM (
-                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
-                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
-                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
-                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                SELECT 'custom_attrs_string' AS source,
+                       'string' AS value_type,
+                       key,
+                       count() AS span_count
                 FROM spans s
+                ARRAY JOIN s.custom_attrs_string.keys AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
-            ) filtered
-            ARRAY JOIN arrayConcat(
-                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
-                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
-                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
-                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
-            ) AS attr
-            GROUP BY source, key, value_type
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_int' AS source,
+                       'int' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_int.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_float' AS source,
+                       'float' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_float.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_bool' AS source,
+                       'bool' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+            )
             ORDER BY span_count DESC, key ASC, source ASC
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
         """
