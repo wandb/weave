@@ -24,8 +24,12 @@ from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
-from weave.trace_server.base64_content_conversion import replace_base64_in_raw_messages
+from weave.trace_server.base64_content_conversion import (
+    replace_base64_in_raw_messages,
+    replace_base64_with_content_objects,
+)
 from weave.trace_server.opentelemetry.helpers import (
+    _set_value_in_nested_dict,
     get_attribute,
     to_json_serializable,
     try_convert_numeric_keys_to_list,
@@ -453,6 +457,83 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 
 
 # ---------------------------------------------------------------------------
+# Inline blob stripping
+# ---------------------------------------------------------------------------
+
+
+def _strip_message_attr(
+    attrs: dict[str, Any],
+    lookup_keys: tuple[str, ...],
+    project_id: str,
+    trace_server: "TraceServerInterface",
+) -> None:
+    """Strip base64 from the first present message-payload attribute key.
+
+    Only the first present lookup key is considered (matching how extraction
+    resolves aliases via ``_get``). If that value is a ``str`` it is a
+    JSON-encoded message payload that the generic leaf walker cannot descend
+    into, so parse-and-strip it and write the (now structured) result back at
+    the same key. If it is already a dict/list the generic pass has handled it,
+    so nothing is done.
+    """
+    for key in lookup_keys:
+        value = get_attribute(attrs, key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            stripped = replace_base64_in_raw_messages(value, project_id, trace_server)
+            # Mirror ``get_attribute``'s flat-vs-nested resolution: write back to
+            # the flat dotted key if present, otherwise into the nested tree.
+            if key in attrs:
+                attrs[key] = stripped
+            else:
+                _set_value_in_nested_dict(attrs, key, stripped)
+        return
+
+
+def strip_inline_blobs_from_span(
+    span: Span,
+    project_id: str,
+    trace_server: "TraceServerInterface",
+) -> None:
+    """Strip inline base64 / base64 data-URIs from a span into stored Content refs.
+
+    Mutates ``span.attributes`` in place. This is the single explicit
+    inline-blob-stripping step for the OTel *agents* ingest path and is run
+    *before* the pure ``extract_genai_span`` transform.
+
+    Two passes are required because base64 lands in two different output
+    columns with two different shapes:
+
+    1. Generic pass — ``replace_base64_with_content_objects`` walks the whole
+       attribute tree and replaces any leaf string that is itself a data-URI /
+       base64 blob. This cleans the lossless dumps (``attributes_dump`` /
+       ``raw_span_dump``) and the typed custom-attribute maps, and it catches
+       structured message payloads (dict/list) where the blob is already a
+       leaf.
+
+    2. Message-payload pass — the ``gen_ai.{input,output}.messages`` payload
+       frequently arrives as a *JSON-encoded string*. The generic walker in
+       pass 1 cannot descend into a JSON-string leaf, so base64 buried inside
+       it survives pass 1. For each of the input / output message attributes we
+       take the first present lookup key and, when its value is such a string,
+       parse-strip-and-write-back via ``replace_base64_in_raw_messages`` — which
+       cleans the ``input_messages`` / ``output_messages`` columns (and, as a
+       side benefit, the dumps for the JSON-string case too, since the attribute
+       is now a stripped structure).
+    """
+    span.attributes = replace_base64_with_content_objects(
+        span.attributes, project_id, trace_server
+    )
+    _strip_message_attr(
+        span.attributes, semconv.INPUT_MESSAGES.lookup_keys, project_id, trace_server
+    )
+    _strip_message_attr(
+        span.attributes, semconv.OUTPUT_MESSAGES.lookup_keys, project_id, trace_server
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -464,16 +545,14 @@ def extract_genai_span(
     wb_run_id: str = "",
     wb_run_step: int = 0,
     wb_run_step_end: int = 0,
-    trace_server: "TraceServerInterface | None" = None,
 ) -> AgentSpanCHInsertable:
     """Extract GenAI semantic convention fields from a parsed OTel span.
 
     Returns an `AgentSpanCHInsertable` ready for ClickHouse insert.
 
-    When *trace_server* is provided, inline base64 / base64 data-URIs in the
-    input and output message payloads are stripped into stored Content refs,
-    mirroring the non-OTel calls path. Left as ``None`` (e.g. in unit tests)
-    the extraction is a pure transform with no file storage.
+    This is a pure transform: it reads ``span`` and produces the insertable
+    with no file storage or other side effects. Inline base64 stripping is a
+    separate, explicit step (`strip_inline_blobs_from_span`) run before this.
     """
     attrs = span.attributes
     events_dicts = [e.as_dict() for e in span.events]
@@ -486,11 +565,6 @@ def extract_genai_span(
 
     raw_output = _extract_raw_output(attrs, events_dicts)
     raw_input = _extract_raw_input(attrs)
-    if trace_server is not None:
-        raw_input = replace_base64_in_raw_messages(raw_input, project_id, trace_server)
-        raw_output = replace_base64_in_raw_messages(
-            raw_output, project_id, trace_server
-        )
     output_msgs = _normalize_raw_messages(raw_output, default_role="assistant")
     reasoning_content = extract_reasoning_content(raw_output)
 

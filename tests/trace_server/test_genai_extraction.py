@@ -14,10 +14,10 @@ from typing import Any
 from unittest.mock import MagicMock
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.base64_content_conversion import (
-    replace_base64_with_content_objects,
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_span,
+    strip_inline_blobs_from_span,
 )
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.python_spans import (
     Resource,
     Span,
@@ -434,8 +434,8 @@ def _mock_trace_server() -> MagicMock:
     return trace_server
 
 
-def test_extract_genai_span_strips_base64_when_trace_server_given() -> None:
-    """With a trace_server, inline base64 in messages is stripped to a ref.
+def test_strip_inline_blobs_then_extract_strips_base64() -> None:
+    """After ``strip_inline_blobs_from_span``, inline base64 in messages is a ref.
 
     Mirrors the non-OTel calls path. The image field value becomes a compact
     weave object ref inside the JSON-serialized NormalizedMessage content.
@@ -456,10 +456,10 @@ def test_extract_genai_span_strips_base64_when_trace_server_given() -> None:
         )
     }
     trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
 
-    result = extract_genai_span(
-        _make_span(attrs=attrs), project_id="p1", trace_server=trace_server
-    )
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
 
     content = json.loads(result.input_messages[0].content)
     assert content[0] == {"type": "text", "content": "describe this"}
@@ -469,8 +469,8 @@ def test_extract_genai_span_strips_base64_when_trace_server_given() -> None:
     assert trace_server.file_create.call_count == 2
 
 
-def test_extract_genai_span_leaves_base64_when_no_trace_server() -> None:
-    """Without a trace_server (the default), base64 is left inline untouched."""
+def test_extract_genai_span_leaves_base64_without_strip_step() -> None:
+    """Without the strip step, ``extract_genai_span`` leaves base64 inline."""
     b64 = base64.b64encode(b"a" * 12000).decode("ascii")
     data_uri = f"data:image/png;base64,{b64}"
     attrs = {
@@ -562,11 +562,9 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
     trace_server = _mock_trace_server()
     span = _make_span(attrs=attrs)
 
-    # AgentWriteHandler converts span.attributes in place before extraction.
-    span.attributes = replace_base64_with_content_objects(
-        span.attributes, "p1", trace_server
-    )
-    result = extract_genai_span(span, project_id="p1", trace_server=trace_server)
+    # AgentWriteHandler strips inline blobs in place before extraction.
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
 
     assert b64 not in result.attributes_dump
     assert b64 not in result.raw_span_dump

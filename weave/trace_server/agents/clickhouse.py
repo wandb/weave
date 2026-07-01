@@ -81,13 +81,13 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
-from weave.trace_server.base64_content_conversion import (
-    replace_base64_with_content_objects,
-)
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_span,
+    strip_inline_blobs_from_span,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
@@ -854,10 +854,11 @@ class AgentWriteHandler:
                         errors.append(str(e))
                         continue
 
-                    # strip inline base64/data-URIs into weave refs.
+                    # Strip inline base64/data-URIs into weave refs before the
+                    # pure extraction transform runs.
                     if self._trace_server is not None:
-                        span.attributes = replace_base64_with_content_objects(
-                            span.attributes, req.project_id, self._trace_server
+                        strip_inline_blobs_from_span(
+                            span, req.project_id, self._trace_server
                         )
 
                     try:
@@ -866,7 +867,6 @@ class AgentWriteHandler:
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id or "",
                             wb_run_id=processed_span.run_id or "",
-                            trace_server=self._trace_server,
                         )
                     except Exception as e:
                         error_type = type(e).__name__
