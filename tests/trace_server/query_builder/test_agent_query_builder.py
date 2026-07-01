@@ -94,7 +94,7 @@ class _AttrSrc:
         started_after: datetime.datetime | None = None,
         started_before: datetime.datetime | None = None,
         base_relation: str = "spans",
-        fallback_trace_id_scope: str | None = None,
+        scope_fallback_to_base: bool = False,
     ) -> None:
         pb = ParamBuilder("genai")
         sql = attributed_spans_source(
@@ -103,7 +103,7 @@ class _AttrSrc:
             started_after=started_after,
             started_before=started_before,
             base_relation=base_relation,
-            fallback_trace_id_scope=fallback_trace_id_scope,
+            scope_fallback_to_base=scope_fallback_to_base,
         )
         self.sql = re.sub(
             r"genai_(\d+)", lambda m: f"genai_{int(m.group(1)) + offset}", sql
@@ -112,10 +112,6 @@ class _AttrSrc:
             f"genai_{int(k.split('_')[1]) + offset}": v
             for k, v in pb.get_params().items()
         }
-
-
-#: trace_id scope the two-pass list read passes to the fallback rollup.
-_PAGE_SCOPE = "SELECT trace_id FROM page"
 
 
 def _two_pass_expected(
@@ -263,7 +259,7 @@ class TestMakeSpansListQuery:
         pb = ParamBuilder("genai")
         query = make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1"))
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", scope_fallback_to_base=True)
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -284,7 +280,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", scope_fallback_to_base=True)
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -310,7 +306,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(5, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(5, base_relation="page", scope_fallback_to_base=True)
         order_by = "if(mapContains(s.custom_attrs_float, {genai_3:String}), toFloat64(s.custom_attrs_float[{genai_3:String}]), NULL) desc, span_id desc"
         expected = _two_pass_expected(
             base="spans",
@@ -372,7 +368,7 @@ class TestMakeSpansListQuery:
             pb, AgentSpansQueryReq(project_id="p1", include_details=True)
         )
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", scope_fallback_to_base=True)
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -497,7 +493,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(4, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(4, base_relation="page", scope_fallback_to_base=True)
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String} AND (s.operation_name = {genai_1:String})",
@@ -536,7 +532,7 @@ class TestMakeSpansListQuery:
             started_after=None,
             started_before=None,
             base_relation="page",
-            fallback_trace_id_scope=_PAGE_SCOPE,
+            scope_fallback_to_base=True,
         )  # genai_5
         expected = _two_pass_expected(
             base=cost_source,

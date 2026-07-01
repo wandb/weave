@@ -979,7 +979,7 @@ def _two_pass_spans_list_query(
         started_after=req.started_after,
         started_before=req.started_before,
         base_relation="page",
-        fallback_trace_id_scope="SELECT trace_id FROM page",
+        scope_fallback_to_base=True,
     )
     return f"""
         WITH page AS (
