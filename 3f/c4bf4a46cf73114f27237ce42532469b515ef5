@@ -1,0 +1,25 @@
+## Conversation
+User asked to build an "integration updater agent" for weave: scan an integration, see if a newer version exists on PyPI/npm, diff versions, decide if our integration code needs updating, and implement it. Clarified form via three forks; user picked the recommended config (skill + deterministic script, implement-locally-then-stop, Python first) by replying "go". Then asked to put up a stack of PRs where the *next* PR fixes openai using this agent — hence this is PR1 (the agent), PR2 (openai fix) is stacked on top.
+
+## Actions
+- Two Explore agents mapped integration structure + existing automation. Findings: integrations live in weave/integrations/<name>/; SymbolPatcher dotted paths are the fragile surface (silent no-op on drift); support pins live in pyproject [project.optional-dependencies]; distribution aliases come from library_integration(name, distribution_name=...); tests+VCR cassettes under tests/integrations/<name>/; dependabot already bumps minor/patch pins but ignores majors and never edits code; Node SDK has a parallel but independent integration layout.
+- Wrote scripts/check_integration_updates.py (AST extraction of SymbolPatcher targets + library_integration distribution; PyPI JSON query via urllib; packaging for version math; tomllib/tomli for pyproject). PEP-723 inline deps so `uv run` works standalone; `uv run --with '<dist>==<ver>'` adds the lib for the live symbol check.
+- Verified against real integrations (see PR description evidence): major/cap detection, distribution aliasing (mistral->mistralai), dynamic-target flagging (google_adk lambda: adk_tracing), callback-style (langchain 0 targets), and live symbol resolution catching the openai beta.chat.completions breakage.
+- Wrote the SKILL.md judgment layer; added an AGENTS.md pointer under Codebase Structure.
+
+## Errors & mistakes
+- ruff flagged unused noqa (S310/BLE001 not enabled in this repo's ruff config) + one PLC0207 (str.split needs maxsplit=1). Fixed by dropping the noqas (kept the rationale as plain comments) and adding maxsplit=1. Re-ran: clean.
+
+## Dead ends
+- Considered a Claude Code subagent (.claude/agents/*.md) — rejected: this repo has no such convention, but it does have a skill+script convention (bump-version, publish-pypi). Matched that instead.
+
+## Hints & warnings
+- The script's default `uv run` env does NOT have the third-party lib, so the live symbol check is skipped (reported honestly as library_installed=false). Use `uv run --with '<dist>==<ver>'` to actually resolve targets.
+- Node SDK support is deliberately deferred (v2). Callback-style integrations (langchain, llamaindex) report 0 SymbolPatcher targets by design — their breakage is in the vendor callback/pydantic schema, which the script cannot see.
+
+## Codebase discoveries
+- IntegrationSettings.enabled defaults True; get_openai_patcher returns NoOpPatcher when disabled.
+- library_integration calls can be multi-line; distribution_name is the authoritative alias source. bedrock->boto3, mistral->mistralai are real aliases.
+
+## Open questions
+- Whether to add a scheduled GitHub Action wrapper (WANDBOT app token) — deferred, offered to user.
