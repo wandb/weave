@@ -19,6 +19,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -28,6 +29,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    RatingCondition,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
@@ -40,6 +42,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
+    build_signal_filter_subquery,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -884,6 +887,71 @@ class TestMakeGroupedSpansListQuery:
                     ],
                 ),
             )
+
+    def test_grouped_query_without_signal_filters_unchanged(self) -> None:
+        """Grouped query with no signal_filters produces no semi-join."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            ),
+        )
+
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_grouped_query_with_signal_filter_adds_semijoin(self) -> None:
+        """Grouped query with signal_filters appends AND s.conversation_id IN (...)."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            ),
+        )
+
+        # Signal subquery params: genai_3 = project_id, genai_4 = tags array
+        # Source params start at genai_5
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.conversation_id IN (SELECT conversation_id
+                                        FROM feedback
+                                        WHERE project_id = {{genai_3:String}}
+                                          AND feedback_type IN ('wandb.agent_user_feedback',
+                                                                'wandb.agent_monitor')
+                                          AND hasAny(scorer_tags, {{genai_4:Array(String)}})
+                                          AND conversation_id != '')
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "p1",
+            "genai_4": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
 
 
 # ============================================================================
@@ -1733,3 +1801,53 @@ class TestBuildOrderBy:
             build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
             == "started_at desc, input_tokens asc"
         )
+
+
+def test_signal_filter_round_trip() -> None:
+    req = AgentSpansQueryReq(
+        project_id="ent/proj",
+        signal_filters=AgentSignalFilter(
+            tags=["a", "b"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert req.signal_filters.tags == ["a", "b"]
+    assert req.signal_filters.ratings[0].op == "gte"
+    assert AgentSignalFilter().is_empty() is True
+    assert req.signal_filters.is_empty() is False
+
+
+def test_build_signal_filter_subquery() -> None:
+    # Empty / None -> None
+    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", None) is None
+    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", AgentSignalFilter()) is None
+
+    # Tags + rating -> full parameterized subquery
+    pb = ParamBuilder()
+    sql = build_signal_filter_subquery(
+        pb,
+        "ent/proj",
+        AgentSignalFilter(
+            tags=["x", "y"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert sql is not None
+    params = pb.get_params()
+    # Assert the complete normalized SQL (collapsed whitespace) and all params.
+    # feedback_type IN (...) is hardcoded SQL — no param slot for it.
+    normalized = " ".join(sql.split())
+    pid_p, tags_p, key_p, val_p = list(params.keys())
+    assert normalized == (
+        f"SELECT conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_user_feedback', 'wandb.agent_monitor') "
+        f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
+        f"AND (mapContains(scorer_ratings, {{{key_p}:String}}) "
+        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) "
+        f"AND conversation_id != ''"
+    )
+    assert params[pid_p] == "ent/proj"
+    assert params[tags_p] == ["x", "y"]
+    assert params[key_p] == "_rating_"
+    assert params[val_p] == 0.8

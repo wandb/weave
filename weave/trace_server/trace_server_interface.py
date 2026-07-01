@@ -1264,6 +1264,19 @@ class FeedbackCreateReq(BaseModelStrict):
         description="Status of the scored turn (from spans.status_code)",
         examples=["SUCCESS"],
     )
+    conversation_id: str = Field(
+        default="",
+        description="Conversation the feedback belongs to (from spans.conversation_id); "
+        "denormalized for filtering agent conversations by signal without a join.",
+        examples=["conv-abc123"],
+    )
+    trace_id: str = Field(
+        default="",
+        description="Turn the feedback belongs to (from spans.trace_id); denormalized "
+        "for filtering agent spans by signal without a join. Empty for "
+        "conversation-targeted feedback, which has no single turn.",
+        examples=["0123456789abcdef0123456789abcdef"],
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
