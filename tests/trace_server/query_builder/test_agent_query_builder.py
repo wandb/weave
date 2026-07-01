@@ -543,6 +543,50 @@ class TestMakeSpansListQuery:
         )
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
+    def test_two_pass_time_window_allocates_page_and_fallback_params(self) -> None:
+        # started_after/before bound the page in its WHERE and are re-derived
+        # (with slack) inside the attribution layer, so the window params are
+        # allocated twice. Lock that numbering: page slots genai_1/genai_2, the
+        # slack-widened fallback slots land last with the attributed source.
+        after = datetime.datetime(2026, 1, 10, tzinfo=datetime.timezone.utc)
+        before = datetime.datetime(2026, 1, 11, tzinfo=datetime.timezone.utc)
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1", started_after=after, started_before=before
+            ),
+        )
+
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: page project filter
+        expected_pb.add(after, param_type="DateTime64(6)")  # genai_1: page after
+        expected_pb.add(before, param_type="DateTime64(6)")  # genai_2: page before
+        expected_pb.add(100, param_type="UInt64")  # genai_3: limit
+        expected_pb.add(0, param_type="UInt64")  # genai_4: offset
+        attributed = attributed_spans_source(
+            expected_pb,
+            project_id="p1",
+            started_after=after,
+            started_before=before,
+            base_relation="page",
+            scope_fallback_to_base=True,
+        )  # genai_5..genai_9
+        expected = _two_pass_expected(
+            base="spans",
+            where=(
+                "s.project_id = {genai_0:String}"
+                " AND s.started_at >= {genai_1:DateTime64(6)}"
+                " AND s.started_at < {genai_2:DateTime64(6)}"
+            ),
+            order_by="started_at DESC, span_id DESC",
+            projection=SPANS_LIST_COLS,
+            attr_sql=attributed,
+            limit_slot="{genai_3:UInt64}",
+            offset_slot="{genai_4:UInt64}",
+        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
+
     def test_include_details_rejected_with_group_by(self) -> None:
         """SPANS_DETAILS_COLS is only projected on the ungrouped path. The
         grouped branch ignores `include_details`, so the validator rejects

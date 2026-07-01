@@ -894,6 +894,11 @@ def _with_span_tiebreaker(order_by: str, sort_by: list[AgentSortBy] | None) -> s
     `(project_id, started_at, span_id)` sort key, so a `started_at`-led page
     still reads in primary-key order; the tiebreaker direction matches the
     leading sort term to keep that alignment.
+
+    Correctness rests on `span_id` being unique within the project: that is what
+    makes `(sort..., span_id)` total, so the CTE's two evaluations agree. A
+    cross-trace collision at the same `started_at` is the only thing that would
+    diverge them, blanking one inherited identity.
     """
     direction = sort_by[0].direction if sort_by else "DESC"
     return f"{order_by}, span_id {direction}"
@@ -953,6 +958,11 @@ def _spans_source(
     )
 
 
+# Name of the two-pass page CTE; also passed as the attributed source's
+# `base_relation` so the fallback rollup scopes to `SELECT trace_id FROM page`.
+_PAGE_CTE = "page"
+
+
 def _two_pass_spans_list_query(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -978,11 +988,11 @@ def _two_pass_spans_list_query(
         project_id=req.project_id,
         started_after=req.started_after,
         started_before=req.started_before,
-        base_relation="page",
+        base_relation=_PAGE_CTE,
         scope_fallback_to_base=True,
     )
     return f"""
-        WITH page AS (
+        WITH {_PAGE_CTE} AS (
             SELECT * FROM {base} s
             WHERE {where}
             ORDER BY {order_by}
