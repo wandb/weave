@@ -1,0 +1,93 @@
+## Conversation
+User asked for a three-part perf fix on the Weave Python SDK tracing hot path
+(work that runs synchronously on the user's thread for every `@weave.op` call).
+All three are "common-case fast path" guards: behavior must stay identical, we
+just skip provably no-op work. Requirements: implement + test each separately
+but land together; behavior-level regression tests via the public API on the
+in-memory fake backend (`--trace-server=fake`); a focused unit test for the
+pure `redact_sensitive_keys`; run a slice of the existing trace suite; lint;
+optional microbenchmark. Commit locally only (no push, no PR).
+
+## Actions
+- Verified line numbers (they matched the prompt closely): redact_sensitive_keys
+  weave_client.py:3491 (called at :1414 on inputs); summary merge :1683; op.py
+  dictify at :389.
+- Read helpers: weave/utils/sanitize.py (_REDACT_KEYS = {api_key, auth_headers,
+  authorization}; should_redact is case-insensitive; redact_dataclass_fields
+  uses dataclasses.replace). call_attributes ContextVar defaults to {} (call_context.py:150).
+  dictify (serialize.py:316) returns {} for {} input, so the empty fast path is
+  byte-identical. map_to_refs (weave_client.py:363) is fully functional (builds
+  new dicts/lists), never mutates input -> safe for COW to return the original.
+  inputs_with_defaults is a per-call fresh dict (op.py _default_on_input_handler).
+- Change 1 (COW redact): dict/list/tuple now lazily build a container only on the
+  first change (dict(obj)/list(obj) shallow copy, then overwrite changed slots);
+  return original obj when nothing changed. Leaves and the dataclass branch
+  unchanged. `new_v is v` identity works because leaf recursion hits `return obj`.
+- Change 2 (op.py): raw = call_attributes.get(); attributes = dictify(raw) if raw else {}.
+  Left the in-function circular-import `from ... import dictify` where it was.
+- Change 3 (summary): `if call.summary:` -> deepcopy + _deep_update (unchanged);
+  else -> merged_summary = computed_summary. Kept merged_summary defined in BOTH
+  branches because the send_end_call closure captures it (weave_client.py:1734).
+- Tests: appended 3 pure-function COW unit tests to tests/trace/test_redaction.py;
+  new file tests/trace/test_hot_path_fast_paths.py with 6 behavioral tests.
+- Ran: new tests (15 pass); test_current_call.py (6 pass, incl. existing
+  test_call_summary_deep_merge that guards Change 3's truthy branch);
+  test_client_trace.py (125 pass, 6 skip -- the client_is_clickhouse-gated ones);
+  test_op_decorator_behaviour + test_integration_metadata + test_sanitize (58 pass).
+  Lint: `uvx ruff check` clean after autofixing 3 D209 docstring nits.
+
+## computed_summary aliasing check (required)
+Confirmed safe to assign `call.summary = computed_summary` directly in the
+no-user-summary branch. `computed_summary` is built fresh at weave_client.py:1641
+and its LAST reference is the `_deep_update(merged_summary, computed_summary)`
+read at :1692; it is never read or mutated afterward (grep of all
+`computed_summary` occurrences: 1641/1643/1651/1652/1666/1667/1673/1692 only).
+`status_counts_dict` (a reference into it, :1673) is last touched at :1680.
+Also: the OLD code already aliased computed_summary's nested VALUES into
+merged_summary (via `_deep_update`'s `dst[k] = v` reference copy), so the new
+code introduces no additional aliasing of leaf values -- only the top-level
+container identity differs, and that container is dead after :1692. No shallow
+copy needed.
+
+## Errors & mistakes
+- Initial deep-merge test set a custom key INSIDE `status_counts`
+  ({status_counts: {custom: 7}}). The server rejected it: `summary.status_counts`
+  keys are validated against the TraceStatus enum (Pydantic enum error), and the
+  `client` fixture flags background task errors -> test failed at read-back with
+  KeyError 'score' (the call never persisted). Fix: exercise the deep-merge on a
+  `usage` collision instead ({usage: {"test-model": {total_tokens: 100}}} +
+  output {model, usage:{prompt_tokens:3}}), whose values are LLMUsageSchema int
+  fields the server accepts. The in-memory assertion proves 3-level deep-merge
+  ({total_tokens, requests, prompt_tokens}); read-back asserts only score +
+  status_counts SUCCESS to avoid server-transform fragility.
+
+## Dead ends
+- Considered a "build temp container then return original if unchanged" COW that
+  still allocates a temp per node. Rejected for the lazy build-on-first-change
+  form (dict(obj) only when a change is detected), which allocates nothing on the
+  no-redaction path -- the whole point. Microbench confirms ~600x less alloc.
+
+## Hints & warnings
+- redact_sensitive_keys must be byte-for-byte identical in the CHANGED case.
+  Verified: dict(obj) preserves insertion order; overwriting existing keys keeps
+  order; sensitive keys skip recursion (set REDACTED_VALUE) exactly as before.
+  For dict/list subclasses the CHANGED case still returns a plain dict/list (like
+  before); only the UNCHANGED case returns the original subclass (intended COW).
+- Local variable annotations (`dict_res: dict[Any, Any] | None = None`) are not
+  evaluated at runtime in CPython, so they're safe regardless of future-annotations.
+- Env gotcha: the worktree .venv was Python 3.14t (freethreaded) with no deps;
+  tiktoken (a litellm dep) can't build on 3.14 (PyO3 max 3.13). Recreated with
+  `uv sync --group test --python 3.12` -> installs from wheels. Run tests with
+  `uv run --no-sync --group test python -m pytest ... --trace-server=fake` and
+  `unset NO_COLOR FORCE_COLOR` to avoid the nox color-flag conflict.
+
+## Codebase discoveries
+- On read-back, persisted `attributes` always include an SDK-injected `weave`
+  metadata block (client_version, source=python-sdk, os/sys info); with no user
+  attributes it is exactly {"weave": {...}} (get_calls fetches it; column-limited
+  queries return {}). Persisted `summary` gains a server-computed `weave` block
+  (status/trace_name/latency_ms); the client-side `status_counts` rollup uses
+  TraceStatus(str, Enum) keys, so enum keys == their string values.
+
+## Open questions
+None.
