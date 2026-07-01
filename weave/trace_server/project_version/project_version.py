@@ -22,10 +22,12 @@ from weave.trace_server.tracing import _tracer
 logger = logging.getLogger(__name__)
 
 PROJECT_RESIDENCE_CACHE_SIZE = 10_000
-# Populated residence is immutable per project, so it is cached without expiry.
-# EMPTY is cached (read path only) so cold projects stop re-probing CH. Writes
-# evict it, so same-process reads see fresh data; the short TTL bounds staleness
-# on other replicas that cached EMPTY but did not serve the write.
+# Populated residence is treated as immutable (assumes data never migrates
+# between tables post-write) and cached without expiry. EMPTY is cached (read
+# path only, short TTL) so cold projects stop re-probing CH. Writes best-effort
+# evict it, but the TTL is the real staleness bound: a read racing a write's
+# probe->insert can re-cache EMPTY on any replica, including the writer. Worst
+# case is a <=TTL transient empty read, never wrong data.
 EMPTY_RESIDENCE_CACHE_TTL_SECS = 10
 
 # Global caches shared across all resolvers and threads, keyed by project_id.
@@ -57,6 +59,9 @@ class TableRoutingResolver:
     def _get_residence(
         self, project_id: str, ch_client: CHClient, *, cache_empty: bool = True
     ) -> ProjectDataResidence:
+        # cache_empty=False on write paths: EMPTY must be ground-truth (a stale
+        # EMPTY would misroute a V1 write into calls_merged past an upgrade error),
+        # so skip the read cache and evict any entry instead of populating it.
         with _project_residence_cache_lock:
             cached = _project_residence_cache.get(project_id)
             if cached is None and cache_empty:
@@ -85,9 +90,9 @@ class TableRoutingResolver:
                     }
                 )
 
-            # Populated residence is immutable -> long-lived cache. EMPTY is cached
-            # (short TTL) only on the read path; a write resolution instead evicts any
-            # read-cached EMPTY, so the post-write read re-probes and sees the new data.
+            # Populated residence -> long-lived cache. EMPTY -> short-TTL read cache;
+            # a write resolution instead evicts any read-cached EMPTY so a post-write
+            # read re-probes (best-effort; a racing read can re-cache it, TTL is the bound).
             with _project_residence_cache_lock:
                 if residence != ProjectDataResidence.EMPTY:
                     _project_residence_cache[project_id] = residence
