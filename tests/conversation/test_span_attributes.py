@@ -196,11 +196,11 @@ def test_conversation_attributes_on_every_streaming_span(
     ) as conversation:
         turn = conversation.start_turn(agent_name="bot")
         with turn:
-            with turn.llm(model="gpt-4o"):
+            with turn.start_llm(model="gpt-4o"):
                 pass
-            with turn.tool(name="Edit"):
+            with turn.start_tool(name="Edit"):
                 pass
-            with turn.subagent(name="researcher"):
+            with turn.start_subagent(name="researcher"):
                 pass
     spans = otel_spans.get_finished_spans()
     names = {span.name for span in spans}
