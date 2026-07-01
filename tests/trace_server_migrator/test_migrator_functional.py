@@ -4,8 +4,11 @@ Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
 import os
+import threading
+import time
 import uuid
 
+import clickhouse_connect
 import pytest
 
 from weave.trace_server.clickhouse_trace_server_migrator import (
@@ -52,6 +55,15 @@ def _get_migration_version(ch_client, mgmt_db: str, target_db: str) -> int:
     )
     assert len(result.result_rows) == 1, f"Migration status for {target_db} not found"
     return int(result.result_rows[0][0])
+
+
+def _partially_applied_version(ch_client, mgmt_db: str, target_db: str) -> int | None:
+    result = ch_client.query(
+        f"SELECT partially_applied_version FROM {mgmt_db}.migrations WHERE db_name = '{target_db}'"
+    )
+    assert len(result.result_rows) == 1, f"Migration status for {target_db} not found"
+    value = result.result_rows[0][0]
+    return None if value is None else int(value)
 
 
 def _get_latest_migration_version(migration_dir: str) -> int:
@@ -123,6 +135,54 @@ def _assert_db_on_every_replica(
         assert actual == expected_engine, (
             f"{db_name} engine = {actual!r}, expected {expected_engine!r}"
         )
+
+
+def _sync_mutations(ch_client, db_name: str) -> None:
+    """Block until every table in db_name has no in-flight mutations.
+
+    Bounded wait so a genuinely stuck mutation surfaces as a test failure
+    rather than an infinite hang.
+    """
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        if not _stuck_mutations(ch_client, db_name):
+            return
+        time.sleep(0.5)
+
+
+def _stuck_mutations(ch_client, db_name: str) -> list[tuple[str, str]]:
+    """{(table, mutation_id)} for mutations still running across the cluster."""
+    result = ch_client.query(
+        f"SELECT table, mutation_id FROM clusterAllReplicas('{_CLUSTER}', system.mutations) "
+        f"WHERE database = '{db_name}' AND is_done = 0"
+    )
+    return [(row[0], row[1]) for row in result.result_rows]
+
+
+def _assert_table_schema_converged(ch_client, db_name: str, table_name: str) -> None:
+    """Fail if a table is missing from a replica or its columns diverge.
+
+    Compares the (name, type) column set per replica via clusterAllReplicas.
+    This is the incident's failure mode (a column present on some replicas,
+    absent on others) and is robust to replica-specific DDL/path rendering
+    that would make raw create_table_query comparison false-positive.
+    """
+    result = ch_client.query(
+        f"SELECT hostName(), name, type FROM clusterAllReplicas('{_CLUSTER}', system.columns) "
+        f"WHERE database = '{db_name}' AND table = '{table_name}' ORDER BY name"
+    )
+    by_host: dict[str, list[tuple[str, str]]] = {}
+    for host, name, col_type in result.result_rows:
+        by_host.setdefault(host, []).append((name, col_type))
+    expected_count = _cluster_replica_count(ch_client)
+    assert len(by_host) == expected_count, (
+        f"{db_name}.{table_name} missing from {expected_count - len(by_host)} replica(s). "
+        f"Got hosts: {sorted(by_host)}"
+    )
+    distinct = {tuple(cols) for cols in by_host.values()}
+    assert len(distinct) == 1, (
+        f"{db_name}.{table_name} columns diverge across replicas: {by_host}"
+    )
 
 
 def test_cloud_creates_db_and_tables(ch_client):
@@ -530,3 +590,123 @@ def test_all_production_down_migrations_distributed(ch_client):
 
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)
+
+
+@pytest.mark.parametrize("use_distributed", [False, True])
+def test_production_migrations_converge_across_replicas(ch_client, use_distributed):
+    """After the full prod dir, every replica agrees on schema and status.
+
+    Guards the load/topology-dependent class where the initiating node sees
+    success but a peer replica never converged: version at max, no partial
+    version left set, no stuck mutations, and identical create_table_query on
+    every replica for the key tables.
+    """
+    mode = "dist" if use_distributed else "repl"
+    mgmt_db = _unique_name(f"db_mgmt_converge_{mode}")
+    target_db = _unique_name(f"converge_{mode}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=True,
+        use_distributed=use_distributed,
+        replicated_cluster=_CLUSTER,
+        replicated_path=_REPLICATED_PATH,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+    migrator.apply_migrations(target_db)
+
+    latest_version = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest_version
+    assert _partially_applied_version(ch_client, mgmt_db, target_db) is None
+
+    _sync_mutations(ch_client, target_db)
+    assert _stuck_mutations(ch_client, target_db) == []
+
+    # In distributed mode the ReplicatedMergeTree data lives in the `_local`
+    # twin; the bare name is a Distributed router. Check whichever exists.
+    for base in ("calls_complete", "call_parts", "calls_merged"):
+        local = f"{base}_local"
+        table = local if _table_exists(ch_client, target_db, local) else base
+        if _table_exists(ch_client, target_db, table):
+            _assert_table_schema_converged(ch_client, target_db, table)
+
+
+def test_concurrent_inserts_during_migration_converge(ch_client, tmp_path):
+    """Writes during a schema change still converge with no partial version.
+
+    Approximates the write-during-DDL class: pre-populate a table, then run an
+    ADD COLUMN migration while a background thread inserts, and assert the
+    migration lands cleanly on every replica.
+    """
+    mgmt_db = _unique_name("db_mgmt_concurrent")
+    target_db = _unique_name("concurrent")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migration_dir = tmp_path / "migrations"
+    migration_dir.mkdir()
+    (migration_dir / "001_init.up.sql").write_text(
+        "CREATE TABLE events (id String, project_id String) "
+        "ENGINE = MergeTree ORDER BY (project_id, id);"
+    )
+    (migration_dir / "001_init.down.sql").write_text("DROP TABLE IF EXISTS events;")
+    (migration_dir / "002_add_col.up.sql").write_text(
+        "ALTER TABLE events ADD COLUMN IF NOT EXISTS created_at DateTime64(3) DEFAULT now64();"
+    )
+    (migration_dir / "002_add_col.down.sql").write_text(
+        "ALTER TABLE events DROP COLUMN IF EXISTS created_at;"
+    )
+
+    def make_migrator():
+        return get_clickhouse_trace_server_migrator(
+            ch_client,
+            replicated=True,
+            use_distributed=False,
+            replicated_cluster=_CLUSTER,
+            replicated_path=_REPLICATED_PATH,
+            management_db=mgmt_db,
+            migration_dir=str(migration_dir),
+            post_migration_hook=None,
+        )
+
+    make_migrator().apply_migrations(target_db, target_version=1)
+    ch_client.insert(
+        f"{target_db}.events",
+        data=[[uuid.uuid4().hex, "p1"] for _ in range(200)],
+        column_names=["id", "project_id"],
+    )
+
+    stop = threading.Event()
+    writer_client = clickhouse_connect.get_client(
+        host=ch_client.test_host,
+        port=ch_client.test_port,
+        autogenerate_session_id=False,
+    )
+
+    def writer():
+        while not stop.is_set():
+            writer_client.command(
+                f"INSERT INTO {target_db}.events (id, project_id) "
+                f"VALUES ('{uuid.uuid4().hex}', 'p1')"
+            )
+            time.sleep(0.01)
+
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+    try:
+        make_migrator().apply_migrations(target_db, target_version=2)
+    finally:
+        stop.set()
+        thread.join(timeout=30)
+        writer_client.close()
+
+    assert not thread.is_alive()
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == 2
+    assert _partially_applied_version(ch_client, mgmt_db, target_db) is None
+    _sync_mutations(ch_client, target_db)
+    assert _stuck_mutations(ch_client, target_db) == []
+    _assert_table_schema_converged(ch_client, target_db, "events")

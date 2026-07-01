@@ -23,6 +23,16 @@ def ch_keeper_server():
     host = "localhost"
     port = int(os.environ.get("WF_CLICKHOUSE_KEEPER_PORT", _DEFAULT_PORT))
 
+    # In the replicated nightly leg the multi-replica topology is already up and
+    # exposed via WF_CLICKHOUSE_PORT; connect to it instead of starting the
+    # embedded single-node container. WF_CLICKHOUSE_PORT is the precise signal:
+    # regular CI sets only WF_CLICKHOUSE_KEEPER_PORT for this shard.
+    if os.environ.get("WF_CLICKHOUSE_PORT"):
+        host = os.environ.get("WF_CLICKHOUSE_HOST", host)
+        port = int(os.environ["WF_CLICKHOUSE_PORT"])
+        yield host, port
+        return
+
     if os.environ.get("CI"):
         yield host, port
         return
@@ -105,6 +115,10 @@ def ch_client(ch_keeper_server):
     # Attach a tracking helper directly on the client instance
     client._tracked_dbs = tracked_dbs
     client.track_db = tracked_dbs.append
+    # Host/port so tests can mint an independent client for concurrent access
+    # (clickhouse_connect HTTP clients are not safe for concurrent requests).
+    client.test_host = host
+    client.test_port = port
 
     yield client
 

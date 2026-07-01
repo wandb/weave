@@ -61,6 +61,7 @@ jobs:
             "flow",
             "trace_server",
             "trace_server_bindings",
+            "trace_server_migrator",
             "anthropic",
             "bedrock",
             "cerebras",
