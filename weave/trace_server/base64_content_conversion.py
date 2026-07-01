@@ -139,9 +139,7 @@ def store_content_object_ref(
     # Coerce to a plain ``str``: ``.uri`` is a str subclass (``_CallableStr``)
     # that exact-type checks (JSON/serialization/ref extraction) can reject.
     return str(
-        InternalObjectRef(
-            project_id=project_id, name=object_id, version=res.digest
-        ).uri
+        InternalObjectRef(project_id=project_id, name=object_id, version=res.digest).uri
     )
 
 

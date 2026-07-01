@@ -38,9 +38,7 @@ def _mock_obj_create(trace_server: MagicMock) -> None:
     ``replace_base64_with_content_objects`` publishes each converted blob as a
     weave object and embeds its ref, so any test that converts must stub this.
     """
-    trace_server.obj_create = MagicMock(
-        return_value=ObjCreateRes(digest=_OBJ_DIGEST)
-    )
+    trace_server.obj_create = MagicMock(return_value=ObjCreateRes(digest=_OBJ_DIGEST))
 
 
 def _assert_content_ref(value: object, project_id: str) -> None:
@@ -582,7 +580,9 @@ class TestReplaceBase64InRawMessages:
     def test_structured_list_messages_converted(self):
         """An already-parsed list is walked directly (no JSON string)."""
         trace_server = self._trace_server()
-        messages = [{"role": "user", "parts": [{"type": "image", "url": self._data_uri()}]}]
+        messages = [
+            {"role": "user", "parts": [{"type": "image", "url": self._data_uri()}]}
+        ]
 
         result = replace_base64_in_raw_messages(messages, "proj", trace_server)
 
