@@ -11,6 +11,7 @@ from weave.trace_server.base64_content_conversion import (
     is_base64,
     is_data_uri,
     process_call_req_to_content,
+    replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
     store_content_object,
 )
@@ -513,6 +514,97 @@ class TestThresholdAndStructuralIdentity:
         # by value rather than identity here — content must round-trip
         # unchanged regardless of the SDK copy.
         assert processed.start.inputs == inputs_before
+        assert trace_server.file_create.call_count == 0
+
+
+class TestReplaceBase64InRawMessages:
+    """Test the OTel raw-message wrapper that mirrors the non-OTel calls path.
+
+    GenAI OTel spans usually carry their message payload as a JSON-encoded
+    string, so ``replace_base64_in_raw_messages`` must parse it into structured
+    form before the shared walker can find inline base64 leaves.
+    """
+
+    @staticmethod
+    def _trace_server() -> MagicMock:
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
+        )
+        return trace_server
+
+    @staticmethod
+    def _data_uri() -> str:
+        b64 = base64.b64encode(b"a" * LARGE_TEST_DATA_SIZE).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+
+    def test_json_string_messages_data_uri_converted(self):
+        """A JSON-string payload is parsed and inline data-URIs are converted."""
+        trace_server = self._trace_server()
+        data_uri = self._data_uri()
+        messages = json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "describe this"},
+                        {"type": "image", "url": data_uri},
+                    ],
+                }
+            ]
+        )
+
+        result = replace_base64_in_raw_messages(messages, "proj", trace_server)
+
+        # Parsed into structured form (mirrors what _normalize_raw_messages sees).
+        assert isinstance(result, list)
+        parts = result[0]["parts"]
+        assert parts[0] == {"type": "text", "content": "describe this"}
+        # The data-URI field value (not the whole part) becomes the Content ref.
+        assert parts[1]["type"] == "image"
+        assert parts[1]["url"]["_type"] == "CustomWeaveType"
+        assert set(parts[1]["url"]["files"].keys()) == {"content", "metadata.json"}
+        assert trace_server.file_create.call_count == 2
+
+    def test_structured_list_messages_converted(self):
+        """An already-parsed list is walked directly (no JSON string)."""
+        trace_server = self._trace_server()
+        messages = [{"role": "user", "parts": [{"type": "image", "url": self._data_uri()}]}]
+
+        result = replace_base64_in_raw_messages(messages, "proj", trace_server)
+
+        assert result[0]["parts"][0]["url"]["_type"] == "CustomWeaveType"
+        assert trace_server.file_create.call_count == 2
+
+    def test_no_base64_is_noop(self):
+        """A payload without base64 triggers no file storage."""
+        trace_server = self._trace_server()
+        messages = json.dumps(
+            [{"role": "user", "parts": [{"type": "text", "content": "hello"}]}]
+        )
+
+        result = replace_base64_in_raw_messages(messages, "proj", trace_server)
+
+        assert result == [
+            {"role": "user", "parts": [{"type": "text", "content": "hello"}]}
+        ]
+        assert trace_server.file_create.call_count == 0
+
+    def test_non_json_string_returned_unchanged(self):
+        """A plain (non-JSON) string is returned as-is, not stored."""
+        trace_server = self._trace_server()
+
+        result = replace_base64_in_raw_messages("just some text", "proj", trace_server)
+
+        assert result == "just some text"
+        assert trace_server.file_create.call_count == 0
+
+    def test_none_and_non_container_returned_unchanged(self):
+        """None and non-container inputs are passed through untouched."""
+        trace_server = self._trace_server()
+
+        assert replace_base64_in_raw_messages(None, "proj", trace_server) is None
+        assert replace_base64_in_raw_messages(42, "proj", trace_server) == 42
         assert trace_server.file_create.call_count == 0
 
 

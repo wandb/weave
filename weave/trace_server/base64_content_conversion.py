@@ -252,3 +252,30 @@ def process_complete_call_to_content(
         complete_call.output, complete_call.project_id, trace_server
     )
     return complete_call
+
+
+def replace_base64_in_raw_messages(
+    raw: Any,
+    project_id: str,
+    trace_server: TraceServerInterface,
+) -> Any:
+    """Strip inline base64 / base64 data-URIs from raw GenAI message payloads.
+
+    Mirrors the non-OTel calls path (``replace_base64_with_content_objects``
+    applied to ``inputs``/``output``) for the OTel *agents* path, where the
+    message payload frequently arrives as a JSON-encoded string. The string is
+    parsed into structured form first so that any inline base64 becomes a leaf
+    value the walker can detect, then the shared conversion runs.
+
+    Returns the (possibly converted) structured messages, or the input
+    unchanged when it is neither a message container nor JSON-decodable.
+    """
+    if not isinstance(raw, (str, list, dict)):
+        return raw
+    parsed = raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return raw
+    return replace_base64_with_content_objects(parsed, project_id, trace_server)

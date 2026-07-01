@@ -121,6 +121,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
+    TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
 
@@ -806,10 +807,13 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper.
+    Optionally takes a `trace_server` used for file storage when stripping
+    inline base64 out of GenAI message payloads into Content refs.
     """
 
     _ch_client: CHClient
     _insert_settings: dict[str, Any] | None = None
+    _trace_server: TraceServerInterface | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -853,6 +857,7 @@ class AgentWriteHandler:
                             project_id=req.project_id,
                             wb_user_id=req.wb_user_id or "",
                             wb_run_id=processed_span.run_id or "",
+                            trace_server=self._trace_server,
                         )
                     except Exception as e:
                         error_type = type(e).__name__
