@@ -854,10 +854,7 @@ class AgentWriteHandler:
                         errors.append(str(e))
                         continue
 
-                    # Mirror the non-OTel calls path: strip inline base64 /
-                    # base64 data-URIs into Content refs. Converting the span
-                    # attributes in place strips the lossless attributes_dump /
-                    # raw_span_dump as well as the extracted messages.
+                    # strip inline base64/data-URIs into weave refs.
                     if self._trace_server is not None:
                         span.attributes = replace_base64_with_content_objects(
                             span.attributes, req.project_id, self._trace_server
