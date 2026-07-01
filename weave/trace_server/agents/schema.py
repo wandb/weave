@@ -37,6 +37,13 @@ AgentSpanOpName: TypeAlias = Literal["weave.genai.turn_ended"]
 OutputTypeLiteral = Literal["", "text", "json", "image", "speech"]
 
 
+# Separator used to flatten a multimodal content parts list into the
+# `NormalizedMessage.content` string at ingest. The read path (chat_view) splits
+# on it to recover parts from already-flattened content, so this is the shared
+# contract between the two — change it in one place only.
+MULTIMODAL_PART_SEPARATOR = "\n"
+
+
 class NormalizedMessage(BaseModel):
     """A single message normalized from any provider format.
 
