@@ -7,9 +7,11 @@ success-path test that exercises every extractor plus one error-status
 test since that's a separate code path (Status object vs attributes).
 """
 
+import base64
 import datetime
 import json
 from typing import Any
+from unittest.mock import MagicMock
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
@@ -20,6 +22,7 @@ from weave.trace_server.opentelemetry.python_spans import (
     Status,
     StatusCode,
 )
+from weave.trace_server.trace_server_interface import FileCreateRes
 
 
 def _make_span(
@@ -415,3 +418,60 @@ def test_extract_custom_attrs_skips_non_finite_floats() -> None:
         assert key not in result.custom_attrs_float
         assert key not in result.custom_attrs_string
         assert key not in result.custom_attrs_int
+
+
+def _mock_trace_server() -> MagicMock:
+    trace_server = MagicMock()
+    trace_server.file_create = MagicMock(
+        side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
+    )
+    return trace_server
+
+
+def test_extract_genai_span_strips_base64_when_trace_server_given() -> None:
+    """With a trace_server, inline base64 in messages is stripped to Content refs.
+
+    Mirrors the non-OTel calls path. The image field value becomes a
+    CustomWeaveType ref inside the JSON-serialized NormalizedMessage content.
+    """
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "describe this"},
+                        {"type": "image", "url": data_uri},
+                    ],
+                }
+            ]
+        )
+    }
+    trace_server = _mock_trace_server()
+
+    result = extract_genai_span(
+        _make_span(attrs=attrs), project_id="p1", trace_server=trace_server
+    )
+
+    content = json.loads(result.input_messages[0].content)
+    assert content[0] == {"type": "text", "content": "describe this"}
+    assert content[1]["url"]["_type"] == "CustomWeaveType"
+    assert b64 not in result.input_messages[0].content
+    assert trace_server.file_create.call_count == 2
+
+
+def test_extract_genai_span_leaves_base64_when_no_trace_server() -> None:
+    """Without a trace_server (the default), base64 is left inline untouched."""
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [{"role": "user", "parts": [{"type": "image", "url": data_uri}]}]
+        )
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    assert data_uri in result.input_messages[0].content
