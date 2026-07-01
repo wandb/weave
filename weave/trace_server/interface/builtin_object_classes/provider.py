@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from pydantic import ConfigDict, Field, field_validator
 
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.helpers.url_safety import is_publicly_routable_url
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
@@ -27,15 +28,15 @@ def _validate_provider_base_url(url: str) -> str:
     """
     # urlparse silently strips a bare trailing '?', so check the raw string too.
     if "?" in url:
-        raise ValueError(INVALID_BASE_URL_MSG)
+        raise InvalidRequest(INVALID_BASE_URL_MSG)
     try:
         parsed = urlparse(url)
     except ValueError as exc:
-        raise ValueError(INVALID_BASE_URL_MSG) from exc
+        raise InvalidRequest(INVALID_BASE_URL_MSG) from exc
     if parsed.fragment:
-        raise ValueError(INVALID_BASE_URL_MSG)
+        raise InvalidRequest(INVALID_BASE_URL_MSG)
     if not is_publicly_routable_url(url):
-        raise ValueError(INVALID_BASE_URL_MSG)
+        raise InvalidRequest(INVALID_BASE_URL_MSG)
     return url
 
 
@@ -61,7 +62,7 @@ class Provider(base_object_def.BaseObject):
     def validate_extra_headers(cls, v: dict[str, str]) -> dict[str, str]:
         for key in v:
             if BLOCKED_HEADER_RE.match(key):
-                raise ValueError("extra_headers contains a disallowed header")
+                raise InvalidRequest("extra_headers contains a disallowed header")
         return v
 
 
