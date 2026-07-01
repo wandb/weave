@@ -1,5 +1,218 @@
 {
   "$defs": {
+    "AgentsSavedView": {
+      "description": "A persisted, named configuration of one agents-panel view.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "label": {
+          "description": "Editable display name for the view.",
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/AgentsSavedViewDefinition"
+        }
+      },
+      "required": [
+        "label",
+        "definition"
+      ],
+      "title": "AgentsSavedView",
+      "type": "object"
+    },
+    "AgentsSavedViewDefinition": {
+      "description": "Flat, all-optional config for one agents-panel view (per `view_type`).",
+      "properties": {
+        "view_type": {
+          "description": "Which view this configures (e.g. 'spans'). Free-form; the set of views is owned by the frontend, so it can change without a backend change.",
+          "title": "View Type",
+          "type": "string"
+        },
+        "time_window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Active time window."
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ViewSort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sort directive."
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Categorical filters keyed by column id.",
+          "title": "Filters"
+        },
+        "numeric_ranges": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/NumericRange"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Numeric histogram filters keyed by column id.",
+          "title": "Numeric Ranges"
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColsDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Column-visibility diff."
+        },
+        "custom_cols": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom-attribute column ids (`<source>:<key>`) on the grid.",
+          "title": "Custom Cols"
+        },
+        "view": {
+          "anyOf": [
+            {
+              "enum": [
+                "table",
+                "split"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Table layout (full table vs split chart view).",
+          "title": "View"
+        },
+        "volume_collapsed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether the volume histogram is collapsed.",
+          "title": "Volume Collapsed"
+        },
+        "conv_custom_attrs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ConversationCustomAttr"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Conversations view: custom-attribute column selections.",
+          "title": "Conv Custom Attrs"
+        },
+        "sort_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agents view: single sort field.",
+          "title": "Sort Field"
+        },
+        "hidden_agents": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColsDiff"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agents view: diff from the default excluded-agents set."
+        }
+      },
+      "required": [
+        "view_type"
+      ],
+      "title": "AgentsSavedViewDefinition",
+      "type": "object"
+    },
     "AlertSpec": {
       "properties": {
         "name": {
@@ -469,6 +682,29 @@
       "title": "ChartConfig",
       "type": "object"
     },
+    "ColsDiff": {
+      "description": "Column-visibility diff from a view's default hidden set.",
+      "properties": {
+        "hide": {
+          "description": "Columns hidden beyond the defaults.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hide",
+          "type": "array"
+        },
+        "show": {
+          "description": "Default-hidden columns the user re-enabled.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Show",
+          "type": "array"
+        }
+      },
+      "title": "ColsDiff",
+      "type": "object"
+    },
     "Column": {
       "properties": {
         "path": {
@@ -705,6 +941,36 @@
         "substr"
       ],
       "title": "ContainsSpec",
+      "type": "object"
+    },
+    "ConversationCustomAttr": {
+      "properties": {
+        "attr_id": {
+          "description": "The `<source>:<key>` custom-attribute id.",
+          "title": "Attr Id",
+          "type": "string"
+        },
+        "mode": {
+          "description": "How the attribute is aggregated across a conversation.",
+          "enum": [
+            "distribution",
+            "avg",
+            "min",
+            "max",
+            "count",
+            "count_true",
+            "count_false",
+            "count_distinct"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attr_id",
+        "mode"
+      ],
+      "title": "ConversationCustomAttr",
       "type": "object"
     },
     "ConvertOperation": {
@@ -2013,6 +2279,24 @@
       "title": "NotOperation",
       "type": "object"
     },
+    "NumericRange": {
+      "properties": {
+        "min": {
+          "title": "Min",
+          "type": "number"
+        },
+        "max": {
+          "title": "Max",
+          "type": "number"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "title": "NumericRange",
+      "type": "object"
+    },
     "ObjectConfig": {
       "properties": {
         "version_groups": {
@@ -2785,6 +3069,91 @@
       "title": "TestOnlyNestedBaseObject",
       "type": "object"
     },
+    "TimeWindow": {
+      "properties": {
+        "unit": {
+          "enum": [
+            "second",
+            "minute",
+            "hour",
+            "day",
+            "week"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "quantity": {
+          "description": "Number of units in the window.",
+          "minimum": 1,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "start_ms": {
+          "description": "Left edge of the window, epoch ms.",
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "selection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeWindowSelection"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional brushed sub-range."
+        }
+      },
+      "required": [
+        "unit",
+        "quantity",
+        "start_ms"
+      ],
+      "title": "TimeWindow",
+      "type": "object"
+    },
+    "TimeWindowSelection": {
+      "properties": {
+        "start_ms": {
+          "title": "Start Ms",
+          "type": "integer"
+        },
+        "end_ms": {
+          "title": "End Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_ms",
+        "end_ms"
+      ],
+      "title": "TimeWindowSelection",
+      "type": "object"
+    },
+    "ViewSort": {
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "sort": {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Sort",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "sort"
+      ],
+      "title": "ViewSort",
+      "type": "object"
+    },
     "WeaveMetricThresholdSpec": {
       "additionalProperties": true,
       "description": "Alert specification for weave metric threshold alerts.\n\nFields align with gorilla's WeaveMetricThresholdFilter and the\nalert_worker's WeaveMetricFilter.  Extra keys are permitted so that\nthe schema can evolve without breaking existing stored objects.",
@@ -2947,6 +3316,9 @@
     "SavedView": {
       "$ref": "#/$defs/SavedView"
     },
+    "AgentsSavedView": {
+      "$ref": "#/$defs/AgentsSavedView"
+    },
     "ComparisonView": {
       "$ref": "#/$defs/ComparisonView"
     },
@@ -2967,6 +3339,7 @@
     "Provider",
     "ProviderModel",
     "SavedView",
+    "AgentsSavedView",
     "ComparisonView",
     "LLMStructuredCompletionModel",
     "ChartConfig"
