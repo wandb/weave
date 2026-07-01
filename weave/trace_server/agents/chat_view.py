@@ -260,6 +260,17 @@ class ChatTraversal:
     # (text, media-digests) of the most recently emitted user message, so the
     # same message replayed by a following LLM span is not emitted twice.
     _last_user_sig: tuple[str, tuple[str, ...]] | None = None
+    # The system-instructions text most recently surfaced (from either an
+    # invoke_agent or a content span), so the same instructions replayed on
+    # every turn's LLM span render once, not once per call. None until the
+    # first instructions are emitted.
+    _last_system_instructions: str | None = None
+    # A just-emitted agent_start that carries an agent identity but no system
+    # prompt (some SDKs record the prompt on the child LLM span, not the
+    # invoke_agent span). A descendant content span's instructions fold into it
+    # rather than emitting a redundant second card. Reset per invoke_agent and
+    # cleared at the turn boundary (user message).
+    _pending_agent_start: AgentChatMessage | None = None
 
     def walk_roots(self, roots: list[SpanNode]) -> None:
         for root in roots:
@@ -295,22 +306,27 @@ class ChatTraversal:
             # TODO: Move type-specific payload construction into AgentChat*
             # constructors once this projection stabilizes, so traversal
             # methods only encode ordering/suppression policy.
-            self.messages.append(
-                AgentChatMessage(
-                    type="agent_start",
-                    span_id=span.span_id,
-                    agent_name=agent_start_label,
-                    agent_version=span.agent_version,
-                    status_code=span.status_code,
-                    started_at=span.started_at,
-                    agent_start=AgentChatAgentStart(
-                        model=span.request_model,
-                        status=span.status_code,
-                        system_instructions=_join_or_none(span.system_instructions),
-                        tool_definitions=span.tool_definitions or None,
-                    ),
-                )
+            instructions = _join_or_none(span.system_instructions)
+            if instructions:
+                self._last_system_instructions = instructions
+            start_msg = AgentChatMessage(
+                type="agent_start",
+                span_id=span.span_id,
+                agent_name=agent_start_label,
+                agent_version=span.agent_version,
+                status_code=span.status_code,
+                started_at=span.started_at,
+                agent_start=AgentChatAgentStart(
+                    model=span.request_model,
+                    status=span.status_code,
+                    system_instructions=instructions,
+                    tool_definitions=span.tool_definitions or None,
+                ),
             )
+            self.messages.append(start_msg)
+            # When the invoke_agent span carried no system prompt, let a
+            # descendant content span fold its instructions into this card.
+            self._pending_agent_start = None if instructions else start_msg
         else:
             logger.debug(
                 "invoke_agent span without agent identity or lifecycle metadata (span_id=%s)",
@@ -384,6 +400,7 @@ class ChatTraversal:
         """
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
+        self._emit_system_instructions(span, agent_name)
         self._emit_user_turn(span)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
@@ -396,6 +413,62 @@ class ChatTraversal:
         assistant = msg.assistant_message
         emitted_text = bool(assistant and assistant.text)
         return emitted_text or subtree_emitted_assistant
+
+    def _emit_system_instructions(
+        self, span: AgentSpanSchema, agent_name: str | None
+    ) -> None:
+        """Surface a content span's system instructions as an agent_start card.
+
+        Providers that instrument plain LLM/chat spans (with no enclosing
+        `invoke_agent` span) record ``gen_ai.system_instructions`` on each call.
+        Those instructions are extracted onto every span, but only
+        `_walk_invoke_agent` previously read them, so traces built from bare
+        chat spans dropped their system prompt entirely. Reuse the `agent_start`
+        card the UI already renders for system instructions.
+
+        Deduped against the last-surfaced instructions (set here and by
+        `_walk_invoke_agent`) so the prompt replayed on every turn's span shows
+        once, not once per call; a genuinely changed prompt emits a new card.
+
+        When the enclosing invoke_agent already emitted a bare agent_start for
+        this turn (agent identity but no prompt), the instructions fold into
+        that card instead of emitting a redundant second one.
+        """
+        instructions = _join_or_none(span.system_instructions)
+        if not instructions or instructions == self._last_system_instructions:
+            return
+        self._last_system_instructions = instructions
+
+        pending = self._pending_agent_start
+        self._pending_agent_start = None
+        if (
+            pending is not None
+            and pending.agent_start is not None
+            and pending.agent_name == agent_name
+        ):
+            pending.agent_start.system_instructions = instructions
+            if pending.agent_start.model is None:
+                pending.agent_start.model = span.request_model
+            if pending.agent_start.tool_definitions is None:
+                pending.agent_start.tool_definitions = span.tool_definitions or None
+            return
+
+        self.messages.append(
+            AgentChatMessage(
+                type="agent_start",
+                span_id=span.span_id,
+                agent_name=agent_name,
+                agent_version=span.agent_version,
+                status_code=span.status_code,
+                started_at=span.started_at,
+                agent_start=AgentChatAgentStart(
+                    model=span.request_model,
+                    status=span.status_code,
+                    system_instructions=instructions,
+                    tool_definitions=span.tool_definitions or None,
+                ),
+            )
+        )
 
     def _emit_user_turn(self, span: AgentSpanSchema) -> None:
         """Emit the user message(s) for the new turn this LLM span answers.
@@ -423,6 +496,9 @@ class ChatTraversal:
                 continue
             self._last_user_sig = sig
             self.emitted_user = True
+            # A user message marks a new turn; an unfilled agent_start from an
+            # earlier turn must not absorb this turn's instructions.
+            self._pending_agent_start = None
             self.messages.append(
                 AgentChatMessage(
                     type="user_message",

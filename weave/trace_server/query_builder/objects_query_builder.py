@@ -334,9 +334,16 @@ class ObjectMetadataQueryBuilder:
 
         join_clause = ""
         if self.include_storage_size:
+            # object_versions_stats is ORDER BY (project_id, kind, object_id,
+            # digest) with no skip indexes, so scope the inner subquery by
+            # object_id (a sort-key prefix column that prunes) when an
+            # object_id predicate exists. digest scoping would not prune.
+            stats_object_id_scope = _make_object_id_conditions_part(
+                self._object_id_conditions
+            )
             join_clause = f"""
             LEFT JOIN (
-                SELECT * FROM object_versions_stats WHERE object_versions_stats.project_id = {{project_id: String}}
+                SELECT * FROM object_versions_stats WHERE object_versions_stats.project_id = {{project_id: String}}{stats_object_id_scope}
             ) as object_versions_stats ON object_versions_stats.digest = {main_table_alias}.digest
             """
 

@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 from weave.conversation.conversation_otel import (
     execute_tool_attributes,
@@ -122,6 +122,17 @@ def _capture_info_attrs() -> dict[str, str]:
     every emit, matching ``@op`` semantics in ``weave_client.py``.
     """
     return {f"weave.{k}": v for k, v in get_capture_info().items()}
+
+
+# Forward-looking deprecation: OpenTelemetry is phasing out the Span Event API
+# (``Span.add_event``), so we steer callers to ``set_attributes``,
+# which Weave already records and surfaces in the Agents tab. ``add_event``
+# still works and existing span-event data stays valid.
+# https://opentelemetry.io/blog/2026/deprecating-span-events/
+_ADD_EVENT_DEPRECATION_MESSAGE = (
+    "`add_event` is deprecated; record this data with `set_attributes` instead. "
+    "OpenTelemetry is phasing out the Span Event API (`Span.add_event`)."
+)
 
 
 class _SpanBase(BaseModel):
@@ -243,6 +254,7 @@ class _SpanBase(BaseModel):
             span.set_attributes(attributes)
         return self
 
+    @deprecated(_ADD_EVENT_DEPRECATION_MESSAGE)
     def add_event(
         self,
         name: str,
@@ -250,6 +262,12 @@ class _SpanBase(BaseModel):
         timestamp: datetime | None = None,
     ) -> Self:
         """Record an OTel span event at a point in time within this span.
+
+        .. deprecated::
+            Record this data with ``set_attributes`` instead. OpenTelemetry is
+            phasing out the Span Event API (``Span.add_event``).
+            ``add_event`` still works and existing span-event data stays valid.
+            See https://opentelemetry.io/blog/2026/deprecating-span-events/.
 
         Use for marker / lifecycle data — permission prompts (e.g.
         ``weave.permission_request``), lifecycle transitions (e.g.
@@ -1073,8 +1091,13 @@ class Conversation(BaseModel):
 
     conversation_id: str = ""
     conversation_name: str = ""
+    # Conversation-level defaults each turn inherits (its own value wins).
+    # system_instructions is excluded — it varies per turn.
     agent_name: str = ""
     model: str = ""
+    agent_id: str = ""
+    agent_description: str = ""
+    agent_version: str = ""
     include_content: bool = True
     continue_parent_trace: bool = False
     # Attributes stamped on every span this conversation emits (e.g. an integration
@@ -1096,13 +1119,19 @@ class Conversation(BaseModel):
         user_message: str = "",
         model: str = "",
         agent_name: str = "",
+        agent_id: str = "",
+        agent_description: str = "",
+        agent_version: str = "",
         system_instructions: list[str] | None = None,
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
         Sets the ``_current_turn`` contextvar so the turn is visible via
         ``get_current_turn()`` regardless of whether a context manager is used.
-        Propagates ``continue_parent_trace`` from this conversation.
+        Each of ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description``
+        / ``agent_version`` falls back to the conversation's default when left
+        empty; ``continue_parent_trace`` is inherited. Override any of them later
+        via ``turn.record(...)``.
 
         ``system_instructions`` (the agent's system prompt) is carried on the
         turn's invoke_agent span; it can also be set later via attribute
@@ -1113,6 +1142,9 @@ class Conversation(BaseModel):
         turn = Turn(
             agent_name=agent_name or self.agent_name,
             model=model or self.model,
+            agent_id=agent_id or self.agent_id,
+            agent_description=agent_description or self.agent_description,
+            agent_version=agent_version or self.agent_version,
             system_instructions=system_instructions or [],
             continue_parent_trace=self.continue_parent_trace,
         )
@@ -1507,8 +1539,8 @@ def log_turn(
     queue workers). Each child span passed in should have ``started_at`` /
     ``ended_at`` set; the emitted OTel span timestamps come from those fields.
     Falls back to the earliest/latest child timestamp, then ``now()``, when
-    the turn doesn't supply its own. The agent-identity fields (``agent_id`` /
-    ``agent_description`` / ``agent_version``) mirror the streaming path.
+    the turn doesn't supply its own. ``agent_id`` / ``agent_description`` /
+    ``agent_version`` mirror the streaming path.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
     these from the active conversation instead. Use custom, non-semconv keys: a
@@ -1556,6 +1588,9 @@ def log_conversation(
     conversation_name: str = "",
     agent_name: str = "",
     model: str = "",
+    agent_id: str = "",
+    agent_description: str = "",
+    agent_version: str = "",
     include_content: bool = True,
     continue_parent_trace: bool = False,
     attributes: Attributes = None,
@@ -1564,10 +1599,10 @@ def log_conversation(
 
     Each Turn's ``.spans`` attribute provides its children. Auto-generates
     ``conversation_id`` if empty. By default each turn gets its own OTel trace.
-    ``agent_name`` / ``model`` are conversation-level defaults — a Turn's own value
-    wins; the conversation value only fills in when the Turn leaves it empty. The
-    conversation's ``continue_parent_trace`` applies to every turn (a per-Turn
-    ``continue_parent_trace`` is intentionally superseded here).
+    ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description`` /
+    ``agent_version`` are conversation-level defaults — a Turn's own value wins;
+    the conversation value only fills in when the Turn leaves it empty. The conversation's ``continue_parent_trace`` applies to every turn (a
+    per-Turn ``continue_parent_trace`` is intentionally superseded here).
 
     ``attributes`` are stamped on every emitted span. Use custom, non-semconv
     keys: a key that collides with a span's own ``gen_ai.*`` / ``weave.*``
@@ -1581,15 +1616,17 @@ def log_conversation(
     root_span_ids: list[str] = []
     span_count = 0
     for turn in turns:
-        # Emit the caller's Turn directly so every field survives (not just the
-        # subset log_turn accepts as kwargs). Fill in conversation-level
-        # agent_name/model defaults and apply the conversation's
-        # continue_parent_trace, without mutating the caller's object.
+        # Emit the caller's Turn directly (every field survives, not just
+        # log_turn's kwargs). model_copy applies the conversation defaults (turn
+        # wins) + continue_parent_trace without mutating the caller.
         result = _emit_turn(
             turn.model_copy(
                 update={
                     "agent_name": turn.agent_name or agent_name,
                     "model": turn.model or model,
+                    "agent_id": turn.agent_id or agent_id,
+                    "agent_description": turn.agent_description or agent_description,
+                    "agent_version": turn.agent_version or agent_version,
                     "continue_parent_trace": continue_parent_trace,
                 }
             ),

@@ -11,6 +11,7 @@ from typing import Any, Literal, TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
@@ -686,6 +687,7 @@ def quote_json_path(path: str) -> str:
 
 
 def quote_json_path_parts(parts: list[str]) -> str:
+    assert_parsable_json_path(parts)
     parts_final = []
     for part in parts:
         try:
@@ -694,6 +696,23 @@ def quote_json_path_parts(parts: list[str]) -> str:
         except ValueError:
             parts_final.append('."' + part + '"')
     return "$" + "".join(parts_final)
+
+
+def assert_parsable_json_path(parts: list[str]) -> None:
+    """Reject path segments ClickHouse's JSON_VALUE grammar cannot parse.
+
+    A negative array index compiles to e.g. `[-1]`, which raises BAD_ARGUMENTS
+    in ClickHouse; surface it as a client-facing InvalidFieldError instead.
+    """
+    for part in parts:
+        try:
+            index = int(part)
+        except ValueError:
+            continue
+        if index < 0:
+            raise InvalidFieldError(
+                f"Negative array index {part!r} is not supported in JSON field paths"
+            )
 
 
 def _transform_external_field_to_internal_field(
