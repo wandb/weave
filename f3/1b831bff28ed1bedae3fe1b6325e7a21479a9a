@@ -1,0 +1,102 @@
+## Conversation
+Task: make the gql/graphql-core import lazy so `import weave` stops eagerly
+loading a GraphQL client it almost never uses. The task named two files
+(weave/trace_server/errors.py and weave/compat/wandb/wandb_thin/internal_api.py)
+and expected `import weave` to load 0 graphql modules afterward, with a
+subprocess regression test. Instructions: make ONLY this change, commit
+locally with git notes, do NOT push / open a PR.
+
+## Actions
+- Measured baseline: `import weave` loaded 21 gql + 125 graphql modules.
+- Traced module-level gql/graphql import sites with an __import__ hook. Found
+  THREE, not two:
+    1. weave/trace_server/errors.py:8   (named)
+    2. weave/compat/wandb/wandb_thin/internal_api.py:10-11 (named)
+    3. weave/wandb_interface/project_creator.py:10  (NOT named by the task)
+- Confirmed all three are on the bare `import weave` path (weave.trace.weave_init
+  -> weave.compat.wandb -> internal_api; remote_http_trace_server ->
+  project_creator; weave_client -> errors).
+- errors.py: removed the module-level `from gql.transport.exceptions import ...`.
+  Added a deferred import inside ErrorRegistry._setup_common_errors (mirrors the
+  existing ClickHouse deferral 6 lines below). TransportServerError is ALSO used
+  in _get_transport_server_error_status_code (runtime isinstance -> local import)
+  and _get_transport_server_error_message (annotation -> string annotation +
+  `if TYPE_CHECKING: from gql.transport.exceptions import TransportServerError`).
+- internal_api.py: this file uses gql.gql(...) at CLASS-BODY scope (11 query
+  constants that execute at import) and graphql.DocumentNode in annotations, so
+  the task's 'just move the import' does not work. Refactor: `from __future__
+  import annotations`; converted the 11 `X = gql.gql("...")` class attrs to plain
+  parenthesized string literals; added a module-level `@functools.cache
+  _compile_query(str) -> GraphQLRequest` that imports gql lazily; the two query()
+  methods now compile str->request via `_compile_query(q) if isinstance(q, str)
+  else q` and accept `str | GraphQLRequest`; the 8 methods with
+  `except gql.transport.exceptions.TransportQueryError` got a local `import gql`.
+- project_creator.py: moved the 4-name transport-exceptions import into the two
+  predicates that use them (_is_retryable_project_exception, _is_permission_denied).
+- Added tests/trace/test_import.py::test_import_weave_does_not_load_graphql - a
+  subprocess check (independent of suite import order) asserting no gql/graphql
+  modules in sys.modules after `import weave`.
+
+## Errors & mistakes
+- First `uv sync` picked Python 3.14 and failed building tiktoken (PyO3 max 3.13).
+  Fixed by `uv venv --python 3.12` + `uv sync --group test --python 3.12`.
+- Initially annotated `_compile_query`/query() with graphql.DocumentNode. WRONG:
+  in gql 4.0 `gql.gql()` returns gql.GraphQLRequest (NOT a DocumentNode; isinstance
+  is False) and SyncClientSession.execute takes a GraphQLRequest. Switched all
+  annotations to `GraphQLRequest` (imported under TYPE_CHECKING from gql).
+
+## Dead ends
+- Considered lazy-loading internal_api via PEP 562 __getattr__ in the compat
+  __init__ files instead of refactoring internal_api internals. Rejected: it
+  cascades (project_creator imports wandb_logger eagerly; wandb_thin.__init__
+  eagerly imports Api/ApiAsync) and adds import-system magic. The leaf-file
+  deferral is more predictable.
+- Considered `except _lazy_getter() as e:` to avoid 8 local `import gql`.
+  Rejected as too clever (clarity over cleverness).
+
+## Hints & warnings
+- IT IS ALL-OR-NOTHING. gql is imported once and cached, so `import weave` loads
+  all 125 graphql modules if ANY of the three sites remains. Fixing only two of
+  the three yields ZERO measurable improvement. This is why project_creator.py
+  (unnamed by the task) HAD to be fixed too.
+- mypy: repo runs mypy repo-wide via pre-commit (mirrors-mypy) with
+  additional_dependencies that do NOT include gql/graphql/aiohttp, so with
+  ignore_missing_imports=true those are Any in CI -> the file is mypy-clean there.
+  Locally (gql/graphql are py.typed and installed) mypy showed the ORIGINAL file
+  had 14 errors and mine has 2. Both remaining errors are PRE-EXISTING and
+  unrelated to this change: errors.py `register(formatter=Callable[[TransportServerError],...])`
+  contravariance, and internal_api.py `await transport.session.close()` on
+  Optional[ClientSession]. Left them (out of scope). My change actually removed
+  12 latent local mypy errors (GraphQLRequest-vs-DocumentNode arg-type).
+- query() intentionally accepts `str | GraphQLRequest`: internal callers pass the
+  string constants; tests/utils/test_ssl_verification.py passes a pre-compiled
+  `gql.gql(...)` (a GraphQLRequest). The isinstance guard handles both. Do not
+  narrow to `str` only.
+- `import gql` (bare) DOES expose gql.transport.exceptions.* (gql's __init__
+  imports the client which imports transports) - verified - so the local
+  `import gql` in the except-methods reproduces the original behavior exactly.
+- ruff (uvx ruff) flagged PLW1510 (subprocess.run without check) - added
+  check=False (we assert on returncode ourselves).
+
+## Codebase discoveries
+- The regression test lives in the existing tests/trace/test_import.py (already
+  had test_import_not_slow). It runs in the 'trace' shard but uses no client
+  fixture, so no ClickHouse/Docker needed.
+- gql version in this env is 4.0.0.
+
+## Verification
+- `import weave` now loads 0 gql / 0 graphql (was 21 / 125).
+- New regression test passes; confirmed it FAILS on the pre-fix source.
+- Affected existing tests pass: tests/trace_server/test_errors.py,
+  tests/wandb_interface/test_project_creator.py,
+  tests/utils/test_ssl_verification.py, tests/compat/wandb/test_login.py (80
+  passed), plus tests/trace/test_import.py (both tests).
+- ruff clean on all 4 files.
+- Functional smoke test: handle_server_exception maps TransportQueryError->403
+  and TransportServerError(404/500)->404/500; _compile_query returns a cached
+  GraphQLRequest; project_creator predicates classify gql exceptions correctly.
+
+## Open questions
+- The 2 pre-existing mypy errors (see Hints) are latent under gql 4.x typing but
+  invisible in the current CI mypy env. Not fixed here to keep scope tight; worth
+  a follow-up if gql/aiohttp are ever added to the mypy hook's deps.
