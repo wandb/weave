@@ -6,10 +6,13 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 
 import datetime
 import json
+import sys
 
 import pytest
 
 from weave.trace_server.agents.chat_view import (
+    _MAX_REF_SEARCH_DEPTH,
+    _iter_internal_refs,
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
@@ -1388,3 +1391,54 @@ def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
     ]
     roots = build_span_tree(spans)
     assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+
+
+def _nest_in_lists(value: object, levels: int) -> object:
+    """Wrap ``value`` in ``levels`` nested single-element lists.
+
+    Each list level costs one ``_iter_internal_refs`` recursive descent, so the
+    ref sits exactly ``levels`` deep — a deterministic knob for the depth cap.
+    """
+    nested = value
+    for _ in range(levels):
+        nested = [nested]
+    return nested
+
+
+def test_iter_internal_refs_finds_refs_at_normal_depth() -> None:
+    """A realistically nested inline part (message dict -> content JSON ->
+    parts list -> image_url dict -> url string) is well within the cap, so the
+    internal ref is still surfaced exactly as before.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    message = {
+        "role": "user",
+        "content": _parts(
+            _text_part("What is in this image?"),
+            {"type": "image_url", "image_url": {"url": image_internal}},
+        ),
+        "finish_reason": "",
+    }
+    assert list(_iter_internal_refs(message)) == [image_internal]
+
+
+def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
+    """A pathologically deep payload terminates without ``RecursionError``.
+
+    The recursion limit is dwarfed by the nesting depth, so an uncapped walk
+    would blow the interpreter stack. With the cap in place the walk returns
+    cleanly; refs at the cap boundary are surfaced and deeper refs are dropped.
+    """
+    ref = "weave-trace-internal:///PID/object/deep:DIGEST"
+
+    # A ref sitting exactly at the cap is still found; one level deeper is not.
+    assert list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH))) == [
+        ref
+    ]
+    assert (
+        list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH + 1))) == []
+    )
+
+    # Far beyond sys.getrecursionlimit(): must not raise, must yield nothing.
+    pathological = _nest_in_lists(ref, sys.getrecursionlimit() * 2)
+    assert list(_iter_internal_refs(pathological)) == []

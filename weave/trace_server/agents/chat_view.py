@@ -770,8 +770,18 @@ def _directional_content_refs(
 
 _INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
 
+# Cap on how far ``_iter_internal_refs`` will descend. It walks nested
+# dicts/lists AND re-parses JSON-encoded strings (JSON-inside-JSON), so a deeply
+# nested or adversarial span payload could otherwise exceed Python's recursion
+# limit and raise ``RecursionError`` on the OTel ingest path, rejecting an
+# otherwise-valid span. Realistic message-part nesting is only a handful of
+# levels deep (message dict -> content JSON -> parts list -> part dict ->
+# image_url dict -> url string), so 8 leaves ample headroom while staying far
+# below ``sys.getrecursionlimit()`` (1000 by default).
+_MAX_REF_SEARCH_DEPTH = 8
 
-def _iter_internal_refs(value: Any) -> Iterator[str]:
+
+def _iter_internal_refs(value: Any, depth: int = 0) -> Iterator[str]:
     """Yield every internal weave ref found anywhere in ``value``.
 
     Recurses through dicts/lists and attempts ``json.loads`` on strings so refs
@@ -780,7 +790,13 @@ def _iter_internal_refs(value: Any) -> Iterator[str]:
     internal-form refs are yielded: the int->ext adapter converts these and
     rejects bare external refs, and external inline refs are already handled via
     ``_directional_content_refs``.
+
+    ``depth`` bounds recursion at ``_MAX_REF_SEARCH_DEPTH``: once it is exceeded
+    we stop without yielding, trading unreachable deep refs for a guarantee that
+    a pathological payload cannot raise ``RecursionError``.
     """
+    if depth > _MAX_REF_SEARCH_DEPTH:
+        return
     if isinstance(value, str):
         stripped = value.strip()
         if stripped.startswith(_INTERNAL_REF_PREFIX):
@@ -790,13 +806,13 @@ def _iter_internal_refs(value: Any) -> Iterator[str]:
                 parsed = json.loads(stripped)
             except (ValueError, TypeError):
                 return
-            yield from _iter_internal_refs(parsed)
+            yield from _iter_internal_refs(parsed, depth + 1)
     elif isinstance(value, dict):
         for v in value.values():
-            yield from _iter_internal_refs(v)
+            yield from _iter_internal_refs(v, depth + 1)
     elif isinstance(value, list):
         for item in value:
-            yield from _iter_internal_refs(item)
+            yield from _iter_internal_refs(item, depth + 1)
 
 
 def _inline_media_refs(messages: list[NormalizedMessage]) -> list[str]:
