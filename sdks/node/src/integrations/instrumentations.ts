@@ -18,7 +18,7 @@ export interface CacheEntry {
 
 export default (global as any)[symCJSInstrumentations];
 
-export type HookFn = (exports: any, name: string, baseDir: string) => any;
+type HookFn = (exports: any, name: string, baseDir: string) => any;
 
 (global as any)[symESMInstrumentations] =
   (global as any)[symESMInstrumentations] ||
