@@ -1,4 +1,5 @@
 import base64
+import json
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock
@@ -179,9 +180,10 @@ def _make_otel_export_req_with_ref_attrs(
             kv = KeyValue(key=full_key)
             kv.value.CopyFrom(build_array_value(refs))
             span.attributes.append(kv)
-    # Non-ref attributes must survive unchanged.
+    # A string attribute that contains no ref substring must survive
+    # byte-for-byte (the cheap pre-check skips the conversion entirely).
     other = KeyValue(key="weave.raw_span_dump")
-    other.value.string_value = "weave:///should/not/be/rewritten"
+    other.value.string_value = "raw span dump with no refs"
     span.attributes.append(other)
 
     scope_spans = ScopeSpans()
@@ -279,18 +281,24 @@ def test_genai_otel_export_rewrites_nested_kvlist_ref_attrs() -> None:
 
 
 def test_genai_otel_export_leaves_non_ref_attrs_untouched() -> None:
-    """Refs embedded in non-ref attributes (here `weave.raw_span_dump`)
-    must survive byte-for-byte — only the three typed-array ref keys are
-    rewritten.
+    """A string attribute whose value contains no ref substring is left
+    byte-identical (the cheap pre-check short-circuits before any parse),
+    while the typed ref array alongside it is still rewritten.
     """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
     req = _make_otel_export_req_with_ref_attrs(
         {"weave.object_refs": ["weave:///ent/proj/object/a:v1"]}
     )
 
     forwarded = _capture_genai_otel_export_req(req)
+    # Non-ref string attribute is untouched.
     span = forwarded.processed_spans[0].resource_spans.scope_spans[0].spans[0]
     dump_kv = next(kv for kv in span.attributes if kv.key == "weave.raw_span_dump")
-    assert dump_kv.value.string_value == "weave:///should/not/be/rewritten"
+    assert dump_kv.value.string_value == "raw span dump with no refs"
+    # Typed ref array is still converted to internal form.
+    assert _ref_attr_values(forwarded, "weave.object_refs") == [
+        f"weave-trace-internal:///{internal_proj}/object/a:v1"
+    ]
 
 
 def test_genai_otel_export_skips_non_external_refs_in_array() -> None:
@@ -314,6 +322,116 @@ def test_genai_otel_export_skips_non_external_refs_in_array() -> None:
         "weave-trace-internal:///already-internal/object/b:v1",
         "not-a-ref-at-all",
     ]
+
+
+# --- genai_otel_export ext→int rewriting of refs in string attributes ---
+# Refs also reach the server buried in ordinary string attribute values —
+# most importantly the message-content JSON under `gen_ai.input.messages` /
+# `gen_ai.output.messages`. Those escape both `_ref_apply` (the protobuf is
+# opaque to its walker) and the typed-array path, so the adapter now runs
+# every string_value through the embedded-ref-aware converter.
+
+
+def _make_otel_export_req_with_string_attr(
+    attr_key: str,
+    attr_value: str,
+    *,
+    project_id: str = "ent/proj",
+) -> tsi.agent_types.GenAIOTelExportReq:
+    """Build a `GenAIOTelExportReq` with a single string-valued span attr."""
+    from opentelemetry.proto.common.v1.common_pb2 import KeyValue
+    from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+    from opentelemetry.proto.trace.v1.trace_pb2 import (
+        ResourceSpans,
+        ScopeSpans,
+        Span,
+    )
+
+    span = Span()
+    span.name = "test"
+    kv = KeyValue(key=attr_key)
+    kv.value.string_value = attr_value
+    span.attributes.append(kv)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(Resource())
+    resource_spans.scope_spans.append(scope_spans)
+
+    processed = tsi.ProcessedResourceSpans(
+        entity=project_id.split("/", maxsplit=1)[0],
+        project=project_id.split("/")[1],
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+    return tsi.agent_types.GenAIOTelExportReq(
+        processed_spans=[processed], project_id=project_id, wb_user_id=None
+    )
+
+
+def _string_attr_value(
+    req: tsi.agent_types.GenAIOTelExportReq, attr_key: str
+) -> str:
+    """Pull the string_value of a flat string attribute from a request."""
+    span = req.processed_spans[0].resource_spans.scope_spans[0].spans[0]
+    for kv in span.attributes:
+        if kv.key == attr_key and kv.value.HasField("string_value"):
+            return kv.value.string_value
+    raise AssertionError(f"no string_value for {attr_key}")
+
+
+def test_genai_otel_export_rewrites_ref_embedded_in_message_json() -> None:
+    """An external ref buried inside a `gen_ai.input.messages` JSON string
+    is rewritten to internal form before the request reaches the inner
+    server; the surrounding JSON structure is preserved.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "ref": "weave:///ent/proj/object/ds:DIG"},
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+    req = _make_otel_export_req_with_string_attr(
+        "gen_ai.input.messages", json.dumps(messages)
+    )
+
+    forwarded = _capture_genai_otel_export_req(req)
+
+    forwarded_json = json.loads(_string_attr_value(forwarded, "gen_ai.input.messages"))
+    assert forwarded_json == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "ref": f"weave-trace-internal:///{internal_proj}/object/ds:DIG",
+                },
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+
+
+def test_genai_otel_export_rewrites_whole_ref_string_attr() -> None:
+    """A string attribute whose whole value is an external ref (not JSON) is
+    forwarded as the internal whole ref.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    req = _make_otel_export_req_with_string_attr(
+        "gen_ai.output.dataset_ref", "weave:///ent/proj/object/ds:DIG"
+    )
+
+    forwarded = _capture_genai_otel_export_req(req)
+
+    assert (
+        _string_attr_value(forwarded, "gen_ai.output.dataset_ref")
+        == f"weave-trace-internal:///{internal_proj}/object/ds:DIG"
+    )
 
 
 def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:

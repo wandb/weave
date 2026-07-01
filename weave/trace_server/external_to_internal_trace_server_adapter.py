@@ -3,7 +3,7 @@ import asyncio
 from collections.abc import Awaitable, Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
-from opentelemetry.proto.common.v1.common_pb2 import KeyValue
+from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
@@ -11,6 +11,7 @@ from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
+    weave_internal_prefix,
     weave_prefix,
 )
 
@@ -30,37 +31,95 @@ _OTEL_REF_ATTR_KEYS = frozenset(
 def _rewrite_otel_ref_attrs_inplace(
     attrs: Iterable[KeyValue],
     ext_to_int_project_id: Callable[[str], str],
-    cache: dict[str, str],
+    verify_internal_project_id: Callable[[str], bool],
     prefix: str = "",
 ) -> None:
-    """Recursively rewrite typed ref attributes from external to internal form.
+    """Recursively rewrite refs in span attributes from external to internal.
 
     OTel encodes attributes either flat (`weave.object_refs`) or nested as
     a `kvlist_value` (top-level key `weave` with a child `object_refs`),
     so we descend through `kvlist_value`s and accumulate dotted prefixes.
-    Only `Array(String)` values under the known ref keys are touched;
-    everything else (including refs embedded in event payloads, message
-    content, `raw_span_dump`, etc.) is left exactly as the client sent it.
-    `cache` is a shared per-request dict that memoizes ext→int project_id
-    lookups across every ref in the batch.
+
+    Two kinds of refs are converted:
+
+      * The typed `Array(String)` ref columns under the known ref keys
+        (`weave.content_refs` / `weave.artifact_refs` / `weave.object_refs`).
+        Only WHOLE external refs are touched here; internal refs and
+        non-refs pass through untouched, because the read path surfaces
+        these as bare strings and must round-trip them exactly.
+      * Every other `string_value` leaf (most importantly the message
+        content JSON under `gen_ai.input.messages` / `gen_ai.output.messages`,
+        but also any other string attribute). These go through the
+        embedded-ref-aware `universal_ext_to_int_ref_converter`, so a whole
+        external ref OR a JSON string that merely embeds refs both convert
+        with the same semantics `_ref_apply` gives every other endpoint.
+
+    `ext_to_int_project_id` is a shared per-request memoized closure so the
+    ext→int project_id lookup runs at most once per distinct entity/project
+    pair across the whole batch (typed arrays AND embedded refs).
+    `verify_internal_project_id` gates embedded internal refs exactly as
+    `_ref_apply` does (accept the request's own project + access-checked
+    cross-project refs).
     """
     for kv in attrs:
         full_key = f"{prefix}{kv.key}" if prefix else kv.key
-        value = kv.value
-        if full_key in _OTEL_REF_ATTR_KEYS and value.HasField("array_value"):
-            for item in value.array_value.values:
-                if item.HasField("string_value") and item.string_value.startswith(
-                    weave_prefix
-                ):
-                    item.string_value = replace_external_weave_ref(
-                        item.string_value, ext_to_int_project_id, cache
-                    )
-        elif value.HasField("kvlist_value"):
-            _rewrite_otel_ref_attrs_inplace(
-                value.kvlist_value.values,
+        _rewrite_otel_value_inplace(
+            kv.value, full_key, ext_to_int_project_id, verify_internal_project_id
+        )
+
+
+def _rewrite_otel_value_inplace(
+    value: AnyValue,
+    full_key: str,
+    ext_to_int_project_id: Callable[[str], str],
+    verify_internal_project_id: Callable[[str], bool],
+) -> None:
+    """Rewrite refs inside a single OTel `AnyValue`, in place.
+
+    Dispatched by value kind; see `_rewrite_otel_ref_attrs_inplace` for the
+    overall contract. Array elements are keyless (`full_key=""`), so they
+    can never match a typed ref key and always fall through to the generic
+    string handling.
+    """
+    # 1. Typed ref-array columns: convert WHOLE external refs only; leave
+    #    internal refs and non-refs exactly as sent so the read path can
+    #    round-trip the bare strings.
+    if full_key in _OTEL_REF_ATTR_KEYS and value.HasField("array_value"):
+        for item in value.array_value.values:
+            if item.HasField("string_value") and item.string_value.startswith(
+                weave_prefix
+            ):
+                item.string_value = replace_external_weave_ref(
+                    item.string_value, ext_to_int_project_id
+                )
+        return
+    # 2. Nested kvlist: descend, accumulating the dotted key so typed ref
+    #    keys emitted as `weave` -> `object_refs` still match.
+    if value.HasField("kvlist_value"):
+        _rewrite_otel_ref_attrs_inplace(
+            value.kvlist_value.values,
+            ext_to_int_project_id,
+            verify_internal_project_id,
+            prefix=f"{full_key}." if full_key else "",
+        )
+        return
+    # 3. Non-typed array: descend into each (keyless) element.
+    if value.HasField("array_value"):
+        for item in value.array_value.values:
+            _rewrite_otel_value_inplace(
+                item, "", ext_to_int_project_id, verify_internal_project_id
+            )
+        return
+    # 4. Plain string leaf: convert whole-ref AND embedded-in-JSON refs via
+    #    the embedded-ref-aware converter. Gated by the cheap substring
+    #    pre-check so ref-free strings never pay for a parse pass.
+    if value.HasField("string_value"):
+        s = value.string_value
+        if weave_prefix in s or weave_internal_prefix in s:
+            value.string_value = universal_ext_to_int_ref_converter(
+                s,
                 ext_to_int_project_id,
-                cache,
-                prefix=f"{full_key}.",
+                verify_internal_project_id=verify_internal_project_id,
             )
 
 
@@ -1313,25 +1372,45 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def genai_otel_export(
         self, req: tsi.agent_types.GenAIOTelExportReq
     ) -> tsi.agent_types.GenAIOTelExportRes:
+        # Convert `req.project_id` DIRECTLY (not through the memoized wrapper
+        # below): this is the request's own project translation and must
+        # always hit the id converter once.
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         # `_ref_apply`'s universal walker can't descend into the raw
-        # protobuf `ResourceSpans` payload, so the typed-ref OTel
-        # attribute values (`weave.content_refs`, `weave.artifact_refs`,
-        # `weave.object_refs`) escape the standard ext→int conversion.
-        # Rewrite them in-place here so the inner trace server sees a
-        # request that's already in internal-ref form, matching the
-        # invariant every other resolver relies on. The cache is shared
-        # across every span in the batch so ext→int_project_id runs at
-        # most once per distinct entity/project pair per request.
-        ext_to_int = self._idc.ext_to_int_project_id
+        # protobuf `ResourceSpans` payload, so refs carried in span
+        # attributes escape the standard ext→int conversion. Rewrite them
+        # in-place here so the inner trace server sees a request that's
+        # already in internal-ref form, matching the invariant every other
+        # resolver relies on. This covers both the typed ref-array columns
+        # (`weave.content_refs` / `weave.artifact_refs` / `weave.object_refs`)
+        # AND refs embedded in ordinary string attributes (e.g. a dataset ref
+        # inside the `gen_ai.input.messages` / `gen_ai.output.messages` JSON).
+        #
+        # A SINGLE memoized closure funnels every ext→int project lookup
+        # (array items AND embedded string refs) so `ext_to_int_project_id`
+        # runs at most once per distinct entity/project pair across the whole
+        # batch. `req.project_id` is already internal here, so the verifier
+        # accepts the request's own project plus access-checked cross-project
+        # internal refs — exactly what `_ref_apply` does.
         project_id_cache: dict[str, str] = {}
+
+        def cached_ext_to_int(project_key: str) -> str:
+            if project_key not in project_id_cache:
+                project_id_cache[project_key] = self._idc.ext_to_int_project_id(
+                    project_key
+                )
+            return project_id_cache[project_key]
+
+        verify_internal_project_id = self._make_project_verifier(req.project_id)
         for processed_span in req.processed_spans:
             for scope_spans in processed_span.resource_spans.scope_spans:
                 for span in scope_spans.spans:
                     _rewrite_otel_ref_attrs_inplace(
-                        span.attributes, ext_to_int, project_id_cache
+                        span.attributes,
+                        cached_ext_to_int,
+                        verify_internal_project_id,
                     )
         return self._internal_trace_server.genai_otel_export(req)
 
