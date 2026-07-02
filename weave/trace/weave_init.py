@@ -45,10 +45,14 @@ logger = logging.getLogger(__name__)
 
 # The conversation/agent OTel provider is set once (OTel's global provider is
 # set-once and its Resource is immutable). A later weave.init() to a different
-# project reroutes by rewriting the exporter's project_id header instead of
-# rebuilding, so agent spans follow the active project.
+# project reroutes by rewriting the exporter's headers instead of rebuilding,
+# so agent spans (and their creds) follow the active project.
 _conversation_tracer_provider: TracerProvider | None = None
 _conversation_span_exporter: OTLPSpanExporter | None = None
+
+# Bound the pre-reroute flush so switching projects can't block weave.init() on a
+# stalled exporter; spans that miss the window export under the new project.
+_CONVERSATION_REROUTE_FLUSH_TIMEOUT_MS = 5000
 
 
 class WeaveWandbAuthenticationException(Exception): ...
@@ -155,16 +159,37 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         return
 
     project_id = f"{entity}/{project}"
+    headers = _conversation_headers(project_id, api_key)
 
-    # Re-init to a new project: our provider is already the global one and can't
-    # be swapped (OTel's set-once), so reroute the live exporter. Flush first so
-    # spans still queued under the old project export under the old project_id.
-    if _conversation_span_exporter is not None and (
-        trace.get_tracer_provider() is _conversation_tracer_provider
+    # Re-init while we own the global provider: it's set-once with an immutable
+    # Resource, so reroute the live exporter's headers instead of rebuilding.
+    existing_provider = _conversation_tracer_provider
+    existing_exporter = _conversation_span_exporter
+    if (
+        existing_provider is not None
+        and existing_exporter is not None
+        and trace.get_tracer_provider() is existing_provider
     ):
-        if _conversation_tracer_provider is not None:
-            _conversation_tracer_provider.force_flush()
-        _conversation_span_exporter._session.headers["project_id"] = project_id
+        # TODO: mutating the exporter's private requests.Session couples us to
+        # http-proto internals; a delegating SpanExporter would drop the poke.
+        current = existing_exporter._session.headers
+        if current.get("project_id") == headers["project_id"] and current.get(
+            "Authorization"
+        ) == headers.get("Authorization"):
+            return
+        # Bounded flush of spans queued under the old project before re-heading,
+        # so in-flight spans export under the old project_id (binds at export).
+        if not existing_provider.force_flush(_CONVERSATION_REROUTE_FLUSH_TIMEOUT_MS):
+            logger.warning(
+                "Conversation tracing: flush timed out (%dms) before project reroute; "
+                "some queued spans may export under the new project",
+                _CONVERSATION_REROUTE_FLUSH_TIMEOUT_MS,
+            )
+        current["project_id"] = headers["project_id"]
+        if "Authorization" in headers:
+            current["Authorization"] = headers["Authorization"]
+        else:
+            current.pop("Authorization", None)
         return
 
     # A provider we didn't install is active (e.g. the user configured their
@@ -173,18 +198,6 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         return
 
     endpoint = otel_traces_endpoint(trace_server_url)
-
-    # Match the auth pattern used by the rest of weave (see
-    # init_weave_get_server: res.set_auth(("api", api_key)) and
-    # wandb_thin/internal_api.py: BasicAuth("api", api_key)).
-    # HTTP Basic auth requires base64("user:pass").
-    # The project rides the project_id header, not the Resource: the Resource is
-    # immutable, so a header is the only field that can follow weave.init().
-    headers: dict[str, str] = {"project_id": project_id}
-    if api_key:
-        token = base64.b64encode(f"api:{api_key}".encode()).decode()
-        headers["Authorization"] = f"Basic {token}"
-
     resource = Resource.create({"service.name": "weave-conversation-sdk"})
     exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
     # Honor WEAVE_INSECURE_DISABLE_SSL for the OTel exporter too, so
@@ -201,8 +214,24 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     # deep-linking in the agent traces UI.
     provider.add_span_processor(EvalLinkSpanProcessor())
     trace.set_tracer_provider(provider)
+    # No-op if another provider won the set-once race after our check above;
+    # only record ownership if ours took, else we leak/mis-route on re-init.
+    if trace.get_tracer_provider() is not provider:
+        provider.shutdown()
+        return
     _conversation_tracer_provider = provider
     _conversation_span_exporter = exporter
+
+
+def _conversation_headers(project_id: str, api_key: str | None) -> dict[str, str]:
+    """Export headers routing agent spans: project via project_id, creds via Basic auth."""
+    # Auth mirrors the rest of weave (BasicAuth base64("api:<key>")); one source
+    # of truth so setup and reroute never diverge into stale creds.
+    headers: dict[str, str] = {"project_id": project_id}
+    if api_key:
+        token = base64.b64encode(f"api:{api_key}".encode()).decode()
+        headers["Authorization"] = f"Basic {token}"
+    return headers
 
 
 def init_weave(

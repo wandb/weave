@@ -8,6 +8,9 @@ spans bleeding into the first-initialized project.
 
 from __future__ import annotations
 
+import base64
+import logging
+
 import pytest
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -55,6 +58,95 @@ def test_conversation_tracing_reroutes_project_on_reinit(
     assert weave_init._conversation_span_exporter is exporter
     assert exporter._session.headers["project_id"] == "ent/proj-b"
     assert exporter._session.headers["Authorization"].startswith("Basic ")
+
+
+def test_conversation_tracing_reroutes_credentials_on_reinit(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Re-init with a new api key reroutes creds too, not just the project.
+
+    The exporter's project_id and Authorization are one logical unit; a stale
+    Authorization would export the new project's spans with the old account's
+    credentials (cross-account attribution / 403s).
+    """
+    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+    exporter = weave_init._conversation_span_exporter
+    assert exporter is not None
+    auth_a = exporter._session.headers["Authorization"]
+    assert auth_a == "Basic " + base64.b64encode(b"api:key-a").decode()
+
+    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    assert weave_init._conversation_span_exporter is exporter
+    assert exporter._session.headers["project_id"] == "ent/proj-b"
+    assert exporter._session.headers["Authorization"] == (
+        "Basic " + base64.b64encode(b"api:key-b").decode()
+    )
+    assert exporter._session.headers["Authorization"] != auth_a
+
+    # Re-init without a key drops the stale Authorization rather than keeping it.
+    weave_init._setup_conversation_tracing("ent", "proj-c", None)
+    assert exporter._session.headers["project_id"] == "ent/proj-c"
+    assert "Authorization" not in exporter._session.headers
+
+
+def test_conversation_tracing_flush_semantics_on_reinit(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    """Flush precedes reheader; same project skips it; a timed-out flush still reroutes (warns)."""
+    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+    provider = weave_init._conversation_tracer_provider
+    exporter = weave_init._conversation_span_exporter
+    assert provider is not None
+    assert exporter is not None
+
+    flushed_project_ids: list[str | None] = []
+    flush_ok = True
+
+    def _spy_flush(*args: object, **kwargs: object) -> bool:
+        # Capture project_id visible at flush time to prove flush precedes reheader.
+        flushed_project_ids.append(exporter._session.headers.get("project_id"))
+        return flush_ok
+
+    monkeypatch.setattr(provider, "force_flush", _spy_flush)
+
+    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    assert flushed_project_ids == ["ent/proj-a"]
+    assert exporter._session.headers["project_id"] == "ent/proj-b"
+
+    # Same project + creds: no reroute work, no blocking flush.
+    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    assert flushed_project_ids == ["ent/proj-a"]
+
+    # A timed-out flush still reroutes (queued spans misroute to the new project) and warns.
+    flush_ok = False
+    with caplog.at_level(logging.WARNING):
+        weave_init._setup_conversation_tracing("ent", "proj-c", "key-c")
+    assert flushed_project_ids == ["ent/proj-a", "ent/proj-b"]
+    assert exporter._session.headers["project_id"] == "ent/proj-c"
+    assert "flush timed out" in caplog.text
+
+
+def test_conversation_tracing_disowns_provider_if_set_once_refused(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """If OTel refuses our provider (set-once lost), shut it down and don't own it."""
+    shutdowns: list[bool] = []
+    orig_shutdown = TracerProvider.shutdown
+
+    def _spy_shutdown(self: TracerProvider, *args: object, **kwargs: object) -> None:
+        shutdowns.append(True)
+        orig_shutdown(self, *args, **kwargs)
+
+    monkeypatch.setattr(TracerProvider, "shutdown", _spy_shutdown)
+    # Simulate losing the set-once race: our set_tracer_provider call is ignored.
+    monkeypatch.setattr(otel_trace, "set_tracer_provider", lambda provider: None)
+
+    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+
+    assert shutdowns == [True]
+    assert weave_init._conversation_tracer_provider is None
+    assert weave_init._conversation_span_exporter is None
 
 
 def test_conversation_tracing_leaves_foreign_provider_untouched(
