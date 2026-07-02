@@ -2040,3 +2040,35 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_e
     else:
         mock_producer.produce_score_agent_spans.assert_not_called()
         mock_producer.flush.assert_not_called()
+
+
+def test_mint_client_forwards_send_receive_timeout():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client(
+            send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+        kwargs = mock_get_client.call_args.kwargs
+        assert (
+            kwargs["send_receive_timeout"]
+            == ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+
+
+def test_mint_client_omits_send_receive_timeout_by_default():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client()
+        assert "send_receive_timeout" not in mock_get_client.call_args.kwargs
