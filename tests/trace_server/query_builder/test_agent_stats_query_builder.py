@@ -463,7 +463,7 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
            WHERE s.ended_at > s.started_at
              AND isNotNull(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL))
              AND isFinite(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL)) ),
-          (SELECT CAST(tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count()) AS Tuple(min_bound Float64, max_bound Float64, value_count UInt64))
+          (SELECT CAST(tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count()) AS Tuple(min_bound Nullable(Float64), max_bound Nullable(Float64), value_count UInt64))
            FROM value_rows) AS bounds_tuple,
              all_buckets AS
           (SELECT toUInt64(number) AS bucket
@@ -538,7 +538,7 @@ def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
           (SELECT avgOrNull(if((mapContains(s.custom_attrs_float, {genai_9:String})), toFloat64(s.custom_attrs_float[{genai_9:String}]), NULL)) AS bucket_value
            FROM filtered_spans s
            GROUP BY s.conversation_id),
-          (SELECT CAST(tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count()) AS Tuple(min_bound Float64, max_bound Float64, value_count UInt64))
+          (SELECT CAST(tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count()) AS Tuple(min_bound Nullable(Float64), max_bound Nullable(Float64), value_count UInt64))
            FROM value_rows) AS bounds_tuple,
              all_buckets AS
           (SELECT toUInt64(number) AS bucket

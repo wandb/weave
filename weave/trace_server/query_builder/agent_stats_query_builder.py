@@ -886,7 +886,7 @@ def _build_numeric_bucket_stats_query(
           toFloat64({min_bound_sql}),
           toFloat64({max_bound_sql}),
           count()
-        ) AS Tuple(min_bound Float64, max_bound Float64, value_count UInt64))
+        ) AS Tuple(min_bound Nullable(Float64), max_bound Nullable(Float64), value_count UInt64))
         FROM {_CTE_VALUE_ROWS}
       ) AS {_BOUNDS_TUPLE},
       {_CTE_ALL_BUCKETS} AS (
