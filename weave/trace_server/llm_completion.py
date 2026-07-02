@@ -384,8 +384,13 @@ def _build_litellm_kwargs(
 
 
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
-    error_message = str(e).replace("litellm.", "")
-    return tsi.CompletionsCreateRes(response={"error": error_message})
+    response: dict[str, Any] = {"error": str(e).replace("litellm.", "")}
+    # litellm exceptions subclass the openai error hierarchy and carry the
+    # provider HTTP status code; preserve it for status-class classification.
+    status_code = getattr(e, "status_code", None)
+    if isinstance(status_code, int):
+        response[tsi.ERROR_STATUS_CODE_KEY] = status_code
+    return tsi.CompletionsCreateRes(response=response)
 
 
 def get_bedrock_credentials(

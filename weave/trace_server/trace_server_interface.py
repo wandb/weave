@@ -565,6 +565,12 @@ class CompletionsCreateReq(BaseModelStrict):
     )
 
 
+# Key in `CompletionsCreateRes.response` holding the provider HTTP status code
+# when the completion failed, so consumers can classify by status class (4xx
+# account/config vs 5xx availability) instead of matching the error string.
+ERROR_STATUS_CODE_KEY = "error_status_code"
+
+
 class CompletionsCreateRes(BaseModel):
     response: dict[str, Any]
     weave_call_id: str | None = None  # Deprecated: use span_id instead
