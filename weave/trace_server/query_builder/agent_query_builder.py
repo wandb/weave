@@ -1229,6 +1229,8 @@ def make_custom_attrs_schema_query(
     span_filters = _spans_filter_sql(pb, req)
     limit_slot = pb.add(req.limit + 1, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
+    # Per-source UNION ALL: a scalar ARRAY JOIN + GROUP BY on the bare key is far
+    # cheaper (CPU, peak memory) than grouping on one concatenated per-row tuple array.
     source_branches = "\n            UNION ALL\n            ".join(
         f"""SELECT '{source}' AS source,
                    '{value_type}' AS value_type,
