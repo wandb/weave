@@ -1167,27 +1167,72 @@ def _create_eval_run_with_cost_trials(client, trials, *, eval_name):
     return run.evaluation_run_id
 
 
-def test_eval_results_summary_predict_total_cost(client):
-    """Summary predict_total_cost sums per-trial predict cost, excluding scorer cost."""
+# One table of (prices, trials, include_costs, expected) instead of five
+# near-identical functions. `expected is None` asserts the None contract;
+# otherwise an exact ($0) or approx dollar amount.
+@pytest.mark.parametrize(
+    ("prices", "trials", "include_costs", "expected"),
+    [
+        # Sums per-trial predict cost and excludes the judge; a usage-less trial
+        # reports no cost and is skipped, not counted as 0.
+        pytest.param(
+            {"predict-llm": _PREDICT_PRICE, "judge-llm": _JUDGE_PRICE},
+            [
+                ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
+                ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
+                (None, {"judge-llm": _JUDGE_USAGE}),
+            ],
+            True,
+            pytest.approx(2 * _PREDICT_COST_PER_TRIAL),
+            id="sums_predict_excludes_judge",
+        ),
+        # Cost is opt-in: without include_costs the total is None even when priced.
+        pytest.param(
+            {"predict-llm": _PREDICT_PRICE},
+            [({"predict-llm": _PREDICT_USAGE}, None)],
+            False,
+            None,
+            id="requires_include_costs",
+        ),
+        # A predict model priced at $0 reports 0.0, not None (mirrors token zero).
+        pytest.param(
+            {"free-llm": {"prompt_token_cost": 0.0, "completion_token_cost": 0.0}},
+            [({"free-llm": _PREDICT_USAGE}, None)],
+            True,
+            0.0,
+            id="counts_zero",
+        ),
+        # Multiple priced models on one predict call: their costs sum.
+        pytest.param(
+            {
+                "predict-llm": _PREDICT_PRICE,
+                "predict-llm-b": {
+                    "prompt_token_cost": 0.003,
+                    "completion_token_cost": 0.004,
+                },
+            },
+            [({"predict-llm": _PREDICT_USAGE, "predict-llm-b": _PREDICT_USAGE}, None)],
+            True,
+            pytest.approx(_PREDICT_COST_PER_TRIAL + 100 * 0.003 + 50 * 0.004),
+            id="sums_multiple_models",
+        ),
+    ],
+)
+def test_eval_results_summary_predict_total_cost(
+    client, prices, trials, include_costs, expected
+):
+    """Summary predict_total_cost: predict-only, opt-in, $0-vs-None, multi-model."""
     project_id = client.project_id
-    client.server.cost_create(
-        CostCreateReq(
-            project_id=project_id,
-            costs={"predict-llm": _PREDICT_PRICE, "judge-llm": _JUDGE_PRICE},
-            wb_user_id="VXNlcjo0NTI1NDQ=",
+    if prices:
+        client.server.cost_create(
+            CostCreateReq(
+                project_id=project_id,
+                costs=prices,
+                wb_user_id="VXNlcjo0NTI1NDQ=",
+            )
         )
-    )
-    # Two trials, each with a priced predict child and a (more expensive) priced
-    # judge child. A third trial's predict has no usage: it reports no cost and
-    # is skipped, not counted as 0.
     eval_id = _create_eval_run_with_cost_trials(
-        client,
-        [
-            ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
-            ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
-            (None, {"judge-llm": _JUDGE_USAGE}),
-        ],
-        eval_name="predict-cost",
+        client, trials, eval_name="predict-cost"
     )
     res = client.server.eval_results_query(
         EvalResultsQueryReq(
@@ -1196,47 +1241,23 @@ def test_eval_results_summary_predict_total_cost(client):
             include_rows=False,
             include_summary=True,
             include_predict_and_score_children=True,
-            include_costs=True,
+            include_costs=include_costs,
         )
     )
     assert res.summary is not None
-    # 2 priced predict trials; the judge cost and the usage-less trial are excluded.
-    assert res.summary.evaluations[0].predict_total_cost == pytest.approx(
-        2 * _PREDICT_COST_PER_TRIAL
-    )
-
-
-def test_eval_results_summary_predict_total_cost_requires_include_costs(client):
-    """Without include_costs the predict_total_cost is None (cost is opt-in)."""
-    project_id = client.project_id
-    client.server.cost_create(
-        CostCreateReq(
-            project_id=project_id,
-            costs={"predict-llm": _PREDICT_PRICE},
-            wb_user_id="VXNlcjo0NTI1NDQ=",
-        )
-    )
-    eval_id = _create_eval_run_with_cost_trials(
-        client,
-        [({"predict-llm": _PREDICT_USAGE}, None)],
-        eval_name="cost-opt-in",
-    )
-    res = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=project_id,
-            evaluation_call_ids=[eval_id],
-            include_rows=False,
-            include_summary=True,
-            include_predict_and_score_children=True,
-            # include_costs omitted -> defaults to False
-        )
-    )
-    assert res.summary is not None
-    assert res.summary.evaluations[0].predict_total_cost is None
+    if expected is None:
+        assert res.summary.evaluations[0].predict_total_cost is None
+    else:
+        assert res.summary.evaluations[0].predict_total_cost == expected
 
 
 def test_eval_results_summary_predict_total_cost_none_when_absent(client):
-    """predict_total_cost is None when no trial reports cost (e.g. unpriced models)."""
+    """predict_total_cost is None when no trial reports cost (e.g. unpriced models).
+
+    Kept separate from the parametrized cases above: it drives a normal eval via
+    _create_eval_with_scores (no predict usage at all) rather than the priced
+    cost-trial builder, exercising the None path from a different setup.
+    """
     eval_id, _ = _create_eval_with_scores(
         client, [{"accuracy": 0.5}], eval_name="no-cost"
     )
@@ -1251,76 +1272,6 @@ def test_eval_results_summary_predict_total_cost_none_when_absent(client):
     )
     assert res.summary is not None
     assert res.summary.evaluations[0].predict_total_cost is None
-
-
-def test_eval_results_summary_predict_total_cost_counts_zero(client):
-    """A predict model priced at $0 reports 0.0, not None (mirrors the token zero case)."""
-    project_id = client.project_id
-    client.server.cost_create(
-        CostCreateReq(
-            project_id=project_id,
-            costs={
-                "free-llm": {"prompt_token_cost": 0.0, "completion_token_cost": 0.0}
-            },
-            wb_user_id="VXNlcjo0NTI1NDQ=",
-        )
-    )
-    eval_id = _create_eval_run_with_cost_trials(
-        client,
-        [({"free-llm": _PREDICT_USAGE}, None)],
-        eval_name="cost-zero",
-    )
-    res = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=project_id,
-            evaluation_call_ids=[eval_id],
-            include_rows=False,
-            include_summary=True,
-            include_predict_and_score_children=True,
-            include_costs=True,
-        )
-    )
-    assert res.summary is not None
-    assert res.summary.evaluations[0].predict_total_cost == 0.0
-
-
-def test_eval_results_summary_predict_total_cost_sums_multiple_models(client):
-    """When a predict call spans multiple priced models, their costs are summed."""
-    project_id = client.project_id
-    client.server.cost_create(
-        CostCreateReq(
-            project_id=project_id,
-            costs={
-                "predict-llm": _PREDICT_PRICE,
-                "predict-llm-b": {
-                    "prompt_token_cost": 0.003,
-                    "completion_token_cost": 0.004,
-                },
-            },
-            wb_user_id="VXNlcjo0NTI1NDQ=",
-        )
-    )
-    eval_id = _create_eval_run_with_cost_trials(
-        client,
-        [({"predict-llm": _PREDICT_USAGE, "predict-llm-b": _PREDICT_USAGE}, None)],
-        eval_name="cost-multimodel",
-    )
-    res = client.server.eval_results_query(
-        EvalResultsQueryReq(
-            project_id=project_id,
-            evaluation_call_ids=[eval_id],
-            include_rows=False,
-            include_summary=True,
-            include_predict_and_score_children=True,
-            include_costs=True,
-        )
-    )
-    assert res.summary is not None
-    # model a: 100*0.001 + 50*0.002 = 0.2; model b: 100*0.003 + 50*0.004 = 0.5.
-    cost_b = 100 * 0.003 + 50 * 0.004
-    assert res.summary.evaluations[0].predict_total_cost == pytest.approx(
-        _PREDICT_COST_PER_TRIAL + cost_b
-    )
 
 
 def test_eval_results_resolved_inputs_inline(client):
