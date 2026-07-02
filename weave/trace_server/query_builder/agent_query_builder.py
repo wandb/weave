@@ -958,8 +958,9 @@ def _spans_source(
     )
 
 
-# Name of the two-pass page CTE; also passed as the attributed source's
-# `base_relation` so the fallback rollup scopes to `SELECT trace_id FROM page`.
+# Name of the two-pass page CTE; passed as both the attributed source's
+# `base_relation` and its `fallback_scope_relation` so the page is attributed
+# and the fallback rollup scopes to `SELECT trace_id FROM page`.
 _PAGE_CTE = "page"
 
 
@@ -989,7 +990,7 @@ def _two_pass_spans_list_query(
         started_after=req.started_after,
         started_before=req.started_before,
         base_relation=_PAGE_CTE,
-        scope_fallback_to_base=True,
+        fallback_scope_relation=_PAGE_CTE,
     )
     return f"""
         WITH {_PAGE_CTE} AS (
