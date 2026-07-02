@@ -801,10 +801,12 @@ def _build_numeric_bucket_stats_query(
         if bucket.max is not None
         else "max(bucket_value)"
     )
-    # bounds is a scalar tuple evaluated once: (min, max, count).
-    bounds_min = f"{_BOUNDS_TUPLE}.1"
-    bounds_max = f"{_BOUNDS_TUPLE}.2"
-    bounds_count = f"{_BOUNDS_TUPLE}.3"
+    # bounds computed once as a scalar tuple (min, max, count).
+    # ClickHouse does NOT materialize table CTEs - each reference re-scans
+    # value_rows (re-decoding the attrs map). Do NOT convert back to a CTE.
+    bounds_min = f"{_BOUNDS_TUPLE}.min_bound"
+    bounds_max = f"{_BOUNDS_TUPLE}.max_bound"
+    bounds_count = f"{_BOUNDS_TUPLE}.value_count"
     bucket_width_sql = (
         f"if({bounds_max} > {bounds_min}, "
         f"({bounds_max} - {bounds_min}) "
@@ -878,11 +880,11 @@ def _build_numeric_bucket_stats_query(
         {value_rows_sql}
       ),
       (
-        SELECT tuple(
+        SELECT CAST(tuple(
           toFloat64({min_bound_sql}),
           toFloat64({max_bound_sql}),
           count()
-        )
+        ) AS Tuple(min_bound Float64, max_bound Float64, value_count UInt64))
         FROM {_CTE_VALUE_ROWS}
       ) AS {_BOUNDS_TUPLE},
       {_CTE_ALL_BUCKETS} AS (
@@ -894,8 +896,7 @@ def _build_numeric_bucket_stats_query(
           {bucket_index_sql} AS {_BUCKET_COLUMN},
           {agg_select_sql}
         FROM {_CTE_VALUE_ROWS}
-        WHERE {bounds_count} > 0
-          AND {_CTE_VALUE_ROWS}.bucket_value >= {bounds_min}
+        WHERE {_CTE_VALUE_ROWS}.bucket_value >= {bounds_min}
           AND {_CTE_VALUE_ROWS}.bucket_value <= {bounds_max}
         GROUP BY {_BUCKET_COLUMN}
       )
