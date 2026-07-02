@@ -390,7 +390,7 @@ ERROR_STATUS_CODE_KEY = "error_status_code"
 
 
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
-    response: dict[str, Any] = {"error": str(e).replace("litellm.", "")}
+    response: dict[str, Any] = {"error": str(e).replace("litellm.", "", 1)}
     # litellm exceptions subclass the openai error hierarchy and carry the
     # provider HTTP status code; preserve it for status-class classification.
     status_code = getattr(e, "status_code", None)
