@@ -100,6 +100,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -1980,8 +1981,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             started_at_max_param = pb.add_param(
                 datetime_to_microseconds(started_at_window[1] + pad)
             )
+        table_name = self._get_calls_complete_table_name()
+        # Logical delete: a lightweight UPDATE writes a patch part the read path
+        # applies on the fly (via its deleted_at filter), so the calls vanish
+        # immediately with no mutation and no part rewrite.
+        soft_delete_query = build_calls_complete_soft_delete_query(
+            table_name,
+            project_id_param,
+            call_ids_param,
+            started_at_min_param=started_at_min_param,
+            started_at_max_param=started_at_max_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(
+            soft_delete_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
+        # Physical reclamation runs async (sync=0) and unwaited: the marker above
+        # already hid the rows, so a slow reclaim never blocks the request.
         delete_query = build_calls_complete_delete_query(
-            self._get_calls_complete_table_name(),
+            table_name,
             project_id_param,
             call_ids_param,
             started_at_min_param=started_at_min_param,
@@ -1993,47 +2013,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
-        self._await_calls_complete_deletion(project_id, call_ids, started_at_window)
-
-    @traced(name="clickhouse_trace_server_batched._await_calls_complete_deletion")
-    def _await_calls_complete_deletion(
-        self,
-        project_id: str,
-        call_ids: list[str],
-        started_at_window: tuple[datetime.datetime, datetime.datetime] | None,
-    ) -> None:
-        """Block until the async delete's row mask applies, up to a bounded window.
-
-        The DELETE runs async (lightweight_deletes_sync=0), so poll the read path
-        until the calls disappear. Returns early once reconciled; on timeout the
-        mutation is left to finish in the background so the request never blocks
-        past the gateway timeout.
-        """
-        if not call_ids:
-            return
-        poll_query = None
-        if started_at_window is not None:
-            pad = datetime.timedelta(
-                seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS
-            )
-            poll_query = started_at_gte_query(started_at_window[0] - pad)
-        deadline = time.monotonic() + ch_settings.DELETE_RECONCILE_TIMEOUT_SECONDS
-        while True:
-            still_present = next(
-                self.calls_query_stream(
-                    tsi.CallsQueryReq(
-                        project_id=project_id,
-                        filter=tsi.CallsFilter(call_ids=call_ids),
-                        query=poll_query,
-                        columns=["id"],
-                        limit=1,
-                    )
-                ),
-                None,
-            )
-            if still_present is None or time.monotonic() >= deadline:
-                return
-            time.sleep(ch_settings.DELETE_RECONCILE_POLL_INTERVAL_SECONDS)
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]

@@ -12,10 +12,6 @@ MAX_DELETE_CALLS_COUNT = 1000
 # Pad the started_at window used to prune partitions on the calls/delete path,
 # absorbing cross-process clock skew between a call and its descendants.
 DELETE_STARTED_AT_PADDING_SECONDS = 1
-# Async calls_complete delete: block up to this long polling for the row mask to
-# apply, then return and let the mutation finish in the background.
-DELETE_RECONCILE_TIMEOUT_SECONDS = 10
-DELETE_RECONCILE_POLL_INTERVAL_SECONDS = 0.25
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
@@ -124,8 +120,8 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
-# calls_complete deletes run async (sync=0); _delete_calls_complete then polls for
-# reconciliation up to a bounded window instead of blocking past the gateway timeout.
+# Physical reclamation of soft-deleted calls_complete rows: sync=0 so the DELETE
+# returns once scheduled and never blocks the request (the soft-delete already hid them).
 CLICKHOUSE_ASYNC_DELETE_SETTINGS: dict[str, int | str] = {
     **CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
     "lightweight_deletes_sync": 0,
