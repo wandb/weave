@@ -2461,6 +2461,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
         eval_root_ids: list[str],
         include_children: bool = True,
+        include_costs: bool = False,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -2493,6 +2494,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
                         columns=columns,
                         sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                        include_costs=include_costs,
                     )
                 )
 
@@ -6811,6 +6813,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 eval_root_ids,
                 include_children=req.include_predict_and_score_children,
+                include_costs=req.include_costs,
             )
         )
         if req.resolve_row_refs:
