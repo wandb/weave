@@ -19,9 +19,9 @@ from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.telemetry import set_current_span_attrs
 from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
@@ -403,7 +403,7 @@ def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],
 ) -> list[str]:
-    set_current_span_dd_tags(
+    set_current_span_attrs(
         {
             "clickhouse_trace_server_batched.find_call_descendants.root_ids_count": str(
                 len(root_ids)

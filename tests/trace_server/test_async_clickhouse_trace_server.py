@@ -20,10 +20,10 @@ from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
 )
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
+from weave.trace_server.telemetry import _db_insert_path
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"

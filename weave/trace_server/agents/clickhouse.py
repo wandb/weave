@@ -82,7 +82,6 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
-from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -113,6 +112,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
+from weave.trace_server.telemetry import record_db_insert, set_root_span_attrs
 from weave.trace_server.trace_server_common import (
     AgentFeedbackByTarget,
     group_agent_feedback_by_target,
@@ -913,7 +913,7 @@ class AgentWriteHandler:
         """
         if not span_rows:
             return
-        set_root_span_dd_tags(
+        set_root_span_attrs(
             {
                 "weave_trace_server.insert.table": "spans",
                 "weave_trace_server.insert.row_count": len(span_rows),
