@@ -1294,7 +1294,15 @@ class CallsQuery(BaseModel):
                 filter_query.query_conditions.append(condition)
 
             filter_query.hardcoded_filter = self.hardcoded_filter
-            filter_query.order_fields = self.order_fields
+            # Total-order pass 1 with an id tiebreaker so the min/max started_at
+            # bound and the id set derive from the identical LIMIT cut.
+            if page_started_at_bound:
+                filter_query.order_fields = [
+                    *self.order_fields,
+                    OrderField(field=get_field_by_name("id"), direction="ASC"),
+                ]
+            else:
+                filter_query.order_fields = self.order_fields
             filter_query.limit = self.limit
             filter_query.offset = self.offset
             # SUPER IMPORTANT: still need to re-sort the final query

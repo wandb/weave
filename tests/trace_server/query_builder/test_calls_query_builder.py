@@ -3942,7 +3942,7 @@ def test_calls_complete_with_hardcoded_filter_and_json_condition_and_summary_ord
                 ) > 0 THEN {pb_9:String}
                 WHEN calls_complete.ended_at = {pb_11:DateTime64(6)} THEN {pb_7:String}
                 ELSE {pb_8:String}
-                END ASC
+                END ASC, calls_complete.id ASC
             LIMIT 100
         )
         SELECT
