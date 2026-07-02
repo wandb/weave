@@ -1991,7 +1991,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._command(
             delete_query,
             parameters=pb.get_params(),
-            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+            settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:

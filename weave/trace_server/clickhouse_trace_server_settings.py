@@ -120,6 +120,13 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
+# calls_complete deletes run async (sync=0): the DELETE returns once the mutation is
+# scheduled instead of blocking on materialization, avoiding the request-timeout cancel.
+CLICKHOUSE_ASYNC_DELETE_SETTINGS: dict[str, int | str] = {
+    **CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+    "lightweight_deletes_sync": 0,
+}
+
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
 # for non-Full sorting modes on distributed tables, which causes error 48
 # ("Serialization of SortingStep is implemented only for Full sorting").
