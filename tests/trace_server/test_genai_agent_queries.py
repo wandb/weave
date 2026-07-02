@@ -1356,29 +1356,26 @@ def test_agent_span_stats_ungrouped_all_time(ch_server):
 
 
 def test_agent_span_stats_numeric_value_buckets(ch_server):
-    """Stats API can bucket the full filtered span set by numeric value range."""
+    """Stats API buckets the full filtered span set by numeric value range.
+
+    A known input_tokens distribution over min=0, max=40, bins=4 pins the
+    complete per-bucket output (index, edges, count) so a bounds miscompute
+    fails CI rather than a dashboard.
+    """
     project_id = _make_project_id("stats_hist")
     start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 
+    # width = (40-0)/4 = 10 -> buckets [0,10) [10,20) [20,30) [30,40].
+    # counts by bucket: 0,5 -> 2 | 12,18 -> 2 | 22 -> 1 | 35,38,40 -> 3.
+    token_values = [0, 5, 12, 18, 22, 35, 38, 40]
     spans = [
         _make_span(
             project_id,
-            input_tokens=10,
-            started_at=start + datetime.timedelta(seconds=10),
-            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=20,
-            started_at=start + datetime.timedelta(seconds=20),
-            ended_at=start + datetime.timedelta(seconds=20, milliseconds=200),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=30,
-            started_at=start + datetime.timedelta(seconds=30),
-            ended_at=start + datetime.timedelta(seconds=30, milliseconds=300),
-        ),
+            input_tokens=tokens,
+            started_at=start + datetime.timedelta(seconds=idx),
+            ended_at=start + datetime.timedelta(seconds=idx, milliseconds=100),
+        )
+        for idx, tokens in enumerate(token_values)
     ]
     _insert_spans(ch_server.ch_client, spans)
 
@@ -1393,7 +1390,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
                     source="field",
                     key="usage.input_tokens",
                 ),
-                bins=2,
+                bins=4,
             ),
             metrics=[
                 AgentSpanStatsMetricSpec(
@@ -1408,9 +1405,10 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
 
     assert res.bucket_type == "number"
     assert res.granularity is None
-    assert [row["count_spans"] for row in res.rows] == [1, 2]
-    assert res.rows[0]["bucket_min"] == 10
-    assert res.rows[-1]["bucket_max"] == 30
+    assert [row["bucket_index"] for row in res.rows] == [0, 1, 2, 3]
+    assert [row["bucket_min"] for row in res.rows] == [0, 10, 20, 30]
+    assert [row["bucket_max"] for row in res.rows] == [10, 20, 30, 40]
+    assert [row["count_spans"] for row in res.rows] == [2, 2, 1, 3]
 
 
 @pytest.mark.flaky(reruns=3)

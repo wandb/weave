@@ -79,7 +79,7 @@ _CTE_FILTERED_SPANS = "filtered_spans"
 _CTE_FILTERED_METRIC_SPANS = "filtered_metric_spans"
 _CTE_QUALIFIED_CONVERSATIONS = "qualified_conversations"
 _CTE_VALUE_ROWS = "value_rows"
-_CTE_BOUNDS = "bounds"
+_BOUNDS_TUPLE = "bounds_tuple"
 _CTE_AGGREGATED_DATA = "aggregated_data"
 _CTE_TOP_GROUPS = "top_groups"
 
@@ -801,31 +801,39 @@ def _build_numeric_bucket_stats_query(
         if bucket.max is not None
         else "max(bucket_value)"
     )
+    # bounds computed once as a scalar tuple (min, max, count).
+    # ClickHouse does NOT materialize table CTEs - each reference re-scans
+    # value_rows (re-decoding the attrs map). Do NOT convert back to a CTE.
+    # Not min()/max() OVER (): the unbounded frame buffers all matched rows
+    # (un-spillable, OOM-risk near the 16 GiB cap at scale); the extra scan is cheaper.
+    bounds_min = f"{_BOUNDS_TUPLE}.min_bound"
+    bounds_max = f"{_BOUNDS_TUPLE}.max_bound"
+    bounds_count = f"{_BOUNDS_TUPLE}.value_count"
     bucket_width_sql = (
-        f"if({_CTE_BOUNDS}.bucket_max_bound > {_CTE_BOUNDS}.bucket_min_bound, "
-        f"({_CTE_BOUNDS}.bucket_max_bound - {_CTE_BOUNDS}.bucket_min_bound) "
+        f"if({bounds_max} > {bounds_min}, "
+        f"({bounds_max} - {bounds_min}) "
         f"/ {bins_float}, 1.0)"
     )
     bucket_index_raw_sql = (
-        f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
+        f"if({bounds_max} = {bounds_min}, "
         "toUInt64(0), "
         f"toUInt64(least(toFloat64({bins_uint}) - 1.0, floor("
-        f"({_CTE_VALUE_ROWS}.bucket_value - {_CTE_BOUNDS}.bucket_min_bound) "
+        f"({_CTE_VALUE_ROWS}.bucket_value - {bounds_min}) "
         f"/ {bucket_width_sql}))))"
     )
     bucket_index_sql = bucket_index_raw_sql
     bucket_min_sql = (
-        f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
-        f"{_CTE_BOUNDS}.bucket_min_bound, "
-        f"{_CTE_BOUNDS}.bucket_min_bound + "
+        f"if({bounds_max} = {bounds_min}, "
+        f"{bounds_min}, "
+        f"{bounds_min} + "
         f"toFloat64({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN}) * {bucket_width_sql})"
     )
     bucket_max_sql = (
-        f"if({_CTE_BOUNDS}.bucket_max_bound = {_CTE_BOUNDS}.bucket_min_bound, "
-        f"{_CTE_BOUNDS}.bucket_max_bound, "
+        f"if({bounds_max} = {bounds_min}, "
+        f"{bounds_max}, "
         f"if({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} = {bins_uint} - toUInt64(1), "
-        f"{_CTE_BOUNDS}.bucket_max_bound, "
-        f"{_CTE_BOUNDS}.bucket_min_bound + "
+        f"{bounds_max}, "
+        f"{bounds_min} + "
         f"toFloat64({_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} + 1) * "
         f"{bucket_width_sql}))"
     )
@@ -873,13 +881,14 @@ def _build_numeric_bucket_stats_query(
       {_CTE_VALUE_ROWS} AS (
         {value_rows_sql}
       ),
-      {_CTE_BOUNDS} AS (
-        SELECT
-          toFloat64({min_bound_sql}) AS bucket_min_bound,
-          toFloat64({max_bound_sql}) AS bucket_max_bound,
-          count() AS value_count
+      (
+        SELECT CAST(tuple(
+          toFloat64({min_bound_sql}),
+          toFloat64({max_bound_sql}),
+          count()
+        ) AS Tuple(min_bound Float64, max_bound Float64, value_count UInt64))
         FROM {_CTE_VALUE_ROWS}
-      ),
+      ) AS {_BOUNDS_TUPLE},
       {_CTE_ALL_BUCKETS} AS (
         SELECT toUInt64(number) AS {_BUCKET_COLUMN}
         FROM numbers({bins_uint})
@@ -889,10 +898,8 @@ def _build_numeric_bucket_stats_query(
           {bucket_index_sql} AS {_BUCKET_COLUMN},
           {agg_select_sql}
         FROM {_CTE_VALUE_ROWS}
-        CROSS JOIN {_CTE_BOUNDS}
-        WHERE {_CTE_BOUNDS}.value_count > 0
-          AND {_CTE_VALUE_ROWS}.bucket_value >= {_CTE_BOUNDS}.bucket_min_bound
-          AND {_CTE_VALUE_ROWS}.bucket_value <= {_CTE_BOUNDS}.bucket_max_bound
+        WHERE {_CTE_VALUE_ROWS}.bucket_value >= {bounds_min}
+          AND {_CTE_VALUE_ROWS}.bucket_value <= {bounds_max}
         GROUP BY {_BUCKET_COLUMN}
       )
     SELECT
@@ -901,12 +908,11 @@ def _build_numeric_bucket_stats_query(
       {bucket_max_sql} AS {_RESPONSE_BUCKET_MAX_COLUMN},
       {outer_metric_sql}
     FROM {_CTE_ALL_BUCKETS}
-    CROSS JOIN {_CTE_BOUNDS}
     LEFT JOIN {_CTE_AGGREGATED_DATA}
       ON {_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} = {_CTE_AGGREGATED_DATA}.{_BUCKET_COLUMN}
-    WHERE {_CTE_BOUNDS}.value_count > 0
+    WHERE {bounds_count} > 0
       AND (
-        {_CTE_BOUNDS}.bucket_max_bound > {_CTE_BOUNDS}.bucket_min_bound
+        {bounds_max} > {bounds_min}
         OR {_CTE_ALL_BUCKETS}.{_BUCKET_COLUMN} = 0
       )
     ORDER BY {_RESPONSE_BUCKET_INDEX_COLUMN}
