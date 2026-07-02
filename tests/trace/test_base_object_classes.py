@@ -11,6 +11,7 @@
 4. We ensure that invalid schemas are properly rejected from the server.
 """
 
+import json
 import time
 from typing import Literal
 
@@ -18,6 +19,11 @@ import pytest
 from pydantic import ValidationError
 
 import weave
+from scripts.generate_base_object_schemas import (
+    OUTPUT_PATH,
+    _canonicalize_self_refs,
+    build_schema,
+)
 from weave.trace import base_objects
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization.serialize import to_json
@@ -1266,4 +1272,27 @@ def test_monitor_create_accepts_valid_query_fields(client: WeaveClient):
         "dynamic-monitor",
         "no-query-monitor",
         "opaque-monitor",
+    }
+
+
+def test_builtin_object_class_schemas_in_sync_and_canonical():
+    """Checked-in schema matches the generator and self-refs canonicalize to $ref."""
+    assert build_schema() == json.loads(OUTPUT_PATH.read_text()), (
+        "generated builtin object class schemas are stale; "
+        "run `make generate_base_object_schemas`"
+    )
+
+    # Pydantic emits {"title": X} placeholders for some recursive self-references
+    # depending on the installed version; the generator rewrites them to a stable $ref.
+    schema = {
+        "$defs": {"AndOperation": {"type": "object"}},
+        "anyOf": [{"title": "AndOperation"}, {"$ref": "#/$defs/AndOperation"}],
+    }
+    _canonicalize_self_refs(schema, set(schema["$defs"]))
+    assert schema == {
+        "$defs": {"AndOperation": {"type": "object"}},
+        "anyOf": [
+            {"$ref": "#/$defs/AndOperation"},
+            {"$ref": "#/$defs/AndOperation"},
+        ],
     }

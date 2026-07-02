@@ -17,30 +17,47 @@ OUTPUT_DIR = (
 )
 OUTPUT_PATH = OUTPUT_DIR / "generated_builtin_object_class_schemas.json"
 
+JSONValue = dict[str, "JSONValue"] | list["JSONValue"] | str | int | float | bool | None
 
-def generate_schemas() -> None:
-    """Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
-    Creates a top-level schema that includes all registered objects and writes it
-    to 'generated_builtin_object_class_schemas.json'.
-    """
-    # Dynamically create a parent model with all registered objects as properties
+
+def build_schema() -> dict[str, JSONValue]:
+    """Build the canonical JSON schema for all registered builtin object classes."""
     CompositeModel = create_model(  # noqa: N806
         "CompositeBaseObject",
         **{name: (cls, ...) for name, cls in BUILTIN_OBJECT_REGISTRY.items()},
     )
+    schema = CompositeModel.model_json_schema(mode="validation")
+    _canonicalize_self_refs(schema, set(schema.get("$defs", {})))
+    return schema
 
-    # Generate the schema using the composite model
-    top_level_schema = CompositeModel.model_json_schema(mode="validation")
 
-    # make sure the output directory exists
+def generate_schemas() -> None:
+    """Generate and write JSON schemas for all registered builtin object classes."""
+    schema = build_schema()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Write schema to file
     with OUTPUT_PATH.open("w") as f:
-        json.dump(top_level_schema, f, indent=2)
-
+        json.dump(schema, f, indent=2)
     print(f"Generated schema for {len(BUILTIN_OBJECT_REGISTRY)} objects")
     print(f"Wrote schema to {OUTPUT_PATH.absolute()}")
+
+
+def _canonicalize_self_refs(node: JSONValue, defs: set[str]) -> None:
+    """Rewrite pydantic's degenerate self-ref union members ({"title": X}) to stable {"$ref": "#/$defs/X"}."""
+    if isinstance(node, dict):
+        members = node.get("anyOf")
+        if isinstance(members, list):
+            for i, member in enumerate(members):
+                if (
+                    isinstance(member, dict)
+                    and member.keys() == {"title"}
+                    and member["title"] in defs
+                ):
+                    members[i] = {"$ref": f"#/$defs/{member['title']}"}
+        for value in node.values():
+            _canonicalize_self_refs(value, defs)
+    elif isinstance(node, list):
+        for value in node:
+            _canonicalize_self_refs(value, defs)
 
 
 if __name__ == "__main__":
