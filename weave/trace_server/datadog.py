@@ -73,6 +73,20 @@ def _resolve_dogstatsd_addr() -> tuple[str, int]:
     return host, port
 
 
+def _resolve_unified_tags() -> list[str]:
+    """Constant `service`/`env`/`version` tags from the DD unified-service env vars.
+
+    Sent on every counter so the metric is attributed even over transports
+    without agent origin detection (UDP host-port, including QA).
+    """
+    by_tag = {
+        "service": os.environ.get("DD_SERVICE"),
+        "env": os.environ.get("DD_ENV"),
+        "version": os.environ.get("DD_VERSION"),
+    }
+    return [f"{tag}:{value}" for tag, value in by_tag.items() if value]
+
+
 def format_packet(metric: str, value: int, tags: list[str]) -> bytes:
     """Format a DogStatsD counter packet. Public so tests can pin the wire format."""
     tag_suffix = f"|#{','.join(tags)}" if tags else ""
@@ -139,6 +153,7 @@ class _StatsDClient:
 
 
 _client = _StatsDClient(*_resolve_dogstatsd_addr())
+_UNIFIED_TAGS = _resolve_unified_tags()
 
 
 @contextlib.contextmanager
@@ -206,7 +221,7 @@ def record_db_insert(*, table: str, count: int, path: str | None = None) -> None
     _client.emit(
         DB_INSERT_METRIC,
         count,
-        [f"table:{table}", f"path:{resolved_path}"],
+        [f"table:{table}", f"path:{resolved_path}", *_UNIFIED_TAGS],
     )
 
 
