@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
@@ -33,6 +33,7 @@ from weave.trace.call import (
     CallsIter,
     _make_calls_iterator,
     elide_display_name,
+    is_eval_call,
     make_client_call,
 )
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
@@ -170,6 +171,7 @@ from weave.trace_server.trace_server_interface import (
     TableUpdateReq,
     TagsListReq,
     TraceStatus,
+    agent_types,
 )
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
@@ -191,6 +193,7 @@ from weave.utils.attributes_dict import AttributesDict
 from weave.utils.capture_info import get_capture_info
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
+from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
@@ -257,6 +260,73 @@ def _add_scored_by_to_calls_query(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
     return Query.model_validate({"$expr": {"$and": exprs}})
+
+
+def _build_agent_spans_query(
+    agent_name: str | None, query: Query | None
+) -> Query | None:
+    """Build the ``get_agent_spans`` query from the ``agent_name`` shortcut.
+
+    Mirrors the TS SDK: ``agent_name`` becomes an ``$eq`` on the ``agent_name``
+    field, AND-combined with any user-supplied ``query`` when both are present.
+    """
+    if agent_name is None:
+        return query
+    agent_expr = {"$eq": [{"$getField": "agent_name"}, {"$literal": agent_name}]}
+    if query is None:
+        return Query.model_validate({"$expr": agent_expr})
+    return Query.model_validate({"$expr": {"$and": [agent_expr, query.expr_]}})
+
+
+_AgentListItemT = TypeVar("_AgentListItemT")
+
+
+def _make_agent_iterator(
+    fetch_page: Callable[[int, int], tuple[list[_AgentListItemT], int]],
+    *,
+    limit_override: int | None,
+    offset_override: int | None,
+    page_size: int,
+) -> PaginatedIterator[_AgentListItemT, _AgentListItemT]:
+    """Wrap an offset/limit agent list endpoint as a ``PaginatedIterator``.
+
+    ``fetch_page(offset, limit)`` returns one page of items together with the
+    endpoint's ``total_count``. Mirrors ``_make_calls_iterator``: ``len()`` is
+    backed by ``total_count``, adjusted for ``offset_override`` and capped by
+    ``limit_override``.
+    """
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
+
+    def fetch_func(offset: int, limit: int) -> list[_AgentListItemT]:
+        # Add the global offset to the page offset (applied once, here).
+        return fetch_page(offset + (offset_override or 0), limit)[0]
+
+    def size_func() -> int:
+        # total_count is returned with every page; fetch the cheapest one.
+        total = fetch_page(0, 1)[1]
+        if limit_override is not None:
+            return min(limit_override, max(0, total - (offset_override or 0)))
+        if offset_override is not None:
+            return max(0, total - offset_override)
+        return total
+
+    return PaginatedIterator(
+        fetch_func,
+        size_func=size_func,
+        limit=limit_override,
+        page_size=page_size,
+    )
+
+
+# Iterator return types for the paginated agent list methods (mirrors ``CallsIter``).
+AgentsIter = PaginatedIterator[agent_types.AgentSchema, agent_types.AgentSchema]
+AgentVersionsIter = PaginatedIterator[
+    agent_types.AgentVersionSchema, agent_types.AgentVersionSchema
+]
+AgentSpansIter = PaginatedIterator[
+    agent_types.AgentSpanSchema, agent_types.AgentSpanSchema
+]
 
 
 def get_obj_name(val: Any) -> str:
@@ -753,6 +823,404 @@ class WeaveClient:
             raise ValueError(f"Call not found: {call_id}")
         response_call = calls[0]
         return make_client_call(self.entity, self.project, response_call, self.server)
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agents(
+        self,
+        *,
+        agent_name: str | None = None,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentsIter:
+        """List agents in this project with aggregated stats.
+
+        Returns a `PaginatedIterator` (like `get_calls`) that transparently
+        fetches pages as you consume it; `len(...)` reports the total agent
+        count, and indexing/slicing are supported.
+
+        Args:
+            agent_name: If set, restrict results to this agent.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of agents to yield. `None` yields all.
+            offset: Number of agents to skip before yielding (for pagination).
+            page_size: Number of agents fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentSchema`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for agent in client.get_agents(limit=20):
+                print(agent.agent_name, agent.total_input_tokens)
+            ```
+        """
+        filters = (
+            agent_types.AgentsQueryFilters(agent_name=agent_name)
+            if agent_name is not None
+            else None
+        )
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentSchema], int]:
+            res = self.server.agent_agents_query(
+                agent_types.AgentsQueryReq(
+                    project_id=self.project_id,
+                    filters=filters,
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.agents, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page,
+            limit_override=limit,
+            offset_override=offset,
+            page_size=page_size,
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_versions(
+        self,
+        *,
+        agent_name: str,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentVersionsIter:
+        """List versions for a single agent, with aggregated stats.
+
+        Returns a `PaginatedIterator` (like `get_calls`) that fetches pages as
+        you consume it; `len(...)` reports the total version count.
+
+        Args:
+            agent_name: The agent whose versions to list.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of versions to yield. `None` yields all.
+            offset: Number of versions to skip before yielding (for pagination).
+            page_size: Number of versions fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentVersionSchema`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for version in client.get_agent_versions(agent_name="my-agent"):
+                print(version.agent_version, version.total_input_tokens)
+            ```
+        """
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentVersionSchema], int]:
+            res = self.server.agent_versions_query(
+                agent_types.AgentVersionsQueryReq(
+                    project_id=self.project_id,
+                    agent_name=agent_name,
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.versions, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page,
+            limit_override=limit,
+            offset_override=offset,
+            page_size=page_size,
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_spans(
+        self,
+        *,
+        agent_name: str | None = None,
+        query: Query | None = None,
+        sort_by: list[agent_types.AgentSortBy] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        page_size: int = agent_types.DEFAULT_AGENT_QUERY_LIMIT,
+    ) -> AgentSpansIter:
+        """Query agent spans for this project, optionally filtered.
+
+        Returns a `PaginatedIterator` (like `get_calls`) that fetches pages as
+        you consume it; `len(...)` reports the total span count.
+
+        Args:
+            agent_name: If set, restrict results to this agent (a convenience
+                shortcut for a `query` on the `agent_name` field).
+            query: A mongo-style filter expression. Combined with `agent_name`
+                via `$and` when both are provided.
+            sort_by: Fields to sort the results by.
+            limit: Maximum number of spans to yield. `None` yields all.
+            offset: Number of spans to skip before yielding (for pagination).
+            page_size: Number of spans fetched per request.
+
+        Returns:
+            A `PaginatedIterator` over `AgentSpanSchema`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            for span in client.get_agent_spans(agent_name="my-agent"):
+                print(span.span_id, span.span_name, span.input_tokens)
+            ```
+        """
+
+        def fetch_page(
+            offset: int, page_limit: int
+        ) -> tuple[list[agent_types.AgentSpanSchema], int]:
+            res = self.server.agent_spans_query(
+                agent_types.AgentSpansQueryReq(
+                    project_id=self.project_id,
+                    query=_build_agent_spans_query(agent_name, query),
+                    sort_by=sort_by,
+                    limit=page_limit,
+                    offset=offset,
+                )
+            )
+            return res.spans, res.total_count
+
+        return _make_agent_iterator(
+            fetch_page,
+            limit_override=limit,
+            offset_override=offset,
+            page_size=page_size,
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_turn(
+        self,
+        *,
+        trace_id: str,
+        include_feedback: bool = False,
+    ) -> agent_types.AgentTraceChatRes:
+        """Get the structured chat view (messages) for a single turn.
+
+        A turn corresponds to one trace.
+
+        Args:
+            trace_id: The trace whose chat view to fetch.
+            include_feedback: If true, include feedback on the messages.
+
+        Returns:
+            An `AgentTraceChatRes` with the ordered `messages` for the turn.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_turn(trace_id="...", include_feedback=True)
+            for message in resp.messages:
+                print(message.type)
+            ```
+        """
+        return self.server.agent_traces_chat(
+            agent_types.AgentTraceChatReq(
+                project_id=self.project_id,
+                trace_id=trace_id,
+                include_feedback=include_feedback,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_turns(
+        self,
+        *,
+        conversation_id: str,
+        limit: int = agent_types.MAX_CONVERSATION_CHAT_TURNS,
+        offset: int = 0,
+        include_feedback: bool = False,
+    ) -> agent_types.AgentConversationChatRes:
+        """Get the multi-turn chat view for a conversation.
+
+        Each turn corresponds to one trace.
+
+        Args:
+            conversation_id: The conversation whose turns to fetch.
+            limit: Maximum number of turns to return.
+            offset: Number of most-recent turns to skip (for pagination).
+            include_feedback: If true, include feedback on the messages.
+
+        Returns:
+            An `AgentConversationChatRes` with the ordered `turns`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_turns(conversation_id="...", limit=20)
+            for turn in resp.turns:
+                for message in turn.messages:
+                    print(message.type)
+            ```
+        """
+        return self.server.agent_conversation_chat(
+            agent_types.AgentConversationChatReq(
+                project_id=self.project_id,
+                conversation_id=conversation_id,
+                limit=limit,
+                offset=offset,
+                include_feedback=include_feedback,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_span_stats(
+        self,
+        *,
+        start: datetime.datetime,
+        metrics: list[agent_types.AgentSpanStatsMetricSpec],
+        end: datetime.datetime | None = None,
+        query: Query | None = None,
+        group_by: list[agent_types.AgentGroupByRef] | None = None,
+        granularity: int | None = None,
+        timezone: str = "UTC",
+    ) -> agent_types.AgentSpanStatsRes:
+        """Compute chart-ready aggregations over agent spans.
+
+        Covers the common time-series / grouped-metric case. For numeric-bucket
+        stats or other advanced options, call ``server.agent_spans_stats``
+        directly.
+
+        Args:
+            start: Start of the time range (inclusive).
+            metrics: One or more metrics to aggregate (e.g. token sums).
+            end: End of the time range. Defaults to now when omitted.
+            query: A mongo-style filter expression to restrict the spans.
+            group_by: Span fields to group the aggregations by.
+            granularity: Time-bucket width in seconds for time-series stats.
+            timezone: IANA timezone used to align time buckets.
+
+        Returns:
+            An ``AgentSpanStatsRes`` with `columns` and `rows`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_span_stats(start=start, metrics=metrics)
+            for row in resp.rows:
+                print(row)
+            ```
+        """
+        return self.server.agent_spans_stats(
+            agent_types.AgentSpanStatsReq(
+                project_id=self.project_id,
+                start=start,
+                end=end,
+                metrics=metrics,
+                query=query,
+                group_by=group_by or [],
+                granularity=granularity,
+                timezone=timezone,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_agent_custom_attributes(
+        self,
+        *,
+        query: Query | None = None,
+        started_after: datetime.datetime | None = None,
+        started_before: datetime.datetime | None = None,
+        limit: int = agent_types.DEFAULT_AGENT_CUSTOM_ATTR_SCHEMA_LIMIT,
+        offset: int = 0,
+    ) -> agent_types.AgentCustomAttrsSchemaRes:
+        """Discover typed custom-attribute keys on matching agent spans.
+
+        Useful for populating filter/column pickers: returns the custom
+        attribute keys (and their value types) seen on the selected spans.
+
+        Args:
+            query: A mongo-style filter expression to restrict the spans.
+            started_after: Only consider spans started at/after this time.
+            started_before: Only consider spans started before this time.
+            limit: Maximum number of attribute keys to return.
+            offset: Number of keys to skip (for pagination).
+
+        Returns:
+            An ``AgentCustomAttrsSchemaRes`` with `attributes` and `has_more`.
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.get_agent_custom_attributes()
+            for attr in resp.attributes:
+                print(attr.key, attr.value_type, attr.span_count)
+            ```
+        """
+        return self.server.agent_custom_attrs_schema(
+            agent_types.AgentCustomAttrsSchemaReq(
+                project_id=self.project_id,
+                query=query,
+                started_after=started_after,
+                started_before=started_before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def search_agents(
+        self,
+        *,
+        query: str = "",
+        agent_name: str | None = None,
+        conversation_id: str | None = None,
+        trace_id: str | None = None,
+        limit: int = agent_types.DEFAULT_SEARCH_LIMIT,
+        offset: int = 0,
+    ) -> agent_types.AgentSearchRes:
+        """Search agent messages by content, grouped by conversation.
+
+        Searches message content (and/or the structured filters below) and
+        returns matching conversations with their matched messages. An empty
+        ``query`` turns this into structured retrieval over the filters.
+
+        Args:
+            query: Substring to match in message content. Empty matches all.
+            agent_name: Restrict to messages from this agent.
+            conversation_id: Restrict to a single conversation.
+            trace_id: Restrict to a single trace.
+            limit: Maximum number of matching messages to consider.
+            offset: Number of matches to skip (for pagination).
+
+        Returns:
+            An ``AgentSearchRes`` with `results` (matched conversations).
+
+        Example:
+            ```python
+            client = weave.init("entity/project")
+            resp = client.search_agents(query="timeout", agent_name="my-agent")
+            for conversation in resp.results:
+                print(conversation.conversation_id, conversation.matched_messages)
+            ```
+        """
+        return self.server.agent_search(
+            agent_types.AgentSearchReq(
+                project_id=self.project_id,
+                query=query,
+                agent_name=agent_name,
+                conversation_id=conversation_id,
+                trace_id=trace_id,
+                limit=limit,
+                offset=offset,
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def create_annotation_queue(
@@ -1258,6 +1726,8 @@ class WeaveClient:
                 end=EndedCallSchemaForInsertWithStartedAt(
                     project_id=project_id,
                     id=call.id,
+                    trace_id=call.trace_id,
+                    is_eval=is_eval_call(call),
                     started_at=call.started_at,
                     ended_at=ended_at,
                     output=output_json,
@@ -2164,7 +2634,7 @@ class WeaveClient:
         Raises the original exception if it is NOT a digest mismatch
         (e.g. an HTTPError with a non-409 status code).
         """
-        # DigestMismatchError: raised directly by local servers (SQLite, ClickHouse).
+        # DigestMismatchError: raised directly by in-process servers (ClickHouse).
         is_local_mismatch = isinstance(e, DigestMismatchError)
         # HTTPError 409: raised by RemoteHTTPTraceServer when the remote
         # server returns HTTP 409 Conflict for a digest mismatch.

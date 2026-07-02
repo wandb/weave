@@ -11,6 +11,12 @@ import {topologicalSortChildrenFirst} from '../../utils/topologicalSort';
 import {getCurrentSpan, getCurrentTrace} from '../openai.agent';
 import {CallStack} from '../../weaveClient';
 import state from '../../state';
+import {asAttributes, libraryIntegration} from '../integrationMetadata';
+
+// Integration provenance stamped onto every call this integration produces.
+const OPENAI_AGENTS_INTEGRATION = libraryIntegration('openai_agents', {
+  packageName: '@openai/agents',
+});
 
 type OpenAIAgentsContext = {
   spanId: string | null;
@@ -210,6 +216,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       attributes: {
         kind: 'agent',
         agent_trace_id: trace.traceId,
+        ...asAttributes(OPENAI_AGENTS_INTEGRATION),
       },
     };
 
@@ -251,6 +258,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const callEnd = {
       project_id: client.projectId,
       id: callData.callId,
+      trace_id: callData.traceId,
       ended_at: new Date().toISOString(),
       output: {
         status: 'completed',
@@ -343,6 +351,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
         agent_span_id: span.spanId,
         agent_trace_id: span.traceId,
         parent_span_id: span.parentId,
+        ...asAttributes(OPENAI_AGENTS_INTEGRATION),
       },
     };
 
@@ -390,6 +399,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
     const callEnd = {
       project_id: client.projectId,
       id: callData.callId,
+      trace_id: callData.traceId,
       ended_at: new Date().toISOString(),
       output: {
         output: spanData.output,
@@ -458,6 +468,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
+        trace_id: callData.traceId,
         ended_at: now,
         output: {status},
         summary: {},
@@ -470,6 +481,7 @@ export class WeaveTracingProcessor implements TracingProcessor {
       const callEnd = {
         project_id: client.projectId,
         id: callData.callId,
+        trace_id: callData.traceId,
         ended_at: now,
         output: {status},
         summary: {},

@@ -66,7 +66,13 @@ def test_make_object_id_conditions_part():
 
 def test_object_query_builder_basic():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
-    assert "project_id = {project_id: String}" in builder.make_metadata_query()
+    assert_sql(
+        builder.make_metadata_query(),
+        _expected_metadata_query(
+            "ov.project_id = {project_id: String}",
+            "WHERE deleted_at IS NULL\nORDER BY created_at ASC",
+        ),
+    )
     assert builder.parameters["project_id"] == "test_project"
 
 
@@ -75,12 +81,14 @@ def test_object_query_builder_add_digest_condition():
 
     # Test latest digest
     builder.add_digests_conditions("latest")
-    assert "is_latest = 1" in builder.conditions_part
+    assert builder.conditions_part == "WHERE ((is_latest = 1) AND (deleted_at IS NULL))"
 
     # Test specific digest
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_digests_conditions("abc123")
-    assert "digest = {version_digest_0: String}" in builder.conditions_part
+    assert builder.conditions_part == (
+        "WHERE ((digest = {version_digest_0: String}) AND (deleted_at IS NULL))"
+    )
     assert builder.parameters["version_digest_0"] == "abc123"
 
 
@@ -89,7 +97,7 @@ def test_object_query_builder_add_object_ids_condition():
 
     # Test single object ID
     builder.add_object_ids_condition(["obj1"])
-    assert "object_id = {object_id: String}" in builder.object_id_conditions_part
+    assert builder.object_id_conditions_part == " AND object_id = {object_id: String}"
     assert builder.parameters["object_id"] == "obj1"
 
     # Test multiple object IDs
@@ -104,7 +112,7 @@ def test_object_query_builder_add_object_ids_condition():
 def test_object_query_builder_add_is_op_condition():
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_is_op_condition(True)
-    assert "is_op = 1" in builder.conditions_part
+    assert builder.conditions_part == "WHERE ((is_op = 1) AND (deleted_at IS NULL))"
 
 
 def test_object_query_builder_limit_offset():
@@ -307,6 +315,154 @@ ORDER BY created_at ASC""",
         "object_id": "my_op",
         "version_index_0": 3,
     }
+
+
+def _expected_storage_metadata_query(
+    where_clause: str, stats_scope: str, outer_clauses: str = ""
+) -> str:
+    """Build expected SQL for the include_storage_size metadata query.
+
+    Args:
+        where_clause: The WHERE condition for latest_row_per_digest.
+        stats_scope: Extra predicate appended to the object_versions_stats
+            inner subquery (e.g. " AND object_id = {object_id: String}").
+        outer_clauses: Optional WHERE/ORDER/LIMIT/OFFSET after the join.
+    """
+    return f"""
+WITH latest_row_per_digest AS (
+    SELECT
+        ov.project_id,
+        ov.object_id,
+        ov.created_at,
+        COALESCE(fc.first_created_at, ov.created_at) AS _first_created_at,
+        ov.deleted_at,
+        ov.kind,
+        ov.base_object_class,
+        ov.leaf_object_class,
+        ov.refs,
+        ov.digest,
+        ov.wb_user_id,
+        if (ov.kind = 'op', 1, 0) AS is_op,
+        row_number() OVER (
+            PARTITION BY ov.project_id, ov.kind, ov.object_id, ov.digest
+            ORDER BY ov.created_at DESC, (ov.deleted_at IS NULL) ASC
+        ) AS rn
+    FROM object_versions AS ov
+    LEFT JOIN (
+        SELECT object_id, digest, min(first_created_at) AS first_created_at
+        FROM object_version_first_seen
+        WHERE project_id = {{project_id: String}}
+        GROUP BY object_id, digest
+    ) AS fc USING (object_id, digest)
+    WHERE {where_clause}
+),
+latest_alias_per_object AS (
+    SELECT project_id, object_id, argMax(digest, created_at) AS digest
+    FROM aliases
+    PREWHERE project_id = {{project_id: String}}
+    WHERE alias = 'latest'
+    GROUP BY project_id, object_id, alias
+    HAVING argMax(deleted_at, created_at) = toDateTime64(0, 3)
+),
+object_versions_with_index AS (
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY _first_created_at ASC, digest ASC
+        ) - 1 AS version_index,
+        count(*) OVER (
+            PARTITION BY project_id, kind, object_id
+        ) AS version_count,
+        row_number() OVER (
+            PARTITION BY project_id, kind, object_id
+            ORDER BY (deleted_at IS NULL) DESC, _first_created_at DESC, digest DESC
+        ) AS _computed_latest_rank,
+        if(
+            (project_id, object_id, digest) IN
+                (SELECT project_id, object_id, digest FROM latest_alias_per_object)
+            OR (
+                _computed_latest_rank = 1
+                AND (project_id, object_id) NOT IN
+                    (SELECT project_id, object_id FROM latest_alias_per_object)
+            ),
+            1, 0
+        ) AS is_latest
+    FROM latest_row_per_digest
+    WHERE rn = 1
+)
+SELECT
+    project_id,
+    object_id,
+    created_at,
+    refs,
+    kind,
+    base_object_class,
+    leaf_object_class,
+    digest,
+    version_index,
+    is_latest,
+    deleted_at,
+    wb_user_id,
+    version_count,
+    is_op,
+    size_bytes
+FROM object_versions_with_index AS main
+    LEFT JOIN (
+        SELECT * FROM object_versions_stats WHERE object_versions_stats.project_id = {{project_id: String}}{stats_scope}
+    ) as object_versions_stats ON object_versions_stats.digest = main.digest
+{outer_clauses}"""
+
+
+def test_metadata_query_storage_size_scoped_to_object_id():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.include_storage_size = True
+    builder.add_object_ids_condition(["my_obj"])
+    builder.add_digests_conditions("latest")
+
+    assert_sql(
+        builder.make_metadata_query(),
+        _expected_storage_metadata_query(
+            "ov.project_id = {project_id: String} AND object_id = {object_id: String}",
+            " AND object_id = {object_id: String}",
+            "WHERE ((is_latest = 1) AND (deleted_at IS NULL))\nORDER BY created_at ASC",
+        ),
+    )
+    assert builder.parameters == {"project_id": "test_project", "object_id": "my_obj"}
+
+
+def test_metadata_query_storage_size_scoped_to_object_ids():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.include_storage_size = True
+    builder.add_object_ids_condition(["a", "b"])
+
+    assert_sql(
+        builder.make_metadata_query(),
+        _expected_storage_metadata_query(
+            "ov.project_id = {project_id: String} AND object_id IN {object_ids: Array(String)}",
+            " AND object_id IN {object_ids: Array(String)}",
+            "WHERE deleted_at IS NULL\nORDER BY created_at ASC",
+        ),
+    )
+    assert builder.parameters == {
+        "project_id": "test_project",
+        "object_ids": ["a", "b"],
+    }
+
+
+def test_metadata_query_storage_size_unscoped_without_object_id():
+    builder = ObjectMetadataQueryBuilder(project_id="test_project")
+    builder.include_storage_size = True
+
+    assert_sql(
+        builder.make_metadata_query(),
+        _expected_storage_metadata_query(
+            "ov.project_id = {project_id: String}",
+            "",
+            "WHERE deleted_at IS NULL\nORDER BY created_at ASC",
+        ),
+    )
+    assert builder.parameters == {"project_id": "test_project"}
 
 
 def test_make_objects_val_query_and_parameters():

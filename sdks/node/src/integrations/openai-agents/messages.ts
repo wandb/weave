@@ -8,7 +8,7 @@
 import type OpenAI from 'openai';
 import type {GenerationSpanData, ResponseSpanData} from '@openai/agents';
 import type {Message, MessagePart} from '../../genai';
-import {MediaPart, urlToMediaPart} from '../../utils/urlToMediaPart';
+import {type MediaPart, urlToMediaPart} from '../../utils/urlToMediaPart';
 import {withIndex} from '../../utils/withIndex';
 import {findLastIndex} from '../../utils/findLastIndex';
 
@@ -162,6 +162,7 @@ function parseResponseSpanItems(
 
     if (
       'role' in item &&
+      'content' in item &&
       (item.role === 'user' ||
         item.role === 'assistant' ||
         item.role === 'system')

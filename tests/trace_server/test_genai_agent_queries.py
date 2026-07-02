@@ -1,6 +1,6 @@
 """Integration tests for GenAI agent tables and query layer.
 
-Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
+Runs against the ClickHouse backend (the only supported backend).
 Migration 030 creates the genai tables automatically.
 """
 
@@ -10,6 +10,9 @@ import uuid
 import pytest
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
+from weave.shared import refs_internal as ri
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -18,6 +21,7 @@ from weave.trace_server.agents.schema import (
 )
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
+    AgentConversationSpansReq,
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
@@ -31,6 +35,10 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+)
+from weave.trace_server.interface.feedback_types import (
+    AGENT_MONITOR_FEEDBACK_TYPE,
+    AGENT_USER_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
 
@@ -117,6 +125,255 @@ def test_spans_insert_and_query(ch_server):
     )
     assert res_filtered.total_count == 2
     assert all(s.agent_name == "agent-A" for s in res_filtered.spans)
+
+
+def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
+    """`AgentWriteHandler.insert_spans` bulk-writes every span in one insert
+    (the scoring-worker batch path); empty input is a no-op.
+    """
+    project_id = _make_project_id("bulk_spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    spans = [
+        _make_span(project_id, agent_name="bulk-A", started_at=now),
+        _make_span(
+            project_id,
+            agent_name="bulk-B",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+    ]
+    handler = AgentWriteHandler(ch_server.ch_client)
+    handler.insert_spans([])  # no-op
+    handler.insert_spans(spans)
+
+    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert res.total_count == 2
+    assert {s.agent_name for s in res.spans} == {"bulk-A", "bulk-B"}
+
+
+# ---------------------------------------------------------------------------
+# Test: read-time trace attribution of agent / conversation identity
+# ---------------------------------------------------------------------------
+
+
+def _agent_name_eq(value: str) -> Query:
+    return Query.model_validate(
+        {"$expr": {"$eq": [{"$getField": "agent.name"}, {"$literal": value}]}}
+    )
+
+
+def test_unset_span_inherits_identity_from_its_trace(ch_server):
+    """A child span with no direct agent metadata inherits it from its turn.
+
+    Identity is reported only on the `invoke_agent` span, while the child llm
+    span carries no agent_name. The spans query reads from the attributed
+    source, so the child both *displays* and *filters as* the turn's agent —
+    while a span from an unrelated trace is never pulled in.
+    """
+    project_id = _make_project_id("attribution")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_id = uuid.uuid4().hex
+    invoke_span_id = uuid.uuid4().hex
+    child_span_id = uuid.uuid4().hex
+    other_span_id = uuid.uuid4().hex
+
+    spans = [
+        # invoke_agent span carries the agent identity.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=invoke_span_id,
+            operation_name="invoke_agent",
+            agent_name="Planner",
+            started_at=now,
+        ),
+        # child llm span has NO direct agent metadata; it should inherit.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=child_span_id,
+            parent_span_id=invoke_span_id,
+            operation_name="chat",
+            agent_name="",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # unrelated trace / agent — must never be pulled in.
+        _make_span(
+            project_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=other_span_id,
+            agent_name="OtherAgent",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Unfiltered list: the child *displays* the inherited agent name.
+    listed = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    by_id = {s.span_id: s for s in listed.spans}
+    assert by_id[child_span_id].agent_name == "Planner"
+    assert by_id[invoke_span_id].agent_name == "Planner"
+    assert by_id[other_span_id].agent_name == "OtherAgent"
+
+    # Filtering on the agent matches the whole turn (own + inherited), and
+    # nothing from the unrelated trace.
+    matched = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, query=_agent_name_eq("Planner"))
+    )
+    assert matched.total_count == 2
+    assert {s.span_id for s in matched.spans} == {invoke_span_id, child_span_id}
+
+    # Time-bounded query: the fallback scan is slack-widened to the same window
+    # and still attributes the child span.
+    windowed = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            started_after=now - datetime.timedelta(minutes=1),
+            started_before=now + datetime.timedelta(minutes=1),
+            query=_agent_name_eq("Planner"),
+        )
+    )
+    assert {s.span_id for s in windowed.spans} == {invoke_span_id, child_span_id}
+
+
+def test_span_with_own_identity_is_not_reattributed(ch_server):
+    """A span that sets its own agent identity keeps it (singleton).
+
+    In a multi-agent turn, a sub-agent span that reported its own agent_name
+    must not be pulled into the parent agent's filter, and must not be displayed
+    as the parent agent.
+    """
+    project_id = _make_project_id("attribution_singleton")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_id = uuid.uuid4().hex
+    coordinator_span_id = uuid.uuid4().hex
+    worker_span_id = uuid.uuid4().hex
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=coordinator_span_id,
+            operation_name="invoke_agent",
+            agent_name="Coordinator",
+            started_at=now,
+        ),
+        # Sub-agent span reports its OWN agent_name.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=worker_span_id,
+            parent_span_id=coordinator_span_id,
+            operation_name="invoke_agent",
+            agent_name="Worker",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # The sub-agent span keeps its own identity on display.
+    listed = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    by_id = {s.span_id: s for s in listed.spans}
+    assert by_id[worker_span_id].agent_name == "Worker"
+    assert by_id[coordinator_span_id].agent_name == "Coordinator"
+
+    # Filtering for the sub-agent returns only its own span, not the parent's.
+    worker = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, query=_agent_name_eq("Worker"))
+    )
+    assert {s.span_id for s in worker.spans} == {worker_span_id}
+
+    # Filtering for the parent does not pull in the self-identified sub-agent.
+    coordinator = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, query=_agent_name_eq("Coordinator"))
+    )
+    assert {s.span_id for s in coordinator.spans} == {coordinator_span_id}
+
+
+def test_unset_span_inherits_a_coherent_agent_triple(ch_server):
+    """An inherited identity is one real agent, never a mix of two.
+
+    agent_name / agent_version / agent_id identify one agent, so an unset span
+    inherits all three from a single span (the earliest in its trace that
+    declares an agent_name). Here two identity-bearing spans deliberately split
+    the columns — one carries the name, a later one carries a version — so a
+    per-column inheritance would synthesize the (name, version) pair
+    ('Planner', 'v2') that never existed on any span. The child must instead
+    inherit Planner's own (coherent) triple.
+    """
+    project_id = _make_project_id("attribution_coherent")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_id = uuid.uuid4().hex
+    planner_span_id = uuid.uuid4().hex
+    versioned_span_id = uuid.uuid4().hex
+    child_span_id = uuid.uuid4().hex
+
+    spans = [
+        # Earliest identity-bearing span: name set, version blank.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=planner_span_id,
+            operation_name="invoke_agent",
+            agent_name="Planner",
+            agent_version="",
+            started_at=now,
+        ),
+        # A later span carries a version but no name.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=versioned_span_id,
+            operation_name="invoke_agent",
+            agent_name="",
+            agent_version="v2",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # Unset child: must inherit Planner's whole triple, not a mix.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=child_span_id,
+            parent_span_id=planner_span_id,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    listed = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    child = {s.span_id: s for s in listed.spans}[child_span_id]
+    # Coherent: the inherited (name, version) co-occurred on a real span.
+    assert (child.agent_name, child.agent_version) == ("Planner", "")
+
+    # And filtering on the phantom pair must not pull the child in.
+    phantom = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "agent.name"},
+                                    {"$literal": "Planner"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "agent.version"},
+                                    {"$literal": "v2"},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert phantom.spans == []
 
 
 # ---------------------------------------------------------------------------
@@ -325,6 +582,162 @@ def test_group_by_conversation_id_message_previews(ch_server):
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
     assert row.last_message.text == "final reply"
+
+
+def _create_feedback(
+    ch_server,
+    project_id: str,
+    weave_ref: str,
+    feedback_type: str,
+    payload: dict | None = None,
+    **scorer_fields,
+) -> None:
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=weave_ref,
+            feedback_type=feedback_type,
+            payload=payload or {},
+            wb_user_id="test-user",
+            **scorer_fields,
+        )
+    )
+
+
+def test_conversation_spans_unknown_id_returns_empty(ch_server):
+    """The endpoint returns one entry per requested conversation; an id with no
+    matching spans comes back with empty sequences rather than being dropped.
+    """
+    project_id = _make_project_id("conv-spans-empty")
+    res = ch_server.agent_conversation_spans(
+        AgentConversationSpansReq(
+            project_id=project_id,
+            conversation_ids=["conv-does-not-exist"],
+        )
+    )
+    assert len(res.conversations) == 1
+    assert res.conversations[0].conversation_id == "conv-does-not-exist"
+    assert res.conversations[0].spans == []
+    assert res.conversations[0].spans_feedback == []
+
+
+def test_conversation_spans_sequence_and_feedback(ch_server):
+    """agent_conversation_spans returns an ordered per-span sequence (kinds from
+    operation_name, ERROR surfaced via status) plus turn-anchored feedback
+    markers carrying detoned tags and scorer ratings.
+    """
+    project_id = _make_project_id("conv-spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_a = uuid.uuid4().hex
+    trace_b = uuid.uuid4().hex
+    tool_span = uuid.uuid4().hex[:16]
+
+    spans = [
+        # Turn A: an agent invocation, then two tool calls (the second errored).
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            operation_name="invoke_agent",
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            span_id=tool_span,
+            operation_name="execute_tool",
+            tool_name="search",
+            started_at=now + datetime.timedelta(seconds=2),
+            ended_at=now + datetime.timedelta(seconds=3),
+        ),
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_a,
+            operation_name="execute_tool",
+            tool_name="broken",
+            status_code="ERROR",
+            started_at=now + datetime.timedelta(seconds=4),
+            ended_at=now + datetime.timedelta(seconds=5),
+        ),
+        # Turn B: a later content span -> classified assistant.
+        _make_span(
+            project_id,
+            conversation_id=conv,
+            trace_id=trace_b,
+            operation_name="chat",
+            started_at=now + datetime.timedelta(seconds=6),
+            ended_at=now + datetime.timedelta(seconds=7),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Turn A: a human thumbs-up tag. Turn B: a scorer with a tag + a rating.
+    turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
+    turn_b_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_b).uri
+    _create_feedback(
+        ch_server,
+        project_id,
+        turn_a_ref,
+        AGENT_USER_FEEDBACK_TYPE,
+        scorer_tags=["\U0001f44d"],
+    )
+    _create_feedback(
+        ch_server,
+        project_id,
+        turn_b_ref,
+        AGENT_MONITOR_FEEDBACK_TYPE,
+        runnable_ref=ri.InternalOpRef(
+            project_id=project_id, name="quality_scorer", version="v1"
+        ).uri,
+        call_ref=ri.InternalCallRef(project_id=project_id, id=trace_b).uri,
+        trigger_ref=ri.InternalObjectRef(
+            project_id=project_id, name="quality_scorer_trigger", version="v1"
+        ).uri,
+        scorer_tags=["helpful"],
+        scorer_ratings={"quality": 0.8},
+        scorer_rating_reasons={"quality": "clear answer"},
+    )
+    res = ch_server.agent_conversation_spans(
+        AgentConversationSpansReq(
+            project_id=project_id,
+            conversation_ids=[conv],
+        )
+    )
+    row = {c.conversation_id: c for c in res.conversations}[conv]
+
+    # Spans carry the raw operation_name (the client classifies), ordered by
+    # started_at; ERROR surfaces via status.
+    assert [(e.operation_name, e.status) for e in row.spans] == [
+        ("invoke_agent", "OK"),
+        ("execute_tool", "OK"),
+        ("execute_tool", "ERROR"),
+        ("chat", "OK"),
+    ]
+    # Each span carries its turn (trace_id) and its own span_id.
+    assert row.spans[0].trace_id == trace_a
+    assert row.spans[-1].trace_id == trace_b
+    assert any(e.span_id == tool_span for e in row.spans)
+
+    # Markers are keyed by turn (trace_id). Emoji tags come back as the detoned
+    # glyph; scorer ratings come back as ratings.
+    by_trace = {f.trace_id: f for f in row.spans_feedback}
+    assert by_trace[trace_a].feedback_type == AGENT_USER_FEEDBACK_TYPE
+    assert by_trace[trace_a].tags == ["👍"]
+    assert by_trace[trace_a].ratings == []
+
+    assert by_trace[trace_b].feedback_type == AGENT_MONITOR_FEEDBACK_TYPE
+    assert by_trace[trace_b].tags == ["helpful"]
+    assert len(by_trace[trace_b].ratings) == 1
+    rating = by_trace[trace_b].ratings[0]
+    assert (rating.name, rating.value, rating.reason) == (
+        "quality",
+        0.8,
+        "clear answer",
+    )
 
 
 def test_group_by_conversation_id_filters_numeric_aggregates(ch_server):
@@ -897,6 +1310,49 @@ def test_agent_span_stats_ungrouped_metrics(ch_server):
     assert row["p95_duration_ms"] is not None
     assert row["count_true_errors"] == 1
     assert row["count_true_invocations"] == 1
+
+
+def test_agent_span_stats_ungrouped_all_time(ch_server):
+    """Ungrouped >31-day request with the whole range as one bucket returns a
+    single row of all-time totals (no range-cap rejection).
+
+    Mirrors the client recipe: start=epoch, end=now, granularity=now-epoch.
+    Time buckets anchor to the epoch origin, so this is the range that
+    collapses to exactly one bucket.
+    """
+    project_id = _make_project_id("stats-all-time")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    epoch = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    # Both spans predate `now` (started_at < end is exclusive) and one is far
+    # past MAX_AGENT_STATS_RANGE_DAYS.
+    recent = now - datetime.timedelta(minutes=1)
+    old = now - datetime.timedelta(days=100)
+
+    spans = [
+        _make_span(project_id, started_at=recent),
+        _make_span(project_id, started_at=old),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_stats(
+        AgentSpanStatsReq(
+            project_id=project_id,
+            start=epoch,
+            end=now,
+            granularity=int((now - epoch).total_seconds()) + 1,
+            metrics=[
+                AgentSpanStatsMetricSpec(
+                    alias="spans",
+                    value_type="datetime",
+                    value=AgentSpanValueRef(source="field", key="started_at"),
+                    aggregations=["count"],
+                )
+            ],
+        )
+    )
+
+    assert len(res.rows) == 1
+    assert res.rows[0]["count_spans"] == 2
 
 
 def test_agent_span_stats_numeric_value_buckets(ch_server):
@@ -1481,6 +1937,109 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
     assert tool.tool_call.tool_result == '{"ok":true}'
 
 
+def test_conversation_chat_excludes_foreign_conversation_sharing_trace_id(ch_server):
+    """A reused trace_id must not bleed foreign conversations into the chat view.
+
+    Agent-eval workloads reuse trace_id across conversations, so the page of
+    turn trace_ids matches spans from other conversations too. The chat view
+    must never return another conversation's tagged spans.
+
+    Untagged children are a known limitation: producers tag conversation_id
+    only on the root span, so a foreign conversation's untagged children on a
+    shared trace_id cannot be attributed and still bleed (see PR #7450).
+    """
+    project_id = _make_project_id("conv_chat_bleed")
+    conv_a = f"conv-a-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-b-{uuid.uuid4().hex[:8]}"
+    shared_trace = uuid.uuid4().hex  # reused by both conversations
+    a_only_trace = uuid.uuid4().hex  # conv A's second turn, its own trace
+    root_a = uuid.uuid4().hex
+    root_b = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_a,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-shared")],
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_a,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childA-text")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_b,
+            conversation_id=conv_b,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userB-foreign")],
+            output_messages=[
+                NormalizedMessage(role="assistant", content="assistantB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_b,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=a_only_trace,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-only")],
+            started_at=now + datetime.timedelta(minutes=1),
+            ended_at=now + datetime.timedelta(minutes=1, seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(project_id=project_id, conversation_id=conv_a)
+    )
+
+    assert res.total_turns == 2
+    assert {turn.trace_id for turn in res.turns} == {shared_trace, a_only_trace}
+
+    texts = [
+        payload.text
+        for turn in res.turns
+        for msg in turn.messages
+        for payload in (msg.user_message, msg.assistant_message)
+        if payload is not None
+    ]
+    assert "userA-shared" in texts
+    assert "childA-text" in texts
+    assert "userA-only" in texts
+    # conv B's tagged root is excluded by conversation_id scoping.
+    assert "userB-foreign" not in texts
+    assert "assistantB-foreign" not in texts
+    # Known limitation (PR #7450 discussion): conv B's untagged child shares
+    # the trace_id, so it currently bleeds. Flip to `not in` when fixed.
+    assert "childB-foreign" in texts
+
+
 # ---------------------------------------------------------------------------
 # Test: Message search
 # ---------------------------------------------------------------------------
@@ -1571,6 +2130,59 @@ def test_message_search_shared_digest_across_spans(ch_server):
     # Both occurrences share a single content_digest
     digests = {m.content_digest for r in res.results for m in r.matched_messages}
     assert len(digests) == 1
+
+
+def test_message_search_trace_id_full_content(ch_server):
+    """Structured retrieval: empty query + trace_id + full_content returns the
+    trace's user/assistant/system messages untruncated, excluding tool roles.
+    This is the path the agent scoring fallback uses.
+    """
+    project_id = _make_project_id("search_trace_full")
+    trace_id = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    long_text = "x" * 600  # exceeds the 500-char preview cap
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="chat",
+            started_at=now,
+            system_instructions=["be helpful"],
+            input_messages=[NormalizedMessage(role="user", content=long_text)],
+            output_messages=[NormalizedMessage(role="assistant", content="hi")],
+        ),
+        # A tool span in the same trace — its tool_result row must be filtered out.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=uuid.uuid4().hex,
+            operation_name="execute_tool",
+            started_at=now + datetime.timedelta(seconds=1),
+            tool_call_result="tool output",
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(
+        AgentSearchReq(
+            project_id=project_id,
+            query="",
+            trace_id=trace_id,
+            roles=["user", "assistant", "system"],
+            truncate_content=False,
+        )
+    )
+    by_role: dict[str, list[str]] = {}
+    for r in res.results:
+        for m in r.matched_messages:
+            by_role.setdefault(m.role, []).append(m.content_preview)
+
+    assert by_role["user"] == [long_text]  # full content, not the 500-char preview
+    assert by_role["assistant"] == ["hi"]
+    assert by_role["system"] == ["be helpful"]
+    assert "tool_result" not in by_role  # excluded by the roles filter
 
 
 def test_message_search_indexes_tool_calls(ch_server):

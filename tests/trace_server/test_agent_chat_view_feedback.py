@@ -1,6 +1,6 @@
 """Integration tests for include_feedback fold-in on agent chat endpoints.
 
-Requires ClickHouse backend (auto-skips on SQLite via ch_server fixture).
+Runs against the ClickHouse backend (the only supported backend).
 """
 
 import datetime

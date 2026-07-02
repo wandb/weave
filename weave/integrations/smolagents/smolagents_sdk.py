@@ -5,12 +5,17 @@ from collections.abc import Callable
 from typing import Any
 
 import weave
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op_protocol import OpKind
 from weave.trace.serialization.serialize import dictify
 
 _smolagents_patcher: MultiPatcher | None = None
+SMOLAGENTS_INTEGRATION = library_integration("smolagents")
 
 
 def smolagents_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -118,7 +123,7 @@ def get_smolagents_patcher(
     if _smolagents_patcher is not None:
         return _smolagents_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, SMOLAGENTS_INTEGRATION)
     patchers = [
         patcher
         for patcher in [

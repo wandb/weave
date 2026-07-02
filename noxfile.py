@@ -53,7 +53,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "custom",
     "flow",
     "trace",
-    "trace_calls_complete_only",
+    "trace_calls_merged_only",
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
@@ -63,6 +63,11 @@ SHARDS_WITHOUT_EXTRAS = {
     "verifiers_test",
     "pandas_test",
     "scorers",
+    # google_adk is installed post-sync (see tests()) rather than via an
+    # extra: google-adk pins opentelemetry-sdk<=1.41.1, so locking it
+    # universally would drag every shard's shared resolution down to that
+    # ceiling. Keeping it out of the lock leaves the shared resolution alone.
+    "google_adk",
 }
 
 
@@ -87,6 +92,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "dspy",
         "gepa",
         "google_genai",
+        "google_adk",
         "groq",
         "instructor",
         "langchain_nvidia_ai_endpoints",
@@ -110,7 +116,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        "trace_calls_complete_only",
+        "trace_calls_merged_only",
         "trace_no_server",
         "stainless",
     ],
@@ -144,6 +150,13 @@ def tests(session: nox.Session, shard: str):
         # Keep the public extra broad for runtime compatibility, but exercise the
         # newer SDK span classes in CI.
         session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
+
+    if shard == "google_adk":
+        # Installed here (not via an extra) so it stays out of the shared
+        # uv.lock — google-adk pins opentelemetry-sdk<=1.41.1, which weave now
+        # tolerates (the ADK integration vendors its GenAI semconv keys). This
+        # downgrades otel in this env only; weave works on the older semconv.
+        session.run("uv", "pip", "install", "google-adk>=2.2.0")
 
     env = {
         k: session.env.get(k) or os.getenv(k)
@@ -194,14 +207,14 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
-        "trace_calls_complete_only": [
+        "trace_calls_merged_only": [
             "tests/trace/",
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
         "trace_no_server": [
             "tests/trace/",
@@ -209,7 +222,7 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/compat/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
     }
 
@@ -221,7 +234,7 @@ def tests(session: nox.Session, shard: str):
 
     # Each worker gets its own isolated database namespace
     # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard in {"trace", "trace_calls_complete_only"}:
+    if shard in {"trace", "trace_calls_merged_only"}:
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -239,14 +252,14 @@ def tests(session: nox.Session, shard: str):
         "--cov-branch",
     ]
 
-    if shard in {"trace", "trace_calls_complete_only"}:
+    if shard in {"trace", "trace_calls_merged_only"}:
         pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    if shard == "trace_calls_complete_only":
-        env["WEAVE_USE_CALLS_COMPLETE"] = "true"
+    if shard == "trace_calls_merged_only":
+        env["WEAVE_USE_CALLS_COMPLETE"] = "false"
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":

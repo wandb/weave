@@ -17,6 +17,10 @@ from typing import Any
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
+from weave.trace_server.agents.span_costs import (
+    COST_DERIVED_METRIC_NAMES,
+    cost_augmented_source_sql,
+)
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSpanGroupFilter,
@@ -35,7 +39,9 @@ from weave.trace_server.calls_query_builder.stats_query_base import (
 )
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_query_builder import (
+    _FIELD_GROUP_BY_SOURCES,
     _project_filter_sql,
     add_time_filters,
     ensure_group_filters_match,
@@ -141,6 +147,35 @@ def _span_col(column: str) -> str:
     return f"{_SPAN_ALIAS}.{column}"
 
 
+def _value_ref_is_cost(value: Any) -> bool:
+    return (
+        value is not None
+        and getattr(value, "source", None) == "derived"
+        and getattr(value, "key", None) in COST_DERIVED_METRIC_NAMES
+    )
+
+
+def _stats_requires_costs(req: AgentSpanStatsReq) -> bool:
+    """Whether any value ref in the request reads a cost column.
+
+    Scans metrics, numeric-bucket value/measure, and group-filter measures so
+    the query reads from the cost-augmented span source iff cost is needed —
+    avoiding the price JOIN on the common no-cost path.
+    """
+    if any(_value_ref_is_cost(metric.value) for metric in req.metrics):
+        return True
+    bucket = req.bucket_by
+    if isinstance(bucket, AgentSpanStatsNumericBucketSpec):
+        if _value_ref_is_cost(bucket.value):
+            return True
+        if bucket.measure is not None and _value_ref_is_cost(bucket.measure.value):
+            return True
+    return any(
+        _value_ref_is_cost(group_filter.measure.value)
+        for group_filter in req.group_filters
+    )
+
+
 def _conversation_group_by() -> list[AgentGroupByRef]:
     return [AgentGroupByRef(source="column", key="conversation_id")]
 
@@ -199,9 +234,15 @@ class _StatsQuerySQLParts:
 
 @dataclass(frozen=True, slots=True)
 class _SpanSourceFilterSQL:
-    """WHERE filters for direct reads from the spans table."""
+    """WHERE filters and FROM source for direct reads from the spans table.
+
+    `source` is the raw `spans` table, or an attributed-spans subquery when the
+    request filters/groups/aggregates on an identity column that inherits from
+    its trace (see `agent_trace_attribution`).
+    """
 
     where: str
+    source: str = _SPANS_TABLE
 
     @property
     def clause(self) -> str:
@@ -278,8 +319,9 @@ def build_agent_span_stats_query(
         )
 
     granularity_seconds = _resolve_granularity(req, start, end)
-    start_epoch = start.replace(tzinfo=datetime.timezone.utc).timestamp()
-    end_epoch = end.replace(tzinfo=datetime.timezone.utc).timestamp()
+    # Whole unix seconds: a fractional float trips ClickHouse Int64 param parsing.
+    start_epoch = int(start.replace(tzinfo=datetime.timezone.utc).timestamp())
+    end_epoch = int(end.replace(tzinfo=datetime.timezone.utc).timestamp())
     start_param = pb.add_param(start_epoch)
     end_param = pb.add_param(end_epoch)
     tz_param = pb.add_param(tz)
@@ -384,7 +426,50 @@ def _spans_source_filter_sql(
     )
     if req.query is not None:
         where_conditions.append(compile_agent_query(req.query, pb))
-    return _SpanSourceFilterSQL(where=" AND ".join(where_conditions))
+    # The base relation carries cost columns only when the request needs them;
+    # attribution then wraps that base so identity columns inherit from their
+    # trace while any cost columns pass through untouched.
+    base = (
+        cost_augmented_source_sql(pb, req.project_id)
+        if _stats_requires_costs(req)
+        else _SPANS_TABLE
+    )
+    source = base
+    if _stats_references_identity(req):
+        source = agent_trace_attribution.attributed_spans_source(
+            pb,
+            project_id=req.project_id,
+            started_after=start,
+            started_before=end,
+            base_relation=base,
+        )
+    return _SpanSourceFilterSQL(where=" AND ".join(where_conditions), source=source)
+
+
+def _stats_references_identity(req: AgentSpanStatsReq) -> bool:
+    """Whether a stats request touches a trace-attributed identity column.
+
+    Checks the filter, every group-by (top-level, numeric-bucket, and
+    group-filter), and metric value refs, so any identity reference pulls in the
+    attributed source. Errs toward attributing — a missed reference would read
+    raw values while the filter expects attributed ones.
+    """
+    if agent_trace_attribution.query_references_identity(req.query):
+        return True
+    group_refs = list(req.group_by)
+    bucket = req.bucket_by
+    if isinstance(bucket, AgentSpanStatsNumericBucketSpec):
+        group_refs += list(bucket.group_by)
+    for group_filter in req.group_filters or []:
+        group_refs += list(group_filter.group_by or [])
+    field_keys = [
+        ref.key for ref in group_refs if ref.source in _FIELD_GROUP_BY_SOURCES
+    ]
+    for metric in req.metrics:
+        value = metric.value
+        if value is not None and value.source in _FIELD_GROUP_BY_SOURCES:
+            field_keys.append(value.key)
+    return agent_trace_attribution.fields_reference_identity(field_keys)
 
 
 def _response_columns(
@@ -584,7 +669,8 @@ def _aggregation_output(
         aggregate_sql = f"countIf({valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_DISTINCT:
-        aggregate_sql = f"uniqExactIf({metric_col}, {valid_col})"
+        # uniq (approx, memory-bounded); uniqExact OOMs on large projects.
+        aggregate_sql = f"uniqIf({metric_col}, {valid_col})"
         value_type = _VALUE_TYPE_NUMBER
     elif agg == _AGG_COUNT_TRUE:
         aggregate_sql = f"countIf({valid_col} AND {metric_col} = 1)"
@@ -781,7 +867,7 @@ def _build_numeric_bucket_stats_query(
     WITH
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {_SPANS_TABLE} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ),
       {_CTE_VALUE_ROWS} AS (
@@ -875,7 +961,7 @@ def _build_ungrouped_stats_query(
       ),
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {_SPANS_TABLE} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ){group_filter_ctes},
       {_CTE_AGGREGATED_DATA} AS (
@@ -978,7 +1064,7 @@ def _build_grouped_stats_query(
       ),
       {_CTE_FILTERED_SPANS} AS (
         SELECT *
-        FROM {_SPANS_TABLE} {_SPAN_ALIAS}
+        FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
       ),
       {_CTE_TOP_GROUPS} AS (

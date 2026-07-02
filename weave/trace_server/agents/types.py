@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -34,6 +34,7 @@ from weave.trace_server.agents.schema import (
     SpanKindLiteral,
     StatusCodeLiteral,
 )
+from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 
 if TYPE_CHECKING:
@@ -69,6 +70,13 @@ AgentSpanStatsDerivedMetric = Literal[
     "total_tokens",
     "is_error",
     "is_invocation",
+    # Query-time costs (USD). Computed by joining the span's model against
+    # llm_token_prices; only resolvable when the query's span source is
+    # cost-augmented. Mirror of span_costs.COST_DERIVED_METRIC_NAMES — keep the
+    # two in sync. See weave/trace_server/agents/span_costs.py.
+    "total_cost_usd",
+    "input_cost_usd",
+    "output_cost_usd",
 ]
 AgentSpanValueSource = Literal[
     "field",
@@ -108,6 +116,9 @@ AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
     "total_tokens": "number",
     "is_error": "boolean",
     "is_invocation": "boolean",
+    "total_cost_usd": "number",
+    "input_cost_usd": "number",
+    "output_cost_usd": "number",
 }
 _ALLOWED_AGGS_BY_TYPE: dict[AgentSpanStatsValueType, set[AgentSpanStatsAggregation]] = {
     "datetime": {"min", "max", "count", "count_distinct"},
@@ -373,8 +384,15 @@ class AgentSpanStatsReq(BaseModel):
         end = self.end or datetime.datetime.now(datetime.timezone.utc)
         if end < self.start:
             raise ValueError("AgentSpanStatsReq end must be after start")
+        # Unfiltered, ungrouped requests are not bound by
+        # MAX_AGENT_STATS_RANGE_DAYS.
+        apply_max_range_days = (
+            bool(self.group_by)
+            or bool(self.group_filters)
+            or numeric_bucket is not None
+        )
         max_range = datetime.timedelta(days=MAX_AGENT_STATS_RANGE_DAYS)
-        if end - self.start > max_range:
+        if apply_max_range_days and end - self.start > max_range:
             raise ValueError(
                 "AgentSpanStatsReq date range cannot exceed "
                 f"{MAX_AGENT_STATS_RANGE_DAYS} days"
@@ -438,6 +456,14 @@ class AgentSpanSchema(BaseModel):
     reasoning_tokens: int | None = None
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
+    # Query-time costs (USD), only populated when AgentSpansQueryReq.include_costs
+    # is set. None (not 0) when the span's model has no matching price, so the UI
+    # can distinguish "unpriced" from "free". See agents/span_costs.py.
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    cache_read_cost_usd: float | None = None
+    cache_creation_cost_usd: float | None = None
+    total_cost_usd: float | None = None
     reasoning_content: str | None = None
     conversation_id: str | None = None
     conversation_name: str | None = None
@@ -541,7 +567,7 @@ class AgentSpanGroupDistributionSpec(BaseModel):
         return self
 
     def custom_attr_source(self) -> AgentCustomAttrSource:
-        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+        """Return `value.source` narrowed to `AgentCustomAttrSource`.
 
         The model validator guarantees this at construction time; this helper
         re-checks each literal so callers avoid `cast()` at use sites.
@@ -603,6 +629,83 @@ class AgentConversationMessagePreview(BaseModel):
     text: str = ""
 
 
+class AgentConversationSpan(BaseModel):
+    """One span in a conversation's trace.
+
+    Returned by `agent_conversation_spans`, which reads span scalar columns
+    only (no message bodies). Spans are ordered by `started_at`, which
+    approximates — but does not exactly match — the detail chat view's
+    parent/child tree-walk order. `operation_name` is the raw OTel value; the
+    client maps it to a display category.
+    """
+
+    operation_name: str
+    trace_id: str
+    span_id: str
+    status: StatusCodeLiteral
+    duration_ms: int
+
+
+class AgentConversationSpanRating(BaseModel):
+    """One numeric rating (a scorer score) applied to a turn or conversation."""
+
+    name: str
+    value: float
+    reason: str | None = None
+    confidence: float | None = None
+
+
+class AgentConversationSpanFeedback(BaseModel):
+    """Tags and ratings applied to a conversation's turn (or the conversation).
+
+    Positioned client-side by matching `trace_id` (turn) against the spans;
+    `trace_id` is None for conversation-level feedback.
+    """
+
+    trace_id: str | None = Field(
+        description="The turn this feedback is anchored to; None for conversation-level."
+    )
+    feedback_type: AgentSpanFeedbackType
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Arbitrary descriptive tags applied to this feedback.",
+        examples=[["👍", "needs-review"]],
+    )
+    ratings: list[AgentConversationSpanRating] = Field(
+        default_factory=list,
+        description="Numeric scorer ratings applied to this feedback.",
+    )
+
+
+class AgentConversationSpans(BaseModel):
+    """One conversation's span sequence and its feedback markers."""
+
+    conversation_id: str
+    spans: list[AgentConversationSpan] = Field(default_factory=list)
+    spans_feedback: list[AgentConversationSpanFeedback] = Field(default_factory=list)
+
+
+class AgentConversationSpansReq(BaseModel):
+    """Request the span sequences for an explicit set of conversations.
+
+    Reads span scalar columns only (no message bodies) for the given
+    `conversation_ids`. Powers the conversations-list spans minimap.
+    """
+
+    project_id: str
+    conversation_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_AGENT_QUERY_LIMIT
+    )
+    started_after: AwareDatetime | None = None  # filter started_at >= start
+    started_before: AwareDatetime | None = None  # filter started_at < end
+
+
+class AgentConversationSpansRes(BaseModel):
+    """Span sequences + feedback markers, one entry per requested conversation."""
+
+    conversations: list[AgentConversationSpans] = Field(default_factory=list)
+
+
 class AgentSpanGroupRow(BaseModel):
     """A single row in a grouped spans query response.
 
@@ -621,6 +724,12 @@ class AgentSpanGroupRow(BaseModel):
     total_reasoning_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
+    # Summed query-time costs (USD) across the group's spans. Only populated
+    # when AgentSpansQueryReq.include_costs is set; None when no span in the
+    # group had a matching model price. See agents/span_costs.py.
+    total_cost_usd: float | None = None
+    total_input_cost_usd: float | None = None
+    total_output_cost_usd: float | None = None
     agent_names: list[str] = Field(default_factory=list)
     agent_versions: list[str] = Field(default_factory=list)
     provider_names: list[str] = Field(default_factory=list)
@@ -663,6 +772,11 @@ class AgentSpansQueryReq(BaseModel):
     # etc.) in each row. Intended for single-trace detail fetches; do not set
     # for broad list queries.
     include_details: bool = False
+    # When true, compute per-span costs (USD) by joining each span's model
+    # against llm_token_prices. Adds input_cost_usd/output_cost_usd/.../total_cost_usd to
+    # ungrouped span rows, or summed total_cost_usd/total_input_cost_usd/
+    # total_output_cost_usd to grouped rows. See agents/span_costs.py.
+    include_costs: bool = False
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
@@ -783,21 +897,29 @@ class AgentCustomAttrsSchemaRes(BaseModel):
 
 
 class AgentSearchReq(BaseModel):
-    """Full-text search across message content and span metadata.
+    """Query the `messages` table by content and/or span-level filters.
 
-    Scans the `messages` table (one row per message occurrence, populated
-    by an MV from spans) and returns matching span-level hits. The caller
-    groups by conversation for the response shape.
+    Scans the `messages` table (one row per message occurrence, populated by an
+    MV from spans) and returns matching span-level hits. Full-text search sets
+    `query`; structured retrieval (e.g. all messages in a trace) leaves `query`
+    empty and uses the filters below. The caller groups by conversation for the
+    response shape.
     """
 
     project_id: str
-    query: str
+    # Substring match on message content. Empty matches all (no content filter),
+    # turning this into structured retrieval over the filters below.
+    query: str = ""
 
+    trace_id: str | None = None
     roles: list[SearchMessageRole] | None = None
     conversation_id: str | None = None
     agent_name: str | None = None
     provider_name: str | None = None
     request_model: str | None = None
+    # Truncate message content to a preview (default) to keep search-UI payloads
+    # small; set False to return full content (e.g. for structured retrieval).
+    truncate_content: bool = True
     started_after: datetime.datetime | None = None
     started_before: datetime.datetime | None = None
 
@@ -859,6 +981,11 @@ class AgentChatAssistantMessage(BaseModel):
     reasoning_tokens: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    # Query-time costs (USD) for this message's span (or, for aggregated agent
+    # turns, summed across the subtree). None when the model has no price.
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    total_cost_usd: float | None = None
     duration_ms: int | None = None
     status: StatusCodeLiteral | None = None
     content_refs: list[str] = Field(default_factory=list)
@@ -908,6 +1035,8 @@ class AgentChatMessage(BaseModel):
     type: AgentChatMessageType
     span_id: str | None = None
     agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     started_at: datetime.datetime | None = None
 
     user_message: AgentChatUserMessage | None = None
@@ -960,6 +1089,9 @@ class AgentTraceChatRes(BaseModel):
 
     trace_id: str
     root_span_name: str | None = None
+    agent_name: str | None = None
+    agent_version: str | None = None
+    status_code: StatusCodeLiteral | None = None
     provider: str | None = None
     total_duration_ms: int | None = Field(
         default=None,
@@ -968,6 +1100,9 @@ class AgentTraceChatRes(BaseModel):
             "This is not a sum of child span durations."
         ),
     )
+    # Summed query-time cost (USD) across all spans in the trace. Unlike
+    # duration, this IS a sum across spans. None when no span had a price.
+    total_cost_usd: float | None = None
     messages: list[AgentChatMessage] = Field(default_factory=list)
     feedback: list[dict[str, Any]] | None = None
 
@@ -1010,6 +1145,9 @@ class AgentConversationChatRes(BaseModel):
     has_more: bool = False
     limit: int = MAX_CONVERSATION_CHAT_TURNS
     offset: int = 0
+    # Summed query-time cost (USD) across the returned turns. None when no turn
+    # had a priced span.
+    total_cost_usd: float | None = None
     feedback: list[dict[str, Any]] | None = None
 
 
@@ -1026,6 +1164,11 @@ class AgentSchema(BaseModel):
     error_count: int
     first_seen: datetime.datetime | None
     last_seen: datetime.datetime | None
+    # Summed query-time cost (USD), populated only when the query sets
+    # include_costs. The agents/agent_versions materialized views don't store
+    # cost, so the handler fills this from a supplementary grouped spans query.
+    # None when costs weren't requested or no span had a price.
+    total_cost_usd: float | None = None
 
 
 class AgentsQueryFilters(BaseModel):
@@ -1044,6 +1187,9 @@ class AgentsQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
+    # When true, fill AgentSchema.total_cost_usd from a supplementary grouped spans
+    # cost query (the agents materialized view has no cost column).
+    include_costs: bool = False
 
 
 class AgentsQueryRes(BaseModel):
@@ -1074,6 +1220,9 @@ class AgentVersionsQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
+    # When true, fill AgentVersionSchema.total_cost_usd from a supplementary grouped
+    # spans cost query (the agent_versions materialized view has no cost column).
+    include_costs: bool = False
 
 
 class AgentVersionsQueryRes(BaseModel):

@@ -1,59 +1,67 @@
 import type {BufferConfig, SpanProcessor} from '@opentelemetry/sdk-trace-base';
 
-export interface GenAISettingsInit {
+export type Settings = {
   /**
-   * How GenAI spans are exported.
+   * Prints links in terminal to Weave UI for ops.
    *
-   * - `'batch'` (default): `BatchSpanProcessor`, suitable for production
-   *   agents and long-lived processes.
-   * - `'simple'`: `SimpleSpanProcessor`, one HTTP POST per span. Useful for
-   *   tests and short-lived CLIs where deterministic flush matters more than
-   *   throughput.
-   * - `SpanProcessor` instance: a user-supplied processor. The caller owns
-   *   its lifecycle; the Weave OTLP exporter targeting `/agents/otel/v1/traces`
-   *   is not used.
+   * @default `true`
    */
-  spanProcessor?: 'batch' | 'simple' | SpanProcessor;
+  readonly printCallLink: boolean;
 
-  /** `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`. */
-  batchOptions?: BufferConfig;
+  /**
+   * A map of attributes applied to every trace produced by this client.
+   */
+  readonly attributes: Record<string, any>;
+
+  /**
+   * Routes OTel-capable integrations through their OTel variant.
+   *
+   * @default `true`
+   */
+  useOTelV2: boolean;
+
+  readonly genai: {
+    /**
+     * How GenAI spans are exported.
+     *
+     * - `'batch'` (default): `BatchSpanProcessor`, suitable for production
+     *   agents and long-lived processes.
+     * - `'simple'`: `SimpleSpanProcessor`, one HTTP POST per span. Useful for
+     *   tests and short-lived CLIs where deterministic flush matters more than
+     *   throughput.
+     * - `SpanProcessor` instance: a user-supplied processor. The caller owns
+     *   its lifecycle; the Weave OTLP exporter targeting `/agents/otel/v1/traces`
+     *   is not used.
+     */
+    spanProcessor?: 'batch' | 'simple' | SpanProcessor;
+
+    /**
+     * `BatchSpanProcessor` configuration. Ignored unless `spanProcessor === 'batch'`.
+     */
+    batchOptions?: BufferConfig;
+  };
+};
+
+export function makeSettings(settings: Partial<Settings> = {}): Settings {
+  // Env vars take precedence over provided settings.
+  const printCallLink =
+    parseEnvVar(process.env.WEAVE_PRINT_CALL_LINK) ??
+    settings.printCallLink ??
+    true;
+
+  const useOTelV2 =
+    parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? settings.useOTelV2 ?? true;
+
+  return {
+    printCallLink,
+    useOTelV2,
+    attributes: settings.attributes ?? {},
+    genai: settings.genai ?? {},
+  };
 }
 
-export interface SettingsInit {
-  printCallLink?: boolean;
-  globalAttributes?: Record<string, any>;
-  genai?: GenAISettingsInit;
-}
-
-export class Settings {
-  constructor(
-    private printCallLink: boolean = true,
-    private globalAttributes: Record<string, any> = {},
-    public readonly genai: GenAISettingsInit = {}
-  ) {}
-
-  get shouldPrintCallLink(): boolean {
-    return parseEnvVar(process.env.WEAVE_PRINT_CALL_LINK) ?? this.printCallLink;
-  }
-
-  get attributes(): Record<string, any> {
-    return this.globalAttributes;
-  }
-}
-
-export function makeSettings(settings?: SettingsInit): Settings {
-  if (!settings) {
-    return new Settings();
-  }
-  return new Settings(
-    settings.printCallLink ?? true,
-    settings.globalAttributes ?? {},
-    settings.genai ?? {}
-  );
-}
-
-export function shouldUseOtelV2(): boolean {
-  return parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? false;
+export function defaultSettings(): Settings {
+  return makeSettings();
 }
 
 function parseEnvVar(val: string | undefined): boolean | undefined {

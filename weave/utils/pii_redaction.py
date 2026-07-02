@@ -1,10 +1,10 @@
-"""PII redaction — used by both @op tracer and Session SDK.
+"""PII redaction — used by both @op tracer and Conversation SDK.
 
 Two layers:
 
 - ``redact_pii`` / ``redact_pii_string`` are the primitives that walk
   dicts, lists, and dataclasses applying Presidio.
-- ``redact_messages`` / ``redact_system_instructions`` are the Session
+- ``redact_messages`` / ``redact_system_instructions`` are the Conversation
   SDK helpers shaped for typed Message payloads (dump → redact →
   revalidate).
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 import dataclasses
 from typing import TYPE_CHECKING, Any, cast
 
-from weave.session.types import Message
+from weave.conversation.types import Message
 from weave.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_exclude_fields, redact_pii_fields
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
@@ -123,7 +123,7 @@ def redact_messages(messages: list[Message]) -> list[Message]:
     """Redact PII in each Message via dump → redact → revalidate.
 
     Routes through the same recursive ``redact_pii`` used by ``@op`` so
-    Session SDK content is redacted identically. Discriminator literals
+    Conversation SDK content is redacted identically. Discriminator literals
     (``role``, part ``type``) aren't matched by Presidio's default
     recognizers, so the round-trip preserves the typed shape.
     """

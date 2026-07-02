@@ -1,6 +1,7 @@
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.orm import (
     Column,
     ParamBuilder,
@@ -8,6 +9,8 @@ from weave.trace_server.orm import (
     _transform_external_field_to_internal_field,
     combine_conditions,
     python_value_to_ch_type,
+    quote_json_path,
+    quote_json_path_parts,
     split_escaped_field_path,
 )
 
@@ -35,23 +38,11 @@ def test_python_value_to_ch_type_negative_integers():
 
 
 def test_parambuilder_clickhouse():
-    pb = ParamBuilder(database_type="clickhouse")
+    pb = ParamBuilder()
     name = pb.add("bar", "foo", "String")
     assert name == "{foo:String}"
     name = pb.add(12, "bim")
     assert name == "{bim:Int64}"
-    assert pb.get_params() == {
-        "foo": "bar",
-        "bim": 12,
-    }
-
-
-def test_parambuilder_sqlite():
-    pb = ParamBuilder(database_type="sqlite")
-    placeholder = pb.add("bar", "foo", "String")
-    assert placeholder == ":foo"
-    placeholder = pb.add(12, "bim")
-    assert placeholder == ":bim"
     assert pb.get_params() == {
         "foo": "bar",
         "bim": 12,
@@ -75,6 +66,28 @@ def test_combine_conditions():
     )
 
 
+def test_quote_json_path_array_indices():
+    """Non-negative ints bracket-index; negative indices are rejected.
+
+    ClickHouse JSON_VALUE's JSONPath grammar rejects negative array indices
+    (`[-1]`) with BAD_ARGUMENTS, 502-ing the whole request. We reject them at
+    compile time as a client-facing InvalidFieldError (HTTP 422) instead.
+    """
+    assert quote_json_path_parts(["a", "0", "2"]) == '$."a"[0][2]'
+    assert quote_json_path("output.scores.0") == '$."output"."scores"[0]'
+
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        quote_json_path_parts(["turn", "user_prompt_parts", "-1"])
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        quote_json_path("turn.user_prompt_parts.-1")
+    with pytest.raises(InvalidFieldError, match="Negative array index '-2'"):
+        _transform_external_field_to_internal_field(
+            "payload.turn.user_prompt_parts.-2",
+            all_columns=["payload_dump"],
+            json_columns=["payload"],
+        )
+
+
 def test_transform_external_field_to_internal_field():
     all_columns = ["id", "creator", "payload_dump"]
     json_columns = ["payload"]
@@ -95,16 +108,7 @@ def test_transform_external_field_to_internal_field():
     )
     assert result[0] == "payload_dump"
     assert result[2] == {"payload_dump"}
-    pb = ParamBuilder(prefix="pb", database_type="sqlite")
-    result = _transform_external_field_to_internal_field(
-        "payload.address",
-        all_columns=all_columns,
-        json_columns=json_columns,
-        param_builder=pb,
-    )
-    assert result[0] == "json_extract(payload_dump, :pb_0)"
-    assert result[2] == {"payload_dump"}
-    pb = ParamBuilder(prefix="pb", database_type="clickhouse")
+    pb = ParamBuilder(prefix="pb")
     result = _transform_external_field_to_internal_field(
         "payload.address",
         all_columns=all_columns,
@@ -115,55 +119,17 @@ def test_transform_external_field_to_internal_field():
     assert result[2] == {"payload_dump"}
 
 
-def test_table_create_sql():
-    table = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
-    )
-    assert (
-        table.create_sql()
-        == "CREATE TABLE IF NOT EXISTS users (\n    id TEXT,\n    creator TEXT,\n    payload_dump TEXT\n)"
-    )
-
-
-def test_table_drop_sql():
-    table = Table(
-        "users",
-        [
-            Column("id", "string"),
-            Column("creator", "string", nullable=True),
-            Column("payload", "json", db_name="payload_dump"),
-        ],
-    )
-    assert table.drop_sql() == "DROP TABLE IF EXISTS users"
-
-
-def test_array_string_column_round_trip_clickhouse():
+def test_array_string_column_round_trip():
     table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
     insert = table.insert({"id": "a", "tags": ["x", "y"]})
-    prepared = insert.prepare(database_type="clickhouse")
+    prepared = insert.prepare()
     # ClickHouse driver accepts native list; ORM must not JSON-encode it.
     assert prepared.data == [["a", ["x", "y"]]]
     # Reading back a CH row returns a native list and ORM passes it through.
-    assert table.tuple_to_row(
-        ("a", ["x", "y"]), ["id", "tags"], database_type="clickhouse"
-    ) == {"id": "a", "tags": ["x", "y"]}
-
-
-def test_array_string_column_round_trip_sqlite():
-    table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
-    insert = table.insert({"id": "a", "tags": ["x", "y"]})
-    prepared = insert.prepare(database_type="sqlite")
-    # SQLite has no Array type — ORM must JSON-encode the list to TEXT.
-    assert prepared.data == [["a", '["x", "y"]']]
-    # And decode on the way out.
-    assert table.tuple_to_row(
-        ("a", '["x", "y"]'), ["id", "tags"], database_type="sqlite"
-    ) == {"id": "a", "tags": ["x", "y"]}
+    assert table.tuple_to_row(("a", ["x", "y"]), ["id", "tags"]) == {
+        "id": "a",
+        "tags": ["x", "y"],
+    }
 
 
 def test_map_string_float_column_round_trip():
@@ -172,20 +138,12 @@ def test_map_string_float_column_round_trip():
         [Column("id", "string"), Column("ratings", "map_string_float")],
     )
     payload = {"_rating_": 0.87}
-    ch_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
-        database_type="clickhouse"
-    )
+    ch_prepared = table.insert({"id": "a", "ratings": payload}).prepare()
     assert ch_prepared.data == [["a", payload]]
-    sqlite_prepared = table.insert({"id": "a", "ratings": payload}).prepare(
-        database_type="sqlite"
-    )
-    assert sqlite_prepared.data == [["a", '{"_rating_": 0.87}']]
-    assert table.tuple_to_row(
-        ("a", payload), ["id", "ratings"], database_type="clickhouse"
-    ) == {"id": "a", "ratings": payload}
-    assert table.tuple_to_row(
-        ("a", '{"_rating_": 0.87}'), ["id", "ratings"], database_type="sqlite"
-    ) == {"id": "a", "ratings": payload}
+    assert table.tuple_to_row(("a", payload), ["id", "ratings"]) == {
+        "id": "a",
+        "ratings": payload,
+    }
 
 
 def test_select_basic():
@@ -199,22 +157,12 @@ def test_select_basic():
     )
     select = table.select()
     select = select.limit(10)
-    prepared = select.prepare(database_type="clickhouse")
+    prepared = select.prepare()
     assert (
         prepared.sql
         == """SELECT id, creator, payload_dump
 FROM users
 LIMIT {limit:UInt64}"""
-    )
-    assert prepared.parameters == {"limit": 10}
-    assert prepared.fields == ["id", "creator", "payload_dump"]
-
-    prepared = select.prepare(database_type="sqlite")
-    assert (
-        prepared.sql
-        == """SELECT id, creator, payload_dump
-FROM users
-LIMIT :limit"""
     )
     assert prepared.parameters == {"limit": 10}
     assert prepared.fields == ["id", "creator", "payload_dump"]
@@ -233,18 +181,8 @@ def test_select_fields():
     select = select.fields(["id", "payload.address"])
 
     # More complicated than normal usage to fix the ParamBuilder prefix.
-    pb = ParamBuilder(prefix="pb", database_type="sqlite")
-    prepared = select.prepare(database_type="sqlite", param_builder=pb)
-    assert (
-        prepared.sql
-        == """SELECT id, json_extract(payload_dump, :pb_0)
-FROM users"""
-    )
-    assert prepared.parameters == {"pb_0": '$."address"'}
-    assert prepared.fields == ["id", "payload.address"]
-
-    pb = ParamBuilder(prefix="pb", database_type="clickhouse")
-    prepared = select.prepare(database_type="clickhouse", param_builder=pb)
+    pb = ParamBuilder(prefix="pb")
+    prepared = select.prepare(param_builder=pb)
     assert (
         prepared.sql
         == """SELECT id, toString(JSON_VALUE(payload_dump, {pb_0:String}))
@@ -289,7 +227,7 @@ def test_join():
         )
     )
 
-    prepared = select.prepare(database_type="clickhouse")
+    prepared = select.prepare()
 
     assert (
         prepared.sql
@@ -335,13 +273,73 @@ def test_join_with_join_type():
         )
     )
 
-    prepared = select.prepare(database_type="clickhouse")
+    prepared = select.prepare()
 
     assert (
         prepared.sql
         == """SELECT id, name
 FROM users
 inner JOIN roles ON (table1.id = table2.id)"""
+    )
+
+
+def test_join_global():
+    table1 = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+    table2 = Table(
+        "roles",
+        [
+            Column("id", "string"),
+            Column("name", "string"),
+        ],
+    )
+
+    select = (
+        table1.select()
+        .fields(["id", "name"])
+        .join(
+            table2,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "table1.id"},
+                            {"$getField": "table2.id"},
+                        ]
+                    }
+                }
+            ),
+            "LEFT",
+            global_=True,
+        )
+    )
+
+    prepared = select.prepare()
+
+    assert (
+        prepared.sql
+        == """SELECT id, name
+FROM users
+GLOBAL LEFT JOIN roles ON (table1.id = table2.id)"""
+    )
+
+    join_query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "table1.id"}, {"$getField": "table2.id"}]}}
+    )
+    no_type = (
+        table1.select().fields(["id", "name"]).join(table2, join_query, global_=True)
+    )
+    assert (
+        no_type.prepare().sql
+        == """SELECT id, name
+FROM users
+GLOBAL JOIN roles ON (table1.id = table2.id)"""
     )
 
 
@@ -357,7 +355,7 @@ def test_group_by():
 
     select = table.select().fields(["id", "creator"]).group_by(["id", "creator"])
 
-    prepared = select.prepare(database_type="clickhouse")
+    prepared = select.prepare()
 
     assert (
         prepared.sql
@@ -422,10 +420,7 @@ def _feedback_table() -> Table:
 
 
 def _prepare_clickhouse(select):
-    return select.prepare(
-        database_type="clickhouse",
-        param_builder=ParamBuilder(prefix="pb", database_type="clickhouse"),
-    )
+    return select.prepare(param_builder=ParamBuilder(prefix="pb"))
 
 
 @pytest.mark.parametrize(

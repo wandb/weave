@@ -115,6 +115,25 @@ describe('PiCodingAgentOtelAdapter', () => {
         'test-session-id'
       );
       expect(span!.attributes['pi.session.cwd']).toBe('/home/user/project');
+      // Integration-tracking metadata is stamped on every span this
+      // integration emits. OTel attributes are scalars, so the nested
+      // `integration` shape is flattened to dotted keys.
+      const stamped = exporter
+        .getFinishedSpans()
+        .filter(s => s.attributes['integration.name'] !== undefined);
+      expect(stamped.length).toBeGreaterThan(0);
+      expect(
+        stamped.every(
+          s => s.attributes['integration.name'] === 'pi_coding_agent'
+        )
+      ).toBe(true);
+      expect(
+        stamped.every(
+          s =>
+            s.attributes['integration.meta.package_name'] ===
+            '@pi-dev/coding-agent'
+        )
+      ).toBe(true);
     });
 
     it('emits one trace per prompt, linked by conversation id', () => {

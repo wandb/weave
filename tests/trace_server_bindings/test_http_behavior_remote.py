@@ -27,7 +27,10 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
+    TRACE_ID_HEADER,
 )
 from weave.trace_server_bindings.models import (
     CompleteBatchItem,
@@ -49,6 +52,11 @@ def make_calls_complete_required_response() -> httpx.Response:
         },
         request=httpx.Request("POST", "http://example.com/call/upsert_batch"),
     )
+
+
+def _request_headers(mock_call) -> dict:
+    """Pull the headers kwarg from a mocked http_requests.* call."""
+    return mock_call.kwargs.get("headers", {})
 
 
 @pytest.fixture
@@ -143,11 +151,15 @@ def test_eager_calls_use_v2_start_end_endpoints(mock_post):
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     start = generate_start(id="call-id", project_id="entity/project")
+    start.trace_id = "trace-eager-start"
     ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
     started_at = ended_at - datetime.timedelta(seconds=1)
+    # Distinct from the start's trace_id so the assertions below prove each
+    # post stamps its OWN item's trace_id, not a single shared value.
     end = tsi.EndedCallSchemaForInsertWithStartedAt(
         project_id="entity/project",
         id="call-id",
+        trace_id="trace-eager-end",
         ended_at=ended_at,
         started_at=started_at,
         summary={"result": "Test summary"},
@@ -171,6 +183,17 @@ def test_eager_calls_use_v2_start_end_endpoints(mock_post):
             "http://example.com/v2/entity/project/call/start",
             "http://example.com/v2/entity/project/call/end",
         ]
+
+        # Both eager v2 single-call posts carry the X-Weave-Trace-Id header
+        # (this is the path Evaluation.evaluate eager ops use).
+        assert (
+            _request_headers(mock_post.call_args_list[0])[TRACE_ID_HEADER]
+            == start.trace_id
+        )
+        assert (
+            _request_headers(mock_post.call_args_list[1])[TRACE_ID_HEADER]
+            == end.trace_id
+        )
 
         end_payload = json.loads(mock_post.call_args_list[1][1]["data"].decode("utf-8"))
         payload_started_at = datetime.datetime.fromisoformat(
@@ -456,6 +479,244 @@ def test_eager_calls_complete_required_is_reraised(mock_post, monkeypatch):
             server._flush_calls_eager([start])
     finally:
         if server.call_processor and server.call_processor.is_accepting_new_work():
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+
+# =============================================================================
+# X-Weave-Trace-Id on single-call ingest requests + trace_id in end bodies
+#
+# A future server-side ingest sampler needs the trace_id where it can read it
+# cheaply: in a header for single calls (the door reads it before parsing the
+# body) and in the body for batched end-parts (a hook parses the batch). These
+# tests pin both wiring points and the backward-compatible "no trace_id" case.
+# =============================================================================
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_start_single_sends_trace_id_header(mock_post, unbatched_server):
+    """Single /call/start attaches the trace_id as the X-Weave-Trace-Id header."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
+    )
+
+    start = generate_start(call_id)
+    unbatched_server.call_start(tsi.CallStartReq(start=start))
+
+    assert _request_headers(mock_post.call_args)[TRACE_ID_HEADER] == start.trace_id
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_end_single_sends_trace_id_header_and_body(mock_post, unbatched_server):
+    """Single /call/end carries trace_id in both the header and the body."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id="test",
+        id=call_id,
+        trace_id="trace-456",
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"result": "ok"},
+    )
+    unbatched_server.call_end(tsi.CallEndReq(end=end))
+
+    assert _request_headers(mock_post.call_args)[TRACE_ID_HEADER] == "trace-456"
+    body = json.loads(mock_post.call_args.kwargs["data"].decode("utf-8"))
+    assert body["end"]["trace_id"] == "trace-456"
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_end_single_without_trace_id_omits_header(mock_post, unbatched_server):
+    """Backward compat: an end with no trace_id sends no X-Weave-Trace-Id header."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id="test",
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"result": "ok"},
+    )
+    unbatched_server.call_end(tsi.CallEndReq(end=end))
+
+    assert TRACE_ID_HEADER not in _request_headers(mock_post.call_args)
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_end_single_carries_is_eval_in_body(mock_post, unbatched_server):
+    """The SDK-computed is_eval flag is serialized into the /call/end body."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id="test",
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"result": "ok"},
+        is_eval=True,
+    )
+    unbatched_server.call_end(tsi.CallEndReq(end=end))
+
+    body = json.loads(mock_post.call_args.kwargs["data"].decode("utf-8"))
+    assert body["end"]["is_eval"] is True
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_start_v2_sends_trace_id_header(mock_post, unbatched_server):
+    """v2 single /call/start attaches the X-Weave-Trace-Id header."""
+    mock_post.return_value = httpx.Response(
+        200,
+        json=dict(tsi.CallStartV2Res(id="call-id", trace_id="trace-v2-start")),
+        request=httpx.Request("POST", "http://test.com"),
+    )
+
+    start = generate_start(id="call-id", project_id="entity/project")
+    start.trace_id = "trace-v2-start"
+    unbatched_server.call_start_v2(tsi.CallStartV2Req(start=start))
+
+    assert (
+        mock_post.call_args[0][0] == "http://example.com/v2/entity/project/call/start"
+    )
+    assert _request_headers(mock_post.call_args)[TRACE_ID_HEADER] == "trace-v2-start"
+
+
+@patch("weave.utils.http_requests.post")
+def test_call_end_v2_sends_trace_id_header(mock_post, unbatched_server):
+    """v2 single /call/end attaches the X-Weave-Trace-Id header."""
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    end = tsi.EndedCallSchemaForInsertWithStartedAt(
+        project_id="entity/project",
+        id="call-id",
+        trace_id="trace-v2",
+        ended_at=ended_at,
+        started_at=ended_at - datetime.timedelta(seconds=1),
+        summary={"result": "ok"},
+    )
+    unbatched_server.call_end_v2(tsi.CallEndV2Req(end=end))
+
+    assert mock_post.call_args[0][0] == "http://example.com/v2/entity/project/call/end"
+    assert _request_headers(mock_post.call_args)[TRACE_ID_HEADER] == "trace-v2"
+
+
+@patch("weave.utils.http_requests.post")
+def test_legacy_upsert_batch_end_carries_trace_id_in_body(mock_post):
+    """Legacy /call/upsert_batch end-parts carry trace_id in the body (hook path)."""
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://example.com")
+    )
+
+    call_id = "call-id"
+    start = StartBatchItem(
+        req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
+    )
+    end = EndBatchItem(
+        req=tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id="entity/project",
+                id=call_id,
+                trace_id="trace-batch",
+                ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                summary={"result": "ok"},
+            )
+        )
+    )
+
+    try:
+        server._flush_calls([start, end])
+
+        urls = [call[0][0] for call in mock_post.call_args_list]
+        assert urls
+        assert all(url == "http://example.com/call/upsert_batch" for url in urls)
+        # A batch can span many traces, so it must NOT carry the per-trace
+        # header; the hook reads trace_id from each item's body instead.
+        for call in mock_post.call_args_list:
+            assert TRACE_ID_HEADER not in _request_headers(call)
+        end_items = [
+            item
+            for call in mock_post.call_args_list
+            for item in json.loads(call.kwargs["data"].decode("utf-8"))["batch"]
+            if item.get("mode") == "end"
+        ]
+        assert end_items, "expected an end item in the posted batch"
+        assert end_items[0]["req"]["end"]["trace_id"] == "trace-batch"
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+
+# =============================================================================
+# X-Weave-Client-Capabilities on every ingest request
+#
+# Unlike the per-trace X-Weave-Trace-Id header, the capability header describes
+# the client build itself, so it rides every request -- single calls AND
+# batches -- letting a future server-side ingest sampler recognize a
+# sampling-safe client even on the batch path, which cannot carry a per-trace
+# trace_id header.
+# =============================================================================
+
+
+@patch("weave.utils.http_requests.post")
+def test_single_call_sends_client_capabilities_header(mock_post, unbatched_server):
+    """Every single-call request advertises the client's capabilities."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
+    )
+
+    unbatched_server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+
+    assert (
+        _request_headers(mock_post.call_args)[CLIENT_CAPABILITIES_HEADER]
+        == CLIENT_CAPABILITIES
+    )
+
+
+@patch("weave.utils.http_requests.post")
+def test_batch_upsert_sends_client_capabilities_header(mock_post):
+    """The batch path carries the capability header too (it describes the
+    client, not a trace), unlike the per-trace X-Weave-Trace-Id header.
+    """
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://example.com")
+    )
+
+    call_id = "call-id"
+    start = StartBatchItem(
+        req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
+    )
+
+    try:
+        server._flush_calls([start])
+
+        assert mock_post.call_args_list
+        for call in mock_post.call_args_list:
+            assert (
+                _request_headers(call)[CLIENT_CAPABILITIES_HEADER]
+                == CLIENT_CAPABILITIES
+            )
+    finally:
+        if server.call_processor:
             server.call_processor.stop_accepting_new_work_and_flush_queue()
         if server.feedback_processor:
             server.feedback_processor.stop_accepting_new_work_and_flush_queue()

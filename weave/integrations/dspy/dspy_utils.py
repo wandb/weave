@@ -192,7 +192,10 @@ def dictify(
                     if isinstance(key, str) and should_redact(key):
                         to_dict_result[key] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
-                        to_dict_result[key] = dictify(v, maxdepth, depth + 1)
+                        # Thread `seen` so cycle detection survives across the
+                        # to_dict boundary; dropping it lets cyclic or shared
+                        # object graphs recurse forever. See issue #5158.
+                        to_dict_result[key] = dictify(v, maxdepth, depth + 1, seen)
                     else:
                         to_dict_result[key] = stringify(v)
                 return to_dict_result

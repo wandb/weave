@@ -222,12 +222,66 @@ def test_grouped_rows_hydrate_message_previews() -> None:
     handler = AgentQueryHandler(query, lambda req: FeedbackQueryRes(result=[]))
     res = handler.spans_query(req)
 
-    # 3 queries: count, grouped list, bounded preview.
+    # 3 queries: count, grouped list, bounded preview. The grouped list query
+    # never reads the wide message columns; the preview is scoped by conversation_id.
     assert len(calls) == 3
-    assert "conversation_id IN" in calls[2]
-    # The main grouped list query must NOT touch the wide message columns.
-    assert "input_messages" not in calls[1]
-    assert "output_messages" not in calls[1]
+    assert calls[1] == (
+        "\n        SELECT s.conversation_id AS conversation_id,\n"
+        "               count() AS span_count,\n"
+        "               countIf(s.operation_name = 'invoke_agent') AS invocation_count,\n"
+        "               uniq(s.conversation_id) AS conversation_count,\n"
+        "               sum(s.input_tokens) AS total_input_tokens,\n"
+        "               sum(s.cache_creation_input_tokens) AS total_cache_creation_input_tokens,\n"
+        "               sum(s.cache_read_input_tokens) AS total_cache_read_input_tokens,\n"
+        "               sum(s.output_tokens) AS total_output_tokens,\n"
+        "               sum(s.reasoning_tokens) AS total_reasoning_tokens,\n"
+        "               sum(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)) AS total_duration_ms,\n"
+        "               countIf(s.status_code = 'ERROR') AS error_count,\n"
+        "               groupUniqArray(s.agent_name) AS agent_names,\n"
+        "               groupUniqArray(s.agent_version) AS agent_versions,\n"
+        "               groupUniqArray(s.provider_name) AS provider_names,\n"
+        "               groupUniqArray(s.request_model) AS request_models,\n"
+        "               groupUniqArray(s.conversation_name) AS conversation_names,\n"
+        "               min(s.started_at) AS first_seen,\n"
+        "               max(s.started_at) AS last_seen\n"
+        "        FROM (\n"
+        "  SELECT * EXCEPT (agent_name, agent_version, agent_id, conversation_id, has_own_agent_identity, fb_agent_identity, fb_conversation_id),\n"
+        "    if(has_own_agent_identity, agent_name, fb_agent_identity.1) AS agent_name,\n"
+        "    if(has_own_agent_identity, agent_version, fb_agent_identity.2) AS agent_version,\n"
+        "    if(has_own_agent_identity, agent_id, fb_agent_identity.3) AS agent_id,\n"
+        "    if(conversation_id != '', conversation_id, fb_conversation_id) AS conversation_id\n"
+        "  FROM (\n"
+        "    SELECT s0.*, (s0.agent_name != '') AS has_own_agent_identity, tf.fb_agent_identity, tf.fb_conversation_id\n"
+        "    FROM spans s0\n"
+        "    LEFT JOIN (\n"
+        "      SELECT\n"
+        "          trace_id,\n"
+        "          argMinIf((agent_name, agent_version, agent_id), started_at, agent_name != '')\n"
+        "            AS fb_agent_identity,\n"
+        "          anyIf(conversation_id, conversation_id != '') AS fb_conversation_id\n"
+        "      FROM spans\n"
+        "      WHERE project_id = {genai_5:String}\n"
+        "      GROUP BY trace_id\n"
+        "    ) tf ON s0.trace_id = tf.trace_id\n"
+        "    WHERE s0.project_id = {genai_5:String}\n"
+        "  )\n"
+        ") s\n"
+        "        WHERE s.project_id = {genai_2:String}\n"
+        "        GROUP BY conversation_id\n"
+        "        \n"
+        "        ORDER BY last_seen DESC\n"
+        "        LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}\n"
+        "    "
+    )
+    assert calls[2] == (
+        "\n        SELECT s.conversation_id AS conversation_id,\n"
+        "               argMinIf(s.input_messages, s.started_at, length(s.input_messages) > 0) AS first_input_messages,\n"
+        "               argMaxIf(s.output_messages, s.ended_at, length(s.output_messages) > 0) AS last_output_messages\n"
+        "        FROM spans s\n"
+        "        WHERE s.project_id = {genai_0:String} AND s.conversation_id IN {genai_1:Array(String)}\n"
+        "        GROUP BY conversation_id\n"
+        "    "
+    )
 
     first, empty = res.groups
     assert first.first_message is not None

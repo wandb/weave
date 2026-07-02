@@ -27,7 +27,7 @@ Outstanding Optimizations/Work:
 
 import logging
 import re
-from collections.abc import Callable, KeysView, Sequence
+from collections.abc import Callable, Collection, KeysView, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -73,6 +73,7 @@ from weave.trace_server.interface.query import (
 )
 from weave.trace_server.orm import (
     ParamBuilder,
+    _format_table_name_with_cluster,
     clickhouse_cast,
     combine_conditions,
     maybe_convert_datetime_operands,
@@ -89,20 +90,13 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
+CTE_STORAGE_SCOPE_IDS = "storage_scope_ids"
 
 # Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
 # Wired up in `build_calls_stats_query` but currently commented out; callers
 # without a `limit` still get an exact count. Flip this on when we see real
 # >>1M-count requests in the wild.
 DEFAULT_STATS_MAX_LIMIT = 1_000_000
-
-# Per-row payload size sum, the inner expression behind storage_size_bytes /
-# total_storage_size_bytes wherever a stats table is read. Single source so a new
-# size column can't silently desync one path's storage number from another's.
-STORAGE_SIZE_BYTES_SUM = (
-    "COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) "
-    "+ COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)"
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +244,13 @@ class CallsMergedDynamicField(CallsMergedAggField):
         cast: tsi_query.CastTo | None = None,
         use_agg_fn: bool = True,
     ) -> str:
+        if use_agg_fn and self.extra_path and cast != "exists":
+            # Aggregate the extracted scalar instead of the raw dump so GROUP BY
+            # state stays tiny (see json_dump_field_as_sql).
+            raw = super().as_sql(pb, table_alias, use_agg_fn=False)
+            return json_dump_field_as_sql(
+                pb, table_alias, raw, self.extra_path, cast, agg_fn=self.agg_fn
+            )
         res = super().as_sql(pb, table_alias, use_agg_fn=use_agg_fn)
         return json_dump_field_as_sql(pb, table_alias, res, self.extra_path, cast)
 
@@ -928,7 +929,7 @@ class CallsQuery(BaseModel):
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
         if field in DISALLOWED_FILTERING_FIELDS:
-            raise ValueError(f"Field {field} is not allowed in ORDER BY")
+            raise InvalidFieldError(_disallowed_filter_message(field))
         direction = direction.upper()
         if direction not in {"ASC", "DESC"}:
             raise ValueError(f"Direction {direction} is not allowed")
@@ -1223,6 +1224,17 @@ class CallsQuery(BaseModel):
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
             candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
 
+        # On calls_complete the total-storage rollup otherwise aggregates the
+        # whole project's stats. Scope it to the matched calls' traces so the
+        # stats primary key (project_id, id) prunes the scan.
+        storage_scope_cte_name: str | None = None
+        scope_cte_sql = self._build_storage_scope_ids_cte_sql(
+            pb, table_alias_resolved, field_to_object_join_alias_map
+        )
+        if scope_cte_sql is not None:
+            ctes.add_cte(CTE_STORAGE_SCOPE_IDS, scope_cte_sql)
+            storage_scope_cte_name = CTE_STORAGE_SCOPE_IDS
+
         if (
             not should_use_filter_cte
             and not self.include_costs
@@ -1232,6 +1244,7 @@ class CallsQuery(BaseModel):
                 pb,
                 table_alias_resolved,
                 id_subquery_name=candidate_cte_name,
+                storage_scope_id_cte=storage_scope_cte_name,
             )
             if ctes.has_ctes():
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
@@ -1310,6 +1323,7 @@ class CallsQuery(BaseModel):
                 table_alias_resolved,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
+                storage_scope_id_cte=storage_scope_cte_name,
             )
 
         if not self.include_costs:
@@ -1371,7 +1385,9 @@ class CallsQuery(BaseModel):
         # all rows returned at least have a call start. op_name is the orphan-end
         # signal (start-only) because started_at now rides on call_end rows too.
 
-        op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        op_name = process_op_name_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, self.read_table
+        )
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1456,6 +1472,7 @@ class CallsQuery(BaseModel):
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
         id_subquery_name: str | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> QueryJoins:
         """Build all JOIN clauses for the query.
 
@@ -1514,7 +1531,7 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
                 GROUP BY id
@@ -1529,13 +1546,25 @@ class CallsQuery(BaseModel):
         # divergence in mind if you touch either side.
         total_storage_size_join = ""
         if self.include_total_storage_size:
-            # When we have a filtered set of call IDs, restrict the trace_ids
-            # looked up in calls_merged_stats to only those related to the
-            # filtered calls. This leverages the primary key index to avoid
-            # aggregating over the entire project when only a subset is needed.
-            trace_id_filter = ""
-            if id_subquery_name is not None:
-                trace_id_filter = f"""AND trace_id IN (
+            # Restrict the stats rollup to the matched calls' traces instead of
+            # the whole project. calls_complete scopes by `id` (the stats
+            # primary key (project_id, id) prunes the scan); calls_merged scopes
+            # by trace_id off its filtered-ids CTE.
+            stats_scope_filter = ""
+            if storage_scope_id_cte is not None:
+                stats_scope_filter = f"""AND id IN (
+                    SELECT id
+                    FROM {table_alias}
+                    WHERE project_id = {param_slot(project_param, "String")}
+                    AND trace_id IN (
+                        SELECT trace_id
+                        FROM {table_alias}
+                        WHERE project_id = {param_slot(project_param, "String")}
+                        AND id IN {storage_scope_id_cte}
+                    )
+                )"""
+            elif id_subquery_name is not None:
+                stats_scope_filter = f"""AND trace_id IN (
                     SELECT trace_id
                     FROM {table_alias}
                     WHERE project_id = {param_slot(project_param, "String")}
@@ -1545,10 +1574,10 @@ class CallsQuery(BaseModel):
             LEFT JOIN (
                 SELECT
                     trace_id,
-                    sum({STORAGE_SIZE_BYTES_SUM}) AS total_storage_size_bytes
+                    sum({config.storage_size_bytes_sum}) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
-                {trace_id_filter}
+                {stats_scope_filter}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
             ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
@@ -1708,6 +1737,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
@@ -1721,6 +1751,8 @@ class CallsQuery(BaseModel):
             id_subquery_name: Optional name of a CTE containing filtered IDs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases for object refs
             expand_columns: List of columns that should be expanded for object refs
+            storage_scope_id_cte: Optional CTE of matched ids used to scope the
+                calls_complete total-storage rollup to their traces
 
         Returns:
             SQL query body string (FROM through OFFSET, not formatted)
@@ -1746,6 +1778,7 @@ class CallsQuery(BaseModel):
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             id_subquery_name=id_subquery_name,
+            storage_scope_id_cte=storage_scope_id_cte,
         )
         needs_feedback_join = (
             filter_result.needs_feedback or order_result.needs_feedback
@@ -1820,6 +1853,38 @@ class CallsQuery(BaseModel):
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         WHERE {trace_id_strict}"""
 
+    def _build_storage_scope_ids_cte_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        field_to_object_join_alias_map: dict[str, str] | None,
+    ) -> str | None:
+        """Build the `storage_scope_ids` CTE body, or None if not applicable.
+
+        Selects the ids the query actually matches (same filters, order, and
+        page) so the total-storage join can scope `calls_complete_stats` to
+        their traces instead of rolling up the whole project. Returns None for
+        non-calls_complete reads or when total storage size is not requested.
+        """
+        if self.read_table != ReadTable.CALLS_COMPLETE:
+            return None
+        if not self.include_total_storage_size:
+            return None
+
+        scope_query = CallsQuery(project_id=self.project_id, read_table=self.read_table)
+        scope_query.add_field("id")
+        scope_query.query_conditions = list(self.query_conditions)
+        scope_query.hardcoded_filter = self.hardcoded_filter
+        scope_query.order_fields = self.order_fields
+        scope_query.limit = self.limit
+        scope_query.offset = self.offset
+        return scope_query._as_sql_base_format(
+            pb,
+            table_alias,
+            field_to_object_join_alias_map=field_to_object_join_alias_map,
+            expand_columns=self.expand_columns,
+        )
+
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
@@ -1827,6 +1892,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> str:
         """Build the base SQL query format.
 
@@ -1839,6 +1905,8 @@ class CallsQuery(BaseModel):
             id_subquery_name: Optional name of a CTE containing filtered IDs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases for object refs
             expand_columns: List of columns that should be expanded for object refs
+            storage_scope_id_cte: Optional CTE of matched ids used to scope the
+                calls_complete total-storage rollup to their traces
 
         Returns:
             Complete SQL query string
@@ -1855,6 +1923,7 @@ class CallsQuery(BaseModel):
             id_subquery_name,
             field_to_object_join_alias_map,
             expand_columns,
+            storage_scope_id_cte,
         )
         # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
         distinct = ""
@@ -1919,6 +1988,16 @@ ALLOWED_CALL_FIELDS = {
 
 DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
+# Dotted prefixes routed to special handlers in `get_field_by_name`.
+ALLOWED_DYNAMIC_FIELD_PREFIXES = (
+    "feedback.*",
+    "annotation_queue_items.*",
+    "summary.weave.*",
+)
+
+# Resolvable but internal; not advertised in `field not allowed` messages.
+_HIDDEN_MESSAGE_FIELDS = {"project_id", "deleted_at", "expire_at"}
+
 # Fields that are stored as DateTime64 columns in ClickHouse. When comparing
 # these fields with numeric unix timestamps, the value must be converted to a
 # datetime string so ClickHouse can properly use primary key / ORDER BY indexes.
@@ -1951,8 +2030,35 @@ def get_field_by_name(name: str) -> CallsMergedField:
                 if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
                     return field.with_path(field_parts[1:])
                 return field
-            raise InvalidFieldError(f"Field {name} is not allowed")
+            raise InvalidFieldError(_invalid_field_message(name))
     return ALLOWED_CALL_FIELDS[name]
+
+
+def _invalid_field_message(name: str) -> str:
+    """`field not allowed` message for an unrecognized field."""
+    return f"Field {name} is not allowed. {_allowed_fields_clause()}"
+
+
+def _disallowed_filter_message(name: str) -> str:
+    """`field not filterable/sortable` message for a recognized-but-blocked field."""
+    return (
+        f"Field {name} cannot be used for filtering or sorting. "
+        f"{_allowed_fields_clause(exclude=DISALLOWED_FILTERING_FIELDS)}"
+    )
+
+
+def _allowed_fields_clause(exclude: Collection[str] = ()) -> str:
+    """Render the advertised `Allowed fields` + `Allowed dynamic prefixes` lists."""
+    hidden = _HIDDEN_MESSAGE_FIELDS.union(exclude)
+    names = [name for name in ALLOWED_CALL_FIELDS if name not in hidden]
+    dotted_prefixes = tuple(
+        f"{name.removesuffix('_dump')}.*"
+        for name in names
+        if isinstance(ALLOWED_CALL_FIELDS[name], CallsMergedDynamicField)
+    )
+    allowed = ", ".join(sorted(name.removesuffix("_dump") for name in names))
+    prefixes = ", ".join(sorted(ALLOWED_DYNAMIC_FIELD_PREFIXES + dotted_prefixes))
+    return f"Allowed fields: {allowed}. Allowed dynamic prefixes: {prefixes}."
 
 
 def _field_as_sql_maybe_agg(
@@ -2174,7 +2280,7 @@ def process_query_to_conditions(
             if cast is None or not isinstance(operand, tsi_query.GetFieldOperator):
                 return None
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
             if isinstance(structured_field, CallsMergedDynamicField):
@@ -2325,7 +2431,7 @@ def process_query_to_conditions(
             )
         elif isinstance(operand, tsi_query.GetFieldOperator):
             if operand.get_field_ in DISALLOWED_FILTERING_FIELDS:
-                raise InvalidFieldError(f"Field {operand.get_field_} is not allowed")
+                raise InvalidFieldError(_disallowed_filter_message(operand.get_field_))
 
             structured_field = get_field_by_name(operand.get_field_)
 
@@ -2387,6 +2493,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -2428,8 +2535,10 @@ def process_op_name_filter_to_sql(
     if not or_conditions:
         return ""
 
-    # Account for unmerged call parts by including null op_name (call ends)
-    or_conditions += [f"{op_field_sql} IS NULL"]
+    # calls_merged's call-end rows carry a NULL op_name, so the OR-IS-NULL arm
+    # keeps them; calls_complete's op_name is non-nullable, so skip the dead arm.
+    if read_table == ReadTable.CALLS_MERGED:
+        or_conditions.append(f"{op_field_sql} IS NULL")
 
     return " AND " + combine_conditions(or_conditions, "OR")
 
@@ -3062,8 +3171,9 @@ def _try_optimized_stats_query(
     # Pattern 3: Unfiltered distinct-call count on calls_merged.
     #
     # Replace the GROUP BY + argMax rollup with two parallel aggregators on one
-    # scan: uniqExact(id) - uniqExactIf(id, isNotNull(deleted_at)). Exact match
-    # to the GROUP BY path's deleted-call exclusion. calls_complete has its own
+    # scan: uniq(id) - uniqIf(id, isNotNull(deleted_at)), mirroring the GROUP BY
+    # path's deleted-call exclusion. uniq is exact below ~64K distinct ids and
+    # <1% off above, where uniqExact's hash set OOMs. calls_complete has its own
     # flat path; limit=1 stays with Pattern 1.
     if read_table == ReadTable.CALLS_MERGED and _is_unfiltered_stats_req(req):
         return _optimized_unfiltered_calls_merged_count_query(
@@ -3073,7 +3183,7 @@ def _try_optimized_stats_query(
     # Pattern 4: Time-windowed distinct-call count on calls_merged.
     #
     # Generalizes Pattern 3 to a count whose only narrowing is a started_at
-    # time bound: count windowed start rows with uniqExact (started_at lives
+    # time bound: count windowed start rows with uniq (started_at lives
     # only on the start row, so the per-row filter equals the GROUP BY path's
     # `any(started_at) <op> T` HAVING), and exclude soft-deleted ids via an
     # anti-set instead of a parallel aggregator (deleted_at lives on a separate
@@ -3148,18 +3258,20 @@ def _optimized_wb_run_id_not_null_query(
 
 
 def _unfiltered_calls_merged_count_expr(table_name: str) -> str:
-    """Distinct non-deleted started-id count over calls_merged via inclusion-exclusion.
+    """Approximate non-deleted distinct-id count over calls_merged via inclusion-exclusion.
 
     count(started not deleted) = count(started or deleted) - count(deleted).
     op_name is start-only and deleted_at is delete-row-only (never on the same
     row), so this matches the GROUP BY path's `op_name IS NOT NULL AND
     deleted_at IS NULL` HAVING -- dropping orphaned call-ends -- in one scan.
+    uniq (not uniqExact) keeps memory fixed: exact below ~64K distinct ids,
+    <1% off above, where uniqExact's full hash set OOMs on large projects.
     """
     started = f"isNotNull({table_name}.op_name)"  # op_name is start-only
     deleted = f"isNotNull({table_name}.deleted_at)"
     return (
-        f"uniqExactIf({table_name}.id, {started} OR {deleted}) "
-        f"- uniqExactIf({table_name}.id, {deleted})"
+        f"uniqIf({table_name}.id, {started} OR {deleted}) "
+        f"- uniqIf({table_name}.id, {deleted})"
     )
 
 
@@ -3222,7 +3334,7 @@ def _optimized_unfiltered_storage_query(
         {count_expr} AS count,
         toUInt8(0) AS has_more,
         coalesce(
-            (SELECT sum({STORAGE_SIZE_BYTES_SUM})
+            (SELECT sum({config.storage_size_bytes_sum})
              FROM {config.stats_table_name}
              WHERE project_id = {project_id_slot}),
             0
@@ -3241,7 +3353,8 @@ def _optimized_time_filtered_calls_merged_count_query(
 ) -> str:
     """Distinct-call count for a calls_merged stats request filtered only by time.
 
-    Counts windowed start rows with uniqExact. started_at gates the window;
+    Counts windowed start rows with uniq (exact below ~64K distinct ids, <1% off
+    above, fixed memory). started_at gates the window;
     since #6933 call-end rows carry started_at too, we also require op_name
     (start-only) to be non-null -- that selects the start row and reproduces the
     GROUP BY path's orphaned-call-end exclusion. Soft-deleted ids are removed
@@ -3295,7 +3408,7 @@ def _optimized_time_filtered_calls_merged_count_query(
         f"WHERE {lower_prefilter} AND isNotNull({table_name}.deleted_at)"
     )
     inner = (
-        f"SELECT uniqExact({table_name}.id) AS raw_count "
+        f"SELECT uniq({table_name}.id) AS raw_count "
         f"FROM {table_name} "
         f"PREWHERE {table_name}.project_id = {project_id_slot} "
         f"WHERE {outer_prefilter} "
@@ -3457,21 +3570,6 @@ def _is_minimal_filter(filter: tsi.CallsFilter | None) -> bool:
     )
 
 
-def _format_table_name_with_cluster(
-    table_name: str,
-    cluster_name: str | None,
-) -> str:
-    """Format a table name with ON CLUSTER clause if cluster_name is provided.
-
-    Callers are responsible for passing the correct table name (e.g.
-    calls_complete_local in distributed mode). This function only appends the
-    ON CLUSTER clause.
-    """
-    if cluster_name:
-        return f"{table_name} ON CLUSTER {cluster_name}"
-    return table_name
-
-
 def build_calls_complete_update_end_query(
     table_name: str,
     project_id_param: str,
@@ -3553,13 +3651,32 @@ def build_calls_complete_delete_query(
     table_name: str,
     project_id_param: str,
     call_ids_param: str,
+    started_at_min_param: str | None = None,
+    started_at_max_param: str | None = None,
     cluster_name: str | None = None,
 ) -> str:
-    """Build the calls_complete DELETE query for call end data."""
+    """Build the calls_complete DELETE query for call end data.
+
+    When started_at bounds are given they bracket the partition key
+    (PARTITION BY toYYYYMM(started_at)) and primary key prefix
+    (project_id, started_at, id), so the delete prunes partitions instead of
+    scanning every one. Bounds are Int64 microseconds since epoch.
+    """
     formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    conditions = [f"project_id = {{{project_id_param}:String}}"]
+    if started_at_min_param is not None:
+        conditions.append(
+            f"started_at >= fromUnixTimestamp64Micro({{{started_at_min_param}:Int64}}, 'UTC')"
+        )
+    if started_at_max_param is not None:
+        conditions.append(
+            f"started_at <= fromUnixTimestamp64Micro({{{started_at_max_param}:Int64}}, 'UTC')"
+        )
+    conditions.append(f"id IN {{{call_ids_param}:Array(String)}}")
+    where_clause = " AND ".join(conditions)
     raw_sql = f"""
         DELETE FROM {formatted_table}
-        WHERE project_id = {{{project_id_param}:String}} AND id IN {{{call_ids_param}:Array(String)}}
+        WHERE {where_clause}
         """
     return safely_format_sql(raw_sql, logger)
 

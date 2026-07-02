@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 REMOTE_SCORER_SCHEMA_VERSION = 1
+CONCISE_MESSAGE_LENGTH = 120
+TOO_LONG_MESSAGE_LENGTH = 500
 
 
-def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
+def score_remote_call(request_body: dict[str, Any]) -> list[dict[str, Any]]:
     """Score one Weave remote scorer request.
 
     Replace this function with your real policy, model, or business logic. It is
@@ -25,7 +27,32 @@ def score_remote_call(request_body: dict[str, Any]) -> dict[str, Any]:
     message = inputs.get("message", "") if isinstance(inputs, dict) else ""
     if not isinstance(message, str):
         message = ""
+    message_length = len(message)
 
-    return {
-        "message_length": len(message),
-    }
+    if message_length <= CONCISE_MESSAGE_LENGTH:
+        conciseness_rating = 1.0
+        length_tag = "concise"
+    elif message_length >= TOO_LONG_MESSAGE_LENGTH:
+        conciseness_rating = 0.0
+        length_tag = "too-long"
+    else:
+        conciseness_rating = 1 - (
+            (message_length - CONCISE_MESSAGE_LENGTH)
+            / (TOO_LONG_MESSAGE_LENGTH - CONCISE_MESSAGE_LENGTH)
+        )
+        length_tag = "verbose"
+
+    return [
+        {
+            "value": round(conciseness_rating, 2),
+            "reason": (
+                f"Message is {message_length} characters; concise messages score best."
+            ),
+            "confidence": 1.0,
+        },
+        {
+            "value": length_tag,
+            "reason": f"Message length category is {length_tag}.",
+            "confidence": 0.9,
+        },
+    ]

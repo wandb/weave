@@ -2,7 +2,6 @@ import {ReadableStream} from 'stream/web';
 import {type Api as TraceServerApi} from '../generated/traceServerApi';
 import {StringPrompt} from '../prompt';
 import * as registryLinkBindings from '../traceServerBindings/linkAssetToRegistry';
-import {type WandbServerApi} from '../wandb/wandbServerApi';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
@@ -22,6 +21,7 @@ function createStreamFromCalls(calls: any[] = []) {
   });
   return stream;
 }
+
 function mockStreamResponse(
   api: jest.Mocked<TraceServerApi<any>>,
   calls: any[]
@@ -34,23 +34,44 @@ function mockStreamResponse(
   } as any);
 }
 
+type MockedTraceServer = jest.Mocked<TraceServerApi<any>> & {
+  calls: {callsQueryStreamCallsStreamQueryPost: jest.Mock};
+  agents: {
+    genaiAgentsQueryAgentsQueryPost: jest.Mock;
+    genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.Mock;
+    genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.Mock;
+    genaiSearchAgentsSearchPost: jest.Mock;
+    genaiSpansQueryAgentsSpansQueryPost: jest.Mock;
+    genaiSpansStatsAgentsSpansStatsPost: jest.Mock;
+    genaiTracesChatAgentsTracesChatPost: jest.Mock;
+    genaiConversationChatAgentsConversationsChatPost: jest.Mock;
+  };
+};
+
 describe('WeaveClient', () => {
   let client: WeaveClient;
-  let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-  let mockWandbServerApi: jest.Mocked<WandbServerApi>;
+  let mockTraceServerApi: MockedTraceServer;
 
   beforeEach(() => {
     mockTraceServerApi = {
       calls: {
         callsQueryStreamCallsStreamQueryPost: jest.fn(),
       },
+      agents: {
+        genaiAgentsQueryAgentsQueryPost: jest.fn(),
+        genaiAgentVersionsQueryAgentsAgentVersionsQueryPost: jest.fn(),
+        genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost: jest.fn(),
+        genaiSearchAgentsSearchPost: jest.fn(),
+        genaiSpansQueryAgentsSpansQueryPost: jest.fn(),
+        genaiSpansStatsAgentsSpansStatsPost: jest.fn(),
+        genaiTracesChatAgentsTracesChatPost: jest.fn(),
+        genaiConversationChatAgentsConversationsChatPost: jest.fn(),
+      },
     } as any;
-    mockWandbServerApi = {} as any;
-    client = new WeaveClient(
-      mockTraceServerApi,
-      mockWandbServerApi,
-      'test-project'
-    );
+    client = new WeaveClient({
+      traceServerApi: mockTraceServerApi,
+      projectId: 'test-project',
+    });
   });
 
   describe('getCalls', () => {
@@ -189,7 +210,6 @@ describe('WeaveClient', () => {
   describe('Batch Processing', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
 
     beforeEach(() => {
       mockTraceServerApi = {
@@ -197,12 +217,10 @@ describe('WeaveClient', () => {
           callStartBatchCallUpsertBatchPost: jest.fn().mockResolvedValue({}),
         },
       } as any;
-      mockWandbServerApi = {} as any;
-      client = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'test-project'
-      );
+      client = new WeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'test-project',
+      });
       // Speed up tests by reducing batch interval
       (client as any).BATCH_INTERVAL = 10;
     });
@@ -361,22 +379,620 @@ describe('WeaveClient', () => {
     });
   });
 
+  describe('getAgents', () => {
+    it('gets agents from the server', async () => {
+      const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
+        {data: {agents, total_count: 1}} as any
+      );
+
+      const result = await client.getAgents({
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'last_seen', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: [{field: 'last_seen', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+      });
+
+      expect(result).toEqual({data: {agents, total_count: 1}});
+    });
+
+    it('gets agent by name', async () => {
+      const agents = [{agent_name: 'Assistant', total_input_tokens: 42}];
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockResolvedValue(
+        {data: {agents, total_count: 1}} as any
+      );
+
+      const result = await client.getAgents({
+        agentName: 'my-cool-agent',
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        filters: {
+          agent_name: 'my-cool-agent',
+        },
+      });
+
+      expect(result).toEqual({data: {agents, total_count: 1}});
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiAgentsQueryAgentsQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgents()).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentVersions', () => {
+    it('gets agent versions from the server', async () => {
+      const versions = [
+        {agent_version: 'v1', total_input_tokens: 42},
+        {agent_version: 'v2', total_input_tokens: 99},
+      ];
+      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockResolvedValue(
+        {data: {versions, total_count: 2}} as any
+      );
+
+      const result = await client.getAgentVersions({
+        agentName: 'Assistant',
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'last_seen', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiAgentVersionsQueryAgentsAgentVersionsQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        agent_name: 'Assistant',
+        sort_by: [{field: 'last_seen', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+      });
+
+      expect(result).toEqual({data: {versions, total_count: 2}});
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentVersions({agentName: 'Assistant'})
+      ).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentSpans', () => {
+    it('gets agent spans from the server filtered by agent name', async () => {
+      const spans = [
+        {span_id: 's1', span_name: 'invoke_agent', input_tokens: 42},
+        {span_id: 's2', span_name: 'chat_completion', input_tokens: 99},
+      ];
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans, total_count: 2}} as any
+      );
+
+      const result = await client.getAgentSpans({
+        agentName: 'Assistant',
+        limit: 50,
+        offset: 10,
+        sortBy: [{field: 'started_at', direction: 'desc'}],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        sort_by: [{field: 'started_at', direction: 'desc'}],
+        limit: 50,
+        offset: 10,
+        query: {
+          $expr: {
+            $eq: [{$getField: 'agent_name'}, {$literal: 'Assistant'}],
+          },
+        },
+      });
+
+      expect(result).toEqual({data: {spans, total_count: 2}});
+    });
+
+    it('omits the query when neither agentName nor query is provided', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      await client.getAgentSpans({limit: 5});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: undefined,
+        sort_by: undefined,
+        limit: 5,
+        offset: undefined,
+      });
+    });
+
+    it('passes through a caller-supplied query when agentName is not set', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      const userQuery = {
+        $expr: {$gt: [{$getField: 'input_tokens'}, {$literal: 100}]},
+      };
+      await client.getAgentSpans({query: userQuery});
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: userQuery,
+        sort_by: undefined,
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('combines agentName with caller-supplied query', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {spans: [], total_count: 0}} as any
+      );
+
+      const userExpr = {
+        $gt: [{$getField: 'input_tokens'}, {$literal: 100}],
+      };
+      await client.getAgentSpans({
+        agentName: 'Assistant',
+        query: {$expr: userExpr},
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: {
+          $expr: {
+            $and: [
+              {$eq: [{$getField: 'agent_name'}, {$literal: 'Assistant'}]},
+              userExpr,
+            ],
+          },
+        },
+        sort_by: undefined,
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('defaults spans to an empty array when the server omits them', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockResolvedValue(
+        {data: {total_count: 0}} as any
+      );
+
+      const result = await client.getAgentSpans({});
+
+      expect(result.data.spans).toEqual([]);
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentSpans({})).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentSpanStats', () => {
+    it('gets agent span stats from the server', async () => {
+      const stats = {
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        granularity: 86400,
+        timezone: 'UTC',
+        bucket_type: 'time',
+        columns: [
+          {name: 'started_at_bucket', role: 'time', value_type: 'datetime'},
+          {
+            name: 'total_input_tokens',
+            role: 'metric',
+            value_type: 'number',
+            metric: 'total_input_tokens',
+            aggregation: 'sum',
+          },
+        ],
+        rows: [
+          {started_at_bucket: '2026-06-10T00:00:00Z', total_input_tokens: 450},
+        ],
+      };
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
+        {data: stats} as any
+      );
+
+      const metrics = [
+        {
+          alias: 'total_input_tokens',
+          value_type: 'number' as const,
+          aggregations: ['sum' as const],
+          value: {source: 'field' as const, key: 'input_tokens'},
+        },
+      ];
+      const groupBy = [{key: 'agent_name'}];
+      const query = {
+        $expr: {
+          $eq: [{$getField: 'provider_name'}, {$literal: 'openai'}],
+        },
+      };
+
+      const result = await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        metrics,
+        groupBy,
+        query,
+        granularity: 86400,
+        timezone: 'America/Los_Angeles',
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        start: '2026-06-10T00:00:00Z',
+        end: '2026-06-23T00:00:00Z',
+        metrics,
+        group_by: groupBy,
+        query,
+        granularity: 86400,
+        timezone: 'America/Los_Angeles',
+      });
+
+      expect(result).toEqual({data: stats});
+    });
+
+    it('fetches without optional fields', async () => {
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockResolvedValue(
+        {data: {start: '', end: '', timezone: 'UTC'}} as any
+      );
+
+      await client.getAgentSpanStats({
+        start: '2026-06-10T00:00:00Z',
+        metrics: [],
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        start: '2026-06-10T00:00:00Z',
+        metrics: [],
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentSpanStats({start: '2026-06-10T00:00:00Z', metrics: []})
+      ).rejects.toThrow('boom');
+    });
+  });
+
+  describe('getAgentTurn', () => {
+    it('gets turn data for a given trace id', async () => {
+      const chat = {
+        trace_id: 'trace-1',
+        root_span_name: 'my-op',
+        provider: 'openai',
+        total_duration_ms: 1234,
+        messages: [],
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentTurn({
+        traceId: 'trace-1',
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockResolvedValue(
+        {data: {trace_id: 'trace-1'}} as any
+      );
+
+      await client.getAgentTurn({traceId: 'trace-1'});
+
+      expect(
+        mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        trace_id: 'trace-1',
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiTracesChatAgentsTracesChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentTurn({traceId: 'trace-1'})).rejects.toThrow(
+        'boom'
+      );
+    });
+  });
+
+  describe('getAgentTurns', () => {
+    it('gets turn data for the given conversation id', async () => {
+      const chat = {
+        conversation_id: 'conv-1',
+        turns: [{trace_id: 'trace-1'}],
+        total_turns: 1,
+        has_more: false,
+        limit: 50,
+        offset: 0,
+        feedback: null,
+      };
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: chat} as any
+      );
+
+      const result = await client.getAgentTurns({
+        conversationId: 'conv-1',
+        limit: 25,
+        offset: 5,
+        includeFeedback: true,
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: 25,
+        offset: 5,
+        include_feedback: true,
+      });
+
+      expect(result).toEqual({data: chat});
+    });
+
+    it('passes undefined limit/offset/includeFeedback when omitted', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockResolvedValue(
+        {data: {conversation_id: 'conv-1'}} as any
+      );
+
+      await client.getAgentTurns({conversationId: 'conv-1'});
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiConversationChatAgentsConversationsChatPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        conversation_id: 'conv-1',
+        limit: undefined,
+        offset: undefined,
+        include_feedback: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiConversationChatAgentsConversationsChatPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(
+        client.getAgentTurns({conversationId: 'conv-1'})
+      ).rejects.toThrow('boom');
+    });
+  });
+
+  describe('searchAgents', () => {
+    it('searches agent conversation messages', async () => {
+      const results = [
+        {
+          conversation_id: 'conv-1',
+          conversation_name: '',
+          agent_name: 'Assistant',
+          matched_messages: [
+            {
+              span_id: 'span-1',
+              trace_id: 'trace-1',
+              role: 'user',
+              content_preview: 'When was the last time Liverpool won?',
+              content_digest: 'digest-1',
+              started_at: '2026-06-16T22:10:34.631000',
+            },
+          ],
+          last_activity: '2026-06-16T22:10:34.631000',
+        },
+      ];
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results, total_conversations: 1},
+      } as any);
+
+      const result = await client.searchAgents({
+        query: 'Liverpool',
+        agentName: 'Assistant',
+        conversationId: 'conv-1',
+        traceId: 'trace-1',
+        limit: 25,
+        offset: 5,
+      });
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'Liverpool',
+        agent_name: 'Assistant',
+        conversation_id: 'conv-1',
+        trace_id: 'trace-1',
+        limit: 25,
+        offset: 5,
+      });
+
+      expect(result).toEqual({data: {results, total_conversations: 1}});
+    });
+
+    it('searches without optional fields', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockResolvedValue({
+        data: {results: [], total_conversations: 0},
+      } as any);
+
+      await client.searchAgents({query: 'Liverpool'});
+
+      expect(
+        mockTraceServerApi.agents.genaiSearchAgentsSearchPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: 'Liverpool',
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiSearchAgentsSearchPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.searchAgents({query: 'Liverpool'})).rejects.toThrow(
+        'boom'
+      );
+    });
+  });
+
+  describe('getAgentCustomAttributes', () => {
+    it('forwards all options to the server', async () => {
+      const schema = {
+        attributes: [
+          {
+            source: 'custom_attrs_string',
+            key: 'environment',
+            value_type: 'string',
+            span_count: 12,
+          },
+          {
+            source: 'custom_attrs_int',
+            key: 'retries',
+            value_type: 'int',
+            span_count: 3,
+          },
+        ],
+        limit: 50,
+        offset: 5,
+        has_more: false,
+      };
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
+        {data: schema} as any
+      );
+
+      const query = {
+        $expr: {
+          $eq: [
+            {$getField: 'agent_name'},
+            {$literal: 'my-cool-agent-with-attributes'},
+          ],
+        },
+      };
+
+      const result = await client.getAgentCustomAttributes({
+        query,
+        startedAfter: '2026-06-15T00:00:00Z',
+        startedBefore: '2026-06-23T00:00:00Z',
+        limit: 50,
+        offset: 5,
+      });
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query,
+        started_after: '2026-06-15T00:00:00Z',
+        started_before: '2026-06-23T00:00:00Z',
+        limit: 50,
+        offset: 5,
+      });
+
+      expect(result).toEqual({data: schema});
+    });
+
+    it('passes undefined for omitted optional fields', async () => {
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockResolvedValue(
+        {data: {attributes: []}} as any
+      );
+
+      await client.getAgentCustomAttributes({});
+
+      expect(
+        mockTraceServerApi.agents
+          .genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost
+      ).toHaveBeenCalledWith({
+        project_id: 'test-project',
+        query: undefined,
+        started_after: undefined,
+        started_before: undefined,
+        limit: undefined,
+        offset: undefined,
+      });
+    });
+
+    it('propagates errors from the underlying API', async () => {
+      mockTraceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost.mockRejectedValue(
+        new Error('boom')
+      );
+
+      await expect(client.getAgentCustomAttributes({})).rejects.toThrow('boom');
+    });
+  });
+
   describe('linkPromptToRegistry', () => {
     let client: WeaveClient;
     let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-    let mockWandbServerApi: jest.Mocked<WandbServerApi>;
     let mockTransport: jest.SpyInstance;
 
     beforeEach(() => {
       mockTraceServerApi = {
         request: jest.fn(),
       } as any;
-      mockWandbServerApi = {} as any;
-      client = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'current-entity/current-project'
-      );
+      client = new WeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'current-entity/current-project',
+      });
       mockTransport = jest
         .spyOn(registryLinkBindings, 'linkAssetToRegistry')
         .mockResolvedValue({version_index: 0});
@@ -474,11 +1090,10 @@ describe('WeaveClient', () => {
     });
 
     it('rejects projectId without entity scope', async () => {
-      const unscopedClient = new WeaveClient(
-        mockTraceServerApi,
-        mockWandbServerApi,
-        'project-only'
-      );
+      const unscopedClient = new WeaveClient({
+        traceServerApi: mockTraceServerApi,
+        projectId: 'project-only',
+      });
       const promptRef = new ObjectRef(
         'source-entity/source-project',
         'my-prompt',

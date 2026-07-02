@@ -23,7 +23,6 @@ def patch_autogen() -> Generator[None, None, None]:
     openai_patcher.undo_patch()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -40,6 +39,15 @@ async def test_simple_client_create(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # AutoGen also drives openai sub-calls, which carry their own metadata, so
+    # filter to the autogen-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    autogen_meta = [i for i in stamped if i["name"] == "autogen"]
+    assert autogen_meta, "expected >=1 call to carry autogen metadata"
+    assert all(i["meta"]["package_name"] == "autogen-agentchat" for i in autogen_meta)
     assert len(calls) == 2
     flattened = flatten_calls(calls)
     assert len(flattened) == 3
@@ -59,7 +67,6 @@ async def test_simple_client_create(
     assert summary["usage"][model_name]["total_tokens"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -103,7 +110,6 @@ async def test_simple_client_create_with_exception(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -142,7 +148,6 @@ async def test_simple_client_create_stream(
     assert summary["usage"][model_name]["total_tokens"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -198,7 +203,6 @@ async def test_simple_cached_client_create(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -249,7 +253,6 @@ async def test_simple_cached_client_create_stream(
     assert got == exp
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -331,7 +334,6 @@ async def test_agentchat_run_with_tool(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -404,7 +406,6 @@ async def test_agentchat_run_stream_with_tool(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -682,7 +683,6 @@ async def test_agentchat_group_chat(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )
@@ -802,7 +802,6 @@ async def test_agent_with_memory(
     assert summary["weave"]["latency_ms"] > 0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
 )

@@ -9,8 +9,12 @@ from gepa.core.adapter import EvaluationBatch
 
 import weave
 from weave.integrations.gepa import gepa_sdk
-from weave.integrations.gepa.gepa_callback import WeaveGEPACallback
-from weave.integrations.gepa.gepa_sdk import get_gepa_patcher
+from weave.integrations.gepa.gepa_callback import WeaveGEPACallback, _safe
+from weave.integrations.gepa.gepa_sdk import (
+    _optimize_postprocess_inputs,
+    _optimize_postprocess_output,
+    get_gepa_patcher,
+)
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
@@ -34,6 +38,31 @@ def patch_gepa() -> Generator[None, None, None]:
     finally:
         patcher.undo_patch()
         gepa_sdk._gepa_patcher = None
+
+
+def test_gepa_logging_helpers_strip_memory_addresses() -> None:
+    # GEPA logs candidate/optimize metadata as versioned objects, so repr() fallbacks
+    # for unserializable values must not embed `at 0x...` addresses (object churn).
+    obj = object()
+    assert " at 0x" in repr(obj)
+
+    assert _safe({"adapter": obj, "nested": [obj]}) == {
+        "adapter": "<object object>",
+        "nested": ["<object object>"],
+    }
+    assert _optimize_postprocess_inputs(
+        {"adapter": obj, "callbacks": [obj], "seed": 7}
+    ) == {"adapter": "<object object>", "callbacks": ["<object object>"], "seed": 7}
+
+    class _Result:
+        best_idx = 2
+        best_candidate = obj
+
+    assert _optimize_postprocess_output(_Result()) == {
+        "__class__": "_Result",
+        "best_candidate": "<object object>",
+        "best_idx": 2,
+    }
 
 
 class _StubAdapter:
@@ -86,7 +115,6 @@ def _stub_reflection_lm(prompt: str | list[dict[str, Any]]) -> str:
     return "ignored"
 
 
-@pytest.mark.skip_clickhouse_client
 def test_gepa_optimize_traces_lifecycle(client: WeaveClient) -> None:
     """Run gepa.optimize with stubs and verify the Weave trace captures the
     top-level optimize span plus iteration / evaluate / propose child spans.
@@ -149,7 +177,6 @@ class _NoProposeAdapter(_StubAdapter):
     propose_new_texts = None  # type: ignore[assignment]
 
 
-@pytest.mark.skip_clickhouse_client
 def test_reflection_lm_call_nests_under_propose(client: WeaveClient) -> None:
     """Any Weave-traced call made by the reflection LM between
     `on_proposal_start` and `on_proposal_end` should appear as a child of
@@ -203,7 +230,6 @@ def test_reflection_lm_call_nests_under_propose(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 def test_gepa_optimize_does_not_double_inject_callback(client: WeaveClient) -> None:
     """If the user already passes a WeaveGEPACallback, the patcher should not
     add a second one.
@@ -223,6 +249,13 @@ def test_gepa_optimize_does_not_double_inject_callback(client: WeaveClient) -> N
     )
     # Still emits traces even with a user-supplied callback.
     calls = list(client.get_calls())
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    gepa_meta = [i for i in stamped if i["name"] == "gepa"]
+    assert gepa_meta, "expected >=1 call to carry gepa metadata"
+    assert all(i["meta"]["package_name"] == "gepa" for i in gepa_meta)
     assert calls, "expected at least the top-level gepa.optimize call"
 
 
@@ -274,7 +307,6 @@ class _ConcisenessAdapter:
         }
 
 
-@pytest.mark.skip_clickhouse_client
 def test_gepa_optimize_end_to_end_with_reflection_lm(client: WeaveClient) -> None:
     """Realistic happy-path: long seed prompt scores 0; reflection LM proposes
     a short candidate that scores higher. Validates that:
@@ -373,7 +405,6 @@ class _FlakyAdapter(_ConcisenessAdapter):
         return super().evaluate(batch, candidate, capture_traces)
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.disable_logging_error_check(reason="gepa logs its own error traceback")
 def test_gepa_optimize_records_multiple_errors(client: WeaveClient) -> None:
     """When several iterations fail, each errored `gepa.evaluate` span should

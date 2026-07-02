@@ -8,10 +8,16 @@ from typing import Any
 
 import weave
 from weave.integrations.gepa.gepa_callback import WeaveGEPACallback
+from weave.integrations.integration_metadata import (
+    library_integration,
+    with_integration_metadata,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.serialization.serialize import stable_repr
 
 _gepa_patcher: MultiPatcher | None = None
+GEPA_INTEGRATION = library_integration("gepa")
 
 
 def _fn_accepts_callbacks(fn: Callable) -> bool:
@@ -50,9 +56,9 @@ def _optimize_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         if key in safe and not isinstance(
             safe[key], (str, int, float, bool, type(None))
         ):
-            safe[key] = repr(safe[key])
+            safe[key] = stable_repr(safe[key])
     if "callbacks" in safe:
-        safe["callbacks"] = [repr(cb) for cb in (safe["callbacks"] or [])]
+        safe["callbacks"] = [stable_repr(cb) for cb in (safe["callbacks"] or [])]
     return safe
 
 
@@ -76,10 +82,10 @@ def _optimize_postprocess_output(output: Any) -> Any:
                     if isinstance(
                         value, (dict, list, str, int, float, bool, type(None))
                     )
-                    else repr(value)
+                    else stable_repr(value)
                 )
             except Exception:
-                summary[attr] = repr(value)
+                summary[attr] = stable_repr(value)
     return summary
 
 
@@ -133,7 +139,7 @@ def get_gepa_patcher(
     if _gepa_patcher is not None:
         return _gepa_patcher
 
-    base = settings.op_settings
+    base = with_integration_metadata(settings.op_settings, GEPA_INTEGRATION)
     optimize_settings = base.model_copy(update={"name": base.name or "gepa.optimize"})
     optimize_anything_settings = base.model_copy(
         update={"name": base.name or "gepa.optimize_anything"}

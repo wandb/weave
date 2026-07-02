@@ -214,7 +214,8 @@ class CallBatchProcessor(AsyncBatchProcessor[BatchItem]):
                     _, end_item = self._pending_ends.popitem()
                     self._queue_item(end_item)
 
-            self._eager_call_ids.clear()
+            # Intentionally keep _eager_call_ids: a flush mid-eval must not orphan
+            # the still-pending end of an in-progress eager call (TTL bounds it).
 
         # Shutdown, processing thread will drain queue (including the orphans
         # we just queued) then exit

@@ -4,13 +4,14 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.object_record import pydantic_object_record
-from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     is_pydantic_model_class,
+    stable_repr,
     stringify,
     to_json,
 )
+from weave.utils.sanitize import strip_memory_addresses
 
 
 def test_dictify_simple() -> None:
@@ -142,6 +143,71 @@ def test_dictify_to_dict() -> None:
         "foo": "bar",
         "baz": 42,
     }
+
+
+def test_dictify_circular_reference() -> None:
+    # A reference cycle routed through `to_dict` must terminate rather than
+    # recurse forever. This is the CrewAI/litellm hang from issue #5158:
+    # those models expose `to_dict`, and dropping cycle detection at that
+    # boundary made `dictify` loop indefinitely.
+    class Node:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.peer: Node | None = None
+
+        def to_dict(self) -> dict:
+            return {"name": self.name, "peer": self.peer}
+
+    a = Node("a")
+    b = Node("b")
+    a.peer = b
+    b.peer = a
+
+    result = dictify(a)
+    assert result["name"] == "a"
+    assert result["peer"]["name"] == "b"
+    # The hop back to `a` closes the cycle and is broken via stringify.
+    assert isinstance(result["peer"]["peer"], str)
+
+
+def test_dictify_self_reference() -> None:
+    class Box:
+        def __init__(self) -> None:
+            self.me: Box | None = None
+
+        def to_dict(self) -> dict:
+            return {"me": self.me}
+
+    box = Box()
+    box.me = box
+
+    result = dictify(box)
+    assert isinstance(result["me"], str)
+
+
+def test_dictify_shared_reference_traversed_once() -> None:
+    # A shared `to_dict`-bearing child reached by two paths must be expanded
+    # only once. Re-expanding it on every path (the bug behind issue #5158)
+    # turns a shared/diamond graph into exponential work — the practical
+    # symptom of the "hang".
+    class Counter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def to_dict(self) -> dict:
+            self.calls += 1
+            return {"leaf": 1}
+
+    shared = Counter()
+
+    class Parent:
+        def to_dict(self) -> dict:
+            return {"a": shared, "b": shared}
+
+    result = dictify(Parent())
+    assert result["a"] == {"leaf": 1}
+    assert isinstance(result["b"], str)
+    assert shared.calls == 1
 
 
 def test_stringify_returns_repr() -> None:
@@ -298,18 +364,26 @@ def test_to_json_function_with_memory_address_in_op(weave_active) -> None:
     assert len(log_me.calls()) == 4
 
 
-def test__replace_memory_address() -> None:
-    # Test with memory addresses of different lengths
+def test_strip_memory_addresses() -> None:
+    # Every ` at 0x...` is removed (not zero-filled), including multiple in one string.
     assert (
-        _replace_memory_address("<Function object at 0x1234>")
-        == "<Function object at 0x0000>"
+        strip_memory_addresses("<Object at 0x1234> and <Object at 0xdeadbeef>")
+        == "<Object> and <Object>"
     )
-    assert _replace_memory_address("<Class at 0xdeadbeef>") == "<Class at 0x00000000>"
+    # Strings without a memory address pass through unchanged.
+    assert strip_memory_addresses("No memory address here") == "No memory address here"
 
-    # Test with multiple memory addresses
-    assert (
-        _replace_memory_address("<Object at 0x1234> and <Object at 0xabcd>")
-        == "<Object at 0x0000> and <Object at 0x0000>"
-    )
-    # Test with no memory addresses
-    assert _replace_memory_address("No memory address here") == "No memory address here"
+
+def test_stable_repr_strips_memory_addresses() -> None:
+    # Two distinct instances differ only by their `at 0x...` address in repr() (the
+    # source of object-version churn when such a repr is stored in published content).
+    a, b = object(), object()
+    assert repr(a) != repr(b)
+    assert " at 0x" in repr(a)
+    assert stable_repr(a) == stable_repr(b) == "<object object>"
+
+    # Functions (e.g. a dspy metric) collapse to a stable, address-free repr.
+    assert stable_repr(stringify) == "<function stringify>"
+
+    # Reprs without a memory address pass through unchanged.
+    assert stable_repr("no address here") == "'no address here'"

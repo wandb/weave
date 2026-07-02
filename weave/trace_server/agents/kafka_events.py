@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from weave.flow.monitor import AgentSpanOpName
-from weave.trace_server.agents.schema import AgentSpanCHInsertable, StatusCodeLiteral
+from weave.trace_server.agents.schema import (
+    AgentSpanCHInsertable,
+    AgentSpanOpName,
+    StatusCodeLiteral,
+)
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH as SENTINEL_EPOCH_UTC
 
 if TYPE_CHECKING:

@@ -1,0 +1,126 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Tue, 16 Jun 2026 21:18:41 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.16.0
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Tue, 16 Jun 2026 21:18:42 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: be89ed3501d2b67e06ae12efa84a3362
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/agent-versions/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","agent_name":"my-cool-agent","limit":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "326"
+      content-type: application/json
+      date: Tue, 16 Jun 2026 21:18:41 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"versions":[{"project_id":"drtangible-mocha/example","agent_name":"my-cool-agent","invocation_count":33,"span_count":33,"total_input_tokens":0,"total_output_tokens":0,"total_duration_ms":4,"error_count":0,"first_seen":"2026-06-15T20:37:39.749000","last_seen":"2026-06-15T20:49:24.875000","agent_version":""}],"total_count":1}'
+- request:
+    url: https://trace.wandb.ai/agents/agent-versions/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","agent_name":"my-cool-agent","limit":1,"offset":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "31"
+      content-type: application/json
+      date: Tue, 16 Jun 2026 21:18:42 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"versions":[],"total_count":1}'
+- request:
+    url: https://trace.wandb.ai/agents/agent-versions/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","agent_name":"my-cool-agent","limit":1,"offset":2}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "31"
+      content-type: application/json
+      date: Tue, 16 Jun 2026 21:18:42 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"versions":[],"total_count":1}'
+- request:
+    url: https://trace.wandb.ai/agents/agent-versions/query
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","agent_name":"my-cool-agent","limit":1,"offset":3}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "31"
+      content-type: application/json
+      date: Tue, 16 Jun 2026 21:18:42 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"versions":[],"total_count":1}'

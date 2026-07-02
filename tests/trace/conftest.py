@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import os
 import threading
-import time
 from dataclasses import dataclass, field
 from unittest import mock
 
@@ -15,10 +14,19 @@ from google.auth.credentials import AnonymousCredentials
 
 from tests.trace.test_utils import FailingSaveType, failing_load, failing_save
 from weave.trace.serialization import serializer
+from weave.trace_server.file_storage import reset_stored_key_cache
 
 # Pinned to the project id of the standard `client` fixture (shawn/test-project).
 TEST_BUCKET = "test-bucket"
 _TEST_PROJECT_ID_B64 = base64.b64encode(b"shawn/test-project").decode()
+
+
+@pytest.fixture(autouse=True)
+def reset_bucket_dedup_cache():
+    """Clear the process-global stored-key cache so one test's write never skips the next's."""
+    reset_stored_key_cache()
+    yield
+    reset_stored_key_cache()
 
 
 @pytest.fixture
@@ -41,6 +49,9 @@ def failing_serializer():
 # handling, retry decorators, and the `if_generation_match=0` skip path.
 # ---------------------------------------------------------------------------
 
+# Safety net so a barrier never deadlocks if fewer uploads arrive than expected.
+_BARRIER_TIMEOUT_SECONDS = 30.0
+
 
 @dataclass
 class GCSMockState:
@@ -48,8 +59,9 @@ class GCSMockState:
 
     Test-side knobs:
       `fail_paths` - inject `PreconditionFailed`-style failures by GCS path.
-      `delay`      - sleep inside upload_from_string so parallel tests can
-                     assert wall-time savings + concurrent peak.
+      `expected_concurrency` - when set, uploads block on a barrier until this
+                     many are simultaneously in-flight, making `concurrent_peak`
+                     deterministic instead of dependent on scheduler timing.
 
     Read-back:
       `blob_data`        - the in-memory backing store, keyed by full path.
@@ -61,7 +73,7 @@ class GCSMockState:
     upload_count: int = 0
     concurrent_peak: int = 0
     fail_paths: set[str] = field(default_factory=set)
-    delay: float = 0.0
+    expected_concurrency: int | None = None
 
 
 @pytest.fixture
@@ -114,6 +126,7 @@ def gcs():
     state = GCSMockState()
     state_lock = threading.Lock()
     inflight = {"n": 0}
+    barrier: dict[str, threading.Barrier | None] = {"b": None}
 
     def make_blob(path: str):
         blob = mock.MagicMock()
@@ -127,9 +140,16 @@ def gcs():
             with state_lock:
                 inflight["n"] += 1
                 state.concurrent_peak = max(state.concurrent_peak, inflight["n"])
+                if state.expected_concurrency and barrier["b"] is None:
+                    barrier["b"] = threading.Barrier(state.expected_concurrency)
             try:
-                if state.delay:
-                    time.sleep(state.delay)
+                # Block until expected_concurrency uploads are in-flight so the
+                # peak is deterministic; timeout avoids hanging on under-count.
+                if barrier["b"] is not None:
+                    try:
+                        barrier["b"].wait(timeout=_BARRIER_TIMEOUT_SECONDS)
+                    except threading.BrokenBarrierError:
+                        pass
                 with state_lock:
                     state.blob_data[path] = data
                     state.upload_count += 1

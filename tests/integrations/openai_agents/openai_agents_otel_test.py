@@ -33,6 +33,7 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from weave.conversation import agent_name_override
 from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
@@ -44,7 +45,7 @@ from weave.trace.weave_client import WeaveClient
 def otel_spans(monkeypatch: pytest.MonkeyPatch):
     """Install an in-memory OTel exporter and return it for assertions.
 
-    Mirrors the fixture in ``tests/session/test_session_otel.py`` — overrides
+    Mirrors the fixture in ``tests/conversation/test_conversation_otel.py`` — overrides
     the global tracer provider via ``monkeypatch.setattr`` so prior state is
     restored cleanly between tests.
     """
@@ -128,7 +129,6 @@ def _by_name(spans: list[Any], prefix: str) -> list[Any]:
     return [s for s in spans if s.name.startswith(prefix)]
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization"],
 )
@@ -140,6 +140,11 @@ def test_openai_agents_quickstart_otel(
     Runner.run_sync(agent, "Write a haiku about recursion in programming.")
 
     spans = otel_spans.get_finished_spans()
+    # Integration-tracking metadata is stamped (flattened) on every emitted span.
+    stamped = [_attrs(s) for s in spans if "integration.name" in _attrs(s)]
+    assert stamped, "expected >=1 span to carry integration metadata"
+    assert all(a["integration.name"] == "openai_agents" for a in stamped)
+    assert all(a["integration.meta.package_name"] == "openai-agents" for a in stamped)
     by_name = {s.name: s for s in spans}
 
     # No synthetic trace root: TaskSpan is the OTel root, named "workflow ..."
@@ -207,6 +212,40 @@ def test_agent_span_carries_provider_name(
     spans = otel_spans.get_finished_spans()
     agent = next(s for s in spans if s.name == "invoke_agent Bot")
     assert _attrs(agent)["gen_ai.provider.name"] == "openai"
+
+
+def test_agent_name_override_wins_over_native(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """An explicit override replaces the SDK-native agent name on the span."""
+    processor = WeaveOtelTracingProcessor()
+    trace = Mock(spec=Trace)
+    trace.trace_id = "trace_o"
+    trace.name = "wf"
+    trace.group_id = None
+
+    agent_span = Mock(spec=Span)
+    agent_span.trace_id = "trace_o"
+    agent_span.span_id = "span_o"
+    agent_span.parent_id = None
+    agent_span.span_data = AgentSpanData(name="Bot")
+    agent_span.started_at = None
+    agent_span.ended_at = None
+    agent_span.error = None
+
+    # The name is resolved at span start/end, so the override must be active then.
+    with agent_name_override("research_agent"):
+        processor.on_trace_start(trace)
+        processor.on_span_start(agent_span)
+        processor.on_span_end(agent_span)
+        processor.on_trace_end(trace)
+
+    spans = otel_spans.get_finished_spans()
+    agent = next(
+        s for s in spans if _attrs(s).get("gen_ai.operation.name") == "invoke_agent"
+    )
+    assert agent.name == "invoke_agent research_agent"
+    assert _attrs(agent)["gen_ai.agent.name"] == "research_agent"
 
 
 def test_response_span_emits_chat_with_messages(

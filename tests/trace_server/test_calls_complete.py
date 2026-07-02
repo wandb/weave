@@ -6,12 +6,15 @@ from typing import Any
 
 import pytest
 
+from tests.trace.server_utils import find_server_layer
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     NotFoundError,
@@ -27,7 +30,12 @@ from weave.trace_server.project_version.types import (
     ReadTable,
     WriteTarget,
 )
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
+
+# Every test in this file asserts calls_complete table residence and raw
+# ClickHouse reads.
+pytestmark = pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
+)
 
 
 @pytest.fixture
@@ -43,9 +51,7 @@ def clickhouse_trace_server(trace_server):
     Examples:
         >>> internal = clickhouse_trace_server
     """
-    internal_server = trace_server._internal_trace_server
-    if isinstance(internal_server, SqliteTraceServer):
-        pytest.skip("ClickHouse-only test")
+    internal_server = find_server_layer(trace_server, ClickHouseTraceServer)
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 
@@ -1514,6 +1520,128 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
     )
     assert res.num_deleted == 4
     assert len(_fetch_calls_stream(trace_server, project3)) == 0
+
+
+def test_calls_delete_cascade_spans_started_at_window(
+    trace_server, clickhouse_trace_server
+):
+    """Cascade delete must capture descendants that start long after the root.
+
+    The delete path bounds its trace read and the calls_complete DELETE by a
+    started_at window derived from the requested calls. Because descendants
+    always start at or after their ancestors, a subtree that starts minutes
+    later must still be fully removed, while an unrelated earlier call in a
+    different trace is left untouched.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_started_at_window"
+    trace_id = str(uuid.uuid4())
+    base = datetime.datetime.now(datetime.timezone.utc)
+    root, child, grandchild = (str(uuid.uuid4()) for _ in range(3))
+    other = str(uuid.uuid4())
+
+    calls = [
+        _make_completed_call(
+            project_id, root, trace_id, base, base + datetime.timedelta(seconds=1)
+        ),
+        _make_completed_call(
+            project_id,
+            child,
+            trace_id,
+            base + datetime.timedelta(minutes=5),
+            base + datetime.timedelta(minutes=5, seconds=1),
+            parent_id=root,
+        ),
+        _make_completed_call(
+            project_id,
+            grandchild,
+            trace_id,
+            base + datetime.timedelta(minutes=10),
+            base + datetime.timedelta(minutes=10, seconds=1),
+            parent_id=child,
+        ),
+        # Unrelated call in a different trace, started an hour earlier.
+        _make_completed_call(
+            project_id,
+            other,
+            str(uuid.uuid4()),
+            base - datetime.timedelta(hours=1),
+            base - datetime.timedelta(hours=1) + datetime.timedelta(seconds=1),
+        ),
+    ]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+    assert len(_fetch_calls_stream(trace_server, project_id)) == 4
+
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[root])
+    )
+    assert res.num_deleted == 3
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project_id)}
+    assert remaining == {other}
+
+
+def test_calls_delete_cascade_started_at_window_merged_residence(
+    trace_server, clickhouse_trace_server
+):
+    """The started_at-bounded trace read must also hold on calls_merged residence.
+
+    Seeding calls_merged forces MERGED_ONLY residence, so the delete takes the
+    soft-delete (tombstone) path and reads descendants from calls_merged. A
+    subtree that starts minutes after the root must still be fully removed.
+    """
+    project_id = f"{TEST_ENTITY}/calls_merged_delete_started_at_window"
+    internal_project_id = b64(project_id)
+    # Seed calls_merged so residence is MERGED_ONLY and the delete uses the v1 path.
+    seed_id = _insert_merged_call(
+        clickhouse_trace_server.ch_client, internal_project_id
+    )
+
+    trace_id = str(uuid.uuid4())
+    base = datetime.datetime.now(datetime.timezone.utc)
+    root, child, grandchild = (str(uuid.uuid4()) for _ in range(3))
+    other = str(uuid.uuid4())
+    calls = [
+        _make_completed_call(
+            project_id, root, trace_id, base, base + datetime.timedelta(seconds=1)
+        ),
+        _make_completed_call(
+            project_id,
+            child,
+            trace_id,
+            base + datetime.timedelta(minutes=5),
+            base + datetime.timedelta(minutes=5, seconds=1),
+            parent_id=root,
+        ),
+        _make_completed_call(
+            project_id,
+            grandchild,
+            trace_id,
+            base + datetime.timedelta(minutes=10),
+            base + datetime.timedelta(minutes=10, seconds=1),
+            parent_id=child,
+        ),
+        _make_completed_call(
+            project_id,
+            other,
+            str(uuid.uuid4()),
+            base - datetime.timedelta(hours=1),
+            base - datetime.timedelta(hours=1) + datetime.timedelta(seconds=1),
+        ),
+    ]
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+    # MERGED_ONLY residence routes the writes to calls_merged, not calls_complete.
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 0
+    )
+
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[root])
+    )
+    assert res.num_deleted == 3
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project_id)}
+    assert remaining == {seed_id, other}
 
 
 def test_project_stats_with_calls_complete(trace_server, clickhouse_trace_server):

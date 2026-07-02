@@ -91,8 +91,49 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
 - **Never create a `_FakeServer`, stub, or mock `TraceServerInterface`** to test
   server-side logic. Use the existing `client` fixture (gives `client.server` +
   `client.project_id`) or the `trace_server` fixture, which run against a real
-  SQLite/ClickHouse backend. Build inputs with the real APIs
+  ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
+
+### Assert on the complete payload (no substring / membership checks)
+
+Assert on the **full value**, not that a fragment appears somewhere inside a
+stringified payload. Substring (`in`) and membership checks pass on accidental
+matches and let the rest of the payload drift undetected, so prefer them only
+when membership in a collection is genuinely the contract under test.
+
+❌ **Never do this:**
+
+```python
+assert "short memo" in msg                 # substring of a serialized blob
+assert "error" in str(response)
+assert "note" in feedback.payload          # key-presence instead of value
+```
+
+✅ **Always do this:**
+
+```python
+assert feedback.payload == {"note": "short memo", "emoji": "👍"}  # whole object
+assert feedback.payload["note"] == "short memo"                   # exact field
+```
+
+If you only care about one field, pin that field with `==`; if you care about
+the shape, compare the whole dict/object. The same rule applies to SQL: assert
+the complete query string, never `assert "WHERE x" in sql`.
+
+### VCR + ClickHouse isolation (integration tests)
+
+- Integration tests replay provider traffic from VCR cassettes while the weave
+  client concurrently talks to ClickHouse over localhost HTTP. vcrpy is not
+  safe for that concurrency out of the box: its urllib3 passthrough wraps real
+  sends in `force_reset()`, which briefly unpatches httpx/httpcore globally and
+  lets provider calls escape an active cassette to the live API (seen as real
+  OpenAI 429s in CI). `tests/integrations/conftest.py` carries two autouse
+  fixtures that prevent this — read their docstrings before touching VCR
+  config, and keep `tests/integrations/langchain/test_vcr_isolation.py` green.
+- Corollary: a real provider 4xx during a `record_mode="none"` cassette means
+  VCR's patches were absent at request time (an isolation bug), not that the
+  cassette failed to match — matching failures raise
+  `CannotOverwriteExistingCassetteException` instead.
 
 ### Key Test Shards
 
@@ -105,7 +146,7 @@ Focus on these primary test shards:
 
 ### Running Tests
 
-**IMPORTANT**: Any test depending on the `client` fixture runs against either SQLite backend or Clickhouse. By default it will run against SQLite for performance. However, it is critical to test both. Use the pytest custom flag `--trace-server=clickhouse` with `--clickhouse-process=true` to run tests against the clickhouse implementation.
+**IMPORTANT**: Any test depending on the `client` fixture runs against ClickHouse, the only trace-server backend. Locally, the test fixtures auto-start a ClickHouse Docker container if one isn't already running, so Docker must be available. Pass `--clickhouse-process=true` to use a local `clickhouse-server` binary instead of Docker.
 
 #### Basic Test Commands
 
@@ -126,21 +167,42 @@ Examples:
 
 #### Backend Selection
 
-The `--trace-server` flag controls which **backend** (database) is used for testing:
+The `--trace-server` flag selects the backend: `clickhouse` (default) or
+`fake` (in-memory).
 
-**SQLite (Default/Recommended for Development):**
-
-```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=sqlite
-```
-
-**ClickHouse (Required for Full Testing):**
+**Fake / in-memory (Fastest for Development):**
 
 ```bash
-nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op --trace-server=fake
 ```
 
-**Note:** ClickHouse tests require Docker to be running. If Docker is not available or you encounter Docker connection errors, use SQLite backend with `--trace-server=sqlite`.
+The fake backend (`weave/trace_server/in_memory_trace_server.py`,
+`InMemoryTraceServer`) is a pure-Python, dict-backed drop-in replacement that
+lives parallel to the ClickHouse implementation. It replicates **ClickHouse**
+(the production backend) at the interface level: JSON_VALUE string typing for
+dynamic fields, `to*OrNull` cast rules, NULLS-LAST ordering, DateTime64
+comparisons, and computed summary fields. Tests that assert ClickHouse
+*internals* (SQL, table routing/residence, insert batching, bucket file
+storage) are gated with `client_is_clickhouse` and skip on the fake. No
+files, no SQL, no Docker.
+
+**ClickHouse (the real backend):**
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op
+```
+
+ClickHouse is the only trace-server backend (`--trace-server` defaults to
+`clickhouse`):
+
+```bash
+nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_client_trace.py::test_simple_op
+```
+
+**Note:** ClickHouse tests require Docker to be running (the fixtures start a
+container automatically), or a local `clickhouse-server` binary with
+`--clickhouse-process=true`. When neither is available, use the in-memory
+fake with `--trace-server=fake`.
 
 #### Remote HTTP Trace Server Implementation Selection
 
@@ -160,7 +222,6 @@ nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_s
 
 **Important Notes:**
 
-- The `--trace-server` flag is for **backend selection** (SQLite vs ClickHouse)
 - The `--remote-http-trace-server` flag is for **trace server binding implementation** (RemoteHTTPTraceServer vs StainlessRemoteHTTPTraceServer)
 - Both implementations share the same test file; the flag determines which server class is used
 
@@ -170,7 +231,7 @@ nox --no-install -e "tests-3.12(shard='trace_server_bindings')" -- tests/trace_s
 If you encounter an error like `Can not specify both --no-color and --force-color`, this is due to conflicting environment variables. Unset them before running nox:
 
 ```bash
-unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle --trace-server=sqlite
+unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/test_dataset.py::test_basic_dataset_lifecycle
 ```
 
 **Prek stashing behavior:**
@@ -180,7 +241,7 @@ unset NO_COLOR FORCE_COLOR && nox --no-install -e "tests-3.12(shard='trace')" --
 `weave/type_handlers/Markdown/markdown.py` only stores large markdown payloads in `markup.md` when `is_mtsaas()` is true. If local `WANDB_BASE_URL`/`WF_TRACE_SERVER_URL` differs from CI defaults, `test_serialization_correctness[markdown]` may fail locally with inline markup differences. For CI-like behavior, set:
 
 ```bash
-WF_TRACE_SERVER_URL=https://trace.wandb.ai nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/data_serialization/test_serialization_correctness.py::test_serialization_correctness[markdown] --trace-server=sqlite
+WF_TRACE_SERVER_URL=https://trace.wandb.ai nox --no-install -e "tests-3.12(shard='trace')" -- tests/trace/data_serialization/test_serialization_correctness.py::test_serialization_correctness[markdown]
 ```
 
 #### Reinstalling Dependencies
@@ -200,15 +261,28 @@ The langchain integration tests work fully on macOS including chromadb/vector st
 **Running LangChain Tests:**
 
 ```bash
-nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langchain/ --trace-server=sqlite
+nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langchain/
 ```
 
 ## Typescript Testing Guidelines
 
+The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
+and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
+`npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
+(`TypeError: Cannot read properties of null (reading 'matches')`).
+
 ```
 cd sdks/node
-npm i
-npm run test
+pnpm install
+pnpm test
+```
+
+To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
+(`import 'weave'` self-resolves via the package `exports` to `dist/index.mjs`);
+`pnpm install` builds it via the `prepare` script. Then:
+
+```
+pnpm exec tsx examples/claudeAgents.ts
 ```
 
 ## Code Review & PR Guidelines

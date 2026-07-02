@@ -16,7 +16,11 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import (
+    REDACTED_VALUE,
+    should_redact,
+    strip_memory_addresses,
+)
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -294,6 +298,11 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     return rep
 
 
+def stable_repr(obj: Any) -> str:
+    """`repr(obj)` with volatile memory addresses removed (see `strip_memory_addresses`)."""
+    return strip_memory_addresses(repr(obj))
+
+
 def is_primitive(obj: Any) -> bool:
     """Check if an object is a known primitive type."""
     return isinstance(obj, (int, float, str, bool, type(None)))
@@ -346,7 +355,12 @@ def dictify(
                     if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:
-                        to_dict_result[k] = dictify(v, maxdepth, depth + 1)
+                        # Thread `seen` so cycle detection survives across the
+                        # to_dict boundary. Dropping it here lets a cyclic or
+                        # heavily-shared object graph (e.g. CrewAI/litellm
+                        # models, which expose to_dict) recurse forever or
+                        # blow up exponentially. See issue #5158.
+                        to_dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
                     else:
                         to_dict_result[k] = stringify(v)
                 return to_dict_result

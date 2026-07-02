@@ -1,12 +1,13 @@
 import base64
-import os
 import uuid
 from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
+from cachetools import LRUCache, TTLCache
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
+from weave.trace_server.project_version import project_version as pv
 from weave.trace_server.project_version.clickhouse_project_version import (
     get_project_data_residence,
 )
@@ -91,6 +92,9 @@ def count_queries(ch_client):
     ],
 )
 @pytest.mark.parametrize("log_collector", ["warning"], indirect=True)
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_version_resolution_by_table_contents(
     client,
     trace_server,
@@ -102,9 +106,6 @@ def test_version_resolution_by_table_contents(
     log_collector,
 ):
     """Test routing resolution for different project data residency states."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
     # manually set this to auto so we can test the switching
@@ -142,9 +143,10 @@ def test_version_resolution_by_table_contents(
         )
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_caching_behavior(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
@@ -162,7 +164,8 @@ def test_caching_behavior(client, trace_server):
         assert table2 == ReadTable.CALLS_COMPLETE
         assert get_count() == 1
 
-    empty_proj = make_project_id("empty_not_cached")
+    # EMPTY residence is now cached (short TTL) so cold projects stop re-probing.
+    empty_proj = make_project_id("empty_cached")
     with count_queries(ch_server.ch_client) as get_count:
         table1 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
         assert table1 == ReadTable.CALLS_COMPLETE
@@ -170,12 +173,73 @@ def test_caching_behavior(client, trace_server):
 
         table2 = resolver.resolve_read_table(empty_proj, ch_server.ch_client)
         assert table2 == ReadTable.CALLS_COMPLETE
-        assert get_count() == 2
+        assert get_count() == 1
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
+def test_empty_residence_expires_after_ttl(client, trace_server, monkeypatch):
+    """EMPTY is re-probed after the short TTL; populated residence never expires."""
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(
+        pv,
+        "_empty_residence_cache",
+        TTLCache(
+            maxsize=10,
+            ttl=pv.EMPTY_RESIDENCE_CACHE_TTL_SECS,
+            timer=lambda: clock["t"],
+        ),
+    )
+    monkeypatch.setattr(pv, "_project_residence_cache", LRUCache(maxsize=10))
+
+    ch_server = trace_server._internal_trace_server
+    resolver = ch_server.table_routing_resolver
+    resolver._mode = CallsStorageServerMode.AUTO
+
+    empty_proj = make_project_id("empty_ttl_expiry")
+    with count_queries(ch_server.ch_client) as get_count:
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        assert get_count() == 1  # cached within TTL
+        clock["t"] += pv.EMPTY_RESIDENCE_CACHE_TTL_SECS + 1
+        resolver.resolve_read_table(empty_proj, ch_server.ch_client)
+        assert get_count() == 2  # re-probed after TTL
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
+def test_cached_empty_does_not_mask_write(client, trace_server):
+    """A read that cached EMPTY must not hide a subsequent write's data.
+
+    A read caches EMPTY (routing reads to calls_complete); a legacy V1 write then
+    lands in calls_merged. The write resolution evicts the cached EMPTY so the next
+    read re-probes and routes to calls_merged (read-your-writes).
+    """
+    ch_server = trace_server._internal_trace_server
+    resolver = ch_server.table_routing_resolver
+    resolver._mode = CallsStorageServerMode.AUTO
+
+    proj = make_project_id("cached_empty_then_write")
+    assert (
+        resolver.resolve_read_table(proj, ch_server.ch_client)
+        == ReadTable.CALLS_COMPLETE
+    )
+    assert (
+        resolver.resolve_v1_write_target(proj, ch_server.ch_client)
+        == WriteTarget.CALLS_MERGED
+    )
+    insert_call(ch_server.ch_client, "calls_merged", proj)
+    assert (
+        resolver.resolve_read_table(proj, ch_server.ch_client) == ReadTable.CALLS_MERGED
+    )
+
+
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_mode_off_and_force_legacy(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     resolver = ch_server.table_routing_resolver
@@ -201,9 +265,10 @@ def test_mode_off_and_force_legacy(client, trace_server):
     assert table == ReadTable.CALLS_COMPLETE
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_clickhouse_provider_directly(client, trace_server):
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
 
     ch_server = trace_server._internal_trace_server
     project_id = make_project_id("provider_direct")
@@ -214,11 +279,11 @@ def test_clickhouse_provider_directly(client, trace_server):
     assert residence == ProjectDataResidence.MERGED_ONLY
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: table routing/residence"
+)
 def test_resolver_as_trace_server_member(client, trace_server):
     """Test that the resolver is properly integrated as a trace server member."""
-    if client_is_sqlite(client):
-        pytest.skip("ClickHouse-only test")
-
     ch_server = trace_server._internal_trace_server
 
     # Test that the resolver is lazily initialized
@@ -248,29 +313,16 @@ def test_resolver_as_trace_server_member(client, trace_server):
         assert get_count() == 1
 
 
-def test_project_version_mode_from_env():
-    original_value = os.environ.get("PROJECT_VERSION_MODE")
+def test_project_version_mode_from_env(monkeypatch):
+    test_cases = [
+        ("off", CallsStorageServerMode.OFF),
+        ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
+        ("auto", CallsStorageServerMode.AUTO),
+        ("invalid_mode", CallsStorageServerMode.AUTO),
+    ]
+    for env_val, expected_mode in test_cases:
+        monkeypatch.setenv("PROJECT_VERSION_MODE", env_val)
+        assert CallsStorageServerMode.from_env() == expected_mode
 
-    try:
-        test_cases = [
-            ("off", CallsStorageServerMode.OFF),
-            ("force_legacy", CallsStorageServerMode.FORCE_LEGACY),
-            ("auto", CallsStorageServerMode.AUTO),
-            ("invalid_mode", CallsStorageServerMode.AUTO),
-        ]
-
-        for env_val, expected_mode in test_cases:
-            os.environ["PROJECT_VERSION_MODE"] = env_val
-            mode = CallsStorageServerMode.from_env()
-            assert mode == expected_mode
-
-        if "PROJECT_VERSION_MODE" in os.environ:
-            del os.environ["PROJECT_VERSION_MODE"]
-        mode = CallsStorageServerMode.from_env()
-        assert mode == CallsStorageServerMode.AUTO
-
-    finally:
-        if original_value is not None:
-            os.environ["PROJECT_VERSION_MODE"] = original_value
-        elif "PROJECT_VERSION_MODE" in os.environ:
-            del os.environ["PROJECT_VERSION_MODE"]
+    monkeypatch.delenv("PROJECT_VERSION_MODE", raising=False)
+    assert CallsStorageServerMode.from_env() == CallsStorageServerMode.AUTO

@@ -4,7 +4,7 @@ import asyncio
 import threading
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 import pytest_asyncio
@@ -12,10 +12,14 @@ import pytest_asyncio
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
+from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import AgentSpansQueryReq
 from weave.trace_server.async_clickhouse_trace_server import (
     AsyncClickHouseTraceServer,
 )
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
@@ -27,7 +31,11 @@ LITELLM_ACOMPLETION_PATCH = (
 
 
 def _make_req(
-    *, track_llm_call: bool, model: str = "gpt-4o-mini", prompt: str | None = None
+    *,
+    track_llm_call: bool,
+    model: str = "gpt-4o-mini",
+    prompt: str | None = None,
+    project_id: str = "p1",
 ) -> tsi.CompletionsCreateReq:
     inputs_kwargs: dict[str, object] = {
         "model": model,
@@ -36,7 +44,7 @@ def _make_req(
     if prompt is not None:
         inputs_kwargs["prompt"] = prompt
     return tsi.CompletionsCreateReq(
-        project_id="p1",
+        project_id=project_id,
         wb_user_id="u1",
         track_llm_call=track_llm_call,
         inputs=tsi.CompletionsCreateRequestInputs(**inputs_kwargs),
@@ -104,6 +112,121 @@ async def test_tracking_routes_through_log_completion_call(
     assert log_mock.call_count == 1
     forwarded_res = log_mock.call_args.args[2]
     assert forwarded_res is llm_res
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_deferred_returns_real_span_without_inserting() -> None:
+    """The deferred path builds a real, fully populated span and returns it for
+    the caller to bulk-insert; nothing is written per call. An untracked call
+    returns no span.
+    """
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
+    try:
+        with (
+            patch(
+                LITELLM_ACOMPLETION_PATCH,
+                new=AsyncMock(
+                    return_value=tsi.CompletionsCreateRes(
+                        response={"choices": [{"x": 1}]}
+                    )
+                ),
+            ),
+            # The project-retention lookup is the only CH read in the build; stub
+            # it (and the client it reads through) so a real span is built
+            # without a live ClickHouse.
+            patch(
+                "weave.trace_server.clickhouse_trace_server_batched.get_project_retention_days",
+                return_value=0,
+            ),
+            patch.object(
+                ClickHouseTraceServer,
+                "ch_client",
+                new_callable=PropertyMock,
+                return_value=MagicMock(),
+            ),
+            patch.object(srv, "_log_completion_call") as log_mock,
+        ):
+            result, span = await srv.acompletions_create_deferred(
+                _make_req(track_llm_call=True, project_id="p1")
+            )
+            untracked = await srv.acompletions_create_deferred(
+                _make_req(track_llm_call=False)
+            )
+        assert isinstance(span, AgentSpanCHInsertable)
+        assert span.project_id == "p1"
+        assert span.span_id == result.span_id == result.weave_call_id
+        assert untracked.span is None
+        assert log_mock.call_count == 0
+    finally:
+        ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+async def test_ainsert_completion_spans_bulk_writes_on_executor() -> None:
+    """Collected spans are bulk-written once via the CH executor, tagged with the
+    `completions_create_batch` insert path; empty input no-ops.
+    """
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(host="test_host", ch_executor=ch_executor)
+    spans = [object(), object()]
+    observed = {"thread_id": None, "path": None}
+
+    def _capture_insert(_spans: object) -> None:
+        observed["thread_id"] = threading.get_ident()
+        observed["path"] = _db_insert_path.get()
+
+    try:
+        with patch.object(
+            srv, "_insert_spans_sync", side_effect=_capture_insert
+        ) as insert_mock:
+            await srv.ainsert_completion_spans([])
+            await srv.ainsert_completion_spans(spans)
+        insert_mock.assert_called_once_with(spans)
+        assert observed["thread_id"] != threading.get_ident()
+        assert observed["path"] == "completions_create_batch"
+    finally:
+        ch_executor.shutdown(wait=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_secret_fetcher")
+async def test_deferred_span_flow_lands_queryable_spans(ch_server) -> None:
+    """End-to-end: two traced completions go through the deferred path, the spans
+    they return bulk-insert via `ainsert_completion_spans`, and both read back
+    from ClickHouse by the call ids the deferred path returned.
+    """
+    project_id = make_project_id("deferred_flow")
+    ch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ch-pool")
+    srv = AsyncClickHouseTraceServer(
+        host=ch_server._host,
+        port=ch_server._port,
+        database=ch_server._database,
+        ch_executor=ch_executor,
+    )
+    try:
+        with patch(
+            LITELLM_ACOMPLETION_PATCH,
+            new=AsyncMock(
+                return_value=tsi.CompletionsCreateRes(response={"choices": [{"x": 1}]})
+            ),
+        ):
+            d1 = await srv.acompletions_create_deferred(
+                _make_req(track_llm_call=True, project_id=project_id)
+            )
+            d2 = await srv.acompletions_create_deferred(
+                _make_req(track_llm_call=True, project_id=project_id)
+            )
+            spans = [d.span for d in (d1, d2) if d.span is not None]
+            assert len(spans) == 2  # built, not yet inserted
+            await srv.ainsert_completion_spans(spans)
+    finally:
+        ch_executor.shutdown(wait=True)
+
+    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert res.total_count == 2
+    assert {d1.result.span_id, d2.result.span_id} == {s.span_id for s in res.spans}
 
 
 @pytest.mark.asyncio

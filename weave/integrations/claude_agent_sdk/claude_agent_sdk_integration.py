@@ -14,6 +14,7 @@ from weave.integrations.claude_agent_sdk.display_utils import (
     tool_use_display_name,
     turn_display_name,
 )
+from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context.weave_client_context import get_weave_client
@@ -21,6 +22,8 @@ from weave.trace.context.weave_client_context import get_weave_client
 logger = logging.getLogger(__name__)
 
 _claude_agent_sdk_patcher: MultiPatcher | None = None
+
+CLAUDE_AGENT_SDK_INTEGRATION = library_integration("claude_agent_sdk")
 
 
 # ── Shared helpers ───────────────────────────────────────────────────
@@ -116,7 +119,10 @@ def _process_message_inline(
                 inputs={},
                 display_name=thinking_display_name(thinking_text),
                 parent=root_call,
-                attributes={"kind": "llm"},
+                attributes={
+                    "kind": "llm",
+                    **CLAUDE_AGENT_SDK_INTEGRATION.as_attributes(),
+                },
                 use_stack=False,
             )
             wc.finish_call(thinking_call, output={"thinking": thinking_text})
@@ -130,7 +136,10 @@ def _process_message_inline(
                 inputs={},
                 display_name=text_display_name(text_content),
                 parent=root_call,
-                attributes={"kind": "llm"},
+                attributes={
+                    "kind": "llm",
+                    **CLAUDE_AGENT_SDK_INTEGRATION.as_attributes(),
+                },
                 use_stack=False,
             )
             wc.finish_call(text_call, output={"text": text_content, "model": msg.model})
@@ -144,7 +153,10 @@ def _process_message_inline(
                 inputs={"message": serialized},
                 display_name=tool_use_display_name(tool_block.name, tool_block.input),
                 parent=root_call,
-                attributes={"kind": "tool"},
+                attributes={
+                    "kind": "tool",
+                    **CLAUDE_AGENT_SDK_INTEGRATION.as_attributes(),
+                },
                 use_stack=False,
             )
             open_tool_calls[tool_block.id] = tool_call
@@ -288,7 +300,10 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
                     op="claude_agent_sdk.query",
                     inputs=root_inputs,
                     display_name=turn_display_name(user_prompt),
-                    attributes={"kind": "agent"},
+                    attributes={
+                        "kind": "agent",
+                        **CLAUDE_AGENT_SDK_INTEGRATION.as_attributes(),
+                    },
                     use_stack=False,
                 )
 
@@ -370,7 +385,10 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                         op="claude_agent_sdk.turn",
                         inputs=turn_inputs,
                         display_name=turn_display_name(user_prompt),
-                        attributes={"kind": "agent"},
+                        attributes={
+                            "kind": "agent",
+                            **CLAUDE_AGENT_SDK_INTEGRATION.as_attributes(),
+                        },
                         use_stack=False,
                     )
 

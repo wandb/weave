@@ -41,7 +41,6 @@ def patch_smolagents() -> Generator[None, None, None]:
     openai_sdk._openai_patcher = None
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path", "query"],
@@ -60,8 +59,21 @@ def test_hf_api_model(client):
     response = engine(messages, stop_sequences=["END"])
     assert "paris" in response.content.lower()
 
-    calls = client.get_calls()
+    # Materialize the lazy CallsIter up front: iterating it for the metadata
+    # check below otherwise changes how calls[0].output later deserializes
+    # (object -> WeaveDict), which breaks the `.content` assertion.
+    calls = list(client.get_calls())
     assert len(calls) == 2
+
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # The model also drives a huggingface_hub sub-call, which carries its own
+    # metadata, so filter to the smolagents-stamped calls before asserting shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    smolagents_meta = [i for i in stamped if i["name"] == "smolagents"]
+    assert smolagents_meta, "expected >=1 call to carry smolagents metadata"
+    assert all(i["meta"]["package_name"] == "smolagents" for i in smolagents_meta)
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -77,7 +89,6 @@ def test_hf_api_model(client):
     assert "paris" in call.output.choices[0].message.content.lower()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -109,7 +120,6 @@ def test_openai_server_model(client):
     assert "paris" in call.output["choices"][0]["message"]["content"].lower()
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -137,7 +147,6 @@ def test_tool_calling_agent_search(client):
     assert str(call.output) == answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -174,7 +183,6 @@ def test_tool_calling_agent_weather(client):
     assert op_name_from_ref(call.op_name) == "smolagents.ToolCallingAgent.run"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],
@@ -203,7 +211,6 @@ def test_code_agent_search(client):
     assert str(call.output) == answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
     match_on=["method", "scheme", "host", "port", "path"],

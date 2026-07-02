@@ -1,3 +1,4 @@
+import contextlib
 import os
 import uuid
 from datetime import datetime
@@ -5,7 +6,6 @@ from unittest.mock import patch
 
 from litellm.types.utils import ModelResponse
 
-from tests.trace.util import client_is_sqlite
 from weave.trace.settings import override_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
@@ -172,6 +172,24 @@ def setup_test_environment(mock_secret_fetcher=None):
     return mock_secret_fetcher, token
 
 
+@contextlib.contextmanager
+def patch_server_obj_read(mock_obj_read):
+    """Patch obj_read on both backend classes so provider/model objects come
+    from the mock regardless of which trace server the client fixture uses.
+    """
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
+        ) as ch_read,
+        patch(
+            "weave.trace_server.in_memory_trace_server.InMemoryTraceServer.obj_read"
+        ) as mem_read,
+    ):
+        ch_read.side_effect = mock_obj_read
+        mem_read.side_effect = mock_obj_read
+        yield
+
+
 def create_mock_obj_read(
     provider_obj: tsi.ObjSchema, provider_model_obj: tsi.ObjSchema
 ):
@@ -267,11 +285,6 @@ def test_custom_provider_completions_create(client):
     Args:
         client: The test client fixture providing access to the completion endpoint
     """
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     # Create unique provider ID and model ID for test isolation
     provider_id = f"test-provider-{uuid.uuid4()}"
     model_id = "test-model"
@@ -309,10 +322,7 @@ def test_custom_provider_completions_create(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -369,11 +379,6 @@ def test_custom_provider_completions_create(client):
 
 def test_custom_provider_ollama_model(client):
     """Test handling of ollama models that need special prefixing."""
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     # Create provider ID and model ID for testing
     provider_id = f"test-ollama-{uuid.uuid4()}"
     model_id = "llama2"
@@ -417,10 +422,7 @@ def test_custom_provider_ollama_model(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -456,11 +458,6 @@ def test_custom_provider_trailing_slash_normalization(client):
 
     This test verifies that trailing slashes are stripped before making the request.
     """
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     # Create provider ID and model ID for testing
     provider_id = f"test-trailing-slash-{uuid.uuid4()}"
     model_id = "test-model"
@@ -501,10 +498,7 @@ def test_custom_provider_trailing_slash_normalization(client):
     with override_settings(disabled=True):
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 with patch("litellm.completion") as mock_completion:
                     mock_completion.return_value = ModelResponse.model_validate(
                         mock_response
@@ -572,11 +566,6 @@ def test_get_custom_provider_info():
 
 def test_error_handling_custom_provider(client):
     """Test error handling for custom provider."""
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     # Create provider ID and model ID for testing
     provider_id = f"test-error-{uuid.uuid4()}"
     model_id = "test-model"
@@ -596,10 +585,7 @@ def test_error_handling_custom_provider(client):
         # Set up the secret fetcher
         mock_secret_fetcher, token = setup_test_environment()
         try:
-            with patch(
-                "weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer.obj_read"
-            ) as mock_read:
-                mock_read.side_effect = mock_obj_read
+            with patch_server_obj_read(mock_obj_read):
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {
@@ -621,11 +607,6 @@ def test_error_handling_custom_provider(client):
 
 def test_custom_provider_invalid_model_format(client):
     """Test error handling for invalid model format."""
-    is_sqlite = client_is_sqlite(client)
-    if is_sqlite:
-        # no need to test in sqlite
-        return
-
     # Use an invalid model format (no slash)
     model_name = "invalid-model-format"
 

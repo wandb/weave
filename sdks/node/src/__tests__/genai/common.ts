@@ -6,26 +6,23 @@ import {
 
 import {setGlobalClient} from '../../clientApi';
 import {type Api as TraceServerApi} from '../../generated/traceServerApi';
-import {Settings, type SettingsInit} from '../../settings';
-import {type WandbServerApi} from '../../wandb/wandbServerApi';
+import {makeSettings, type Settings} from '../../settings';
 import {WeaveClient} from '../../weaveClient';
 import state from 'weave/state';
+import {ATTR_GEN_AI_CONVERSATION_ID} from 'weave/genai/semconv';
 
 export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
 
-export function installFakeClient(settings: SettingsInit = {}): WeaveClient {
+export function installFakeClient(
+  settings: Partial<Settings> = {}
+): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
-  const client = new WeaveClient(
+  const client = new WeaveClient({
     traceServerApi,
-    {} as WandbServerApi,
-    TEST_PROJECT,
-    new Settings(
-      settings.printCallLink ?? true,
-      settings.globalAttributes ?? {},
-      settings.genai ?? {}
-    )
-  );
+    projectId: TEST_PROJECT,
+    settings: makeSettings(settings),
+  });
   setGlobalClient(client);
   return client;
 }
@@ -46,7 +43,7 @@ export function resetProviderSingleton(): void {
 // Reach into the GenAI default-state singleton and null out its slots so each
 // test body starts clean even when prior tests in the same worker mutated it.
 export function resetGenaiDefaultState(): void {
-  state.genAi.defaultState.session = null;
+  state.genAi.defaultState.conversation = null;
   state.genAi.defaultState.turn = null;
   state.genAi.defaultState.llm = null;
 }
@@ -88,6 +85,26 @@ export function findSpan(spans: ReadableSpan[], name: string): ReadableSpan {
     );
   }
   return span;
+}
+
+export type SpanSnapshotOpts = {
+  maskConversationId?: boolean;
+  maskTimestamps?: boolean;
+};
+
+export function spanSnapshot(
+  span: ReadableSpan,
+  {maskConversationId = true, maskTimestamps = true}: SpanSnapshotOpts = {}
+) {
+  if (maskConversationId && span.attributes[ATTR_GEN_AI_CONVERSATION_ID]) {
+    span.attributes[ATTR_GEN_AI_CONVERSATION_ID] = '<uuid>';
+  }
+
+  return {
+    attributes: span.attributes,
+    endTime: maskTimestamps ? '<timestamp>' : span.endTime,
+    startTime: maskTimestamps ? '<timestamp>' : span.startTime,
+  };
 }
 
 /**

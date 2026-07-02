@@ -6,20 +6,38 @@ specific setup requirements.
 """
 
 import base64
+import datetime
 import os
+import socket
+import uuid
 from unittest import mock
 
 import boto3
 import pytest
 from azure.core.exceptions import ResourceExistsError
 from google.api_core import exceptions
+from google.auth import credentials as ga_credentials
+from google.cloud import storage
 from moto import mock_aws
 
-from tests.trace.util import client_is_sqlite
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_settings
-from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
+from weave.trace_server import clickhouse_trace_server_settings, file_storage
+from weave.trace_server.trace_server_interface import (
+    CallEndReq,
+    CallEndV2Req,
+    CallStartReq,
+    CallStartRes,
+    CallStartV2Req,
+    CallStartV2Res,
+    EndedCallSchemaForInsert,
+    EndedCallSchemaForInsertWithStartedAt,
+    FileContentReadReq,
+    FileCreateReq,
+    StartedCallSchemaForInsert,
+)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
@@ -49,8 +67,6 @@ def run_storage_test(client: WeaveClient):
         assert file.content == TEST_CONTENT
         return res
 
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
     return _run_test
 
 
@@ -85,6 +101,9 @@ class TestS3Storage:
             yield
 
     @pytest.mark.usefixtures("aws_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_aws_storage(self, run_storage_test, s3):
         """Test file storage using AWS S3."""
         res = run_storage_test()
@@ -99,6 +118,9 @@ class TestS3Storage:
         obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
         assert obj_response["Body"].read() == TEST_CONTENT
 
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
         # This test is critical in that it ensures that the system works correctly for large files. Both
         # before and after the migration to file storage, we should be able to read the file correctly.
@@ -145,9 +167,6 @@ class TestS3Storage:
             d3 = _run_single_test()
             assert d1 == d2 == d3
 
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         _run_test()
 
 
@@ -160,6 +179,9 @@ class TestGCSStorage:
     """
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage(self, run_storage_test, gcs, client: WeaveClient):
         """Test file storage using Google Cloud Storage."""
         res = run_storage_test()
@@ -171,15 +193,15 @@ class TestGCSStorage:
         assert gcs.state.upload_count == 1
 
     @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_gcp_storage_skips_duplicate_write(self, client: WeaveClient):
         """Test that writing the same content twice skips the second write.
 
         This verifies the if_generation_match=0 conditional write works correctly
         to prevent GCS rate limiting when multiple pods write the same object.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         upload_count = 0
         blob_data = {}
 
@@ -242,6 +264,104 @@ class TestGCSStorage:
             assert file.content == TEST_CONTENT
 
 
+class _ScopedFakeCredentials(ga_credentials.Credentials, ga_credentials.Scoped):
+    """Service-account-like credentials that require scoping before use."""
+
+    def __init__(self, scopes: list[str] | None = None):
+        super().__init__()
+        self._scopes = scopes
+
+    @property
+    def requires_scopes(self) -> bool:
+        return not self._scopes
+
+    @property
+    def scopes(self) -> list[str] | None:
+        return self._scopes
+
+    def with_scopes(self, scopes, default_scopes=None) -> "_ScopedFakeCredentials":
+        return _ScopedFakeCredentials(scopes=list(scopes))
+
+    def refresh(self, request) -> None:
+        self.token = "fake-token"
+
+
+def test_keepalive_gcs_client_scopes_credentials_for_session():
+    """Regression for #7221: the keep-alive GCS session must carry scoped credentials."""
+    expected_scopes = list(storage.Client.SCOPE)
+
+    unscoped = _ScopedFakeCredentials()
+    assert unscoped.requires_scopes
+    client = file_storage._build_keepalive_gcs_client(unscoped)
+
+    # The session that mints tokens must hold scoped creds, else invalid_scope.
+    assert client._http.credentials.scopes == expected_scopes
+    assert not client._http.credentials.requires_scopes
+    assert isinstance(
+        client._http.get_adapter("https://storage.googleapis.com"),
+        file_storage._KeepAliveHTTPAdapter,
+    )
+
+    # Already-scoped creds (local user creds) pass through, so prod-only repro.
+    prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
+    passthrough = file_storage._build_keepalive_gcs_client(prescoped)
+    assert passthrough._http.credentials.scopes == ["existing-scope"]
+
+
+def test_keepalive_adapter_sets_tcp_user_timeout():
+    """In-flight stalls need TCP_USER_TIMEOUT; keep-alive only covers idle sockets."""
+    adapter = file_storage._KeepAliveHTTPAdapter(
+        pool_maxsize=file_storage.GCS_POOL_MAXSIZE
+    )
+    socket_options = adapter.poolmanager.connection_pool_kw["socket_options"]
+
+    assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in socket_options
+    # Linux-only knob (skipped on macOS/BSD where the constant is absent).
+    if hasattr(socket, "TCP_USER_TIMEOUT"):
+        assert (
+            socket.IPPROTO_TCP,
+            socket.TCP_USER_TIMEOUT,
+            file_storage.GCS_TCP_USER_TIMEOUT_MS,
+        ) in socket_options
+
+
+class _CountingStorageClient(file_storage.FileStorageClient):
+    """Records store() calls so a test can assert the dedup cache skips repeats."""
+
+    def __init__(self, base_uri: file_storage.FileStorageURI):
+        super().__init__(base_uri)
+        self.store_calls = 0
+
+    def store(self, uri: file_storage.FileStorageURI, data: bytes) -> None:
+        self.store_calls += 1
+
+    def read(self, uri: file_storage.FileStorageURI) -> bytes:
+        raise NotImplementedError
+
+
+def test_store_in_bucket_dedups_repeat_keys():
+    """A repeat content-addressed write is served from the per-pod cache, not the backend."""
+    file_storage.reset_stored_key_cache()
+    base = file_storage.FileStorageURI.parse_uri_str("gs://dedup-test-bucket")
+    client = _CountingStorageClient(base)
+
+    path = file_storage.key_for_project_digest("proj", "digestA")
+    uri1 = file_storage.store_in_bucket(client, path, b"data")
+    uri2 = file_storage.store_in_bucket(client, path, b"data")
+    assert uri1.to_uri_str() == uri2.to_uri_str()
+    assert client.store_calls == 1  # second call served from cache
+
+    file_storage.store_in_bucket(
+        client, file_storage.key_for_project_digest("proj", "digestB"), b"x"
+    )
+    assert client.store_calls == 2  # a distinct key still reaches the backend
+
+    # reset re-arms the backend write for an already-seen key.
+    file_storage.reset_stored_key_cache()
+    file_storage.store_in_bucket(client, path, b"data")
+    assert client.store_calls == 3
+
+
 class TestAzureStorage:
     """Tests for Azure Blob Storage implementation using mocks."""
 
@@ -299,6 +419,9 @@ class TestAzureStorage:
             yield
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage(self, run_storage_test, azure_blob):
         """Test file storage using Azure Blob Storage."""
         res = run_storage_test()
@@ -313,6 +436,9 @@ class TestAzureStorage:
         assert blob_client.download_blob().readall() == TEST_CONTENT
 
     @pytest.mark.usefixtures("azure_storage_env")
+    @pytest.mark.skipif(
+        NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+    )
     def test_azure_storage_does_not_overwrite_existing_blob(self, client: WeaveClient):
         """Azure store must not clobber an existing content-addressable blob.
 
@@ -321,9 +447,6 @@ class TestAzureStorage:
         be a no-op, not an overwrite. Otherwise any project with write scope
         can substitute content at a known URI.
         """
-        if client_is_sqlite(client):
-            pytest.skip("Not implemented in SQLite")
-
         blob_data: dict[str, bytes] = {}
         upload_calls: list[dict] = []
 
@@ -392,12 +515,13 @@ class TestAzureStorage:
             assert file.content == original
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_support_for_variable_length_chunks(client: WeaveClient):
     """Test that the system supports variable length chunks.
     We don't actually want to change this often, but we need to make sure it works.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
@@ -438,11 +562,11 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 
 
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_file_storage_retry_limit(client: WeaveClient):
     """Test that file storage operations retry exactly 3 times on storage failures."""
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     attempt_count = 0
 
     def mock_upload_fail(*args, **kwargs):
@@ -521,17 +645,19 @@ def _unique_payload(unique: str, size: int) -> bytes:
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
 @pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs):
     """Multiple file_create calls inside one call_batch fan out to GCS in
     parallel: concurrent uploads happen, identical content within the batch
     collapses to one upload, and every stored object lands under the
     expected project prefix.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
-    gcs.state.delay = 0.1
     # 4 unique blobs + 2 duplicates of the first => 4 GCS uploads after dedup.
+    # Barrier makes the peak deterministic so it can't flake under CI scheduler
+    # jitter (each upload blocks until all 4 are simultaneously in-flight).
+    gcs.state.expected_concurrency = 4
     payload_size = 50_000
     payloads = [
         _unique_payload("alpha", payload_size),
@@ -551,10 +677,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
                 )
             )
 
-    # Pool defaults to 8 workers, so all 4 unique uploads should run
-    # concurrently. concurrent_peak is the load-bearing parallelism signal;
-    # wall-time assertions on top would flake on contended CI runners.
-    assert gcs.state.concurrent_peak >= 4, (
+    # Pool defaults to 8 workers, so all 4 unique uploads run concurrently;
+    # the upload barrier guarantees the peak reaches 4.
+    assert gcs.state.concurrent_peak == 4, (
         f"expected 4 concurrent uploads, peak={gcs.state.concurrent_peak}"
     )
 
@@ -578,6 +703,9 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     ],
     ids=["single-chunk-fallback", "multi-chunk-fallback"],
 )
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
 def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     client: WeaveClient, gcs, fail_payload_size: int
 ):
@@ -588,9 +716,6 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
     server's read path -- it must reassemble bit-for-bit from CH chunks for
     both single-chunk and multi-chunk payloads.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Not implemented in SQLite")
-
     server = client.server
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
 
@@ -631,3 +756,165 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
         FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
+
+
+def _data_uri(mimetype: str, size: int) -> str:
+    """Build a distinct data URI whose decoded body exceeds AUTO_CONVERSION_MIN_SIZE."""
+    raw = (mimetype + "_" + "x" * size).encode()
+    return f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_start_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
+):
+    """Eager call/start (v1 and v2) with many inline data-URI inputs fans the
+    auto-extracted attachment uploads across the bucket pool instead of one
+    serial PUT each. The barrier of 2 makes the parallel floor deterministic;
+    the pre-fix serial path only ever had one upload in flight.
+    """
+    gcs.state.expected_concurrency = 2
+    # Distinct mimetype+size keeps every content and metadata digest unique, so
+    # dedup can't collapse the upload set below the barrier width.
+    inputs = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    res = _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=str(uuid.uuid4()),
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+            attributes={},
+            inputs=inputs,
+        ),
+    )
+
+    assert res.id
+    assert res.trace_id
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_end_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
+):
+    """Eager call/end (v1 and v2) fans its output-attachment uploads across the
+    bucket pool too (and, for calls_complete projects, finishes them before the
+    end UPDATE references them). Barrier of 2 pins the parallel floor; the
+    pre-fix serial path peaked at 1.
+    """
+    call_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=call_id,
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=started_at,
+            attributes={},
+            inputs={},
+        ),
+    )
+
+    # Set the barrier only now so it gates the end's uploads, not the empty start.
+    gcs.state.expected_concurrency = 2
+    output = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    _end_call(
+        client.server,
+        version,
+        project_id=client.project_id,
+        call_id=call_id,
+        started_at=started_at,
+        ended_at=started_at + datetime.timedelta(seconds=1),
+        output=output,
+    )
+
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+def _start_call(
+    server: TraceServerClientInterface,
+    version: str,
+    start: StartedCallSchemaForInsert,
+) -> CallStartRes | CallStartV2Res:
+    """Dispatch a single eager call/start to the v1 or v2 write path."""
+    if version == "v1":
+        return server.call_start(CallStartReq(start=start))
+    if version == "v2":
+        return server.call_start_v2(CallStartV2Req(start=start))
+    raise ValueError(f"unknown call version: {version}")
+
+
+def _end_call(
+    server: TraceServerClientInterface,
+    version: str,
+    *,
+    project_id: str,
+    call_id: str,
+    started_at: datetime.datetime,
+    ended_at: datetime.datetime,
+    output: dict[str, str],
+) -> None:
+    """Dispatch a single eager call/end to the v1 or v2 write path."""
+    if version == "v1":
+        server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    elif version == "v2":
+        server.call_end_v2(
+            CallEndV2Req(
+                end=EndedCallSchemaForInsertWithStartedAt(
+                    project_id=project_id,
+                    id=call_id,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    else:
+        raise ValueError(f"unknown call version: {version}")

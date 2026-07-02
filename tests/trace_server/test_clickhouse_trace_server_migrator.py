@@ -8,6 +8,7 @@ import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
@@ -204,7 +205,16 @@ def test_apply_migrations_with_target_version(
     # Verify the actual SQL commands were executed
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
-        [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
+        [
+            call(
+                "CREATE TABLE test1 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+            call(
+                "CREATE TABLE test2 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+        ]
     )
 
 
@@ -260,21 +270,34 @@ def test_apply_migrations_discovers_existing_target_database_engine(
 
         executed_sql = [call.args[0] for call in ch_client.command.call_args_list]
         create_sql = executed_sql[0]
-        assert "CREATE TABLE" in create_sql
-        assert "object_version_first_seen" in create_sql
-        assert "ENGINE = ReplicatedAggregatingMergeTree()" in create_sql
-        assert ("ON CLUSTER test_cluster" in create_sql) is expect_on_cluster
+        table_name = (
+            "object_version_first_seen_local"
+            if use_distributed
+            else "object_version_first_seen"
+        )
+        on_cluster = " ON CLUSTER test_cluster" if expect_on_cluster else ""
+        assert create_sql == (
+            f"CREATE TABLE IF NOT EXISTS {table_name}{on_cluster} (\n"
+            "            project_id String,\n"
+            "            object_id String,\n"
+            "            digest String,\n"
+            "            first_created_at SimpleAggregateFunction(min, DateTime64(3))\n"
+            "        ) ENGINE = ReplicatedAggregatingMergeTree()\n"
+            "        ORDER BY (project_id, object_id, digest)"
+        )
         assert migrator._replicated_db_engine_cache[target_db] is (
             target_engine == "Replicated"
         )
 
         if use_distributed:
             distributed_sql = executed_sql[1]
-            assert "CREATE TABLE IF NOT EXISTS object_version_first_seen" in (
-                distributed_sql
+            assert distributed_sql == (
+                "\n"
+                "        CREATE TABLE IF NOT EXISTS object_version_first_seen\n"
+                "        AS object_version_first_seen_local\n"
+                "        ENGINE = Distributed(test_cluster, currentDatabase(), object_version_first_seen_local, rand())\n"
+                "    "
             )
-            assert "ENGINE = Distributed" in distributed_sql
-            assert ("ON CLUSTER test_cluster" in distributed_sql) is expect_on_cluster
 
     # Existing legacy Replicated DBs reject ON CLUSTER during upgrades.
     run_upgrade_case(
@@ -460,14 +483,19 @@ def test_execute_migration_command(migrator):
     assert (
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
-    migrator.ch_client.command.assert_called_once_with("CREATE TABLE test (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE test (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
 
 
 def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig)
+    migrator.ch_client.command.assert_called_once_with(
+        orig, settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS
+    )
 
 
 def test_update_migration_status(migrator):
@@ -480,13 +508,15 @@ def test_update_migration_status(migrator):
     # Test start of migration
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
 
@@ -672,7 +702,18 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     # ON CLUSTER on CH 25.8+, so the shape of this statement is fully pinned
     # by test_replicated_management_table_follows_database_engine.
     create_table_sql = ch_client.command.call_args_list[1][0][0]
-    assert "ENGINE = ReplicatedMergeTree()" in create_table_sql
+    assert create_table_sql == (
+        "\n"
+        "            CREATE TABLE IF NOT EXISTS db_management.migrations\n"
+        "            (\n"
+        "    db_name String,\n"
+        "    curr_version UInt64,\n"
+        "    partially_applied_version UInt64 NULL,\n"
+        ")\n"
+        "            ENGINE = ReplicatedMergeTree()\n"
+        "            ORDER BY (db_name)\n"
+        "        "
+    )
 
     # Times out: engine never becomes visible, error includes the SQL context
     timeout_client = Mock()
@@ -912,15 +953,15 @@ def test_format_distributed_sql():
     # CREATE TABLE should create both local and distributed
     sql = "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = MergeTree"
     result = distributed_migrator._format_distributed_sql(sql)
-    assert "test_local" in result.local_command
-    assert result.distributed_command is not None
-    assert (
-        "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster"
-        in result.distributed_command
+    assert result.local_command == (
+        "CREATE TABLE test_local ON CLUSTER test_cluster (id Int32) ENGINE = MergeTree"
     )
-    assert (
-        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in result.distributed_command
+    assert result.distributed_command == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n"
+        "        AS test_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())\n"
+        "    "
     )
 
 
@@ -933,18 +974,18 @@ def test_execute_migration_command_with_distributed(distributed_migrator):
     assert distributed_migrator.ch_client.database == "original_db"
 
     first_call = distributed_migrator.ch_client.command.call_args_list[0][0][0]
-    assert "CREATE TABLE test_local ON CLUSTER test_cluster" in first_call
-    assert (
-        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
-        in first_call
+    assert first_call == (
+        "CREATE TABLE test_local ON CLUSTER test_cluster (id Int32) "
+        "ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
     )
 
     second_call = distributed_migrator.ch_client.command.call_args_list[1][0][0]
-    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in second_call
-    assert "AS test_local" in second_call
-    assert (
-        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in second_call
+    assert second_call == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n"
+        "        AS test_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())\n"
+        "    "
     )
 
 
@@ -1388,10 +1429,13 @@ def test_rename_table_distributed(distributed_migrator):
 
     # 3. Create new distributed table
     create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
-    assert "calls_complete_old" in create_sql
-    assert "ON CLUSTER test_cluster" in create_sql
-    assert "Distributed" in create_sql
-    assert "calls_complete_old_local" in create_sql
+    assert create_sql == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS calls_complete_old ON CLUSTER test_cluster\n"
+        "        AS calls_complete_old_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_old_local, rand())\n"
+        "    "
+    )
 
 
 def test_rename_table_distributed_picks_up_shard_key(distributed_migrator):
@@ -1404,8 +1448,13 @@ def test_rename_table_distributed_picks_up_shard_key(distributed_migrator):
 
     # The new distributed table should use sipHash64(trace_id) for calls_complete
     create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
-    assert "sipHash64(trace_id)" in create_sql
-    assert "calls_complete_local" in create_sql
+    assert create_sql == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS calls_complete ON CLUSTER test_cluster\n"
+        "        AS calls_complete_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(trace_id))\n"
+        "    "
+    )
 
 
 def test_rename_table_replicated(replicated_migrator):
@@ -1769,10 +1818,6 @@ def test_split_migration_sql() -> None:
         "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'",
         "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax",
     ]
-    for s in statements:
-        assert not s.endswith(";")
-        assert "--" not in s
-        assert "/*" not in s
 
 
 def test_shipped_migrations_do_not_embed_on_cluster() -> None:
@@ -1840,3 +1885,31 @@ def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
             f"  old ({len(old_norm)}): {old_norm}\n"
             f"  new ({len(new_norm)}): {new_norm}"
         )
+
+
+def test_run_ddl_with_retry_passes_migration_ddl_settings(migrator):
+    migrator._run_ddl_with_retry("CREATE TABLE t (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE t (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
+
+
+def test_run_ddl_with_retry_merges_caller_settings(migrator):
+    migrator._run_ddl_with_retry("SELECT 1", settings={"mutations_sync": 2})
+    migrator.ch_client.command.assert_called_once_with(
+        "SELECT 1",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
+    )
+
+
+def test_migration_timeout_ladder_invariants():
+    # The client read timeout must outlast both the ON CLUSTER DDL wait and the
+    # server's replicated-DDL wait (database_replicated_initial_query_timeout_sec,
+    # default 300s) so the client always gets a response rather than the read
+    # timeout that stranded the migration mid-DDL in the incident.
+    client = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+    ddl_task = ch_settings.MIGRATION_DDL_QUERY_SETTINGS["distributed_ddl_task_timeout"]
+    server_replicated_ddl_default = 300
+    assert client > ddl_task
+    assert client > server_replicated_ddl_default

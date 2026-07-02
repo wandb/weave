@@ -30,27 +30,34 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     Span,
 )
 
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import CallsCompleteModeRequired
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 # =============================================================================
 # Fixtures
 # =============================================================================
 
 
+# Every test in this file asserts calls_complete table residence and raw
+# ClickHouse reads.
+pytestmark = pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
+)
+
+
 @pytest.fixture
 def clickhouse_trace_server(trace_server):
     """Get internal ClickHouse server with AUTO routing mode enabled."""
     internal_server = trace_server._internal_trace_server
-    if isinstance(internal_server, SqliteTraceServer):
-        pytest.skip("ClickHouse-only test")
+    assert isinstance(internal_server, ClickHouseTraceServer)
     internal_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return internal_server
 

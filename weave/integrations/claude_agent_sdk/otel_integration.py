@@ -8,6 +8,12 @@ Each ``query()`` call / ``ClaudeSDKClient`` turn becomes an ``invoke_agent``
 span, with a child ``chat`` span per model response and an ``execute_tool``
 span per tool call. The SDK reports token usage only on the final
 ``ResultMessage``, so it is attached to the last ``chat`` span.
+
+The Claude Agent SDK has no agent-name concept, so ``invoke_agent`` spans
+default to ``claude_agent_sdk``. Users relabel them for a block of work with the
+generic ``weave.conversation.agent_name_override(...)`` context manager; the name is
+resolved per turn at span creation, so it is robust to (implicit) patch timing
+and correct under concurrent async queries.
 """
 
 from __future__ import annotations
@@ -34,23 +40,28 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.session.session_otel import (
+from weave.conversation.agent_context import resolve_agent_name
+from weave.conversation.conversation_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
 )
-from weave.session.types import Message, Reasoning, ToolCallPart, Usage
+from weave.conversation.types import Message, Reasoning, ToolCallPart, Usage
+from weave.integrations.integration_metadata import library_integration
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.settings import should_disable_weave
 
 logger = logging.getLogger(__name__)
 
 _TRACER_NAME = "weave.claude_agent_sdk"
-_AGENT_NAME = "claude_agent_sdk"
+_DEFAULT_AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
 
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
+
+# Integration provenance, flattened once for OTel span attributes (scalars only).
+_INTEGRATION_OTEL_ATTRS = library_integration("claude_agent_sdk").as_otel_attributes()
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +154,9 @@ class _TurnState:
     """
 
     user_prompt: str | None
+    # Resolved once at turn start so the span name and gen_ai.agent.name stay
+    # consistent even if finalization runs outside the context that set it.
+    agent_name: str = _DEFAULT_AGENT_NAME
     conversation_id: str = ""
     model: str = ""
     final_text: str = ""
@@ -216,6 +230,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             output_messages=[output.message],
             reasoning=output.reasoning if output.reasoning.content else None,
         )
+        chat_attrs.update(_INTEGRATION_OTEL_ATTRS)
         state.pending_chat = _PendingChat(span=chat, attrs=chat_attrs)
         state.accumulated.append(output.message)
 
@@ -247,6 +262,7 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
                 tool_call_result=str(block.content),
                 tool_call_id=block.tool_use_id,
             )
+            attrs.update(_INTEGRATION_OTEL_ATTRS)
             for key, value in attrs.items():
                 open_tool.span.set_attribute(key, value)
             if block.is_error:
@@ -271,7 +287,7 @@ def _finalize_turn(root: Any, state: _TurnState) -> None:
     state.open_tool_spans.clear()
 
     attrs = invoke_agent_attributes(
-        agent_name=_AGENT_NAME,
+        agent_name=state.agent_name,
         conversation_id=state.conversation_id,
         provider_name=_PROVIDER_NAME,
         model=state.model,
@@ -282,6 +298,7 @@ def _finalize_turn(root: Any, state: _TurnState) -> None:
         if state.final_text
         else None,
     )
+    attrs.update(_INTEGRATION_OTEL_ATTRS)
     for key, value in attrs.items():
         root.set_attribute(key, value)
     if state.is_error:
@@ -302,9 +319,12 @@ async def _trace_turn(
     session_id) is only sent on the first turn, so later turns must inherit it.
     """
     tracer = _tracer()
-    root = tracer.start_span(f"invoke_agent {_AGENT_NAME}")
+    # Resolve once here: this runs on the first __anext__, inside the user's
+    # ``agent_name_override(...)`` block, so the override contextvar is visible.
+    agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
+    root = tracer.start_span(f"invoke_agent {agent_name}")
     token = otel_context.attach(otel_trace.set_span_in_context(root))
-    state = _TurnState(user_prompt=user_prompt)
+    state = _TurnState(user_prompt=user_prompt, agent_name=agent_name)
     if conversation_id_holder is not None and conversation_id_holder[0]:
         state.conversation_id = conversation_id_holder[0]
     try:

@@ -86,7 +86,6 @@ def accuracy_metric(answer, model_output, trace=None):
     return answer["answer"].lower() == predicted_answer
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -104,6 +103,16 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 
     calls = list(client.get_calls())
     assert len(calls) == 4
+
+    # Integration-tracking metadata is stamped on the integration's patched calls.
+    # dspy also drives litellm/openai sub-calls, which carry their own metadata,
+    # so filter to the dspy-stamped calls before asserting their shape.
+    stamped = [
+        c.attributes["integration"] for c in calls if "integration" in c.attributes
+    ]
+    dspy_meta = [i for i in stamped if i["name"] == "dspy"]
+    assert dspy_meta, "expected >=1 call to carry dspy metadata"
+    assert all(i["meta"]["package_name"] == "dspy" for i in dspy_meta)
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -129,7 +138,6 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -177,7 +185,6 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -233,7 +240,6 @@ def test_dspy_cot(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -294,7 +300,6 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -364,7 +369,6 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert output["output"]["Average Metric"] > 0.3
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -423,7 +427,6 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
     assert 0.0 <= output["output"]["Average Metric"] <= 1.0
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -461,7 +464,6 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",
@@ -499,7 +501,6 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     )
 
 
-@pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=[
         "authorization",

@@ -11,11 +11,10 @@ import datetime
 import pytest
 
 import weave
-from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import client_is_sqlite
+from tests.trace.server_utils import TEST_ENTITY
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
-from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
 def test_filter_calls_by_queue_inner_join_behavior(client):
@@ -26,8 +25,6 @@ def test_filter_calls_by_queue_inner_join_behavior(client):
     - Calls not in the queue are excluded (INNER JOIN behavior)
     - The CallsMergedQueueItemField and queue_id extraction work correctly
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create 10 calls
     @weave.op(name="test_queue_filter")
@@ -93,8 +90,6 @@ def test_filter_calls_by_multiple_distinct_queues(client):
     Verifies the queue_id extraction optimization works when filtering
     by different queues in separate queries.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create 6 calls
     @weave.op(name="multi_queue_test")
@@ -193,8 +188,6 @@ def test_filter_calls_by_queue_combined_with_other_filters(client):
     Verifies that the INNER JOIN for queue items integrates properly with
     other filter conditions in complex queries.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create calls with two different op names
     @weave.op(name="op_include")
@@ -275,8 +268,6 @@ def test_filter_calls_by_nonexistent_queue(client):
 
     Verifies INNER JOIN behavior when no matching queue items exist.
     """
-    if client_is_sqlite(client):
-        pytest.skip("Annotation queues not supported in SQLite")
 
     # Create some calls
     @weave.op(name="test_nonexistent")
@@ -308,6 +299,9 @@ def test_filter_calls_by_nonexistent_queue(client):
     assert len(res.calls) == 0
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: calls_complete table residence"
+)
 def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
     """Integration test: queue filtering works correctly with calls_complete table.
 
@@ -321,13 +315,6 @@ def test_filter_calls_by_queue_with_calls_complete_table(trace_server):
     4. Query by queue_id - should automatically use calls_complete table
     5. Verify INNER JOIN correctly filters results
     """
-    try:
-        find_server_layer(trace_server, SqliteTraceServer)
-    except TypeError:
-        pass
-    else:
-        pytest.skip("ClickHouse-only test")
-
     project_id = f"{TEST_ENTITY}/test_queue_calls_complete"
 
     # Step 1: Seed project with calls_complete data to establish residence

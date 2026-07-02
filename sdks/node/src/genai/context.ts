@@ -1,5 +1,5 @@
 import type {LLM} from './llm';
-import type {Session} from './session';
+import type {Conversation} from './conversation';
 import type {Turn} from './turn';
 import state from '../state';
 
@@ -12,13 +12,13 @@ import state from '../state';
  * the relevant slot directly — no `enterWith`, no leak.
  */
 export interface GenAIState {
-  session: Session | null;
+  conversation: Conversation | null;
   turn: Turn | null;
   llm: LLM | null;
 }
 
 function freshState(): GenAIState {
-  return {session: null, turn: null, llm: null};
+  return {conversation: null, turn: null, llm: null};
 }
 
 /**
@@ -29,12 +29,12 @@ function freshState(): GenAIState {
  *
  * Internal helper, not part of the public API.
  */
-export function _getGenaiState(): GenAIState {
+export function getGenaiState(): GenAIState {
   return state.genAi.state.getStore() ?? state.genAi.defaultState;
 }
 
 /**
- * Run `fn` in a fresh, isolated GenAI state frame. Any Session / Turn / LLM
+ * Run `fn` in a fresh, isolated GenAI state frame. Any Conversation / Turn / LLM
  * started inside `fn` lives in this frame only — it does not clash with
  * sibling `runIsolated` frames running concurrently, and it does not leak
  * to the outer async chain.
@@ -55,17 +55,20 @@ export function runIsolated<T>(fn: () => T): T {
   return state.genAi.state.run(freshState(), fn);
 }
 
-/** Returns the current Session, or undefined. */
-export function getCurrentSession(): Session | undefined {
-  return _getGenaiState().session ?? undefined;
+/** Returns the current Conversation, or undefined. */
+export function getCurrentConversation(): Conversation | undefined {
+  return getGenaiState().conversation ?? undefined;
 }
+
+/** @deprecated Use {@link getCurrentConversation} instead. */
+export const getCurrentSession = getCurrentConversation;
 
 /** Returns the current Turn, or undefined. */
 export function getCurrentTurn(): Turn | undefined {
-  return _getGenaiState().turn ?? undefined;
+  return getGenaiState().turn ?? undefined;
 }
 
 /** Returns the current LLM, or undefined. */
 export function getCurrentLLM(): LLM | undefined {
-  return _getGenaiState().llm ?? undefined;
+  return getGenaiState().llm ?? undefined;
 }

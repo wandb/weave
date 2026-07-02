@@ -9,8 +9,7 @@ import logging
 import re
 from typing import Any, TypeVar
 
-import ddtrace
-
+from weave.trace_server.content.content import Content
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -19,7 +18,7 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.type_wrappers.Content.content import Content
+from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +65,7 @@ def is_data_uri(data_uri: str) -> bool:
     return DATA_URI_PATTERN.match(data_uri) is not None
 
 
-@ddtrace.tracer.wrap(name="store_content_object")
+@traced(name="store_content_object")
 def store_content_object(
     content_obj: Content,
     project_id: str,

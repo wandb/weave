@@ -50,6 +50,37 @@ wandb_init_hook()
 
 from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState
+from weave.conversation._deprecated import (
+    Session,
+    end_session,
+    get_current_session,
+    log_session,
+    start_session,
+)
+from weave.conversation.conversation import (
+    LLM,
+    Conversation,
+    LogResult,
+    MediaAttachment,
+    Message,
+    SubAgent,
+    Tool,
+    Turn,
+    Usage,
+    end_conversation,
+    end_llm,
+    end_turn,
+    get_current_conversation,
+    get_current_llm,
+    get_current_turn,
+    log_conversation,
+    log_turn,
+    start_conversation,
+    start_llm,
+    start_subagent,
+    start_tool,
+    start_turn,
+)
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
@@ -60,30 +91,6 @@ from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
-from weave.session.session import (
-    LLM,
-    LogResult,
-    MediaAttachment,
-    Message,
-    Session,
-    SubAgent,
-    Tool,
-    Turn,
-    Usage,
-    end_llm,
-    end_session,
-    end_turn,
-    get_current_llm,
-    get_current_session,
-    get_current_turn,
-    log_session,
-    log_turn,
-    start_llm,
-    start_session,
-    start_subagent,
-    start_tool,
-    start_turn,
-)
 from weave.trace.log_call import log_call
 from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
@@ -104,6 +111,7 @@ __all__ = [
     "Audio",
     "ClassifierMonitor",
     "Content",
+    "Conversation",
     "Dataset",
     "EasyPrompt",
     "Evaluation",
@@ -132,6 +140,7 @@ __all__ = [
     "add_tags",
     "as_op",
     "attributes",
+    "end_conversation",
     "end_llm",
     "end_session",
     "end_turn",
@@ -140,6 +149,7 @@ __all__ = [
     "get_aliases",
     "get_client",
     "get_current_call",
+    "get_current_conversation",
     "get_current_llm",
     "get_current_session",
     "get_current_turn",
@@ -150,6 +160,7 @@ __all__ = [
     "list_aliases",
     "list_tags",
     "log_call",
+    "log_conversation",
     "log_session",
     "log_turn",
     "op",
@@ -161,6 +172,7 @@ __all__ = [
     "require_current_call",
     "set_aliases",
     "set_view",
+    "start_conversation",
     "start_llm",
     "start_session",
     "start_subagent",

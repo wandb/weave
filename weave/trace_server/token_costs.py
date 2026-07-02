@@ -226,9 +226,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(param_builder=param_builder)
     return prepared_query
 
 
@@ -357,12 +355,13 @@ def get_ranked_prices(
                 }
             ),
             "LEFT",
+            # CH 24.3+ analyzer ignores distributed_product_mode, so GLOBAL must
+            # be explicit to avoid Code 288 double-distributed JOIN on clusters.
+            global_=True,
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(param_builder=param_builder)
     return prepared_query
 
 
@@ -535,7 +534,8 @@ def _build_feedback_join(
         Complete LEFT JOIN SQL clause
     """
     project_param = param_builder.add_param(project_id)
-    return f"""LEFT JOIN (
+    # GLOBAL: feedback is Distributed; matches the cost price JOIN (Code 288).
+    return f"""GLOBAL LEFT JOIN (
     SELECT * FROM feedback WHERE feedback.project_id = {{{project_param}:String}}
 ) AS feedback ON (
     feedback.weave_ref = concat('weave-trace-internal:///', {{{project_param}:String}}, '/call/', {table_alias}.id))"""

@@ -74,6 +74,7 @@ import {
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../genai/semconv';
 
+import {asOtelAttributes, libraryIntegration} from './integrationMetadata';
 import type {
   PiAgentMessage,
   PiAssistantMessage,
@@ -83,6 +84,11 @@ import type {
   PiExtensionEvent,
   PiModel,
 } from './piCodingAgent.types';
+
+// Integration provenance, flattened once for OTel span attributes (scalars only).
+const PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
+  libraryIntegration('pi_coding_agent', {packageName: '@pi-dev/coding-agent'})
+);
 
 // ---------------------------------------------------------------------------
 // Options
@@ -329,6 +335,7 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          ...PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS,
           [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
           [ATTR_GEN_AI_AGENT_NAME]: 'pi-coding-agent',
           ...(model
@@ -398,6 +405,7 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.CLIENT,
         attributes: {
+          ...PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS,
           [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
           ...(model
             ? {
@@ -497,7 +505,8 @@ export class PiCodingAgentOtelAdapter {
   private onToolCall = (
     event: Extract<PiExtensionEvent, {type: 'tool_call'}>
   ): void => {
-    const attributes: Record<string, string> = {
+    const attributes: Record<string, string | number | boolean> = {
+      ...PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS,
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: event.toolName,
       [ATTR_GEN_AI_TOOL_CALL_ID]: event.toolCallId,
@@ -551,6 +560,7 @@ export class PiCodingAgentOtelAdapter {
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          ...PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS,
           [ATTR_PI_COMPACTION_REASON]: event.reason,
           [ATTR_PI_COMPACTION_ABORTED]: event.aborted,
           [ATTR_PI_COMPACTION_WILL_RETRY]: event.willRetry,
