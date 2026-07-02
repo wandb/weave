@@ -383,9 +383,20 @@ def _build_litellm_kwargs(
     return completion_kwargs
 
 
+# Key in the `CompletionsCreateRes.response` error payload holding the provider
+# HTTP status code, so consumers can classify a failure by status class (4xx
+# account/config vs 5xx availability) instead of matching the error string.
+ERROR_STATUS_CODE_KEY = "error_status_code"
+
+
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
-    error_message = str(e).replace("litellm.", "")
-    return tsi.CompletionsCreateRes(response={"error": error_message})
+    response: dict[str, Any] = {"error": str(e).replace("litellm.", "")}
+    # litellm exceptions subclass the openai error hierarchy and carry the
+    # provider HTTP status code; preserve it for status-class classification.
+    status_code = getattr(e, "status_code", None)
+    if isinstance(status_code, int):
+        response[ERROR_STATUS_CODE_KEY] = status_code
+    return tsi.CompletionsCreateRes(response=response)
 
 
 def get_bedrock_credentials(
