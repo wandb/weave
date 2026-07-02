@@ -53,6 +53,7 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryReq,
     group_by_ref_alias,
 )
+from weave.trace_server.interface.feedback_types import AGENT_SPAN_FEEDBACK_TYPES
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
@@ -871,31 +872,47 @@ _OP_TO_SQL: dict[str, str] = {
     "eq": "=",
 }
 
+# Derived from the write-path constant so a change to the frozenset propagates here.
+# Sorted for a deterministic SQL string; these are trusted literals, not user input.
+_AGENT_FEEDBACK_TYPES_SQL = "feedback_type IN ({})".format(
+    ", ".join(f"'{t}'" for t in sorted(AGENT_SPAN_FEEDBACK_TYPES))
+)
 
-def build_signal_filter_subquery(
+
+def build_signal_filter_clause(
     pb: ParamBuilder,
     project_id: str,
     signal_filters: AgentSignalFilter | None,
+    conversation_col: str = "s.conversation_id",
 ) -> str | None:
-    """Subquery selecting conversation_ids that carry the requested signals.
+    """Restrict `conversation_col` to conversations carrying the requested signals.
 
-    Returns None when there is no signal filter, so callers omit the semi-join
-    entirely (zero overhead for unfiltered queries). The feedback table is
-    project-partitioned and tag-indexed, so this scan is selective; it is NOT
-    time-constrained because a signal's timestamp is not the conversation's.
+    Each grain gets its own `IN (SELECT conversation_id FROM feedback ...)` sub-select,
+    AND-ed together, because a conversation matches if ANY of its feedback rows carries
+    the signal — and human tags (wandb.agent_user_feedback) and scorer ratings
+    (wandb.agent_monitor) live on different rows, so a single-row conjunction would
+    never match a combined tag + rating filter. Tags within one filter are match-any
+    (hasAny); each rating condition is its own sub-select.
+
+    Returns None for an empty filter, so callers omit the semi-join. Not
+    time-constrained: a signal's timestamp is not the conversation's.
     """
     if signal_filters is None or signal_filters.is_empty():
         return None
 
     pid_slot = pb.add(project_id, param_type="String")
-    conditions: list[str] = [
-        f"project_id = {pid_slot}",
-        "feedback_type IN ('wandb.agent_user_feedback', 'wandb.agent_monitor')",
-    ]
+    base = f"project_id = {pid_slot} AND {_AGENT_FEEDBACK_TYPES_SQL}"
 
+    def _in(predicate: str) -> str:
+        return (
+            f"{conversation_col} IN (SELECT conversation_id FROM feedback "
+            f"WHERE {base} AND {predicate} AND conversation_id != '')"
+        )
+
+    clauses: list[str] = []
     if signal_filters.tags:
         tags_slot = pb.add(signal_filters.tags, param_type="Array(String)")
-        conditions.append(f"hasAny(scorer_tags, {tags_slot})")
+        clauses.append(_in(f"hasAny(scorer_tags, {tags_slot})"))
 
     for cond in signal_filters.ratings:
         key_slot = pb.add(cond.scorer_key, param_type="String")
@@ -903,14 +920,14 @@ def build_signal_filter_subquery(
         op = _OP_TO_SQL[cond.op]
         # mapContains guard: Map access returns 0.0 for an absent key, which
         # would spuriously pass a `>= 0` test.
-        conditions.append(
-            f"(mapContains(scorer_ratings, {key_slot}) "
-            f"AND scorer_ratings[{key_slot}] {op} {val_slot})"
+        clauses.append(
+            _in(
+                f"mapContains(scorer_ratings, {key_slot}) "
+                f"AND scorer_ratings[{key_slot}] {op} {val_slot}"
+            )
         )
 
-    conditions.append("conversation_id != ''")
-    where = " AND ".join(conditions)
-    return f"SELECT conversation_id FROM feedback WHERE {where}"
+    return " AND ".join(clauses)
 
 
 def _group_by_references_identity(group_by: list[AgentGroupByRef] | None) -> bool:
@@ -1188,10 +1205,18 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans count")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f" HAVING {having}" if having else ""
+    # Apply the signal semi-join here too, so total_count matches the filtered list
+    # (an unfiltered count produces phantom empty pages). Filtering on the attributed
+    # conversation_id forces attribution even when the query wouldn't otherwise need it.
+    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
+    count_where = span_filters.where
+    if signal_clause is not None:
+        count_where = f"{count_where} AND {signal_clause}"
+        attribute = True
     source = _spans_source(pb, req, attribute=attribute)
     return (
         f"SELECT count() FROM ("
-        f"SELECT {group_exprs} FROM {source} s WHERE {span_filters.where} "
+        f"SELECT {group_exprs} FROM {source} s WHERE {count_where} "
         f"GROUP BY {group_exprs}"
         f"{having_sql}"
         f")"
@@ -1285,12 +1310,10 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
-    signal_subquery = build_signal_filter_subquery(pb, req.project_id, req.signal_filters)
+    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
     grouped_where = span_filters.where
-    if signal_subquery is not None:
-        grouped_where = (
-            f"{grouped_where} AND s.conversation_id IN ({signal_subquery})"
-        )
+    if signal_clause is not None:
+        grouped_where = f"{grouped_where} AND {signal_clause}"
     source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""

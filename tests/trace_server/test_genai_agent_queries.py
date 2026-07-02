@@ -3062,6 +3062,9 @@ def test_filter_conversations_by_signal(ch_server):
     - Rating filter returns only the rated conversation.
     - No filter returns both.
     - Conv-level tag matches the other union arm.
+    - total_count reflects the filter (not the unfiltered conversation count).
+    - A combined tag + rating filter matches across feedback rows (human tag and
+      monitor rating live on different rows) and AND-s the two grains.
     - Purging the feedback removes it from the filter result.
     """
     project_id = _make_project_id("signal-filter")
@@ -3107,8 +3110,18 @@ def test_filter_conversations_by_signal(ch_server):
             if g.group_keys.get("conversation_id") in {conv_a, conv_b}
         )
 
-    # Baseline: no signal filter returns both conversations.
+    def filtered_count(signal_filters: AgentSignalFilter | None) -> int:
+        return ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        ).total_count
+
+    # Baseline: no signal filter returns both conversations, and total_count agrees.
     assert filtered_ids(None) == sorted([conv_a, conv_b])
+    assert filtered_count(None) == 2
 
     # Tag a TURN in conv-A. The producer (here, the monitor) supplies conversation_id
     # from the scored span, so the turn-level signal resolves up to conv-A.
@@ -3136,6 +3149,8 @@ def test_filter_conversations_by_signal(ch_server):
 
     # Tag filter selects only conv-A (turn-level signal resolves up to conversation).
     assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == [conv_a]
+    # total_count applies the filter too (else the UI paginates over phantom empties).
+    assert filtered_count(AgentSignalFilter(tags=["flagged"])) == 1
 
     # Rating filter selects conv-A (0.9 >= 0.8).
     assert filtered_ids(
@@ -3159,6 +3174,39 @@ def test_filter_conversations_by_signal(ch_server):
         )
     )
     assert filtered_ids(AgentSignalFilter(tags=["reviewed"])) == [conv_b]
+
+    # Combined tag + rating must match ACROSS rows: add a human tag on conv-A on a
+    # separate wandb.agent_user_feedback row from the monitor's rating. A single-row
+    # conjunction would miss this; the per-grain sub-selects match it.
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u3",
+            scorer_tags=["human-flag"],
+            conversation_id=conv_a,
+            trace_id=trace_a,
+        )
+    )
+    combined = AgentSignalFilter(
+        tags=["human-flag"],
+        ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+    )
+    assert filtered_ids(combined) == [conv_a]
+
+    # AND across grains: conv-B has the "reviewed" tag but no rating, so a combined
+    # tag + rating filter excludes it.
+    assert (
+        filtered_ids(
+            AgentSignalFilter(
+                tags=["reviewed"],
+                ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+            )
+        )
+        == []
+    )
 
     # Mutation-correctness: purge the conv-A turn feedback; tag filter returns [].
     ch_server.feedback_purge(

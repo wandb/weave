@@ -42,7 +42,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
-    build_signal_filter_subquery,
+    build_signal_filter_clause,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -810,6 +810,43 @@ class TestMakeGroupedSpansCountQuery:
         expected_params = {"genai_0": "p1", "genai_1": "env"}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_conversation_id_with_signal_filter(self) -> None:
+        """Grouped count applies the signal semi-join too, so total_count matches the
+        filtered list instead of counting every conversation.
+        """
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            ),
+        )
+        # genai_0 = span-filter project_id, genai_1 = signal project_id, genai_2 = tags;
+        # attributed source params come last (genai_3).
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT count() FROM (
+                SELECT s.conversation_id FROM {src.sql} s
+                WHERE s.project_id = {{genai_0:String}}
+                  AND s.conversation_id IN (SELECT conversation_id FROM feedback
+                                            WHERE project_id = {{genai_1:String}}
+                                              AND feedback_type IN ('wandb.agent_monitor',
+                                                                    'wandb.agent_user_feedback')
+                                              AND hasAny(scorer_tags, {{genai_2:Array(String)}})
+                                              AND conversation_id != '')
+                GROUP BY s.conversation_id
+            )
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_list_query (grouped)
@@ -1212,8 +1249,8 @@ class TestMakeGroupedSpansListQuery:
               AND s.conversation_id IN (SELECT conversation_id
                                         FROM feedback
                                         WHERE project_id = {{genai_3:String}}
-                                          AND feedback_type IN ('wandb.agent_user_feedback',
-                                                                'wandb.agent_monitor')
+                                          AND feedback_type IN ('wandb.agent_monitor',
+                                                                'wandb.agent_user_feedback')
                                           AND hasAny(scorer_tags, {{genai_4:Array(String)}})
                                           AND conversation_id != '')
             GROUP BY conversation_id
@@ -2138,37 +2175,60 @@ def test_signal_filter_round_trip() -> None:
     assert req.signal_filters.is_empty() is False
 
 
-def test_build_signal_filter_subquery() -> None:
+def test_build_signal_filter_clause() -> None:
     # Empty / None -> None
-    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", None) is None
-    assert build_signal_filter_subquery(ParamBuilder(), "ent/proj", AgentSignalFilter()) is None
-
-    # Tags + rating -> full parameterized subquery
-    pb = ParamBuilder()
-    sql = build_signal_filter_subquery(
-        pb,
-        "ent/proj",
-        AgentSignalFilter(
-            tags=["x", "y"],
-            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
-        ),
+    assert build_signal_filter_clause(ParamBuilder(), "ent/proj", None) is None
+    assert (
+        build_signal_filter_clause(ParamBuilder(), "ent/proj", AgentSignalFilter())
+        is None
     )
-    assert sql is not None
+
+    # Tags only -> a single conversation_id IN (...) sub-select. feedback_type list is
+    # sorted from AGENT_SPAN_FEEDBACK_TYPES, not re-hardcoded.
+    pb = ParamBuilder()
+    clause = build_signal_filter_clause(pb, "ent/proj", AgentSignalFilter(tags=["x", "y"]))
+    assert clause is not None
     params = pb.get_params()
-    # Assert the complete normalized SQL (collapsed whitespace) and all params.
-    # feedback_type IN (...) is hardcoded SQL — no param slot for it.
-    normalized = " ".join(sql.split())
-    pid_p, tags_p, key_p, val_p = list(params.keys())
-    assert normalized == (
-        f"SELECT conversation_id FROM feedback "
+    pid_p, tags_p = list(params.keys())
+    assert " ".join(clause.split()) == (
+        f"s.conversation_id IN (SELECT conversation_id FROM feedback "
         f"WHERE project_id = {{{pid_p}:String}} "
-        f"AND feedback_type IN ('wandb.agent_user_feedback', 'wandb.agent_monitor') "
+        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
         f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
-        f"AND (mapContains(scorer_ratings, {{{key_p}:String}}) "
-        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) "
-        f"AND conversation_id != ''"
+        f"AND conversation_id != '')"
     )
     assert params[pid_p] == "ent/proj"
     assert params[tags_p] == ["x", "y"]
+
+    # Tags + rating -> two independent sub-selects AND-ed. A conversation can carry the
+    # human tag and the monitor rating on different feedback rows, so they must NOT be a
+    # single-row conjunction.
+    pb = ParamBuilder()
+    clause = build_signal_filter_clause(
+        pb,
+        "ent/proj",
+        AgentSignalFilter(
+            tags=["x"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert clause is not None
+    params = pb.get_params()
+    pid_p, tags_p, key_p, val_p = list(params.keys())
+    assert " ".join(clause.split()) == (
+        f"s.conversation_id IN (SELECT conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
+        f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
+        f"AND conversation_id != '') "
+        f"AND s.conversation_id IN (SELECT conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
+        f"AND mapContains(scorer_ratings, {{{key_p}:String}}) "
+        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}} "
+        f"AND conversation_id != '')"
+    )
+    assert params[pid_p] == "ent/proj"
+    assert params[tags_p] == ["x"]
     assert params[key_p] == "_rating_"
     assert params[val_p] == 0.8
