@@ -804,6 +804,8 @@ def _build_numeric_bucket_stats_query(
     # bounds computed once as a scalar tuple (min, max, count).
     # ClickHouse does NOT materialize table CTEs - each reference re-scans
     # value_rows (re-decoding the attrs map). Do NOT convert back to a CTE.
+    # Not min()/max() OVER (): the unbounded frame buffers all matched rows
+    # (un-spillable, OOM-risk near the 16 GiB cap at scale); the extra scan is cheaper.
     bounds_min = f"{_BOUNDS_TUPLE}.min_bound"
     bounds_max = f"{_BOUNDS_TUPLE}.max_bound"
     bounds_count = f"{_BOUNDS_TUPLE}.value_count"
