@@ -254,4 +254,29 @@ describe('SubAgent', () => {
     expect(innerSpan.parentSpanId).toBe(outerSpan.spanContext().spanId);
     expect(chatSpan!.parentSpanId).toBe(innerSpan.spanContext().spanId);
   });
+
+  it('binds children eagerly, not via ambient context: a child created after the SubAgent (and Turn) end still nests under it', () => {
+    // The TS analog of the Python out-of-block bug. In Python the child span is
+    // created lazily (at `with child:`) from whatever ambient OTel context is
+    // current, so it detaches once the parent's context is popped. TS binds the
+    // parent context eagerly inside start*(), so the parent link holds even if
+    // the child span is created after the SubAgent and Turn have already ended.
+    // This guards against a regression to active/ambient-context parenting.
+    const turn = Turn.create({agentName: 'parent'});
+    const sub = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
+    sub.end();
+    turn.end();
+    // Children created AFTER both parents have ended.
+    sub.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
+    sub.startTool({name: 'search'}).end();
+
+    const spans = getExporter().getFinishedSpans();
+    const subSpan = findSub(spans);
+    const chatSpan = spans.find(s => s.name === 'chat');
+    const toolSpan = spans.find(s => s.name === 'execute_tool');
+    expect(chatSpan).toBeDefined();
+    expect(toolSpan).toBeDefined();
+    expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+    expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
+  });
 });
