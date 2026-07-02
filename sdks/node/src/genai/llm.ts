@@ -15,8 +15,13 @@ import {
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_OUTPUT_TYPE,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
+  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+  ATTR_GEN_AI_RESPONSE_ID,
+  ATTR_GEN_AI_RESPONSE_MODEL,
+  ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
@@ -31,6 +36,7 @@ import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
 export interface LLMInit extends SpanInitBase {
   model: string;
   providerName?: string;
+  systemInstructions?: string[];
 }
 
 /** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
@@ -38,13 +44,6 @@ export type AttachMediaOpts =
   | {content: string; mimeType: string; modality: Modality}
   | {uri: string; modality: Modality}
   | {fileId: string; modality: Modality; mimeType?: string};
-
-export interface LLMRecordOpts {
-  inputMessages?: Message[];
-  outputMessages?: Message[];
-  usage?: Usage;
-  reasoning?: Reasoning;
-}
 
 /**
  * An LLM call. Emits a `chat` span with `gen_ai.*` attributes.
@@ -60,11 +59,26 @@ export interface LLMRecordOpts {
  *
  * @example
  * const llm = weave.startLLM({model: 'gpt-4o-mini', providerName: 'openai'});
+ *
  * try {
  *   llm.inputMessages = [{role: 'user', content: prompt}];
  *   const resp = await openai.chat.completions.create({...});
  *   llm.output(resp.choices[0].message.content ?? '');
  *   llm.record({usage: {inputTokens: resp.usage?.prompt_tokens}});
+ * } finally {
+ *   llm.end();
+ * }
+ *
+ * @example
+ * const llm = weave.startLLM({
+ *   model: 'gpt-4o-mini',
+ *   providerName: 'openai',
+ *   systemInstructions: ['You are a helpful weather bot.'],
+ *   startTime: new Date('2026-05-29T10:00:00.000Z'),
+ * });
+ *
+ * try {
+ *   // ... call the LLM, populate llm.outputMessages / usage ...
  * } finally {
  *   llm.end();
  * }
@@ -90,12 +104,19 @@ export class LLM extends SpanBase {
    */
   reasoning?: Reasoning;
 
+  private _mediaAttachments: AttachMediaOpts[] = [];
+  private _responseId?: string;
+  private _responseModel?: string;
+  private _finishReasons: string[] = [];
+  private _outputType?: string;
+
   private constructor(
     span: Span,
     private readonly context: Context,
     private readonly conversationId: string,
     public readonly model: string,
-    public readonly providerName: string
+    public readonly providerName: string,
+    private readonly systemInstructions: string[]
   ) {
     super(span);
   }
@@ -108,17 +129,7 @@ export class LLM extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {
-      ...(state.conversation?.attributes ?? {}),
-      [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-      [ATTR_GEN_AI_REQUEST_MODEL]: opts.model,
-    };
-    if (opts.providerName) {
-      attributes[ATTR_GEN_AI_PROVIDER_NAME] = opts.providerName;
-    }
-    if (opts.conversationId) {
-      attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
-    }
+    const attributes: Attributes = {...(state.conversation?.attributes ?? {})};
     const span = tracer.startSpan(
       'chat',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
@@ -129,7 +140,8 @@ export class LLM extends SpanBase {
       trace.setSpan(opts.parentContext, span),
       opts.conversationId ?? '',
       opts.model,
-      opts.providerName ?? ''
+      opts.providerName ?? '',
+      opts.systemInstructions ?? []
     );
     state.llm = llm;
     return llm;
@@ -164,23 +176,15 @@ export class LLM extends SpanBase {
     return this;
   }
 
-  /** Attach a media part to the last input message. Pick exactly one of
+  /** Stage a media attachment for the LLM call. Pick exactly one of
    *  `content` (inline base64 bytes), `uri` (URI reference), or `fileId`
-   *  (pre-uploaded file id). */
+   *  (pre-uploaded file id). The attachment is glued onto the last user
+   *  message in `inputMessages` on `end()`. */
   attachMedia(opts: AttachMediaOpts): this {
     if (this._warnIfEnded('attachMedia')) {
       return this;
     }
-    const parts = this._ensureLastInputParts();
-    let part: MessagePart;
-    if ('content' in opts) {
-      part = {type: 'blob', ...opts};
-    } else if ('uri' in opts) {
-      part = {type: 'uri', ...opts};
-    } else {
-      part = {type: 'file', ...opts};
-    }
-    parts.push(part);
+    this._mediaAttachments.push(opts);
     return this;
   }
 
@@ -196,7 +200,17 @@ export class LLM extends SpanBase {
    * Bulk-set any subset of the mutable fields. Replaces (does not merge).
    * Useful for assigning everything at once after a provider call returns.
    */
-  record(opts: LLMRecordOpts): this {
+  record(opts: {
+    inputMessages?: Message[];
+    outputMessages?: Message[];
+    usage?: Usage;
+    reasoning?: Reasoning;
+    responseId?: string;
+    responseModel?: string;
+    finishReasons?: string[];
+    outputType?: string;
+    mediaAttachments?: AttachMediaOpts[];
+  }): this {
     if (this._warnIfEnded('record')) {
       return this;
     }
@@ -211,6 +225,21 @@ export class LLM extends SpanBase {
     }
     if (opts.reasoning !== undefined) {
       this.reasoning = opts.reasoning;
+    }
+    if (opts.responseId !== undefined) {
+      this._responseId = opts.responseId;
+    }
+    if (opts.responseModel !== undefined) {
+      this._responseModel = opts.responseModel;
+    }
+    if (opts.finishReasons !== undefined) {
+      this._finishReasons = opts.finishReasons;
+    }
+    if (opts.outputType !== undefined) {
+      this._outputType = opts.outputType;
+    }
+    if (opts.mediaAttachments !== undefined) {
+      this._mediaAttachments = opts.mediaAttachments;
     }
     return this;
   }
@@ -248,12 +277,47 @@ export class LLM extends SpanBase {
     }
     this._ended = true;
 
+    this.span.setAttribute(ATTR_GEN_AI_OPERATION_NAME, 'chat');
+    if (this.model) {
+      this.span.setAttribute(ATTR_GEN_AI_REQUEST_MODEL, this.model);
+    }
+    if (this.providerName) {
+      this.span.setAttribute(ATTR_GEN_AI_PROVIDER_NAME, this.providerName);
+    }
+    if (this.conversationId) {
+      this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this.conversationId);
+    }
+    if (this.systemInstructions.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
+        JSON.stringify(
+          this.systemInstructions.map(content => ({type: 'text', content}))
+        )
+      );
+    }
+
     // Fold reasoning into the last assistant message as a ReasoningPart so
     // the wire format matches the Python SDK (which serializes reasoning
     // inside gen_ai.output.messages, not as a separate attribute).
     if (this.reasoning?.content) {
       const parts = this._ensureLastAssistantParts();
       parts.push({type: 'reasoning', content: this.reasoning.content});
+    }
+
+    // Throw staged media attachments onto the last user message in `inputMessages`.
+    if (this._mediaAttachments.length > 0) {
+      const parts = this._ensureLastInputParts();
+      for (const m of this._mediaAttachments) {
+        let part: MessagePart;
+        if ('content' in m) {
+          part = {type: 'blob', ...m};
+        } else if ('uri' in m) {
+          part = {type: 'uri', ...m};
+        } else {
+          part = {type: 'file', ...m};
+        }
+        parts.push(part);
+      }
     }
 
     if (this.inputMessages.length > 0) {
@@ -293,6 +357,22 @@ export class LLM extends SpanBase {
         ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
         u.cacheReadInputTokens
       );
+    }
+
+    if (this._responseId) {
+      this.span.setAttribute(ATTR_GEN_AI_RESPONSE_ID, this._responseId);
+    }
+    if (this._responseModel) {
+      this.span.setAttribute(ATTR_GEN_AI_RESPONSE_MODEL, this._responseModel);
+    }
+    if (this._finishReasons.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
+        this._finishReasons
+      );
+    }
+    if (this._outputType) {
+      this.span.setAttribute(ATTR_GEN_AI_OUTPUT_TYPE, this._outputType);
     }
 
     this._closeSpan(opts);

@@ -1741,29 +1741,26 @@ def test_agent_span_stats_ungrouped_all_time(ch_server):
 
 
 def test_agent_span_stats_numeric_value_buckets(ch_server):
-    """Stats API can bucket the full filtered span set by numeric value range."""
+    """Stats API buckets the full filtered span set by numeric value range.
+
+    A known input_tokens distribution over min=0, max=40, bins=4 pins the
+    complete per-bucket output (index, edges, count) so a bounds miscompute
+    fails CI rather than a dashboard.
+    """
     project_id = _make_project_id("stats_hist")
     start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 
+    # width = (40-0)/4 = 10 -> buckets [0,10) [10,20) [20,30) [30,40].
+    # counts by bucket: 0,5 -> 2 | 12,18 -> 2 | 22 -> 1 | 35,38,40 -> 3.
+    token_values = [0, 5, 12, 18, 22, 35, 38, 40]
     spans = [
         _make_span(
             project_id,
-            input_tokens=10,
-            started_at=start + datetime.timedelta(seconds=10),
-            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=20,
-            started_at=start + datetime.timedelta(seconds=20),
-            ended_at=start + datetime.timedelta(seconds=20, milliseconds=200),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=30,
-            started_at=start + datetime.timedelta(seconds=30),
-            ended_at=start + datetime.timedelta(seconds=30, milliseconds=300),
-        ),
+            input_tokens=tokens,
+            started_at=start + datetime.timedelta(seconds=idx),
+            ended_at=start + datetime.timedelta(seconds=idx, milliseconds=100),
+        )
+        for idx, tokens in enumerate(token_values)
     ]
     _insert_spans(ch_server.ch_client, spans)
 
@@ -1778,7 +1775,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
                     source="field",
                     key="usage.input_tokens",
                 ),
-                bins=2,
+                bins=4,
             ),
             metrics=[
                 AgentSpanStatsMetricSpec(
@@ -1793,9 +1790,10 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
 
     assert res.bucket_type == "number"
     assert res.granularity is None
-    assert [row["count_spans"] for row in res.rows] == [1, 2]
-    assert res.rows[0]["bucket_min"] == 10
-    assert res.rows[-1]["bucket_max"] == 30
+    assert [row["bucket_index"] for row in res.rows] == [0, 1, 2, 3]
+    assert [row["bucket_min"] for row in res.rows] == [0, 10, 20, 30]
+    assert [row["bucket_max"] for row in res.rows] == [10, 20, 30, 40]
+    assert [row["count_spans"] for row in res.rows] == [2, 2, 1, 3]
 
 
 @pytest.mark.flaky(reruns=3)
@@ -2320,6 +2318,109 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
     assert tool.tool_call.tool_name == "lookup"
     assert tool.tool_call.tool_arguments == '{"query":"hello"}'
     assert tool.tool_call.tool_result == '{"ok":true}'
+
+
+def test_conversation_chat_excludes_foreign_conversation_sharing_trace_id(ch_server):
+    """A reused trace_id must not bleed foreign conversations into the chat view.
+
+    Agent-eval workloads reuse trace_id across conversations, so the page of
+    turn trace_ids matches spans from other conversations too. The chat view
+    must never return another conversation's tagged spans.
+
+    Untagged children are a known limitation: producers tag conversation_id
+    only on the root span, so a foreign conversation's untagged children on a
+    shared trace_id cannot be attributed and still bleed (see PR #7450).
+    """
+    project_id = _make_project_id("conv_chat_bleed")
+    conv_a = f"conv-a-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-b-{uuid.uuid4().hex[:8]}"
+    shared_trace = uuid.uuid4().hex  # reused by both conversations
+    a_only_trace = uuid.uuid4().hex  # conv A's second turn, its own trace
+    root_a = uuid.uuid4().hex
+    root_b = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_a,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-shared")],
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_a,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childA-text")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_b,
+            conversation_id=conv_b,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userB-foreign")],
+            output_messages=[
+                NormalizedMessage(role="assistant", content="assistantB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_b,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=a_only_trace,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-only")],
+            started_at=now + datetime.timedelta(minutes=1),
+            ended_at=now + datetime.timedelta(minutes=1, seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(project_id=project_id, conversation_id=conv_a)
+    )
+
+    assert res.total_turns == 2
+    assert {turn.trace_id for turn in res.turns} == {shared_trace, a_only_trace}
+
+    texts = [
+        payload.text
+        for turn in res.turns
+        for msg in turn.messages
+        for payload in (msg.user_message, msg.assistant_message)
+        if payload is not None
+    ]
+    assert "userA-shared" in texts
+    assert "childA-text" in texts
+    assert "userA-only" in texts
+    # conv B's tagged root is excluded by conversation_id scoping.
+    assert "userB-foreign" not in texts
+    assert "assistantB-foreign" not in texts
+    # Known limitation (PR #7450 discussion): conv B's untagged child shares
+    # the trace_id, so it currently bleeds. Flip to `not in` when fixed.
+    assert "childB-foreign" in texts
 
 
 # ---------------------------------------------------------------------------

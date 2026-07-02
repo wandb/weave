@@ -94,7 +94,7 @@ class _AttrSrc:
         started_after: datetime.datetime | None = None,
         started_before: datetime.datetime | None = None,
         base_relation: str = "spans",
-        fallback_trace_id_scope: str | None = None,
+        fallback_scope_relation: str | None = None,
     ) -> None:
         pb = ParamBuilder("genai")
         sql = attributed_spans_source(
@@ -103,7 +103,7 @@ class _AttrSrc:
             started_after=started_after,
             started_before=started_before,
             base_relation=base_relation,
-            fallback_trace_id_scope=fallback_trace_id_scope,
+            fallback_scope_relation=fallback_scope_relation,
         )
         self.sql = re.sub(
             r"genai_(\d+)", lambda m: f"genai_{int(m.group(1)) + offset}", sql
@@ -112,10 +112,6 @@ class _AttrSrc:
             f"genai_{int(k.split('_')[1]) + offset}": v
             for k, v in pb.get_params().items()
         }
-
-
-#: trace_id scope the two-pass list read passes to the fallback rollup.
-_PAGE_SCOPE = "SELECT trace_id FROM page"
 
 
 def _two_pass_expected(
@@ -263,7 +259,7 @@ class TestMakeSpansListQuery:
         pb = ParamBuilder("genai")
         query = make_spans_list_query(pb, AgentSpansQueryReq(project_id="p1"))
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", fallback_scope_relation="page")
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -284,7 +280,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", fallback_scope_relation="page")
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -310,7 +306,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(5, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(5, base_relation="page", fallback_scope_relation="page")
         order_by = "if(mapContains(s.custom_attrs_float, {genai_3:String}), toFloat64(s.custom_attrs_float[{genai_3:String}]), NULL) desc, span_id desc"
         expected = _two_pass_expected(
             base="spans",
@@ -372,7 +368,7 @@ class TestMakeSpansListQuery:
             pb, AgentSpansQueryReq(project_id="p1", include_details=True)
         )
 
-        src = _AttrSrc(3, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(3, base_relation="page", fallback_scope_relation="page")
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String}",
@@ -497,7 +493,7 @@ class TestMakeSpansListQuery:
             ),
         )
 
-        src = _AttrSrc(4, base_relation="page", fallback_trace_id_scope=_PAGE_SCOPE)
+        src = _AttrSrc(4, base_relation="page", fallback_scope_relation="page")
         expected = _two_pass_expected(
             base="spans",
             where="s.project_id = {genai_0:String} AND (s.operation_name = {genai_1:String})",
@@ -538,7 +534,7 @@ class TestMakeSpansListQuery:
             started_after=None,
             started_before=None,
             base_relation=cost_page,
-            fallback_trace_id_scope=_PAGE_SCOPE,
+            fallback_scope_relation="page",
         )  # genai_5
         expected = _two_pass_expected(
             base="spans",
@@ -546,6 +542,50 @@ class TestMakeSpansListQuery:
             order_by="started_at DESC, span_id DESC",
             projection=f"{SPANS_LIST_COLS}, {SPANS_COST_COLS}",
             attr_sql=attributed,
+        )
+        assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
+
+    def test_two_pass_time_window_allocates_page_and_fallback_params(self) -> None:
+        # started_after/before bound the page in its WHERE and are re-derived
+        # (with slack) inside the attribution layer, so the window params are
+        # allocated twice. Lock that numbering: page slots genai_1/genai_2, the
+        # slack-widened fallback slots land last with the attributed source.
+        after = datetime.datetime(2026, 1, 10, tzinfo=datetime.timezone.utc)
+        before = datetime.datetime(2026, 1, 11, tzinfo=datetime.timezone.utc)
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1", started_after=after, started_before=before
+            ),
+        )
+
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")  # genai_0: page project filter
+        expected_pb.add(after, param_type="DateTime64(6)")  # genai_1: page after
+        expected_pb.add(before, param_type="DateTime64(6)")  # genai_2: page before
+        expected_pb.add(100, param_type="UInt64")  # genai_3: limit
+        expected_pb.add(0, param_type="UInt64")  # genai_4: offset
+        attributed = attributed_spans_source(
+            expected_pb,
+            project_id="p1",
+            started_after=after,
+            started_before=before,
+            base_relation="page",
+            fallback_scope_relation="page",
+        )  # genai_5..genai_9
+        expected = _two_pass_expected(
+            base="spans",
+            where=(
+                "s.project_id = {genai_0:String}"
+                " AND s.started_at >= {genai_1:DateTime64(6)}"
+                " AND s.started_at < {genai_2:DateTime64(6)}"
+            ),
+            order_by="started_at DESC, span_id DESC",
+            projection=SPANS_LIST_COLS,
+            attr_sql=attributed,
+            limit_slot="{genai_3:UInt64}",
+            offset_slot="{genai_4:UInt64}",
         )
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
@@ -1522,25 +1562,44 @@ class TestMakeCustomAttrsSchemaQuery:
         )
 
         expected = """
-            SELECT tupleElement(attr, 1) AS source,
-                   tupleElement(attr, 2) AS key,
-                   tupleElement(attr, 3) AS value_type,
-                   count() AS span_count
+            SELECT source, key, value_type, span_count
             FROM (
-                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
-                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
-                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
-                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                SELECT 'custom_attrs_string' AS source,
+                       'string' AS value_type,
+                       key,
+                       count() AS span_count
                 FROM spans s
+                ARRAY JOIN s.custom_attrs_string.keys AS key
                 WHERE s.project_id = {genai_0:String}
-            ) filtered
-            ARRAY JOIN arrayConcat(
-                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
-                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
-                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
-                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
-            ) AS attr
-            GROUP BY source, key, value_type
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_int' AS source,
+                       'int' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_int.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_float' AS source,
+                       'float' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_float.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_bool' AS source,
+                       'bool' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                GROUP BY key
+            )
             ORDER BY span_count DESC, key ASC, source ASC
             LIMIT {genai_1:UInt64} OFFSET {genai_2:UInt64}
         """
@@ -1575,27 +1634,52 @@ class TestMakeCustomAttrsSchemaQuery:
         )
 
         expected = """
-            SELECT tupleElement(attr, 1) AS source,
-                   tupleElement(attr, 2) AS key,
-                   tupleElement(attr, 3) AS value_type,
-                   count() AS span_count
+            SELECT source, key, value_type, span_count
             FROM (
-                SELECT s.custom_attrs_string.keys AS custom_attrs_string_keys,
-                       s.custom_attrs_int.keys AS custom_attrs_int_keys,
-                       s.custom_attrs_float.keys AS custom_attrs_float_keys,
-                       s.custom_attrs_bool.keys AS custom_attrs_bool_keys
+                SELECT 'custom_attrs_string' AS source,
+                       'string' AS value_type,
+                       key,
+                       count() AS span_count
                 FROM spans s
+                ARRAY JOIN s.custom_attrs_string.keys AS key
                 WHERE s.project_id = {genai_0:String}
                 AND s.started_at >= {genai_1:DateTime64(6)}
                 AND (s.agent_name = {genai_2:String})
-            ) filtered
-            ARRAY JOIN arrayConcat(
-                arrayMap(k -> tuple('custom_attrs_string', k, 'string'), filtered.custom_attrs_string_keys),
-                arrayMap(k -> tuple('custom_attrs_int', k, 'int'), filtered.custom_attrs_int_keys),
-                arrayMap(k -> tuple('custom_attrs_float', k, 'float'), filtered.custom_attrs_float_keys),
-                arrayMap(k -> tuple('custom_attrs_bool', k, 'bool'), filtered.custom_attrs_bool_keys)
-            ) AS attr
-            GROUP BY source, key, value_type
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_int' AS source,
+                       'int' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_int.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_float' AS source,
+                       'float' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_float.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+                UNION ALL
+                SELECT 'custom_attrs_bool' AS source,
+                       'bool' AS value_type,
+                       key,
+                       count() AS span_count
+                FROM spans s
+                ARRAY JOIN s.custom_attrs_bool.keys AS key
+                WHERE s.project_id = {genai_0:String}
+                AND s.started_at >= {genai_1:DateTime64(6)}
+                AND (s.agent_name = {genai_2:String})
+                GROUP BY key
+            )
             ORDER BY span_count DESC, key ASC, source ASC
             LIMIT {genai_3:UInt64} OFFSET {genai_4:UInt64}
         """
@@ -1845,9 +1929,7 @@ class TestMakeConversationChatSpansQuery:
         expected_pb.add(0, param_type="UInt64")  # genai_3: offset
         source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-            FROM {source} s
-            INNER JOIN (
+            WITH turn_page AS (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
                 WHERE project_id = {{genai_0:String}}
@@ -1855,8 +1937,13 @@ class TestMakeConversationChatSpansQuery:
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
-            ) t ON s.trace_id = t.trace_id
+            )
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
+            INNER JOIN turn_page t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id IN (SELECT trace_id FROM turn_page)
+            AND s.conversation_id IN ({{genai_1:String}}, '')
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
@@ -1877,9 +1964,7 @@ class TestMakeConversationChatSpansQuery:
         expected_pb.add(20, param_type="UInt64")  # genai_3: offset
         source = cost_augmented_source_sql(expected_pb, "p1")
         expected = f"""
-            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-            FROM {source} s
-            INNER JOIN (
+            WITH turn_page AS (
                 SELECT trace_id, min(started_at) AS turn_started_at
                 FROM spans
                 WHERE project_id = {{genai_0:String}}
@@ -1887,8 +1972,13 @@ class TestMakeConversationChatSpansQuery:
                 GROUP BY trace_id
                 ORDER BY turn_started_at DESC, trace_id DESC
                 LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
-            ) t ON s.trace_id = t.trace_id
+            )
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
+            INNER JOIN turn_page t ON s.trace_id = t.trace_id
             WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id IN (SELECT trace_id FROM turn_page)
+            AND s.conversation_id IN ({{genai_1:String}}, '')
             ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())

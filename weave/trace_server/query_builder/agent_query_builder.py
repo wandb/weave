@@ -901,6 +901,11 @@ def _with_span_tiebreaker(order_by: str, sort_by: list[AgentSortBy] | None) -> s
     `(project_id, started_at, span_id)` sort key, so a `started_at`-led page
     still reads in primary-key order; the tiebreaker direction matches the
     leading sort term to keep that alignment.
+
+    Correctness rests on `span_id` being unique within the project: that is what
+    makes `(sort..., span_id)` total, so the CTE's two evaluations agree. A
+    cross-trace collision at the same `started_at` is the only thing that would
+    diverge them, blanking one inherited identity.
     """
     direction = sort_by[0].direction if sort_by else "DESC"
     return f"{order_by}, span_id {direction}"
@@ -965,6 +970,11 @@ def _spans_source(
     )
 
 
+# Name of the two-pass page CTE, fed to the attributed source as its
+# `base_relation` (cost-augmented when costs are on) and `fallback_scope_relation`.
+_PAGE_CTE = "page"
+
+
 def _two_pass_spans_list_query(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -989,19 +999,21 @@ def _two_pass_spans_list_query(
     whole-project scan (the LIMIT can't prune below a JOIN). Cost-column sorts
     gate out of the two-pass since the page would then depend on the JOIN.
     """
-    attr_base = "page"
+    attr_base = _PAGE_CTE
     if req.include_costs:
-        attr_base = cost_augmented_source_sql(pb, req.project_id, base_relation="page")
+        attr_base = cost_augmented_source_sql(
+            pb, req.project_id, base_relation=_PAGE_CTE
+        )
     attributed_page = agent_trace_attribution.attributed_spans_source(
         pb,
         project_id=req.project_id,
         started_after=req.started_after,
         started_before=req.started_before,
         base_relation=attr_base,
-        fallback_trace_id_scope="SELECT trace_id FROM page",
+        fallback_scope_relation=_PAGE_CTE,
     )
     return f"""
-        WITH page AS (
+        WITH {_PAGE_CTE} AS (
             SELECT * FROM spans s
             WHERE {where}
             ORDER BY {order_by}
@@ -1352,27 +1364,24 @@ def make_custom_attrs_schema_query(
     span_filters = _spans_filter_sql(pb, req)
     limit_slot = pb.add(req.limit + 1, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
-    key_columns = ",\n               ".join(
-        f"s.{source}.keys AS {source}_keys" for source, _ in _CUSTOM_ATTR_SCHEMA_SOURCES
-    )
-    attr_arrays = ",\n            ".join(
-        f"arrayMap(k -> tuple('{source}', k, '{value_type}'), filtered.{source}_keys)"
+    # Per-source UNION ALL: a scalar ARRAY JOIN + GROUP BY on the bare key is far
+    # cheaper (CPU, peak memory) than grouping on one concatenated per-row tuple array.
+    source_branches = "\n            UNION ALL\n            ".join(
+        f"""SELECT '{source}' AS source,
+                   '{value_type}' AS value_type,
+                   key,
+                   count() AS span_count
+            FROM spans s
+            ARRAY JOIN s.{source}.keys AS key
+            WHERE {span_filters.where}
+            GROUP BY key"""
         for source, value_type in _CUSTOM_ATTR_SCHEMA_SOURCES
     )
     return f"""
-        SELECT tupleElement(attr, 1) AS source,
-               tupleElement(attr, 2) AS key,
-               tupleElement(attr, 3) AS value_type,
-               count() AS span_count
+        SELECT source, key, value_type, span_count
         FROM (
-            SELECT {key_columns}
-            FROM spans s
-            WHERE {span_filters.where}
-        ) filtered
-        ARRAY JOIN arrayConcat(
-            {attr_arrays}
-        ) AS attr
-        GROUP BY source, key, value_type
+            {source_branches}
+        )
         ORDER BY span_count DESC, key ASC, source ASC
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
@@ -1864,10 +1873,11 @@ def make_conversation_chat_spans_query(
     # Always cost-augmented so the multi-turn chat view can render per-message
     # and per-turn cost; bounded to one conversation's turns, so cheap.
     source = cost_augmented_source_sql(pb, req.project_id)
+    # Scope to this conversation's spans + untagged children. The duplicate
+    # `trace_id IN (turn_page)` is the index prune CH won't derive from the
+    # JOIN; keep turn_page's total ORDER BY so both inlined scans agree.
     return f"""
-        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-        FROM {source} s
-        INNER JOIN (
+        WITH turn_page AS (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
             WHERE {_project_filter_sql("project_id", pid)}
@@ -1875,8 +1885,13 @@ def make_conversation_chat_spans_query(
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
-        ) t ON s.trace_id = t.trace_id
+        )
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+        FROM {source} s
+        INNER JOIN turn_page t ON s.trace_id = t.trace_id
         WHERE {_project_filter_sql("s.project_id", pid)}
+          AND s.trace_id IN (SELECT trace_id FROM turn_page)
+          AND s.conversation_id IN ({cid}, '')
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 

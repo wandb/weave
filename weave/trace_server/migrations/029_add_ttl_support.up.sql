@@ -23,7 +23,9 @@ ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
 
 -- Step 1c: Re-apply TTL expression after column rename.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
-ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE;
+-- materialize_ttl_after_modify=0: set TTL metadata only. Every row has the
+-- 2100 sentinel so eager materialization rewrites every part to delete nothing.
+ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 2: Add expire_at to call_parts
 ALTER TABLE call_parts
@@ -67,14 +69,14 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Step 5: Enable TTL deletion on call_parts and calls_merged.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
-ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
-ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
+ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 6: Add expire_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
-ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 7: Add expire_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
@@ -85,7 +87,7 @@ ALTER TABLE calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
-ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 8: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

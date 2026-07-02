@@ -79,7 +79,7 @@ def test_attributed_source_scopes_fallback_to_trace_ids() -> None:
         started_after=None,
         started_before=None,
         base_relation="page",
-        fallback_trace_id_scope="SELECT trace_id FROM page",
+        fallback_scope_relation="page",
     )
     expected = """
         (SELECT * EXCEPT (agent_name, agent_version, agent_id, conversation_id,

@@ -386,6 +386,141 @@ def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
     assert messages[0].agent_name is None
 
 
+def test_content_span_system_instructions_surface_as_agent_start() -> None:
+    """System instructions logged on a bare chat span (no invoke_agent) still
+    reach the chat view via a synthesized agent_start card.
+    """
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="chat",
+                operation_name="chat",
+                request_model="gpt-4o",
+                system_instructions=["You are helpful."],
+                output_messages=[{"role": "assistant", "content": "hello"}],
+            )
+        ]
+    )
+
+    assert [m.type for m in messages] == ["agent_start", "assistant_message"]
+    agent_start = _agent_start_payload(messages[0])
+    assert agent_start.system_instructions == "You are helpful."
+    assert agent_start.model == "gpt-4o"
+
+
+def test_content_span_system_instructions_deduped_across_turns() -> None:
+    """The same system prompt replayed on every turn's chat span renders once."""
+    spans = [
+        _span(
+            span_id=f"chat{i}",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            input_messages=[{"role": "user", "content": f"q{i}"}],
+            output_messages=[{"role": "assistant", "content": f"a{i}"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, i, tzinfo=datetime.timezone.utc
+            ),
+        )
+        for i in range(3)
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [m.type for m in messages].count("agent_start") == 1
+
+
+def test_content_span_system_instructions_change_emits_new_card() -> None:
+    """A genuinely changed system prompt mid-conversation emits a fresh card."""
+    spans = [
+        _span(
+            span_id="chat0",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            output_messages=[{"role": "assistant", "content": "a0"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
+            ),
+        ),
+        _span(
+            span_id="chat1",
+            operation_name="chat",
+            system_instructions=["You are terse."],
+            output_messages=[{"role": "assistant", "content": "a1"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc
+            ),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    starts = [m for m in messages if m.type == "agent_start"]
+    assert [_agent_start_payload(m).system_instructions for m in starts] == [
+        "You are helpful.",
+        "You are terse.",
+    ]
+
+
+def test_invoke_agent_system_instructions_suppress_descendant_duplicate() -> None:
+    """An invoke_agent's system instructions are not re-emitted by a descendant
+    chat span that replays the same prompt.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            span_name="invoke_agent",
+            system_instructions=["You are helpful."],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            output_messages=[{"role": "assistant", "content": "hello"}],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [m.type for m in messages].count("agent_start") == 1
+
+
+def test_invoke_agent_without_prompt_absorbs_descendant_system_instructions() -> None:
+    """A bare invoke_agent agent_start (identity, no prompt) absorbs a child
+    chat span's system instructions instead of emitting a second card.
+
+    Mirrors the prod WB Agent shape: invoke_agent carries the agent name but no
+    instructions, and the prompt is recorded on the child chat span.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            span_name="invoke_agent WB Agent",
+            agent_name="WB Agent",
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            agent_name="WB Agent",
+            request_model="gpt-5.5",
+            system_instructions=["You are ARIA."],
+            output_messages=[{"role": "assistant", "content": "hello"}],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    starts = [m for m in messages if m.type == "agent_start"]
+    assert len(starts) == 1
+    payload = _agent_start_payload(starts[0])
+    assert payload.system_instructions == "You are ARIA."
+    # Model is folded in from the chat span when the invoke_agent lacked one.
+    assert payload.model == "gpt-5.5"
+
+
 def test_build_span_tree_handles_null_started_at() -> None:
     """build_span_tree must not crash when a span has started_at=None.
 

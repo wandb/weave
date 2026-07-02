@@ -90,6 +90,7 @@ logger = logging.getLogger(__name__)
 CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
+CTE_STORAGE_SCOPE_IDS = "storage_scope_ids"
 
 # Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
 # Wired up in `build_calls_stats_query` but currently commented out; callers
@@ -1223,6 +1224,17 @@ class CallsQuery(BaseModel):
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
             candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
 
+        # On calls_complete the total-storage rollup otherwise aggregates the
+        # whole project's stats. Scope it to the matched calls' traces so the
+        # stats primary key (project_id, id) prunes the scan.
+        storage_scope_cte_name: str | None = None
+        scope_cte_sql = self._build_storage_scope_ids_cte_sql(
+            pb, table_alias_resolved, field_to_object_join_alias_map
+        )
+        if scope_cte_sql is not None:
+            ctes.add_cte(CTE_STORAGE_SCOPE_IDS, scope_cte_sql)
+            storage_scope_cte_name = CTE_STORAGE_SCOPE_IDS
+
         if (
             not should_use_filter_cte
             and not self.include_costs
@@ -1232,6 +1244,7 @@ class CallsQuery(BaseModel):
                 pb,
                 table_alias_resolved,
                 id_subquery_name=candidate_cte_name,
+                storage_scope_id_cte=storage_scope_cte_name,
             )
             if ctes.has_ctes():
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
@@ -1310,6 +1323,7 @@ class CallsQuery(BaseModel):
                 table_alias_resolved,
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
+                storage_scope_id_cte=storage_scope_cte_name,
             )
 
         if not self.include_costs:
@@ -1371,7 +1385,9 @@ class CallsQuery(BaseModel):
         # all rows returned at least have a call start. op_name is the orphan-end
         # signal (start-only) because started_at now rides on call_end rows too.
 
-        op_name = process_op_name_filter_to_sql(self.hardcoded_filter, pb, table_alias)
+        op_name = process_op_name_filter_to_sql(
+            self.hardcoded_filter, pb, table_alias, self.read_table
+        )
         trace_id = process_trace_id_filter_to_sql(
             self.hardcoded_filter, pb, table_alias, self.read_table
         )
@@ -1456,6 +1472,7 @@ class CallsQuery(BaseModel):
         expand_columns: list[str] | None,
         field_to_object_join_alias_map: dict[str, str] | None,
         id_subquery_name: str | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> QueryJoins:
         """Build all JOIN clauses for the query.
 
@@ -1529,13 +1546,25 @@ class CallsQuery(BaseModel):
         # divergence in mind if you touch either side.
         total_storage_size_join = ""
         if self.include_total_storage_size:
-            # When we have a filtered set of call IDs, restrict the trace_ids
-            # looked up in calls_merged_stats to only those related to the
-            # filtered calls. This leverages the primary key index to avoid
-            # aggregating over the entire project when only a subset is needed.
-            trace_id_filter = ""
-            if id_subquery_name is not None:
-                trace_id_filter = f"""AND trace_id IN (
+            # Restrict the stats rollup to the matched calls' traces instead of
+            # the whole project. calls_complete scopes by `id` (the stats
+            # primary key (project_id, id) prunes the scan); calls_merged scopes
+            # by trace_id off its filtered-ids CTE.
+            stats_scope_filter = ""
+            if storage_scope_id_cte is not None:
+                stats_scope_filter = f"""AND id IN (
+                    SELECT id
+                    FROM {table_alias}
+                    WHERE project_id = {param_slot(project_param, "String")}
+                    AND trace_id IN (
+                        SELECT trace_id
+                        FROM {table_alias}
+                        WHERE project_id = {param_slot(project_param, "String")}
+                        AND id IN {storage_scope_id_cte}
+                    )
+                )"""
+            elif id_subquery_name is not None:
+                stats_scope_filter = f"""AND trace_id IN (
                     SELECT trace_id
                     FROM {table_alias}
                     WHERE project_id = {param_slot(project_param, "String")}
@@ -1548,7 +1577,7 @@ class CallsQuery(BaseModel):
                     sum({config.storage_size_bytes_sum}) AS total_storage_size_bytes
                 FROM {config.stats_table_name}
                 WHERE project_id = {param_slot(project_param, "String")}
-                {trace_id_filter}
+                {stats_scope_filter}
                 GROUP BY trace_id
             ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
             ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
@@ -1708,6 +1737,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> QueryBodyResult:
         """Build the SQL query body: everything from FROM through OFFSET.
 
@@ -1721,6 +1751,8 @@ class CallsQuery(BaseModel):
             id_subquery_name: Optional name of a CTE containing filtered IDs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases for object refs
             expand_columns: List of columns that should be expanded for object refs
+            storage_scope_id_cte: Optional CTE of matched ids used to scope the
+                calls_complete total-storage rollup to their traces
 
         Returns:
             SQL query body string (FROM through OFFSET, not formatted)
@@ -1746,6 +1778,7 @@ class CallsQuery(BaseModel):
             expand_columns=expand_columns,
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             id_subquery_name=id_subquery_name,
+            storage_scope_id_cte=storage_scope_id_cte,
         )
         needs_feedback_join = (
             filter_result.needs_feedback or order_result.needs_feedback
@@ -1820,6 +1853,38 @@ class CallsQuery(BaseModel):
         PREWHERE {table_alias}.project_id = {param_slot(project_param, "String")}
         WHERE {trace_id_strict}"""
 
+    def _build_storage_scope_ids_cte_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        field_to_object_join_alias_map: dict[str, str] | None,
+    ) -> str | None:
+        """Build the `storage_scope_ids` CTE body, or None if not applicable.
+
+        Selects the ids the query actually matches (same filters, order, and
+        page) so the total-storage join can scope `calls_complete_stats` to
+        their traces instead of rolling up the whole project. Returns None for
+        non-calls_complete reads or when total storage size is not requested.
+        """
+        if self.read_table != ReadTable.CALLS_COMPLETE:
+            return None
+        if not self.include_total_storage_size:
+            return None
+
+        scope_query = CallsQuery(project_id=self.project_id, read_table=self.read_table)
+        scope_query.add_field("id")
+        scope_query.query_conditions = list(self.query_conditions)
+        scope_query.hardcoded_filter = self.hardcoded_filter
+        scope_query.order_fields = self.order_fields
+        scope_query.limit = self.limit
+        scope_query.offset = self.offset
+        return scope_query._as_sql_base_format(
+            pb,
+            table_alias,
+            field_to_object_join_alias_map=field_to_object_join_alias_map,
+            expand_columns=self.expand_columns,
+        )
+
     def _as_sql_base_format(
         self,
         pb: ParamBuilder,
@@ -1827,6 +1892,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: str | None = None,
         field_to_object_join_alias_map: dict[str, str] | None = None,
         expand_columns: list[str] | None = None,
+        storage_scope_id_cte: str | None = None,
     ) -> str:
         """Build the base SQL query format.
 
@@ -1839,6 +1905,8 @@ class CallsQuery(BaseModel):
             id_subquery_name: Optional name of a CTE containing filtered IDs
             field_to_object_join_alias_map: Mapping of field paths to CTE aliases for object refs
             expand_columns: List of columns that should be expanded for object refs
+            storage_scope_id_cte: Optional CTE of matched ids used to scope the
+                calls_complete total-storage rollup to their traces
 
         Returns:
             Complete SQL query string
@@ -1855,6 +1923,7 @@ class CallsQuery(BaseModel):
             id_subquery_name,
             field_to_object_join_alias_map,
             expand_columns,
+            storage_scope_id_cte,
         )
         # On calls_complete, feedback LEFT JOIN can multiply rows, so use DISTINCT to de-dup.
         distinct = ""
@@ -2424,6 +2493,7 @@ def process_op_name_filter_to_sql(
     hardcoded_filter: HardCodedFilter | None,
     param_builder: ParamBuilder,
     table_alias: str,
+    read_table: ReadTable,
 ) -> str:
     """Pulls out the op_name and returns a sql string if there are any op_names."""
     if hardcoded_filter is None or not hardcoded_filter.filter.op_names:
@@ -2465,8 +2535,10 @@ def process_op_name_filter_to_sql(
     if not or_conditions:
         return ""
 
-    # Account for unmerged call parts by including null op_name (call ends)
-    or_conditions += [f"{op_field_sql} IS NULL"]
+    # calls_merged's call-end rows carry a NULL op_name, so the OR-IS-NULL arm
+    # keeps them; calls_complete's op_name is non-nullable, so skip the dead arm.
+    if read_table == ReadTable.CALLS_MERGED:
+        or_conditions.append(f"{op_field_sql} IS NULL")
 
     return " AND " + combine_conditions(or_conditions, "OR")
 
