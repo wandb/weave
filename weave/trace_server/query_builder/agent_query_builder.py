@@ -1229,27 +1229,24 @@ def make_custom_attrs_schema_query(
     span_filters = _spans_filter_sql(pb, req)
     limit_slot = pb.add(req.limit + 1, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
-    key_columns = ",\n               ".join(
-        f"s.{source}.keys AS {source}_keys" for source, _ in _CUSTOM_ATTR_SCHEMA_SOURCES
-    )
-    attr_arrays = ",\n            ".join(
-        f"arrayMap(k -> tuple('{source}', k, '{value_type}'), filtered.{source}_keys)"
+    # Per-source UNION ALL: a scalar ARRAY JOIN + GROUP BY on the bare key is far
+    # cheaper (CPU, peak memory) than grouping on one concatenated per-row tuple array.
+    source_branches = "\n            UNION ALL\n            ".join(
+        f"""SELECT '{source}' AS source,
+                   '{value_type}' AS value_type,
+                   key,
+                   count() AS span_count
+            FROM spans s
+            ARRAY JOIN s.{source}.keys AS key
+            WHERE {span_filters.where}
+            GROUP BY key"""
         for source, value_type in _CUSTOM_ATTR_SCHEMA_SOURCES
     )
     return f"""
-        SELECT tupleElement(attr, 1) AS source,
-               tupleElement(attr, 2) AS key,
-               tupleElement(attr, 3) AS value_type,
-               count() AS span_count
+        SELECT source, key, value_type, span_count
         FROM (
-            SELECT {key_columns}
-            FROM spans s
-            WHERE {span_filters.where}
-        ) filtered
-        ARRAY JOIN arrayConcat(
-            {attr_arrays}
-        ) AS attr
-        GROUP BY source, key, value_type
+            {source_branches}
+        )
         ORDER BY span_count DESC, key ASC, source ASC
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
