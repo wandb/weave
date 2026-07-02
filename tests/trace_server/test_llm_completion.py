@@ -1444,7 +1444,7 @@ def test_litellm_error_response_preserves_status_code():
     )
     assert with_status.response == {
         "error": "RateLimitError: quota exceeded",
-        tsi.ERROR_STATUS_CODE_KEY: 429,
+        llm_mod.ERROR_STATUS_CODE_KEY: 429,
     }
 
     without_status = llm_mod._litellm_error_response(
