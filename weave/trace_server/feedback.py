@@ -1,6 +1,5 @@
 import datetime
 import json
-from collections.abc import Callable
 from typing import Any, NamedTuple
 from zoneinfo import ZoneInfo
 
@@ -344,14 +343,17 @@ def resolve_feedback_agent_targets(
     weave_ref: str,
     supplied_conversation_id: str,
     supplied_trace_id: str,
-    span_lookup: Callable[[str, str], ResolvedAgentTargets],
 ) -> ResolvedAgentTargets:
     """Resolve the conversation and turn a feedback row belongs to, for denormalization.
 
-    Caller-supplied values win per field. Otherwise derive from the target ref:
-    a conversation ref gives the conversation but no single turn; a turn ref
-    gives the trace_id directly and resolves the conversation via `span_lookup`;
-    a span ref resolves both via `span_lookup`. Missing fields stay '' .
+    Producers that hold the scored span (the agent monitor worker, the UI feedback
+    controls) supply both IDs directly, and those win. As a zero-cost convenience for
+    callers that don't, we also derive what the target ref alone reveals: a
+    conversation ref gives the conversation; a turn ref gives the trace. A span ref
+    reveals neither (its id is not a trace/conversation id) and unknown/invalid refs
+    reveal nothing. Missing fields stay '' (invisible to that grain's signal filter
+    until a backfill runs). There is deliberately no spans lookup here — resolution
+    is either caller-supplied or free from the ref.
     """
     conversation_id = supplied_conversation_id
     trace_id = supplied_trace_id
@@ -365,14 +367,6 @@ def resolve_feedback_agent_targets(
         conversation_id = conversation_id or ref.conversation_id
     elif isinstance(ref, ri.InternalAgentTurnRef):
         trace_id = trace_id or ref.trace_id
-        if not conversation_id:
-            conversation_id = span_lookup(ref.trace_id, "").conversation_id
-    elif isinstance(ref, ri.InternalAgentSpanRef) and (
-        not conversation_id or not trace_id
-    ):
-        resolved = span_lookup("", ref.span_id)
-        conversation_id = conversation_id or resolved.conversation_id
-        trace_id = trace_id or resolved.trace_id
     return ResolvedAgentTargets(conversation_id, trace_id)
 
 

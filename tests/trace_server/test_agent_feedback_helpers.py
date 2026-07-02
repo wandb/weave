@@ -101,21 +101,18 @@ def test_resolve_feedback_agent_targets():
     turn_uri = ri.InternalAgentTurnRef(project_id=pid, trace_id="t1").uri()
     span_uri = ri.InternalAgentSpanRef(project_id=pid, span_id="s1").uri()
 
-    def lookup(trace_id: str, span_id: str) -> ResolvedAgentTargets:
-        return {
-            ("t1", ""): ResolvedAgentTargets("c-from-turn", "t1"),
-            ("", "s1"): ResolvedAgentTargets("c-from-span", "t-from-span"),
-        }.get((trace_id, span_id), ResolvedAgentTargets("", ""))
-
     cases = [
         # (weave_ref, supplied_conversation_id, supplied_trace_id, expected)
         # conversation ref: conversation from the ref, no single turn
         (conv_uri, "", "", ResolvedAgentTargets("c1", "")),
-        # turn ref: trace_id straight from the ref, conversation via lookup
-        (turn_uri, "", "", ResolvedAgentTargets("c-from-turn", "t1")),
-        # span ref: both resolved via lookup
-        (span_uri, "", "", ResolvedAgentTargets("c-from-span", "t-from-span")),
-        # caller-supplied values win per field (lookup not consulted)
+        # turn ref: trace from the ref; conversation must be supplied (no lookup)
+        (turn_uri, "", "", ResolvedAgentTargets("", "t1")),
+        # turn ref + caller-supplied conversation: both set
+        (turn_uri, "c-sup", "", ResolvedAgentTargets("c-sup", "t1")),
+        # span ref: nothing derivable from the ref alone; rely on caller-supplied
+        (span_uri, "", "", ResolvedAgentTargets("", "")),
+        (span_uri, "c-sup", "t-sup", ResolvedAgentTargets("c-sup", "t-sup")),
+        # caller-supplied values win entirely (ref not consulted)
         (
             turn_uri,
             "explicit-conv",
@@ -131,6 +128,5 @@ def test_resolve_feedback_agent_targets():
     ]
     for weave_ref, sup_conv, sup_trace, expected in cases:
         assert (
-            resolve_feedback_agent_targets(weave_ref, sup_conv, sup_trace, lookup)
-            == expected
+            resolve_feedback_agent_targets(weave_ref, sup_conv, sup_trace) == expected
         )

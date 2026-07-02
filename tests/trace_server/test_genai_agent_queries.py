@@ -3009,26 +3009,15 @@ def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
     ]
 
 
-def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_server):
-    """Feedback targeting a turn ref resolves conversation_id via the spans table."""
+def test_feedback_create_persists_conversation_and_trace_id_from_turn_ref(ch_server):
+    """Turn-targeted feedback records trace_id from the ref; the conversation_id is
+    supplied by the producer (the trace server does no spans lookup at write time).
+    """
     project_id = _make_project_id("fb-turn-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     trace_id = uuid.uuid4().hex
-
-    # Seed a span with the conversation_id so the lookup can resolve it.
-    _insert_spans(
-        ch_server.ch_client,
-        [
-            _make_span(
-                project_id,
-                trace_id=trace_id,
-                operation_name="invoke_agent",
-                conversation_id=conv_id,
-            )
-        ],
-    )
-
     turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+
     ch_server.feedback_create(
         tsi.FeedbackCreateReq(
             project_id=project_id,
@@ -3036,6 +3025,8 @@ def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_serve
             feedback_type=AGENT_USER_FEEDBACK_TYPE,
             payload={},
             scorer_tags=["low-quality"],
+            # Producer supplies the conversation; trace_id is parsed from the ref.
+            conversation_id=conv_id,
             wb_user_id="u2",
         )
     )
@@ -3046,7 +3037,6 @@ def test_feedback_create_persists_conversation_id_from_turn_span_lookup(ch_serve
             fields=["conversation_id", "trace_id", "scorer_tags"],
         )
     )
-    # Turn-targeted feedback: trace_id from the ref, conversation via the spans lookup.
     assert res.result == [
         {
             "conversation_id": conv_id,
@@ -3120,7 +3110,8 @@ def test_filter_conversations_by_signal(ch_server):
     # Baseline: no signal filter returns both conversations.
     assert filtered_ids(None) == sorted([conv_a, conv_b])
 
-    # Tag a TURN in conv-A (turn-level signal resolves up to conv-A).
+    # Tag a TURN in conv-A. The producer (here, the monitor) supplies conversation_id
+    # from the scored span, so the turn-level signal resolves up to conv-A.
     turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
     fb_a = ch_server.feedback_create(
         tsi.FeedbackCreateReq(
@@ -3138,6 +3129,8 @@ def test_filter_conversations_by_signal(ch_server):
             ).uri,
             scorer_tags=["flagged"],
             scorer_ratings={"_rating_": 0.9},
+            conversation_id=conv_a,
+            trace_id=trace_a,
         )
     )
 

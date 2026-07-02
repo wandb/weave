@@ -194,7 +194,6 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
-    ResolvedAgentTargets,
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
@@ -6631,41 +6630,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.CostPurgeRes()
 
-    def _make_span_lookup(self, project_id: str):
-        """Return a span_lookup callable for resolve_feedback_agent_targets.
-
-        The returned function point-queries `spans` by `trace_id` or `span_id`
-        using bloom-indexed columns, returning the resolved
-        `(conversation_id, trace_id)` (each '' if not found). Only used for agent
-        feedback types to avoid unnecessary span lookups.
-        """
-
-        def _lookup(trace_id: str, span_id: str) -> ResolvedAgentTargets:
-            if trace_id:
-                # Turn lookup: trace_id is known; find the turn/root span that
-                # carries the conversation_id.
-                rows = self._query(
-                    "SELECT conversation_id FROM spans "
-                    "WHERE project_id = {pid:String} AND trace_id = {tid:String} "
-                    "AND conversation_id != '' LIMIT 1",
-                    {"pid": project_id, "tid": trace_id},
-                ).result_rows
-                conversation_id = rows[0][0] if rows else ""
-                return ResolvedAgentTargets(conversation_id, trace_id)
-            if span_id:
-                # Span lookup: resolve both ids from the span's own row.
-                rows = self._query(
-                    "SELECT conversation_id, trace_id FROM spans "
-                    "WHERE project_id = {pid:String} AND span_id = {sid:String} "
-                    "LIMIT 1",
-                    {"pid": project_id, "sid": span_id},
-                ).result_rows
-                if rows:
-                    return ResolvedAgentTargets(rows[0][0], rows[0][1])
-            return ResolvedAgentTargets("", "")
-
-        return _lookup
-
     @tag_db_insert_path("feedback_create")
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
@@ -6673,10 +6637,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if req.feedback_type in AGENT_SPAN_FEEDBACK_TYPES:
             targets = resolve_feedback_agent_targets(
-                req.weave_ref,
-                req.conversation_id,
-                req.trace_id,
-                self._make_span_lookup(req.project_id),
+                req.weave_ref, req.conversation_id, req.trace_id
             )
             req = req.model_copy(
                 update={
@@ -6714,12 +6675,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             validate_feedback_create_req(feedback_req, self)
 
             if feedback_req.feedback_type in AGENT_SPAN_FEEDBACK_TYPES:
-                # TODO: batch span lookups by trace_id when batch sizes grow
                 targets = resolve_feedback_agent_targets(
                     feedback_req.weave_ref,
                     feedback_req.conversation_id,
                     feedback_req.trace_id,
-                    self._make_span_lookup(feedback_req.project_id),
                 )
                 feedback_req = feedback_req.model_copy(
                     update={
