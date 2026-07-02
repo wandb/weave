@@ -20,7 +20,7 @@ def test_trace_server_fixture(request, trace_server: UserInjectingExternalTraceS
 
 
 # All instance attributes set in ClickHouseTraceServer.__init__.
-# Instrumentation (ddtrace, coverage) may add extras — those are ignored.
+# Instrumentation (coverage, etc.) may add extras — those are ignored.
 # If you add a new attribute to __init__, add it here AND decide whether
 # _reset_server_state in conftest.py needs to reset it between tests.
 KNOWN_SERVER_ATTRS = frozenset(
@@ -52,12 +52,10 @@ KNOWN_SERVER_ATTRS = frozenset(
 def test_reset_server_state_covers_all_attrs(ch_server):
     """Fails when ClickHouseTraceServer gains new instance attributes.
 
-    Instrumentation attrs (ddtrace, coverage) are ignored — only attrs
+    Instrumentation attrs (coverage, etc.) are ignored — only attrs
     missing from KNOWN_SERVER_ATTRS trigger failure.
     """
-    # Only check underscore-prefixed attrs (real app state).
-    # Instrumentation (ddtrace) injects public-name wrappers like
-    # 'objs_query', 'file_create' etc. — ignore those.
+    # Skip public-name attrs — only real app state uses underscore prefix.
     actual = {
         a for a in ch_server.__dict__ if a.startswith("_") and not a.startswith("__")
     }

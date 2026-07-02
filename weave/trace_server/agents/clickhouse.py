@@ -160,7 +160,7 @@ class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
     Takes a `query_fn` (typically the server's `_query` method) so queries
-    participate in the same logging / ddtrace / error-handling wrapper as the
+    participate in the same logging / tracing / error-handling wrapper as the
     rest of the trace server. Also takes a `feedback_query_fn` (the server's
     `feedback_query` method), invoked only when `include_feedback=True` to
     fold agent-target feedback into the chat response.

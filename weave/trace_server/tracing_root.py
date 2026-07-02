@@ -1,21 +1,14 @@
-"""Contextvar-based "local root span" tracker for the OpenTelemetry tracing
-migration.
+"""Contextvar-based "local root span" tracker for OpenTelemetry tracing.
 
-Why this exists
----------------
-ddtrace exposed `ddtrace.tracer.current_root_span()`: the entry-point span of
-the trace currently active on this thread/task. Helpers like
-`set_root_span_dd_tags` use that root to stamp per-request attribution that
-DD dashboards filter on. The OpenTelemetry API has no equivalent —
-`opentelemetry.trace.get_current_span()` returns the *currently active* span,
-which deeper in a call tree is some child of the root, not the root itself.
+Records the entry-point span so downstream helpers can attribute per-request
+tags to the outer span. `opentelemetry.trace.get_current_span()` returns the
+innermost active span, not the root, so we track the root explicitly.
 
-This tracker bridges the gap: a `local_root_scope(span)` context manager
-records `span` in a contextvar, and `get_local_root()` reads it back.
-Application code enters a scope at each entry point (FastAPI request
-middleware, Kafka batch handler, scheduled-task entry); downstream helpers
-that need "the root for this unit of work" call `get_local_root()` instead
-of `ddtrace.tracer.current_root_span()`.
+A `local_root_scope(span)` context manager records `span` in a contextvar,
+and `get_local_root()` reads it back. Application code enters a scope at
+each entry point (FastAPI request middleware, Kafka batch handler,
+scheduled-task entry); downstream helpers that need "the root for this unit
+of work" call `get_local_root()`.
 
 Python contextvars semantics — what callers need to know
 ---------------------------------------------------------
@@ -82,9 +75,7 @@ def get_local_root() -> trace.Span | None:
     `None` if no scope is active or the stored span is not recording.
 
     Non-recording spans (e.g. `trace.INVALID_SPAN`, or spans created while no
-    real provider was installed) are treated as "no local root" so callers
-    that branch on `if get_local_root() is None` behave the same way they
-    used to under ddtrace's `current_root_span()`.
+    real provider was installed) are treated as "no local root".
     """
     span = _local_root.get()
     if span is None:

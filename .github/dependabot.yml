@@ -34,7 +34,6 @@ updates:
       # Trace server dependencies
       trace_server:
         patterns:
-          - "ddtrace*"
           - "boto3*"
           - "azure-storage-blob*"
           - "google-cloud-storage*"

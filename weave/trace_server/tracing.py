@@ -1,14 +1,8 @@
 """OpenTelemetry-backed tracing primitives for `weave.trace_server`.
 
-This module is the OTel-equivalent of the `ddtrace`-flavored helpers in
-`weave/trace_server/datadog.py`. It exists so call sites under
-`weave/trace_server/` can decorate functions with `@traced(name=...)` without
-importing `ddtrace` directly.
-
 Contract for `@traced(name)`:
   - The span name is exactly `name` (no auto-derivation from `__qualname__`).
-    Dashboards in DD are keyed on this name, so it MUST match the historical
-    `@ddtrace.tracer.wrap(name="X")` value 1:1 during the migration.
+    Dashboards key on this name, so span-name literals are load-bearing.
   - Both `def` and `async def` shapes are supported.
   - A raised `Exception` propagates and marks the span ERROR. OTel's
     `start_as_current_span` handles this on `__exit__`; the decorator does
@@ -74,8 +68,7 @@ def traced(name: str) -> Callable[[F], F]:
 
     Args:
         name: The span name. Becomes the DD APM `resource_name` via the
-            OTel→DD bridge, so it MUST match the historical
-            `@ddtrace.tracer.wrap(name="X")` value during the migration.
+            OTel→DD bridge; dashboards key on this literal.
 
     Raises:
         TypeError: If applied to a generator or async-generator function.
@@ -111,8 +104,7 @@ def traced_generator(
 ]:
     """Wrap a generator function in an OTel span that spans the full iteration.
 
-    Drop-in replacement for `weave.trace_server.datadog.generator_trace`. Use
-    on streaming endpoints where the function `yield`s rows incrementally.
+    Use on streaming endpoints where the function `yield`s rows incrementally.
 
     `GeneratorExit` (consumer calling `gen.close()` or HTTP client disconnect)
     is treated as normal completion: OTel's `use_span` only catches
