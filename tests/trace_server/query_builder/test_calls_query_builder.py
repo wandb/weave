@@ -2528,6 +2528,80 @@ def test_total_storage_size_calls_complete(with_filter: bool):
         )
 
 
+def test_calls_complete_page_prefetch_two_pass():
+    """calls_complete defers heavy payload dumps via a started_at-bounded page CTE.
+
+    A single pass materializes every dump column for each row the sort scans;
+    selecting the id page first (light) then hydrating payloads only for that
+    page cuts peak memory. The outer scan is bounded to the page's started_at
+    window (sort-key prefix prune) and narrowed to its ids. Engages only with a
+    payload dump in the SELECT ordered by started_at; a light-only SELECT stays
+    single-pass (nothing to defer).
+    """
+    payload_query = CallsQuery(
+        project_id="test/project", read_table=ReadTable.CALLS_COMPLETE
+    )
+    for field in ("id", "started_at", "inputs_dump", "output_dump"):
+        payload_query.add_field(field)
+    payload_query.set_hardcoded_filter(
+        HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
+    )
+    payload_query.add_order("started_at", "desc")
+    payload_query.set_limit(50)
+    assert_sql(
+        payload_query,
+        """
+        WITH filtered_calls AS (
+            SELECT calls_complete.id AS id,
+                calls_complete.started_at AS started_at
+            FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+            WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
+                OR (calls_complete.op_name IS NULL))
+                AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+            ORDER BY calls_complete.started_at DESC
+            LIMIT 50
+        )
+        SELECT calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.inputs_dump AS inputs_dump,
+            calls_complete.output_dump AS output_dump
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE (calls_complete.started_at >= (SELECT min(started_at) FROM filtered_calls))
+            AND (calls_complete.started_at <= (SELECT max(started_at) FROM filtered_calls))
+            AND (calls_complete.id IN (SELECT id FROM filtered_calls))
+        ORDER BY calls_complete.started_at DESC
+        LIMIT 50
+        """,
+        {"pb_0": SENTINEL_EPOCH, "pb_1": ["a", "b"], "pb_2": "test/project"},
+    )
+
+    light_query = CallsQuery(
+        project_id="test/project", read_table=ReadTable.CALLS_COMPLETE
+    )
+    for field in ("id", "started_at", "op_name"):
+        light_query.add_field(field)
+    light_query.set_hardcoded_filter(
+        HardCodedFilter(filter=tsi.CallsFilter(op_names=["a", "b"]))
+    )
+    light_query.add_order("started_at", "desc")
+    light_query.set_limit(50)
+    assert_sql(
+        light_query,
+        """
+        SELECT calls_complete.id AS id,
+            calls_complete.started_at AS started_at,
+            calls_complete.op_name AS op_name
+        FROM calls_complete PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE ((calls_complete.op_name IN {pb_1:Array(String)})
+            OR (calls_complete.op_name IS NULL))
+            AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+        ORDER BY calls_complete.started_at DESC
+        LIMIT 50
+        """,
+        {"pb_0": SENTINEL_EPOCH, "pb_1": ["a", "b"], "pb_2": "test/project"},
+    )
+
+
 def test_aggregated_data_size_field():
     """Test the AggregatedDataSizeField class."""
     field = AggregatedDataSizeField(
