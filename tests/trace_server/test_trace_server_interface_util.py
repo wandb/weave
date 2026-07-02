@@ -370,9 +370,7 @@ def _make_otel_export_req_with_string_attr(
     )
 
 
-def _string_attr_value(
-    req: tsi.agent_types.GenAIOTelExportReq, attr_key: str
-) -> str:
+def _string_attr_value(req: tsi.agent_types.GenAIOTelExportReq, attr_key: str) -> str:
     """Pull the string_value of a flat string attribute from a request."""
     span = req.processed_spans[0].resource_spans.scope_spans[0].spans[0]
     for kv in span.attributes:

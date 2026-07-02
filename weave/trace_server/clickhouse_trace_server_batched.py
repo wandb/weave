@@ -825,7 +825,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     # JSON-encoded message attribute only surfaces as a leaf
                     # after to_call parses it.
                     start_call.inputs = replace_base64_with_content_objects(
-                        start_call.inputs, req.project_id, self, wb_user_id=req.wb_user_id
+                        start_call.inputs,
+                        req.project_id,
+                        self,
+                        wb_user_id=req.wb_user_id,
                     )
                     end_call.output = replace_base64_with_content_objects(
                         end_call.output, req.project_id, self, wb_user_id=req.wb_user_id

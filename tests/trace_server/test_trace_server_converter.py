@@ -472,9 +472,7 @@ def test_embedded_external_ref_respects_tolerate_flag_int_to_ext(caplog):
             payload, int_to_ext, tolerate_external_refs=True
         )
 
-    assert json.loads(converted["content"]) == [
-        {"type": "image", "url": external_ref}
-    ]
+    assert json.loads(converted["content"]) == [{"type": "image", "url": external_ref}]
     assert "Returning stored external ref unchanged" in caplog.text
 
 
@@ -501,9 +499,7 @@ def test_embedded_internal_ref_requires_verification_ext_to_int():
         lambda project: "unused",
         verify_internal_project_id=lambda pid: pid == internal_project_id,
     )
-    assert json.loads(converted["content"]) == [
-        {"type": "image", "url": internal_ref}
-    ]
+    assert json.loads(converted["content"]) == [{"type": "image", "url": internal_ref}]
 
 
 def test_deeply_nested_json_in_json_terminates_without_recursion_error():

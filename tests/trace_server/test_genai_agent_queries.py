@@ -2826,9 +2826,9 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
     Content object is attributed to the caller's ``wb_user_id``.
     """
     external_project_id = _ref_safe_external_project_id("genai_otel_boundary")
-    internal_project_id = base64.b64encode(
-        external_project_id.encode("ascii")
-    ).decode("ascii")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
     # The client sends an external user id; the adapter converts it to the
     # internal (base64) form the internal server persists on the Content object.
     external_user_id = "user-42"
@@ -2860,9 +2860,7 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
             }
         ]
     )
-    processed = _build_genai_chat_processed_span(
-        trace_id, span_id, input_messages_json
-    )
+    processed = _build_genai_chat_processed_span(trace_id, span_id, input_messages_json)
 
     # Submit through the EXTERNAL adapter, exactly as a real client would: no
     # internal ids or internal refs cross this boundary.
@@ -2902,8 +2900,7 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
     assert isinstance(parsed_image_ref, ri.InternalObjectRef)
     assert parsed_image_ref.project_id == internal_project_id
     assert (
-        internal_image_ref
-        == f"weave-trace-internal:///{internal_project_id}/object/"
+        internal_image_ref == f"weave-trace-internal:///{internal_project_id}/object/"
         f"{parsed_image_ref.name}:{parsed_image_ref.version}"
     )
 
