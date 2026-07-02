@@ -82,7 +82,6 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
-from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -113,6 +112,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
+from weave.trace_server.telemetry import record_db_insert, set_root_span_attrs
 from weave.trace_server.trace_server_common import (
     AgentFeedbackByTarget,
     group_agent_feedback_by_target,
@@ -160,7 +160,7 @@ class AgentQueryHandler:
     """Read-side query operations for the agent observability system.
 
     Takes a `query_fn` (typically the server's `_query` method) so queries
-    participate in the same logging / ddtrace / error-handling wrapper as the
+    participate in the same logging / tracing / error-handling wrapper as the
     rest of the trace server. Also takes a `feedback_query_fn` (the server's
     `feedback_query` method), invoked only when `include_feedback=True` to
     fold agent-target feedback into the chat response.
@@ -913,7 +913,7 @@ class AgentWriteHandler:
         """
         if not span_rows:
             return
-        set_root_span_dd_tags(
+        set_root_span_attrs(
             {
                 "weave_trace_server.insert.table": "spans",
                 "weave_trace_server.insert.row_count": len(span_rows),

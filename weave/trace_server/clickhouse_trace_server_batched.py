@@ -169,12 +169,6 @@ from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
-from weave.trace_server.datadog import (
-    record_db_insert,
-    set_current_span_dd_tags,
-    set_root_span_dd_tags,
-    tag_db_insert_path,
-)
 from weave.trace_server.dataset_sources import DatasetSourcesHandler
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -295,6 +289,12 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_table_stats_query_with_storage_size,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.telemetry import (
+    record_db_insert,
+    set_current_span_attrs,
+    set_root_span_attrs,
+    tag_db_insert_path,
+)
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -668,7 +668,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         assert_non_null_wb_user_id(req)
         calls, rejected_spans, error_messages = self._otel_proto_to_calls(req)
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": len(calls)})
+        set_current_span_attrs({"weave_trace_server.insert_call_count": len(calls)})
 
         obj_id_idx_map = defaultdict(list)
         for idx, (start_call, _) in enumerate(calls):
@@ -815,7 +815,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         )
                     )
 
-        set_current_span_dd_tags({"call_count": len(calls)})
+        set_current_span_attrs({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
 
     @traced(name="clickhouse_trace_server_batched.otel_export.build_rows")
@@ -849,7 +849,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         end_call_for_insert_to_ch_insertable(end, retention_days)
                     )
                 )
-        set_current_span_dd_tags({"row_count": len(rows)})
+        set_current_span_attrs({"row_count": len(rows)})
         return rows
 
     @traced(name="clickhouse_trace_server_batched.kafka_producer.flush")
@@ -968,7 +968,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
+        set_current_span_attrs({"weave_trace_server.insert_call_count": 1})
 
         req = self._offload_call_content(req)
         retention_days = get_project_retention_days(
@@ -1051,7 +1051,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallsUpsertCompleteRes: Empty response on success.
         """
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {"weave_trace_server.insert_call_count": len(req.batch)}
         )
 
@@ -1674,7 +1674,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # We put summary_dump last so that when we compute the costs and summary its in the right place
         if req.include_costs:
-            set_current_span_dd_tags({"include_costs": "true"})
+            set_current_span_attrs({"include_costs": "true"})
             summary_columns = ["summary", "summary_dump"]
             columns = [
                 *[col for col in columns if col not in summary_columns],
@@ -1742,9 +1742,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         include_feedback = req.include_feedback or False
 
         if include_feedback:
-            set_current_span_dd_tags({"include_feedback": "true"})
+            set_current_span_attrs({"include_feedback": "true"})
         if expand_columns:
-            set_current_span_dd_tags({"expand_columns": "true"})
+            set_current_span_attrs({"expand_columns": "true"})
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return ch_call_dict_to_call_schema_dict(
@@ -1871,7 +1871,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 f"Cannot delete more than {ch_settings.MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "clickhouse_trace_server_batched.calls_delete.count": str(
                     len(req.call_ids)
@@ -2170,7 +2170,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         new versions exist but their "latest" alias is missing — readers
         see the prior latest until the alias write succeeds on retry.
         """
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
         )
 
@@ -2279,7 +2279,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         obj_schema = ch_obj_to_obj_schema(obj)
         if req.include_tags_and_aliases:
-            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            set_root_span_attrs({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, [obj_schema])
         return tsi.ObjReadRes(obj=obj_schema)
 
@@ -2327,7 +2327,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         objs = self._select_objs_query(object_query_builder, metadata_only)
         obj_schemas = [ch_obj_to_obj_schema(obj) for obj in objs]
         if req.include_tags_and_aliases:
-            set_root_span_dd_tags({"include_tags_and_aliases": True})
+            set_root_span_attrs({"include_tags_and_aliases": True})
             self._enrich_objs_with_tags_and_aliases(req.project_id, obj_schemas)
         return tsi.ObjQueryRes(objs=obj_schemas)
 
@@ -6134,12 +6134,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_create_clickhouse(req, digest)
         else:
             self._file_create_clickhouse(req, digest)
-        set_root_span_dd_tags({"write_bytes": len(req.content)})
+        set_root_span_attrs({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @traced(name="clickhouse_trace_server_batched._file_create_clickhouse")
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
-        set_root_span_dd_tags({"storage_provider": "clickhouse"})
+        set_root_span_attrs({"storage_provider": "clickhouse"})
         self._insert_file_chunks(file_chunks_for(req, digest))
 
     @traced(name="clickhouse_trace_server_batched._file_create_bucket")
@@ -6155,7 +6155,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # tag matches where the bytes actually land.
             self._bucket_uploads.stage(req, digest)
             return
-        set_root_span_dd_tags({"storage_provider": "bucket"})
+        set_root_span_attrs({"storage_provider": "bucket"})
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
@@ -6306,14 +6306,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             else:
                 chunk_bytes = result_row[1]
                 bytes += chunk_bytes
-                set_root_span_dd_tags({"storage_provider": "clickhouse"})
+                set_root_span_attrs({"storage_provider": "clickhouse"})
 
-        set_root_span_dd_tags({"read_bytes": len(bytes)})
+        set_root_span_attrs({"read_bytes": len(bytes)})
         return tsi.FileContentReadRes(content=bytes)
 
     @traced(name="clickhouse_trace_server_batched._file_read_bucket")
     def _file_read_bucket(self, file_storage_uri: FileStorageURI) -> bytes:
-        set_root_span_dd_tags({"storage_provider": "bucket"})
+        set_root_span_attrs({"storage_provider": "bucket"})
         client = self.file_storage_client
         if client is None:
             raise FileStorageReadError("File storage client is not configured")
@@ -6462,7 +6462,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         rows_to_insert = []
         results = []
 
-        set_root_span_dd_tags({"feedback_create_batch.count": len(req.batch)})
+        set_root_span_attrs({"feedback_create_batch.count": len(req.batch)})
 
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
@@ -7140,7 +7140,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> None:
         # Tags roll up to the parent _flush_calls span instead of creating a
         # separate intermediate span on every call.
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "clickhouse_trace_server_batched._insert_call_batch.count": str(
                     len(batch)
@@ -7386,12 +7386,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
         record_db_insert(table=table, count=len(data))
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "clickhouse_trace_server_batched._insert.table": table,
             }
         )
-        set_root_span_dd_tags(
+        set_root_span_attrs(
             {
                 "weave_trace_server.insert.table": table,
                 "weave_trace_server.insert.row_count": len(data),
@@ -7401,7 +7401,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         async_insert = self._use_async_insert and not do_sync_insert
         if async_insert:
             settings = ch_settings.update_settings_for_async_insert(settings)
-            set_current_span_dd_tags(
+            set_current_span_attrs(
                 {
                     "clickhouse_trace_server_batched._insert.async_insert": True,
                 }
@@ -7519,7 +7519,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         # Tags roll up to the parent _flush_calls_complete span instead of
         # creating a separate intermediate span on every call.
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "clickhouse_trace_server_batched._insert_call_complete_batch.count": str(
                     len(batch)
@@ -7606,7 +7606,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             final_batch.append(stripped_item)
 
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "clickhouse_trace_server_batched._strip_large_values.stripped_count": str(
                     stripped_count

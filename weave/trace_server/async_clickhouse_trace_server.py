@@ -14,8 +14,8 @@ from weave.trace_server.clickhouse_trace_server_batched import (
     ClickHouseTraceServer,
     CompletionPrepResult,
 )
-from weave.trace_server.datadog import tag_db_insert_path
 from weave.trace_server.llm_completion import lite_llm_acompletion
+from weave.trace_server.telemetry import tag_db_insert_path
 
 _T = TypeVar("_T")
 

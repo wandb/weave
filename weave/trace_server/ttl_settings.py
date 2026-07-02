@@ -23,8 +23,8 @@ from cachetools import TTLCache
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.redis_client import get_redis_client
+from weave.trace_server.telemetry import set_current_span_attrs
 from weave.trace_server.tracing import _tracer, traced
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def get_project_retention_days(
     """
     cached = _l1_get(project_id)
     if cached is not None:
-        set_current_span_dd_tags({"ttl.cache_hit": "L1"})
+        set_current_span_attrs({"ttl.cache_hit": "L1"})
         return cached
 
     with _tracer.start_as_current_span(

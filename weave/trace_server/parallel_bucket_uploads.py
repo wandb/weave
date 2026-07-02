@@ -47,7 +47,6 @@ from dataclasses import dataclass
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_schema import FileChunkCreateCHInsertable
-from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.file_storage import (
     FileStorageClient,
@@ -55,6 +54,7 @@ from weave.trace_server.file_storage import (
     key_for_project_digest,
     store_in_bucket,
 )
+from weave.trace_server.telemetry import set_current_span_attrs
 from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ class BucketUploadBatch:
                     exc_info=True,
                 )
                 raise
-        set_current_span_dd_tags(
+        set_current_span_attrs(
             {
                 "bucket_upload_batch.bucket_success": bucket_success,
                 "bucket_upload_batch.ch_fallback": ch_fallback,
