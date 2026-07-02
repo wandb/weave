@@ -33,10 +33,22 @@ from weave.trace_server_version import MIN_TRACE_SERVER_VERSION
 from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+        OTLPSpanExporter,
+    )
+    from opentelemetry.sdk.trace import TracerProvider
+
     from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc
     from weave.trace_server.service_interface import ServerInfoRes
 
 logger = logging.getLogger(__name__)
+
+# The conversation/agent OTel provider is set once (OTel's global provider is
+# set-once and its Resource is immutable). A later weave.init() to a different
+# project reroutes by rewriting the exporter's project_id header instead of
+# rebuilding, so agent spans follow the active project.
+_conversation_tracer_provider: TracerProvider | None = None
+_conversation_span_exporter: OTLPSpanExporter | None = None
 
 
 class WeaveWandbAuthenticationException(Exception): ...
@@ -115,10 +127,13 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     Sets the global OTel TracerProvider so that ``trace.get_tracer("weave.conversation")``
     returns a real tracer.
 
-    No-ops if the trace server URL is not configured. Logs a warning and
-    returns early if opentelemetry is unavailable. Other errors propagate
-    so misconfiguration is visible to the user.
+    On a later weave.init() to a different project, reroutes the existing
+    exporter to the new project instead of rebuilding (see the module-level
+    provider globals). No-ops if the trace server URL is not configured. Logs
+    a warning and returns early if opentelemetry is unavailable. Other errors
+    propagate so misconfiguration is visible to the user.
     """
+    global _conversation_tracer_provider, _conversation_span_exporter  # noqa: PLW0603
     try:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
@@ -135,13 +150,26 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         )
         return
 
-    # Don't reconfigure if already set up (e.g. from a previous init call
-    # or from a user who installed their own provider before weave.init()).
-    if isinstance(trace.get_tracer_provider(), TracerProvider):
-        return
-
     trace_server_url = env.weave_trace_server_url()
     if not trace_server_url:
+        return
+
+    project_id = f"{entity}/{project}"
+
+    # Re-init to a new project: our provider is already the global one and can't
+    # be swapped (OTel's set-once), so reroute the live exporter. Flush first so
+    # spans still queued under the old project export under the old project_id.
+    if _conversation_span_exporter is not None and (
+        trace.get_tracer_provider() is _conversation_tracer_provider
+    ):
+        if _conversation_tracer_provider is not None:
+            _conversation_tracer_provider.force_flush()
+        _conversation_span_exporter._session.headers["project_id"] = project_id
+        return
+
+    # A provider we didn't install is active (e.g. the user configured their
+    # own before weave.init()); leave it untouched.
+    if isinstance(trace.get_tracer_provider(), TracerProvider):
         return
 
     endpoint = otel_traces_endpoint(trace_server_url)
@@ -150,18 +178,14 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     # init_weave_get_server: res.set_auth(("api", api_key)) and
     # wandb_thin/internal_api.py: BasicAuth("api", api_key)).
     # HTTP Basic auth requires base64("user:pass").
-    headers: dict[str, str] = {}
+    # The project rides the project_id header, not the Resource: the Resource is
+    # immutable, so a header is the only field that can follow weave.init().
+    headers: dict[str, str] = {"project_id": project_id}
     if api_key:
         token = base64.b64encode(f"api:{api_key}".encode()).decode()
         headers["Authorization"] = f"Basic {token}"
 
-    resource = Resource.create(
-        {
-            "service.name": "weave-conversation-sdk",
-            "wandb.entity": entity,
-            "wandb.project": project,
-        }
-    )
+    resource = Resource.create({"service.name": "weave-conversation-sdk"})
     exporter = OTLPSpanExporter(endpoint=endpoint, headers=headers)
     # Honor WEAVE_INSECURE_DISABLE_SSL for the OTel exporter too, so
     # dev environments with self-signed certs can export spans.
@@ -177,6 +201,8 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     # deep-linking in the agent traces UI.
     provider.add_span_processor(EvalLinkSpanProcessor())
     trace.set_tracer_provider(provider)
+    _conversation_tracer_provider = provider
+    _conversation_span_exporter = exporter
 
 
 def init_weave(
