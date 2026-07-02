@@ -463,32 +463,27 @@ def test_numeric_bucket_stats_query_uses_value_buckets() -> None:
            WHERE s.ended_at > s.started_at
              AND isNotNull(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL))
              AND isFinite(if(s.ended_at > s.started_at, toFloat64(toUnixTimestamp64Milli(s.ended_at) - toUnixTimestamp64Milli(s.started_at)), NULL)) ),
-             bounds AS
-          (SELECT toFloat64(min(bucket_value)) AS bucket_min_bound,
-                  toFloat64(max(bucket_value)) AS bucket_max_bound,
-                  count() AS value_count
-           FROM value_rows),
+          (SELECT tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count())
+           FROM value_rows) AS bounds_tuple,
              all_buckets AS
           (SELECT toUInt64(number) AS bucket
            FROM numbers({genai_3:UInt64})),
              aggregated_data AS
-          (SELECT if(bounds.bucket_max_bound = bounds.bucket_min_bound, toUInt64(0), toUInt64(least(toFloat64({genai_3:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds.bucket_min_bound) / if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))))) AS bucket,
+          (SELECT if(bounds_tuple.2 = bounds_tuple.1, toUInt64(0), toUInt64(least(toFloat64({genai_3:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds_tuple.1) / if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_3:Float64}, 1.0))))) AS bucket,
                   countIf(v_spans) AS count_spans
            FROM value_rows
-           CROSS JOIN bounds
-           WHERE bounds.value_count > 0
-             AND value_rows.bucket_value >= bounds.bucket_min_bound
-             AND value_rows.bucket_value <= bounds.bucket_max_bound
+           WHERE bounds_tuple.3 > 0
+             AND value_rows.bucket_value >= bounds_tuple.1
+             AND value_rows.bucket_value <= bounds_tuple.2
            GROUP BY bucket)
         SELECT all_buckets.bucket AS bucket_index,
-               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_min_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0)) AS bucket_min,
-               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_max_bound, if(all_buckets.bucket = {genai_3:UInt64} - toUInt64(1), bounds.bucket_max_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket + 1) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_3:Float64}, 1.0))) AS bucket_max,
+               if(bounds_tuple.2 = bounds_tuple.1, bounds_tuple.1, bounds_tuple.1 + toFloat64(all_buckets.bucket) * if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_3:Float64}, 1.0)) AS bucket_min,
+               if(bounds_tuple.2 = bounds_tuple.1, bounds_tuple.2, if(all_buckets.bucket = {genai_3:UInt64} - toUInt64(1), bounds_tuple.2, bounds_tuple.1 + toFloat64(all_buckets.bucket + 1) * if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_3:Float64}, 1.0))) AS bucket_max,
                COALESCE(aggregated_data.count_spans, 0) AS count_spans
         FROM all_buckets
-        CROSS JOIN bounds
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
-        WHERE bounds.value_count > 0
-          AND (bounds.bucket_max_bound > bounds.bucket_min_bound
+        WHERE bounds_tuple.3 > 0
+          AND (bounds_tuple.2 > bounds_tuple.1
                OR all_buckets.bucket = 0)
         ORDER BY bucket_index
     """
@@ -544,32 +539,27 @@ def test_numeric_bucket_stats_query_groups_custom_attr_measure() -> None:
           (SELECT avgOrNull(if((mapContains(s.custom_attrs_float, {genai_9:String})), toFloat64(s.custom_attrs_float[{genai_9:String}]), NULL)) AS bucket_value
            FROM filtered_spans s
            GROUP BY s.conversation_id),
-             bounds AS
-          (SELECT toFloat64(min(bucket_value)) AS bucket_min_bound,
-                  toFloat64(max(bucket_value)) AS bucket_max_bound,
-                  count() AS value_count
-           FROM value_rows),
+          (SELECT tuple(toFloat64(min(bucket_value)), toFloat64(max(bucket_value)), count())
+           FROM value_rows) AS bounds_tuple,
              all_buckets AS
           (SELECT toUInt64(number) AS bucket
            FROM numbers({genai_8:UInt64})),
              aggregated_data AS
-          (SELECT if(bounds.bucket_max_bound = bounds.bucket_min_bound, toUInt64(0), toUInt64(least(toFloat64({genai_8:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds.bucket_min_bound) / if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_8:Float64}, 1.0))))) AS bucket,
+          (SELECT if(bounds_tuple.2 = bounds_tuple.1, toUInt64(0), toUInt64(least(toFloat64({genai_8:UInt64}) - 1.0, floor((value_rows.bucket_value - bounds_tuple.1) / if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_8:Float64}, 1.0))))) AS bucket,
                   count() AS count
            FROM value_rows
-           CROSS JOIN bounds
-           WHERE bounds.value_count > 0
-             AND value_rows.bucket_value >= bounds.bucket_min_bound
-             AND value_rows.bucket_value <= bounds.bucket_max_bound
+           WHERE bounds_tuple.3 > 0
+             AND value_rows.bucket_value >= bounds_tuple.1
+             AND value_rows.bucket_value <= bounds_tuple.2
            GROUP BY bucket)
         SELECT all_buckets.bucket AS bucket_index,
-               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_min_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_8:Float64}, 1.0)) AS bucket_min,
-               if(bounds.bucket_max_bound = bounds.bucket_min_bound, bounds.bucket_max_bound, if(all_buckets.bucket = {genai_8:UInt64} - toUInt64(1), bounds.bucket_max_bound, bounds.bucket_min_bound + toFloat64(all_buckets.bucket + 1) * if(bounds.bucket_max_bound > bounds.bucket_min_bound, (bounds.bucket_max_bound - bounds.bucket_min_bound) / {genai_8:Float64}, 1.0))) AS bucket_max,
+               if(bounds_tuple.2 = bounds_tuple.1, bounds_tuple.1, bounds_tuple.1 + toFloat64(all_buckets.bucket) * if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_8:Float64}, 1.0)) AS bucket_min,
+               if(bounds_tuple.2 = bounds_tuple.1, bounds_tuple.2, if(all_buckets.bucket = {genai_8:UInt64} - toUInt64(1), bounds_tuple.2, bounds_tuple.1 + toFloat64(all_buckets.bucket + 1) * if(bounds_tuple.2 > bounds_tuple.1, (bounds_tuple.2 - bounds_tuple.1) / {genai_8:Float64}, 1.0))) AS bucket_max,
                COALESCE(aggregated_data.count, 0) AS count
         FROM all_buckets
-        CROSS JOIN bounds
         LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
-        WHERE bounds.value_count > 0
-          AND (bounds.bucket_max_bound > bounds.bucket_min_bound
+        WHERE bounds_tuple.3 > 0
+          AND (bounds_tuple.2 > bounds_tuple.1
                OR all_buckets.bucket = 0)
         ORDER BY bucket_index
     """.replace("{_ATTR_SRC}", src_sql)
