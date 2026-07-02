@@ -1,7 +1,6 @@
 import base64
 import datetime
 import json
-import time
 import uuid
 from typing import Any
 
@@ -207,18 +206,6 @@ def _fetch_calls_stream(trace_server, project_id: str) -> list[tsi.CallSchema]:
     return list(
         trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
     )
-
-
-def _wait_for_live_call_ids(
-    trace_server, project_id: str, expected: set[str], timeout: float = 10.0
-) -> set[str]:
-    """Poll live call ids until they match `expected` (async calls_complete delete)."""
-    deadline = time.monotonic() + timeout
-    while True:
-        got = {c.id for c in _fetch_calls_stream(trace_server, project_id)}
-        if got == expected or time.monotonic() >= deadline:
-            return got
-        time.sleep(0.05)
 
 
 def _find_call_by_id(
@@ -1473,16 +1460,16 @@ def test_calls_delete(trace_server, clickhouse_trace_server):
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_ids[0]])
     )
     assert res.num_deleted == 1
-    assert _wait_for_live_call_ids(
-        trace_server, project_id, {call_ids[1], call_ids[2]}
-    ) == {call_ids[1], call_ids[2]}
+    remaining = _fetch_calls_stream(trace_server, project_id)
+    assert len(remaining) == 2
+    assert call_ids[0] not in {c.id for c in remaining}
 
     # Delete multiple calls
     res = trace_server.calls_delete(
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_ids[1], call_ids[2]])
     )
     assert res.num_deleted == 2
-    assert _wait_for_live_call_ids(trace_server, project_id, set()) == set()
+    assert len(_fetch_calls_stream(trace_server, project_id)) == 0
 
 
 def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
@@ -1499,9 +1486,8 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
         tsi.CallsDeleteReq(project_id=project1, call_ids=[ids1["child1"]])
     )
     assert res.num_deleted == 1
-    assert _wait_for_live_call_ids(
-        trace_server, project1, {ids1["root"], ids1["child2"]}
-    ) == {ids1["root"], ids1["child2"]}
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project1)}
+    assert remaining == {ids1["root"], ids1["child2"]}
 
     # Test 2: Middle node deletion cascades to subtree only
     project2 = f"{TEST_ENTITY}/calls_complete_cascade_middle"
@@ -1516,9 +1502,9 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
         tsi.CallsDeleteReq(project_id=project2, call_ids=[ids2["middle"]])
     )
     assert res.num_deleted == 3  # middle + 2 leaves
-    assert _wait_for_live_call_ids(trace_server, project2, {ids2["root"]}) == {
-        ids2["root"]
-    }
+    remaining = _fetch_calls_stream(trace_server, project2)
+    assert len(remaining) == 1
+    assert remaining[0].id == ids2["root"]
 
     # Test 3: Root deletion cascades to entire tree
     project3 = f"{TEST_ENTITY}/calls_complete_cascade_root"
@@ -1533,7 +1519,7 @@ def test_calls_delete_cascade(trace_server, clickhouse_trace_server):
         tsi.CallsDeleteReq(project_id=project3, call_ids=[ids3["root"]])
     )
     assert res.num_deleted == 4
-    assert _wait_for_live_call_ids(trace_server, project3, set()) == set()
+    assert len(_fetch_calls_stream(trace_server, project3)) == 0
 
 
 def test_calls_delete_cascade_spans_started_at_window(
@@ -1589,7 +1575,8 @@ def test_calls_delete_cascade_spans_started_at_window(
         tsi.CallsDeleteReq(project_id=project_id, call_ids=[root])
     )
     assert res.num_deleted == 3
-    assert _wait_for_live_call_ids(trace_server, project_id, {other}) == {other}
+    remaining = {c.id for c in _fetch_calls_stream(trace_server, project_id)}
+    assert remaining == {other}
 
 
 def test_calls_delete_cascade_started_at_window_merged_residence(

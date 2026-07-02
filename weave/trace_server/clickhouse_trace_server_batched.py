@@ -1993,6 +1993,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
+        self._await_calls_complete_deletion(project_id, call_ids, started_at_window)
+
+    @traced(name="clickhouse_trace_server_batched._await_calls_complete_deletion")
+    def _await_calls_complete_deletion(
+        self,
+        project_id: str,
+        call_ids: list[str],
+        started_at_window: tuple[datetime.datetime, datetime.datetime] | None,
+    ) -> None:
+        """Block until the async delete's row mask applies, up to a bounded window.
+
+        The DELETE runs async (lightweight_deletes_sync=0), so poll the read path
+        until the calls disappear. Returns early once reconciled; on timeout the
+        mutation is left to finish in the background so the request never blocks
+        past the gateway timeout.
+        """
+        if not call_ids:
+            return
+        poll_query = None
+        if started_at_window is not None:
+            pad = datetime.timedelta(
+                seconds=ch_settings.DELETE_STARTED_AT_PADDING_SECONDS
+            )
+            poll_query = started_at_gte_query(started_at_window[0] - pad)
+        deadline = time.monotonic() + ch_settings.DELETE_RECONCILE_TIMEOUT_SECONDS
+        while True:
+            still_present = next(
+                self.calls_query_stream(
+                    tsi.CallsQueryReq(
+                        project_id=project_id,
+                        filter=tsi.CallsFilter(call_ids=call_ids),
+                        query=poll_query,
+                        columns=["id"],
+                        limit=1,
+                    )
+                ),
+                None,
+            )
+            if still_present is None or time.monotonic() >= deadline:
+                return
+            time.sleep(ch_settings.DELETE_RECONCILE_POLL_INTERVAL_SECONDS)
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
