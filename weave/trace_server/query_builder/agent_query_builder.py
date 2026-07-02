@@ -884,6 +884,13 @@ def _sort_references_identity(sort_by: list[AgentSortBy] | None) -> bool:
     return agent_trace_attribution.fields_reference_identity([s.field for s in sort_by])
 
 
+def _sort_references_cost(sort_by: list[AgentSortBy] | None) -> bool:
+    """Whether any sort field is a per-span cost column (computed by the JOIN)."""
+    if not sort_by:
+        return False
+    return any(s.field in _SPAN_COST_SORTABLE_COLS for s in sort_by)
+
+
 def _with_span_tiebreaker(order_by: str, sort_by: list[AgentSortBy] | None) -> str:
     """Append `span_id` so the list order is total (a deterministic page).
 
@@ -915,12 +922,17 @@ def _spans_list_two_pass_applies(req: AgentSpansQueryReq) -> bool:
     Also falls back on a `trace_id` filter: ClickHouse pushes that predicate
     into the fallback rollup, so the current path is already optimal and the
     two-pass would only add a redundant scan.
+
+    A cost-column sort also falls back: costs are joined to the page *after* the
+    LIMIT, so the page cannot be ordered by a value it does not yet carry.
     """
     if req.group_by:
         return False
     if agent_trace_attribution.query_references_identity(req.query):
         return False
     if agent_trace_attribution.query_references_trace_id(req.query):
+        return False
+    if req.include_costs and _sort_references_cost(req.sort_by):
         return False
     return not _sort_references_identity(req.sort_by)
 
@@ -958,9 +970,8 @@ def _spans_source(
     )
 
 
-# Name of the two-pass page CTE; passed as both the attributed source's
-# `base_relation` and its `fallback_scope_relation` so the page is attributed
-# and the fallback rollup scopes to `SELECT trace_id FROM page`.
+# Name of the two-pass page CTE, fed to the attributed source as its
+# `base_relation` (cost-augmented when costs are on) and `fallback_scope_relation`.
 _PAGE_CTE = "page"
 
 
@@ -976,25 +987,34 @@ def _two_pass_spans_list_query(
 ) -> str:
     """Page-prefetch two-pass SQL for the ungrouped list read.
 
-    The page is limited first on the bare base (sort-key pruned), then only the
-    page is attributed by feeding it as `base_relation` with the fallback rollup
-    scoped to the page's traces (gating in `_spans_list_two_pass_applies`). This
-    avoids the whole-project base scan + rollup the always-attribute path pays
-    before its LIMIT. No outer LIMIT: the page already holds exactly the
-    displayed rows and the trace_id join is 1:1.
+    The page is limited first on the bare `spans` table (sort-key pruned), then
+    only the page is attributed by feeding it as `base_relation` with the
+    fallback rollup scoped to the page's traces (gating in
+    `_spans_list_two_pass_applies`). This avoids the whole-project base scan +
+    rollup the always-attribute path pays before its LIMIT. No outer LIMIT: the
+    page already holds exactly the displayed rows and the trace_id join is 1:1.
+
+    Costs (the per-span price JOIN) wrap the *page*, not the base, so the JOIN
+    runs over the limited rows; putting it under the page LIMIT would force a
+    whole-project scan (the LIMIT can't prune below a JOIN). Cost-column sorts
+    gate out of the two-pass since the page would then depend on the JOIN.
     """
-    base = _base_relation(pb, req.project_id, include_costs=req.include_costs)
+    attr_base = _PAGE_CTE
+    if req.include_costs:
+        attr_base = cost_augmented_source_sql(
+            pb, req.project_id, base_relation=_PAGE_CTE
+        )
     attributed_page = agent_trace_attribution.attributed_spans_source(
         pb,
         project_id=req.project_id,
         started_after=req.started_after,
         started_before=req.started_before,
-        base_relation=_PAGE_CTE,
+        base_relation=attr_base,
         fallback_scope_relation=_PAGE_CTE,
     )
     return f"""
         WITH {_PAGE_CTE} AS (
-            SELECT * FROM {base} s
+            SELECT * FROM spans s
             WHERE {where}
             ORDER BY {order_by}
             LIMIT {limit_slot} OFFSET {offset_slot}

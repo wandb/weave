@@ -197,6 +197,7 @@ def cost_augmented_source_sql(
     project_id: str,
     *,
     span_alias: str = "s",
+    base_relation: str = "spans",
 ) -> str:
     """Return a `spans`-shaped relation with the cost columns appended.
 
@@ -207,6 +208,12 @@ def cost_augmented_source_sql(
     (`s.total_cost_usd`) — without rewriting their grouping or bucketing logic.
     Span-level WHERE filters applied by the caller push down to the inner
     `spans` scan, so this does not force a full-table materialization.
+
+    `base_relation` is the relation the cost columns are read from; it defaults
+    to the raw `spans` table but may be any `spans`-shaped subquery (e.g. an
+    already-limited page), in which case the price JOIN runs over just those
+    rows. It is interpolated as raw SQL and must be a trusted, internal fragment
+    (a relation name), never user input.
     """
     exprs = cost_select_exprs(span_alias=span_alias)
     cost_projection = ",\n            ".join(exprs)
@@ -214,6 +221,6 @@ def cost_augmented_source_sql(
     return f"""(
         SELECT {span_alias}.*,
             {cost_projection}
-        FROM spans {span_alias}
+        FROM {base_relation} {span_alias}
         {join}
     )"""
