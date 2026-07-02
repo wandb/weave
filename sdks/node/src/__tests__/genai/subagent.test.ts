@@ -222,4 +222,36 @@ describe('SubAgent', () => {
     expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
     expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
   });
+
+  it('nests a child SubAgent (and its descendants) under the parent subagent', () => {
+    const turn = Turn.create({agentName: 'parent'});
+    const outer = turn.startSubagent({name: 'outer'});
+    const inner = outer.startSubagent({name: 'inner', model: 'gpt-4o'});
+    inner.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
+    inner.end();
+    outer.end();
+    turn.end();
+
+    const spans = getExporter().getFinishedSpans();
+    const bySubName = (name: string) => {
+      const found = spans.find(
+        s =>
+          s.name === 'invoke_agent' &&
+          s.attributes[ATTR_GEN_AI_AGENT_NAME] === name
+      );
+      if (!found) throw new Error(`no invoke_agent span for ${name}`);
+      return found;
+    };
+    const turnSpan = bySubName('parent');
+    const outerSpan = bySubName('outer');
+    const innerSpan = bySubName('inner');
+    const chatSpan = spans.find(s => s.name === 'chat');
+    expect(chatSpan).toBeDefined();
+    // Full chain: turn -> outer -> inner -> chat. The nested SubAgent parents
+    // to the outer sub (not the Turn), and threads its own context down to the
+    // LLM it starts.
+    expect(outerSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
+    expect(innerSpan.parentSpanId).toBe(outerSpan.spanContext().spanId);
+    expect(chatSpan!.parentSpanId).toBe(innerSpan.spanContext().spanId);
+  });
 });
