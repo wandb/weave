@@ -41,6 +41,8 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 # behaviour and is handled correctly by the existing storage path.
 AUTO_CONVERSION_MIN_SIZE = 8192  # 8 KiB
 
+CONTENT_CLASS = "weave.type_wrappers.Content.content.Content"
+
 
 def is_base64(value: str) -> bool:
     """Huerestic to quickly check if a string is likely base64.
@@ -104,7 +106,7 @@ def store_content_object(
     # We exclude the load op because it isn't possible to get from the server side
     return {
         "_type": "CustomWeaveType",
-        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+        "weave_type": {"type": CONTENT_CLASS},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
     }
 
