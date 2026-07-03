@@ -62,9 +62,7 @@ def test_list_success_uses_get_and_sorts() -> None:
 
 
 def test_list_missing_api_key_raises() -> None:
-    with patch(
-        "weave.chat.inference_models.get_wandb_api_context", return_value=None
-    ):
+    with patch("weave.chat.inference_models.get_wandb_api_context", return_value=None):
         with pytest.raises(ValueError, match="No API key found"):
             _make_models().list()
 
