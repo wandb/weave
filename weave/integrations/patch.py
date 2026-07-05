@@ -168,6 +168,16 @@ def patch_cerebras(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_together(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Together AI."""
+    _patch_integration(
+        module_path="weave.integrations.together.together_sdk",
+        patcher_func_getter_name="get_together_patcher",
+        triggering_symbols=["together"],
+        settings=settings,
+    )
+
+
 def patch_cohere(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Cohere."""
     _patch_integration(
@@ -491,6 +501,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "groq": patch_groq,
     "litellm": patch_litellm,
     "cerebras": patch_cerebras,
+    "together": patch_together,
     "cohere": patch_cohere,
     # ADK must come before ``google.genai`` / ``google.generativeai``:
     # patching ADK suppresses google-genai (see ``patch_google_adk``), but

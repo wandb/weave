@@ -87,6 +87,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "trace_server_migrator",
         "anthropic",
         "cerebras",
+        "together",
         "cohere",
         "crewai",
         "dspy",
