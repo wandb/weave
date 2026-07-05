@@ -50,6 +50,7 @@ class AutopatchSettings(BaseModel):
     groq: IntegrationSettings | None = None
     litellm: IntegrationSettings | None = None
     cerebras: IntegrationSettings | None = None
+    together: IntegrationSettings | None = None
     cohere: IntegrationSettings | None = None
     google_genai: IntegrationSettings | None = None
     vertexai: IntegrationSettings | None = None
