@@ -168,6 +168,16 @@ def patch_cerebras(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def patch_ollama(settings: IntegrationSettings | None = None) -> None:
+    """Enable Weave tracing for Ollama."""
+    _patch_integration(
+        module_path="weave.integrations.ollama.ollama_sdk",
+        patcher_func_getter_name="get_ollama_patcher",
+        triggering_symbols=["ollama"],
+        settings=settings,
+    )
+
+
 def patch_cohere(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Cohere."""
     _patch_integration(
@@ -491,6 +501,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "groq": patch_groq,
     "litellm": patch_litellm,
     "cerebras": patch_cerebras,
+    "ollama": patch_ollama,
     "cohere": patch_cohere,
     # ADK must come before ``google.genai`` / ``google.generativeai``:
     # patching ADK suppresses google-genai (see ``patch_google_adk``), but
