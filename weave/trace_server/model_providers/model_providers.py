@@ -76,7 +76,9 @@ Quantization = Literal[
     "fp32",
 ]
 
-LifecycleStage = Literal["general-availability", "experimental", "retired"]
+LifecycleStage = Literal[
+    "experimental", "general-availability", "deprecated", "retired"
+]
 
 InferenceEnvironment = Literal["cw-prod", "cw-qa"]
 
