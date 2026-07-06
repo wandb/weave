@@ -326,16 +326,16 @@ class TestSubAgent:
 
     def test_llm_returns_llm_and_inherits_model(self) -> None:
         sa = SubAgent(name="research-bot", model="gpt-4o-mini")
-        c = sa.llm(model="gpt-4o-mini")
+        c = sa.start_llm(model="gpt-4o-mini")
         assert isinstance(c, LLM)
         assert c.model == "gpt-4o-mini"
         # inherits model when not specified
-        c2 = sa.llm()
+        c2 = sa.start_llm()
         assert c2.model == "gpt-4o-mini"
 
     def test_tool_returns_tool(self) -> None:
         sa = SubAgent(name="bot")
-        t = sa.tool(name="web_search", arguments='{"q":"X"}', tool_call_id="tc_2")
+        t = sa.start_tool(name="web_search", arguments='{"q":"X"}', tool_call_id="tc_2")
         assert isinstance(t, Tool)
         assert t.name == "web_search"
 
@@ -346,10 +346,10 @@ class TestSubAgent:
 
     def test_subagent_with_nested_tools(self) -> None:
         with Turn(agent_name="bot") as turn:
-            with turn.subagent(name="sub") as sa:
-                with sa.tool(name="tool1", arguments='{"x":1}') as t1:
+            with turn.start_subagent(name="sub") as sa:
+                with sa.start_tool(name="tool1", arguments='{"x":1}') as t1:
                     t1.result = "result1"
-                with sa.tool(name="tool2", arguments='{"x":2}') as t2:
+                with sa.start_tool(name="tool2", arguments='{"x":2}') as t2:
                     t2.result = "result2"
         assert t1.result == "result1"
         assert t1.duration_ms >= 0
@@ -379,7 +379,7 @@ class TestTurn:
 
     def test_llm_returns_llm_and_inherits_model(self) -> None:
         t = Turn(model="gpt-4o")
-        c = t.llm(
+        c = t.start_llm(
             model="gpt-4o",
             provider_name="openai",
             system_instructions=["Be helpful"],
@@ -389,12 +389,12 @@ class TestTurn:
         assert c.provider_name == "openai"
         assert c.system_instructions == ["Be helpful"]
         # inherits model when not specified
-        c2 = t.llm()
+        c2 = t.start_llm()
         assert c2.model == "gpt-4o"
 
     def test_tool_returns_tool(self) -> None:
         t = Turn()
-        tool = t.tool(
+        tool = t.start_tool(
             name="get_weather", arguments='{"city":"Tokyo"}', tool_call_id="tc_1"
         )
         assert isinstance(tool, Tool)
@@ -403,12 +403,12 @@ class TestTurn:
 
     def test_subagent_returns_subagent_and_inherits_model(self) -> None:
         t = Turn(model="gpt-4o")
-        sa = t.subagent(name="research-bot", model="gpt-4o-mini")
+        sa = t.start_subagent(name="research-bot", model="gpt-4o-mini")
         assert isinstance(sa, SubAgent)
         assert sa.name == "research-bot"
         assert sa.model == "gpt-4o-mini"
         # inherits model when not specified
-        sa2 = t.subagent(name="bot")
+        sa2 = t.start_subagent(name="bot")
         assert sa2.model == "gpt-4o"
 
     def test_context_manager_sets_timestamps(self) -> None:
@@ -549,16 +549,16 @@ class TestContextVars:
     def test_full_context_manager_pattern(self) -> None:
         with start_conversation(agent_name="weather-bot") as s:
             with s.start_turn(user_message="What's the weather?") as turn:
-                with turn.llm(model="gpt-4o") as llm:
+                with turn.start_llm(model="gpt-4o") as llm:
                     llm.output("Let me check.")
                     llm.usage = Usage(input_tokens=100, output_tokens=50)
-                with turn.tool(
+                with turn.start_tool(
                     name="get_weather",
                     arguments='{"city":"Tokyo"}',
                     tool_call_id="tc_1",
                 ) as tool:
                     tool.result = "75F"
-                with turn.llm(model="gpt-4o") as llm:
+                with turn.start_llm(model="gpt-4o") as llm:
                     llm.output("It's 75F in Tokyo!")
 
         assert get_current_conversation() is None
