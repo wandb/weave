@@ -357,20 +357,55 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
+def test_apply_migrations_recovers_partially_applied(mock_migration_lock):
+    # partial == curr+1 is recoverable: re-run the interrupted (idempotent)
+    # migration, then continue with the rest instead of dead-ending.
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
     )
+    migrator._migration_row_exists = Mock(return_value=True)
     migrator._get_migration_status = Mock(
+        side_effect=[
+            {"curr_version": 1, "partially_applied_version": 2},
+            {"curr_version": 2, "partially_applied_version": None},
+        ]
+    )
+    migrator._get_migrations = Mock(
         return_value={
-            "curr_version": 1,
-            "partially_applied_version": 2,
+            2: {"up": "2.up.sql", "down": "2.down.sql"},
+            3: {"up": "3.up.sql", "down": "3.down.sql"},
+        }
+    )
+    migrator._determine_migrations_to_apply = Mock(return_value=[(3, "3.up.sql")])
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    migrator.apply_migrations("test_db")
+
+    migrator._apply_migration.assert_any_call("test_db", 2, "2.up.sql")
+    migrator._apply_migration.assert_any_call("test_db", 3, "3.up.sql")
+
+
+def test_apply_migrations_raises_on_unrecoverable_partial(mock_migration_lock):
+    # A partial version that isn't the expected next migration (curr+1) is not
+    # safe to auto-recover; require manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 5}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 6)
         }
     )
     migrator._has_migrations_to_apply = Mock(return_value=True)
 
-    with pytest.raises(MigrationError, match="partially applied migration version 2"):
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
         migrator.apply_migrations("test_db")
 
 

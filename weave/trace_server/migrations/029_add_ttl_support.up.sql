@@ -18,10 +18,14 @@ SETTINGS
     enable_block_number_column = 1,
     enable_block_offset_column = 1;
 
--- Step 1b: Rename ttl_at to expire_at on calls_complete
-ALTER TABLE calls_complete RENAME COLUMN IF EXISTS ttl_at TO expire_at;
+-- Step 1b: Add expire_at to calls_complete (additive, not a rename).
+-- ttl_at is kept so a rollback to a pre-029 app can still write it. A RENAME
+-- would be irreversible mid-migration and, under prod write load on CH 25.10,
+-- spawns a mutation that can stall against concurrent lightweight updates.
+ALTER TABLE calls_complete
+    ADD COLUMN IF NOT EXISTS expire_at DateTime DEFAULT '2100-01-01 00:00:00';
 
--- Step 1c: Re-apply TTL expression after column rename.
+-- Step 1c: Set the TTL to expire_at.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
 -- materialize_ttl_after_modify=0: set TTL metadata only. Every row has the
 -- 2100 sentinel so eager materialization rewrites every part to delete nothing.
