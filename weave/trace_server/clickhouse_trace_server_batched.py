@@ -333,6 +333,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 T = TypeVar("T")
+_CallReqT = TypeVar(
+    "_CallReqT", bound=tsi.CallStartReq | tsi.CallEndReq | tsi.CallEndV2Req
+)
 
 # ClickHouse connection pool settings
 CH_POOL_MAX_CONNECTIONS = 50
@@ -885,6 +888,29 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
+        self._flush_file_batches()
+
+        # Raises on fail
+        try:
+            self._flush_calls()
+            self._flush_calls_complete()
+        except Exception:
+            logger.exception("Failed to flush calls")
+            raise
+
+        # Catch and continue on fail
+        try:
+            self._flush_kafka_producer()
+        except Exception:
+            logger.exception("Failed to flush kafka producer")
+
+    def _flush_file_batches(self) -> None:
+        """Fan out staged bucket uploads in parallel, then insert their chunk rows.
+
+        Shared by the per-request content offload and the call_batch flush. The
+        bucket-upload rows join _file_batch before the chunk insert so URIs land
+        alongside any inline-CH fallback chunks. Requires _flush_immediately=True.
+        """
         # Raises on fail
         try:
             self._file_batch.extend(
@@ -901,19 +927,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush file chunks")
             raise
 
-        # Raises on fail
-        try:
-            self._flush_calls()
-            self._flush_calls_complete()
-        except Exception:
-            logger.exception("Failed to flush calls")
-            raise
+    def _offload_call_content(self, req: _CallReqT) -> _CallReqT:
+        """Replace inline base64 content with file refs, uploading in parallel.
 
-        # Catch and continue on fail
+        Each extracted attachment becomes a file_create; staging them and
+        fanning the bucket uploads across the pool turns N serial GCS PUTs into
+        one parallel batch. Files persist before this returns, so the caller's
+        call insert/UPDATE can reference them. Deferral is a no-op when already
+        inside call_batch(), which owns the flush.
+        """
+        if not self._flush_immediately:
+            return process_call_req_to_content(req, self)
+        self._flush_immediately = False
         try:
-            self._flush_kafka_producer()
-        except Exception:
-            logger.exception("Failed to flush kafka producer")
+            processed = process_call_req_to_content(req, self)
+            self._flush_immediately = True
+            self._flush_file_batches()
+            return processed
+        finally:
+            self._file_batch = []
+            self._bucket_uploads = BucketUploadBatch()
+            self._flush_immediately = True
 
     @tag_db_insert_path("call_start_batch")
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
@@ -936,7 +970,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # as enforcing business rules and defaults
         set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
 
-        req = process_call_req_to_content(req, self)
+        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(
             req.start.project_id, self.ch_client
         )
@@ -969,7 +1003,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        req = process_call_req_to_content(req, self)
+        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
         ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
@@ -1063,7 +1097,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         This is used for eager ops like Evaluation.evaluate that need
         their start to be visible immediately in the UI.
         """
-        start_req = process_call_req_to_content(tsi.CallStartReq(start=req.start), self)
+        start_req = self._offload_call_content(tsi.CallStartReq(start=req.start))
         retention_days = get_project_retention_days(
             start_req.start.project_id, self.ch_client
         )
@@ -1097,7 +1131,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallEndV2Res: Empty response on success.
         """
-        req = process_call_req_to_content(req, self)
+        req = self._offload_call_content(req)
 
         write_target = self.table_routing_resolver.resolve_v2_write_target(
             req.end.project_id,
@@ -5662,6 +5696,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(parent_ids=batch),
                     columns=child_columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    include_costs=req.include_costs,
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
