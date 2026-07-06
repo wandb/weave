@@ -120,6 +120,21 @@ export class InMemoryTraceServer {
     throw new Error(`InMemoryTraceServer: unhandled request to ${path}`);
   };
 
+  // Mirrors the generated client: the v2 helper delegates to `request`, so the
+  // request spy still sees the calls/complete path.
+  v2 = {
+    callsCompleteV2EntityProjectCallsCompletePost: async (
+      entity: string,
+      project: string,
+      data: {batch: Call[]}
+    ) =>
+      this.request({
+        path: `/v2/${entity}/${project}/calls/complete`,
+        method: 'POST',
+        body: data,
+      }),
+  };
+
   calls = {
     callsStreamQueryPost: async (queryParams: QueryParams) => {
       let filteredCalls = this._calls.filter(

@@ -1057,10 +1057,7 @@ export class WeaveClient {
 
   private postV2(
     pathSuffix: string,
-    body:
-      | {batch: CompletedCallParams[]}
-      | {start: CallStartParams}
-      | {end: Omit<CallEndParams, 'display_name'>}
+    body: {start: CallStartParams} | {end: Omit<CallEndParams, 'display_name'>}
   ) {
     return this.traceServerApi.request({
       path: `/v2/${this.projectId}/${pathSuffix}`,
@@ -1072,7 +1069,12 @@ export class WeaveClient {
   }
 
   private sendCallsComplete(batch: CompletedCallParams[]) {
-    return this.postV2('calls/complete', {batch});
+    const [entity, project] = this.projectId.split('/');
+    return this.traceServerApi.v2.callsCompleteV2EntityProjectCallsCompletePost(
+      entity,
+      project,
+      {batch}
+    );
   }
 
   private sendCallStartV2(start: CallStartParams) {
