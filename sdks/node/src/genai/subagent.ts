@@ -36,20 +36,22 @@ export interface SubAgentInit extends SpanInitBase {
 /**
  * A nested agent invocation — used when the current agent hands work to
  * another named agent (e.g. a planner calling a researcher). Emits an
- * `invoke_agent` span tagged with the sub-agent's name and (optionally)
+ * `invoke_agent` span tagged with the subagent's name and (optionally)
  * its model.
  *
  * Created by `weave.startSubagent()` (or `turn.startSubagent()`, or
  * `llm.startSubagent()`) and terminated with `end()`. Children (LLM, Tool,
  * SubAgent) attach via the `startLLM`, `startTool`, `startSubagent` methods,
- * so a sub-agent's own model calls and tools nest under its `invoke_agent`
+ * so a subagent's own model calls and tools nest under its `invoke_agent`
  * span rather than flattening onto the parent Turn.
  *
  * @example
  * const sub = weave.startSubagent({name: 'researcher'});
  *
  * try {
- *   // ... orchestrate the sub-agent's LLM/Tool calls ...
+ *   const llm = sub.startLLM({model: 'gpt-4o', providerName: 'openai'});
+ *   // ... orchestrate the subagent's LLM/Tool calls ...
+ *   llm.end();
  * } finally {
  *   sub.end();
  * }
@@ -64,7 +66,7 @@ export interface SubAgentInit extends SpanInitBase {
  *
  * try {
  *   const llm = sub.startLLM({model: 'gpt-4o', providerName: 'openai'});
- *   // ... orchestrate the sub-agent's LLM/Tool calls ...
+ *   // ... orchestrate the subagent's LLM/Tool calls ...
  *   llm.end();
  * } finally {
  *   sub.end();
