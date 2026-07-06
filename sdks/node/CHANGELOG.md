@@ -4,6 +4,25 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.2] - 2026-07-06
+
+### Added
+
+- Add `Turn.record()`, `Subagent.record()`, and `LLM.record()`. ([#7481](https://github.com/wandb/weave/pull/7481), [#7480](https://github.com/wandb/weave/pull/7480))
+- Accept `userMessage` and `systemInstructions` when creating `Turn`s. ([#7468](https://github.com/wandb/weave/pull/7468))
+- Accept `systemInstructions` when creating `Subagent`s and `LLM`s. ([#7471](https://github.com/wandb/weave/pull/7471), [#7472](https://github.com/wandb/weave/pull/7472))
+- Accept `agent_id`, `agent_description`, and `agent_version` when creating `Turn`s and `Conversation`s. ([#7473](https://github.com/wandb/weave/pull/7473), [#7490](https://github.com/wandb/weave/pull/7490))
+- Accept `mediaAttachments`, `responseId`, `responseModel`, `finishReasons`, and `outputType` in `LLM.record()`. ([#7482](https://github.com/wandb/weave/pull/7482))
+
+### Changed
+
+- Deprecate `addEvent`. ([#7458](https://github.com/wandb/weave/pull/7458))
+
+### Fixed
+
+- Re-route agent spans to the active project when re-initialzing a different project via `weave.init()`. ([#7512](https://github.com/wandb/weave/pull/7512))
+
+
 ## [0.16.1] - 2026-06-29
 
 ### Changed
