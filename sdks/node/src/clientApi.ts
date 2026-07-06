@@ -135,10 +135,8 @@ export async function init(
       projectId,
       settings: resolvedSettings,
     });
-    // Re-init to a different project can't reuse the cached GenAI provider
-    // (its exporter is pinned to the previous project via the project_id
-    // header), so tear it down here and let the next span rebuild one aimed at
-    // the new project. See resetTracerProviderForReinit.
+    // Drop a GenAI provider left over from a previous init() to a different
+    // project so the next span rebuilds one that routes to this project.
     resetTracerProviderForReinit(projectId);
     setGlobalClient(client);
     setGlobalDomain(domain);

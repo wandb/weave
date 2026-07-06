@@ -35,18 +35,14 @@ describe('otel/provider', () => {
     expect(getWeaveTracerProvider()).toBe(providerA);
   });
 
-  it('stamps exactly the weave/wandb resource attributes (target project stays off the Resource)', () => {
+  it('sets only the weave SDK resource attributes (no wandb.entity/project)', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     const provider = getWeaveTracerProvider();
     expect(provider).not.toBeNull();
-    // Snapshot the full set of attributes in our own `weave.`/`wandb.`
-    // namespaces (ignoring OTel's default telemetry.* / service.name). The
-    // exact match is the regression guard: server precedence ranks
-    // `wandb.entity`/`wandb.project` Resource attrs above the exporter's
-    // project_id header, so if either ever crept back onto the (immutable)
-    // Resource it would pin routing to the first project and bleed a later
-    // init()'s spans into it. A stray `wandb.*` key here fails the snapshot.
+    // Exact match over our own attributes (ignoring OTel defaults) guards
+    // against `wandb.entity`/`wandb.project` reappearing on the Resource, which
+    // would misroute spans (the server ranks those above the project_id header).
     const attrs = provider!.resource.attributes;
     const weaveOwned = Object.fromEntries(
       Object.entries(attrs).filter(
@@ -62,7 +58,7 @@ describe('otel/provider', () => {
   it('honors a user-supplied SpanProcessor and routes spans through it', async () => {
     const exporter = new InMemorySpanExporter();
     const processor = new SimpleSpanProcessor(exporter);
-    installFakeClient({genai: {spanProcessor: processor}});
+    installFakeClient({settings: {genai: {spanProcessor: processor}}});
 
     const tracer = getWeaveTracer('weave-genai');
     tracer.startSpan('user-supplied-processor-span').end();
@@ -97,7 +93,7 @@ describe('otel/provider', () => {
     // provider. Keeps these tests exercising the same reset path as init(),
     // without standing up the full network-touching init().
     function reinit(projectId: string): void {
-      installFakeClient({}, {projectId});
+      installFakeClient({projectId});
       resetTracerProviderForReinit(projectId);
       getWeaveTracer('weave-genai');
     }

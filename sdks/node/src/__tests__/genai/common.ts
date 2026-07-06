@@ -14,10 +14,10 @@ import {ATTR_GEN_AI_CONVERSATION_ID} from 'weave/genai/semconv';
 export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
 
-export function installFakeClient(
-  settings: Partial<Settings> = {},
-  {projectId = TEST_PROJECT}: {projectId?: string} = {}
-): WeaveClient {
+export function installFakeClient({
+  settings = {},
+  projectId = TEST_PROJECT,
+}: {settings?: Partial<Settings>; projectId?: string} = {}): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
   const client = new WeaveClient({
     traceServerApi,
@@ -139,7 +139,7 @@ export function setupExporterPerTest(): () => InMemorySpanExporter {
   beforeEach(() => {
     current = new InMemorySpanExporter();
     installFakeClient({
-      genai: {spanProcessor: new SimpleSpanProcessor(current)},
+      settings: {genai: {spanProcessor: new SimpleSpanProcessor(current)}},
     });
   });
   return () => current;
