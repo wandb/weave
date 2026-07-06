@@ -877,6 +877,71 @@ def _spans_query_references_identity(req: AgentSpansQueryReq) -> bool:
     ) or _group_by_references_identity(req.group_by)
 
 
+def _sort_references_identity(sort_by: list[AgentSortBy] | None) -> bool:
+    """Whether any sort field resolves to an attributed identity column."""
+    if not sort_by:
+        return False
+    return agent_trace_attribution.fields_reference_identity([s.field for s in sort_by])
+
+
+def _sort_references_cost(sort_by: list[AgentSortBy] | None) -> bool:
+    """Whether any sort field is a per-span cost column (computed by the JOIN)."""
+    if not sort_by:
+        return False
+    return any(s.field in _SPAN_COST_SORTABLE_COLS for s in sort_by)
+
+
+def _with_span_tiebreaker(order_by: str, sort_by: list[AgentSortBy] | None) -> str:
+    """Append `span_id` so the list order is total (a deterministic page).
+
+    The two-pass references the page CTE twice (as the base relation and as the
+    fallback's trace_id scope); a non-total `ORDER BY ... LIMIT` could resolve
+    ties differently per reference and leave a span without its fallback row,
+    blanking an inherited identity. `span_id` completes the table's
+    `(project_id, started_at, span_id)` sort key, so a `started_at`-led page
+    still reads in primary-key order; the tiebreaker direction matches the
+    leading sort term to keep that alignment.
+
+    Correctness rests on `span_id` being unique within the project: that is what
+    makes `(sort..., span_id)` total, so the CTE's two evaluations agree. A
+    cross-trace collision at the same `started_at` is the only thing that would
+    diverge them, blanking one inherited identity.
+    """
+    direction = sort_by[0].direction if sort_by else "DESC"
+    return f"{order_by}, span_id {direction}"
+
+
+def _spans_list_two_pass_applies(req: AgentSpansQueryReq) -> bool:
+    """Whether the ungrouped list read can use the page-prefetch two-pass.
+
+    Valid only when the page is decided independently of attribution: no
+    group_by, and neither the filter nor the sort references an attributed
+    identity column. Otherwise page membership/order would depend on the very
+    attribution we want to defer, so fall back to the always-attribute path.
+
+    Also falls back on a `trace_id` filter: ClickHouse pushes that predicate
+    into the fallback rollup, so the current path is already optimal and the
+    two-pass would only add a redundant scan.
+
+    A cost-column sort also falls back: costs are joined to the page *after* the
+    LIMIT, so the page cannot be ordered by a value it does not yet carry.
+    """
+    if req.group_by:
+        return False
+    if agent_trace_attribution.query_references_identity(req.query):
+        return False
+    if agent_trace_attribution.query_references_trace_id(req.query):
+        return False
+    if req.include_costs and _sort_references_cost(req.sort_by):
+        return False
+    return not _sort_references_identity(req.sort_by)
+
+
+def _base_relation(pb: ParamBuilder, project_id: str, *, include_costs: bool) -> str:
+    """The bare relation a spans read scans: cost-augmented source or raw `spans`."""
+    return cost_augmented_source_sql(pb, project_id) if include_costs else "spans"
+
+
 def _spans_source(
     pb: ParamBuilder,
     req: AgentSpansQueryReq,
@@ -893,7 +958,7 @@ def _spans_source(
     `agent_trace_attribution`); otherwise the base is used directly so
     non-identity queries skip the extra trace scan.
     """
-    base = cost_augmented_source_sql(pb, req.project_id) if include_costs else "spans"
+    base = _base_relation(pb, req.project_id, include_costs=include_costs)
     if not attribute:
         return base
     return agent_trace_attribution.attributed_spans_source(
@@ -903,6 +968,61 @@ def _spans_source(
         started_before=req.started_before,
         base_relation=base,
     )
+
+
+# Name of the two-pass page CTE, fed to the attributed source as its
+# `base_relation` (cost-augmented when costs are on) and `fallback_scope_relation`.
+_PAGE_CTE = "page"
+
+
+def _two_pass_spans_list_query(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    *,
+    projection: str,
+    where: str,
+    order_by: str,
+    limit_slot: str,
+    offset_slot: str,
+) -> str:
+    """Page-prefetch two-pass SQL for the ungrouped list read.
+
+    The page is limited first on the bare `spans` table (sort-key pruned), then
+    only the page is attributed by feeding it as `base_relation` with the
+    fallback rollup scoped to the page's traces (gating in
+    `_spans_list_two_pass_applies`). This avoids the whole-project base scan +
+    rollup the always-attribute path pays before its LIMIT. No outer LIMIT: the
+    page already holds exactly the displayed rows and the trace_id join is 1:1.
+
+    Costs (the per-span price JOIN) wrap the *page*, not the base, so the JOIN
+    runs over the limited rows; putting it under the page LIMIT would force a
+    whole-project scan (the LIMIT can't prune below a JOIN). Cost-column sorts
+    gate out of the two-pass since the page would then depend on the JOIN.
+    """
+    attr_base = _PAGE_CTE
+    if req.include_costs:
+        attr_base = cost_augmented_source_sql(
+            pb, req.project_id, base_relation=_PAGE_CTE
+        )
+    attributed_page = agent_trace_attribution.attributed_spans_source(
+        pb,
+        project_id=req.project_id,
+        started_after=req.started_after,
+        started_before=req.started_before,
+        base_relation=attr_base,
+        fallback_scope_relation=_PAGE_CTE,
+    )
+    return f"""
+        WITH {_PAGE_CTE} AS (
+            SELECT * FROM spans s
+            WHERE {where}
+            ORDER BY {order_by}
+            LIMIT {limit_slot} OFFSET {offset_slot}
+        )
+        SELECT {projection}
+        FROM {attributed_page} s
+        ORDER BY {order_by}
+    """
 
 
 def _agents_where(pb: ParamBuilder, req: AgentsQueryReq) -> str:
@@ -1029,10 +1149,11 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
 
 def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     """List spans (ungrouped) or aggregate groups (grouped)."""
-    # Always attribute: the spans table and its grouped rollups exist to show
-    # each span's agent / conversation identity, which child spans only have via
-    # their trace. The attributed source is allocated last (see `_spans_source`)
-    # so it never renumbers the filter / projection params.
+    # The list view shows each span's agent / conversation identity, which child
+    # spans only have via their trace, so the source is attributed. A plain
+    # ungrouped list (sort/filter independent of identity) uses the page-prefetch
+    # two-pass instead, attributing only the returned page. The attributed source
+    # is allocated last so it never renumbers the filter / projection params.
     span_filters = _spans_filter_sql(pb, req)
     limit_slot, offset_slot = _pagination_slots(pb, req.limit, req.offset)
 
@@ -1041,20 +1162,34 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         sortable = SPAN_SORTABLE_COLS.union(frozenset(custom_sort_exprs.keys()))
         if req.include_costs:
             sortable = sortable.union(_SPAN_COST_SORTABLE_COLS)
-        order_by = build_order_by(
+        order_by = _with_span_tiebreaker(
+            build_order_by(
+                req.sort_by,
+                sortable,
+                "started_at DESC",
+                column_exprs=custom_sort_exprs,
+            ),
             req.sort_by,
-            sortable,
-            "started_at DESC",
-            column_exprs=custom_sort_exprs,
         )
         custom_attr_projection = _custom_attr_map_projection(
             pb, req.custom_attr_columns
         )
         details_projection = f", {SPANS_DETAILS_COLS}" if req.include_details else ""
         cost_projection = f", {SPANS_COST_COLS}" if req.include_costs else ""
+        projection = f"{SPANS_LIST_COLS}{details_projection}{custom_attr_projection}{cost_projection}"
+        if _spans_list_two_pass_applies(req):
+            return _two_pass_spans_list_query(
+                pb,
+                req,
+                projection=projection,
+                where=span_filters.where,
+                order_by=order_by,
+                limit_slot=limit_slot,
+                offset_slot=offset_slot,
+            )
         source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
         return f"""
-            SELECT {SPANS_LIST_COLS}{details_projection}{custom_attr_projection}{cost_projection}
+            SELECT {projection}
             FROM {source} s
             WHERE {span_filters.where}
             ORDER BY {order_by}
@@ -1229,27 +1364,24 @@ def make_custom_attrs_schema_query(
     span_filters = _spans_filter_sql(pb, req)
     limit_slot = pb.add(req.limit + 1, param_type="UInt64")
     offset_slot = pb.add(req.offset, param_type="UInt64")
-    key_columns = ",\n               ".join(
-        f"s.{source}.keys AS {source}_keys" for source, _ in _CUSTOM_ATTR_SCHEMA_SOURCES
-    )
-    attr_arrays = ",\n            ".join(
-        f"arrayMap(k -> tuple('{source}', k, '{value_type}'), filtered.{source}_keys)"
+    # Per-source UNION ALL: a scalar ARRAY JOIN + GROUP BY on the bare key is far
+    # cheaper (CPU, peak memory) than grouping on one concatenated per-row tuple array.
+    source_branches = "\n            UNION ALL\n            ".join(
+        f"""SELECT '{source}' AS source,
+                   '{value_type}' AS value_type,
+                   key,
+                   count() AS span_count
+            FROM spans s
+            ARRAY JOIN s.{source}.keys AS key
+            WHERE {span_filters.where}
+            GROUP BY key"""
         for source, value_type in _CUSTOM_ATTR_SCHEMA_SOURCES
     )
     return f"""
-        SELECT tupleElement(attr, 1) AS source,
-               tupleElement(attr, 2) AS key,
-               tupleElement(attr, 3) AS value_type,
-               count() AS span_count
+        SELECT source, key, value_type, span_count
         FROM (
-            SELECT {key_columns}
-            FROM spans s
-            WHERE {span_filters.where}
-        ) filtered
-        ARRAY JOIN arrayConcat(
-            {attr_arrays}
-        ) AS attr
-        GROUP BY source, key, value_type
+            {source_branches}
+        )
         ORDER BY span_count DESC, key ASC, source ASC
         LIMIT {limit_slot} OFFSET {offset_slot}
     """
@@ -1741,10 +1873,11 @@ def make_conversation_chat_spans_query(
     # Always cost-augmented so the multi-turn chat view can render per-message
     # and per-turn cost; bounded to one conversation's turns, so cheap.
     source = cost_augmented_source_sql(pb, req.project_id)
+    # Scope to this conversation's spans + untagged children. The duplicate
+    # `trace_id IN (turn_page)` is the index prune CH won't derive from the
+    # JOIN; keep turn_page's total ORDER BY so both inlined scans agree.
     return f"""
-        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
-        FROM {source} s
-        INNER JOIN (
+        WITH turn_page AS (
             SELECT trace_id, min(started_at) AS turn_started_at
             FROM spans
             WHERE {_project_filter_sql("project_id", pid)}
@@ -1752,8 +1885,13 @@ def make_conversation_chat_spans_query(
             GROUP BY trace_id
             ORDER BY turn_started_at DESC, trace_id DESC
             LIMIT {limit_slot} OFFSET {offset_slot}
-        ) t ON s.trace_id = t.trace_id
+        )
+        SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+        FROM {source} s
+        INNER JOIN turn_page t ON s.trace_id = t.trace_id
         WHERE {_project_filter_sql("s.project_id", pid)}
+          AND s.trace_id IN (SELECT trace_id FROM turn_page)
+          AND s.conversation_id IN ({cid}, '')
         ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
     """
 

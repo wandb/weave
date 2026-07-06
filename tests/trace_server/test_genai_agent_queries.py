@@ -289,6 +289,391 @@ def test_span_with_own_identity_is_not_reattributed(ch_server):
     assert {s.span_id for s in coordinator.spans} == {coordinator_span_id}
 
 
+def _identity(span: object) -> tuple[str, str, str, str]:
+    return (
+        span.agent_name,
+        span.agent_version,
+        span.agent_id,
+        span.conversation_id,
+    )
+
+
+def test_two_pass_list_attribution_matches_full_attribution(ch_server):
+    """The page-prefetch two-pass attributes a span exactly like the full path.
+
+    A plain list (non-identity sort/filter) limits first then attributes only
+    the page, scoping the fallback to the page's traces. This must produce the
+    same per-span identity as the full-attribution path, even when the page
+    straddles a trace boundary: a child span on the page inherits the identity
+    of its trace's earliest agent span *even when that span is off the page*,
+    because the fallback is scoped by trace_id, not by the page's rows.
+    """
+    project_id = _make_project_id("two_pass_attr")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    tx, ty, tq = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+
+    def sid() -> str:
+        return uuid.uuid4().hex
+
+    root_x, own_z, child_x = sid(), sid(), sid()
+    root_y, child_y, q = sid(), sid(), sid()
+
+    def at(secs: int) -> datetime.datetime:
+        return now + datetime.timedelta(seconds=secs)
+
+    spans = [
+        # Trace TX: earliest span (root_x) declares Delta; a later sub-agent span
+        # (own_z) declares its own Zeta; the latest span (child_x) is unset and
+        # must inherit Delta. Sorted started_at DESC, root_x is LAST -> a small
+        # page that includes child_x excludes root_x (the straddle case).
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=root_x,
+            operation_name="invoke_agent",
+            agent_name="Delta",
+            agent_version="dv",
+            agent_id="did",
+            conversation_id="cx",
+            started_at=at(1),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=own_z,
+            operation_name="invoke_agent",
+            agent_name="Zeta",
+            agent_version="zv",
+            agent_id="zid",
+            conversation_id="",
+            started_at=at(99),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=child_x,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(100),
+        ),
+        # Trace TY: root + inheriting child, both recent (fully on a small page).
+        _make_span(
+            project_id,
+            trace_id=ty,
+            span_id=root_y,
+            operation_name="invoke_agent",
+            agent_name="Epsilon",
+            agent_version="ev",
+            agent_id="eid",
+            conversation_id="cy",
+            started_at=at(101),
+        ),
+        _make_span(
+            project_id,
+            trace_id=ty,
+            span_id=child_y,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(102),
+        ),
+        # Trace TQ: a lone unset span, no identity-bearing span in its trace, so
+        # it stays blank under both paths.
+        _make_span(
+            project_id,
+            trace_id=tq,
+            span_id=q,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(50),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Two-pass (default started_at DESC sort, non-identity -> two-pass).
+    two_pass = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    tp = {s.span_id: _identity(s) for s in two_pass.spans}
+
+    # The attribution rule, computed independently of the query.
+    assert tp[root_x] == ("Delta", "dv", "did", "cx")
+    assert tp[child_x] == ("Delta", "dv", "did", "cx")  # inherits root_x's triple
+    assert tp[own_z] == ("Zeta", "zv", "zid", "cx")  # own triple, conv inherited
+    assert tp[root_y] == ("Epsilon", "ev", "eid", "cy")
+    assert tp[child_y] == ("Epsilon", "ev", "eid", "cy")
+    assert tp[q] == ("", "", "", "")
+
+    # Full-attribution path (identity sort gates out of two-pass) attributes
+    # every span identically; compared by span_id so the sort order is moot.
+    full = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            sort_by=[AgentSortBy(field="agent_name", direction="asc")],
+        )
+    )
+    assert {s.span_id: _identity(s) for s in full.spans} == tp
+
+    # Straddle: a page of 3 (started_at DESC) is [child_y, root_y, child_x].
+    # child_x inherits Delta even though its source span root_x is off the page.
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, limit=3)
+    )
+    assert [s.span_id for s in page.spans] == [child_y, root_y, child_x]
+    assert all(_identity(s) == tp[s.span_id] for s in page.spans)
+
+
+def test_two_pass_page_cut_inside_started_at_tie(ch_server):
+    """When the page cut falls inside a `started_at` tie, the `span_id`
+    tiebreaker gives a well-defined page and inheritance holds across the cut.
+
+    The two-pass references the page twice (base relation + the fallback's
+    trace_id scope); a `started_at`-only order is not total, so the page is
+    contractually defined only once `span_id` completes the sort key (see the
+    SQL snapshot tests for the tiebreaker itself). Here the cut splits a tie and
+    a child's identity-bearing root sorts below it, so the page takes the child
+    but not the root; the trace_id-scoped fallback still attributes it.
+    """
+    project_id = _make_project_id("two_pass_ties")
+    tied = datetime.datetime(2026, 3, 1, tzinfo=datetime.timezone.utc)
+
+    # All spans share one `started_at`; `span_id DESC` alone orders the page.
+    # t1's root sorts BELOW its child, so a page of 3 takes the child and cuts
+    # the root off (straddle within the tie); t1's child must still inherit.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_root",
+            operation_name="invoke_agent",
+            agent_name="Gamma",
+            agent_version="gv",
+            agent_id="gid",
+            conversation_id="cg",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_root",
+            operation_name="invoke_agent",
+            agent_name="Theta",
+            agent_version="tv",
+            agent_id="tid",
+            conversation_id="ct",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="f0",
+            span_id="f0",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # span_id DESC over the tie: t2_zchild, t2_root, t1_zchild, t1_root, f0.
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, limit=3)
+    )
+    assert [s.span_id for s in page.spans] == ["t2_zchild", "t2_root", "t1_zchild"]
+    ident = {s.span_id: _identity(s) for s in page.spans}
+    assert ident["t2_zchild"] == ("Theta", "tv", "tid", "ct")
+    assert ident["t2_root"] == ("Theta", "tv", "tid", "ct")
+    # The straddle-in-tie span: inherits Gamma though t1_root is below the cut.
+    assert ident["t1_zchild"] == ("Gamma", "gv", "gid", "cg")
+
+
+def test_two_pass_inherits_root_outside_window_via_slack(ch_server):
+    """The two-pass fallback widens by slack, so an in-window child inherits an
+    identity-bearing root that started just before the query window.
+
+    The page base scan is bounded to the window (the root is off-page), but the
+    trace_id-scoped fallback rollup widens the window by one trace-duration, so
+    the root still resolves and the child inherits across the window edge.
+    """
+    project_id = _make_project_id("two_pass_slack")
+    after = datetime.datetime(2026, 4, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    before = after + datetime.timedelta(minutes=10)
+
+    # root starts 5min before the window (inside the 1h fallback slack); child
+    # starts inside the window. A lone in-window span anchors the page.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="root",
+            operation_name="invoke_agent",
+            agent_name="Sigma",
+            agent_version="sv",
+            agent_id="sid",
+            conversation_id="cs",
+            started_at=after - datetime.timedelta(minutes=5),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="child",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=1),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="other",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id, started_after=after, started_before=before
+        )
+    )
+    by_id = {s.span_id: _identity(s) for s in page.spans}
+    # root is off-page (outside the window) but still resolves the child.
+    assert "root" not in by_id
+    assert by_id["child"] == ("Sigma", "sv", "sid", "cs")
+    assert by_id["other"] == ("", "", "", "")
+
+
+def test_two_pass_include_costs_matches_full_attribution(ch_server):
+    """include_costs two-pass joins prices to the page; per-span costs equal the
+    full-attribution path, the cost is span-exact (a child's own tokens, not the
+    inherited agent's), and an unpriced model passes through as null cost.
+    """
+    project_id = _make_project_id("two_pass_costs")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    tx = uuid.uuid4().hex
+    root, child, lone = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+
+    def at(secs: int) -> datetime.datetime:
+        return now + datetime.timedelta(seconds=secs)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=root,
+            operation_name="invoke_agent",
+            agent_name="Delta",
+            agent_version="dv",
+            agent_id="did",
+            conversation_id="cx",
+            request_model="gpt-4o",
+            input_tokens=1000,
+            output_tokens=500,
+            started_at=at(1),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=child,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="gpt-4o",
+            input_tokens=200,
+            output_tokens=100,
+            started_at=at(2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=lone,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="no-such-model-xyz",
+            input_tokens=10,
+            output_tokens=10,
+            started_at=at(3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    tp = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(project_id=project_id, include_costs=True)
+        ).spans
+    }
+    # A cost-column sort gates out of the two-pass -> the full-attribution path.
+    full = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                include_costs=True,
+                sort_by=[AgentSortBy(field="total_cost_usd", direction="desc")],
+            )
+        ).spans
+    }
+
+    def costs(s: object) -> tuple:
+        return (s.input_cost_usd, s.output_cost_usd, s.total_cost_usd)
+
+    for sid in (root, child, lone):
+        assert costs(tp[sid]) == costs(full[sid])
+        assert _identity(tp[sid]) == _identity(full[sid])
+
+    # Priced spans get real costs; the child's cost is its own (200/100 tokens),
+    # not the inherited agent's (1000/500), while its identity IS inherited.
+    assert tp[root].total_cost_usd
+    assert tp[child].total_cost_usd
+    assert tp[child].total_cost_usd != tp[root].total_cost_usd
+    assert _identity(tp[child]) == ("Delta", "dv", "did", "cx")
+    # An unpriced model stays null (distinguishes "unpriced" from "free").
+    assert tp[lone].total_cost_usd is None
+
+
 def test_unset_span_inherits_a_coherent_agent_triple(ch_server):
     """An inherited identity is one real agent, never a mix of two.
 
@@ -1356,29 +1741,26 @@ def test_agent_span_stats_ungrouped_all_time(ch_server):
 
 
 def test_agent_span_stats_numeric_value_buckets(ch_server):
-    """Stats API can bucket the full filtered span set by numeric value range."""
+    """Stats API buckets the full filtered span set by numeric value range.
+
+    A known input_tokens distribution over min=0, max=40, bins=4 pins the
+    complete per-bucket output (index, edges, count) so a bounds miscompute
+    fails CI rather than a dashboard.
+    """
     project_id = _make_project_id("stats_hist")
     start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 
+    # width = (40-0)/4 = 10 -> buckets [0,10) [10,20) [20,30) [30,40].
+    # counts by bucket: 0,5 -> 2 | 12,18 -> 2 | 22 -> 1 | 35,38,40 -> 3.
+    token_values = [0, 5, 12, 18, 22, 35, 38, 40]
     spans = [
         _make_span(
             project_id,
-            input_tokens=10,
-            started_at=start + datetime.timedelta(seconds=10),
-            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=20,
-            started_at=start + datetime.timedelta(seconds=20),
-            ended_at=start + datetime.timedelta(seconds=20, milliseconds=200),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=30,
-            started_at=start + datetime.timedelta(seconds=30),
-            ended_at=start + datetime.timedelta(seconds=30, milliseconds=300),
-        ),
+            input_tokens=tokens,
+            started_at=start + datetime.timedelta(seconds=idx),
+            ended_at=start + datetime.timedelta(seconds=idx, milliseconds=100),
+        )
+        for idx, tokens in enumerate(token_values)
     ]
     _insert_spans(ch_server.ch_client, spans)
 
@@ -1393,7 +1775,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
                     source="field",
                     key="usage.input_tokens",
                 ),
-                bins=2,
+                bins=4,
             ),
             metrics=[
                 AgentSpanStatsMetricSpec(
@@ -1408,9 +1790,10 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
 
     assert res.bucket_type == "number"
     assert res.granularity is None
-    assert [row["count_spans"] for row in res.rows] == [1, 2]
-    assert res.rows[0]["bucket_min"] == 10
-    assert res.rows[-1]["bucket_max"] == 30
+    assert [row["bucket_index"] for row in res.rows] == [0, 1, 2, 3]
+    assert [row["bucket_min"] for row in res.rows] == [0, 10, 20, 30]
+    assert [row["bucket_max"] for row in res.rows] == [10, 20, 30, 40]
+    assert [row["count_spans"] for row in res.rows] == [2, 2, 1, 3]
 
 
 @pytest.mark.flaky(reruns=3)
@@ -1935,6 +2318,109 @@ def test_conversation_chat_includes_child_spans_without_conversation_id(ch_serve
     assert tool.tool_call.tool_name == "lookup"
     assert tool.tool_call.tool_arguments == '{"query":"hello"}'
     assert tool.tool_call.tool_result == '{"ok":true}'
+
+
+def test_conversation_chat_excludes_foreign_conversation_sharing_trace_id(ch_server):
+    """A reused trace_id must not bleed foreign conversations into the chat view.
+
+    Agent-eval workloads reuse trace_id across conversations, so the page of
+    turn trace_ids matches spans from other conversations too. The chat view
+    must never return another conversation's tagged spans.
+
+    Untagged children are a known limitation: producers tag conversation_id
+    only on the root span, so a foreign conversation's untagged children on a
+    shared trace_id cannot be attributed and still bleed (see PR #7450).
+    """
+    project_id = _make_project_id("conv_chat_bleed")
+    conv_a = f"conv-a-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-b-{uuid.uuid4().hex[:8]}"
+    shared_trace = uuid.uuid4().hex  # reused by both conversations
+    a_only_trace = uuid.uuid4().hex  # conv A's second turn, its own trace
+    root_a = uuid.uuid4().hex
+    root_b = uuid.uuid4().hex
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_a,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-shared")],
+            started_at=now,
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_a,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childA-text")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            span_id=root_b,
+            conversation_id=conv_b,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userB-foreign")],
+            output_messages=[
+                NormalizedMessage(role="assistant", content="assistantB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=shared_trace,
+            parent_span_id=root_b,
+            operation_name="chat",
+            output_messages=[
+                NormalizedMessage(role="assistant", content="childB-foreign")
+            ],
+            started_at=now + datetime.timedelta(seconds=1),
+            ended_at=now + datetime.timedelta(seconds=2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=a_only_trace,
+            conversation_id=conv_a,
+            operation_name="invoke_agent",
+            input_messages=[NormalizedMessage(role="user", content="userA-only")],
+            started_at=now + datetime.timedelta(minutes=1),
+            ended_at=now + datetime.timedelta(minutes=1, seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_conversation_chat(
+        AgentConversationChatReq(project_id=project_id, conversation_id=conv_a)
+    )
+
+    assert res.total_turns == 2
+    assert {turn.trace_id for turn in res.turns} == {shared_trace, a_only_trace}
+
+    texts = [
+        payload.text
+        for turn in res.turns
+        for msg in turn.messages
+        for payload in (msg.user_message, msg.assistant_message)
+        if payload is not None
+    ]
+    assert "userA-shared" in texts
+    assert "childA-text" in texts
+    assert "userA-only" in texts
+    # conv B's tagged root is excluded by conversation_id scoping.
+    assert "userB-foreign" not in texts
+    assert "assistantB-foreign" not in texts
+    # Known limitation (PR #7450 discussion): conv B's untagged child shares
+    # the trace_id, so it currently bleeds. Flip to `not in` when fixed.
+    assert "childB-foreign" in texts
 
 
 # ---------------------------------------------------------------------------

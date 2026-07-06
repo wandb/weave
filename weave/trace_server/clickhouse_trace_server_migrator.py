@@ -608,7 +608,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         and 999 (KEEPER_EXCEPTION) when ON CLUSTER DDL hits a transient Keeper
         coordination error.
         """
-        self.ch_client.command(command, settings=settings)
+        merged_settings = {
+            **ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            **(settings or {}),
+        }
+        self.ch_client.command(command, settings=merged_settings)
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):
