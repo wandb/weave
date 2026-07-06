@@ -1151,8 +1151,6 @@ class CallsQuery(BaseModel):
             raise ValueError("Missing select columns")
 
         # Determine if we should use the two-step filtered_calls CTE pattern.
-        # Only relevant for calls_merged (where GROUP BY makes the two-pass
-        # approach worthwhile). For calls_complete, we always use single-pass.
         should_use_filter_cte = self._should_use_filter_cte()
 
         # Important: Always inject deleted_at into the query.
@@ -1224,16 +1222,29 @@ class CallsQuery(BaseModel):
             ctes.add_cte(CTE_FILTER_CANDIDATE_IDS, candidate_cte_sql)
             candidate_cte_name = CTE_FILTER_CANDIDATE_IDS
 
+        # Two-pass filtered_calls CTE: pass 1 narrows ids on light columns, pass 2
+        # loads heavy *_dump columns only for the page. For calls_complete this reads
+        # the page's payloads instead of every scanned row's (prod: 28 GiB -> 1.7 GiB
+        # on a fat-payload list read). calls_merged additionally uses it for costs /
+        # object-ref pushdown ahead of its GROUP BY.
+        use_filter_cte = should_use_filter_cte or (
+            self.read_table != ReadTable.CALLS_COMPLETE
+            and (self.include_costs or bool(object_ref_conditions))
+        )
+
         # On calls_complete the total-storage rollup otherwise aggregates the
         # whole project's stats. Scope it to the matched calls' traces so the
-        # stats primary key (project_id, id) prunes the scan.
+        # stats primary key (project_id, id) prunes the scan. Only the single-pass
+        # paths reference it; two-pass scopes the rollup via filtered_calls, so
+        # emitting it there is dead SQL.
         storage_scope_cte_name: str | None = None
-        scope_cte_sql = self._build_storage_scope_ids_cte_sql(
-            pb, table_alias_resolved, field_to_object_join_alias_map
-        )
-        if scope_cte_sql is not None:
-            ctes.add_cte(CTE_STORAGE_SCOPE_IDS, scope_cte_sql)
-            storage_scope_cte_name = CTE_STORAGE_SCOPE_IDS
+        if not use_filter_cte:
+            scope_cte_sql = self._build_storage_scope_ids_cte_sql(
+                pb, table_alias_resolved, field_to_object_join_alias_map
+            )
+            if scope_cte_sql is not None:
+                ctes.add_cte(CTE_STORAGE_SCOPE_IDS, scope_cte_sql)
+                storage_scope_cte_name = CTE_STORAGE_SCOPE_IDS
 
         if (
             not should_use_filter_cte
@@ -1249,16 +1260,6 @@ class CallsQuery(BaseModel):
             if ctes.has_ctes():
                 return safely_format_sql(ctes.to_sql() + "\n" + base_sql, logger)
             return base_sql
-
-        # Two-pass filtered_calls CTE: pass 1 narrows ids on light columns, pass 2
-        # loads heavy *_dump columns only for the page. For calls_complete this reads
-        # the page's payloads instead of every scanned row's (prod: 28 GiB -> 1.7 GiB
-        # on a fat-payload list read). calls_merged additionally uses it for costs /
-        # object-ref pushdown ahead of its GROUP BY.
-        use_filter_cte = should_use_filter_cte or (
-            self.read_table != ReadTable.CALLS_COMPLETE
-            and (self.include_costs or bool(object_ref_conditions))
-        )
 
         if use_filter_cte:
             # Build two queries: a filter CTE that narrows rows by light
