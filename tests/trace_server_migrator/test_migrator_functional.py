@@ -83,6 +83,30 @@ def _reset_migration_version(
     )
 
 
+def _set_partial_migration(
+    ch_client, mgmt_db: str, target_db: str, curr: int, partial: int
+) -> None:
+    """Forge a crashed-mid-migration row: curr_version=curr, partial=partial.
+
+    Reproduces the state a pod leaves behind when it dies after _apply_migration
+    records partially_applied_version but before it records curr_version.
+    """
+    ch_client.command(
+        f"ALTER TABLE {mgmt_db}.migrations "
+        f"UPDATE curr_version = {curr}, partially_applied_version = {partial} "
+        f"WHERE db_name = '{target_db}' SETTINGS mutations_sync = 2"
+    )
+
+
+def _get_partial_version(ch_client, mgmt_db: str, target_db: str) -> int | None:
+    result = ch_client.query(
+        f"SELECT partially_applied_version FROM {mgmt_db}.migrations "
+        f"WHERE db_name = '{target_db}'"
+    )
+    assert len(result.result_rows) == 1, f"Migration status for {target_db} not found"
+    return result.result_rows[0][0]
+
+
 def _table_swap_versions(migration_dir: str) -> list[int]:
     """Versions whose up.sql performs a bare `RENAME TABLE`.
 
@@ -707,6 +731,71 @@ def test_production_migrations_are_idempotent(
     assert _schema_snapshot(ch_client, target_db) == before, (
         "re-running migrations changed the table/column schema"
     )
+
+
+@pytest.mark.parametrize(
+    ("case_name", "replicated", "use_distributed"),
+    [
+        pytest.param("cloud", False, False, id="cloud"),
+        pytest.param("replicated", True, False, id="replicated"),
+        pytest.param("distributed", True, True, id="distributed"),
+    ],
+)
+def test_partial_migration_auto_recovers(
+    ch_client, case_name: str, replicated: bool, use_distributed: bool
+):
+    """A crash mid-migration self-heals on the next startup instead of crash-looping.
+
+    _apply_migration records partially_applied_version before running the DDL and
+    clears it after, so a crash in between leaves the flag set. Recovery re-runs
+    that idempotent migration and converges to latest (the incident hard-raised
+    here and crash-looped for 44h). A one-shot migration (024 table swap) is never
+    auto-recovered: it raises for manual repair with the flag left intact.
+    """
+    mgmt_db = _unique_name(f"db_mgmt_recover_{case_name}")
+    target_db = _unique_name(f"recover_{case_name}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    kwargs = {
+        "replicated": replicated,
+        "use_distributed": use_distributed,
+        "management_db": mgmt_db,
+        "migration_dir": _PROD_MIGRATION_DIR,
+        "post_migration_hook": None,
+    }
+    if replicated:
+        kwargs["replicated_cluster"] = _CLUSTER
+        kwargs["replicated_path"] = _REPLICATED_PATH
+    migrator = get_clickhouse_trace_server_migrator(ch_client, **kwargs)
+
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    swaps = _table_swap_versions(_PROD_MIGRATION_DIR)
+    recoverable = latest not in swaps and latest != 6
+    assert recoverable, (
+        f"test assumes migration {latest} is re-runnable; it is one-shot, so forge "
+        "the partial state on a recoverable version instead"
+    )
+
+    migrator.apply_migrations(target_db)
+    clean_schema = _schema_snapshot(ch_client, target_db)
+
+    # Happy path: forge a crash mid-`latest`, then recover to a clean converge.
+    _set_partial_migration(ch_client, mgmt_db, target_db, latest - 1, latest)
+    migrator.apply_migrations(target_db)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+    assert _get_partial_version(ch_client, mgmt_db, target_db) is None
+    assert _schema_snapshot(ch_client, target_db) == clean_schema, (
+        "auto-recovery changed the schema; the re-run was not a no-op"
+    )
+
+    # Denylist: a one-shot swap is refused and the flag survives for manual repair.
+    swap = swaps[0]
+    _set_partial_migration(ch_client, mgmt_db, target_db, swap - 1, swap)
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
+        migrator.apply_migrations(target_db)
+    assert _get_partial_version(ch_client, mgmt_db, target_db) == swap
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == swap - 1
 
 
 @pytest.mark.parametrize(
