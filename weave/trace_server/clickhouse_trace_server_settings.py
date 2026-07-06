@@ -120,10 +120,9 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
-# Physical reclamation of soft-deleted calls_complete rows: sync=0 so the DELETE
-# returns once scheduled and never blocks the request (the soft-delete already hid them).
+# Physical reclamation of soft-deleted calls_complete rows: sync=0 lets the lightweight
+# DELETE return once scheduled (never blocks). A DELETE needs none of the UPDATE settings.
 CLICKHOUSE_ASYNC_DELETE_SETTINGS: dict[str, int | str] = {
-    **CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
     "lightweight_deletes_sync": 0,
 }
 
