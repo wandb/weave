@@ -6,8 +6,10 @@ Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 import os
 import uuid
 
+import clickhouse_connect
 import pytest
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
     get_clickhouse_trace_server_migrator,
 )
@@ -530,3 +532,40 @@ def test_all_production_down_migrations_distributed(ch_client):
 
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)
+
+
+def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
+    """A client minted with the production migration timeout runs a full
+    replicated migration and carries the incident-fixing HTTP read timeout.
+    """
+    host, port = ch_keeper_server
+    client = clickhouse_connect.get_client(
+        host=host,
+        port=port,
+        autogenerate_session_id=False,
+        send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC,
+    )
+    assert client.timeout.read_timeout == (
+        ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+    )
+
+    mgmt_db = _unique_name("db_mgmt_timeout")
+    target_db = _unique_name("timeout_repl")
+    try:
+        migrator = get_clickhouse_trace_server_migrator(
+            client,
+            replicated=True,
+            use_distributed=False,
+            replicated_cluster=_CLUSTER,
+            replicated_path=_REPLICATED_PATH,
+            management_db=mgmt_db,
+            migration_dir=_PROD_MIGRATION_DIR,
+            post_migration_hook=None,
+        )
+        latest_version = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+        migrator.apply_migrations(target_db)
+        assert _get_migration_version(client, mgmt_db, target_db) == latest_version
+    finally:
+        for db in (target_db, mgmt_db):
+            client.command(f"DROP DATABASE IF EXISTS {db}")
+        client.close()

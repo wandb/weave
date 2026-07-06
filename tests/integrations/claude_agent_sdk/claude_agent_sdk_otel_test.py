@@ -22,17 +22,17 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode
 
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
+from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
-from weave.session import agent_name_override
 
 
 @pytest.fixture
 def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporter]:
     """Install an in-memory OTel exporter as the global provider.
 
-    Mirrors the session-SDK / openai_agents_otel fixture: overrides the
+    Mirrors the conversation-SDK / openai_agents_otel fixture: overrides the
     private ``_TRACER_PROVIDER`` so prior state is restored cleanly and the
     "set once" warning is avoided.
     """

@@ -26,6 +26,12 @@ MAX_AGENT_STATS_RESULT_ROWS = 10_000
 # Maximum number of traces to render in the multi-turn conversation chat view.
 MAX_CONVERSATION_CHAT_TURNS = 50
 
+# Maximum number of spans returned per conversation by agent_conversation_spans.
+# Bounds the payload of the per-conversation spans sequence (the "minimap"); the
+# client downsamples further for narrow columns. Conversations longer than this
+# truncate their tail.
+MAX_CONVERSATION_SPANS = 200
+
 # ---------------------------------------------------------------------------
 # Chat view walk limits
 # ---------------------------------------------------------------------------

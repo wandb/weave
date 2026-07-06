@@ -1,7 +1,6 @@
 import {join} from 'node:path';
 import {DefaultRequestMatcher, FileStorage, VCR} from 'vcr-test';
 import type {HttpRequest} from 'vcr-test';
-import {CLIENT_CAPABILITIES_HEADER} from '../../constants';
 
 const vcr = new VCR(new FileStorage(join(__dirname, '..', '__cassettes__')));
 
@@ -29,6 +28,25 @@ function normalizeVolatileBodyFields(req: HttpRequest): HttpRequest {
 }
 
 /**
+ * Replace the SDK version token in the `user-agent` header with a stable
+ * placeholder, so cassette matching survives version bumps.
+ */
+function normalizeUserAgentVersion(req: HttpRequest): HttpRequest {
+  const userAgent = req.headers['user-agent'];
+  if (!userAgent) {
+    return req;
+  }
+
+  return {
+    ...req,
+    headers: {
+      ...req.headers,
+      'user-agent': userAgent.replace(/(JS Client ).+$/, '$1<VERSION>'),
+    },
+  };
+}
+
+/**
  * Replace per-request multipart boundary with a stable placeholder
  * in both the `content-type` header and the body, so cassette matching works
  * across runs. Non-multipart requests pass through untouched.
@@ -51,26 +69,11 @@ function normalizeMultipartBoundary(req: HttpRequest): HttpRequest {
   };
 }
 
-/**
- * Drop the client-capabilities header so cassettes recorded before it existed
- * still match. Like the `client_version` body field above, it is SDK-identity
- * metadata, not part of a request's logical identity.
- */
-function stripClientCapabilitiesHeader(req: HttpRequest): HttpRequest {
-  const key = CLIENT_CAPABILITIES_HEADER.toLowerCase();
-  if (!(key in req.headers)) {
-    return req;
-  }
-  const headers = {...req.headers};
-  delete headers[key];
-  return {...req, headers};
-}
-
 function normalizeRequest(req: HttpRequest): HttpRequest {
   return [
     normalizeMultipartBoundary,
     normalizeVolatileBodyFields,
-    stripClientCapabilitiesHeader,
+    normalizeUserAgentVersion,
   ].reduce((req, normalizer) => normalizer(req), req);
 }
 

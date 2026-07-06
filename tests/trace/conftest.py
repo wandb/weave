@@ -14,10 +14,19 @@ from google.auth.credentials import AnonymousCredentials
 
 from tests.trace.test_utils import FailingSaveType, failing_load, failing_save
 from weave.trace.serialization import serializer
+from weave.trace_server.file_storage import reset_stored_key_cache
 
 # Pinned to the project id of the standard `client` fixture (shawn/test-project).
 TEST_BUCKET = "test-bucket"
 _TEST_PROJECT_ID_B64 = base64.b64encode(b"shawn/test-project").decode()
+
+
+@pytest.fixture(autouse=True)
+def reset_bucket_dedup_cache():
+    """Clear the process-global stored-key cache so one test's write never skips the next's."""
+    reset_stored_key_cache()
+    yield
+    reset_stored_key_cache()
 
 
 @pytest.fixture

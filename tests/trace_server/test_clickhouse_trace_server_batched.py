@@ -17,6 +17,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import GenAIOTelExportReq, GenAIOTelExportRes
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
@@ -1976,3 +1977,98 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
         f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
         f"NotFoundError-family error mentioning 'not found' or 'deleted'."
     )
+
+
+def _turn_ended_span_row() -> AgentSpanCHInsertable:
+    """A finished root span; ScoreAgentSpansEvent.from_row yields a turn_ended event."""
+    return AgentSpanCHInsertable(
+        project_id="p",
+        trace_id="tr",
+        span_id="root",
+        parent_span_id="",
+        span_name="root",
+        started_at=dt.datetime(2024, 1, 1, 11, 0, 0),
+        ended_at=dt.datetime(2024, 1, 1, 12, 0, 0),
+        agent_name="a",
+        operation_name="invoke_agent",
+    )
+
+
+@pytest.mark.parametrize(
+    ("online_eval", "scoring", "should_emit"),
+    [
+        (True, True, True),
+        (True, False, False),  # scoring off -> skip
+        (False, True, False),  # online eval off -> skip
+    ],
+    ids=["both-on", "scoring-off", "online-eval-off"],
+)
+def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_emit):
+    """OTel ingest emits turn-ended events only when online eval and agent scoring
+    are both enabled; otherwise the kafka emit is skipped.
+    """
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+
+    monkeypatch.setattr(
+        AgentWriteHandler,
+        "insert_otel_spans",
+        lambda self, req: (
+            GenAIOTelExportRes(accepted_spans=1),
+            [_turn_ended_span_row()],
+        ),
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: online_eval
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+
+    res = server.genai_otel_export(
+        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
+    )
+
+    assert res.accepted_spans == 1
+    if should_emit:
+        mock_producer.produce_score_agent_spans.assert_called_once()
+        mock_producer.flush.assert_called_once_with(0)
+    else:
+        mock_producer.produce_score_agent_spans.assert_not_called()
+        mock_producer.flush.assert_not_called()
+
+
+def test_mint_client_forwards_send_receive_timeout():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client(
+            send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+        kwargs = mock_get_client.call_args.kwargs
+        assert (
+            kwargs["send_receive_timeout"]
+            == ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+
+
+def test_mint_client_omits_send_receive_timeout_by_default():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client()
+        assert "send_receive_timeout" not in mock_get_client.call_args.kwargs

@@ -91,7 +91,7 @@ def test_weave_media_connection_wrapping_sends_and_receives(monkeypatch):
     mc.wrapped_on_message(mc.ws, json.dumps(server_msg))
 
     # Verify session propagated into state
-    assert mc.conversation_manager.state.session_span is not None
+    assert mc.conversation_manager.state_exporter.session_span is not None
 
     # Prevent atexit handler from firing after monkeypatch restores require_weave_client
     mc._exit_ran = True
@@ -148,7 +148,7 @@ async def test_async_wrapper_basic(monkeypatch):
     except Exception:
         pass
     # Session should be set from received message
-    assert conn.conversation_manager.state.session_span is not None
+    assert conn.conversation_manager.state_exporter.session_span is not None
 
     # Prevent atexit handler from firing after monkeypatch restores require_weave_client
     conn._exit_ran = True

@@ -552,6 +552,27 @@ def test_call_end_single_without_trace_id_omits_header(mock_post, unbatched_serv
 
 
 @patch("weave.utils.http_requests.post")
+def test_call_end_single_carries_is_eval_in_body(mock_post, unbatched_server):
+    """The SDK-computed is_eval flag is serialized into the /call/end body."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id="test",
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"result": "ok"},
+        is_eval=True,
+    )
+    unbatched_server.call_end(tsi.CallEndReq(end=end))
+
+    body = json.loads(mock_post.call_args.kwargs["data"].decode("utf-8"))
+    assert body["end"]["is_eval"] is True
+
+
+@patch("weave.utils.http_requests.post")
 def test_call_start_v2_sends_trace_id_header(mock_post, unbatched_server):
     """v2 single /call/start attaches the X-Weave-Trace-Id header."""
     mock_post.return_value = httpx.Response(

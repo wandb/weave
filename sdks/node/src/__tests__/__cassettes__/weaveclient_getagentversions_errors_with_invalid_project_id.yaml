@@ -22,7 +22,7 @@
     headers:
       authorization: masked
       content-type: application/json
-      user-agent: Weave JS Client 0.15.1
+      user-agent: Weave JS Client 0.16.0
     body: '{"query":"\nquery DefaultEntity {\n    viewer
       {\n        username\n        defaultEntity
       {\n            name\n        }\n    }\n}\n","variables":{}}'
@@ -51,6 +51,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/nonexistent-project","agent_name":"my-cool-agent"}'
   response:
     status: 403

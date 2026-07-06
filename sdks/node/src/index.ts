@@ -41,30 +41,39 @@ export type {
 export {
   wrapOpenAI,
   wrapGoogleGenAI,
+  wrapClaudeAgentSdk,
+  WeaveAdkPlugin,
   createOpenAIAgentsTracingProcessor,
   instrumentOpenAIAgents,
   patchRealtimeSession,
   createOtelExtension,
 } from './integrations';
 export {
+  endConversation,
   endLLM,
-  endSession,
   endTurn,
   flushOTel,
+  getCurrentConversation,
   getCurrentLLM,
-  getCurrentSession,
   getCurrentTurn,
   runIsolated,
+  startConversation,
   startLLM,
-  startSession,
   startSubagent,
   startTool,
   startTurn,
+
+  /* @deprecated */
+  endSession,
+  getCurrentSession,
+  startSession,
 } from './genai';
 // Type-only: consumers can name these in their own signatures, but the
 // runtime values aren't reachable — construction is private to the SDK's
 // top-level entry-point functions.
 export type {
+  Conversation,
+  ConversationInit,
   LLM,
   LLMInit,
   Message,
@@ -72,8 +81,6 @@ export type {
   Modality,
   Reasoning,
   Role,
-  Session,
-  SessionInit,
   SubAgent,
   SubAgentInit,
   Tool,
@@ -81,6 +88,10 @@ export type {
   Turn,
   TurnInit,
   Usage,
+
+  /* @deprecated */
+  Session,
+  SessionInit,
 } from './genai';
 export {
   weaveAudio,

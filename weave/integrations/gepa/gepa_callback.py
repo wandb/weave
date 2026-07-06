@@ -8,6 +8,7 @@ from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.integration_metadata import library_integration
 from weave.trace.call import Call
 from weave.trace.context import weave_client_context
+from weave.trace.serialization.serialize import stable_repr
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def _safe(value: Any) -> Any:
         return [_safe(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _safe(v) for k, v in value.items()}
-    return repr(value)
+    return stable_repr(value)
 
 
 def _kind_attrs(kind: str) -> dict[str, Any]:
