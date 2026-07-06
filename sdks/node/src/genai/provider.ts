@@ -83,12 +83,8 @@ export function clearWeaveTracerProvider() {
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  // One cached provider for the active project, not a projectId->provider map:
-  // only one project is active at a time, and each provider owns an OTLP
-  // exporter pinned to its project, so a map would just accumulate idle
-  // exporters for every project ever init'd. init() drops the slot on a project
-  // switch (see shutdownWeaveTracerProvider); here we reuse it while the
-  // project matches and rebuild otherwise.
+  // Reuse the cached provider only while it targets the active project; a
+  // project switch is torn down by init() before we get here.
   const cached = state.genAi.provider;
   if (cached && cached.projectId === client.projectId) {
     return cached.tracerProvider;
