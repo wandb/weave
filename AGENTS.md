@@ -289,10 +289,22 @@ pnpm exec tsx examples/claudeAgents.ts
 
 ### PR Requirements
 
-- Title format: Must start with one of:
-  - `chore(weave):` - For maintenance tasks
-  - `feat(weave):` - For new features
-  - `fix(weave):` - For bug fixes
+- Title format: `<type>(<scope>): <description>`, where `<type>` is one of
+  `chore`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `security`,
+  `test`. A scope is **required** (`requireScope: true`) and CI validates it
+  (`.github/workflows/pr.yaml`).
+- **Pick the scope by which SDK/area the change touches:**
+  - `weave_ts` — **required for ALL TypeScript / Node SDK changes** (anything
+    under `sdks/node/`). Any PR that modifies the TS SDK must be marked
+    `(weave_ts)`, e.g. `fix(weave_ts): ...`, `feat(weave_ts): ...`,
+    `chore(weave_ts): ...`.
+  - `weave` — the Python SDK and trace server (the default for `weave/…`
+    changes), e.g. `fix(weave): ...`, `feat(weave): ...`, `chore(weave): ...`.
+  - Other valid scopes (see `pr.yaml` for the authoritative list): `ui`, `app`,
+    `dev`, `deps`, `inference`.
+- If a single PR spans both the Python and TS SDKs, prefer splitting it; if that
+  isn't practical, scope it to the SDK that carries the primary change and call
+  out the other in the PR body.
 - Provide detailed PR summaries including:
   - Purpose of changes
   - Testing performed
