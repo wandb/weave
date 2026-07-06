@@ -16,12 +16,12 @@ describe('SubAgent', () => {
 
   it('emits a nested invoke_agent span as a child of the turn', () => {
     const turn = Turn.create({agentName: 'parent'});
-    const sub = turn.startSubagent({
+    const subagent = turn.startSubagent({
       name: 'child-bot',
       model: 'gpt-4o',
       systemInstructions: ['Be helpful', 'Be concise'],
     });
-    sub.end();
+    subagent.end();
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
@@ -67,13 +67,13 @@ describe('SubAgent', () => {
   it('setAttributes records attributes on the subagent span; warns + no-op after end()', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher'});
-    sub.setAttributes({
+    const subagent = turn.startSubagent({name: 'researcher'});
+    subagent.setAttributes({
       'weave.claude_code.display_name': 'Agent: research-bot',
       'weave.tag': 'enterprise',
     });
-    sub.end();
-    sub.setAttributes({'after.end': 'x'});
+    subagent.end();
+    subagent.setAttributes({'after.end': 'x'});
     turn.end();
 
     const subSpan = findSub(getExporter().getFinishedSpans());
@@ -91,10 +91,10 @@ describe('SubAgent', () => {
   it('addEvent records a span event on the subagent span; warns + no-op after end()', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher'});
-    sub.addEvent('weave.lifecycle', {state: 'spawned'});
-    sub.end();
-    sub.addEvent('after.end');
+    const subagent = turn.startSubagent({name: 'researcher'});
+    subagent.addEvent('weave.lifecycle', {state: 'spawned'});
+    subagent.end();
+    subagent.addEvent('after.end');
     turn.end();
 
     const subSpan = findSub(getExporter().getFinishedSpans());
@@ -108,14 +108,14 @@ describe('SubAgent', () => {
 
   it('record() updates fields, which are emitted at end()', () => {
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher'});
-    sub.record({
+    const subagent = turn.startSubagent({name: 'researcher'});
+    subagent.record({
       agentId: 'agent-9',
       agentDescription: 'A research bot',
       agentVersion: 'v4',
       systemInstructions: ['Find authoritative sources'],
     });
-    sub.end();
+    subagent.end();
     turn.end();
 
     const span = findSub(getExporter().getFinishedSpans());
@@ -137,14 +137,14 @@ describe('SubAgent', () => {
 
   it('record() preserves untouched values', () => {
     const turn = Turn.create({});
-    const sub = turn.startSubagent({
+    const subagent = turn.startSubagent({
       name: 'researcher',
       agentId: 'preset',
       agentVersion: 'v1',
       systemInstructions: ['initial'],
     });
-    sub.record({agentVersion: 'v2'});
-    sub.end();
+    subagent.record({agentVersion: 'v2'});
+    subagent.end();
     turn.end();
 
     const span = findSub(getExporter().getFinishedSpans());
@@ -165,20 +165,20 @@ describe('SubAgent', () => {
 
   it('record() is chainable', () => {
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher'});
-    expect(sub.record({agentId: 'x'}).record({agentDescription: 'foo'})).toBe(
-      sub
+    const subagent = turn.startSubagent({name: 'researcher'});
+    expect(subagent.record({agentId: 'x'}).record({agentDescription: 'foo'})).toBe(
+      subagent
     );
-    sub.end();
+    subagent.end();
     turn.end();
   });
 
   it('record() warns and is a no-op after end()', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher'});
-    sub.end();
-    sub.record({agentId: 'after-end'});
+    const subagent = turn.startSubagent({name: 'researcher'});
+    subagent.end();
+    subagent.record({agentId: 'after-end'});
     turn.end();
 
     const subSpan = findSub(getExporter().getFinishedSpans());
@@ -193,8 +193,8 @@ describe('SubAgent', () => {
     const startedAt = new Date('2026-01-01T00:00:00Z');
     const endedAt = new Date('2026-01-01T00:00:05Z');
     const turn = Turn.create({});
-    const sub = turn.startSubagent({name: 'researcher', startTime: startedAt});
-    sub.end({endTime: endedAt});
+    const subagent = turn.startSubagent({name: 'researcher', startTime: startedAt});
+    subagent.end({endTime: endedAt});
     turn.end();
 
     expectSpanTimesToMatch(
@@ -206,10 +206,10 @@ describe('SubAgent', () => {
 
   it('nests child LLM and Tool spans under the subagent span', () => {
     const turn = Turn.create({agentName: 'parent'});
-    const sub = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
-    sub.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
-    sub.startTool({name: 'search'}).end();
-    sub.end();
+    const subagent = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
+    subagent.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
+    subagent.startTool({name: 'search'}).end();
+    subagent.end();
     turn.end();
 
     const spans = getExporter().getFinishedSpans();
@@ -218,7 +218,7 @@ describe('SubAgent', () => {
     const toolSpan = spans.find(s => s.name === 'execute_tool');
     expect(chatSpan).toBeDefined();
     expect(toolSpan).toBeDefined();
-    // Both children parent to the sub-agent, not the enclosing Turn.
+    // Both children parent to the subagent, not the enclosing Turn.
     expect(chatSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
     expect(toolSpan!.parentSpanId).toBe(subSpan.spanContext().spanId);
   });
@@ -248,7 +248,7 @@ describe('SubAgent', () => {
     const chatSpan = spans.find(s => s.name === 'chat');
     expect(chatSpan).toBeDefined();
     // Full chain: turn -> outer -> inner -> chat. The nested SubAgent parents
-    // to the outer sub (not the Turn), and threads its own context down to the
+    // to the outer subagent (not the Turn), and threads its own context down to the
     // LLM it starts.
     expect(outerSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
     expect(innerSpan.parentSpanId).toBe(outerSpan.spanContext().spanId);
@@ -263,12 +263,12 @@ describe('SubAgent', () => {
     // the child span is created after the SubAgent and Turn have already ended.
     // This guards against a regression to active/ambient-context parenting.
     const turn = Turn.create({agentName: 'parent'});
-    const sub = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
-    sub.end();
+    const subagent = turn.startSubagent({name: 'researcher', model: 'gpt-4o'});
+    subagent.end();
     turn.end();
     // Children created AFTER both parents have ended.
-    sub.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
-    sub.startTool({name: 'search'}).end();
+    subagent.startLLM({model: 'gpt-4o', providerName: 'openai'}).end();
+    subagent.startTool({name: 'search'}).end();
 
     const spans = getExporter().getFinishedSpans();
     const subSpan = findSub(spans);

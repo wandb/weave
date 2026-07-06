@@ -46,18 +46,18 @@ export interface SubAgentInit extends SpanInitBase {
  * span rather than flattening onto the parent Turn.
  *
  * @example
- * const sub = weave.startSubagent({name: 'researcher'});
+ * const subagent = weave.startSubagent({name: 'researcher'});
  *
  * try {
- *   const llm = sub.startLLM({model: 'gpt-4o', providerName: 'openai'});
+ *   const llm = subagent.startLLM({model: 'gpt-4o', providerName: 'openai'});
  *   // ... orchestrate the subagent's LLM/Tool calls ...
  *   llm.end();
  * } finally {
- *   sub.end();
+ *   subagent.end();
  * }
  *
  * @example
- * const sub = weave.startSubagent({
+ * const subagent = weave.startSubagent({
  *   name: 'researcher',
  *   model: 'gpt-4o',
  *   systemInstructions: ['Find authoritative sources before answering.'],
@@ -65,11 +65,11 @@ export interface SubAgentInit extends SpanInitBase {
  * });
  *
  * try {
- *   const llm = sub.startLLM({model: 'gpt-4o', providerName: 'openai'});
+ *   const llm = subagent.startLLM({model: 'gpt-4o', providerName: 'openai'});
  *   // ... orchestrate the subagent's LLM/Tool calls ...
  *   llm.end();
  * } finally {
- *   sub.end();
+ *   subagent.end();
  * }
  */
 type Opts = {
