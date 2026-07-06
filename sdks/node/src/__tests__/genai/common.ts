@@ -15,12 +15,13 @@ export const TEST_BASE_URL = 'http://localhost:8080';
 export const TEST_PROJECT = 'test-entity/test-project';
 
 export function installFakeClient(
-  settings: Partial<Settings> = {}
+  settings: Partial<Settings> = {},
+  projectId: string = TEST_PROJECT
 ): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
   const client = new WeaveClient({
     traceServerApi,
-    projectId: TEST_PROJECT,
+    projectId,
     settings: makeSettings(settings),
   });
   setGlobalClient(client);

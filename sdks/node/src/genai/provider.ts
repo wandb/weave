@@ -56,20 +56,36 @@ export function getWeaveTracerProvider(): BasicTracerProvider | null {
 
 export function clearWeaveTracerProvider() {
   state.genAi.provider = null;
+  state.genAi.providerProjectId = null;
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  if (state.genAi.provider) {
-    return state.genAi.provider;
+  // The provider routes agent spans to a single project: the target rides the
+  // exporter's `project_id` header (see buildOtlpExporter), and server-side
+  // precedence puts Resource attrs above that header. So the project must NOT
+  // live on the immutable Resource, or a later `weave.init('ent/B')` can't
+  // re-route — the cached provider keeps exporting B's spans under A.
+  //
+  // Because we own a standalone provider (not OTel's set-once global), the
+  // simplest correct re-route is to rebuild when the target project changes.
+  // This mirrors the Python fix (#7507) without poking the exporter's private
+  // request internals.
+  const cached = state.genAi.provider;
+  if (cached && state.genAi.providerProjectId === client.projectId) {
+    return cached;
+  }
+  if (cached) {
+    // A re-init pointed us at a different project. Flush spans queued under the
+    // old project before tearing the provider down, then rebuild for the new
+    // one. shutdown() force-flushes then disposes; failures are best-effort
+    // since the queued spans belong to the previous project regardless.
+    void cached.shutdown().catch(() => {
+      // Nothing actionable if the old provider fails to drain; we're replacing
+      // it either way.
+    });
   }
 
-  const [entity, project] = client.projectId.includes('/')
-    ? client.projectId.split('/')
-    : ['', client.projectId];
-
   const resource = new Resource({
-    [WEAVE_RESOURCE_ATTR.WANDB_ENTITY]: entity,
-    [WEAVE_RESOURCE_ATTR.WANDB_PROJECT]: project,
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
@@ -78,6 +94,7 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     resource,
     spanProcessors: [buildSpanProcessor(client)],
   });
+  state.genAi.providerProjectId = client.projectId;
   registerBeforeExitHookOnce();
   return state.genAi.provider;
 }

@@ -25,6 +25,18 @@ type State = {
   genAi: {
     provider: BasicTracerProvider | null;
 
+    /**
+     * The `projectId` (`entity/project`) the cached `provider` routes to.
+     *
+     * The provider's OTLP exporter carries its target project in the
+     * `project_id` header, so a later `weave.init()` to a *different* project
+     * must rebuild the provider rather than reuse the cached one — otherwise
+     * agent spans keep exporting under the first project (see
+     * `getOrBuildProvider`). Comparing against this value is how we detect the
+     * project switched. `null` whenever `provider` is `null`.
+     */
+    providerProjectId: string | null;
+
     providerRegistered: boolean;
 
     /**
@@ -116,6 +128,7 @@ function defaultState(): State {
 
     genAi: {
       provider: null,
+      providerProjectId: null,
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
       defaultState: {conversation: null, turn: null, llm: null},
