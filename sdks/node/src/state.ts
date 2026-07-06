@@ -23,7 +23,13 @@ type State = {
   domain: string | null;
 
   genAi: {
-    provider: BasicTracerProvider | null;
+    /**
+     * The cached GenAI provider paired with the `projectId` it routes to. Held
+     * together because the provider's exporter is pinned to that project, so a
+     * `weave.init()` to a different project must rebuild it. `null` until the
+     * first tracer is pulled; reset on a project switch.
+     */
+    provider: {tracerProvider: BasicTracerProvider; projectId: string} | null;
 
     providerRegistered: boolean;
 

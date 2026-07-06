@@ -5,4 +5,4 @@
 // Lives as a constant — rather than being read from package.json at runtime —
 // so the source compiles cleanly to both CJS and ESM without needing
 // `__dirname` (CJS-only) or `import.meta.url` (ESM-only).
-export const packageVersion = '0.16.0';
+export const packageVersion = '0.16.2';
