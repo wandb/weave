@@ -84,7 +84,10 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_span,
+    strip_inline_blobs_from_span,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
@@ -121,6 +124,7 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
+    TraceServerInterface,
 )
 from weave.trace_server.tracing import traced
 
@@ -806,10 +810,13 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper.
+    Optionally takes a `trace_server` used for file storage when stripping
+    inline base64 out of GenAI message payloads into Content refs.
     """
 
     _ch_client: CHClient
     _insert_settings: dict[str, Any] | None = None
+    _trace_server: TraceServerInterface | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -846,6 +853,16 @@ class AgentWriteHandler:
                         rejected += 1
                         errors.append(str(e))
                         continue
+
+                    # Strip inline base64/data-URIs into weave refs before the
+                    # pure extraction transform runs.
+                    if self._trace_server is not None:
+                        strip_inline_blobs_from_span(
+                            span,
+                            req.project_id,
+                            self._trace_server,
+                            wb_user_id=req.wb_user_id,
+                        )
 
                     try:
                         genai_row = extract_genai_span(

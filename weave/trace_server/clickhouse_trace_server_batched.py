@@ -84,6 +84,7 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
+    replace_base64_with_content_objects,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -808,13 +809,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
+                    # Mirror the non-OTel calls path: strip inline base64 /
+                    # base64 data-URIs into Content refs. Converting the span
+                    # attributes in place (before deriving the call) also
+                    # strips the lossless otel_dump the call carries.
+                    span.attributes = replace_base64_with_content_objects(
+                        span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
                     )
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                    # Also convert the derived inputs/output: base64 nested in a
+                    # JSON-encoded message attribute only surfaces as a leaf
+                    # after to_call parses it.
+                    start_call.inputs = replace_base64_with_content_objects(
+                        start_call.inputs,
+                        req.project_id,
+                        self,
+                        wb_user_id=req.wb_user_id,
+                    )
+                    end_call.output = replace_base64_with_content_objects(
+                        end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
+                    )
+                    calls.append((start_call, end_call))
 
         set_current_span_dd_tags({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
@@ -7082,7 +7101,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(
-            self.ch_client, self._async_insert_settings()
+            self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled

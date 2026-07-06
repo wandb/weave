@@ -4,10 +4,15 @@ Runs against the ClickHouse backend (the only supported backend).
 Migration 030 creates the genai tables automatically.
 """
 
+import base64
 import datetime
+import json
 import uuid
 
 import pytest
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans, Span
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
@@ -35,12 +40,16 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+    AgentTraceChatReq,
+    GenAIOTelExportReq,
 )
+from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
+from weave.trace_server.opentelemetry.python_spans import StatusCode
 
 
 def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
@@ -2707,3 +2716,256 @@ def test_query_dsl_typed_custom_attr_comparison(ch_server):
     )
     assert res.total_count == 1
     assert len(res.spans) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test: end-to-end base64 -> Content-ref conversion on the GenAI OTel agents
+# ingest path (mirrors test_calls_complete's data-URI conversion test, but for
+# the agents endpoint).
+# ---------------------------------------------------------------------------
+
+
+def _ref_safe_external_project_id(prefix: str) -> str:
+    """A unique EXTERNAL ``entity/project`` id whose internal form carries no '/'.
+
+    A real client submits an external ``entity/project`` id; the adapter maps it
+    to the internal id via ``base64(entity/project)`` and embeds that internal id
+    in ``weave-trace-internal:///<internal>/object/...`` refs. ``InternalObjectRef``
+    rejects a project_id containing '/', and standard base64 can emit '/', so
+    regenerate the external id until its base64 form is clean.
+    """
+    while True:
+        external = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
+        internal = base64.b64encode(external.encode("ascii")).decode("ascii")
+        if "/" not in internal:
+            return external
+
+
+def _build_genai_chat_processed_span(
+    trace_id: bytes,
+    span_id: bytes,
+    input_messages_json: str,
+) -> tsi.ProcessedResourceSpans:
+    """Build a real OTel proto ``chat`` span carrying JSON-encoded input messages.
+
+    The messages arrive under ``gen_ai.input.messages`` as a JSON *string* — the
+    shape that exercises the ``_strip_message_attr`` -> ``replace_base64_in_raw_messages``
+    message-payload pass on ingest.
+    """
+    span = Span()
+    span.name = "chat gemini-2.0-flash"
+    span.trace_id = trace_id
+    span.span_id = span_id
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    span.start_time_unix_nano = now_ns
+    span.end_time_unix_nano = now_ns + 1_000_000_000
+    span.kind = 1  # CLIENT
+
+    op_kv = KeyValue()
+    op_kv.key = "gen_ai.operation.name"
+    op_kv.value.string_value = "chat"
+    span.attributes.append(op_kv)
+
+    model_kv = KeyValue()
+    model_kv.key = "gen_ai.request.model"
+    model_kv.value.string_value = "gemini-2.0-flash"
+    span.attributes.append(model_kv)
+
+    msgs_kv = KeyValue()
+    msgs_kv.key = "gen_ai.input.messages"
+    msgs_kv.value.string_value = input_messages_json
+    span.attributes.append(msgs_kv)
+
+    span.status.code = StatusCode.OK.value  # type: ignore[assignment]
+
+    scope = InstrumentationScope()
+    scope.name = "test_instrumentation"
+    scope.version = "1.0.0"
+    scope_spans = ScopeSpans()
+    scope_spans.scope.CopyFrom(scope)
+    scope_spans.spans.append(span)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(Resource())
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
+    ch_server, trace_server
+):
+    """End-to-end ref-boundary check for the GenAI OTel agents ingest/read path.
+
+    A real client submits ONE Gemini-style ``chat`` span through the EXTERNAL
+    adapter (external ``entity/project`` id, external user id, external refs).
+    Its ``gen_ai.input.messages`` JSON carries three parts: a text part, an image
+    part with an inline base64 data-URI (the server converts it to a stored
+    Content ref), and a ``resource`` part embedding an EXTERNAL weave ref (an
+    MCP-fetched dataset). The invariant is then asserted in BOTH directions:
+
+      * DB truth (raw internal server): the stored message content holds ONLY
+        internal refs — the base64 became an internal Content ref, and the
+        external dataset ref was converted to internal on ingest; no external
+        scheme and no base64 blob survive.
+      * External read (through the adapter): the same content holds ONLY
+        external refs — ``weave-trace-internal://`` never leaks (the leak the
+        boundary converter closes), and the dataset ref round-trips
+        ext -> int -> ext unchanged.
+
+    Also checks the chat view surfaces the media consistently (internal refs on
+    the raw server, external refs through the adapter) and that the converted
+    Content object is attributed to the caller's ``wb_user_id``.
+    """
+    external_project_id = _ref_safe_external_project_id("genai_otel_boundary")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
+    # The client sends an external user id; the adapter converts it to the
+    # internal (base64) form the internal server persists on the Content object.
+    external_user_id = "user-42"
+    internal_user_id = base64.b64encode(external_user_id.encode("ascii")).decode(
+        "ascii"
+    )
+
+    raw_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    b64_data = base64.b64encode(raw_bytes).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64_data}"
+    # An MCP-fetched dataset ref, in the same external project as the span so it
+    # maps back cleanly on read.
+    external_dataset_ref = f"weave:///{external_project_id}/object/mcp_dataset:v1"
+    internal_dataset_ref = (
+        f"weave-trace-internal:///{internal_project_id}/object/mcp_dataset:v1"
+    )
+
+    trace_id = uuid.uuid4().bytes
+    span_id = uuid.uuid4().bytes[:8]
+    input_messages_json = json.dumps(
+        [
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "describe"},
+                    {"type": "image", "url": data_uri},
+                    {"type": "resource", "ref": external_dataset_ref},
+                ],
+            }
+        ]
+    )
+    processed = _build_genai_chat_processed_span(trace_id, span_id, input_messages_json)
+
+    # Submit through the EXTERNAL adapter, exactly as a real client would: no
+    # internal ids or internal refs cross this boundary.
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[processed],
+            project_id=external_project_id,
+            wb_user_id=external_user_id,
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+    assert res.error_message == ""
+
+    # --- DB TRUTH (raw internal server): only internal refs, no base64 ---
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    stored_span = stored.spans[0]
+    assert stored_span.operation_name == "chat"
+    assert len(stored_span.input_messages) == 1
+
+    stored_content = stored_span.input_messages[0].content
+    stored_parts = json.loads(stored_content)
+
+    # Text part verbatim; the base64 image url is now a compact internal Content
+    # ref; the external dataset ref was rewritten to internal on ingest.
+    internal_image_ref = stored_parts[1]["url"]
+    assert stored_parts == [
+        {"type": "text", "content": "describe"},
+        {"type": "image", "url": internal_image_ref},
+        {"type": "resource", "ref": internal_dataset_ref},
+    ]
+
+    parsed_image_ref = ri.parse_internal_uri(internal_image_ref)
+    assert isinstance(parsed_image_ref, ri.InternalObjectRef)
+    assert parsed_image_ref.project_id == internal_project_id
+    assert (
+        internal_image_ref == f"weave-trace-internal:///{internal_project_id}/object/"
+        f"{parsed_image_ref.name}:{parsed_image_ref.version}"
+    )
+
+    # No base64 blob and no external scheme survive anywhere in the stored content.
+    assert b64_data not in stored_content
+    assert "weave:///" not in stored_content
+
+    # --- EXTERNAL READ (through the adapter): only external refs, no leak ---
+    external = trace_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=external_project_id, include_details=True)
+    )
+    assert len(external.spans) == 1
+    external_span = external.spans[0]
+    assert external_span.project_id == external_project_id
+    external_content = external_span.input_messages[0].content
+    external_parts = json.loads(external_content)
+
+    expected_external_image_ref = (
+        f"weave:///{external_project_id}/object/"
+        f"{parsed_image_ref.name}:{parsed_image_ref.version}"
+    )
+    assert external_parts == [
+        {"type": "text", "content": "describe"},
+        {"type": "image", "url": expected_external_image_ref},
+        {"type": "resource", "ref": external_dataset_ref},
+    ]
+    # KEY leak assertion: the internal scheme must never reach the client.
+    assert "weave-trace-internal:///" not in external_content
+    # The embedded dataset ref round-trips ext -> int -> ext unchanged.
+    assert external_parts[2]["ref"] == external_dataset_ref
+
+    trace_id_hex = stored_span.trace_id
+
+    # --- Chat view (raw internal server): media surfaces as internal refs ---
+    internal_chat = ch_server.agent_traces_chat(
+        AgentTraceChatReq(project_id=internal_project_id, trace_id=trace_id_hex)
+    )
+    internal_user_messages = [
+        m for m in internal_chat.messages if m.type == "user_message"
+    ]
+    assert len(internal_user_messages) == 1
+    assert internal_user_messages[0].user_message.content_refs == [
+        internal_image_ref,
+        internal_dataset_ref,
+    ]
+
+    # --- Chat view (external adapter read path): int refs -> external weave:// ---
+    external_chat = trace_server.agent_traces_chat(
+        AgentTraceChatReq(project_id=external_project_id, trace_id=trace_id_hex)
+    )
+    external_user_messages = [
+        m for m in external_chat.messages if m.type == "user_message"
+    ]
+    assert len(external_user_messages) == 1
+    assert external_user_messages[0].user_message.content_refs == [
+        expected_external_image_ref,
+        external_dataset_ref,
+    ]
+
+    # --- The converted Content object is attributed to the caller ---
+    obj = ch_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=internal_project_id,
+            object_id=parsed_image_ref.name,
+            digest=parsed_image_ref.version,
+        )
+    )
+    assert obj.obj.wb_user_id == internal_user_id

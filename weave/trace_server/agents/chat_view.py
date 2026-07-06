@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
+from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
@@ -488,7 +491,7 @@ class ChatTraversal:
         """
         for message in _trailing_user_messages(span.input_messages):
             text = _display_text(message.content)
-            media = _directional_content_refs(span, _media_part_digests([message]))
+            media = _message_content_refs(span, [message])
             if not text and not media:
                 continue
             sig = (text, tuple(media))
@@ -589,12 +592,18 @@ def _display_text(content: str) -> str:
         return content
     texts: list[str] = []
     for p in parts:
-        if isinstance(p, dict) and isinstance(p.get("content"), str):
+        if isinstance(p, dict):
             # Reasoning is rendered separately via `reasoning_content`;
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
-            texts.append(p["content"])
+            # Support both the weave parts model (``content``) and the
+            # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
+            # images) carry neither and are skipped for display.
+            if isinstance(p.get("content"), str):
+                texts.append(p["content"])
+            elif isinstance(p.get("text"), str):
+                texts.append(p["text"])
         elif isinstance(p, str):
             texts.append(p)
     return "\n".join(texts)
@@ -759,6 +768,87 @@ def _directional_content_refs(
     return [r for r in _content_refs(span) if _ref_digest(r) in part_digests]
 
 
+_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
+
+# Cap on how far ``_iter_internal_refs`` will descend. It walks nested
+# dicts/lists AND re-parses JSON-encoded strings (JSON-inside-JSON), so a deeply
+# nested or adversarial span payload could otherwise exceed Python's recursion
+# limit and raise ``RecursionError`` on the OTel ingest path, rejecting an
+# otherwise-valid span. Realistic message-part nesting is only a handful of
+# levels deep (message dict -> content JSON -> parts list -> part dict ->
+# image_url dict -> url string), so 8 leaves ample headroom while staying far
+# below ``sys.getrecursionlimit()`` (1000 by default).
+_MAX_REF_SEARCH_DEPTH = 8
+
+
+def _iter_internal_refs(value: Any, depth: int = 0) -> Iterator[str]:
+    """Yield every internal weave ref found anywhere in ``value``.
+
+    Recurses through dicts/lists and attempts ``json.loads`` on strings so refs
+    buried inside JSON-serialized blobs (e.g. a message ``content`` parts array)
+    are not missed, regardless of which field/part shape carries them. Only
+    internal-form refs are yielded: the int->ext adapter converts these and
+    rejects bare external refs, and external inline refs are already handled via
+    ``_directional_content_refs``.
+
+    ``depth`` bounds recursion at ``_MAX_REF_SEARCH_DEPTH``: once it is exceeded
+    we stop without yielding, trading unreachable deep refs for a guarantee that
+    a pathological payload cannot raise ``RecursionError``.
+    """
+    if depth > _MAX_REF_SEARCH_DEPTH:
+        return
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(_INTERNAL_REF_PREFIX):
+            yield stripped
+        elif stripped[:1] in {"[", "{"}:
+            try:
+                parsed = json.loads(stripped)
+            except (ValueError, TypeError):
+                return
+            yield from _iter_internal_refs(parsed, depth + 1)
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _iter_internal_refs(v, depth + 1)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_internal_refs(item, depth + 1)
+
+
+def _inline_media_refs(messages: list[NormalizedMessage]) -> list[str]:
+    """Internal weave refs embedded inline anywhere in ``messages``.
+
+    Server-side content conversion replaces an inline blob with a weave ref in
+    the message part itself (rather than via the span's ``content_refs``). Walk
+    each message recursively so those refs render, without special-casing any
+    part shape.
+    """
+    refs: list[str] = []
+    seen: set[str] = set()
+    for message in messages:
+        for ref in _iter_internal_refs(message.model_dump()):
+            if ref not in seen:
+                seen.add(ref)
+                refs.append(ref)
+    return refs
+
+
+def _message_content_refs(
+    span: AgentSpanSchema, messages: list[NormalizedMessage]
+) -> list[str]:
+    """Content refs for ``messages``: span.content_refs matched by media-part
+    digest (client-uploaded media) plus internal refs found inline in the
+    messages (server-converted content).
+    """
+    refs = list(_directional_content_refs(span, _media_part_digests(messages)))
+    seen = set(refs)
+    for ref in _inline_media_refs(messages):
+        if ref not in seen:
+            seen.add(ref)
+            refs.append(ref)
+    return refs
+
+
 def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]:
     """The user's side of a message list, selected by role.
 
@@ -804,8 +894,7 @@ def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
     refs: list[str] = []
     seen: set[str] = set()
     for span in spans:
-        in_digests = _media_part_digests(_user_messages(span.input_messages))
-        for ref in _directional_content_refs(span, in_digests):
+        for ref in _message_content_refs(span, _user_messages(span.input_messages)):
             if ref not in seen:
                 seen.add(ref)
                 refs.append(ref)
@@ -938,8 +1027,6 @@ def _emit_assistant_message(
             total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
-            content_refs=_directional_content_refs(
-                span, _media_part_digests(span.output_messages)
-            ),
+            content_refs=_message_content_refs(span, span.output_messages),
         ),
     )

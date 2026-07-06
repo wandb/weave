@@ -6,10 +6,13 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 
 import datetime
 import json
+import sys
 
 import pytest
 
 from weave.trace_server.agents.chat_view import (
+    _MAX_REF_SEARCH_DEPTH,
+    _iter_internal_refs,
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
@@ -993,6 +996,105 @@ def test_input_media_attaches_to_user_message_not_assistant() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
+    """Server-side content conversion embeds an internal weave ref directly in
+    the message part (e.g. an OpenAI ``image_url``) with no span-level
+    ``content_refs``. The recursive inline-ref sweep surfaces it so the image
+    still renders on the user bubble.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-describer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("What is in this image?")),
+                }
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_internal}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+            # No span-level content_refs — the ref lives only inline in the part.
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    assert _user_payload(user).content_refs == [image_internal]
+    assert _assistant_payload(assistant).content_refs == []
+
+
+@pytest.mark.xfail(
+    reason=(
+        "Known limitation (PR #7489 discussion): the inline-ref sweep "
+        "(_iter_internal_refs) surfaces ANY internal weave ref, not only "
+        "Content/media refs. A message that legitimately carries a ref to a "
+        "non-media object (prompt/model/dataset) in a structured field leaks "
+        "into content_refs and renders as broken media. A media ref is "
+        "indistinguishable from a prompt ref at the string level and the part "
+        "shapes are not normalized, so scoping the sweep is deferred to a "
+        "follow-up (e.g. record converted media refs authoritatively at "
+        "ingest, or scope the sweep to media part positions)."
+    ),
+    strict=False,
+)
+def test_inline_sweep_excludes_non_media_internal_refs() -> None:
+    """The inline-ref sweep must surface only Content/media refs. A message that
+    legitimately carries a ref to a non-media object (a prompt, model, dataset)
+    in a structured field must NOT land in ``content_refs``, or the UI renders
+    it as broken media. Content objects are stored under a sanitized-filename
+    object_id, so a media ref is indistinguishable at the string level from a
+    prompt ref — the walker needs to scope the match.
+    """
+    image_ref = "weave-trace-internal:///PID/object/gift_basket_png:IMGDIGEST"
+    prompt_ref = "weave-trace-internal:///PID/object/describe_image_prompt:PROMPTDIGEST"
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_ref}},
+                        # Agent quoting the prompt object it ran under — not media.
+                        {"type": "tool_use", "input": {"prompt_ref": prompt_ref}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the media ref should render; the prompt ref is a false positive today.
+    assert _user_payload(user).content_refs == [image_ref]
+
+
 def test_output_media_attaches_to_assistant_message() -> None:
     """Model-generated media is a part on the output message and renders on
     the assistant bubble (mirror image of the input case).
@@ -1341,3 +1443,54 @@ def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
     ]
     roots = build_span_tree(spans)
     assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+
+
+def _nest_in_lists(value: object, levels: int) -> object:
+    """Wrap ``value`` in ``levels`` nested single-element lists.
+
+    Each list level costs one ``_iter_internal_refs`` recursive descent, so the
+    ref sits exactly ``levels`` deep — a deterministic knob for the depth cap.
+    """
+    nested = value
+    for _ in range(levels):
+        nested = [nested]
+    return nested
+
+
+def test_iter_internal_refs_finds_refs_at_normal_depth() -> None:
+    """A realistically nested inline part (message dict -> content JSON ->
+    parts list -> image_url dict -> url string) is well within the cap, so the
+    internal ref is still surfaced exactly as before.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    message = {
+        "role": "user",
+        "content": _parts(
+            _text_part("What is in this image?"),
+            {"type": "image_url", "image_url": {"url": image_internal}},
+        ),
+        "finish_reason": "",
+    }
+    assert list(_iter_internal_refs(message)) == [image_internal]
+
+
+def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
+    """A pathologically deep payload terminates without ``RecursionError``.
+
+    The recursion limit is dwarfed by the nesting depth, so an uncapped walk
+    would blow the interpreter stack. With the cap in place the walk returns
+    cleanly; refs at the cap boundary are surfaced and deeper refs are dropped.
+    """
+    ref = "weave-trace-internal:///PID/object/deep:DIGEST"
+
+    # A ref sitting exactly at the cap is still found; one level deeper is not.
+    assert list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH))) == [
+        ref
+    ]
+    assert (
+        list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH + 1))) == []
+    )
+
+    # Far beyond sys.getrecursionlimit(): must not raise, must yield nothing.
+    pathological = _nest_in_lists(ref, sys.getrecursionlimit() * 2)
+    assert list(_iter_internal_refs(pathological)) == []
