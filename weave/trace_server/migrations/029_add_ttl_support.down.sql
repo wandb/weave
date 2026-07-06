@@ -1,6 +1,9 @@
 -- Rollback Migration 029: Remove TTL support
 
--- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration
+-- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration.
+-- REMOVE TTL has no IF EXISTS form and errors on a table with no TTL, so this down
+-- is not re-runnable. Downs are manual-only (auto-recovery only re-runs ups), so
+-- an operator applies it once against the state the up left.
 ALTER TABLE call_parts REMOVE TTL;
 ALTER TABLE calls_merged REMOVE TTL;
 ALTER TABLE calls_merged_stats REMOVE TTL;

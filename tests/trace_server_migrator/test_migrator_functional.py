@@ -12,6 +12,7 @@ import pytest
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
+    _NON_RECOVERABLE_MIGRATION_VERSIONS,
     MigrationError,
     get_clickhouse_trace_server_migrator,
 )
@@ -161,6 +162,25 @@ def _schema_snapshot(ch_client, db_name: str) -> tuple[list, list]:
         "ORDER BY table, name"
     ).result_rows
     return [tuple(r) for r in tables], [tuple(r) for r in columns]
+
+
+def _row_count_snapshot(ch_client, db_name: str) -> dict[str, int]:
+    """Row counts for every MergeTree-family table in a database.
+
+    Comparing this before and after a re-run upgrades the idempotency check from
+    schema-only to data too, so a seed that duplicates rows on re-run (like 006) is
+    caught unless its version is excluded from the re-run via
+    _NON_RECOVERABLE_MIGRATION_VERSIONS. Views and Distributed tables have no
+    independent storage and are skipped.
+    """
+    tables = ch_client.query(
+        f"SELECT name FROM system.tables WHERE database = '{db_name}' "
+        "AND engine LIKE '%MergeTree%' ORDER BY name"
+    ).result_rows
+    return {
+        name: ch_client.query(f"SELECT count() FROM {db_name}.{name}").result_rows[0][0]
+        for (name,) in tables
+    }
 
 
 def _table_exists(ch_client, db_name: str, table_name: str) -> bool:
@@ -717,19 +737,34 @@ def test_production_migrations_are_idempotent(
         f"unexpected table-swap migration(s) {swaps}; a RENAME TABLE is one-shot, "
         "so reassess idempotency and update this assertion deliberately"
     )
+    # A structural swap is not re-runnable, so the recovery denylist must contain
+    # every one. This ties the SQL scan to the production denylist so the two can't
+    # drift; the row-count check below covers the seeds the scan can't detect.
+    assert set(swaps) <= _NON_RECOVERABLE_MIGRATION_VERSIONS, (
+        f"table-swap migration(s) {swaps} are missing from "
+        "_NON_RECOVERABLE_MIGRATION_VERSIONS"
+    )
 
     # Re-apply every re-runnable migration by rewinding the recorded version and
-    # migrating back up through each contiguous segment around the swap(s). The
-    # schema must be byte-for-byte unchanged, so a guard that silently skips a
-    # needed change is caught rather than masked.
+    # migrating back up through each contiguous segment around the excluded (one-
+    # shot) versions. Excluding exactly the production denylist means the re-run
+    # covers precisely the migrations recovery would re-run in prod. Schema and row
+    # counts must both be unchanged, so a guard that silently skips a needed change,
+    # or a non-idempotent seed that isn't denylisted, is caught rather than masked.
+    excluded = sorted(_NON_RECOVERABLE_MIGRATION_VERSIONS)
     before = _schema_snapshot(ch_client, target_db)
-    for reset_to, apply_to in _rerunnable_segments(latest, swaps):
+    before_counts = _row_count_snapshot(ch_client, target_db)
+    for reset_to, apply_to in _rerunnable_segments(latest, excluded):
         _reset_migration_version(ch_client, mgmt_db, target_db, reset_to)
         migrator.apply_migrations(target_db, target_version=apply_to)
 
     assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
     assert _schema_snapshot(ch_client, target_db) == before, (
         "re-running migrations changed the table/column schema"
+    )
+    assert _row_count_snapshot(ch_client, target_db) == before_counts, (
+        "re-running migrations changed row counts; a non-idempotent seed is not in "
+        "_NON_RECOVERABLE_MIGRATION_VERSIONS"
     )
 
 

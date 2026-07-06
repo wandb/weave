@@ -22,6 +22,10 @@ SETTINGS
 -- ttl_at is kept so a rollback to a pre-029 app can still write it. A RENAME
 -- would be irreversible mid-migration and, under prod write load on CH 25.10,
 -- spawns a mutation that can stall against concurrent lightweight updates.
+-- DateTime (not DateTime64(3) like the sibling tables) matches ttl_at's type so
+-- the TTL swap and the rollback path stay type-stable. No backfill from ttl_at is
+-- needed: TTL ships with this migration, so every existing row still holds the
+-- 2100 sentinel that ttl_at defaults to.
 ALTER TABLE calls_complete
     ADD COLUMN IF NOT EXISTS expire_at DateTime DEFAULT '2100-01-01 00:00:00';
 

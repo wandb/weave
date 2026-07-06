@@ -134,9 +134,11 @@ _COMMAND_PREVIEW_LENGTH = 100
 # Migrations that are one-shot by design and MUST NOT be auto-recovered: re-running
 # them is not a safe no-op. 006 re-inserts cost seed rows; 024 is a table-swap
 # RENAME that can half-apply and cross-wire tables on re-run. A partial application
-# of these needs manual repair. Every other migration is idempotent (guarded by
-# IF [NOT] EXISTS and enforced by the apply-twice migrator test), so re-running the
-# interrupted version converges the schema.
+# of these needs manual repair. This set is the single source of truth for "not
+# re-runnable": test_production_migrations_are_idempotent excludes exactly it from
+# the re-run and asserts both schema AND row counts are unchanged, so any other
+# migration that isn't schema- and data-idempotent (e.g. a new hardcoded seed)
+# fails that test until it is added here.
 _NON_RECOVERABLE_MIGRATION_VERSIONS = frozenset({6, 24})
 
 
@@ -415,8 +417,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
             )
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
-        if status["partially_applied_version"] is not None:
-            status = self._recover_partial_migration(target_db, status)
+        partial_version = status["partially_applied_version"]
+        if partial_version is not None:
+            status = self._recover_partial_migration(
+                target_db, status["curr_version"], partial_version
+            )
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
             status["curr_version"], migration_map, target_version
@@ -437,7 +442,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
             target_db, status["curr_version"], applied_target_version
         )
 
-    def _recover_partial_migration(self, target_db: str, status: dict) -> dict:
+    def _recover_partial_migration(
+        self, target_db: str, curr_version: int, partial_version: int
+    ) -> MigrationStatus:
         """Re-run an interrupted migration instead of dead-ending on it.
 
         A migration that times out mid-DDL leaves partially_applied_version set,
@@ -447,11 +454,15 @@ class BaseClickHouseTraceServerMigrator(ABC):
         is not consulted); a requested downgrade resumes after the flag clears.
         Only the expected next version, and only an idempotent one, is recovered;
         anything else, or a re-run failure, falls back to requiring manual repair.
+
+        Convergence is schema-level: in distributed/replicated mode a re-run of a
+        MODIFY QUERY drops and recreates the `_local` materialized view, so rows
+        inserted in that window are not aggregated into the target until the next
+        write. Data already at rest is unaffected.
         """
-        partial_version = status["partially_applied_version"]
         migration = self._get_migrations().get(partial_version)
         if (
-            partial_version != status["curr_version"] + 1
+            partial_version != curr_version + 1
             or partial_version in _NON_RECOVERABLE_MIGRATION_VERSIONS
             or migration is None
             or migration["up"] is None
@@ -514,7 +525,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """
         return add_heartbeat_column_sql(self.management_db)
 
-    def _get_migration_status(self, db_name: str) -> dict:
+    def _get_migration_status(self, db_name: str) -> MigrationStatus:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
@@ -533,7 +544,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if res is None or len(result_rows) == 0:
             raise MigrationError("Migration table not found")
 
-        return dict(zip(column_names, result_rows[0], strict=False))
+        _, curr_version, partially_applied_version = result_rows[0]
+        return {
+            "curr_version": curr_version,
+            "partially_applied_version": partially_applied_version,
+        }
 
     def _get_migrations(
         self,
