@@ -14,6 +14,11 @@ zero new objects are allocated.
 Pydantic models with nested dataclasses inside `Any` fields fall back to
 the legacy `model_dump` / `model_validate` round-trip, since Pydantic
 does not round-trip dataclasses safely through getattr / setattr.
+
+Refs can also be buried inside a JSON-serialized string leaf (e.g. an agent
+message's `content` parts array). Such leaves are decoded and re-walked so the
+embedded refs convert with the same semantics as top-level ones, bounded by
+`_MAX_REF_SEARCH_DEPTH` to cap JSON-in-JSON nesting.
 """
 
 import dataclasses
@@ -35,15 +40,10 @@ B = TypeVar("B")
 weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
-# Cap on how deep the embedded-ref path re-parses JSON-inside-JSON. Some
-# payloads store refs inside a JSON-serialized string (e.g. an agent message's
-# ``content`` parts array); the mapper re-parses those and re-runs itself over
-# the decoded structure. A JSON blob can itself hold another JSON-string leaf,
-# so an adversarial or pathological payload could nest arbitrarily and exceed
-# Python's recursion limit. Realistic nesting is a handful of levels deep, so 8
-# leaves ample headroom while staying far below ``sys.getrecursionlimit()``
-# (1000 by default). This bounds only the JSON-in-JSON descent — the underlying
-# ``_walk`` container traversal is unchanged. Mirrors
+# Caps the JSON-in-JSON descent for refs embedded inside a JSON-serialized
+# string leaf: a decoded blob can hold another JSON-string leaf, so a
+# pathological payload could nest without bound. Realistic nesting is a few
+# levels; 8 leaves headroom below sys.getrecursionlimit(). Mirrors
 # ``chat_view._MAX_REF_SEARCH_DEPTH``.
 _MAX_REF_SEARCH_DEPTH = 8
 
@@ -55,21 +55,12 @@ class InvalidInternalRef(ValueError):
 def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
     """Rewrite refs buried inside a JSON-serialized string ``s``.
 
-    ``s`` is assumed to be a leaf that does not itself start with a ref prefix
-    but does contain one as a substring (the caller gates on that cheap check
-    plus a depth cap before invoking this). We attempt to decode it as JSON and,
-    if it parses, re-run the SAME ``mapper`` over the decoded structure so
-    embedded refs convert with identical semantics to top-level leaves.
-
-    Returns the ORIGINAL string unchanged when it does not parse as JSON, or
-    when nothing inside it changed — avoiding a gratuitous re-serialization for
-    ref-free (or already-correct) payloads. Otherwise returns ``json.dumps`` of
-    the rewritten structure with default separators, which round-trips cleanly
-    because the producers serialize with ``json.dumps`` defaults too.
-
-    Any exception raised by ``mapper`` (e.g. an embedded ref failing a
-    verification/tolerance check) propagates unchanged, preserving the
-    whole-string raise semantics for embedded leaves.
+    Decode ``s`` as JSON and re-run ``mapper`` over the result so embedded refs
+    convert with the same semantics as top-level leaves. Returns ``s`` unchanged
+    when it does not parse as JSON or when nothing inside it changed (avoiding a
+    gratuitous re-dump); otherwise returns the re-serialized structure. Any
+    exception from ``mapper`` propagates, preserving whole-string raise
+    semantics.
     """
     try:
         parsed = json.loads(s)
@@ -79,6 +70,38 @@ def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
     if result is parsed:
         return s
     return json.dumps(result)
+
+
+def _make_ref_string_mapper(convert_ref: Callable[[str], str]) -> Callable[[B], B]:
+    """Build a copy-on-write mapper that rewrites weave refs in string leaves.
+
+    ``convert_ref`` handles a string that starts with a ref prefix, returning
+    its converted form (or raising for a disallowed ref). A string that instead
+    embeds a ref inside a JSON blob (e.g. a message ``content`` parts array) is
+    decoded and re-run through the same mapper so embedded refs convert exactly
+    like top-level ones. The substring pre-check keeps ref-free strings off the
+    ``json.loads`` path, and ``_MAX_REF_SEARCH_DEPTH`` caps the JSON-in-JSON
+    descent.
+    """
+    depth = 0
+
+    def mapper(obj: B) -> B:
+        nonlocal depth
+        if not isinstance(obj, str):
+            return obj
+        if obj.startswith(weave_prefix) or obj.startswith(weave_internal_prefix):
+            return cast(B, convert_ref(obj))
+        if depth < _MAX_REF_SEARCH_DEPTH and (
+            weave_prefix in obj or weave_internal_prefix in obj
+        ):
+            depth += 1
+            try:
+                return cast(B, _convert_embedded_json_refs(obj, mapper))
+            finally:
+                depth -= 1
+        return obj
+
+    return mapper
 
 
 def replace_external_weave_ref(
@@ -135,59 +158,31 @@ def universal_ext_to_int_ref_converter(
         references.
     """
     ext_to_int_project_cache: dict[str, str] = {}
-    # Tracks JSON-in-JSON descent depth for the embedded-ref path (below).
-    embedded_depth = 0
 
-    def replace_ref(ref_str: str) -> str:
-        return replace_external_weave_ref(
-            ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
-        )
+    def convert_ref(ref_str: str) -> str:
+        if ref_str.startswith(weave_prefix):
+            return replace_external_weave_ref(
+                ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
+            )
+        # Internal ref: accept only when the verify callback confirms the
+        # project_id, else a client could smuggle refs to arbitrary private
+        # projects.
+        rest = ref_str[len(weave_internal_prefix) :]
+        parts = rest.split("/", 2)
+        if len(parts) < 2:
+            raise InvalidExternalRef(
+                "Invalid internal ref format: missing project_id or kind."
+            )
+        if verify_internal_project_id is not None and verify_internal_project_id(
+            parts[0]
+        ):
+            return ref_str
+        raise InvalidExternalRef("Encountered unexpected internal ref format.")
 
-    def mapper(obj: B) -> B:
-        nonlocal embedded_depth
-        if isinstance(obj, str):
-            if obj.startswith(weave_prefix):
-                result = replace_ref(obj)
-                return cast(B, result)
-            elif obj.startswith(weave_internal_prefix):
-                # Internal refs are only accepted when the verify callback
-                # confirms the project_id is valid. Without this check, a
-                # malicious client could embed refs to arbitrary private
-                # projects.
-                rest = obj[len(weave_internal_prefix) :]
-                parts = rest.split("/", 2)
-                if len(parts) < 2:
-                    raise InvalidExternalRef(
-                        "Invalid internal ref format: missing project_id or kind."
-                    )
-                ref_project_id = parts[0]
-                if (
-                    verify_internal_project_id is not None
-                    and verify_internal_project_id(ref_project_id)
-                ):
-                    return obj
-                raise InvalidExternalRef("Encountered unexpected internal ref format.")
-            elif embedded_depth < _MAX_REF_SEARCH_DEPTH and (
-                weave_prefix in obj or weave_internal_prefix in obj
-            ):
-                # The string does not start with a ref but embeds one inside a
-                # JSON blob (e.g. a message ``content`` parts array). Descend
-                # so embedded external refs convert to internal and embedded
-                # internal refs go through the same verify check as top-level
-                # leaves. Gated by the cheap substring pre-check above and the
-                # depth cap so ref-free strings never pay for ``json.loads``.
-                embedded_depth += 1
-                try:
-                    return cast(B, _convert_embedded_json_refs(obj, mapper))
-                finally:
-                    embedded_depth -= 1
-        return obj
-
-    return _map_values(obj, mapper)
+    return _map_values(obj, _make_ref_string_mapper(convert_ref))
 
 
 C = TypeVar("C")
-D = TypeVar("D")
 
 
 def universal_int_to_ext_ref_converter(
@@ -214,54 +209,30 @@ def universal_int_to_ext_ref_converter(
         references.
     """
     int_to_ext_project_cache: dict[str, str | None] = {}
-    # Tracks JSON-in-JSON descent depth for the embedded-ref path (below).
-    embedded_depth = 0
 
-    def replace_ref(ref_str: str) -> str:
-        if not ref_str.startswith(weave_internal_prefix):
-            raise ValueError(f"Invalid URI: {ref_str}")
-        rest = ref_str[len(weave_internal_prefix) :]
-        parts = rest.split("/", 1)
-        if len(parts) != 2:
-            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
-        project_id, tail = parts
-        if project_id not in int_to_ext_project_cache:
-            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
-                project_id
-            )
-        external_project_id = int_to_ext_project_cache[project_id]
-        if not external_project_id:
-            return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
-        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+    def convert_ref(ref_str: str) -> str:
+        if ref_str.startswith(weave_internal_prefix):
+            rest = ref_str[len(weave_internal_prefix) :]
+            parts = rest.split("/", 1)
+            if len(parts) != 2:
+                raise InvalidInternalRef(f"Invalid URI: {ref_str}")
+            project_id, tail = parts
+            if project_id not in int_to_ext_project_cache:
+                int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                    project_id
+                )
+            external_project_id = int_to_ext_project_cache[project_id]
+            if not external_project_id:
+                return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+            return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+        # External ref stored where an internal one belongs. Agent reads
+        # tolerate it (already external-shaped); other paths raise loudly.
+        if not tolerate_external_refs:
+            raise InvalidInternalRef("Encountered unexpected ref format.")
+        logger.error("Returning stored external ref unchanged: %s", ref_str)
+        return ref_str
 
-    def mapper(obj: D) -> D:
-        nonlocal embedded_depth
-        if isinstance(obj, str):
-            if obj.startswith(weave_internal_prefix):
-                return cast(D, replace_ref(obj))
-            elif obj.startswith(weave_prefix):
-                # External ref stored where an internal one belongs. Agent reads
-                # tolerate it (already external-shaped); other paths raise loudly.
-                if not tolerate_external_refs:
-                    raise InvalidInternalRef("Encountered unexpected ref format.")
-                logger.error("Returning stored external ref unchanged: %s", obj)
-            elif embedded_depth < _MAX_REF_SEARCH_DEPTH and (
-                weave_prefix in obj or weave_internal_prefix in obj
-            ):
-                # The string does not start with a ref but embeds one inside a
-                # JSON blob (e.g. a message ``content`` parts array). Descend
-                # so embedded internal refs externalize and embedded external
-                # refs hit the same tolerate/raise policy as top-level leaves.
-                # Gated by the cheap substring pre-check above and the depth cap
-                # so ref-free strings never pay for ``json.loads``.
-                embedded_depth += 1
-                try:
-                    return cast(D, _convert_embedded_json_refs(obj, mapper))
-                finally:
-                    embedded_depth -= 1
-        return obj
-
-    return _map_values(obj, mapper)
+    return _map_values(obj, _make_ref_string_mapper(convert_ref))
 
 
 E = TypeVar("E")

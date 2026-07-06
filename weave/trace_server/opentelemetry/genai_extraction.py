@@ -368,8 +368,6 @@ def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> 
                     break
     return try_convert_numeric_keys_to_list(val)
 
-    return None
-
 
 # ---------------------------------------------------------------------------
 # Custom attributes -> typed Maps
