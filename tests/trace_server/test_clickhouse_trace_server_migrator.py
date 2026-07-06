@@ -409,6 +409,30 @@ def test_apply_migrations_raises_on_unrecoverable_partial(mock_migration_lock):
         migrator.apply_migrations("test_db")
 
 
+def test_apply_migrations_raises_on_non_recoverable_one_shot(mock_migration_lock):
+    # A one-shot migration (006 seed, 024 swap) is partial==curr+1 but must NOT be
+    # re-run; recovery refuses it and requires manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 5, "partially_applied_version": 6}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 7)
+        }
+    )
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
+        migrator.apply_migrations("test_db")
+    migrator._apply_migration.assert_not_called()
+
+
 def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(

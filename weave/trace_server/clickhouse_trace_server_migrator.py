@@ -131,6 +131,14 @@ _MAX_RETRIES = 3
 _RETRY_MAX_WAIT_SECONDS = 8
 _COMMAND_PREVIEW_LENGTH = 100
 
+# Migrations that are one-shot by design and MUST NOT be auto-recovered: re-running
+# them is not a safe no-op. 006 re-inserts cost seed rows; 024 is a table-swap
+# RENAME that can half-apply and cross-wire tables on re-run. A partial application
+# of these needs manual repair. Every other migration is idempotent (guarded by
+# IF [NOT] EXISTS and enforced by the apply-twice migrator test), so re-running the
+# interrupted version converges the schema.
+_NON_RECOVERABLE_MIGRATION_VERSIONS = frozenset({6, 24})
+
 
 def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
@@ -407,7 +415,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
             )
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
-        if status["partially_applied_version"]:
+        if status["partially_applied_version"] is not None:
             status = self._recover_partial_migration(target_db, status)
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
@@ -435,13 +443,16 @@ class BaseClickHouseTraceServerMigrator(ABC):
         A migration that times out mid-DDL leaves partially_applied_version set,
         which otherwise hard-blocks every restart. Migration DDL is idempotent,
         so re-running the interrupted version converges the schema and clears the
-        flag. Only the expected next version is recoverable; anything else, or a
-        re-run failure, falls back to requiring manual repair.
+        flag. Recovery always rolls the interrupted version forward (target_version
+        is not consulted); a requested downgrade resumes after the flag clears.
+        Only the expected next version, and only an idempotent one, is recovered;
+        anything else, or a re-run failure, falls back to requiring manual repair.
         """
         partial_version = status["partially_applied_version"]
         migration = self._get_migrations().get(partial_version)
         if (
             partial_version != status["curr_version"] + 1
+            or partial_version in _NON_RECOVERABLE_MIGRATION_VERSIONS
             or migration is None
             or migration["up"] is None
         ):
