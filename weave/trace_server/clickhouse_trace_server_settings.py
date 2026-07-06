@@ -147,6 +147,17 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
 }
 
 
+# HTTP read timeout for the migration client. Must exceed the server's
+# database_replicated_initial_query_timeout_sec (default 300s) so slow DDL completes.
+MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC = 900
+
+# Bounds only the ON CLUSTER (distributed DDL queue) wait; does not affect the
+# Replicated-DB-engine path, which the client read timeout above covers.
+MIGRATION_DDL_QUERY_SETTINGS: dict[str, int | str] = {
+    "distributed_ddl_task_timeout": 600,
+}
+
+
 def merge_default_query_settings(
     overrides: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:

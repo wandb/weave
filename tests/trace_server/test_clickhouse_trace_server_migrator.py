@@ -8,6 +8,7 @@ import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
@@ -204,7 +205,16 @@ def test_apply_migrations_with_target_version(
     # Verify the actual SQL commands were executed
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
-        [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
+        [
+            call(
+                "CREATE TABLE test1 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+            call(
+                "CREATE TABLE test2 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+        ]
     )
 
 
@@ -308,21 +318,82 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
+def test_apply_migrations_recovers_partially_applied(mock_migration_lock):
+    # partial == curr+1 is recoverable: re-run the interrupted (idempotent)
+    # migration, then continue with the rest instead of dead-ending.
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
     )
     migrator._get_migration_status = Mock(
+        side_effect=[
+            {"curr_version": 1, "partially_applied_version": 2},
+            {"curr_version": 2, "partially_applied_version": None},
+        ]
+    )
+    migrator._get_migrations = Mock(
         return_value={
-            "curr_version": 1,
-            "partially_applied_version": 2,
+            2: {"up": "2.up.sql", "down": "2.down.sql"},
+            3: {"up": "3.up.sql", "down": "3.down.sql"},
+        }
+    )
+    migrator._determine_migrations_to_apply = Mock(return_value=[(3, "3.up.sql")])
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    migrator.apply_migrations("test_db")
+
+    migrator._apply_migration.assert_any_call("test_db", 2, "2.up.sql")
+    migrator._apply_migration.assert_any_call("test_db", 3, "3.up.sql")
+
+
+def test_apply_migrations_raises_on_unrecoverable_partial(mock_migration_lock):
+    # A partial version that isn't the expected next migration (curr+1) is not
+    # safe to auto-recover; require manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 5}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 6)
         }
     )
     migrator._has_migrations_to_apply = Mock(return_value=True)
 
-    with pytest.raises(MigrationError, match="partially applied migration version 2"):
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
         migrator.apply_migrations("test_db")
+
+
+def test_run_ddl_with_retry_passes_migration_ddl_settings(migrator):
+    migrator._run_ddl_with_retry("CREATE TABLE t (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE t (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
+
+
+def test_run_ddl_with_retry_merges_caller_settings(migrator):
+    migrator._run_ddl_with_retry("SELECT 1", settings={"mutations_sync": 2})
+    migrator.ch_client.command.assert_called_once_with(
+        "SELECT 1",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
+    )
+
+
+def test_migration_timeout_ladder_invariants():
+    # The client read timeout must outlast both the ON CLUSTER DDL wait and the
+    # server's replicated-DDL wait (database_replicated_initial_query_timeout_sec,
+    # default 300s) so the client always gets a response rather than the read
+    # timeout that stranded the migration mid-DDL in the incident.
+    client = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+    ddl_task = ch_settings.MIGRATION_DDL_QUERY_SETTINGS["distributed_ddl_task_timeout"]
+    server_replicated_ddl_default = 300
+    assert client > ddl_task
+    assert client > server_replicated_ddl_default
 
 
 def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):
@@ -460,14 +531,19 @@ def test_execute_migration_command(migrator):
     assert (
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
-    migrator.ch_client.command.assert_called_once_with("CREATE TABLE test (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE test (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
 
 
 def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig)
+    migrator.ch_client.command.assert_called_once_with(
+        orig, settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS
+    )
 
 
 def test_update_migration_status(migrator):
@@ -480,13 +556,15 @@ def test_update_migration_status(migrator):
     # Test start of migration
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
-        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'"
+        "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
     )
 
 

@@ -367,11 +367,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
         if status["partially_applied_version"]:
-            raise MigrationError(
-                f"Unable to apply migrations to `{target_db}`. Found partially applied "
-                f"migration version {status['partially_applied_version']}. "
-                f"Please fix the database manually and try again."
-            )
+            status = self._recover_partial_migration(target_db, status)
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
             status["curr_version"], migration_map, target_version
@@ -391,6 +387,41 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._run_post_migration_hook(
             target_db, status["curr_version"], applied_target_version
         )
+
+    def _recover_partial_migration(self, target_db: str, status: dict) -> dict:
+        """Re-run an interrupted migration instead of dead-ending on it.
+
+        A migration that times out mid-DDL leaves partially_applied_version set,
+        which otherwise hard-blocks every restart. Migration DDL is idempotent,
+        so re-running the interrupted version converges the schema and clears the
+        flag. Only the expected next version is recoverable; anything else, or a
+        re-run failure, falls back to requiring manual repair.
+        """
+        partial_version = status["partially_applied_version"]
+        migration = self._get_migrations().get(partial_version)
+        if (
+            partial_version != status["curr_version"] + 1
+            or migration is None
+            or migration["up"] is None
+        ):
+            raise MigrationError(
+                f"Unable to apply migrations to `{target_db}`. Found partially applied "
+                f"migration version {partial_version} that cannot be auto-recovered. "
+                f"Please fix the database manually and try again."
+            )
+        logger.warning(
+            "Found partially applied migration %s on `%s`; re-running it idempotently to recover.",
+            partial_version,
+            target_db,
+        )
+        try:
+            self._apply_migration(target_db, partial_version, migration["up"])
+        except Exception as exc:
+            raise MigrationError(
+                f"Unable to auto-recover partially applied migration {partial_version} "
+                f"on `{target_db}`: {exc}. Please fix the database manually and try again."
+            ) from exc
+        return self._get_migration_status(target_db)
 
     def _run_post_migration_hook(
         self, target_db: str, current_version: int, target_version: int | None
@@ -595,7 +626,9 @@ class BaseClickHouseTraceServerMigrator(ABC):
         retry=retry_if_exception(_is_transient_ch_error),
         reraise=True,
     )
-    def _run_ddl_with_retry(self, command: str) -> None:
+    def _run_ddl_with_retry(
+        self, command: str, settings: dict[str, int | str] | None = None
+    ) -> None:
         """Execute a DDL command with retry for transient replication errors.
 
         Retries with exponential backoff for known-transient codes:
@@ -603,7 +636,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         and 999 (KEEPER_EXCEPTION) when ON CLUSTER DDL hits a transient Keeper
         coordination error.
         """
-        self.ch_client.command(command)
+        merged_settings = {
+            **ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            **(settings or {}),
+        }
+        self.ch_client.command(command, settings=merged_settings)
 
 
 class CloudClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator):

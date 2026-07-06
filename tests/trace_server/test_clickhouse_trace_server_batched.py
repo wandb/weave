@@ -1946,3 +1946,35 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
         f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
         f"NotFoundError-family error mentioning 'not found' or 'deleted'."
     )
+
+
+def test_mint_client_forwards_send_receive_timeout():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client(
+            send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+        kwargs = mock_get_client.call_args.kwargs
+        assert (
+            kwargs["send_receive_timeout"]
+            == ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+
+
+def test_mint_client_omits_send_receive_timeout_by_default():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client()
+        assert "send_receive_timeout" not in mock_get_client.call_args.kwargs

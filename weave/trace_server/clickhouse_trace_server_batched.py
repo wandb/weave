@@ -6941,13 +6941,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
             self._database_ensured = True
 
-    def _mint_client(self) -> CHClient:
+    def _mint_client(self, send_receive_timeout: int | None = None) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager.
 
         autogenerate_session_id=False: weave-trace uses no session features,
         and the default collides on overlapping queries with SESSION_IS_LOCKED
         (code 373). See PR #6655.
+        `send_receive_timeout` overrides the HTTP read timeout (migration clients
+        need to outlast replicated-DDL propagation); None keeps the library default.
         """
+        optional_kwargs: dict[str, int] = {}
+        if send_receive_timeout is not None:
+            optional_kwargs["send_receive_timeout"] = send_receive_timeout
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
@@ -6956,6 +6961,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             secure=self._port == CLICKHOUSE_SECURE_PORT,
             pool_mgr=_CH_POOL_MANAGER,
             autogenerate_session_id=False,
+            **optional_kwargs,
         )
         self._ensure_database(client)
         client.database = self._database
@@ -7044,15 +7050,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     def _run_migrations(self) -> None:
         logger.info("Running migrations")
+        migration_timeout = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
         migrator = wf_migrator.get_clickhouse_trace_server_migrator(
-            self._mint_client(),
+            self._mint_client(send_receive_timeout=migration_timeout),
             replicated=wf_env.wf_clickhouse_replicated(),
             replicated_path=wf_env.wf_clickhouse_replicated_path(),
             replicated_cluster=wf_env.wf_clickhouse_replicated_cluster(),
             use_distributed=wf_env.wf_clickhouse_use_distributed_tables(),
             # Mint the heartbeat's client like the primary so it inherits
             # secure/pool/db settings (raw env would drop `secure=`).
-            heartbeat_client_factory=self._mint_client,
+            heartbeat_client_factory=partial(
+                self._mint_client, send_receive_timeout=migration_timeout
+            ),
         )
         migrator.apply_migrations(self._database)
 
