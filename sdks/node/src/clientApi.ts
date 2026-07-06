@@ -1,7 +1,10 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
-import {resetTracerProviderForReinit} from './genai/provider';
+import {
+  getWeaveTracerProviderProjectId,
+  shutdownWeaveTracerProvider,
+} from './genai/provider';
 import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
@@ -135,9 +138,17 @@ export async function init(
       projectId,
       settings: resolvedSettings,
     });
-    // Drop a GenAI provider left over from a previous init() to a different
-    // project so the next span rebuilds one that routes to this project.
-    resetTracerProviderForReinit(projectId);
+    // A GenAI provider is pinned to the project it was built for (its OTLP
+    // exporter carries that project_id), so if a previous init() built one for
+    // a different project, drop it here — the next span rebuilds one that
+    // routes to this project.
+    const priorProviderProjectId = getWeaveTracerProviderProjectId();
+    if (
+      priorProviderProjectId !== null &&
+      priorProviderProjectId !== projectId
+    ) {
+      shutdownWeaveTracerProvider();
+    }
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);

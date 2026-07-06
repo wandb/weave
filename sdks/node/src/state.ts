@@ -24,16 +24,10 @@ type State = {
 
   genAi: {
     /**
-     * The cached GenAI TracerProvider together with the `projectId`
-     * (`entity/project`) it routes to.
-     *
-     * The two are one unit: the provider's OTLP exporter carries its target
-     * project in the `project_id` header, so a later `weave.init()` to a
-     * *different* project must rebuild the provider rather than reuse it —
-     * otherwise agent spans keep exporting under the first project. Keeping the
-     * provider and its `projectId` in a single object makes it impossible for
-     * them to drift out of sync (see `getOrBuildProvider`). `null` until the
-     * first tracer is pulled, and reset back to `null` on project switch.
+     * The cached GenAI provider paired with the `projectId` it routes to. Held
+     * together because the provider's exporter is pinned to that project, so a
+     * `weave.init()` to a different project must rebuild it. `null` until the
+     * first tracer is pulled; reset on a project switch.
      */
     provider: {tracerProvider: BasicTracerProvider; projectId: string} | null;
 

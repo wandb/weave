@@ -54,43 +54,41 @@ export function getWeaveTracerProvider(): BasicTracerProvider | null {
   return state.genAi.provider?.tracerProvider ?? null;
 }
 
-export function clearWeaveTracerProvider() {
-  state.genAi.provider = null;
+/**
+ * The project the cached provider routes to, or `null` if none is built yet.
+ * Lets `init()` detect a project switch and decide to tear the provider down.
+ */
+export function getWeaveTracerProviderProjectId(): string | null {
+  return state.genAi.provider?.projectId ?? null;
 }
 
 /**
- * Tear down the cached GenAI provider if it routes to a different project than
- * the one `weave.init()` just selected, so the next emitted span rebuilds a
- * provider aimed at the new project.
- *
- * The provider routes agent spans to a single project: the target rides the
- * exporter's `project_id` header (see `buildOtlpExporter`), and server-side
- * precedence puts Resource attrs above that header — which is why the project
- * must NOT live on the immutable Resource. A cached provider therefore can't
- * follow a re-`init('ent/B')`; it would keep exporting B's spans under A.
- *
- * We own a standalone provider (not OTel's set-once global), so the correct
- * re-route is simply to drop the stale one and let it be rebuilt for the new
- * project. Doing this teardown here — driven from `init()` — rather than lazily
- * on the next span keeps the provider's lifecycle tied to the actual
- * re-configuration event. Mirrors the Python fix (#7507) without poking the
- * exporter's private request internals.
+ * Flush and drop the cached GenAI provider (if any). `shutdown()` force-flushes
+ * then disposes; failures are best-effort. The next emitted span rebuilds a
+ * fresh provider for the then-current client.
  */
-export function resetTracerProviderForReinit(projectId: string): void {
+export function shutdownWeaveTracerProvider(): void {
   const cached = state.genAi.provider;
-  if (!cached || cached.projectId === projectId) {
+  if (!cached) {
     return;
   }
-  // Flush spans queued under the old project before tearing the provider down.
-  // shutdown() force-flushes then disposes; failures are best-effort since the
-  // queued spans belong to the previous project regardless.
   void cached.tracerProvider.shutdown().catch(() => {
     // Nothing actionable if the old provider fails to drain; we're replacing it.
   });
   state.genAi.provider = null;
 }
 
+export function clearWeaveTracerProvider() {
+  state.genAi.provider = null;
+}
+
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
+  // One cached provider for the active project, not a projectId->provider map:
+  // only one project is active at a time, and each provider owns an OTLP
+  // exporter pinned to its project, so a map would just accumulate idle
+  // exporters for every project ever init'd. init() drops the slot on a project
+  // switch (see shutdownWeaveTracerProvider); here we reuse it while the
+  // project matches and rebuild otherwise.
   const cached = state.genAi.provider;
   if (cached && cached.projectId === client.projectId) {
     return cached.tracerProvider;

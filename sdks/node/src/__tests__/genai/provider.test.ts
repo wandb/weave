@@ -8,7 +8,8 @@ import {flushOTel} from '../../genai/flush';
 import {
   getWeaveTracer,
   getWeaveTracerProvider,
-  resetTracerProviderForReinit,
+  getWeaveTracerProviderProjectId,
+  shutdownWeaveTracerProvider,
 } from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
 import {packageVersion} from '../../utils/packageVersion';
@@ -88,13 +89,16 @@ describe('otel/provider', () => {
   });
 
   describe('project re-routing across weave.init() calls', () => {
-    // Simulate a re-init to `projectId`: install the client (as init() does)
-    // and run the teardown init() drives, then pull a tracer to (re)build the
-    // provider. Keeps these tests exercising the same reset path as init(),
-    // without standing up the full network-touching init().
+    // Simulate a re-init to `projectId`: install the client (as init() does),
+    // run the same project-switch teardown init() performs, then pull a tracer
+    // to (re)build the provider. Keeps these tests exercising the real reset
+    // path without standing up the full network-touching init().
     function reinit(projectId: string): void {
       installFakeClient({projectId});
-      resetTracerProviderForReinit(projectId);
+      const prior = getWeaveTracerProviderProjectId();
+      if (prior !== null && prior !== projectId) {
+        shutdownWeaveTracerProvider();
+      }
       getWeaveTracer('weave-genai');
     }
 
