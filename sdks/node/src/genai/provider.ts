@@ -51,7 +51,31 @@ export function getWeaveTracer(name: string): Tracer {
  * has been pulled yet. Used by the `flushOTel` / `beforeExit` paths.
  */
 export function getWeaveTracerProvider(): BasicTracerProvider | null {
-  return state.genAi.provider;
+  return state.genAi.provider?.tracerProvider ?? null;
+}
+
+/**
+ * The project the cached provider routes to, or `null` if none is built yet.
+ * Lets `init()` detect a project switch and decide to tear the provider down.
+ */
+export function getWeaveTracerProviderProjectId(): string | null {
+  return state.genAi.provider?.projectId ?? null;
+}
+
+/**
+ * Flush and drop the cached GenAI provider (if any). `shutdown()` force-flushes
+ * then disposes; failures are best-effort. The next emitted span rebuilds a
+ * fresh provider for the then-current client.
+ */
+export function shutdownWeaveTracerProvider(): void {
+  const cached = state.genAi.provider;
+  if (!cached) {
+    return;
+  }
+  void cached.tracerProvider.shutdown().catch(() => {
+    // Nothing actionable if the old provider fails to drain; we're replacing it.
+  });
+  state.genAi.provider = null;
 }
 
 export function clearWeaveTracerProvider() {
@@ -59,27 +83,25 @@ export function clearWeaveTracerProvider() {
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  if (state.genAi.provider) {
-    return state.genAi.provider;
+  // Reuse the cached provider only while it targets the active project; a
+  // project switch is torn down by init() before we get here.
+  const cached = state.genAi.provider;
+  if (cached && cached.projectId === client.projectId) {
+    return cached.tracerProvider;
   }
 
-  const [entity, project] = client.projectId.includes('/')
-    ? client.projectId.split('/')
-    : ['', client.projectId];
-
   const resource = new Resource({
-    [WEAVE_RESOURCE_ATTR.WANDB_ENTITY]: entity,
-    [WEAVE_RESOURCE_ATTR.WANDB_PROJECT]: project,
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
-  state.genAi.provider = new BasicTracerProvider({
+  const tracerProvider = new BasicTracerProvider({
     resource,
     spanProcessors: [buildSpanProcessor(client)],
   });
+  state.genAi.provider = {tracerProvider, projectId: client.projectId};
   registerBeforeExitHookOnce();
-  return state.genAi.provider;
+  return tracerProvider;
 }
 
 // Best-effort flush on process exit. Registered the first time a real
@@ -91,11 +113,12 @@ function registerBeforeExitHookOnce(): void {
   }
   state.genAi.providerRegistered = true;
   process.once('beforeExit', async () => {
-    if (!state.genAi.provider) {
+    const cached = state.genAi.provider;
+    if (!cached) {
       return;
     }
     try {
-      await state.genAi.provider.shutdown();
+      await cached.tracerProvider.shutdown();
     } catch {
       // If shutdown fails we have no good place to surface it — the
       // process is already on its way out.
