@@ -3292,6 +3292,14 @@ class EvalResultsQueryBody(BaseModelStrict):
             "scorer_call_ids will be null/empty)."
         ),
     )
+    include_costs: bool = Field(
+        default=False,
+        description=(
+            "When true, enrich the predict-and-score child calls with cost so "
+            "the summary can report predict-only `predict_total_cost`. Opt-in: "
+            "other callers skip the cost computation."
+        ),
+    )
     sort_by: list[EvalResultsSortBy] | None = Field(
         default=None,
         description=(
@@ -3344,6 +3352,7 @@ class EvalResultsTrial(BaseModel):
     scores: dict[str, Any] = Field(default_factory=dict)
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
+    total_cost: float | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
     genai_span_ref: list[GenAISpanRef] | None = None
 
@@ -3403,6 +3412,14 @@ class EvalResultsEvaluationSummary(BaseModel):
             "Sum of per-trial predict-only token usage for this evaluation "
             "(the model's predict() tokens only, excluding LLM-as-a-judge "
             "scorer usage); None when no trial reports usage."
+        ),
+    )
+    predict_total_cost: float | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only cost for this evaluation (the "
+            "model's predict() cost only, excluding LLM-as-a-judge scorer "
+            "cost); None when no trial reports cost."
         ),
     )
     evaluation_ref: str | None = None
