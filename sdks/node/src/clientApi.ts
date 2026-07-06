@@ -1,6 +1,7 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
+import {resetTracerProviderForReinit} from './genai/provider';
 import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
@@ -134,6 +135,11 @@ export async function init(
       projectId,
       settings: resolvedSettings,
     });
+    // Re-init to a different project can't reuse the cached GenAI provider
+    // (its exporter is pinned to the previous project via the project_id
+    // header), so tear it down here and let the next span rebuild one aimed at
+    // the new project. See resetTracerProviderForReinit.
+    resetTracerProviderForReinit(projectId);
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);

@@ -51,38 +51,49 @@ export function getWeaveTracer(name: string): Tracer {
  * has been pulled yet. Used by the `flushOTel` / `beforeExit` paths.
  */
 export function getWeaveTracerProvider(): BasicTracerProvider | null {
-  return state.genAi.provider;
+  return state.genAi.provider?.tracerProvider ?? null;
 }
 
 export function clearWeaveTracerProvider() {
   state.genAi.provider = null;
-  state.genAi.providerProjectId = null;
+}
+
+/**
+ * Tear down the cached GenAI provider if it routes to a different project than
+ * the one `weave.init()` just selected, so the next emitted span rebuilds a
+ * provider aimed at the new project.
+ *
+ * The provider routes agent spans to a single project: the target rides the
+ * exporter's `project_id` header (see `buildOtlpExporter`), and server-side
+ * precedence puts Resource attrs above that header — which is why the project
+ * must NOT live on the immutable Resource. A cached provider therefore can't
+ * follow a re-`init('ent/B')`; it would keep exporting B's spans under A.
+ *
+ * We own a standalone provider (not OTel's set-once global), so the correct
+ * re-route is simply to drop the stale one and let it be rebuilt for the new
+ * project. Doing this teardown here — driven from `init()` — rather than lazily
+ * on the next span keeps the provider's lifecycle tied to the actual
+ * re-configuration event. Mirrors the Python fix (#7507) without poking the
+ * exporter's private request internals.
+ */
+export function resetTracerProviderForReinit(projectId: string): void {
+  const cached = state.genAi.provider;
+  if (!cached || cached.projectId === projectId) {
+    return;
+  }
+  // Flush spans queued under the old project before tearing the provider down.
+  // shutdown() force-flushes then disposes; failures are best-effort since the
+  // queued spans belong to the previous project regardless.
+  void cached.tracerProvider.shutdown().catch(() => {
+    // Nothing actionable if the old provider fails to drain; we're replacing it.
+  });
+  state.genAi.provider = null;
 }
 
 function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
-  // The provider routes agent spans to a single project: the target rides the
-  // exporter's `project_id` header (see buildOtlpExporter), and server-side
-  // precedence puts Resource attrs above that header. So the project must NOT
-  // live on the immutable Resource, or a later `weave.init('ent/B')` can't
-  // re-route — the cached provider keeps exporting B's spans under A.
-  //
-  // Because we own a standalone provider (not OTel's set-once global), the
-  // simplest correct re-route is to rebuild when the target project changes.
-  // This mirrors the Python fix (#7507) without poking the exporter's private
-  // request internals.
   const cached = state.genAi.provider;
-  if (cached && state.genAi.providerProjectId === client.projectId) {
-    return cached;
-  }
-  if (cached) {
-    // A re-init pointed us at a different project. Flush spans queued under the
-    // old project before tearing the provider down, then rebuild for the new
-    // one. shutdown() force-flushes then disposes; failures are best-effort
-    // since the queued spans belong to the previous project regardless.
-    void cached.shutdown().catch(() => {
-      // Nothing actionable if the old provider fails to drain; we're replacing
-      // it either way.
-    });
+  if (cached && cached.projectId === client.projectId) {
+    return cached.tracerProvider;
   }
 
   const resource = new Resource({
@@ -90,13 +101,13 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
-  state.genAi.provider = new BasicTracerProvider({
+  const tracerProvider = new BasicTracerProvider({
     resource,
     spanProcessors: [buildSpanProcessor(client)],
   });
-  state.genAi.providerProjectId = client.projectId;
+  state.genAi.provider = {tracerProvider, projectId: client.projectId};
   registerBeforeExitHookOnce();
-  return state.genAi.provider;
+  return tracerProvider;
 }
 
 // Best-effort flush on process exit. Registered the first time a real
@@ -108,11 +119,12 @@ function registerBeforeExitHookOnce(): void {
   }
   state.genAi.providerRegistered = true;
   process.once('beforeExit', async () => {
-    if (!state.genAi.provider) {
+    const cached = state.genAi.provider;
+    if (!cached) {
       return;
     }
     try {
-      await state.genAi.provider.shutdown();
+      await cached.tracerProvider.shutdown();
     } catch {
       // If shutdown fails we have no good place to surface it — the
       // process is already on its way out.

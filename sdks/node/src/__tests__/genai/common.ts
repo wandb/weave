@@ -16,7 +16,7 @@ export const TEST_PROJECT = 'test-entity/test-project';
 
 export function installFakeClient(
   settings: Partial<Settings> = {},
-  projectId: string = TEST_PROJECT
+  {projectId = TEST_PROJECT}: {projectId?: string} = {}
 ): WeaveClient {
   const traceServerApi = {baseUrl: TEST_BASE_URL} as TraceServerApi<any>;
   const client = new WeaveClient({

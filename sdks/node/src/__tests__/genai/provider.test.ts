@@ -5,7 +5,11 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {flushOTel} from '../../genai/flush';
-import {getWeaveTracer, getWeaveTracerProvider} from '../../genai/provider';
+import {
+  getWeaveTracer,
+  getWeaveTracerProvider,
+  resetTracerProviderForReinit,
+} from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
 import {packageVersion} from '../../utils/packageVersion';
 
@@ -31,27 +35,28 @@ describe('otel/provider', () => {
     expect(getWeaveTracerProvider()).toBe(providerA);
   });
 
-  it('stamps the weave SDK resource attributes on the provider', () => {
+  it('stamps exactly the weave/wandb resource attributes (target project stays off the Resource)', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     const provider = getWeaveTracerProvider();
     expect(provider).not.toBeNull();
+    // Snapshot the full set of attributes in our own `weave.`/`wandb.`
+    // namespaces (ignoring OTel's default telemetry.* / service.name). The
+    // exact match is the regression guard: server precedence ranks
+    // `wandb.entity`/`wandb.project` Resource attrs above the exporter's
+    // project_id header, so if either ever crept back onto the (immutable)
+    // Resource it would pin routing to the first project and bleed a later
+    // init()'s spans into it. A stray `wandb.*` key here fails the snapshot.
     const attrs = provider!.resource.attributes;
-    expect(attrs[WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]).toBe(packageVersion);
-    expect(attrs[WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]).toBe('node');
-  });
-
-  it('keeps the target project off the immutable Resource (routing rides the project_id header)', () => {
-    installFakeClient();
-    getWeaveTracer('weave-genai');
-    const provider = getWeaveTracerProvider();
-    expect(provider).not.toBeNull();
-    const attrs = provider!.resource.attributes;
-    // Regression guard: server precedence ranks these Resource attrs above the
-    // exporter's project_id header, so baking them in pins routing to the first
-    // project and bleeds a later init()'s spans into it.
-    expect(attrs['wandb.entity']).toBeUndefined();
-    expect(attrs['wandb.project']).toBeUndefined();
+    const weaveOwned = Object.fromEntries(
+      Object.entries(attrs).filter(
+        ([k]) => k.startsWith('weave.') || k.startsWith('wandb.')
+      )
+    );
+    expect(weaveOwned).toEqual({
+      [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
+      [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: 'node',
+    });
   });
 
   it('honors a user-supplied SpanProcessor and routes spans through it', async () => {
@@ -87,9 +92,21 @@ describe('otel/provider', () => {
   });
 
   describe('project re-routing across weave.init() calls', () => {
-    // The OTLP proto exporter buries its request headers a couple of layers
-    // deep. Reaching in here (in the test only) lets us assert the concrete
-    // routing target — the `project_id` header — that a re-init must follow.
+    // Simulate a re-init to `projectId`: install the client (as init() does)
+    // and run the teardown init() drives, then pull a tracer to (re)build the
+    // provider. Keeps these tests exercising the same reset path as init(),
+    // without standing up the full network-touching init().
+    function reinit(projectId: string): void {
+      installFakeClient({}, {projectId});
+      resetTracerProviderForReinit(projectId);
+      getWeaveTracer('weave-genai');
+    }
+
+    // TODO(#7512 review): this reaches into OTLP proto exporter internals to
+    // read the `project_id` header a couple of layers deep. It's the concrete
+    // routing target a re-init must follow, but it's coupled to exporter
+    // internals — better replaced by an integration test that asserts the
+    // header on a captured export once we have that harness.
     function exporterProjectId(provider: BasicTracerProvider): string {
       const processor = (provider as any)._registeredSpanProcessors?.[0];
       const exporter = processor?._exporter;
@@ -98,39 +115,33 @@ describe('otel/provider', () => {
     }
 
     it('reuses the cached provider when re-init targets the same project', () => {
-      installFakeClient({}, 'ent/A');
-      getWeaveTracer('weave-genai');
+      reinit('ent/A');
       const first = getWeaveTracerProvider();
 
       // Same project again: the cached provider is reused, not rebuilt.
-      installFakeClient({}, 'ent/A');
-      getWeaveTracer('weave-genai');
+      reinit('ent/A');
       expect(getWeaveTracerProvider()).toBe(first);
     });
 
     it('rebuilds the provider when re-init targets a different project', () => {
-      installFakeClient({}, 'ent/A');
-      getWeaveTracer('weave-genai');
+      reinit('ent/A');
       const providerA = getWeaveTracerProvider();
       expect(providerA).toBeInstanceOf(BasicTracerProvider);
 
       // Re-init to a different project must NOT hand back A's cached provider,
       // or B's agent spans would export under A (the reported bleed).
-      installFakeClient({}, 'ent/B');
-      getWeaveTracer('weave-genai');
+      reinit('ent/B');
       const providerB = getWeaveTracerProvider();
       expect(providerB).toBeInstanceOf(BasicTracerProvider);
       expect(providerB).not.toBe(providerA);
     });
 
     it('shuts down the old provider when switching projects', () => {
-      installFakeClient({}, 'ent/A');
-      getWeaveTracer('weave-genai');
+      reinit('ent/A');
       const providerA = getWeaveTracerProvider()!;
       const shutdownSpy = jest.spyOn(providerA, 'shutdown').mockResolvedValue();
 
-      installFakeClient({}, 'ent/B');
-      getWeaveTracer('weave-genai');
+      reinit('ent/B');
 
       // The abandoned provider is torn down (its shutdown() force-flushes
       // A's queued spans, then disposes it) so we don't leak an exporter.
@@ -139,12 +150,10 @@ describe('otel/provider', () => {
     });
 
     it('routes the rebuilt provider to the new project via the project_id header', () => {
-      installFakeClient({}, 'ent/A');
-      getWeaveTracer('weave-genai');
+      reinit('ent/A');
       expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/A');
 
-      installFakeClient({}, 'ent/B');
-      getWeaveTracer('weave-genai');
+      reinit('ent/B');
       expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/B');
     });
   });
