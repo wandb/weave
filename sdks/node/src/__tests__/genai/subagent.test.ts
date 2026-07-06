@@ -166,9 +166,9 @@ describe('SubAgent', () => {
   it('record() is chainable', () => {
     const turn = Turn.create({});
     const subagent = turn.startSubagent({name: 'researcher'});
-    expect(subagent.record({agentId: 'x'}).record({agentDescription: 'foo'})).toBe(
-      subagent
-    );
+    expect(
+      subagent.record({agentId: 'x'}).record({agentDescription: 'foo'})
+    ).toBe(subagent);
     subagent.end();
     turn.end();
   });
@@ -193,7 +193,10 @@ describe('SubAgent', () => {
     const startedAt = new Date('2026-01-01T00:00:00Z');
     const endedAt = new Date('2026-01-01T00:00:05Z');
     const turn = Turn.create({});
-    const subagent = turn.startSubagent({name: 'researcher', startTime: startedAt});
+    const subagent = turn.startSubagent({
+      name: 'researcher',
+      startTime: startedAt,
+    });
     subagent.end({endTime: endedAt});
     turn.end();
 
