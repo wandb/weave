@@ -16,6 +16,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
     build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
@@ -4247,6 +4248,32 @@ def test_build_calls_complete_delete_query_with_started_at_window() -> None:
     expected = sqlparse.format(
         """
         DELETE FROM calls_complete ON CLUSTER my_cluster
+        WHERE project_id = {project_id:String}
+        AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
+        AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')
+        AND id IN {call_ids:Array(String)}
+        """,
+        reindent=True,
+    )
+
+    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
+
+
+def test_build_calls_complete_soft_delete_query() -> None:
+    """Soft-delete marks deleted_at via a lightweight UPDATE, pruned by the started_at window."""
+    query = build_calls_complete_soft_delete_query(
+        table_name="calls_complete",
+        project_id_param="project_id",
+        call_ids_param="call_ids",
+        started_at_min_param="started_at_min",
+        started_at_max_param="started_at_max",
+        cluster_name="my_cluster",
+    )
+
+    expected = sqlparse.format(
+        """
+        UPDATE calls_complete ON CLUSTER my_cluster
+        SET deleted_at = now64(3)
         WHERE project_id = {project_id:String}
         AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
         AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')

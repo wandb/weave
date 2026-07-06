@@ -100,6 +100,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -1980,8 +1981,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             started_at_max_param = pb.add_param(
                 datetime_to_microseconds(started_at_window[1] + pad)
             )
+        table_name = self._get_calls_complete_table_name()
+        # Logical delete: a lightweight UPDATE writes a patch part the read path
+        # applies on the fly (via its deleted_at filter), so the calls vanish
+        # immediately with no mutation and no part rewrite.
+        soft_delete_query = build_calls_complete_soft_delete_query(
+            table_name,
+            project_id_param,
+            call_ids_param,
+            started_at_min_param=started_at_min_param,
+            started_at_max_param=started_at_max_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(
+            soft_delete_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
+        # Physical reclamation runs async (sync=0) and unwaited: the marker above
+        # already hid the rows, so a slow reclaim never blocks the request.
         delete_query = build_calls_complete_delete_query(
-            self._get_calls_complete_table_name(),
+            table_name,
             project_id_param,
             call_ids_param,
             started_at_min_param=started_at_min_param,
@@ -1991,7 +2011,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._command(
             delete_query,
             parameters=pb.get_params(),
-            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+            settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:

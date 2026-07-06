@@ -3684,22 +3684,18 @@ def build_calls_complete_update_end_query(
         """
 
 
-def build_calls_complete_delete_query(
-    table_name: str,
+def _calls_complete_id_window_where(
     project_id_param: str,
     call_ids_param: str,
-    started_at_min_param: str | None = None,
-    started_at_max_param: str | None = None,
-    cluster_name: str | None = None,
+    started_at_min_param: str | None,
+    started_at_max_param: str | None,
 ) -> str:
-    """Build the calls_complete DELETE query for call end data.
+    """Shared WHERE for calls_complete delete/soft-delete.
 
-    When started_at bounds are given they bracket the partition key
-    (PARTITION BY toYYYYMM(started_at)) and primary key prefix
-    (project_id, started_at, id), so the delete prunes partitions instead of
-    scanning every one. Bounds are Int64 microseconds since epoch.
+    started_at bounds bracket the partition key (toYYYYMM(started_at)) and primary
+    key prefix (project_id, started_at, id) so the statement prunes partitions.
+    Bounds are Int64 microseconds since epoch.
     """
-    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
     conditions = [f"project_id = {{{project_id_param}:String}}"]
     if started_at_min_param is not None:
         conditions.append(
@@ -3710,7 +3706,47 @@ def build_calls_complete_delete_query(
             f"started_at <= fromUnixTimestamp64Micro({{{started_at_max_param}:Int64}}, 'UTC')"
         )
     conditions.append(f"id IN {{{call_ids_param}:Array(String)}}")
-    where_clause = " AND ".join(conditions)
+    return " AND ".join(conditions)
+
+
+def build_calls_complete_soft_delete_query(
+    table_name: str,
+    project_id_param: str,
+    call_ids_param: str,
+    started_at_min_param: str | None = None,
+    started_at_max_param: str | None = None,
+    cluster_name: str | None = None,
+) -> str:
+    """Build the calls_complete soft-delete: a lightweight UPDATE marking deleted_at.
+
+    This writes a patch part (no mutation, no part rewrite) that the read path
+    applies on the fly via its deleted_at filter, so the calls disappear immediately.
+    """
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    where_clause = _calls_complete_id_window_where(
+        project_id_param, call_ids_param, started_at_min_param, started_at_max_param
+    )
+    raw_sql = f"""
+        UPDATE {formatted_table}
+        SET deleted_at = now64(3)
+        WHERE {where_clause}
+        """
+    return safely_format_sql(raw_sql, logger)
+
+
+def build_calls_complete_delete_query(
+    table_name: str,
+    project_id_param: str,
+    call_ids_param: str,
+    started_at_min_param: str | None = None,
+    started_at_max_param: str | None = None,
+    cluster_name: str | None = None,
+) -> str:
+    """Build the calls_complete physical DELETE (async reclamation after soft-delete)."""
+    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
+    where_clause = _calls_complete_id_window_where(
+        project_id_param, call_ids_param, started_at_min_param, started_at_max_param
+    )
     raw_sql = f"""
         DELETE FROM {formatted_table}
         WHERE {where_clause}
