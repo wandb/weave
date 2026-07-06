@@ -607,13 +607,20 @@ class BaseClickHouseTraceServerMigrator(ABC):
     def _update_migration_status(
         self, target_db: str, target_version: int, is_start: bool = True
     ) -> None:
-        """Update the migration status in management database migrations table."""
+        """Update the migration status in management database migrations table.
+
+        mutations_sync=2 makes the status write durable on every replica before we
+        return; the async default lets a read-back see the old version, which
+        double-applies during recovery and can leave a finished migration marked
+        partial.
+        """
+        sync = {"mutations_sync": 2}
         if is_start:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE partially_applied_version = {target_version} WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
         else:
             command = f"ALTER TABLE {self.management_db}.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
-            self._run_ddl_with_retry(command)
+            self._run_ddl_with_retry(command, settings=sync)
 
     @staticmethod
     def _is_safe_identifier(value: str) -> bool:

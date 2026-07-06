@@ -557,14 +557,14 @@ def test_update_migration_status(migrator):
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
-        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
-        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
 
