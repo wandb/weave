@@ -746,7 +746,7 @@ class SubAgent(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def llm(
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -766,9 +766,35 @@ class SubAgent(_SpanBase):
         llm._token = _current_llm.set(llm)
         return llm
 
-    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
         """Start a tool execution within this sub-agent."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+
+    # Deprecated aliases — the factory methods were renamed to ``start_*`` to
+    # match the module-level ``start_*`` functions.
+    @deprecated("`llm` is deprecated; use `start_llm` instead.")
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias for :meth:`start_llm`."""
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    @deprecated("`tool` is deprecated; use `start_tool` instead.")
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+        """Deprecated alias for :meth:`start_tool`."""
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
 
     def record(
         self,
@@ -913,7 +939,7 @@ class Turn(_SpanBase):
         self.messages.append(Message(role="user", content=content))
         return self
 
-    def llm(
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -933,11 +959,13 @@ class Turn(_SpanBase):
         llm._token = _current_llm.set(llm)
         return llm
 
-    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
         """Start a tool execution (execute_tool span, child of this turn)."""
         return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
-    def subagent(
+    def start_subagent(
         self,
         *,
         name: str,
@@ -949,6 +977,43 @@ class Turn(_SpanBase):
             name=name,
             model=model or self.model,
             system_instructions=system_instructions or [],
+        )
+
+    # Deprecated aliases — the factory methods were renamed to ``start_*`` to
+    # match the module-level ``start_*`` functions.
+    @deprecated("`llm` is deprecated; use `start_llm` instead.")
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias for :meth:`start_llm`."""
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    @deprecated("`tool` is deprecated; use `start_tool` instead.")
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+        """Deprecated alias for :meth:`start_tool`."""
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
+
+    @deprecated("`subagent` is deprecated; use `start_subagent` instead.")
+    def subagent(
+        self,
+        *,
+        name: str,
+        model: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> SubAgent:
+        """Deprecated alias for :meth:`start_subagent`."""
+        return self.start_subagent(
+            name=name, model=model, system_instructions=system_instructions
         )
 
     def record(
@@ -1276,7 +1341,7 @@ def start_llm(
     """
     turn = get_current_turn()
     if turn is not None:
-        return turn.llm(
+        return turn.start_llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,
