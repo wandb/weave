@@ -37,6 +37,12 @@ export const startSession = startConversation;
  *
  * Starts without a `conversation_id` if no `Conversation` is active.
  *
+ * > [!TIP]
+ * > Prefer `conversation.startTurn(...)` when you have a handle on the parent.
+ * > `weave.startTurn(...)` may be helpful when it is impractical for the
+ * > code that starts the span to receive the parent handle directly.
+ *
+ *
  * @example
  * weave.startTurn();
  *
@@ -51,11 +57,6 @@ export const startSession = startConversation;
  *   systemInstructions: ['You are a helpful weather bot.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
- *
- * @remarks
- * Prefer `conversation.startTurn(...)` when you have a handle on the parent.
- * `weave.startTurn(...)` may be helpful when it is impractical for the
- * code that starts the span to receive the parent handle directly.
  *
  */
 export function startTurn(opts: TurnInit = {}): Turn {
