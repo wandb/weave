@@ -54,6 +54,10 @@ FILL_SETTINGS = {
     "max_memory_usage": 16_000_000_000,
     "max_execution_time": 3600,
 }
+# Verification reads must not race replica metadata sync: on ClickHouse Cloud a
+# SELECT right after an INSERT can land on a replica that hasn't seen the new
+# parts yet and silently undercount (observed on QA: 0 of 100k rows visible).
+READ_SETTINGS = {"select_sequential_consistency": 1}
 
 
 @dataclass
@@ -123,6 +127,7 @@ def plan(
             )
             """,
             parameters={"pid": pid},
+            settings=READ_SETTINGS,
         ).result_rows[0]
         (
             state.unique_calls,
@@ -177,6 +182,7 @@ def verify(
             FROM {journal.staging_table} WHERE project_id = {{pid:String}}
             """,
             parameters={"pid": pid},
+            settings=READ_SETTINGS,
         ).result_rows[0]
         state.staging_rows = staging_rows
         mismatches = client.query(
@@ -199,6 +205,7 @@ def verify(
             )
             """,
             parameters={"pid": pid},
+            settings=READ_SETTINGS,
         ).result_rows[0][0]
         # past_retention rows may or may not have been TTL-reaped in staging yet.
         low = state.expected_rows
@@ -246,7 +253,8 @@ def attach(
     partitions = [
         str(r[0])
         for r in client.query(
-            f"SELECT DISTINCT toYYYYMM(started_at) FROM {journal.staging_table} ORDER BY 1"
+            f"SELECT DISTINCT toYYYYMM(started_at) FROM {journal.staging_table} ORDER BY 1",
+            settings=READ_SETTINGS,
         ).result_rows
     ]
     for part in partitions:
@@ -353,6 +361,7 @@ def preflight(client: Client, journal: Journal, projects: list[str]) -> None:
     dirty = client.query(
         "SELECT DISTINCT project_id FROM calls_complete WHERE project_id IN {pids:Array(String)}",
         parameters={"pids": pending},
+        settings=READ_SETTINGS,
     ).result_rows
     if dirty:
         raise SystemExit(
@@ -385,6 +394,7 @@ def post_attach_report(client: Client, journal: Journal) -> None:
             FROM calls_complete WHERE project_id = {pid:String}
             """,
             parameters={"pid": pid},
+            settings=READ_SETTINGS,
         ).result_rows[0]
         status = "ok" if (attached == state.staging_rows and dupes == 0) else "MISMATCH"
         print(
