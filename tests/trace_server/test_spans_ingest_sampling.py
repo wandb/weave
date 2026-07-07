@@ -29,6 +29,10 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportReq,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.opentelemetry.helpers import (
+    AttributePathConflictError,
+    unflatten_key_values,
+)
 from weave.trace_server.opentelemetry.python_spans import Resource as PyResource
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import StatusCode
@@ -116,6 +120,13 @@ def _parse(span: PbSpan) -> PySpan:
     return PySpan.from_proto(span, PyResource.from_proto(PbResource()))
 
 
+def _conflict_error(span: PbSpan) -> str:
+    """The exact parse-failure message the server records for this span."""
+    with pytest.raises(AttributePathConflictError) as excinfo:
+        unflatten_key_values(span.attributes)
+    return str(excinfo.value)
+
+
 def _tid_with_verdict(rate: float, *, kept: bool, start: int = 1) -> bytes:
     """First 16-byte trace id (from ``start`` upward) whose verdict matches."""
     for i in range(start, start + 10_000):
@@ -154,7 +165,8 @@ def sampler_metrics(monkeypatch: pytest.MonkeyPatch) -> dict[str, list]:
 
 def test_keep_by_hash_matches_inline_sha256() -> None:
     # Pin the exact formula: the calls-model sampler uses the same one, and a
-    # trace living in both data models must get one verdict.
+    # trace living in both data models must get one verdict. Purity also gives
+    # cross-request determinism: the verdict depends on nothing but the string.
     for i in range(1, 50):
         tid = i.to_bytes(16, "big").hex()
         for rate in (0.0, 0.1, 0.5, 0.9, 1.0):
@@ -193,17 +205,29 @@ def test_sample_rate_env_falls_back_to_off_when_invalid(
 
 
 @pytest.mark.parametrize(
-    ("trace_id", "usable"),
+    ("trace_id_bytes", "usable"),
     [
-        ("a" * 32, True),
-        ("", False),  # empty proto bytes
-        ("a" * 30, False),  # 15-byte id
-        ("a" * 34, False),  # 17-byte id
-        ("0" * 32, False),  # OTel-invalid zero id
+        (b"\xaa" * 16, True),
+        (b"", False),  # empty proto bytes
+        (b"\xab" * 15, False),  # 15-byte id
+        (b"\xab" * 17, False),  # 17-byte id
+        (b"\x00" * 16, False),  # OTel-invalid zero id
     ],
 )
-def test_usable_trace_id(trace_id: str, usable: bool) -> None:
-    assert ingest_sampling._usable_trace_id(trace_id) is usable
+def test_unusable_trace_ids_fail_open_in_decisions(
+    sampler_metrics: dict[str, list], trace_id_bytes: bytes, usable: bool
+) -> None:
+    # At rate 0.0 a usable id is hash-dropped; an unusable one is kept
+    # fail-open and counted as a parse failure.
+    config = ingest_sampling.SamplingConfig(rate=0.0, dry_run=False)
+    span = _parse(_proto_span(trace_id_bytes, b"\x0a" * 8))
+    decisions = ingest_sampling.decide_spans(config, [span], [5])
+    if usable:
+        assert decisions == [ingest_sampling.SpanDecision(drop=True)]
+        assert sampler_metrics["parse_failures"] == []
+    else:
+        assert decisions == [ingest_sampling.SpanDecision(drop=False)]
+        assert sampler_metrics["parse_failures"] == [1]
 
 
 # --- decision ladder (parsed spans, no backend) -----------------------------
@@ -227,9 +251,10 @@ def test_decide_spans_ladder_at_rate_zero(sampler_metrics: dict[str, list]) -> N
         ingest_sampling.SpanDecision(drop=False),
         ingest_sampling.SpanDecision(drop=True),
     ]
-    assert sampler_metrics["seen"] == [1, 1, 1, 1]
+    # Counters are per span but emitted once per request (aggregated).
+    assert sampler_metrics["seen"] == [4]
     assert sampler_metrics["parse_failures"] == [1]
-    assert sampler_metrics["evals_kept"] == [1, 1]
+    assert sampler_metrics["evals_kept"] == [2]
     assert sampler_metrics["dropped"] == [(1, 40, False)]
 
 
@@ -281,29 +306,42 @@ def test_sampler_off_is_inert(
     monkeypatch: pytest.MonkeyPatch,
     rate_env: str | None,
 ) -> None:
-    """The default config must not change ingest behavior at all."""
+    """The default config must not change ingest behavior at all.
+
+    Pins the exact error_message (content and per-span order) on a request
+    mixing good spans with two distinct parse failures. Extraction failures
+    share the same extract_row helper in both branches, but no real OTel
+    payload can make the defensively-guarded extractor raise, so that branch
+    is covered by construction rather than by a fixture.
+    """
     if rate_env is None:
         monkeypatch.delenv("WEAVE_INGEST_SAMPLE_RATE", raising=False)
     else:
         monkeypatch.setenv("WEAVE_INGEST_SAMPLE_RATE", rate_env)
     project_id = make_project_id("spans_sampling_off")
     tid = (10).to_bytes(16, "big")
-    conflict = _proto_span(
+    conflict_a = _proto_span(
         (11).to_bytes(16, "big"),
         b"\x13" * 8,
         # "x" as a leaf and "x.y" under it can't both exist -> parse failure.
         attrs={"x": "leaf", "x.y": "nested"},
     )
+    conflict_b = _proto_span(
+        (12).to_bytes(16, "big"), b"\x14" * 8, attrs={"y": "leaf", "y.z": "nested"}
+    )
     res = _export(
         ch_server,
         project_id,
         _proto_span(tid, b"\x11" * 8),
+        conflict_a,
         _proto_span(tid, b"\x12" * 8, parent_span_id=b"\x11" * 8),
-        conflict,
+        conflict_b,
     )
     assert res.accepted_spans == 2
-    assert res.rejected_spans == 1
-    assert res.error_message != ""
+    assert res.rejected_spans == 2
+    assert res.error_message == "; ".join(
+        _conflict_error(span) for span in (conflict_a, conflict_b)
+    )
     assert len(_stored_spans(ch_server, project_id)) == 2
     # Disabled sampler emits nothing at all.
     assert sampler_metrics == {
@@ -332,10 +370,7 @@ def test_rate_zero_drops_non_eval_trace_whole(
     assert res.accepted_spans == 2
     assert res.rejected_spans == 0
     assert _stored_spans(ch_server, project_id) == []
-    assert [(c, d) for c, _, d in sampler_metrics["dropped"]] == [
-        (1, False),
-        (1, False),
-    ]
+    assert [(c, d) for c, _, d in sampler_metrics["dropped"]] == [(2, False)]
     assert all(size > 0 for _, size, _ in sampler_metrics["dropped"])
 
 
@@ -427,6 +462,7 @@ def test_mixed_request_drops_selectively(
     # Parse failures stay rejected in the sampled path exactly as today.
     assert res.accepted_spans == 2
     assert res.rejected_spans == 1
+    assert res.error_message == _conflict_error(conflict)
     stored = _stored_spans(ch_server, project_id)
     assert [s.trace_id for s in stored] == [kept_tid.hex()]
 
@@ -447,7 +483,7 @@ def test_unusable_trace_ids_fail_open(
     )
     assert res.accepted_spans == 4
     assert len(_stored_spans(ch_server, project_id)) == 4
-    assert sampler_metrics["parse_failures"] == [1, 1, 1, 1]
+    assert sampler_metrics["parse_failures"] == [4]
     assert sampler_metrics["dropped"] == []
 
 

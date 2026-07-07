@@ -835,7 +835,7 @@ class AgentWriteHandler:
         and whole traces are kept or dropped *before* the expensive
         blob-strip/extraction steps run, so dropped traces never write
         Content files. Dropped spans are neither stored nor returned (they
-        never reach the scoring Kafka emit) but still count as accepted --
+        never reach the scoring Kafka emit) but still count as accepted —
         the client sees an ordinary success. See agents/ingest_sampling.py
         (WB-36877).
         """
@@ -846,8 +846,8 @@ class AgentWriteHandler:
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
 
-        # Both branches below run every span through these two helpers, so
-        # parse/extraction failure accounting cannot drift between them.
+        # Both branches below account every parse/extraction failure through
+        # these two helpers, so the bookkeeping cannot drift between them.
         def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
             nonlocal rejected
             try:

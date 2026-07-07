@@ -6,7 +6,8 @@ one central sampling rate to cut storage cost. Mirrors the calls-model
 sampler in the trace-server service: both read the same
 ``WEAVE_INGEST_SAMPLE_RATE`` / ``WEAVE_INGEST_SAMPLE_DRY_RUN`` environment
 variables and share the same hash, so a trace that writes into both data
-models gets one verdict. Off by default (rate 1.0). See WB-36877.
+models gets one verdict — when both models record the same ``trace_id``
+string. Off by default (rate 1.0). See WB-36877.
 
 The keep/drop decision is a pure hash of ``trace_id``, so every span of a
 trace gets the same verdict and a trace is kept or dropped whole. A trace is
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from weave.trace_server import environment as wf_env
 from weave.trace_server.agents import ingest_sampling_metrics as metrics
+from weave.trace_server.constants import EVAL_SPAN_ATTR_PREFIX
 from weave.trace_server.opentelemetry.helpers import get_attribute
 
 if TYPE_CHECKING:
@@ -39,12 +41,6 @@ if TYPE_CHECKING:
 # flat dotted form is how custom attributes are stored on span rows; the calls
 # model records the same fact as ``attributes["weave"]["ingest_sample_rate"]``.
 INGEST_SAMPLE_RATE_ATTR = "weave.ingest_sample_rate"
-
-# Any non-empty value under this subtree marks a span as belonging to an
-# evaluation. The SDK stamps ``weave.eval.predict_and_score_call_id`` etc. on
-# every span started inside an eval context -- see the ``EVAL_*_SPAN_ATTR``
-# constants in ``weave/trace_server/constants.py``.
-_EVAL_MARKER_KEY = "weave.eval"
 
 # sha256(trace_id) is reduced modulo this many buckets; a trace is kept when
 # its bucket falls below rate * buckets. Must stay byte-identical to the
@@ -119,27 +115,34 @@ def decide_spans(
     """Decide keep/drop for every parsed span of one export request.
 
     The verdict is per trace: a trace is kept whole when any of its spans in
-    this request carries the eval marker, otherwise the trace hash decides.
-    Spans whose trace_id is unusable are kept individually (fail-open).
-    ``byte_sizes`` -- serialized protobuf sizes aligned with ``spans`` -- feed
-    the dropped-bytes counter. Metrics count spans, not traces.
+    this request carries a ``weave.eval.*`` marker, otherwise the trace hash
+    decides. Spans whose trace_id is unusable are kept individually
+    (fail-open). ``byte_sizes`` -- serialized protobuf sizes aligned with
+    ``spans`` -- feed the dropped-bytes counter. Metrics count spans, not
+    traces, and are emitted once per call.
     """
     eval_traces: set[str] = set()
     for span in spans:
         if _usable_trace_id(span.trace_id) and get_attribute(
-            span.attributes, _EVAL_MARKER_KEY
+            span.attributes, EVAL_SPAN_ATTR_PREFIX
         ):
             eval_traces.add(span.trace_id)
 
+    # Counters are aggregated and emitted once per request: per-span UDP
+    # packets would triple the syscall count on large exports for no gain.
+    parse_failure_count = 0
+    evals_kept_count = 0
+    dropped_count = 0
+    dropped_bytes = 0
+
     decisions: list[SpanDecision] = []
     for span, byte_size in zip(spans, byte_sizes, strict=True):
-        metrics.seen(1)
         trace_id = span.trace_id
         if not _usable_trace_id(trace_id):
-            metrics.parse_failures(1)
+            parse_failure_count += 1
             decisions.append(SpanDecision(drop=False))
         elif trace_id in eval_traces:
-            metrics.evals_kept(1)
+            evals_kept_count += 1
             decisions.append(SpanDecision(drop=False))
         elif keep_by_hash(trace_id, config.rate):
             # In dry-run nothing is dropped, so the hash winners don't
@@ -147,16 +150,22 @@ def decide_spans(
             rate = None if config.dry_run else config.rate
             decisions.append(SpanDecision(drop=False, sampled_rate=rate))
         else:
-            metrics.dropped(1, byte_size, config.dry_run)
+            dropped_count += 1
+            dropped_bytes += byte_size
             decisions.append(SpanDecision(drop=not config.dry_run))
+
+    metrics.seen(len(spans))
+    if parse_failure_count:
+        metrics.parse_failures(parse_failure_count)
+    if evals_kept_count:
+        metrics.evals_kept(evals_kept_count)
+    if dropped_count:
+        metrics.dropped(dropped_count, dropped_bytes, config.dry_run)
     return decisions
 
 
 def stamp_sample_rate(row: AgentSpanCHInsertable, rate: float) -> None:
-    """Record the applied rate on a hash-kept span row.
-
-    Runs after custom-attribute extraction, so the stamp cannot be evicted by
-    the per-span attribute cap, and overwrites any client-supplied float under
-    the same key.
+    """Stamp the applied rate; runs post-extraction, so the per-span attribute
+    cap can't evict it and a client-supplied float under the key is overwritten.
     """
     row.custom_attrs_float[INGEST_SAMPLE_RATE_ATTR] = rate
