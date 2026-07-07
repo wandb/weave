@@ -98,9 +98,9 @@ def test_disabled_streaming_emits_no_spans(otel_spans: InMemorySpanExporter):
             agent_name="a", conversation_id="convo-disabled-streaming"
         ) as s:
             with s.start_turn() as t:
-                with t.llm(model="gpt-4o"):
+                with t.start_llm(model="gpt-4o"):
                     pass
-                with t.tool(name="search"):
+                with t.start_tool(name="search"):
                     pass
     assert otel_spans.get_finished_spans() == ()
 
@@ -151,7 +151,7 @@ def _streaming_tool_with_pii() -> None:
         start_conversation(conversation_id="convo-pii-streaming-tool") as sess,
         sess.start_turn() as t,
     ):
-        with t.tool(name="lookup") as tool:
+        with t.start_tool(name="lookup") as tool:
             tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
             tool.result = f"found {_PII_EMAIL}"
 
@@ -161,7 +161,7 @@ def _streaming_llm_messages_with_pii() -> None:
         start_conversation(conversation_id="convo-pii-streaming-llm-messages") as sess,
         sess.start_turn() as t,
     ):
-        with t.llm(
+        with t.start_llm(
             model="gpt-4o", system_instructions=[f"contact {_PII_EMAIL}"]
         ) as llm:
             llm.input_messages = [Message(role="user", content=_PII_EMAIL)]
@@ -176,7 +176,7 @@ def _streaming_llm_reasoning_with_pii() -> None:
         start_conversation(conversation_id="convo-pii-streaming-llm-reasoning") as sess,
         sess.start_turn() as t,
     ):
-        with t.llm(model="gpt-4o") as llm:
+        with t.start_llm(model="gpt-4o") as llm:
             llm.reasoning = Reasoning(content=f"think about {_PII_EMAIL}")
             llm.output_messages = [Message(role="assistant", content="ok")]
 
@@ -296,7 +296,7 @@ def _content_off_tool() -> None:
         conversation_id="convo-content-off-tool", include_content=False
     ) as sess:
         with sess.start_turn() as t:
-            with t.tool(name="lookup") as tool:
+            with t.start_tool(name="lookup") as tool:
                 tool.arguments = f'{{"email":"{_PII_EMAIL}"}}'
 
 
@@ -305,7 +305,7 @@ def _content_off_llm() -> None:
         conversation_id="convo-content-off-llm", include_content=False
     ) as sess:
         with sess.start_turn() as t:
-            with t.llm(model="gpt-4o") as llm:
+            with t.start_llm(model="gpt-4o") as llm:
                 llm.input_messages = [Message(role="user", content=_PII_EMAIL)]
                 llm.reasoning = Reasoning(content="think")
 
@@ -357,7 +357,7 @@ def _reasoning_content_off_streaming() -> None:
         conversation_id="convo-reasoning-off-streaming", include_content=False
     ) as sess:
         with sess.start_turn() as t:
-            with t.llm(model="gpt-4o") as llm:
+            with t.start_llm(model="gpt-4o") as llm:
                 llm.reasoning = Reasoning(content="sensitive reasoning")
 
 
@@ -437,7 +437,7 @@ def test_capture_info_settings(
     ):
         with start_conversation(conversation_id="convo-capture-info") as sess:
             with sess.start_turn() as t:
-                with t.tool(name="x"):
+                with t.start_tool(name="x"):
                     pass
 
     spans = otel_spans.get_finished_spans()
@@ -482,7 +482,7 @@ def test_settings_independent(otel_spans: InMemorySpanExporter, fake_presidio: N
             start_conversation(conversation_id="convo-settings-independent") as sess,
             sess.start_turn() as t,
         ):
-            with t.tool(name="lookup") as tool:
+            with t.start_tool(name="lookup") as tool:
                 tool.arguments = _PII_EMAIL
 
     tool_spans = _spans_with_prefix(otel_spans, "execute_tool")
@@ -498,6 +498,6 @@ def test_defaults_skip_redaction(otel_spans: InMemorySpanExporter):
             start_conversation(conversation_id="convo-defaults-skip-redaction") as sess,
             sess.start_turn() as t,
         ):
-            with t.tool(name="x") as tool:
+            with t.start_tool(name="x") as tool:
                 tool.arguments = _PII_EMAIL
     mock_get_engines.assert_not_called()

@@ -40,7 +40,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
-from weave.trace.feedback import FeedbackQuery
+from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -73,6 +73,9 @@ from weave.trace.ref_util import (
     set_ref,
 )
 from weave.trace.refs import (
+    AgentConversationRef,
+    AgentSpanRef,
+    AgentTurnRef,
     CallRef,
     ObjectRef,
     OpRef,
@@ -2249,6 +2252,45 @@ class WeaveClient:
             limit=limit,
             show_refs=True,
         )
+
+    def get_agent_span_feedback(self, span_id: str) -> RefFeedbackQuery:
+        """Feedback interface for an agent span (one message in the Agent view).
+
+        Examples:
+            ```python
+            fb = client.get_agent_span_feedback("<span_id>")
+            fb.add_reaction("👍")
+            fb.add_note("Great answer")
+            ```
+        """
+        ref = AgentSpanRef(entity=self.entity, project=self.project, span_id=span_id)
+        return RefFeedbackQuery(ref.uri)
+
+    def get_agent_turn_feedback(self, trace_id: str) -> RefFeedbackQuery:
+        """Feedback interface for an agent turn (one user->agent exchange).
+
+        Examples:
+            ```python
+            fb = client.get_agent_turn_feedback("<trace_id>")
+            fb.add_reaction("👍")
+            ```
+        """
+        ref = AgentTurnRef(entity=self.entity, project=self.project, trace_id=trace_id)
+        return RefFeedbackQuery(ref.uri)
+
+    def get_agent_conversation_feedback(self, conversation_id: str) -> RefFeedbackQuery:
+        """Feedback interface for an agent conversation (a session of turns).
+
+        Examples:
+            ```python
+            fb = client.get_agent_conversation_feedback("<conversation_id>")
+            fb.add_reaction("👍")
+            ```
+        """
+        ref = AgentConversationRef(
+            entity=self.entity, project=self.project, conversation_id=conversation_id
+        )
+        return RefFeedbackQuery(ref.uri)
 
     def add_cost(
         self,
