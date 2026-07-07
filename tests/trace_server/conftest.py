@@ -15,7 +15,10 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
-from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server import (
+    base64_content_conversion,
+    clickhouse_trace_server_batched,
+)
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import (
     clickhouse_trace_server_settings as ch_settings,
@@ -105,6 +108,14 @@ def reset_project_version_cache():
     project_version.reset_project_residence_cache()
     yield
     project_version.reset_project_residence_cache()
+
+
+@pytest.fixture(autouse=True)
+def reset_content_ref_cache():
+    """The module-level published-content ref cache would leak refs across tests."""
+    base64_content_conversion._content_ref_cache.clear()
+    yield
+    base64_content_conversion._content_ref_cache.clear()
 
 
 def _get_worker_db_suffix(request, default: str = "_test") -> str:

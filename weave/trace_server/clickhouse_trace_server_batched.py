@@ -84,6 +84,7 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
+    replace_base64_with_content_objects,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -100,6 +101,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     QueryBuilderDynamicField,
     QueryBuilderField,
     build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -807,13 +809,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
+                    # Mirror the non-OTel calls path: strip inline base64 /
+                    # base64 data-URIs into Content refs. Converting the span
+                    # attributes in place (before deriving the call) also
+                    # strips the lossless otel_dump the call carries.
+                    span.attributes = replace_base64_with_content_objects(
+                        span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
                     )
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                    # Also convert the derived inputs/output: base64 nested in a
+                    # JSON-encoded message attribute only surfaces as a leaf
+                    # after to_call parses it.
+                    start_call.inputs = replace_base64_with_content_objects(
+                        start_call.inputs,
+                        req.project_id,
+                        self,
+                        wb_user_id=req.wb_user_id,
+                    )
+                    end_call.output = replace_base64_with_content_objects(
+                        end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
+                    )
+                    calls.append((start_call, end_call))
 
         set_current_span_dd_tags({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
@@ -1980,8 +2000,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             started_at_max_param = pb.add_param(
                 datetime_to_microseconds(started_at_window[1] + pad)
             )
+        table_name = self._get_calls_complete_table_name()
+        # Logical delete: a lightweight UPDATE writes a patch part the read path
+        # applies on the fly (via its deleted_at filter), so the calls vanish
+        # immediately with no mutation and no part rewrite.
+        soft_delete_query = build_calls_complete_soft_delete_query(
+            table_name,
+            project_id_param,
+            call_ids_param,
+            started_at_min_param=started_at_min_param,
+            started_at_max_param=started_at_max_param,
+            cluster_name=self.clickhouse_cluster_name,
+        )
+        self._command(
+            soft_delete_query,
+            parameters=pb.get_params(),
+            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+        )
+        # Physical reclamation runs async (sync=0) and unwaited: the marker above
+        # already hid the rows, so a slow reclaim never blocks the request.
         delete_query = build_calls_complete_delete_query(
-            self._get_calls_complete_table_name(),
+            table_name,
             project_id_param,
             call_ids_param,
             started_at_min_param=started_at_min_param,
@@ -1991,7 +2030,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._command(
             delete_query,
             parameters=pb.get_params(),
-            settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
+            settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
@@ -5696,6 +5735,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(parent_ids=batch),
                     columns=child_columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+                    include_costs=req.include_costs,
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
@@ -7061,7 +7101,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(
-            self.ch_client, self._async_insert_settings()
+            self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled

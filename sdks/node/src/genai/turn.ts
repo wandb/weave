@@ -38,6 +38,13 @@ export interface TurnInit extends SpanInitBase {
   agentVersion?: string;
 }
 
+type Opts = {
+  conversationId: string;
+  messages: Message[];
+  span: Span;
+  context: Context;
+} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
+
 /**
  * An agent invocation. Typically wraps the work to respond to a single
  * user message. Emits an `invoke_agent` span and acts as the root of the
@@ -81,14 +88,6 @@ export interface TurnInit extends SpanInitBase {
  *   turn.end();
  * }
  */
-
-type Opts = {
-  conversationId: string;
-  messages: Message[];
-  span: Span;
-  context: Context;
-} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
-
 export class Turn extends SpanBase {
   private _context: Context;
   private _conversationId: string;

@@ -414,9 +414,18 @@ def bedrock_stream_accumulator(
     if "metadata" in value:
         metadata = value["metadata"]
         if "usage" in metadata:
-            acc["usage"]["inputTokens"] = metadata["usage"].get("inputTokens", 0)
-            acc["usage"]["outputTokens"] = metadata["usage"].get("outputTokens", 0)
-            acc["usage"]["totalTokens"] = metadata["usage"].get("totalTokens", 0)
+            usage = metadata["usage"]
+            acc["usage"]["inputTokens"] = usage.get("inputTokens", 0)
+            acc["usage"]["outputTokens"] = usage.get("outputTokens", 0)
+            acc["usage"]["totalTokens"] = usage.get("totalTokens", 0)
+            # Preserve Bedrock's cache token keys so bedrock_on_finish_converse
+            # captures them; caching may be off, so a count of 0 is meaningful.
+            cache_read = usage.get("cacheReadInputTokenCount")
+            if cache_read is not None:
+                acc["usage"]["cacheReadInputTokenCount"] = cache_read
+            cache_write = usage.get("cacheWriteInputTokenCount")
+            if cache_write is not None:
+                acc["usage"]["cacheWriteInputTokenCount"] = cache_write
         if "metrics" in metadata:
             acc["latency_ms"] = metadata["metrics"].get("latencyMs", 0)
 
