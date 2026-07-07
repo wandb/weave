@@ -189,9 +189,6 @@ class RefFeedbackQuery(FeedbackQuery):
 
     def __init__(self, ref: str) -> None:
         parsed_ref = Ref.parse_uri(ref)
-        # All ref types have entity and project attributes
-        if not hasattr(parsed_ref, "entity") or not hasattr(parsed_ref, "project"):
-            raise ValueError(f"Invalid ref type: {type(parsed_ref)}")
         query = {
             "$expr": {
                 "$eq": [
@@ -201,8 +198,8 @@ class RefFeedbackQuery(FeedbackQuery):
             }
         }
         super().__init__(
-            entity=parsed_ref.entity,  # type: ignore
-            project=parsed_ref.project,  # type: ignore
+            entity=parsed_ref.entity,
+            project=parsed_ref.project,
             query=Query(**query),
         )
         self.weave_ref = ref

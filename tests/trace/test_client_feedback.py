@@ -1,8 +1,10 @@
 import pytest
 
+from weave.trace import feedback
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface import feedback_types
 from weave.trace_server.interface.query import Query
 
 
@@ -292,8 +294,14 @@ def test_feedback_query_created_at_filter(client):
 
 
 def test_agent_feedback_apis(client):
+    # The client mirrors these because the layering contract bars the import.
+    assert feedback.AGENT_USER_FEEDBACK_TYPE == feedback_types.AGENT_USER_FEEDBACK_TYPE
+    assert feedback.NOTE_FEEDBACK_TYPE == feedback_types.NOTE_FEEDBACK_TYPE
+    assert feedback.REACTION_FEEDBACK_TYPE == feedback_types.REACTION_FEEDBACK_TYPE
+
     span_fb = client.get_agent_span_feedback("0123456789abcdef")
     turn_fb = client.get_agent_turn_feedback("0123456789abcdef0123456789abcdef")
+    conv_fb = client.get_agent_conversation_feedback("sess-demo")
     assert (
         span_fb.weave_ref
         == f"weave:///{client.entity}/{client.project}/agent_span/0123456789abcdef"
@@ -302,10 +310,15 @@ def test_agent_feedback_apis(client):
         turn_fb.weave_ref
         == f"weave:///{client.entity}/{client.project}/agent_turn/0123456789abcdef0123456789abcdef"
     )
+    assert (
+        conv_fb.weave_ref
+        == f"weave:///{client.entity}/{client.project}/agent_conversation/sess-demo"
+    )
 
     span_reaction_id = span_fb.add_reaction("👍", creator="griffin")
     span_note_id = span_fb.add_note("solid answer")
     turn_reaction_id = turn_fb.add_reaction("👎")
+    conv_reaction_id = conv_fb.add_reaction("👍")
 
     # Call refs keep the classic reaction type.
     call_fb = RefFeedbackQuery(
@@ -336,6 +349,11 @@ def test_agent_feedback_apis(client):
     assert turn_reaction["weave_ref"] == turn_fb.weave_ref
     assert turn_reaction["feedback_type"] == "wandb.agent_user_feedback"
     assert turn_reaction["scorer_tags"] == ["👎"]
+
+    conv_reaction = rows[conv_reaction_id]
+    assert conv_reaction["weave_ref"] == conv_fb.weave_ref
+    assert conv_reaction["feedback_type"] == "wandb.agent_user_feedback"
+    assert conv_reaction["scorer_tags"] == ["👍"]
 
     call_reaction = rows[call_reaction_id]
     assert call_reaction["feedback_type"] == "wandb.reaction.1"

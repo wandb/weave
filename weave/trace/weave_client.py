@@ -73,6 +73,7 @@ from weave.trace.ref_util import (
     set_ref,
 )
 from weave.trace.refs import (
+    AgentConversationRef,
     AgentSpanRef,
     AgentTurnRef,
     CallRef,
@@ -2257,7 +2258,7 @@ class WeaveClient:
 
         Examples:
             ```python
-            fb = client.get_agent_span_feedback("fad093438c77f8b8")
+            fb = client.get_agent_span_feedback("<span_id>")
             fb.add_reaction("👍")
             fb.add_note("Great answer")
             ```
@@ -2270,11 +2271,25 @@ class WeaveClient:
 
         Examples:
             ```python
-            fb = client.get_agent_turn_feedback("9c5d048e5cda3663428307043c7e0244")
+            fb = client.get_agent_turn_feedback("<trace_id>")
             fb.add_reaction("👍")
             ```
         """
         ref = AgentTurnRef(entity=self.entity, project=self.project, trace_id=trace_id)
+        return RefFeedbackQuery(ref.uri)
+
+    def get_agent_conversation_feedback(self, conversation_id: str) -> RefFeedbackQuery:
+        """Feedback interface for an agent conversation (a session of turns).
+
+        Examples:
+            ```python
+            fb = client.get_agent_conversation_feedback("<conversation_id>")
+            fb.add_reaction("👍")
+            ```
+        """
+        ref = AgentConversationRef(
+            entity=self.entity, project=self.project, conversation_id=conversation_id
+        )
         return RefFeedbackQuery(ref.uri)
 
     def add_cost(
