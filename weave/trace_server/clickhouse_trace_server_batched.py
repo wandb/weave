@@ -82,6 +82,7 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
 )
 from weave.trace_server.base64_content_conversion import (
+    PendingContentObjs,
     process_call_req_to_content,
     process_complete_call_to_content,
     replace_base64_with_content_objects,
@@ -1075,7 +1076,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             {"weave_trace_server.insert_call_count": len(req.batch)}
         )
 
-        pending_objs: list[tsi.ObjSchemaForInsert] = []
+        pending_objs = PendingContentObjs()
         with self.call_batch():
             for complete_call in req.batch:
                 processed_complete_call = process_complete_call_to_content(
@@ -1113,17 +1114,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsUpsertCompleteRes()
 
-    def _flush_pending_content_objs(
-        self, pending_objs: list[tsi.ObjSchemaForInsert]
-    ) -> None:
+    def _flush_pending_content_objs(self, pending_objs: PendingContentObjs) -> None:
         """Write content objects queued by calls_complete's base64 walk.
 
         Dedupes by (project_id, object_id, digest) so identical content
         embedded in multiple calls of the batch is written once, then does
         one obj_create_batch per project (it raises on multi-project input).
+        Any object that fails to write has its ref-cache entries evicted so
+        later requests do not reuse a ref that was never published.
         """
         deduped: dict[tuple[str, str, str | None], tsi.ObjSchemaForInsert] = {}
-        for obj in pending_objs:
+        for obj in pending_objs.objs:
             deduped.setdefault(
                 (obj.project_id, obj.object_id, obj.expected_digest), obj
             )
@@ -1144,7 +1145,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     logger.warning(
                         "Skipping content object with name/type collision: %s", e
                     )
+                    pending_objs.evict_cached_refs(e.object_id)
                     remaining = [o for o in remaining if o.object_id != e.object_id]
+                except Exception:
+                    for obj in remaining:
+                        pending_objs.evict_cached_refs(obj.object_id)
+                    raise
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:

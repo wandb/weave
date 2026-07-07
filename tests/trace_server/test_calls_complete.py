@@ -704,13 +704,15 @@ def test_calls_complete_batches_content_object_inserts(
     ]
 
     insert_tables = []
-    original_insert = clickhouse_trace_server._insert
+    original_insert = type(clickhouse_trace_server)._insert
 
-    def _spy_insert(table, *args, **kwargs):
+    def _spy_insert(self, table, *args, **kwargs):
         insert_tables.append(table)
-        return original_insert(table, *args, **kwargs)
+        return original_insert(self, table, *args, **kwargs)
 
-    monkeypatch.setattr(clickhouse_trace_server, "_insert", _spy_insert)
+    # Patch the class, not the instance: an instance-level patch leaves a
+    # permanent `_insert` instance attribute behind after monkeypatch undo.
+    monkeypatch.setattr(type(clickhouse_trace_server), "_insert", _spy_insert)
 
     trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
 
