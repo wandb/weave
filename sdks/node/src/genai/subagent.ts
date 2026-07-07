@@ -33,17 +33,24 @@ export interface SubAgentInit extends SpanInitBase {
   agentVersion?: string;
 }
 
+type Opts = {
+  span: Span;
+  context: Context;
+  conversationId: string;
+} & Required<Omit<SubAgentInit, 'startTime'>>;
+
 /**
  * A nested agent invocation — used when the current agent hands work to
  * another named agent (e.g. a planner calling a researcher). Emits an
  * `invoke_agent` span tagged with the subagent's name and (optionally)
  * its model.
  *
- * Created by `weave.startSubagent()` (or `turn.startSubagent()`, or
- * `llm.startSubagent()`) and terminated with `end()`. Children (LLM, Tool,
- * SubAgent) attach via the `startLLM`, `startTool`, `startSubagent` methods,
- * so a subagent's own model calls and tools nest under its `invoke_agent`
- * span rather than flattening onto the parent Turn.
+ * Created by `weave.startSubagent()` (or `turn.startSubagent()`,
+ * `llm.startSubagent()`, or `subagent.startSubagent()`) and terminated with
+ * `end()`. Children (LLM, Tool, SubAgent) attach via the `startLLM`,
+ * `startTool`, `startSubagent` methods, so a subagent's own model calls and
+ * tools nest under its `invoke_agent` span rather than flattening onto the
+ * parent Turn.
  *
  * @example
  * const subagent = weave.startSubagent({name: 'researcher'});
@@ -72,12 +79,6 @@ export interface SubAgentInit extends SpanInitBase {
  *   subagent.end();
  * }
  */
-type Opts = {
-  span: Span;
-  context: Context;
-  conversationId: string;
-} & Required<Omit<SubAgentInit, 'startTime'>>;
-
 export class SubAgent extends SpanBase {
   private _context: Context;
   private _conversationId: string;
