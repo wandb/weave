@@ -76,28 +76,74 @@ def _content_ref_cache_put(key: tuple[str, str], ref: str) -> None:
         _content_ref_cache[key] = ref
 
 
-def _content_ref_cache_pop(key: tuple[str, str]) -> None:
-    with _content_ref_cache_lock:
-        _content_ref_cache.pop(key, None)
+def _lookup_content_ref(
+    cache_key: tuple[str, str], pending_objs: "PendingContentObjs | None"
+) -> str | None:
+    """Known ref for this content: the global cache of published refs first,
+    then this request's queued-but-uncommitted objects.
+    """
+    if (cached := _content_ref_cache_get(cache_key)) is not None:
+        return cached
+    if pending_objs is not None:
+        return pending_objs.get_ref(cache_key)
+    return None
+
+
+@dataclass
+class _PendingContentEntry:
+    project_id: str
+    object_id: str
+    cache_key: tuple[str, str]
+    ref: str
+    raw_val: str
 
 
 @dataclass
 class PendingContentObjs:
-    """Content objects queued for one batched write, with the ref-cache keys
-    each object populated so a failed or skipped write can evict its refs.
+    """Content objects queued for one batched write.
+
+    Tracks enough per object to dedupe repeats of the same content within the
+    batch (`get_ref`), publish the global ref cache only once the whole batch
+    has committed (`publish_refs`), and restore the original raw value
+    wherever a skipped object's ref was embedded (`restore_map`).
     """
 
     objs: list[ObjSchemaForInsert] = field(default_factory=list)
-    _cache_keys: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    _entries: list[_PendingContentEntry] = field(default_factory=list)
+    _ref_by_cache_key: dict[tuple[str, str], str] = field(default_factory=dict)
+    _skipped: set[tuple[str, str]] = field(default_factory=set)
 
-    def add(self, obj: ObjSchemaForInsert, cache_key: tuple[str, str] | None) -> None:
+    def add(self, obj: ObjSchemaForInsert, ref: str, raw_val: str) -> None:
+        cache_key = _content_ref_cache_key(obj.project_id, raw_val)
         self.objs.append(obj)
-        if cache_key is not None:
-            self._cache_keys.setdefault(obj.object_id, []).append(cache_key)
+        self._entries.append(
+            _PendingContentEntry(obj.project_id, obj.object_id, cache_key, ref, raw_val)
+        )
+        self._ref_by_cache_key[cache_key] = ref
 
-    def evict_cached_refs(self, object_id: str) -> None:
-        for key in self._cache_keys.pop(object_id, []):
-            _content_ref_cache_pop(key)
+    def get_ref(self, cache_key: tuple[str, str]) -> str | None:
+        return self._ref_by_cache_key.get(cache_key)
+
+    def mark_skipped(self, project_id: str, object_id: str) -> None:
+        self._skipped.add((project_id, object_id))
+
+    def restore_map(self) -> dict[str, str]:
+        """Refs of skipped objects mapped to the raw values they replaced."""
+        return {
+            e.ref: e.raw_val
+            for e in self._entries
+            if (e.project_id, e.object_id) in self._skipped
+        }
+
+    def publish_refs(self) -> None:
+        """Publish non-skipped refs to the global cache.
+
+        Call only after the batch has fully committed (objects, files, and
+        calls): a cache hit must always mean the ref resolves.
+        """
+        for e in self._entries:
+            if (e.project_id, e.object_id) not in self._skipped:
+                _content_ref_cache_put(e.cache_key, e.ref)
 
 
 def is_base64(value: str) -> bool:
@@ -174,7 +220,7 @@ def store_content_object_ref(
     trace_server: TraceServerInterface,
     wb_user_id: str | None = None,
     pending_objs: PendingContentObjs | None = None,
-    cache_key: tuple[str, str] | None = None,
+    raw_val: str | None = None,
 ) -> str:
     """Store a Content object, publish it, and return its internal weave ref.
 
@@ -184,37 +230,44 @@ def store_content_object_ref(
     the inline object. The version is the server-computed object digest, so
     identical content dedupes to the same ref.
 
-    When ``pending_objs`` is given, the object is appended to it instead of
+    When ``pending_objs`` is given, the object is queued there instead of
     being written via ``obj_create`` immediately, so a caller can batch many
-    objects into one insert.
+    objects into one insert. ``raw_val`` (required in that mode) is the
+    original string being replaced, kept so a skipped write can restore it.
     """
     obj_val = store_content_object(content_obj, project_id, trace_server)
     object_id = make_object_id(content_obj.filename, "content")
     if pending_objs is not None:
-        digest_result = compute_object_digest_result(obj_val, None)
+        if raw_val is None:
+            raise ValueError("raw_val is required when queueing into pending_objs")
+        digest = compute_object_digest_result(obj_val, None).digest
+        ref = _content_ref(project_id, object_id, digest)
         pending_objs.add(
             ObjSchemaForInsert(
                 project_id=project_id,
                 object_id=object_id,
                 val=obj_val,
                 wb_user_id=wb_user_id,
-                expected_digest=digest_result.digest,
+                expected_digest=digest,
             ),
-            cache_key,
+            ref,
+            raw_val,
         )
-        digest = digest_result.digest
-    else:
-        res = trace_server.obj_create(
-            ObjCreateReq(
-                obj=ObjSchemaForInsert(
-                    project_id=project_id,
-                    object_id=object_id,
-                    val=obj_val,
-                    wb_user_id=wb_user_id,
-                )
+        return ref
+    res = trace_server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=project_id,
+                object_id=object_id,
+                val=obj_val,
+                wb_user_id=wb_user_id,
             )
         )
-        digest = res.digest
+    )
+    return _content_ref(project_id, object_id, res.digest)
+
+
+def _content_ref(project_id: str, object_id: str, digest: str) -> str:
     # Coerce to a plain ``str``: ``.uri`` is a str subclass (``_CallableStr``)
     # that exact-type checks (JSON/serialization/ref extraction) can reject.
     return str(
@@ -277,8 +330,8 @@ def replace_base64_with_content_objects(
             # Check for data URI pattern first
             if is_data_uri(val):
                 cache_key = _content_ref_cache_key(project_id, val)
-                if (cached := _content_ref_cache_get(cache_key)) is not None:
-                    return cached
+                if (known := _lookup_content_ref(cache_key, pending_objs)) is not None:
+                    return known
                 try:
                     # Publish the content and replace the base64 with its ref.
                     ref = store_content_object_ref(
@@ -287,7 +340,7 @@ def replace_base64_with_content_objects(
                         trace_server,
                         wb_user_id,
                         pending_objs,
-                        cache_key,
+                        raw_val=val,
                     )
                 except Exception as e:
                     logger.warning(
@@ -295,13 +348,16 @@ def replace_base64_with_content_objects(
                         e,
                     )
                 else:
-                    _content_ref_cache_put(cache_key, ref)
+                    # In batch mode the global cache is published only after
+                    # the batch commits; pending_objs serves intra-batch hits.
+                    if pending_objs is None:
+                        _content_ref_cache_put(cache_key, ref)
                     return ref
 
             if is_base64(val):
                 cache_key = _content_ref_cache_key(project_id, val)
-                if (cached := _content_ref_cache_get(cache_key)) is not None:
-                    return cached
+                if (known := _lookup_content_ref(cache_key, pending_objs)) is not None:
+                    return known
                 try:
                     # All we care about here is if this is an object that we can handle in some way.
                     # 'aaaa' is valid base64 and will come out as text/plain
@@ -319,9 +375,10 @@ def replace_base64_with_content_objects(
                             trace_server,
                             wb_user_id,
                             pending_objs,
-                            cache_key,
+                            raw_val=val,
                         )
-                        _content_ref_cache_put(cache_key, ref)
+                        if pending_objs is None:
+                            _content_ref_cache_put(cache_key, ref)
                         return ref
                 except Exception as e:
                     logger.warning(
@@ -403,6 +460,31 @@ def process_complete_call_to_content(
         pending_objs,
     )
     return complete_call
+
+
+def restore_raw_content_values(
+    complete_call: CompletedCallSchemaForInsert,
+    raw_by_ref: dict[str, str],
+) -> CompletedCallSchemaForInsert:
+    """Replace embedded content refs with the raw values they came from.
+
+    Used when a queued content object was skipped at flush time (name/type
+    collision): the call payload keeps the original inline value instead of
+    a ref that resolves to nothing.
+    """
+    complete_call.inputs = _restore_refs(complete_call.inputs, raw_by_ref)
+    complete_call.output = _restore_refs(complete_call.output, raw_by_ref)
+    return complete_call
+
+
+def _restore_refs(val: Any, raw_by_ref: dict[str, str]) -> Any:
+    if isinstance(val, dict):
+        return {k: _restore_refs(v, raw_by_ref) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_restore_refs(v, raw_by_ref) for v in val]
+    if isinstance(val, str):
+        return raw_by_ref.get(val, val)
+    return val
 
 
 def replace_base64_in_raw_messages(

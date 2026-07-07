@@ -86,6 +86,7 @@ from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
     process_complete_call_to_content,
     replace_base64_with_content_objects,
+    restore_raw_content_values,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -1078,10 +1079,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pending_objs = PendingContentObjs()
         with self.call_batch():
-            for complete_call in req.batch:
-                processed_complete_call = process_complete_call_to_content(
-                    complete_call, self, pending_objs
-                )
+            processed_calls = [
+                process_complete_call_to_content(complete_call, self, pending_objs)
+                for complete_call in req.batch
+            ]
+            # Content objects are written before the calls flush (on with-exit)
+            # so a committed call never references an unwritten object; refs of
+            # collision-skipped objects are swapped back to their raw values.
+            raw_by_ref = self._flush_pending_content_objs(pending_objs)
+
+            for processed_complete_call in processed_calls:
+                if raw_by_ref:
+                    restore_raw_content_values(processed_complete_call, raw_by_ref)
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
@@ -1110,18 +1119,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     processed_complete_call.ended_at,
                 )
 
-            self._flush_pending_content_objs(pending_objs)
-
+        # Only now is a cached ref guaranteed to resolve: objects, files,
+        # and calls have all committed.
+        pending_objs.publish_refs()
         return tsi.CallsUpsertCompleteRes()
 
-    def _flush_pending_content_objs(self, pending_objs: PendingContentObjs) -> None:
+    def _flush_pending_content_objs(
+        self, pending_objs: PendingContentObjs
+    ) -> dict[str, str]:
         """Write content objects queued by calls_complete's base64 walk.
 
         Dedupes by (project_id, object_id, digest) so identical content
-        embedded in multiple calls of the batch is written once, then does
-        one obj_create_batch per project (it raises on multi-project input).
-        Any object that fails to write has its ref-cache entries evicted so
-        later requests do not reuse a ref that was never published.
+        embedded in multiple calls of the batch is written once, then runs
+        one WB-30574 collision check and one obj_create_batch per project.
+        A collision must not fail the calls batch: the colliding object is
+        skipped and reported in the returned {ref: raw_value} map so the
+        caller can restore the original inline values in the call payloads.
         """
         deduped: dict[tuple[str, str, str | None], tsi.ObjSchemaForInsert] = {}
         for obj in pending_objs.objs:
@@ -1133,24 +1146,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for obj in deduped.values():
             by_project.setdefault(obj.project_id, []).append(obj)
 
-        for project_objs in by_project.values():
-            remaining = project_objs
-            while remaining:
-                try:
-                    self.obj_create_batch(remaining, check_name_collisions=True)
-                    break
-                except ObjectNameTypeCollision as e:
-                    # A collision must not fail the calls batch: drop the
-                    # colliding object (its ref dangles) and write the rest.
-                    logger.warning(
-                        "Skipping content object with name/type collision: %s", e
-                    )
-                    pending_objs.evict_cached_refs(e.object_id)
-                    remaining = [o for o in remaining if o.object_id != e.object_id]
-                except Exception:
-                    for obj in remaining:
-                        pending_objs.evict_cached_refs(obj.object_id)
-                    raise
+        for project_id, project_objs in by_project.items():
+            checks: list[tuple[str, str, str | None]] = []
+            for obj in project_objs:
+                digest_result = compute_object_digest_result(
+                    obj.val, obj.builtin_object_class
+                )
+                kind = get_kind(digest_result.processed_val)
+                checks.append((obj.object_id, kind, digest_result.base_object_class))
+            collisions = self._find_obj_name_type_collisions(project_id, checks)
+            for collision in collisions:
+                logger.warning(
+                    "Skipping content object with name/type collision: %s", collision
+                )
+                pending_objs.mark_skipped(project_id, collision.object_id)
+
+            colliding_ids = {c.object_id for c in collisions}
+            to_write = [o for o in project_objs if o.object_id not in colliding_ids]
+            if to_write:
+                self.obj_create_batch(to_write)
+
+        return pending_objs.restore_map()
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
@@ -2221,67 +2237,64 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         (WB-30574). Weave refs do not carry type, so allowing same-name
         different-type would make refs ambiguous.
         """
-        query, parameters = make_obj_name_type_collision_query(
-            project_id=project_id, object_ids=[object_id], kind=kind
+        collisions = self._find_obj_name_type_collisions(
+            project_id, [(object_id, kind, new_base_object_class)]
         )
-        result = self._query(query, parameters)
-        existing_classes = [row[1] for row in result.result_rows]
-        mismatched = [c for c in existing_classes if c != new_base_object_class]
-        if mismatched:
-            raise ObjectNameTypeCollision(
-                object_id=object_id,
-                kind=kind,
-                new_base_object_class=new_base_object_class,
-                existing_base_object_classes=mismatched,
-            )
+        if collisions:
+            raise collisions[0]
 
-    def _reject_obj_name_type_collisions_batch(
+    def _find_obj_name_type_collisions(
         self,
         project_id: str,
         checks: list[tuple[str, str, str | None]],
-    ) -> None:
-        """Batched WB-30574 collision guard for obj_create_batch: one query
-        per distinct kind in the batch instead of one query per object.
+    ) -> list[ObjectNameTypeCollision]:
+        """WB-30574 collision check: one query per distinct kind, returning
+        one ObjectNameTypeCollision per object_id bound to more than one
+        base_object_class, by committed rows or by conflicting entries
+        within ``checks`` itself. Callers decide whether to raise.
 
         ``checks`` is a list of (object_id, kind, new_base_object_class).
         """
-        by_kind: dict[str, dict[str, str | None]] = {}
+        by_kind: dict[str, dict[str, set[str | None]]] = {}
         for object_id, kind, new_base_object_class in checks:
-            by_kind.setdefault(kind, {})[object_id] = new_base_object_class
+            by_kind.setdefault(kind, {}).setdefault(object_id, set()).add(
+                new_base_object_class
+            )
 
-        for kind, object_id_to_class in by_kind.items():
+        collisions: list[ObjectNameTypeCollision] = []
+        for kind, object_id_to_classes in by_kind.items():
             query, parameters = make_obj_name_type_collision_query(
                 project_id=project_id,
-                object_ids=sorted(object_id_to_class),
+                object_ids=sorted(object_id_to_classes),
                 kind=kind,
             )
             result = self._query(query, parameters)
-            existing_by_object_id: dict[str, list[str | None]] = {}
+            existing_by_object_id: dict[str, set[str | None]] = {}
             for object_id, base_object_class in result.result_rows:
-                existing_by_object_id.setdefault(object_id, []).append(
+                existing_by_object_id.setdefault(object_id, set()).add(
                     base_object_class
                 )
 
-            for object_id, new_base_object_class in object_id_to_class.items():
-                mismatched = [
-                    c
-                    for c in existing_by_object_id.get(object_id, [])
-                    if c != new_base_object_class
-                ]
-                if mismatched:
-                    raise ObjectNameTypeCollision(
-                        object_id=object_id,
-                        kind=kind,
-                        new_base_object_class=new_base_object_class,
-                        existing_base_object_classes=mismatched,
+            for object_id, new_classes in object_id_to_classes.items():
+                bound = existing_by_object_id.get(object_id, set()) | new_classes
+                if len(bound) > 1:
+                    new_class = sorted(new_classes, key=str)[0]
+                    collisions.append(
+                        ObjectNameTypeCollision(
+                            object_id=object_id,
+                            kind=kind,
+                            new_base_object_class=new_class,
+                            existing_base_object_classes=sorted(
+                                (c for c in bound if c != new_class), key=str
+                            ),
+                        )
                     )
+        return collisions
 
     @traced(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
     def obj_create_batch(
-        self,
-        batch: list[tsi.ObjSchemaForInsert],
-        check_name_collisions: bool = False,
+        self, batch: list[tsi.ObjSchemaForInsert]
     ) -> list[tsi.ObjCreateRes]:
         """This method is for the special case where all objects are known to use a placeholder.
         We lose any knowledge of what version the created object is in return for an enormous
@@ -2294,10 +2307,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         new versions exist but their "latest" alias is missing — readers
         see the prior latest until the alias write succeeds on retry.
 
-        ``check_name_collisions`` runs the WB-30574 name/type guard that
-        ``obj_create`` runs per object, batched into one query per distinct
-        kind. Callers that already know their object_ids are fresh (like
-        OTel ingest) can skip it.
+        Unlike obj_create, no WB-30574 name/type collision guard runs here:
+        callers must know their object_ids are fresh or check beforehand
+        (see _flush_pending_content_objs).
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -2316,7 +2328,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
 
         alias_rows: list[tuple[str, str, str, str]] = []
-        collision_checks: list[tuple[str, str, str | None]] = []
         for obj in batch:
             digest_result = compute_object_digest_result(
                 obj.val,
@@ -2325,12 +2336,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             processed_val = digest_result.processed_val
             json_val = digest_result.json_val
             digest = digest_result.digest
-            kind = get_kind(processed_val)
+            validate_expected_digest(
+                expected=obj.expected_digest,
+                actual=digest,
+                label=f"obj {obj.object_id!r}",
+            )
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
                 wb_user_id=obj.wb_user_id,
-                kind=kind,
+                kind=get_kind(processed_val),
                 base_object_class=digest_result.base_object_class,
                 leaf_object_class=digest_result.leaf_object_class,
                 refs=extract_refs_from_values(processed_val),
@@ -2343,9 +2358,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             alias_rows.append(
                 (obj.project_id, obj.object_id, digest, obj.wb_user_id or "")
             )
-            collision_checks.append(
-                (obj.object_id, kind, digest_result.base_object_class)
-            )
 
             # Record the inserted data
             obj_results.append(
@@ -2353,12 +2365,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     digest=digest,
                     object_id=obj.object_id,
                 )
-            )
-
-        if check_name_collisions:
-            self._reject_obj_name_type_collisions_batch(
-                project_id=next(iter(unique_projects)),
-                checks=collision_checks,
             )
 
         self._insert(

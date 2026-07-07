@@ -19,7 +19,6 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     NotFoundError,
-    ObjectNameTypeCollision,
     RequestTooLarge,
 )
 from weave.trace_server.orm import ParamBuilder
@@ -785,66 +784,13 @@ def test_calls_complete_batches_content_object_inserts(
     assert obj_a.obj.val != obj_b.obj.val
 
 
-def test_obj_create_batch_check_name_collisions(trace_server, clickhouse_trace_server):
-    """check_name_collisions=True runs the WB-30574 name/type guard in one
-    batched query and matches obj_create's per-object rejection; the OTel
-    default (check_name_collisions=False) skips the guard entirely.
-    """
-    project_id = f"{TEST_ENTITY}/obj_create_batch_collision"
-    internal_project_id = b64(project_id)
-
-    trace_server.obj_create(
-        tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=project_id,
-                object_id="shared_name",
-                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeA"},
-            )
-        )
-    )
-
-    # A fresh object_id in the same batched call is unaffected.
-    clickhouse_trace_server.obj_create_batch(
-        [
-            tsi.ObjSchemaForInsert(
-                project_id=internal_project_id,
-                object_id="fresh_name",
-                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeB"},
-            )
-        ],
-        check_name_collisions=True,
-    )
-
-    with pytest.raises(ObjectNameTypeCollision):
-        clickhouse_trace_server.obj_create_batch(
-            [
-                tsi.ObjSchemaForInsert(
-                    project_id=internal_project_id,
-                    object_id="shared_name",
-                    val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeC"},
-                )
-            ],
-            check_name_collisions=True,
-        )
-
-    # Default (OTel ingest path) skips the guard entirely.
-    clickhouse_trace_server.obj_create_batch(
-        [
-            tsi.ObjSchemaForInsert(
-                project_id=internal_project_id,
-                object_id="shared_name",
-                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeC"},
-            )
-        ]
-    )
-
-
 def test_calls_complete_tolerates_content_object_name_collision(
     trace_server, clickhouse_trace_server
 ):
     """A content object whose object_id is already bound to a different
-    base_object_class is skipped with a dangling ref; the calls and the
-    batch's other content objects still land.
+    base_object_class is skipped: its calls keep the original inline data
+    URI (no dangling ref), the batch's other content objects still land,
+    and the skipped ref is never published to the content-ref cache.
     """
     seed_project_id = f"{TEST_ENTITY}/calls_complete_collision_seed"
     project_id = f"{TEST_ENTITY}/calls_complete_collision"
@@ -929,19 +875,11 @@ def test_calls_complete_tolerates_content_object_name_collision(
         internal_project_id,
         call_b_id,
     )
-    parsed_a = ri.parse_internal_uri(inputs_a["image"])
-    parsed_b = ri.parse_internal_uri(inputs_b["image"])
-    assert parsed_a.name == content_object_id_a
 
-    # The colliding object was skipped (its ref dangles); the other landed.
-    with pytest.raises(NotFoundError):
-        clickhouse_trace_server.obj_read(
-            tsi.ObjReadReq(
-                project_id=parsed_a.project_id,
-                object_id=parsed_a.name,
-                digest=parsed_a.version,
-            )
-        )
+    # The colliding object was skipped and its call keeps the original
+    # inline value verbatim; the other content object landed and resolves.
+    assert inputs_a["image"] == data_uri_a
+    parsed_b = ri.parse_internal_uri(inputs_b["image"])
     obj_b = clickhouse_trace_server.obj_read(
         tsi.ObjReadReq(
             project_id=parsed_b.project_id,
@@ -957,6 +895,32 @@ def test_calls_complete_tolerates_content_object_name_collision(
         )
         == 2
     )
+
+    # The skipped ref was never published to the content-ref cache: a later
+    # batch with the same payload restores inline again instead of embedding
+    # a cached ref that resolves to nothing.
+    call_c_id = str(uuid.uuid4())
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                _make_completed_call(
+                    project_id,
+                    call_c_id,
+                    str(uuid.uuid4()),
+                    started_at,
+                    ended_at,
+                    inputs={"image": data_uri_a},
+                )
+            ]
+        )
+    )
+    inputs_c, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_c_id,
+    )
+    assert inputs_c["image"] == data_uri_a
 
 
 def test_call_start_end_v2_updates_calls_complete(

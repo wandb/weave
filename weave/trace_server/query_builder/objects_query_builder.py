@@ -472,7 +472,7 @@ def make_obj_name_type_collision_query(
     """Build the query that returns the distinct (object_id, base_object_class)
     pairs currently bound to any of the given object_ids in a project.
 
-    Used by obj_create / obj_create_batch to enforce that an object_id maps
+    Used by the WB-30574 collision guards to enforce that an object_id maps
     to a single base_object_class for the lifetime of the project (WB-30574).
     Accepts many object_ids so a batch insert can run one collision check
     instead of one per object.
