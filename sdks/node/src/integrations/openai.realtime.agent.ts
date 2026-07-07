@@ -34,6 +34,8 @@ import type {RealtimeSession} from '@openai/agents-realtime';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import state from '../state';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
+import {defaultSettings} from '../settings';
+import {WeaveRealtimeOTelAdapter} from './openai.realtime.agent.otel';
 
 // Integration provenance stamped onto every call this integration produces.
 const OPENAI_REALTIME_AGENT_INTEGRATION = libraryIntegration(
@@ -759,18 +761,28 @@ function patchRealtimeSessionCommon(realtimeExports: any): void {
         audio: ArrayBuffer,
         opts?: {commit?: boolean}
       ) {
-        (
-          this[ADAPTER] as WeaveRealtimeTracingAdapter | undefined
-        )?.pushAudioChunk(audio);
+        const adapter = this[ADAPTER] as
+          | {pushAudioChunk(audio: ArrayBuffer): void}
+          | undefined;
+        adapter?.pushAudioChunk(audio);
         return origSendAudio.apply(this, [audio, opts]);
       };
 
       return {
         construct(target: any, args: any[], newTarget: any) {
           const instance = Reflect.construct(target, args, newTarget) as any;
-          instance[ADAPTER] = new WeaveRealtimeTracingAdapter(
-            instance as RealtimeSession
-          );
+          const client = getGlobalClient();
+          const useOTel =
+            client?.settings?.useOTelV2 ?? defaultSettings().useOTelV2;
+          if (useOTel) {
+            instance[ADAPTER] = new WeaveRealtimeOTelAdapter(
+              instance as RealtimeSession
+            );
+          } else {
+            instance[ADAPTER] = new WeaveRealtimeTracingAdapter(
+              instance as RealtimeSession
+            );
+          }
           return instance;
         },
       };
