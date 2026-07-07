@@ -9,6 +9,7 @@ import logging
 import re
 from typing import Any, TypeVar
 
+from weave.shared.digest import compute_object_digest_result
 from weave.shared.refs_internal import InternalObjectRef
 from weave.trace_server.content.content import Content
 from weave.trace_server.object_creation_utils import make_object_id
@@ -119,6 +120,7 @@ def store_content_object_ref(
     project_id: str,
     trace_server: TraceServerInterface,
     wb_user_id: str | None = None,
+    pending_objs: list[ObjSchemaForInsert] | None = None,
 ) -> str:
     """Store a Content object, publish it, and return its internal weave ref.
 
@@ -127,23 +129,41 @@ def store_content_object_ref(
     embed a compact ``weave-trace-internal:///…`` ref in the payload instead of
     the inline object. The version is the server-computed object digest, so
     identical content dedupes to the same ref.
+
+    When ``pending_objs`` is given, the object is appended to it instead of
+    being written via ``obj_create`` immediately, so a caller can batch many
+    objects into one insert.
     """
     obj_val = store_content_object(content_obj, project_id, trace_server)
     object_id = make_object_id(content_obj.filename, "content")
-    res = trace_server.obj_create(
-        ObjCreateReq(
-            obj=ObjSchemaForInsert(
+    if pending_objs is not None:
+        digest_result = compute_object_digest_result(obj_val, None)
+        pending_objs.append(
+            ObjSchemaForInsert(
                 project_id=project_id,
                 object_id=object_id,
                 val=obj_val,
                 wb_user_id=wb_user_id,
+                expected_digest=digest_result.digest,
             )
         )
-    )
+        digest = digest_result.digest
+    else:
+        res = trace_server.obj_create(
+            ObjCreateReq(
+                obj=ObjSchemaForInsert(
+                    project_id=project_id,
+                    object_id=object_id,
+                    val=obj_val,
+                    wb_user_id=wb_user_id,
+                )
+            )
+        )
+        digest = res.digest
     # Coerce to a plain ``str``: ``.uri`` is a str subclass (``_CallableStr``)
     # that exact-type checks (JSON/serialization/ref extraction) can reject.
     return str(
-        InternalObjectRef(project_id=project_id, name=object_id, version=res.digest).uri
+        InternalObjectRef(project_id=project_id, name=object_id, version=digest).uri
     )
 
 
@@ -155,6 +175,7 @@ def replace_base64_with_content_objects(
     project_id: str,
     trace_server: TraceServerInterface,
     wb_user_id: str | None = None,
+    pending_objs: list[ObjSchemaForInsert] | None = None,
 ) -> T:
     """Recursively replace base64 content with Content objects.
 
@@ -207,6 +228,7 @@ def replace_base64_with_content_objects(
                         project_id,
                         trace_server,
                         wb_user_id,
+                        pending_objs,
                     )
                 except Exception as e:
                     logger.warning(
@@ -231,6 +253,7 @@ def replace_base64_with_content_objects(
                             project_id,
                             trace_server,
                             wb_user_id,
+                            pending_objs,
                         )
                 except Exception as e:
                     logger.warning(
@@ -284,12 +307,15 @@ def process_call_req_to_content(
 def process_complete_call_to_content(
     complete_call: CompletedCallSchemaForInsert,
     trace_server: TraceServerInterface,
+    pending_objs: list[ObjSchemaForInsert] | None = None,
 ) -> CompletedCallSchemaForInsert:
     """Process a complete call to replace base64 content in inputs and outputs.
 
     Args:
         complete_call: Complete call schema with both inputs and outputs.
         trace_server: Trace server instance for file storage.
+        pending_objs: When given, content objects are queued here instead of
+            being written immediately, so a caller can batch the writes.
 
     Returns:
         CompletedCallSchemaForInsert with base64 content replaced by Content objects.
@@ -299,12 +325,14 @@ def process_complete_call_to_content(
         complete_call.project_id,
         trace_server,
         complete_call.wb_user_id,
+        pending_objs,
     )
     complete_call.output = replace_base64_with_content_objects(
         complete_call.output,
         complete_call.project_id,
         trace_server,
         complete_call.wb_user_id,
+        pending_objs,
     )
     return complete_call
 

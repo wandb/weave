@@ -493,14 +493,14 @@ def test_make_objects_val_query_and_parameters():
 
 def test_make_obj_name_type_collision_query():
     query, parameters = make_obj_name_type_collision_query(
-        project_id="test_project", object_id="object_1", kind="object"
+        project_id="test_project", object_ids=["object_1"], kind="object"
     )
 
     expected_query = """
-        SELECT DISTINCT base_object_class
+        SELECT DISTINCT object_id, base_object_class
         FROM object_versions
         WHERE project_id = {project_id: String}
-            AND object_id = {object_id: String}
+            AND object_id IN {object_ids: Array(String)}
             AND kind = {kind: String}
             AND deleted_at IS NULL
     """
@@ -508,6 +508,28 @@ def test_make_obj_name_type_collision_query():
     assert_sql(query, expected_query)
     assert parameters == {
         "project_id": "test_project",
-        "object_id": "object_1",
+        "object_ids": ["object_1"],
+        "kind": "object",
+    }
+
+
+def test_make_obj_name_type_collision_query_multiple_object_ids():
+    query, parameters = make_obj_name_type_collision_query(
+        project_id="test_project", object_ids=["object_1", "object_2"], kind="object"
+    )
+
+    expected_query = """
+        SELECT DISTINCT object_id, base_object_class
+        FROM object_versions
+        WHERE project_id = {project_id: String}
+            AND object_id IN {object_ids: Array(String)}
+            AND kind = {kind: String}
+            AND deleted_at IS NULL
+    """
+
+    assert_sql(query, expected_query)
+    assert parameters == {
+        "project_id": "test_project",
+        "object_ids": ["object_1", "object_2"],
         "kind": "object",
     }

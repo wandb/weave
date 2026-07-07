@@ -467,13 +467,15 @@ def make_objects_val_query_and_parameters(
 
 
 def make_obj_name_type_collision_query(
-    project_id: str, object_id: str, kind: str
+    project_id: str, object_ids: list[str], kind: str
 ) -> tuple[str, dict[str, Any]]:
-    """Build the query that returns the set of distinct base_object_class
-    values currently bound to a given (project_id, kind, object_id).
+    """Build the query that returns the distinct (object_id, base_object_class)
+    pairs currently bound to any of the given object_ids in a project.
 
-    Used by obj_create to enforce that an object_id maps to a single
-    base_object_class for the lifetime of the project (WB-30574).
+    Used by obj_create / obj_create_batch to enforce that an object_id maps
+    to a single base_object_class for the lifetime of the project (WB-30574).
+    Accepts many object_ids so a batch insert can run one collision check
+    instead of one per object.
 
     Queries `object_versions` directly rather than the
     `object_versions_deduped` view because the view computes two window
@@ -491,16 +493,16 @@ def make_obj_name_type_collision_query(
     silently rebinding a name to a new type.
     """
     query = """
-        SELECT DISTINCT base_object_class
+        SELECT DISTINCT object_id, base_object_class
         FROM object_versions
         WHERE project_id = {project_id: String}
-            AND object_id = {object_id: String}
+            AND object_id IN {object_ids: Array(String)}
             AND kind = {kind: String}
             AND deleted_at IS NULL
     """
     parameters = {
         "project_id": project_id,
-        "object_id": object_id,
+        "object_ids": object_ids,
         "kind": kind,
     }
     return query, parameters

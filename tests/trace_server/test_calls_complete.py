@@ -10,6 +10,7 @@ from tests.trace.server_utils import find_server_layer
 from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest import TEST_ENTITY
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
+from weave.shared import refs_internal as ri
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
@@ -18,6 +19,7 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
     NotFoundError,
+    ObjectNameTypeCollision,
     RequestTooLarge,
 )
 from weave.trace_server.orm import ParamBuilder
@@ -651,6 +653,188 @@ def test_calls_complete_converts_data_uri_inputs_and_outputs(
     assert fetched_call.inputs["image"].startswith(f"weave:///{project_id}/object/")
     assert isinstance(fetched_call.output["image"], str)
     assert fetched_call.output["image"].startswith(f"weave:///{project_id}/object/")
+
+
+def test_calls_complete_batches_content_object_inserts(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """A batch of object-heavy calls writes content objects once per project.
+
+    Duplicate content across calls in the batch collapses to the same ref,
+    and the whole batch issues exactly one insert into object_versions and
+    one into aliases instead of one pair of inserts per object.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_batched_objects"
+    internal_project_id = b64(project_id)
+
+    raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri_a = f"data:image/png;base64,{base64.b64encode(raw_a).decode('ascii')}"
+    data_uri_b = f"data:image/png;base64,{base64.b64encode(raw_b).decode('ascii')}"
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    ended_at = started_at + datetime.timedelta(seconds=1)
+    call_1_id, call_2_id, call_3_id = (str(uuid.uuid4()) for _ in range(3))
+    calls = [
+        _make_completed_call(
+            project_id,
+            call_1_id,
+            str(uuid.uuid4()),
+            started_at,
+            ended_at,
+            inputs={"image": data_uri_a},
+            output={"image": data_uri_a},
+        ),
+        _make_completed_call(
+            project_id,
+            call_2_id,
+            str(uuid.uuid4()),
+            started_at,
+            ended_at,
+            inputs={"image": data_uri_a},
+        ),
+        _make_completed_call(
+            project_id,
+            call_3_id,
+            str(uuid.uuid4()),
+            started_at,
+            ended_at,
+            inputs={"image": data_uri_b},
+        ),
+    ]
+
+    insert_tables = []
+    original_insert = clickhouse_trace_server._insert
+
+    def _spy_insert(table, *args, **kwargs):
+        insert_tables.append(table)
+        return original_insert(table, *args, **kwargs)
+
+    monkeypatch.setattr(clickhouse_trace_server, "_insert", _spy_insert)
+
+    trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
+
+    assert insert_tables.count("object_versions") == 1
+    assert insert_tables.count("aliases") == 1
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "object_versions", internal_project_id
+        )
+        == 2
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "aliases", internal_project_id
+        )
+        == 2
+    )
+
+    inputs_1, output_1 = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_1_id,
+    )
+    inputs_2, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_2_id,
+    )
+    inputs_3, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_3_id,
+    )
+
+    ref_a_input = inputs_1["image"]
+    ref_a_output = output_1["image"]
+    ref_a_dup = inputs_2["image"]
+    ref_b = inputs_3["image"]
+
+    assert ref_a_input.startswith(
+        f"weave-trace-internal:///{internal_project_id}/object/"
+    )
+    assert ref_a_input == ref_a_output == ref_a_dup
+    assert ref_b != ref_a_input
+
+    parsed_a = ri.parse_internal_uri(ref_a_input)
+    parsed_b = ri.parse_internal_uri(ref_b)
+    obj_a = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_a.project_id,
+            object_id=parsed_a.name,
+            digest=parsed_a.version,
+        )
+    )
+    obj_b = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_b.project_id,
+            object_id=parsed_b.name,
+            digest=parsed_b.version,
+        )
+    )
+    assert obj_a.obj.val["_type"] == "CustomWeaveType"
+    assert obj_a.obj.val["weave_type"] == {
+        "type": "weave.type_wrappers.Content.content.Content"
+    }
+    assert obj_b.obj.val["_type"] == "CustomWeaveType"
+    assert obj_a.obj.val != obj_b.obj.val
+
+
+def test_obj_create_batch_check_name_collisions(trace_server, clickhouse_trace_server):
+    """check_name_collisions=True runs the WB-30574 name/type guard in one
+    batched query and matches obj_create's per-object rejection; the OTel
+    default (check_name_collisions=False) skips the guard entirely.
+    """
+    project_id = f"{TEST_ENTITY}/obj_create_batch_collision"
+    internal_project_id = b64(project_id)
+
+    trace_server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id,
+                object_id="shared_name",
+                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeA"},
+            )
+        )
+    )
+
+    # A fresh object_id in the same batched call is unaffected.
+    clickhouse_trace_server.obj_create_batch(
+        [
+            tsi.ObjSchemaForInsert(
+                project_id=internal_project_id,
+                object_id="fresh_name",
+                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeB"},
+            )
+        ],
+        check_name_collisions=True,
+    )
+
+    with pytest.raises(ObjectNameTypeCollision):
+        clickhouse_trace_server.obj_create_batch(
+            [
+                tsi.ObjSchemaForInsert(
+                    project_id=internal_project_id,
+                    object_id="shared_name",
+                    val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeC"},
+                )
+            ],
+            check_name_collisions=True,
+        )
+
+    # Default (OTel ingest path) skips the guard entirely.
+    clickhouse_trace_server.obj_create_batch(
+        [
+            tsi.ObjSchemaForInsert(
+                project_id=internal_project_id,
+                object_id="shared_name",
+                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeC"},
+            )
+        ]
+    )
 
 
 def test_call_start_end_v2_updates_calls_complete(
