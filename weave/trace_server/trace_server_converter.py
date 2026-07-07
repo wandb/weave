@@ -72,14 +72,17 @@ def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
     return json.dumps(result)
 
 
-def _make_ref_string_mapper(convert_ref: Callable[[str], str]) -> Callable[[B], B]:
+def _make_ref_string_mapper(
+    convert_ref: Callable[[str, bool], str],
+) -> Callable[[B], B]:
     """Build a copy-on-write mapper that rewrites weave refs in string leaves.
 
-    ``convert_ref`` handles a string that starts with a ref prefix, returning
-    its converted form (or raising for a disallowed ref). A string that instead
+    ``convert_ref`` handles a string that starts with a ref prefix (plus a bool
+    marking whether the leaf sits inside an embedded JSON blob), returning its
+    converted form (or raising for a disallowed ref). A string that instead
     embeds a ref inside a JSON blob (e.g. a message ``content`` parts array) is
-    decoded and re-run through the same mapper so embedded refs convert exactly
-    like top-level ones. The substring pre-check keeps ref-free strings off the
+    decoded and re-run through the same mapper so embedded refs convert like
+    top-level ones. The substring pre-check keeps ref-free strings off the
     ``json.loads`` path, and ``_MAX_REF_SEARCH_DEPTH`` caps the JSON-in-JSON
     descent.
     """
@@ -90,7 +93,7 @@ def _make_ref_string_mapper(convert_ref: Callable[[str], str]) -> Callable[[B], 
         if not isinstance(obj, str):
             return obj
         if obj.startswith(weave_prefix) or obj.startswith(weave_internal_prefix):
-            return cast(B, convert_ref(obj))
+            return cast(B, convert_ref(obj, depth > 0))
         if depth < _MAX_REF_SEARCH_DEPTH and (
             weave_prefix in obj or weave_internal_prefix in obj
         ):
@@ -159,7 +162,7 @@ def universal_ext_to_int_ref_converter(
     """
     ext_to_int_project_cache: dict[str, str] = {}
 
-    def convert_ref(ref_str: str) -> str:
+    def convert_ref(ref_str: str, embedded: bool) -> str:
         if ref_str.startswith(weave_prefix):
             return replace_external_weave_ref(
                 ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
@@ -199,10 +202,13 @@ def universal_int_to_ext_ref_converter(
         obj: The object to convert.
         convert_int_to_ext_project_id: A function that takes an internal
             project ID and returns the external project ID.
-        tolerate_external_refs: When True, a ref already in external
-            (`weave:///`) form is logged and passed through instead of
-            raising. Used by agent reads, whose ingest path does not fully
-            convert refs and can therefore persist external refs.
+        tolerate_external_refs: When True, a top-level ref already in
+            external (`weave:///`) form is logged and passed through instead
+            of raising. Used by agent reads, whose ingest path does not fully
+            convert refs and can therefore persist external refs. External
+            refs embedded in JSON-string leaves are always passed through:
+            rows written before the converter descended into JSON strings
+            legitimately contain them.
 
     Returns:
         The object with all internal references replaced with external
@@ -210,7 +216,7 @@ def universal_int_to_ext_ref_converter(
     """
     int_to_ext_project_cache: dict[str, str | None] = {}
 
-    def convert_ref(ref_str: str) -> str:
+    def convert_ref(ref_str: str, embedded: bool) -> str:
         if ref_str.startswith(weave_internal_prefix):
             rest = ref_str[len(weave_internal_prefix) :]
             parts = rest.split("/", 1)
@@ -225,9 +231,11 @@ def universal_int_to_ext_ref_converter(
             if not external_project_id:
                 return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
             return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
-        # External ref stored where an internal one belongs. Agent reads
-        # tolerate it (already external-shaped); other paths raise loudly.
-        if not tolerate_external_refs:
+        # External ref stored where an internal one belongs. Embedded ones are
+        # expected legacy state (writes only started converting inside JSON
+        # strings mid-2026) and are already external-shaped, so they always
+        # pass through; top-level ones raise unless the caller opted in.
+        if not (embedded or tolerate_external_refs):
             raise InvalidInternalRef("Encountered unexpected ref format.")
         logger.error("Returning stored external ref unchanged: %s", ref_str)
         return ref_str
