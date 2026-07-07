@@ -1,5 +1,6 @@
 import pytest
 
+from weave.trace.feedback import RefFeedbackQuery
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
@@ -288,3 +289,63 @@ def test_feedback_query_created_at_filter(client):
         "payload": {"key": "value123"},
     }
     assert query_since("2999-01-01T00:00:00.000000Z") == []
+
+
+def test_agent_feedback_apis(client):
+    span_fb = client.get_agent_span_feedback("0123456789abcdef")
+    turn_fb = client.get_agent_turn_feedback("0123456789abcdef0123456789abcdef")
+    assert (
+        span_fb.weave_ref
+        == f"weave:///{client.entity}/{client.project}/agent_span/0123456789abcdef"
+    )
+    assert (
+        turn_fb.weave_ref
+        == f"weave:///{client.entity}/{client.project}/agent_turn/0123456789abcdef0123456789abcdef"
+    )
+
+    span_reaction_id = span_fb.add_reaction("👍", creator="griffin")
+    span_note_id = span_fb.add_note("solid answer")
+    turn_reaction_id = turn_fb.add_reaction("👎")
+
+    # Call refs keep the classic reaction type.
+    call_fb = RefFeedbackQuery(
+        f"weave:///{client.entity}/{client.project}/call/00000000-0000-0000-0000-000000000000"
+    )
+    call_reaction_id = call_fb.add_reaction("👍")
+
+    res = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=client.project_id)
+    )
+    rows = {row["id"]: row for row in res.result}
+
+    span_reaction = rows[span_reaction_id]
+    assert span_reaction["weave_ref"] == span_fb.weave_ref
+    assert span_reaction["feedback_type"] == "wandb.agent_user_feedback"
+    assert span_reaction["scorer_tags"] == ["👍"]
+    assert span_reaction["scorer_tag_reasons"] == {"👍": "Set by user"}
+    assert span_reaction["scorer_tag_confidences"] == {"👍": 1.0}
+    assert span_reaction["payload"] == {"emoji": "👍", "scorer_tags": ["👍"]}
+    assert span_reaction["creator"] == "griffin"
+
+    span_note = rows[span_note_id]
+    assert span_note["weave_ref"] == span_fb.weave_ref
+    assert span_note["feedback_type"] == "wandb.note.1"
+    assert span_note["payload"] == {"note": "solid answer"}
+
+    turn_reaction = rows[turn_reaction_id]
+    assert turn_reaction["weave_ref"] == turn_fb.weave_ref
+    assert turn_reaction["feedback_type"] == "wandb.agent_user_feedback"
+    assert turn_reaction["scorer_tags"] == ["👎"]
+
+    call_reaction = rows[call_reaction_id]
+    assert call_reaction["feedback_type"] == "wandb.reaction.1"
+    assert call_reaction["payload"] == {
+        "emoji": "👍",
+        "alias": ":thumbs_up:",
+        "detoned": "👍",
+        "detoned_alias": ":thumbs_up:",
+    }
+
+    # The ref-scoped query only sees its own rows.
+    assert {f.id for f in span_fb.refresh()} == {span_reaction_id, span_note_id}
+    assert {f.id for f in turn_fb.refresh()} == {turn_reaction_id}
