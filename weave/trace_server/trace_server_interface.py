@@ -1272,20 +1272,15 @@ class FeedbackCreateReq(BaseModelStrict):
     span_status_code: str = Field(
         default="UNSET",
         description="Status of the scored turn (from spans.status_code)",
-        examples=["SUCCESS"],
+        examples=["OK"],
     )
-    conversation_id: str = Field(
+    span_conversation_id: str = Field(
         default="",
-        description="Conversation the feedback belongs to (from spans.conversation_id); "
-        "denormalized for filtering agent conversations by signal without a join.",
-        examples=["conv-abc123"],
+        description="Conversation the feedback belongs to (from spans.conversation_id)",
     )
-    trace_id: str = Field(
+    span_trace_id: str = Field(
         default="",
-        description="Turn the feedback belongs to (from spans.trace_id); denormalized "
-        "for filtering agent spans by signal without a join. Empty for "
-        "conversation-targeted feedback, which has no single turn.",
-        examples=["0123456789abcdef0123456789abcdef"],
+        description="Turn the feedback belongs to (from spans.trace_id)",
     )
 
     # wb_user_id is automatically populated by the server

@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import Any, NamedTuple
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -16,6 +16,7 @@ from weave.trace_server.interface.builtin_object_classes.annotation_spec import 
     AnnotationSpec,
 )
 from weave.trace_server.interface.feedback_types import (
+    AGENT_SPAN_FEEDBACK_TYPES,
     ANNOTATION_FEEDBACK_TYPE_PREFIX,
     FEEDBACK_PAYLOAD_SCHEMAS,
     REACTION_FEEDBACK_TYPE,
@@ -277,6 +278,35 @@ def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
         raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
 
 
+def validate_feedback_agent_req_targets(req: tsi.FeedbackCreateReq) -> None:
+    """Validate producer-supplied agent-feedback denormalized target IDs."""
+    if req.feedback_type not in AGENT_SPAN_FEEDBACK_TYPES:
+        return
+
+    try:
+        ref = ri.parse_internal_uri(req.weave_ref)
+    except ri.InvalidInternalRef:
+        return
+
+    if isinstance(ref, ri.InternalAgentConversationRef):
+        if req.span_conversation_id and req.span_conversation_id != ref.conversation_id:
+            raise InvalidRequest(
+                f"feedback span_conversation_id {req.span_conversation_id!r} "
+                f"conflicts with conversation ref {ref.conversation_id!r}"
+            )
+        if req.span_trace_id:
+            raise InvalidRequest(
+                f"feedback span_trace_id {req.span_trace_id!r} cannot be supplied "
+                "for conversation-targeted feedback"
+            )
+    elif isinstance(ref, ri.InternalAgentTurnRef):
+        if req.span_trace_id and req.span_trace_id != ref.trace_id:
+            raise InvalidRequest(
+                f"feedback span_trace_id {req.span_trace_id!r} conflicts with "
+                f"turn ref {ref.trace_id!r}"
+            )
+
+
 def format_feedback_to_row(
     feedback_req: tsi.FeedbackCreateReq,
     processed_payload: dict[str, Any],
@@ -322,52 +352,9 @@ def format_feedback_to_row(
         "span_agent_name": feedback_req.span_agent_name,
         "span_agent_version": feedback_req.span_agent_version,
         "span_status_code": feedback_req.span_status_code,
-        "conversation_id": feedback_req.conversation_id,
-        "trace_id": feedback_req.trace_id,
+        "conversation_id": feedback_req.span_conversation_id,
+        "trace_id": feedback_req.span_trace_id,
     }
-
-
-class ResolvedAgentTargets(NamedTuple):
-    """The conversation and turn a feedback row is attributed to.
-
-    `trace_id` is '' for conversation-targeted feedback (no single turn) and for
-    anything unresolved; consumers treat '' as "invisible to that grain's
-    signal filter until a backfill runs".
-    """
-
-    conversation_id: str
-    trace_id: str
-
-
-def resolve_feedback_agent_targets(
-    weave_ref: str,
-    supplied_conversation_id: str,
-    supplied_trace_id: str,
-) -> ResolvedAgentTargets:
-    """Resolve the conversation and turn a feedback row belongs to, for denormalization.
-
-    Producers that hold the scored span (the agent monitor worker, the UI feedback
-    controls) supply both IDs directly, and those win. As a zero-cost convenience for
-    callers that don't, we also derive what the target ref alone reveals: a
-    conversation ref gives the conversation; a turn ref gives the trace. A span ref
-    reveals neither (its id is not a trace/conversation id) and unknown/invalid refs
-    reveal nothing. Missing fields stay '' (invisible to that grain's signal filter
-    until a backfill runs). There is deliberately no spans lookup here — resolution
-    is either caller-supplied or free from the ref.
-    """
-    conversation_id = supplied_conversation_id
-    trace_id = supplied_trace_id
-    if conversation_id and trace_id:
-        return ResolvedAgentTargets(conversation_id, trace_id)
-    try:
-        ref = ri.parse_internal_uri(weave_ref)
-    except ri.InvalidInternalRef:
-        return ResolvedAgentTargets(conversation_id, trace_id)
-    if isinstance(ref, ri.InternalAgentConversationRef):
-        conversation_id = conversation_id or ref.conversation_id
-    elif isinstance(ref, ri.InternalAgentTurnRef):
-        trace_id = trace_id or ref.trace_id
-    return ResolvedAgentTargets(conversation_id, trace_id)
 
 
 def format_feedback_to_res(row: Row) -> tsi.FeedbackCreateRes:

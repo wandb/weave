@@ -42,7 +42,6 @@ from weave.trace_server.query_builder.agent_query_builder import (
     SPANS_COST_COLS,
     SPANS_LIST_COLS,
     build_order_by,
-    build_signal_filter_clause,
     make_agent_versions_count_query,
     make_agent_versions_list_query,
     make_agents_count_query,
@@ -59,6 +58,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_list_query,
     make_trace_detail_spans_query,
     resolve_group_by,
+)
+from weave.trace_server.query_builder.agent_signal_filters import (
+    build_signal_filter_clause,
 )
 from weave.trace_server.query_builder.agent_trace_attribution import (
     attributed_spans_source,
@@ -360,6 +362,23 @@ class TestMakeSpansListQuery:
                     AgentSpanValueRef(source="custom_attrs_string", key="env")
                 ],
             )
+
+    def test_signal_filters_require_group_by(self) -> None:
+        """signal_filters compile to a conversation_id semi-join applied only on the
+        grouped path, so requiring group_by keeps them from silently no-op'ing on an
+        ungrouped query. An empty filter is a no-op and must not trip the guard.
+        """
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(
+                project_id="p1",
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            )
+        AgentSpansQueryReq(project_id="p1", signal_filters=AgentSignalFilter())
+        AgentSpansQueryReq(
+            project_id="p1",
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            signal_filters=AgentSignalFilter(tags=["x"]),
+        )
 
     def test_include_details_projects_detail_columns(self) -> None:
         from weave.trace_server.query_builder.agent_query_builder import (
@@ -834,8 +853,9 @@ class TestMakeGroupedSpansCountQuery:
                                             WHERE project_id = {{genai_1:String}}
                                               AND feedback_type IN ('wandb.agent_monitor',
                                                                     'wandb.agent_user_feedback')
-                                              AND hasAny(scorer_tags, {{genai_2:Array(String)}})
-                                              AND conversation_id != '')
+                                              AND conversation_id != ''
+                                            GROUP BY conversation_id
+                                            HAVING sum(hasAny(scorer_tags, {{genai_2:Array(String)}})) > 0)
                 GROUP BY s.conversation_id
             )
         """
@@ -1251,8 +1271,9 @@ class TestMakeGroupedSpansListQuery:
                                         WHERE project_id = {{genai_3:String}}
                                           AND feedback_type IN ('wandb.agent_monitor',
                                                                 'wandb.agent_user_feedback')
-                                          AND hasAny(scorer_tags, {{genai_4:Array(String)}})
-                                          AND conversation_id != '')
+                                          AND conversation_id != ''
+                                        GROUP BY conversation_id
+                                        HAVING sum(hasAny(scorer_tags, {{genai_4:Array(String)}})) > 0)
             GROUP BY conversation_id
             ORDER BY last_seen DESC
             LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
@@ -2164,6 +2185,7 @@ class TestBuildOrderBy:
 def test_signal_filter_round_trip() -> None:
     req = AgentSpansQueryReq(
         project_id="ent/proj",
+        group_by=[AgentGroupByRef(source="column", key="conversation_id")],
         signal_filters=AgentSignalFilter(
             tags=["a", "b"],
             ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
@@ -2183,10 +2205,12 @@ def test_build_signal_filter_clause() -> None:
         is None
     )
 
-    # Tags only -> a single conversation_id IN (...) sub-select. feedback_type list is
-    # sorted from AGENT_SPAN_FEEDBACK_TYPES, not re-hardcoded.
+    # Tags only -> one grouped sub-select, HAVING sum(hasAny(...)) > 0. feedback_type
+    # list is sorted from AGENT_SPAN_FEEDBACK_TYPES, not re-hardcoded.
     pb = ParamBuilder()
-    clause = build_signal_filter_clause(pb, "ent/proj", AgentSignalFilter(tags=["x", "y"]))
+    clause = build_signal_filter_clause(
+        pb, "ent/proj", AgentSignalFilter(tags=["x", "y"])
+    )
     assert clause is not None
     params = pb.get_params()
     pid_p, tags_p = list(params.keys())
@@ -2194,15 +2218,16 @@ def test_build_signal_filter_clause() -> None:
         f"s.conversation_id IN (SELECT conversation_id FROM feedback "
         f"WHERE project_id = {{{pid_p}:String}} "
         f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
-        f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
-        f"AND conversation_id != '')"
+        f"AND conversation_id != '' "
+        f"GROUP BY conversation_id "
+        f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0)"
     )
     assert params[pid_p] == "ent/proj"
     assert params[tags_p] == ["x", "y"]
 
-    # Tags + rating -> two independent sub-selects AND-ed. A conversation can carry the
-    # human tag and the monitor rating on different feedback rows, so they must NOT be a
-    # single-row conjunction.
+    # Tags + rating -> one grouped sub-select with a HAVING term per signal. A
+    # conversation can carry the human tag and the monitor rating on different feedback
+    # rows, so the match is per-conversation (sum(...) > 0), not a single-row conjunction.
     pb = ParamBuilder()
     clause = build_signal_filter_clause(
         pb,
@@ -2219,14 +2244,11 @@ def test_build_signal_filter_clause() -> None:
         f"s.conversation_id IN (SELECT conversation_id FROM feedback "
         f"WHERE project_id = {{{pid_p}:String}} "
         f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
-        f"AND hasAny(scorer_tags, {{{tags_p}:Array(String)}}) "
-        f"AND conversation_id != '') "
-        f"AND s.conversation_id IN (SELECT conversation_id FROM feedback "
-        f"WHERE project_id = {{{pid_p}:String}} "
-        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
-        f"AND mapContains(scorer_ratings, {{{key_p}:String}}) "
-        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}} "
-        f"AND conversation_id != '')"
+        f"AND conversation_id != '' "
+        f"GROUP BY conversation_id "
+        f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0 "
+        f"AND sum(mapContains(scorer_ratings, {{{key_p}:String}}) "
+        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) > 0)"
     )
     assert params[pid_p] == "ent/proj"
     assert params[tags_p] == ["x"]

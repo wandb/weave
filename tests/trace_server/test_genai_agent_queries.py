@@ -46,6 +46,7 @@ from weave.trace_server.agents.types import (
     RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
@@ -2978,8 +2979,8 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
 # ---------------------------------------------------------------------------
 
 
-def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
-    """Feedback targeting a conversation ref resolves conversation_id from the ref itself."""
+def test_feedback_create_persists_supplied_conversation_id_for_conv_ref(ch_server):
+    """Conversation-targeted feedback preserves the producer-supplied target ID."""
     project_id = _make_project_id("fb-conv-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     conv_ref = ri.InternalAgentConversationRef(
@@ -2993,6 +2994,7 @@ def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
             feedback_type=AGENT_USER_FEEDBACK_TYPE,
             payload={},
             scorer_tags=["hallucination"],
+            span_conversation_id=conv_id,
             wb_user_id="u1",
         )
     )
@@ -3003,16 +3005,70 @@ def test_feedback_create_persists_conversation_id_from_conv_ref(ch_server):
             fields=["conversation_id", "trace_id", "scorer_tags"],
         )
     )
-    # Conversation-targeted feedback: conversation from the ref, no single turn.
     assert res.result == [
         {"conversation_id": conv_id, "trace_id": "", "scorer_tags": ["hallucination"]}
     ]
 
 
-def test_feedback_create_persists_conversation_and_trace_id_from_turn_ref(ch_server):
-    """Turn-targeted feedback records trace_id from the ref; the conversation_id is
-    supplied by the producer (the trace server does no spans lookup at write time).
-    """
+def test_feedback_create_does_not_derive_agent_target_ids_from_ref(ch_server):
+    project_id = _make_project_id("fb-no-target-id-derivation")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id="trace-a").uri
+
+    ch_server.feedback_create_batch(
+        tsi.FeedbackCreateBatchReq(
+            batch=[
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=conv_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["conv-tag"],
+                    wb_user_id="u1",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=turn_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["turn-tag"],
+                    wb_user_id="u2",
+                ),
+            ]
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["weave_ref", "conversation_id", "trace_id", "scorer_tags"],
+        )
+    )
+    actual = sorted(res.result, key=lambda row: row["weave_ref"])
+    expected = sorted(
+        [
+            {
+                "weave_ref": conv_ref,
+                "conversation_id": "",
+                "trace_id": "",
+                "scorer_tags": ["conv-tag"],
+            },
+            {
+                "weave_ref": turn_ref,
+                "conversation_id": "",
+                "trace_id": "",
+                "scorer_tags": ["turn-tag"],
+            },
+        ],
+        key=lambda row: row["weave_ref"],
+    )
+    assert actual == expected
+
+
+def test_feedback_create_persists_supplied_target_ids_for_turn_ref(ch_server):
+    """Turn-targeted feedback preserves producer-supplied target IDs."""
     project_id = _make_project_id("fb-turn-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     trace_id = uuid.uuid4().hex
@@ -3025,8 +3081,8 @@ def test_feedback_create_persists_conversation_and_trace_id_from_turn_ref(ch_ser
             feedback_type=AGENT_USER_FEEDBACK_TYPE,
             payload={},
             scorer_tags=["low-quality"],
-            # Producer supplies the conversation; trace_id is parsed from the ref.
-            conversation_id=conv_id,
+            span_conversation_id=conv_id,
+            span_trace_id=trace_id,
             wb_user_id="u2",
         )
     )
@@ -3044,6 +3100,200 @@ def test_feedback_create_persists_conversation_and_trace_id_from_turn_ref(ch_ser
             "scorer_tags": ["low-quality"],
         }
     ]
+
+
+def test_feedback_create_persists_conversation_and_trace_id_from_span_ref(ch_server):
+    """Span-targeted feedback preserves producer-supplied denormalized IDs."""
+    project_id = _make_project_id("fb-span-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=span_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            span_conversation_id=conv_id,
+            span_trace_id=trace_id,
+            wb_user_id="u3",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["conversation_id", "trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "conversation_id": conv_id,
+            "trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
+def test_feedback_create_batch_persists_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-ids")
+    conv_ref_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    span_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_trace_id = uuid.uuid4().hex
+    span_trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_ref_id
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(
+        project_id=project_id, trace_id=turn_trace_id
+    ).uri
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create_batch(
+        tsi.FeedbackCreateBatchReq(
+            batch=[
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=conv_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["conv-tag"],
+                    span_conversation_id=conv_ref_id,
+                    wb_user_id="u1",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=turn_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["turn-tag"],
+                    span_conversation_id=turn_conv_id,
+                    span_trace_id=turn_trace_id,
+                    wb_user_id="u2",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=span_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["span-tag"],
+                    span_conversation_id=span_conv_id,
+                    span_trace_id=span_trace_id,
+                    wb_user_id="u3",
+                ),
+            ]
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["weave_ref", "conversation_id", "trace_id", "scorer_tags"],
+        )
+    )
+    actual = sorted(res.result, key=lambda row: row["weave_ref"])
+    expected = sorted(
+        [
+            {
+                "weave_ref": conv_ref,
+                "conversation_id": conv_ref_id,
+                "trace_id": "",
+                "scorer_tags": ["conv-tag"],
+            },
+            {
+                "weave_ref": turn_ref,
+                "conversation_id": turn_conv_id,
+                "trace_id": turn_trace_id,
+                "scorer_tags": ["turn-tag"],
+            },
+            {
+                "weave_ref": span_ref,
+                "conversation_id": span_conv_id,
+                "trace_id": span_trace_id,
+                "scorer_tags": ["span-tag"],
+            },
+        ],
+        key=lambda row: row["weave_ref"],
+    )
+    assert actual == expected
+
+
+def test_feedback_create_rejects_trace_id_for_conversation_ref(ch_server):
+    project_id = _make_project_id("fb-conv-ref-trace-id")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-a' cannot be supplied for "
+        "conversation-targeted feedback",
+    ):
+        ch_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=conv_ref,
+                feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                payload={},
+                scorer_tags=["hallucination"],
+                span_trace_id="trace-a",
+                wb_user_id="u1",
+            )
+        )
+
+
+def test_feedback_create_batch_rejects_conflicting_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-id-conflict")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id="trace-a").uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_conversation_id 'conv-b' conflicts with "
+        "conversation ref 'conv-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=conv_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["conv-tag"],
+                        span_conversation_id="conv-b",
+                        wb_user_id="u1",
+                    )
+                ]
+            )
+        )
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-b' conflicts with turn ref 'trace-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=turn_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["turn-tag"],
+                        span_trace_id="trace-b",
+                        wb_user_id="u2",
+                    )
+                ]
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -3123,8 +3373,9 @@ def test_filter_conversations_by_signal(ch_server):
     assert filtered_ids(None) == sorted([conv_a, conv_b])
     assert filtered_count(None) == 2
 
-    # Tag a TURN in conv-A. The producer (here, the monitor) supplies conversation_id
-    # from the scored span, so the turn-level signal resolves up to conv-A.
+    # Tag a TURN in conv-A. The producer (here, the monitor) supplies
+    # span_conversation_id from the scored span, so the turn-level signal resolves
+    # up to conv-A.
     turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
     fb_a = ch_server.feedback_create(
         tsi.FeedbackCreateReq(
@@ -3142,8 +3393,8 @@ def test_filter_conversations_by_signal(ch_server):
             ).uri,
             scorer_tags=["flagged"],
             scorer_ratings={"_rating_": 0.9},
-            conversation_id=conv_a,
-            trace_id=trace_a,
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
         )
     )
 
@@ -3186,8 +3437,8 @@ def test_filter_conversations_by_signal(ch_server):
             payload={},
             wb_user_id="u3",
             scorer_tags=["human-flag"],
-            conversation_id=conv_a,
-            trace_id=trace_a,
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
         )
     )
     combined = AgentSignalFilter(

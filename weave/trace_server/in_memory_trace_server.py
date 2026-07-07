@@ -93,6 +93,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    validate_feedback_agent_req_targets,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -3752,6 +3753,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
+        validate_feedback_agent_req_targets(req)
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
@@ -3769,6 +3771,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
+            validate_feedback_agent_req_targets(feedback_req)
 
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)

@@ -808,6 +808,14 @@ class AgentSpansQueryReq(BaseModel):
             raise ValueError(
                 "grouped measures, distributions, and filters require group_by"
             )
+        # `signal_filters` currently only apply when grouping by conversation_id.
+        # Later we may add support for filtering on ungrouped or turn-level data.
+        if (
+            self.signal_filters is not None
+            and not self.signal_filters.is_empty()
+            and not self.group_by
+        ):
+            raise ValueError("signal_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:

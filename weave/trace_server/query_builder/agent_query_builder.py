@@ -37,7 +37,6 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
-    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -53,11 +52,13 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryReq,
     group_by_ref_alias,
 )
-from weave.trace_server.interface.feedback_types import AGENT_SPAN_FEEDBACK_TYPES
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
+)
+from weave.trace_server.query_builder.agent_signal_filters import (
+    build_signal_filter_clause,
 )
 
 # ---------------------------------------------------------------------------
@@ -862,72 +863,6 @@ def _spans_filter_sql(
 
         where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
     return _FilterSQL(where=" AND ".join(where_conditions))
-
-
-_OP_TO_SQL: dict[str, str] = {
-    "gte": ">=",
-    "gt": ">",
-    "lte": "<=",
-    "lt": "<",
-    "eq": "=",
-}
-
-# Derived from the write-path constant so a change to the frozenset propagates here.
-# Sorted for a deterministic SQL string; these are trusted literals, not user input.
-_AGENT_FEEDBACK_TYPES_SQL = "feedback_type IN ({})".format(
-    ", ".join(f"'{t}'" for t in sorted(AGENT_SPAN_FEEDBACK_TYPES))
-)
-
-
-def build_signal_filter_clause(
-    pb: ParamBuilder,
-    project_id: str,
-    signal_filters: AgentSignalFilter | None,
-    conversation_col: str = "s.conversation_id",
-) -> str | None:
-    """Restrict `conversation_col` to conversations carrying the requested signals.
-
-    Each grain gets its own `IN (SELECT conversation_id FROM feedback ...)` sub-select,
-    AND-ed together, because a conversation matches if ANY of its feedback rows carries
-    the signal — and human tags (wandb.agent_user_feedback) and scorer ratings
-    (wandb.agent_monitor) live on different rows, so a single-row conjunction would
-    never match a combined tag + rating filter. Tags within one filter are match-any
-    (hasAny); each rating condition is its own sub-select.
-
-    Returns None for an empty filter, so callers omit the semi-join. Not
-    time-constrained: a signal's timestamp is not the conversation's.
-    """
-    if signal_filters is None or signal_filters.is_empty():
-        return None
-
-    pid_slot = pb.add(project_id, param_type="String")
-    base = f"project_id = {pid_slot} AND {_AGENT_FEEDBACK_TYPES_SQL}"
-
-    def _in(predicate: str) -> str:
-        return (
-            f"{conversation_col} IN (SELECT conversation_id FROM feedback "
-            f"WHERE {base} AND {predicate} AND conversation_id != '')"
-        )
-
-    clauses: list[str] = []
-    if signal_filters.tags:
-        tags_slot = pb.add(signal_filters.tags, param_type="Array(String)")
-        clauses.append(_in(f"hasAny(scorer_tags, {tags_slot})"))
-
-    for cond in signal_filters.ratings:
-        key_slot = pb.add(cond.scorer_key, param_type="String")
-        val_slot = pb.add(cond.value, param_type="Float64")
-        op = _OP_TO_SQL[cond.op]
-        # mapContains guard: Map access returns 0.0 for an absent key, which
-        # would spuriously pass a `>= 0` test.
-        clauses.append(
-            _in(
-                f"mapContains(scorer_ratings, {key_slot}) "
-                f"AND scorer_ratings[{key_slot}] {op} {val_slot}"
-            )
-        )
-
-    return " AND ".join(clauses)
 
 
 def _group_by_references_identity(group_by: list[AgentGroupByRef] | None) -> bool:
