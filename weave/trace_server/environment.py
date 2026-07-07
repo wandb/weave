@@ -79,6 +79,33 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+# Ingest sampling (spans model) -- shared knobs with the calls-model sampler.
+
+
+def wf_ingest_sample_rate() -> float:
+    """Fraction of non-eval traces to keep at OTel-spans ingest (0.0-1.0).
+
+    The same environment variable also governs the calls-model sampler in the
+    trace-server service, so one operator knob covers both data models.
+    Defaults to 1.0 (sampling off); an unparseable or out-of-range value falls
+    back to 1.0, so a bad config can never start dropping data. Change the
+    rate in a quiet traffic window: an in-flight trace hashed at two different
+    rates can be stored partially.
+    """
+    try:
+        rate = float(os.environ.get("WEAVE_INGEST_SAMPLE_RATE", "1.0"))
+    except ValueError:
+        return 1.0
+    if not 0.0 <= rate <= 1.0:
+        return 1.0
+    return rate
+
+
+def wf_ingest_sample_dry_run() -> bool:
+    """When true, the spans sampler records what it would drop but drops nothing."""
+    return os.environ.get("WEAVE_INGEST_SAMPLE_DRY_RUN", "false").lower() == "true"
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(

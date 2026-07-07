@@ -1,7 +1,7 @@
 """DogStatsD counter emission + DD-flavored OTel span-tag helpers.
 
-Emits a single counter (`weave_trace_server.db_inserts`) over a UDP socket.
-Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
+Emits best-effort counters (the `weave_trace_server.*` family) over a UDP
+socket. Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
 """
 
 from __future__ import annotations
@@ -223,6 +223,17 @@ def record_db_insert(*, table: str, count: int, path: str | None = None) -> None
         count,
         [f"table:{table}", f"path:{resolved_path}", *_UNIFIED_TAGS],
     )
+
+
+def emit_counter(metric: str, value: int, tags: list[str]) -> None:
+    """Emit a best-effort counter with the unified service tags appended.
+
+    For counter families owned by other modules (e.g. the spans ingest
+    sampler); `record_db_insert` stays the dedicated DB-insert emitter.
+    """
+    if value <= 0:
+        return
+    _client.emit(metric, value, [*tags, *_UNIFIED_TAGS])
 
 
 def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
