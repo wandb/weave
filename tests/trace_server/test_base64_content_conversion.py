@@ -267,6 +267,82 @@ class TestBase64Replacement:
         assert processed_end.end.output == long_b64
 
 
+class TestContentRefCache:
+    """Repeat blobs reuse the published ref instead of re-running the pipeline."""
+
+    def test_repeat_blobs_reuse_cached_ref(self):
+        """Identical blobs dedupe within a request and across requests, per project."""
+        trace_server = MagicMock()
+        trace_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        _mock_obj_create(trace_server)
+
+        b64_data = base64.b64encode(b"a" * LARGE_TEST_DATA_SIZE).decode("ascii")
+        data_uri = f"data:image/png;base64,{b64_data}"
+
+        # Within-request: the same blob twice publishes exactly once.
+        result = replace_base64_with_content_objects(
+            {"first": data_uri, "second": [data_uri]}, "proj_a", trace_server
+        )
+        _assert_content_ref(result["first"], "proj_a")
+        assert result["second"][0] == result["first"]
+        assert trace_server.file_create.call_count == 2
+        assert trace_server.obj_create.call_count == 1
+
+        # Cross-request, same project: served from cache with no server work.
+        fresh_server = MagicMock()
+        cached = replace_base64_with_content_objects(
+            {"img": data_uri}, "proj_a", fresh_server
+        )
+        assert cached["img"] == result["first"]
+        fresh_server.file_create.assert_not_called()
+        fresh_server.obj_create.assert_not_called()
+
+        # Different project: the key is project-scoped, so it publishes again.
+        other_server = MagicMock()
+        other_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest_b"),
+                FileCreateRes(digest="metadata_digest_b"),
+            ]
+        )
+        _mock_obj_create(other_server)
+        other = replace_base64_with_content_objects(
+            {"img": data_uri}, "proj_b", other_server
+        )
+        _assert_content_ref(other["img"], "proj_b")
+        assert other_server.obj_create.call_count == 1
+
+    def test_failed_publish_is_not_cached(self):
+        """A failed publish leaves the value inline and does not poison the cache."""
+        b64_data = base64.b64encode(b"b" * LARGE_TEST_DATA_SIZE).decode("ascii")
+        data_uri = f"data:image/png;base64,{b64_data}"
+
+        broken_server = MagicMock()
+        broken_server.file_create = MagicMock(side_effect=RuntimeError("bucket down"))
+        unchanged = replace_base64_with_content_objects(
+            {"img": data_uri}, "proj_fail", broken_server
+        )
+        assert unchanged["img"] == data_uri
+
+        working_server = MagicMock()
+        working_server.file_create = MagicMock(
+            side_effect=[
+                FileCreateRes(digest="content_digest"),
+                FileCreateRes(digest="metadata_digest"),
+            ]
+        )
+        _mock_obj_create(working_server)
+        result = replace_base64_with_content_objects(
+            {"img": data_uri}, "proj_fail", working_server
+        )
+        _assert_content_ref(result["img"], "proj_fail")
+
+
 class TestStandaloneBase64Detection:
     """Test detection and conversion of standalone base64 strings (new functionality)."""
 

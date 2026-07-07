@@ -4,10 +4,14 @@ This module handles automatic detection and replacement of base64 encoded conten
 with content objects stored in bucket storage.
 """
 
+import hashlib
 import json
 import logging
 import re
+import threading
 from typing import Any, TypeVar
+
+from cachetools import LRUCache
 
 from weave.shared.refs_internal import InternalObjectRef
 from weave.trace_server.content.content import Content
@@ -44,6 +48,30 @@ BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 # fall below 8 KiB now stay inline in ClickHouse, which is the pre-feature
 # behaviour and is handled correctly by the existing storage path.
 AUTO_CONVERSION_MIN_SIZE = 8192  # 8 KiB
+
+# Per-pod memo of published content refs keyed by (project_id, sha256 of the raw
+# base64/data-URI string). Agent payloads re-send the same blobs on every chat
+# turn (e.g. screenshot history); a hit skips the decode, both file uploads, and
+# the obj_create insert entirely and returns the previously published ref.
+CONTENT_REF_CACHE_SIZE = 100_000
+_content_ref_cache: LRUCache[tuple[str, str], str] = LRUCache(
+    maxsize=CONTENT_REF_CACHE_SIZE
+)
+_content_ref_cache_lock = threading.Lock()
+
+
+def _content_ref_cache_key(project_id: str, raw_val: str) -> tuple[str, str]:
+    return (project_id, hashlib.sha256(raw_val.encode("utf-8")).hexdigest())
+
+
+def _content_ref_cache_get(key: tuple[str, str]) -> str | None:
+    with _content_ref_cache_lock:
+        return _content_ref_cache.get(key)
+
+
+def _content_ref_cache_put(key: tuple[str, str], ref: str) -> None:
+    with _content_ref_cache_lock:
+        _content_ref_cache[key] = ref
 
 
 def is_base64(value: str) -> bool:
@@ -200,9 +228,12 @@ def replace_base64_with_content_objects(
         if isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):
+                cache_key = _content_ref_cache_key(project_id, val)
+                if (cached := _content_ref_cache_get(cache_key)) is not None:
+                    return cached
                 try:
                     # Publish the content and replace the base64 with its ref.
-                    return store_content_object_ref(
+                    ref = store_content_object_ref(
                         Content.from_data_url(val),
                         project_id,
                         trace_server,
@@ -213,8 +244,14 @@ def replace_base64_with_content_objects(
                         "Failed to create and store content from data URI with error %s",
                         e,
                     )
+                else:
+                    _content_ref_cache_put(cache_key, ref)
+                    return ref
 
             if is_base64(val):
+                cache_key = _content_ref_cache_key(project_id, val)
+                if (cached := _content_ref_cache_get(cache_key)) is not None:
+                    return cached
                 try:
                     # All we care about here is if this is an object that we can handle in some way.
                     # 'aaaa' is valid base64 and will come out as text/plain
@@ -226,12 +263,14 @@ def replace_base64_with_content_objects(
                         "text/plain",
                         "application/octet-stream",
                     }:
-                        return store_content_object_ref(
+                        ref = store_content_object_ref(
                             content,
                             project_id,
                             trace_server,
                             wb_user_id,
                         )
+                        _content_ref_cache_put(cache_key, ref)
+                        return ref
                 except Exception as e:
                     logger.warning(
                         "Failed to create content from standalone base64: %s", e
