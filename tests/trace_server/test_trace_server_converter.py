@@ -5,6 +5,7 @@ import logging
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace.refs import ObjectRef
 from weave.trace_server.errors import InvalidExternalRef
 from weave.trace_server.interface.query import Query
@@ -17,6 +18,8 @@ from weave.trace_server.trace_server_converter import (
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
     ObjCreateReq,
+    ObjQueryReq,
+    ObjReadReq,
     ObjSchemaForInsert,
     StartedCallSchemaForInsert,
 )
@@ -521,3 +524,38 @@ def test_deeply_nested_json_in_json_terminates_without_recursion_error():
     # Termination + no RecursionError is the contract; the buried ref is below
     # the cap so the string comes back unchanged.
     assert converted["content"] == nested
+
+
+@pytest.mark.disable_logging_error_check
+def test_stored_embedded_external_ref_reads_back_through_server(trace_server):
+    """Functional guard for the legacy-data regression: rows written before the
+    converter descended into JSON strings hold external refs inside stringified
+    blobs. Reads through the external adapter must return them unchanged, not
+    raise InvalidInternalRef.
+    """
+    project_id = f"{TEST_ENTITY}/test-embedded-ext-ref-legacy"
+    external_ref = f"weave:///{project_id}/op/scorer:abc"
+    blob = json.dumps({"source_refs": [external_ref], "note": "legacy"})
+
+    # Register the ext<->int project mapping, then write the legacy row through
+    # the internal server (no ref conversion), exactly as pre-descent
+    # deployments persisted it.
+    internal_project_id = trace_server._idc.ext_to_int_project_id(project_id)
+    trace_server._internal_trace_server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=internal_project_id,
+                object_id="legacy-obj",
+                val={"description": blob},
+            )
+        )
+    )
+
+    read = trace_server.obj_read(
+        ObjReadReq(project_id=project_id, object_id="legacy-obj", digest="latest")
+    )
+    assert read.obj.val == {"description": blob}
+
+    query = trace_server.objs_query(ObjQueryReq(project_id=project_id))
+    assert [obj.object_id for obj in query.objs] == ["legacy-obj"]
+    assert query.objs[0].val == {"description": blob}
