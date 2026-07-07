@@ -162,7 +162,7 @@ def universal_ext_to_int_ref_converter(
     """
     ext_to_int_project_cache: dict[str, str] = {}
 
-    def convert_ref(ref_str: str, embedded: bool) -> str:
+    def convert_ref(ref_str: str, _embedded: bool) -> str:
         if ref_str.startswith(weave_prefix):
             return replace_external_weave_ref(
                 ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
@@ -198,6 +198,10 @@ def universal_int_to_ext_ref_converter(
     format of `weave-trace-internal:///project_id/...` and the external references are
     expected to be in the format of `weave:///entity/project/...`.
 
+    External refs embedded in JSON-string leaves always pass through (logged):
+    rows written before the converter descended into JSON strings legitimately
+    contain them.
+
     Args:
         obj: The object to convert.
         convert_int_to_ext_project_id: A function that takes an internal
@@ -205,10 +209,7 @@ def universal_int_to_ext_ref_converter(
         tolerate_external_refs: When True, a top-level ref already in
             external (`weave:///`) form is logged and passed through instead
             of raising. Used by agent reads, whose ingest path does not fully
-            convert refs and can therefore persist external refs. External
-            refs embedded in JSON-string leaves are always passed through:
-            rows written before the converter descended into JSON strings
-            legitimately contain them.
+            convert refs and can therefore persist external refs.
 
     Returns:
         The object with all internal references replaced with external
@@ -237,7 +238,7 @@ def universal_int_to_ext_ref_converter(
         # pass through; top-level ones raise unless the caller opted in.
         if not (embedded or tolerate_external_refs):
             raise InvalidInternalRef("Encountered unexpected ref format.")
-        logger.error("Returning stored external ref unchanged: %s", ref_str)
+        logger.warning("Returning stored external ref unchanged: %s", ref_str)
         return ref_str
 
     return _map_values(obj, _make_ref_string_mapper(convert_ref))

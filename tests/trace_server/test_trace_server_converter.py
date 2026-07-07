@@ -235,7 +235,6 @@ def test_replace_external_weave_ref_rejects_malformed_tail():
         replace_external_weave_ref("weave:///just-entity", lambda p: p)
 
 
-@pytest.mark.disable_logging_error_check
 def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
     """Egress: internal refs externalize and unresolvable projects fall back to
     a private ref. A stored external ref raises by default (surfacing
@@ -261,7 +260,7 @@ def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
         "plain": "no-ref-here",
     }
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         converted = universal_int_to_ext_ref_converter(
             payload, int_to_ext, tolerate_external_refs=True
         )
@@ -428,7 +427,6 @@ def test_json_string_without_refs_is_not_reserialized():
     assert converted["content"] is blob
 
 
-@pytest.mark.disable_logging_error_check
 def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(caplog):
     """When an embedded ref does not change (already external), the ORIGINAL
     string is returned with no re-serialization (spacing preserved).
@@ -442,7 +440,7 @@ def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(capl
     blob = json.dumps([{"type": "image", "url": external_ref}], indent=2)
     payload = {"content": blob}
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
 
     assert converted is payload
@@ -450,7 +448,6 @@ def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(capl
     assert "Returning stored external ref unchanged" in caplog.text
 
 
-@pytest.mark.disable_logging_error_check
 def test_embedded_external_ref_passes_through_int_to_ext(caplog):
     """An embedded external ref passes through under the strict default (rows
     written before the converter descended into JSON strings contain them),
@@ -466,7 +463,7 @@ def test_embedded_external_ref_passes_through_int_to_ext(caplog):
     content = json.dumps({"source_refs": [external_ref], "call": internal_ref})
     payload = {"description": content}
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
 
     assert json.loads(converted["description"]) == {
