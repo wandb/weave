@@ -6,7 +6,7 @@ one central sampling rate to cut storage cost. Mirrors the calls-model
 sampler in the trace-server service: both read the same
 ``WEAVE_INGEST_SAMPLE_RATE`` / ``WEAVE_INGEST_SAMPLE_DRY_RUN`` environment
 variables and share the same hash, so a trace that writes into both data
-models gets one verdict — when both models record the same ``trace_id``
+models gets one verdict -- when both models record the same ``trace_id``
 string. Off by default (rate 1.0). See WB-36877.
 
 The keep/drop decision is a pure hash of ``trace_id``, so every span of a
@@ -154,7 +154,10 @@ def decide_spans(
             dropped_bytes += byte_size
             decisions.append(SpanDecision(drop=not config.dry_run))
 
-    metrics.seen(len(spans))
+    # `seen` counts spans that reached the ladder; spans rejected at parse
+    # never get here, so total arrivals = seen + the caller's parse rejects.
+    if spans:
+        metrics.seen(len(spans))
     if parse_failure_count:
         metrics.parse_failures(parse_failure_count)
     if evals_kept_count:

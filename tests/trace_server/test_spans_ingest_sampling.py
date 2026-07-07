@@ -225,6 +225,8 @@ def test_unusable_trace_ids_fail_open_in_decisions(
     if usable:
         assert decisions == [ingest_sampling.SpanDecision(drop=True)]
         assert sampler_metrics["parse_failures"] == []
+        assert sampler_metrics["seen"] == [1]
+        assert sampler_metrics["dropped"] == [(1, 5, False)]
     else:
         assert decisions == [ingest_sampling.SpanDecision(drop=False)]
         assert sampler_metrics["parse_failures"] == [1]
@@ -309,10 +311,8 @@ def test_sampler_off_is_inert(
     """The default config must not change ingest behavior at all.
 
     Pins the exact error_message (content and per-span order) on a request
-    mixing good spans with two distinct parse failures. Extraction failures
-    share the same extract_row helper in both branches, but no real OTel
-    payload can make the defensively-guarded extractor raise, so that branch
-    is covered by construction rather than by a fixture.
+    interleaving good spans, two distinct parse failures, and an extraction
+    failure (a message whose `parts` field is not a list).
     """
     if rate_env is None:
         monkeypatch.delenv("WEAVE_INGEST_SAMPLE_RATE", raising=False)
@@ -329,18 +329,29 @@ def test_sampler_off_is_inert(
     conflict_b = _proto_span(
         (12).to_bytes(16, "big"), b"\x14" * 8, attrs={"y": "leaf", "y.z": "nested"}
     )
+    extract_sid = b"\x15" * 8
+    extract_fail = _proto_span(
+        (13).to_bytes(16, "big"),
+        extract_sid,
+        attrs={"gen_ai.output.messages": '[{"parts": 5}]'},
+    )
     res = _export(
         ch_server,
         project_id,
         _proto_span(tid, b"\x11" * 8),
         conflict_a,
         _proto_span(tid, b"\x12" * 8, parent_span_id=b"\x11" * 8),
+        extract_fail,
         conflict_b,
     )
     assert res.accepted_spans == 2
-    assert res.rejected_spans == 2
+    assert res.rejected_spans == 3
     assert res.error_message == "; ".join(
-        _conflict_error(span) for span in (conflict_a, conflict_b)
+        [
+            _conflict_error(conflict_a),
+            f"Extraction failed for span {extract_sid.hex()}: TypeError",
+            _conflict_error(conflict_b),
+        ]
     )
     assert len(_stored_spans(ch_server, project_id)) == 2
     # Disabled sampler emits nothing at all.
@@ -465,6 +476,29 @@ def test_mixed_request_drops_selectively(
     assert res.error_message == _conflict_error(conflict)
     stored = _stored_spans(ch_server, project_id)
     assert [s.trace_id for s in stored] == [kept_tid.hex()]
+
+
+@pytest.mark.flaky(reruns=3)
+def test_extraction_failure_on_kept_trace_stays_rejected(
+    ch_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hash-kept span that fails extraction is rejected with the exact
+    type-name-only error, same as with the sampler off (shared helper).
+    """
+    rate = 0.5
+    monkeypatch.setenv("WEAVE_INGEST_SAMPLE_RATE", str(rate))
+    project_id = make_project_id("spans_sampling_extractfail")
+    tid = _tid_with_verdict(rate, kept=True)
+    sid = b"\xa1" * 8
+    res = _export(
+        ch_server,
+        project_id,
+        _proto_span(tid, sid, attrs={"gen_ai.output.messages": '[{"parts": 5}]'}),
+    )
+    assert res.accepted_spans == 0
+    assert res.rejected_spans == 1
+    assert res.error_message == f"Extraction failed for span {sid.hex()}: TypeError"
+    assert _stored_spans(ch_server, project_id) == []
 
 
 @pytest.mark.flaky(reruns=3)
