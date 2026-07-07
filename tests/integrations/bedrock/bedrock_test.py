@@ -118,7 +118,12 @@ MOCK_STREAM_EVENTS = [
 # names these cacheReadInputTokenCount / cacheWriteInputTokenCount.
 MOCK_STREAM_EVENTS_CACHE = [
     {"messageStart": {"role": "assistant"}},
-    {"contentBlockDelta": {"delta": {"text": "Cached answer."}, "contentBlockIndex": 0}},
+    {
+        "contentBlockDelta": {
+            "delta": {"text": "Cached answer."},
+            "contentBlockIndex": 0,
+        }
+    },
     {"contentBlockStop": {"contentBlockIndex": 0}},
     {"messageStop": {"stopReason": "end_turn"}},
     {
