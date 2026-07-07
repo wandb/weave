@@ -837,6 +837,126 @@ def test_obj_create_batch_check_name_collisions(trace_server, clickhouse_trace_s
     )
 
 
+def test_calls_complete_tolerates_content_object_name_collision(
+    trace_server, clickhouse_trace_server
+):
+    """A content object whose object_id is already bound to a different
+    base_object_class is skipped with a dangling ref; the calls and the
+    batch's other content objects still land.
+    """
+    seed_project_id = f"{TEST_ENTITY}/calls_complete_collision_seed"
+    project_id = f"{TEST_ENTITY}/calls_complete_collision"
+    internal_project_id = b64(project_id)
+
+    raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri_a = f"data:image/png;base64,{base64.b64encode(raw_a).decode('ascii')}"
+    data_uri_b = f"data:image/png;base64,{base64.b64encode(raw_b).decode('ascii')}"
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    ended_at = started_at + datetime.timedelta(seconds=1)
+
+    # Learn the deterministic content object_id for payload a in a seed project.
+    seed_call_id = str(uuid.uuid4())
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                _make_completed_call(
+                    seed_project_id,
+                    seed_call_id,
+                    str(uuid.uuid4()),
+                    started_at,
+                    ended_at,
+                    inputs={"image": data_uri_a},
+                )
+            ]
+        )
+    )
+    seed_inputs, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        b64(seed_project_id),
+        seed_call_id,
+    )
+    content_object_id_a = ri.parse_internal_uri(seed_inputs["image"]).name
+
+    # Bind that object_id to a different base_object_class in the target project.
+    trace_server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id,
+                object_id=content_object_id_a,
+                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeA"},
+            )
+        )
+    )
+
+    call_a_id, call_b_id = str(uuid.uuid4()), str(uuid.uuid4())
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                _make_completed_call(
+                    project_id,
+                    call_a_id,
+                    str(uuid.uuid4()),
+                    started_at,
+                    ended_at,
+                    inputs={"image": data_uri_a},
+                ),
+                _make_completed_call(
+                    project_id,
+                    call_b_id,
+                    str(uuid.uuid4()),
+                    started_at,
+                    ended_at,
+                    inputs={"image": data_uri_b},
+                ),
+            ]
+        )
+    )
+
+    inputs_a, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_a_id,
+    )
+    inputs_b, _ = _fetch_call_dumps(
+        clickhouse_trace_server.ch_client,
+        "calls_complete",
+        internal_project_id,
+        call_b_id,
+    )
+    parsed_a = ri.parse_internal_uri(inputs_a["image"])
+    parsed_b = ri.parse_internal_uri(inputs_b["image"])
+    assert parsed_a.name == content_object_id_a
+
+    # The colliding object was skipped (its ref dangles); the other landed.
+    with pytest.raises(NotFoundError):
+        clickhouse_trace_server.obj_read(
+            tsi.ObjReadReq(
+                project_id=parsed_a.project_id,
+                object_id=parsed_a.name,
+                digest=parsed_a.version,
+            )
+        )
+    obj_b = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_b.project_id,
+            object_id=parsed_b.name,
+            digest=parsed_b.version,
+        )
+    )
+    assert obj_b.obj.val["_type"] == "CustomWeaveType"
+    # object_versions holds the seeded user object plus content object b only.
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "object_versions", internal_project_id
+        )
+        == 2
+    )
+
+
 def test_call_start_end_v2_updates_calls_complete(
     trace_server, clickhouse_trace_server
 ):

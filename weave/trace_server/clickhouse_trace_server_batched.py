@@ -1133,7 +1133,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             by_project.setdefault(obj.project_id, []).append(obj)
 
         for project_objs in by_project.values():
-            self.obj_create_batch(project_objs, check_name_collisions=True)
+            remaining = project_objs
+            while remaining:
+                try:
+                    self.obj_create_batch(remaining, check_name_collisions=True)
+                    break
+                except ObjectNameTypeCollision as e:
+                    # A collision must not fail the calls batch: drop the
+                    # colliding object (its ref dangles) and write the rest.
+                    logger.warning(
+                        "Skipping content object with name/type collision: %s", e
+                    )
+                    remaining = [o for o in remaining if o.object_id != e.object_id]
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
