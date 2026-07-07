@@ -65,6 +65,28 @@ const INTEGRATION_OTEL_ATTRS = asOtelAttributes(
 const TEXT_CONTENT_TYPES = new Set(['text', 'input_text', 'output_text']);
 const AUDIO_CONTENT_TYPES = new Set(['audio', 'output_audio']);
 
+function pcmToWav(pcm: Buffer): Buffer {
+  const channels = 1;
+  const sampleRate = 24000;
+  const bitDepth = 16;
+  const wav = Buffer.alloc(44 + pcm.length);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + pcm.length, 4);
+  wav.write('WAVE', 8);
+  wav.write('fmt ', 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20); // PCM
+  wav.writeUInt16LE(channels, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * channels * (bitDepth / 8), 28);
+  wav.writeUInt16LE(channels * (bitDepth / 8), 32);
+  wav.writeUInt16LE(bitDepth, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(pcm.length, 40);
+  wav.set(pcm, 44);
+  return wav;
+}
+
 export class WeaveRealtimeOTelAdapter {
   private rootSpan: OtelSpan | null = null;
   private rootContext: OtelContext | null = null;
@@ -153,8 +175,11 @@ export class WeaveRealtimeOTelAdapter {
   private onTurnDone = (event: any): void => {
     const response = event?.response;
     if (!response?.id) return;
+    const responseId: string = response.id;
+    const outputChunks = this.audioChunks.get(responseId);
+    this.audioChunks.delete(responseId);
     try {
-      this.emitChatSpan(response);
+      this.emitChatSpan(response, outputChunks);
     } catch {
       // Never let span creation break the event flow.
     }
@@ -265,7 +290,10 @@ export class WeaveRealtimeOTelAdapter {
 
   // ---- Chat span emission ----
 
-  private emitChatSpan(response: Record<string, any>) {
+  private emitChatSpan(
+    response: Record<string, any>,
+    outputAudioChunks?: Buffer[]
+  ) {
     const root = this.ensureRootSpan();
     if (!root) return;
 
@@ -280,6 +308,25 @@ export class WeaveRealtimeOTelAdapter {
     const inputMessages = this.buildInputMessages();
     const {outputMessages, toolCallItems, hasAudio} =
       this.buildOutputMessages(response);
+
+    if (hasAudio && outputAudioChunks && outputAudioChunks.length > 0) {
+      try {
+        const pcm = Buffer.concat(outputAudioChunks);
+        const wav = pcmToWav(pcm);
+        const assistantMsg = outputMessages[0];
+        if (assistantMsg) {
+          assistantMsg.parts = assistantMsg.parts ?? [];
+          (assistantMsg.parts as any[]).push({
+            type: 'uri',
+            uri: `data:audio/wav;base64,${wav.toString('base64')}`,
+            mime_type: 'audio/wav',
+            modality: 'audio',
+          });
+        }
+      } catch {
+        // Fall through with transcript only
+      }
+    }
 
     const attrs: Record<string, any> = {
       [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
