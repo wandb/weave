@@ -279,6 +279,7 @@ def extract_total_cost(
     return total_cost if found_any else None
 
 
+@traced(name="eval_results_helpers.apply_predict_costs")
 def apply_predict_costs(
     rows: list[tsi.EvalResultsRow],
     project_id: str,
