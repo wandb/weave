@@ -1,6 +1,6 @@
 -- Add thread_id to stats table
 ALTER TABLE calls_merged_stats
-    ADD COLUMN thread_id SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS thread_id SimpleAggregateFunction(any, Nullable(String));
 
 -- Update stats materialized view to include thread_id
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

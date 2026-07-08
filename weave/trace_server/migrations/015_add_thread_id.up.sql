@@ -1,10 +1,10 @@
 -- Add thread_id to raw call parts table
 ALTER TABLE call_parts
-    ADD COLUMN thread_id Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS thread_id Nullable(String) DEFAULT NULL;
 
 -- Add thread_id to aggregated calls table
 ALTER TABLE calls_merged
-    ADD COLUMN thread_id SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS thread_id SimpleAggregateFunction(any, Nullable(String));
 
 -- Update materialized view to include thread_id
 ALTER TABLE calls_merged_view MODIFY QUERY

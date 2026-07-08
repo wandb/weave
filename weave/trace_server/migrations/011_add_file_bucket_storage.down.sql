@@ -14,7 +14,7 @@ GROUP BY
     files.digest,
     files.chunk_index;
 
-ALTER TABLE files_stats DROP COLUMN file_storage_uri;
+ALTER TABLE files_stats DROP COLUMN IF EXISTS file_storage_uri;
 
-ALTER TABLE files DROP COLUMN bytes_stored;
-ALTER TABLE files DROP COLUMN file_storage_uri;
+ALTER TABLE files DROP COLUMN IF EXISTS bytes_stored;
+ALTER TABLE files DROP COLUMN IF EXISTS file_storage_uri;
