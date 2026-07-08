@@ -4,10 +4,15 @@ Runs against the ClickHouse backend (the only supported backend).
 Migration 030 creates the genai tables automatically.
 """
 
+import base64
 import datetime
+import json
 import uuid
 
 import pytest
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans, Span
 
 from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
@@ -35,12 +40,16 @@ from weave.trace_server.agents.types import (
     AgentSpanStatsReq,
     AgentSpanValueRef,
     AgentsQueryReq,
+    AgentTraceChatReq,
+    GenAIOTelExportReq,
 )
+from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
 )
 from weave.trace_server.interface.query import Query
+from weave.trace_server.opentelemetry.python_spans import StatusCode
 
 
 def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
@@ -287,6 +296,391 @@ def test_span_with_own_identity_is_not_reattributed(ch_server):
         AgentSpansQueryReq(project_id=project_id, query=_agent_name_eq("Coordinator"))
     )
     assert {s.span_id for s in coordinator.spans} == {coordinator_span_id}
+
+
+def _identity(span: object) -> tuple[str, str, str, str]:
+    return (
+        span.agent_name,
+        span.agent_version,
+        span.agent_id,
+        span.conversation_id,
+    )
+
+
+def test_two_pass_list_attribution_matches_full_attribution(ch_server):
+    """The page-prefetch two-pass attributes a span exactly like the full path.
+
+    A plain list (non-identity sort/filter) limits first then attributes only
+    the page, scoping the fallback to the page's traces. This must produce the
+    same per-span identity as the full-attribution path, even when the page
+    straddles a trace boundary: a child span on the page inherits the identity
+    of its trace's earliest agent span *even when that span is off the page*,
+    because the fallback is scoped by trace_id, not by the page's rows.
+    """
+    project_id = _make_project_id("two_pass_attr")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    tx, ty, tq = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+
+    def sid() -> str:
+        return uuid.uuid4().hex
+
+    root_x, own_z, child_x = sid(), sid(), sid()
+    root_y, child_y, q = sid(), sid(), sid()
+
+    def at(secs: int) -> datetime.datetime:
+        return now + datetime.timedelta(seconds=secs)
+
+    spans = [
+        # Trace TX: earliest span (root_x) declares Delta; a later sub-agent span
+        # (own_z) declares its own Zeta; the latest span (child_x) is unset and
+        # must inherit Delta. Sorted started_at DESC, root_x is LAST -> a small
+        # page that includes child_x excludes root_x (the straddle case).
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=root_x,
+            operation_name="invoke_agent",
+            agent_name="Delta",
+            agent_version="dv",
+            agent_id="did",
+            conversation_id="cx",
+            started_at=at(1),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=own_z,
+            operation_name="invoke_agent",
+            agent_name="Zeta",
+            agent_version="zv",
+            agent_id="zid",
+            conversation_id="",
+            started_at=at(99),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=child_x,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(100),
+        ),
+        # Trace TY: root + inheriting child, both recent (fully on a small page).
+        _make_span(
+            project_id,
+            trace_id=ty,
+            span_id=root_y,
+            operation_name="invoke_agent",
+            agent_name="Epsilon",
+            agent_version="ev",
+            agent_id="eid",
+            conversation_id="cy",
+            started_at=at(101),
+        ),
+        _make_span(
+            project_id,
+            trace_id=ty,
+            span_id=child_y,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(102),
+        ),
+        # Trace TQ: a lone unset span, no identity-bearing span in its trace, so
+        # it stays blank under both paths.
+        _make_span(
+            project_id,
+            trace_id=tq,
+            span_id=q,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=at(50),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # Two-pass (default started_at DESC sort, non-identity -> two-pass).
+    two_pass = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    tp = {s.span_id: _identity(s) for s in two_pass.spans}
+
+    # The attribution rule, computed independently of the query.
+    assert tp[root_x] == ("Delta", "dv", "did", "cx")
+    assert tp[child_x] == ("Delta", "dv", "did", "cx")  # inherits root_x's triple
+    assert tp[own_z] == ("Zeta", "zv", "zid", "cx")  # own triple, conv inherited
+    assert tp[root_y] == ("Epsilon", "ev", "eid", "cy")
+    assert tp[child_y] == ("Epsilon", "ev", "eid", "cy")
+    assert tp[q] == ("", "", "", "")
+
+    # Full-attribution path (identity sort gates out of two-pass) attributes
+    # every span identically; compared by span_id so the sort order is moot.
+    full = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            sort_by=[AgentSortBy(field="agent_name", direction="asc")],
+        )
+    )
+    assert {s.span_id: _identity(s) for s in full.spans} == tp
+
+    # Straddle: a page of 3 (started_at DESC) is [child_y, root_y, child_x].
+    # child_x inherits Delta even though its source span root_x is off the page.
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, limit=3)
+    )
+    assert [s.span_id for s in page.spans] == [child_y, root_y, child_x]
+    assert all(_identity(s) == tp[s.span_id] for s in page.spans)
+
+
+def test_two_pass_page_cut_inside_started_at_tie(ch_server):
+    """When the page cut falls inside a `started_at` tie, the `span_id`
+    tiebreaker gives a well-defined page and inheritance holds across the cut.
+
+    The two-pass references the page twice (base relation + the fallback's
+    trace_id scope); a `started_at`-only order is not total, so the page is
+    contractually defined only once `span_id` completes the sort key (see the
+    SQL snapshot tests for the tiebreaker itself). Here the cut splits a tie and
+    a child's identity-bearing root sorts below it, so the page takes the child
+    but not the root; the trace_id-scoped fallback still attributes it.
+    """
+    project_id = _make_project_id("two_pass_ties")
+    tied = datetime.datetime(2026, 3, 1, tzinfo=datetime.timezone.utc)
+
+    # All spans share one `started_at`; `span_id DESC` alone orders the page.
+    # t1's root sorts BELOW its child, so a page of 3 takes the child and cuts
+    # the root off (straddle within the tie); t1's child must still inherit.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_root",
+            operation_name="invoke_agent",
+            agent_name="Gamma",
+            agent_version="gv",
+            agent_id="gid",
+            conversation_id="cg",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="t1_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_root",
+            operation_name="invoke_agent",
+            agent_name="Theta",
+            agent_version="tv",
+            agent_id="tid",
+            conversation_id="ct",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="t2_zchild",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+        _make_span(
+            project_id,
+            trace_id="f0",
+            span_id="f0",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=tied,
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    # span_id DESC over the tie: t2_zchild, t2_root, t1_zchild, t1_root, f0.
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, limit=3)
+    )
+    assert [s.span_id for s in page.spans] == ["t2_zchild", "t2_root", "t1_zchild"]
+    ident = {s.span_id: _identity(s) for s in page.spans}
+    assert ident["t2_zchild"] == ("Theta", "tv", "tid", "ct")
+    assert ident["t2_root"] == ("Theta", "tv", "tid", "ct")
+    # The straddle-in-tie span: inherits Gamma though t1_root is below the cut.
+    assert ident["t1_zchild"] == ("Gamma", "gv", "gid", "cg")
+
+
+def test_two_pass_inherits_root_outside_window_via_slack(ch_server):
+    """The two-pass fallback widens by slack, so an in-window child inherits an
+    identity-bearing root that started just before the query window.
+
+    The page base scan is bounded to the window (the root is off-page), but the
+    trace_id-scoped fallback rollup widens the window by one trace-duration, so
+    the root still resolves and the child inherits across the window edge.
+    """
+    project_id = _make_project_id("two_pass_slack")
+    after = datetime.datetime(2026, 4, 1, 12, 0, tzinfo=datetime.timezone.utc)
+    before = after + datetime.timedelta(minutes=10)
+
+    # root starts 5min before the window (inside the 1h fallback slack); child
+    # starts inside the window. A lone in-window span anchors the page.
+    spans = [
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="root",
+            operation_name="invoke_agent",
+            agent_name="Sigma",
+            agent_version="sv",
+            agent_id="sid",
+            conversation_id="cs",
+            started_at=after - datetime.timedelta(minutes=5),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t1",
+            span_id="child",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=1),
+        ),
+        _make_span(
+            project_id,
+            trace_id="t2",
+            span_id="other",
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            started_at=after + datetime.timedelta(minutes=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    page = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id, started_after=after, started_before=before
+        )
+    )
+    by_id = {s.span_id: _identity(s) for s in page.spans}
+    # root is off-page (outside the window) but still resolves the child.
+    assert "root" not in by_id
+    assert by_id["child"] == ("Sigma", "sv", "sid", "cs")
+    assert by_id["other"] == ("", "", "", "")
+
+
+def test_two_pass_include_costs_matches_full_attribution(ch_server):
+    """include_costs two-pass joins prices to the page; per-span costs equal the
+    full-attribution path, the cost is span-exact (a child's own tokens, not the
+    inherited agent's), and an unpriced model passes through as null cost.
+    """
+    project_id = _make_project_id("two_pass_costs")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    tx = uuid.uuid4().hex
+    root, child, lone = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+
+    def at(secs: int) -> datetime.datetime:
+        return now + datetime.timedelta(seconds=secs)
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=root,
+            operation_name="invoke_agent",
+            agent_name="Delta",
+            agent_version="dv",
+            agent_id="did",
+            conversation_id="cx",
+            request_model="gpt-4o",
+            input_tokens=1000,
+            output_tokens=500,
+            started_at=at(1),
+        ),
+        _make_span(
+            project_id,
+            trace_id=tx,
+            span_id=child,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="gpt-4o",
+            input_tokens=200,
+            output_tokens=100,
+            started_at=at(2),
+        ),
+        _make_span(
+            project_id,
+            trace_id=uuid.uuid4().hex,
+            span_id=lone,
+            operation_name="chat",
+            agent_name="",
+            agent_version="",
+            agent_id="",
+            conversation_id="",
+            request_model="no-such-model-xyz",
+            input_tokens=10,
+            output_tokens=10,
+            started_at=at(3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    tp = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(project_id=project_id, include_costs=True)
+        ).spans
+    }
+    # A cost-column sort gates out of the two-pass -> the full-attribution path.
+    full = {
+        s.span_id: s
+        for s in ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                include_costs=True,
+                sort_by=[AgentSortBy(field="total_cost_usd", direction="desc")],
+            )
+        ).spans
+    }
+
+    def costs(s: object) -> tuple:
+        return (s.input_cost_usd, s.output_cost_usd, s.total_cost_usd)
+
+    for sid in (root, child, lone):
+        assert costs(tp[sid]) == costs(full[sid])
+        assert _identity(tp[sid]) == _identity(full[sid])
+
+    # Priced spans get real costs; the child's cost is its own (200/100 tokens),
+    # not the inherited agent's (1000/500), while its identity IS inherited.
+    assert tp[root].total_cost_usd
+    assert tp[child].total_cost_usd
+    assert tp[child].total_cost_usd != tp[root].total_cost_usd
+    assert _identity(tp[child]) == ("Delta", "dv", "did", "cx")
+    # An unpriced model stays null (distinguishes "unpriced" from "free").
+    assert tp[lone].total_cost_usd is None
 
 
 def test_unset_span_inherits_a_coherent_agent_triple(ch_server):
@@ -1356,29 +1750,26 @@ def test_agent_span_stats_ungrouped_all_time(ch_server):
 
 
 def test_agent_span_stats_numeric_value_buckets(ch_server):
-    """Stats API can bucket the full filtered span set by numeric value range."""
+    """Stats API buckets the full filtered span set by numeric value range.
+
+    A known input_tokens distribution over min=0, max=40, bins=4 pins the
+    complete per-bucket output (index, edges, count) so a bounds miscompute
+    fails CI rather than a dashboard.
+    """
     project_id = _make_project_id("stats_hist")
     start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 
+    # width = (40-0)/4 = 10 -> buckets [0,10) [10,20) [20,30) [30,40].
+    # counts by bucket: 0,5 -> 2 | 12,18 -> 2 | 22 -> 1 | 35,38,40 -> 3.
+    token_values = [0, 5, 12, 18, 22, 35, 38, 40]
     spans = [
         _make_span(
             project_id,
-            input_tokens=10,
-            started_at=start + datetime.timedelta(seconds=10),
-            ended_at=start + datetime.timedelta(seconds=10, milliseconds=100),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=20,
-            started_at=start + datetime.timedelta(seconds=20),
-            ended_at=start + datetime.timedelta(seconds=20, milliseconds=200),
-        ),
-        _make_span(
-            project_id,
-            input_tokens=30,
-            started_at=start + datetime.timedelta(seconds=30),
-            ended_at=start + datetime.timedelta(seconds=30, milliseconds=300),
-        ),
+            input_tokens=tokens,
+            started_at=start + datetime.timedelta(seconds=idx),
+            ended_at=start + datetime.timedelta(seconds=idx, milliseconds=100),
+        )
+        for idx, tokens in enumerate(token_values)
     ]
     _insert_spans(ch_server.ch_client, spans)
 
@@ -1393,7 +1784,7 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
                     source="field",
                     key="usage.input_tokens",
                 ),
-                bins=2,
+                bins=4,
             ),
             metrics=[
                 AgentSpanStatsMetricSpec(
@@ -1408,9 +1799,10 @@ def test_agent_span_stats_numeric_value_buckets(ch_server):
 
     assert res.bucket_type == "number"
     assert res.granularity is None
-    assert [row["count_spans"] for row in res.rows] == [1, 2]
-    assert res.rows[0]["bucket_min"] == 10
-    assert res.rows[-1]["bucket_max"] == 30
+    assert [row["bucket_index"] for row in res.rows] == [0, 1, 2, 3]
+    assert [row["bucket_min"] for row in res.rows] == [0, 10, 20, 30]
+    assert [row["bucket_max"] for row in res.rows] == [10, 20, 30, 40]
+    assert [row["count_spans"] for row in res.rows] == [2, 2, 1, 3]
 
 
 @pytest.mark.flaky(reruns=3)
@@ -2324,3 +2716,256 @@ def test_query_dsl_typed_custom_attr_comparison(ch_server):
     )
     assert res.total_count == 1
     assert len(res.spans) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test: end-to-end base64 -> Content-ref conversion on the GenAI OTel agents
+# ingest path (mirrors test_calls_complete's data-URI conversion test, but for
+# the agents endpoint).
+# ---------------------------------------------------------------------------
+
+
+def _ref_safe_external_project_id(prefix: str) -> str:
+    """A unique EXTERNAL ``entity/project`` id whose internal form carries no '/'.
+
+    A real client submits an external ``entity/project`` id; the adapter maps it
+    to the internal id via ``base64(entity/project)`` and embeds that internal id
+    in ``weave-trace-internal:///<internal>/object/...`` refs. ``InternalObjectRef``
+    rejects a project_id containing '/', and standard base64 can emit '/', so
+    regenerate the external id until its base64 form is clean.
+    """
+    while True:
+        external = f"test/{prefix}_{uuid.uuid4().hex[:8]}"
+        internal = base64.b64encode(external.encode("ascii")).decode("ascii")
+        if "/" not in internal:
+            return external
+
+
+def _build_genai_chat_processed_span(
+    trace_id: bytes,
+    span_id: bytes,
+    input_messages_json: str,
+) -> tsi.ProcessedResourceSpans:
+    """Build a real OTel proto ``chat`` span carrying JSON-encoded input messages.
+
+    The messages arrive under ``gen_ai.input.messages`` as a JSON *string* — the
+    shape that exercises the ``_strip_message_attr`` -> ``replace_base64_in_raw_messages``
+    message-payload pass on ingest.
+    """
+    span = Span()
+    span.name = "chat gemini-2.0-flash"
+    span.trace_id = trace_id
+    span.span_id = span_id
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    span.start_time_unix_nano = now_ns
+    span.end_time_unix_nano = now_ns + 1_000_000_000
+    span.kind = 1  # CLIENT
+
+    op_kv = KeyValue()
+    op_kv.key = "gen_ai.operation.name"
+    op_kv.value.string_value = "chat"
+    span.attributes.append(op_kv)
+
+    model_kv = KeyValue()
+    model_kv.key = "gen_ai.request.model"
+    model_kv.value.string_value = "gemini-2.0-flash"
+    span.attributes.append(model_kv)
+
+    msgs_kv = KeyValue()
+    msgs_kv.key = "gen_ai.input.messages"
+    msgs_kv.value.string_value = input_messages_json
+    span.attributes.append(msgs_kv)
+
+    span.status.code = StatusCode.OK.value  # type: ignore[assignment]
+
+    scope = InstrumentationScope()
+    scope.name = "test_instrumentation"
+    scope.version = "1.0.0"
+    scope_spans = ScopeSpans()
+    scope_spans.scope.CopyFrom(scope)
+    scope_spans.spans.append(span)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(Resource())
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
+    ch_server, trace_server
+):
+    """End-to-end ref-boundary check for the GenAI OTel agents ingest/read path.
+
+    A real client submits ONE Gemini-style ``chat`` span through the EXTERNAL
+    adapter (external ``entity/project`` id, external user id, external refs).
+    Its ``gen_ai.input.messages`` JSON carries three parts: a text part, an image
+    part with an inline base64 data-URI (the server converts it to a stored
+    Content ref), and a ``resource`` part embedding an EXTERNAL weave ref (an
+    MCP-fetched dataset). The invariant is then asserted in BOTH directions:
+
+      * DB truth (raw internal server): the stored message content holds ONLY
+        internal refs — the base64 became an internal Content ref, and the
+        external dataset ref was converted to internal on ingest; no external
+        scheme and no base64 blob survive.
+      * External read (through the adapter): the same content holds ONLY
+        external refs — ``weave-trace-internal://`` never leaks (the leak the
+        boundary converter closes), and the dataset ref round-trips
+        ext -> int -> ext unchanged.
+
+    Also checks the chat view surfaces the media consistently (internal refs on
+    the raw server, external refs through the adapter) and that the converted
+    Content object is attributed to the caller's ``wb_user_id``.
+    """
+    external_project_id = _ref_safe_external_project_id("genai_otel_boundary")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
+    # The client sends an external user id; the adapter converts it to the
+    # internal (base64) form the internal server persists on the Content object.
+    external_user_id = "user-42"
+    internal_user_id = base64.b64encode(external_user_id.encode("ascii")).decode(
+        "ascii"
+    )
+
+    raw_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    b64_data = base64.b64encode(raw_bytes).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64_data}"
+    # An MCP-fetched dataset ref, in the same external project as the span so it
+    # maps back cleanly on read.
+    external_dataset_ref = f"weave:///{external_project_id}/object/mcp_dataset:v1"
+    internal_dataset_ref = (
+        f"weave-trace-internal:///{internal_project_id}/object/mcp_dataset:v1"
+    )
+
+    trace_id = uuid.uuid4().bytes
+    span_id = uuid.uuid4().bytes[:8]
+    input_messages_json = json.dumps(
+        [
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "describe"},
+                    {"type": "image", "url": data_uri},
+                    {"type": "resource", "ref": external_dataset_ref},
+                ],
+            }
+        ]
+    )
+    processed = _build_genai_chat_processed_span(trace_id, span_id, input_messages_json)
+
+    # Submit through the EXTERNAL adapter, exactly as a real client would: no
+    # internal ids or internal refs cross this boundary.
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[processed],
+            project_id=external_project_id,
+            wb_user_id=external_user_id,
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+    assert res.error_message == ""
+
+    # --- DB TRUTH (raw internal server): only internal refs, no base64 ---
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    stored_span = stored.spans[0]
+    assert stored_span.operation_name == "chat"
+    assert len(stored_span.input_messages) == 1
+
+    stored_content = stored_span.input_messages[0].content
+    stored_parts = json.loads(stored_content)
+
+    # Text part verbatim; the base64 image url is now a compact internal Content
+    # ref; the external dataset ref was rewritten to internal on ingest.
+    internal_image_ref = stored_parts[1]["url"]
+    assert stored_parts == [
+        {"type": "text", "content": "describe"},
+        {"type": "image", "url": internal_image_ref},
+        {"type": "resource", "ref": internal_dataset_ref},
+    ]
+
+    parsed_image_ref = ri.parse_internal_uri(internal_image_ref)
+    assert isinstance(parsed_image_ref, ri.InternalObjectRef)
+    assert parsed_image_ref.project_id == internal_project_id
+    assert (
+        internal_image_ref == f"weave-trace-internal:///{internal_project_id}/object/"
+        f"{parsed_image_ref.name}:{parsed_image_ref.version}"
+    )
+
+    # No base64 blob and no external scheme survive anywhere in the stored content.
+    assert b64_data not in stored_content
+    assert "weave:///" not in stored_content
+
+    # --- EXTERNAL READ (through the adapter): only external refs, no leak ---
+    external = trace_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=external_project_id, include_details=True)
+    )
+    assert len(external.spans) == 1
+    external_span = external.spans[0]
+    assert external_span.project_id == external_project_id
+    external_content = external_span.input_messages[0].content
+    external_parts = json.loads(external_content)
+
+    expected_external_image_ref = (
+        f"weave:///{external_project_id}/object/"
+        f"{parsed_image_ref.name}:{parsed_image_ref.version}"
+    )
+    assert external_parts == [
+        {"type": "text", "content": "describe"},
+        {"type": "image", "url": expected_external_image_ref},
+        {"type": "resource", "ref": external_dataset_ref},
+    ]
+    # KEY leak assertion: the internal scheme must never reach the client.
+    assert "weave-trace-internal:///" not in external_content
+    # The embedded dataset ref round-trips ext -> int -> ext unchanged.
+    assert external_parts[2]["ref"] == external_dataset_ref
+
+    trace_id_hex = stored_span.trace_id
+
+    # --- Chat view (raw internal server): media surfaces as internal refs ---
+    internal_chat = ch_server.agent_traces_chat(
+        AgentTraceChatReq(project_id=internal_project_id, trace_id=trace_id_hex)
+    )
+    internal_user_messages = [
+        m for m in internal_chat.messages if m.type == "user_message"
+    ]
+    assert len(internal_user_messages) == 1
+    assert internal_user_messages[0].user_message.content_refs == [
+        internal_image_ref,
+        internal_dataset_ref,
+    ]
+
+    # --- Chat view (external adapter read path): int refs -> external weave:// ---
+    external_chat = trace_server.agent_traces_chat(
+        AgentTraceChatReq(project_id=external_project_id, trace_id=trace_id_hex)
+    )
+    external_user_messages = [
+        m for m in external_chat.messages if m.type == "user_message"
+    ]
+    assert len(external_user_messages) == 1
+    assert external_user_messages[0].user_message.content_refs == [
+        expected_external_image_ref,
+        external_dataset_ref,
+    ]
+
+    # --- The converted Content object is attributed to the caller ---
+    obj = ch_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=internal_project_id,
+            object_id=parsed_image_ref.name,
+            digest=parsed_image_ref.version,
+        )
+    )
+    assert obj.obj.wb_user_id == internal_user_id

@@ -8,6 +8,8 @@ can't silently drift them.
 
 from __future__ import annotations
 
+import socket
+
 import pytest
 
 from weave.trace_server import datadog
@@ -132,3 +134,62 @@ def test_parse_port_non_numeric_does_not_raise_at_import(
     host, port = datadog._resolve_dogstatsd_addr()
     assert host == "agent.example.com"
     assert port == 8125  # fell back to default
+
+
+# ---------------------------------------------------------------------------
+# Unified service tags — service/env/version attached to every counter
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        # Nothing set → no unified tags.
+        ({}, []),
+        # Only DD_SERVICE set.
+        ({"DD_SERVICE": "weave-trace"}, ["service:weave-trace"]),
+        # All three set, in service/env/version order.
+        (
+            {"DD_SERVICE": "weave-trace", "DD_ENV": "qa", "DD_VERSION": "abc123"},
+            ["service:weave-trace", "env:qa", "version:abc123"],
+        ),
+        # Empty-string values are skipped (unset, not `service:`).
+        ({"DD_SERVICE": "", "DD_ENV": "prod"}, ["env:prod"]),
+    ],
+)
+def test_resolve_unified_tags(
+    env: dict[str, str], expected: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for var in ("DD_SERVICE", "DD_ENV", "DD_VERSION"):
+        monkeypatch.delenv(var, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert datadog._resolve_unified_tags() == expected
+
+
+def test_record_db_insert_emits_full_packet_with_unified_tags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real UDP server receives table/path + service/env/version in order.
+
+    This is the regression guard: over UDP host-port (QA + the prod
+    fallback) there is no agent origin detection, so the counter must
+    carry service/version itself or it drops off service-scoped dashboards.
+    """
+    server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server.bind(("127.0.0.1", 0))
+    server.settimeout(2.0)
+    monkeypatch.setattr(
+        datadog, "_client", datadog._StatsDClient(*server.getsockname())
+    )
+    monkeypatch.setattr(
+        datadog, "_UNIFIED_TAGS", ["service:weave-trace", "env:qa", "version:abc123"]
+    )
+    try:
+        datadog.record_db_insert(table="calls_complete", count=3, path="otel")
+        assert server.recv(4096) == (
+            b"weave_trace_server.db_inserts:3|c"
+            b"|#table:calls_complete,path:otel,service:weave-trace,env:qa,version:abc123"
+        )
+    finally:
+        server.close()

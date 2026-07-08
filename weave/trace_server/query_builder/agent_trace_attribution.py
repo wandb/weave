@@ -87,10 +87,9 @@ def _collect_get_fields(node: object) -> set[str]:
     return found
 
 
-def _names_hit_identity(names: set[str]) -> bool:
+def _names_hit(names: set[str], columns: frozenset[str]) -> bool:
     return any(
-        semconv.FILTERABLE_KEY_TO_COLUMN.get(name, name) in _IDENTITY_COLUMN_SET
-        for name in names
+        semconv.FILTERABLE_KEY_TO_COLUMN.get(name, name) in columns for name in names
     )
 
 
@@ -104,12 +103,25 @@ def query_references_identity(query: tsi_query.Query | None) -> bool:
     if query is None:
         return False
     names = _collect_get_fields(query.model_dump(by_alias=True))
-    return _names_hit_identity(names)
+    return _names_hit(names, _IDENTITY_COLUMN_SET)
+
+
+def query_references_trace_id(query: tsi_query.Query | None) -> bool:
+    """Whether a Query filter references `trace_id`, the trace-fallback join key.
+
+    A `trace_id` filter is pushed by ClickHouse straight into the fallback
+    rollup, so the current path is already optimal; the page-prefetch two-pass
+    would only add a redundant scan.
+    """
+    if query is None:
+        return False
+    names = _collect_get_fields(query.model_dump(by_alias=True))
+    return _names_hit(names, frozenset({"trace_id"}))
 
 
 def fields_reference_identity(field_names: list[str]) -> bool:
     """Whether any public field name resolves to an identity column."""
-    return _names_hit_identity(set(field_names))
+    return _names_hit(set(field_names), _IDENTITY_COLUMN_SET)
 
 
 def attributed_spans_source(
@@ -119,6 +131,7 @@ def attributed_spans_source(
     started_after: datetime.datetime | None,
     started_before: datetime.datetime | None,
     base_relation: str = "spans",
+    fallback_scope_relation: str | None = None,
 ) -> str:
     """Return a parenthesized subquery that stands in for the `spans` table.
 
@@ -133,6 +146,19 @@ def attributed_spans_source(
     through untouched. The per-trace fallback always scans the raw `spans`
     table since it only needs the identity columns and `trace_id`.
 
+    `fallback_scope_relation`, when set, restricts the fallback rollup to the
+    `trace_id`s of that relation (`trace_id IN (SELECT trace_id FROM
+    {fallback_scope_relation})`). Since the fallback is consumed only via the
+    `trace_id` join, scoping it to the join's trace_ids removes only rows the
+    join would discard, so attributed values are unchanged. The page-prefetch
+    two-pass list read passes its page CTE here to scope the rollup to the
+    page's traces.
+
+    `base_relation` and `fallback_scope_relation` are interpolated as raw SQL
+    and must be trusted, internal fragments (a relation name / a literal
+    subquery), never user input; user-derived values still flow through `pb`
+    params.
+
     The inner scan is bounded to `project_id` and the outer time window so it
     prunes by primary key; the fallback scan is bounded to the same window
     widened by one trace-duration of slack so edge spans still resolve.
@@ -141,6 +167,10 @@ def attributed_spans_source(
 
     fallback_conds = [f"project_id = {pid_slot}"]
     base_conds = [f"s0.project_id = {pid_slot}"]
+    if fallback_scope_relation is not None:
+        fallback_conds.append(
+            f"trace_id IN (SELECT trace_id FROM {fallback_scope_relation})"
+        )
     if started_after is not None:
         fb_after = pb.add(
             started_after - _TRACE_FALLBACK_WINDOW_SLACK, param_type="DateTime64(6)"
