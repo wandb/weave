@@ -7,10 +7,12 @@ that support it: FileCreateReq, ObjCreateReq, and TableCreateReq.
 from __future__ import annotations
 
 import json
+from enum import IntEnum
 
 import pytest
 
 from weave.shared.digest import (
+    canonical_json,
     compute_file_digest,
     compute_object_digest,
     compute_row_digest,
@@ -49,6 +51,44 @@ def test_row_digest_stable_across_json_roundtrip() -> None:
     """Same invariant for table row digests (non-string keys in a row)."""
     row = {"weights": {1: 0.5, 2: 0.3, 10: 0.2}}
     assert compute_row_digest(row) == compute_row_digest(json.loads(json.dumps(row)))
+
+
+class _Label(IntEnum):
+    NEG = 0
+    POS = 1
+
+
+@pytest.mark.parametrize(
+    "val",
+    [
+        {"floats": {"a": 1.5, "b": float("nan"), "c": float("inf")}},
+        {"unicode": {"emoji": "😀", "esc": 'a"b\\c'}},
+        {"nested": [{"x": 1}, {"y": [{"z": 2}]}]},
+        {"enum_val": {"score": _Label.POS}},
+        {"label_map": {1: "neg", 2: "neu", 10: "pos"}},
+        {"mixed": {1: "a", "b": 2}},
+        {"collision": {1: "a", "1": "b"}},
+        {"bools": {True: "on", False: "off"}},
+    ],
+    ids=[
+        "floats",
+        "unicode",
+        "nested",
+        "enum_value",
+        "int_keys",
+        "mixed_keys",
+        "key_collision",
+        "bool_keys",
+    ],
+)
+def test_canonical_json_matches_full_roundtrip(val: dict) -> None:
+    """The gated fast path must be byte-identical to the unconditional
+    dumps->loads->dumps round-trip for every payload, whether or not it has
+    non-string dict keys. Any divergence is a silent digest mismatch.
+    """
+    assert canonical_json(val) == json.dumps(
+        json.loads(json.dumps(val)), sort_keys=True
+    )
 
 
 def test_validate_expected_digest_match() -> None:

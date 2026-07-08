@@ -39,12 +39,14 @@ def str_digest(json_val: str) -> str:
 def canonical_json(val: Any) -> str:
     """Serialize val the way the server sees it after transport.
 
-    The client hashes an in-memory value while the server hashes the same
-    value after it round-trips through JSON over the wire, which coerces
-    non-string dict keys to strings before sort_keys orders them. Round-tripping
-    here keeps both sides byte-identical regardless of key types.
+    The wire coerces non-string dict keys to strings before sort_keys orders
+    them. When every key is already a str (every server-side call, and
+    virtually all client payloads) a single dumps is byte-identical to the
+    round-trip, so the round-trip is only paid when a non-string key exists.
     """
-    return json.dumps(json.loads(json.dumps(val)), sort_keys=True)
+    if _has_non_string_dict_keys(val):
+        return json.dumps(json.loads(json.dumps(val)), sort_keys=True)
+    return json.dumps(val, sort_keys=True)
 
 
 @dataclass(slots=True, frozen=True)
@@ -101,3 +103,18 @@ def compute_table_digest(row_digests: list[str]) -> str:
 def compute_file_digest(content: bytes) -> str:
     """Compute file digest using server-equivalent file hashing."""
     return bytes_digest(content)
+
+
+def _has_non_string_dict_keys(val: Any) -> bool:
+    """True if any dict reachable from val has a non-str key.
+
+    Traverses exactly the containers json.dumps serializes (dict, list, tuple);
+    revisit if a default= or custom encoder is ever added to canonical_json.
+    """
+    if isinstance(val, dict):
+        return any(not isinstance(k, str) for k in val) or any(
+            _has_non_string_dict_keys(v) for v in val.values()
+        )
+    if isinstance(val, (list, tuple)):
+        return any(_has_non_string_dict_keys(v) for v in val)
+    return False
