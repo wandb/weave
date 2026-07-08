@@ -33,13 +33,18 @@ def bedrock_on_finish_converse(
             "completion_tokens": output_usage["outputTokens"],
             "total_tokens": output_usage["totalTokens"],
         }
-        # Bedrock Converse API returns cache tokens when prompt caching is used
+        # Bedrock Converse API returns cache tokens when prompt caching is used.
+        # Bedrock's inputTokens excludes cached tokens, while Weave's cost math
+        # treats prompt_tokens as the gross total and subtracts the cache counts
+        # from it, so add them in (litellm maps Bedrock usage the same way).
         cache_read = output_usage.get("cacheReadInputTokens")
         if cache_read is not None:
             tokens_metrics["cache_read_input_tokens"] = cache_read
+            tokens_metrics["prompt_tokens"] += cache_read
         cache_write = output_usage.get("cacheWriteInputTokens")
         if cache_write is not None:
             tokens_metrics["cache_creation_input_tokens"] = cache_write
+            tokens_metrics["prompt_tokens"] += cache_write
         usage[model_name].update(tokens_metrics)
     if call.summary is not None:
         call.summary.update(summary_update)

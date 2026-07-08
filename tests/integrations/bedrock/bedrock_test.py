@@ -720,7 +720,9 @@ def test_bedrock_converse_cache_tokens(
     calls = client.get_calls()
     assert len(calls) == 1
     model_usage = calls[0].summary["usage"][model_id]
-    assert model_usage["prompt_tokens"] == 100
+    # prompt_tokens is gross: inputTokens (100) excludes cached tokens, so the
+    # cache read (80) and cache write (15) counts are added in.
+    assert model_usage["prompt_tokens"] == 195
     assert model_usage["completion_tokens"] == 20
     assert model_usage["total_tokens"] == 120
     assert model_usage["cache_read_input_tokens"] == 80
@@ -751,7 +753,8 @@ def test_bedrock_converse_stream_cache_tokens(
     calls = client.get_calls()
     assert len(calls) == 1
     model_usage = calls[0].summary["usage"][model_id]
-    assert model_usage["prompt_tokens"] == 100
+    # Same gross prompt_tokens math as the non-streaming cache test above.
+    assert model_usage["prompt_tokens"] == 195
     assert model_usage["completion_tokens"] == 20
     assert model_usage["total_tokens"] == 120
     assert model_usage["cache_read_input_tokens"] == 80
@@ -783,6 +786,8 @@ def test_bedrock_converse_stream_cache_tokens_zero(
     model_usage = calls[0].summary["usage"][model_id]
     assert model_usage["cache_read_input_tokens"] == 0
     assert model_usage["cache_creation_input_tokens"] == 0
+    # Zero cache counts add nothing: prompt_tokens stays at inputTokens.
+    assert model_usage["prompt_tokens"] == 100
 
 
 @mock_aws
