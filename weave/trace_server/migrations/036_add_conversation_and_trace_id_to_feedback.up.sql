@@ -2,11 +2,11 @@
 Denormalize the conversation and turn a feedback row belongs to, so we can
 filter agent conversations (by conversation_id) and, later, agent spans (by
 trace_id) on signals without joining the `spans` table. Populated going
-forward only; `spans` remains the source of truth. Mirrors the existing
+forward only, while `spans` remains the source of truth. Mirrors the existing
 span_* denormalization (migration 033).
 
-Conversation-targeted feedback has a conversation_id but no single trace_id;
-turn/span-targeted feedback carries both.
+Conversation-targeted feedback has a conversation_id but no single trace_id.
+Turn/span-targeted feedback carries both.
 */
 ALTER TABLE feedback ADD COLUMN IF NOT EXISTS conversation_id String DEFAULT '';
 ALTER TABLE feedback ADD COLUMN IF NOT EXISTS trace_id String DEFAULT '';

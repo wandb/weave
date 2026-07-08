@@ -2975,12 +2975,12 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
 
 
 # ---------------------------------------------------------------------------
-# Tests: conversation_id persisted on agent feedback create
+# Tests: agent target IDs persisted on feedback create
 # ---------------------------------------------------------------------------
 
 
-def test_feedback_create_persists_supplied_conversation_id_for_conv_ref(ch_server):
-    """Conversation-targeted feedback preserves the producer-supplied target ID."""
+def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
+    """Conversation-targeted feedback persists the supplied denormalized ID."""
     project_id = _make_project_id("fb-conv-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     conv_ref = ri.InternalAgentConversationRef(
@@ -3010,100 +3010,8 @@ def test_feedback_create_persists_supplied_conversation_id_for_conv_ref(ch_serve
     ]
 
 
-def test_feedback_create_does_not_derive_agent_target_ids_from_ref(ch_server):
-    project_id = _make_project_id("fb-no-target-id-derivation")
-    conv_ref = ri.InternalAgentConversationRef(
-        project_id=project_id, conversation_id="conv-a"
-    ).uri
-    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id="trace-a").uri
-
-    ch_server.feedback_create_batch(
-        tsi.FeedbackCreateBatchReq(
-            batch=[
-                tsi.FeedbackCreateReq(
-                    project_id=project_id,
-                    weave_ref=conv_ref,
-                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
-                    payload={},
-                    scorer_tags=["conv-tag"],
-                    wb_user_id="u1",
-                ),
-                tsi.FeedbackCreateReq(
-                    project_id=project_id,
-                    weave_ref=turn_ref,
-                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
-                    payload={},
-                    scorer_tags=["turn-tag"],
-                    wb_user_id="u2",
-                ),
-            ]
-        )
-    )
-
-    res = ch_server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            fields=["weave_ref", "conversation_id", "trace_id", "scorer_tags"],
-        )
-    )
-    actual = sorted(res.result, key=lambda row: row["weave_ref"])
-    expected = sorted(
-        [
-            {
-                "weave_ref": conv_ref,
-                "conversation_id": "",
-                "trace_id": "",
-                "scorer_tags": ["conv-tag"],
-            },
-            {
-                "weave_ref": turn_ref,
-                "conversation_id": "",
-                "trace_id": "",
-                "scorer_tags": ["turn-tag"],
-            },
-        ],
-        key=lambda row: row["weave_ref"],
-    )
-    assert actual == expected
-
-
-def test_feedback_create_persists_supplied_target_ids_for_turn_ref(ch_server):
-    """Turn-targeted feedback preserves producer-supplied target IDs."""
-    project_id = _make_project_id("fb-turn-id")
-    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
-    trace_id = uuid.uuid4().hex
-    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
-
-    ch_server.feedback_create(
-        tsi.FeedbackCreateReq(
-            project_id=project_id,
-            weave_ref=turn_ref,
-            feedback_type=AGENT_USER_FEEDBACK_TYPE,
-            payload={},
-            scorer_tags=["low-quality"],
-            span_conversation_id=conv_id,
-            span_trace_id=trace_id,
-            wb_user_id="u2",
-        )
-    )
-
-    res = ch_server.feedback_query(
-        tsi.FeedbackQueryReq(
-            project_id=project_id,
-            fields=["conversation_id", "trace_id", "scorer_tags"],
-        )
-    )
-    assert res.result == [
-        {
-            "conversation_id": conv_id,
-            "trace_id": trace_id,
-            "scorer_tags": ["low-quality"],
-        }
-    ]
-
-
-def test_feedback_create_persists_conversation_and_trace_id_from_span_ref(ch_server):
-    """Span-targeted feedback preserves producer-supplied denormalized IDs."""
+def test_feedback_create_persists_supplied_span_target_ids(ch_server):
+    """Span-targeted feedback persists supplied denormalized IDs."""
     project_id = _make_project_id("fb-span-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     trace_id = uuid.uuid4().hex
@@ -3138,7 +3046,7 @@ def test_feedback_create_persists_conversation_and_trace_id_from_span_ref(ch_ser
     ]
 
 
-def test_feedback_create_batch_persists_agent_target_ids(ch_server):
+def test_feedback_create_batch_persists_supplied_agent_target_ids(ch_server):
     project_id = _make_project_id("fb-batch-target-ids")
     conv_ref_id = f"conv-{uuid.uuid4().hex[:8]}"
     turn_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
