@@ -36,6 +36,17 @@ def str_digest(json_val: str) -> str:
     return bytes_digest(json_val.encode())
 
 
+def canonical_json(val: Any) -> str:
+    """Serialize val the way the server sees it after transport.
+
+    The client hashes an in-memory value while the server hashes the same
+    value after it round-trips through JSON over the wire, which coerces
+    non-string dict keys to strings before sort_keys orders them. Round-tripping
+    here keeps both sides byte-identical regardless of key types.
+    """
+    return json.dumps(json.loads(json.dumps(val)), sort_keys=True)
+
+
 @dataclass(slots=True, frozen=True)
 class ObjectDigestResult:
     """Deterministic digest data for object-create style payloads."""
@@ -53,8 +64,9 @@ def compute_object_digest_result(
     """Compute the object digest using server-equivalent normalization and hashing."""
     processed_result = process_incoming_object_val(val, builtin_object_class)
     processed_val = processed_result["val"]
-    # Keep object digests stable regardless of dictionary insertion order.
-    json_val = json.dumps(processed_val, sort_keys=True)
+    # Keep object digests stable regardless of dictionary insertion order
+    # and non-string key types (see canonical_json).
+    json_val = canonical_json(processed_val)
     digest = str_digest(json_val)
     return ObjectDigestResult(
         processed_val=processed_val,
@@ -72,8 +84,9 @@ def compute_object_digest(val: Any, builtin_object_class: str | None = None) -> 
 
 def compute_row_digest(row: dict[str, Any]) -> str:
     """Compute a single row digest exactly as table_create does server-side."""
-    # Keep table row digests stable regardless of dictionary insertion order.
-    row_json = json.dumps(row, sort_keys=True)
+    # Keep table row digests stable regardless of dictionary insertion order
+    # and non-string key types (see canonical_json).
+    row_json = canonical_json(row)
     return str_digest(row_json)
 
 
