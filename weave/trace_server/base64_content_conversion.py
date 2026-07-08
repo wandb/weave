@@ -59,6 +59,12 @@ CONTENT_REF_CACHE_SIZE = 100_000
 _content_ref_cache: LRUCache[tuple[str, str], str] = LRUCache(
     maxsize=CONTENT_REF_CACHE_SIZE
 )
+# Companion LRU set of bare-base64 blobs the mimetype filter keeps inline; a hit
+# skips the repeat decode. The rejection is deterministic per string, so it stays
+# correct for the pod's lifetime. Transient publish failures are never cached.
+_rejected_blob_cache: LRUCache[tuple[str, str], None] = LRUCache(
+    maxsize=CONTENT_REF_CACHE_SIZE
+)
 _content_ref_cache_lock = threading.Lock()
 
 
@@ -74,6 +80,16 @@ def _content_ref_cache_get(key: tuple[str, str]) -> str | None:
 def _content_ref_cache_put(key: tuple[str, str], ref: str) -> None:
     with _content_ref_cache_lock:
         _content_ref_cache[key] = ref
+
+
+def _rejected_blob_cache_contains(key: tuple[str, str]) -> bool:
+    with _content_ref_cache_lock:
+        return key in _rejected_blob_cache
+
+
+def _rejected_blob_cache_put(key: tuple[str, str]) -> None:
+    with _content_ref_cache_lock:
+        _rejected_blob_cache[key] = None
 
 
 def _lookup_content_ref(
@@ -358,6 +374,8 @@ def replace_base64_with_content_objects(
                 cache_key = _content_ref_cache_key(project_id, val)
                 if (known := _lookup_content_ref(cache_key, pending_objs)) is not None:
                     return known
+                if _rejected_blob_cache_contains(cache_key):
+                    return val
                 try:
                     # All we care about here is if this is an object that we can handle in some way.
                     # 'aaaa' is valid base64 and will come out as text/plain
@@ -380,6 +398,7 @@ def replace_base64_with_content_objects(
                         if pending_objs is None:
                             _content_ref_cache_put(cache_key, ref)
                         return ref
+                    _rejected_blob_cache_put(cache_key)
                 except Exception as e:
                     logger.warning(
                         "Failed to create content from standalone base64: %s", e
