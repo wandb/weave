@@ -5746,10 +5746,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_predict_and_score_children,
         )
 
-        # Cost is read from the predict call only (see _build_trial), so the
-        # children above are fetched without cost enrichment and only the
-        # predict calls are priced here — before compute_summary_from_rows,
-        # which sums trial.total_cost.
+        # children above are fetched without costs; price only the predict calls
         if req.include_costs:
             eval_helpers.apply_predict_costs(
                 all_rows, req.project_id, self.calls_query_stream

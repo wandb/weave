@@ -6913,6 +6913,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             all_rows_req, eval_root_ids, all_calls
         )
 
+        # ---- Fill predict-call costs onto trials ----
         if req.include_costs:
             eval_helpers.apply_predict_costs(
                 all_rows, req.project_id, self.calls_query_stream

@@ -285,7 +285,7 @@ def apply_predict_costs(
     project_id: str,
     fetch_calls: Callable[[tsi.CallsQueryReq], Iterable[tsi.CallSchema]],
 ) -> None:
-    """Fill each trial's total_cost from its predict call, in place.
+    """Fill each trial's total_cost from its predict call in-place.
 
     Trial children are fetched without cost enrichment (pricing every scorer
     child just to read the predict cost is wasted work), so trials start with
@@ -448,10 +448,11 @@ def _build_trial(
         total_tokens=extract_total_tokens(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
-        # Predict-only: read cost from the predict call alone. Unlike tokens, do
-        # not fall back to the predict_and_score summary, whose cost rollup would
-        # include the LLM-as-a-judge scorer.
-        total_cost=extract_total_cost(predict_call.summary) if predict_call else None,
+        # Cost is filled afterwards by apply_predict_costs: children arrive
+        # without cost enrichment, and only the predict calls get priced —
+        # never the predict_and_score rollup, which would include the
+        # LLM-as-a-judge scorer.
+        total_cost=None,
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
         genai_span_ref=_combine_genai_span_refs(predict_call, predict_and_score_call),
     )

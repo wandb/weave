@@ -3295,9 +3295,10 @@ class EvalResultsQueryBody(BaseModelStrict):
     include_costs: bool = Field(
         default=False,
         description=(
-            "When true, enrich the predict-and-score child calls with cost so "
-            "the summary can report predict-only `predict_total_cost`. Opt-in: "
-            "other callers skip the cost computation."
+            "When true, price each trial's predict call so rows and summary "
+            "report predict-only cost (`total_cost` / `predict_total_cost`); "
+            "scorer costs are excluded. Opt-in: other callers skip the cost "
+            "computation."
         ),
     )
     sort_by: list[EvalResultsSortBy] | None = Field(

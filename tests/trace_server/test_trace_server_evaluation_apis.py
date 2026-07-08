@@ -1455,16 +1455,22 @@ def test_eval_results_trial_genai_span_ref_preserved_with_costs(client):
             project_id=project_id,
             evaluation_call_ids=[run.evaluation_run_id],
             include_rows=True,
-            include_summary=False,
+            include_summary=True,
             include_predict_and_score_children=True,
             include_costs=True,
         )
     )
+    assert res.total_rows == 1
     trial = res.rows[0].evaluations[0].trials[0]
     assert trial.genai_span_ref == [
         GenAISpanRef(trace_id="agent-trace-1", span_id="span-1")
     ]
+    # Rows and summary of the same response carry the same predict-only cost.
     assert trial.total_cost == pytest.approx(_PREDICT_COST_PER_TRIAL)
+    assert res.summary is not None
+    assert res.summary.evaluations[0].predict_total_cost == pytest.approx(
+        _PREDICT_COST_PER_TRIAL
+    )
 
 
 def test_eval_results_resolved_inputs_inline(client):
