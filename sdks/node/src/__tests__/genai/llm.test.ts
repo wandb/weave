@@ -38,7 +38,7 @@ describe('LLM (via Turn.startLLM)', () => {
     const turnSpan = findSpan(spans, 'invoke_agent');
 
     expect(llmSpan.kind).toBe(SpanKind.CLIENT);
-    expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
+    expect(llmSpan.parentSpanContext?.spanId).toBe(turnSpan.spanContext().spanId);
     expect(llmSpan.spanContext().traceId).toBe(turnSpan.spanContext().traceId);
 
     expect(spanSnapshot(llmSpan)).toMatchInlineSnapshot(`

@@ -36,9 +36,9 @@ describe('end-to-end chain', () => {
     expect(toolSpan.spanContext().traceId).toBe(traceId);
 
     // Parent-child chain.
-    expect(turnSpan.parentSpanId).toBeUndefined();
-    expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
-    expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
+    expect(turnSpan.parentSpanContext?.spanId).toBeUndefined();
+    expect(llmSpan.parentSpanContext?.spanId).toBe(turnSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(llmSpan.spanContext().spanId);
 
     // Conversation id propagates everywhere.
     for (const s of spans) {

@@ -276,7 +276,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    expect(invoke.parentSpanId).toBeUndefined();
+    expect(invoke.parentSpanContext?.spanId).toBeUndefined();
     // The root carries no token usage of its own — per-model usage rides on
     // child `chat` spans (asserted below) so the trace server costs and rolls
     // it up per model. The SDK's authoritative total cost stays on the root.
@@ -306,7 +306,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
       'tool_use',
     ]);
-    expect(chat.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(chat.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
     expect(
       JSON.parse(chat.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([
@@ -345,7 +345,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe(
       'claude_agent_sdk'
     );
-    expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(usageChat.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
 
     const tool = findSpan(spans, 'execute_tool Bash');
     expect(tool.kind).toBe(SpanKind.INTERNAL);
@@ -356,7 +356,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     );
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('Sunny');
     expect(tool.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
-    expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(tool.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
 
     // The whole tree shares one trace.
     const traceId = invoke.spanContext().traceId;
@@ -407,7 +407,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(opus.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBe(100);
     expect(opus.attributes[ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(40);
     expect(opus.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(140);
-    expect(opus.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(opus.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
 
     // The internal fast model has no content chat span, only a usage span —
     // sourcing from `modelUsage` is what makes its tokens visible at all.
@@ -426,7 +426,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ).toBe(3);
     // total_tokens = inclusive input (28) + output (8).
     expect(haiku.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(36);
-    expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
+    expect(haiku.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
   });
 
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {

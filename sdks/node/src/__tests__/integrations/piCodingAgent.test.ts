@@ -285,7 +285,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       )!;
       const chat = spans.find(s => s.name.startsWith('chat '))!;
       expect(chat.kind).toBe(SpanKind.CLIENT);
-      expect(chat.parentSpanId).toBe(invoke.spanContext().spanId);
+      expect(chat.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
       expect(chat.attributes['gen_ai.operation.name']).toBe('chat');
       expect(chat.attributes['gen_ai.provider.name']).toBe('anthropic');
       expect(chat.attributes['gen_ai.request.model']).toBe(
@@ -413,7 +413,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       )!;
       const tool = spans.find(s => s.name === 'execute_tool bash')!;
       expect(tool.kind).toBe(SpanKind.INTERNAL);
-      expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
+      expect(tool.parentSpanContext?.spanId).toBe(invoke.spanContext().spanId);
       expect(tool.attributes['gen_ai.tool.name']).toBe('bash');
       expect(tool.attributes['gen_ai.tool.call.id']).toBe('call-1');
       expect(tool.attributes['gen_ai.conversation.id']).toBe('test-session-id');
@@ -503,7 +503,7 @@ describe('PiCodingAgentOtelAdapter', () => {
         .getFinishedSpans()
         .find(s => s.name === 'pi.coding_agent.compaction')!;
       expect(compact).toBeDefined();
-      expect(compact.parentSpanId).toBeUndefined();
+      expect(compact.parentSpanContext?.spanId).toBeUndefined();
       expect(compact.attributes['pi.compaction.reason']).toBe('context_limit');
       expect(compact.attributes['pi.compaction.aborted']).toBe(false);
       expect(compact.attributes['pi.compaction.will_retry']).toBe(false);

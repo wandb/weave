@@ -222,7 +222,7 @@ describe('Google ADK integration', () => {
 
       const [root] = byOperation(exporter.getFinishedSpans(), 'invoke_agent');
       expect(root).toBeDefined();
-      expect(root.parentSpanId).toBeUndefined();
+      expect(root.parentSpanContext?.spanId).toBeUndefined();
       expect(root.name).toBe('invoke_agent agent_a');
       expect(root.attributes).toMatchObject({
         'gen_ai.operation.name': 'invoke_agent',
@@ -262,7 +262,7 @@ describe('Google ADK integration', () => {
 
       const root = requireSpan(
         byOperation(exporter.getFinishedSpans(), 'invoke_agent').find(
-          span => !span.parentSpanId
+          span => !span.parentSpanContext?.spanId
         )
       );
       expect(root.name).toBe('invoke_agent runner_agent');
@@ -381,7 +381,7 @@ describe('Google ADK integration', () => {
       const spans = exporter.getFinishedSpans();
       const chatSpans = byOperation(spans, 'chat');
       const root = requireSpan(
-        byOperation(spans, 'invoke_agent').find(span => !span.parentSpanId)
+        byOperation(spans, 'invoke_agent').find(span => !span.parentSpanContext?.spanId)
       );
 
       expect(chatSpans).toHaveLength(1);
@@ -647,10 +647,10 @@ describe('Google ADK integration', () => {
       expect(toolSpans).toHaveLength(1);
 
       const root = requireSpan(
-        invokeAgentSpans.find(span => !span.parentSpanId)
+        invokeAgentSpans.find(span => !span.parentSpanContext?.spanId)
       );
       const agentSpan = requireSpan(
-        invokeAgentSpans.find(span => span.parentSpanId)
+        invokeAgentSpans.find(span => span.parentSpanContext?.spanId)
       );
       const [toolSpan] = toolSpans;
 
@@ -665,12 +665,12 @@ describe('Google ADK integration', () => {
 
       // Structure: root invoke_agent → invoke_agent → (chat, chat, tool).
       expect(root.name).toBe('invoke_agent weather_agent');
-      expect(agentSpan.parentSpanId).toBe(spanId(root));
+      expect(agentSpan.parentSpanContext?.spanId).toBe(spanId(root));
       expect(agentSpan.attributes).toMatchObject({
         'gen_ai.agent.name': 'weather_agent',
       });
       for (const span of [...chatSpans, ...toolSpans]) {
-        expect(span.parentSpanId).toBe(spanId(agentSpan));
+        expect(span.parentSpanContext?.spanId).toBe(spanId(agentSpan));
       }
 
       // Root carries the user message in and the final answer out.
@@ -761,25 +761,25 @@ describe('Google ADK integration', () => {
       const chatSpans = byOperation(spans, 'chat');
 
       const root = requireSpan(
-        invokeAgentSpans.find(span => !span.parentSpanId)
+        invokeAgentSpans.find(span => !span.parentSpanContext?.spanId)
       );
       const byAgent = (name: string) =>
         requireSpan(
           invokeAgentSpans.find(
             span =>
-              span.parentSpanId && span.attributes['gen_ai.agent.name'] === name
+              span.parentSpanContext?.spanId && span.attributes['gen_ai.agent.name'] === name
           )
         );
       const pipelineSpan = byAgent('pipeline');
       const firstSpan = byAgent('first_agent');
       const secondSpan = byAgent('second_agent');
 
-      expect(pipelineSpan.parentSpanId).toBe(spanId(root));
-      expect(firstSpan.parentSpanId).toBe(spanId(pipelineSpan));
-      expect(secondSpan.parentSpanId).toBe(spanId(pipelineSpan));
+      expect(pipelineSpan.parentSpanContext?.spanId).toBe(spanId(root));
+      expect(firstSpan.parentSpanContext?.spanId).toBe(spanId(pipelineSpan));
+      expect(secondSpan.parentSpanContext?.spanId).toBe(spanId(pipelineSpan));
 
       expect(chatSpans).toHaveLength(2);
-      const chatParents = chatSpans.map(span => span.parentSpanId).sort();
+      const chatParents = chatSpans.map(span => span.parentSpanContext?.spanId).sort();
       expect(chatParents).toEqual(
         [spanId(firstSpan), spanId(secondSpan)].sort()
       );
@@ -822,7 +822,7 @@ describe('Google ADK integration', () => {
           span => span.attributes['gen_ai.agent.name'] === 'outside_agent'
         )
       );
-      expect(outsideAgent.parentSpanId).toBe(spanId(toolSpan));
+      expect(outsideAgent.parentSpanContext?.spanId).toBe(spanId(toolSpan));
     });
 
     test('tool errors record span errors; the late afterToolCallback is ignored', async () => {
@@ -963,7 +963,7 @@ describe('Google ADK integration', () => {
       const roots = byOperation(
         exporter.getFinishedSpans(),
         'invoke_agent'
-      ).filter(span => !span.parentSpanId);
+      ).filter(span => !span.parentSpanContext?.spanId);
       // The run-root span was ended (and thus exported) despite the early
       // break — the invocation did not leak.
       expect(roots).toHaveLength(1);
