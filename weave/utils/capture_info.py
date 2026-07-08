@@ -1,4 +1,4 @@
-"""Shared client/system info capture — used by both @op tracer and Session SDK.
+"""Shared client/system info capture — used by both @op tracer and Conversation SDK.
 
 Returns ``weave.*`` metadata key/value pairs gated by
 ``should_capture_client_info()`` / ``should_capture_system_info()``. Call

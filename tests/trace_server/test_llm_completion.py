@@ -1433,6 +1433,26 @@ def test_completions_handles_error_response(
         assert span.status_message == "Rate limit exceeded"
 
 
+def test_litellm_error_response_preserves_status_code():
+    """Error payload strips the `litellm.` prefix and preserves any status code."""
+
+    class _StatusError(Exception):
+        status_code = 429
+
+    with_status = llm_mod._litellm_error_response(
+        _StatusError("litellm.RateLimitError: quota exceeded")
+    )
+    assert with_status.response == {
+        "error": "RateLimitError: quota exceeded",
+        llm_mod.ERROR_STATUS_CODE_KEY: 429,
+    }
+
+    without_status = llm_mod._litellm_error_response(
+        Exception("litellm.APIConnectionError: connection reset")
+    )
+    assert without_status.response == {"error": "APIConnectionError: connection reset"}
+
+
 def test_completions_usage_captured_in_span(
     completions_mock_server, completions_secret_fetcher, completions_mock_response
 ):

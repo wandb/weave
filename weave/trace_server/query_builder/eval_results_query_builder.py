@@ -14,6 +14,9 @@ from functools import partial
 
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.optimization_builder import (
+    DATETIME_BUFFER_TIME_SECONDS,
+)
 from weave.trace_server.calls_query_builder.utils import (
     json_dump_field_as_sql,
     param_slot,
@@ -41,8 +44,28 @@ END"""
 
 
 def _or_any_prefix_matches(op_name_expr: str, op_prefix_params: list[str]) -> str:
-    """`position(op_name, p) > 0` OR'd across every prefix param."""
-    return " OR ".join(f"position({op_name_expr}, {p}) > 0" for p in op_prefix_params)
+    """`multiSearchAny(op_name, [prefixes])`: matches if any prefix is a substring (engages idx_op_name ngrambf index)."""
+    return f"multiSearchAny({op_name_expr}, [{', '.join(op_prefix_params)}])"
+
+
+def _build_eval_start_lower_bound(
+    project_id_param: str, eval_root_ids_param: str
+) -> str:
+    """sortable_datetime floor for the calls_merged scan, as a scalar subquery.
+
+    Predict-and-score calls start at/after their eval root, so bounding by the
+    roots' earliest start (minus a buffer) engages the sortable_datetime minmax
+    index and prunes granules. Falls back to epoch if the root start is NULL.
+    """
+    return f"""coalesce(
+        (
+            SELECT min(roots.started_at) - toIntervalSecond({DATETIME_BUFFER_TIME_SECONDS})
+            FROM calls_merged AS roots
+            PREWHERE roots.project_id = {project_id_param}
+            WHERE roots.id IN {eval_root_ids_param}
+        ),
+        toDateTime64(0, 3)
+    )"""
 
 
 def _sort_filter_uses_inputs(
@@ -96,6 +119,9 @@ def build_predict_and_score_calls_cte(
     )
 
     if read_table == "calls_merged":
+        eval_start_lower_bound = _build_eval_start_lower_bound(
+            project_id_param, eval_root_ids_param
+        )
         return f"""predict_and_score_calls AS (
     SELECT
         calls_merged.id AS call_id,
@@ -114,6 +140,7 @@ def build_predict_and_score_calls_cte(
         {op_match_where}
         OR calls_merged.op_name IS NULL
     )
+    AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
     HAVING any(calls_merged.parent_id) IN {eval_root_ids_param}
         AND ({op_match_having})
@@ -263,6 +290,25 @@ def _make_field_resolver(
     return partial(resolve_eval_field_to_sql, evaluation_call_id=evaluation_call_id)
 
 
+def _sort_numeric_scalar(
+    field_path: str,
+    pb: ParamBuilder,
+    evaluation_call_id: str | None,
+) -> str:
+    """Return a single numeric scalar for a field (no direction, no multi-term).
+
+    Safe to embed inside greatest()/least() for difference-mode sorting. Scores
+    carry their bool coercion via _build_json_field_inner; inputs/output are
+    coerced to float here so numeric values sort numerically rather than
+    lexicographically. (Only ever called for scores/inputs/output fields --
+    difference mode never targets row_digest.)
+    """
+    inner, _ = _build_json_field_inner(field_path, pb, evaluation_call_id)
+    if field_path.startswith("scores."):
+        return _score_sort_numeric(inner)
+    return f"toFloat64OrNull(any({inner}))"
+
+
 def build_sort_expression(
     sort_by: list[tsi.EvalResultsSortBy] | None,
     eval_root_ids: list[str],
@@ -280,10 +326,11 @@ def build_sort_expression(
     for s in sort_by:
         direction = "DESC" if s.direction == "desc" else "ASC"
         if s.mode == "difference" and len(eval_root_ids) > 1:
-            expr = _build_difference_sort(s.field, eval_root_ids, pb)
+            parts.append(_build_difference_sort(s.field, eval_root_ids, pb, direction))
         else:
-            expr = _build_sort_aggregate(s.field, pb, s.evaluation_call_id)
-        parts.append(f"{expr} {direction}")
+            parts.append(
+                _build_sort_aggregate(s.field, pb, s.evaluation_call_id, direction)
+            )
 
     parts.append("row_digest ASC")
     return ", ".join(parts)
@@ -293,31 +340,46 @@ def _build_sort_aggregate(
     field_path: str,
     pb: ParamBuilder,
     evaluation_call_id: str | None,
+    direction: str,
 ) -> str:
-    """Build the per-field sort expression, applying the right aggregate.
+    """Build the per-field ORDER BY fragment, including its direction(s).
 
-    Scores get numeric avg (with bool coercion); other fields get any().
-    row_digest is used bare (it's the GROUP BY key).
+    - row_digest: bare GROUP BY key.
+    - scores.*: numeric avg (with bool coercion), single term.
+    - inputs.*/output.*: a three-term existence -> numeric -> string fallback,
+      mirroring OrderField in the calls query
+      (calls_query_builder._build_standard_order_sql). The existence term is
+      fixed DESC so rows with a numeric value precede NULL/text rows in BOTH
+      sort directions -- ClickHouse places NULLs first on DESC by default and
+      these builders use no explicit NULLS clauses. The numeric term sorts
+      numeric values; the string term orders the remaining (text) rows.
     """
     inner, _ = _build_json_field_inner(field_path, pb, evaluation_call_id)
     if field_path == "row_digest":
-        return inner
+        return f"{inner} {direction}"
     if field_path.startswith("scores."):
-        return _score_sort_numeric(inner)
-    return f"any({inner})"
+        return f"{_score_sort_numeric(inner)} {direction}"
+    numeric = f"toFloat64OrNull(any({inner}))"
+    string = f"any({inner})"
+    return f"({numeric} IS NOT NULL) DESC, {numeric} {direction}, {string} {direction}"
 
 
 def _build_difference_sort(
     field_path: str,
     eval_root_ids: list[str],
     pb: ParamBuilder,
+    direction: str,
 ) -> str:
-    """Build greatest(...) - least(...) expression for difference mode sorting."""
+    """Build greatest(...) - least(...) expression for difference mode sorting.
+
+    Uses the numeric scalar per eval so the subtraction is numeric; sorting an
+    output column in difference mode previously subtracted raw strings.
+    """
     per_eval_exprs: list[str] = []
     for eval_id in eval_root_ids:
-        per_eval_exprs.append(_build_sort_aggregate(field_path, pb, eval_id))
+        per_eval_exprs.append(_sort_numeric_scalar(field_path, pb, eval_id))
     joined = ", ".join(per_eval_exprs)
-    return f"greatest({joined}) - least({joined})"
+    return f"greatest({joined}) - least({joined}) {direction}"
 
 
 def _build_having_clause(
@@ -325,8 +387,15 @@ def _build_having_clause(
     filters: list[tsi.EvalResultsFilter] | None,
     require_intersection: bool,
     pb: ParamBuilder,
+    filter_logic_operator: str = "or",
 ) -> str:
-    """Build the HAVING clause for ranked_digests."""
+    """Build the HAVING clause for ranked_digests.
+
+    Args:
+        filter_logic_operator: 'and' (Match All) or 'or' (Match Any, default).
+            - 'and': Row must match filters in ALL evals
+            - 'or': Row must match filters in ANY eval (default)
+    """
     having_parts: list[str] = ["1=1"]
 
     if require_intersection and len(eval_root_ids) > 1:
@@ -334,12 +403,31 @@ def _build_having_clause(
         having_parts.append(f"countDistinct(eval_call_id) >= {num_param}")
 
     if filters:
-        for f in filters:
-            resolver = _make_field_resolver(f.evaluation_call_id)
-            conditions, _ = _process_query_to_conditions(
-                f.query, param_builder=pb, field_resolver=resolver
-            )
-            having_parts.extend(conditions)
+        if filter_logic_operator == "or":
+            # Match Any: group conditions by eval, OR between groups
+            eval_groups: dict[str | None, list[str]] = {}
+            for f in filters:
+                resolver = _make_field_resolver(f.evaluation_call_id)
+                conditions, _ = _process_query_to_conditions(
+                    f.query, param_builder=pb, field_resolver=resolver
+                )
+                eval_groups.setdefault(f.evaluation_call_id, []).extend(conditions)
+
+            # Each eval's conditions are AND'd, then OR'd between evals
+            group_clauses = []
+            for conds in eval_groups.values():
+                if conds:
+                    group_clauses.append(f"({' AND '.join(conds)})")
+            if group_clauses:
+                having_parts.append(f"({' OR '.join(group_clauses)})")
+        else:
+            # Match All (default): flat AND of all conditions
+            for f in filters:
+                resolver = _make_field_resolver(f.evaluation_call_id)
+                conditions, _ = _process_query_to_conditions(
+                    f.query, param_builder=pb, field_resolver=resolver
+                )
+                having_parts.extend(conditions)
 
     return "\n                    AND ".join(having_parts)
 
@@ -352,6 +440,7 @@ def build_ranked_digests_cte(
     limit: int | None,
     offset: int,
     pb: ParamBuilder,
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build ranked_digests, ranked_digest_count, and page_digests CTEs.
 
@@ -361,7 +450,7 @@ def build_ranked_digests_cte(
     """
     sort_expr = build_sort_expression(sort_by, eval_root_ids, pb)
     having_clause = _build_having_clause(
-        eval_root_ids, filters, require_intersection, pb
+        eval_root_ids, filters, require_intersection, pb, filter_logic_operator
     )
 
     pagination = ""
@@ -470,6 +559,7 @@ def build_eval_results_query(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build the complete eval_results SQL query.
 
@@ -487,6 +577,7 @@ def build_eval_results_query(
         offset,
         pb,
         read_table,
+        filter_logic_operator,
     )
     project_id_param = param_slot(pb.add_param(project_id), "String")
     page_calls_cte = _build_page_calls_cte(project_id_param, read_table)
@@ -525,6 +616,7 @@ def build_eval_results_cte_chain(
     offset: int,
     pb: ParamBuilder,
     read_table: str,
+    filter_logic_operator: str = "or",
 ) -> str:
     """Build the CTE chain body (without WITH keyword).
 
@@ -572,6 +664,7 @@ def build_eval_results_cte_chain(
         limit,
         offset,
         pb,
+        filter_logic_operator,
     )
     page_resolved_cte = build_page_resolved_inputs_cte(project_id_param)
     page_rows_cte = build_page_rows_cte()

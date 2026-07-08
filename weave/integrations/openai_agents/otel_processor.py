@@ -61,24 +61,24 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
+from weave.conversation.adapters.openai import (
+    message_from_openai_responses_input,
+    reasoning_from_openai_responses,
+    usage_from_openai_responses,
+)
+from weave.conversation.agent_context import resolve_agent_name
+from weave.conversation.conversation_otel import (
+    execute_tool_attributes,
+    invoke_agent_attributes,
+    llm_attributes,
+)
+from weave.conversation.types import Message, Reasoning, Usage
 from weave.integrations.openai_agents.openai_agents import (
     OPENAI_AGENTS_INTEGRATION,
     _call_name,
     _is_task_span_data,
     _is_turn_span_data,
 )
-from weave.session.adapters.openai import (
-    message_from_openai_responses_input,
-    reasoning_from_openai_responses,
-    usage_from_openai_responses,
-)
-from weave.session.agent_context import resolve_agent_name
-from weave.session.session_otel import (
-    execute_tool_attributes,
-    invoke_agent_attributes,
-    llm_attributes,
-)
-from weave.session.types import Message, Reasoning, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ _warned_unhandled_span_types: set[type] = set()
 
 # Keys we extract from ``GenerationSpanData.model_config`` into the equivalent
 # ``llm_attributes`` request_* kwargs. The map keeps the wire shape (raw openai
-# request body keys) → the Session SDK kwarg name in one place.
+# request body keys) → the Conversation SDK kwarg name in one place.
 _GENERATION_MODEL_CONFIG_KEYS = {
     "temperature": "request_temperature",
     "top_p": "request_top_p",

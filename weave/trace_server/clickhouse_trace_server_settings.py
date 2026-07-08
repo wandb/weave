@@ -9,6 +9,9 @@ from weave.trace_server import environment as wf_env
 # File and batch processing settings
 FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 1000
+# Pad the started_at window used to prune partitions on the calls/delete path,
+# absorbing cross-process clock skew between a call and its descendants.
+DELETE_STARTED_AT_PADDING_SECONDS = 1
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
@@ -60,6 +63,12 @@ RETURN_TYPE_ALLOW_COMPLEX = "1"
 _env_max_execution_time = wf_env.wf_clickhouse_max_execution_time()
 # Treat 0 as unset; a zero-second timeout is not a useful service default.
 _max_execution_time = _env_max_execution_time or DEFAULT_MAX_EXECUTION_TIME
+# The projection guard is tuned independently of the hard runtime cap: a flaky
+# estimate can fire early, so operators may want a looser projection ceiling
+# while keeping a tight real-runtime cap. Falls back to the hard cap when unset.
+_max_estimated_execution_time = (
+    wf_env.wf_clickhouse_max_estimated_execution_time() or _max_execution_time
+)
 _disable_query_failure_prediction = (
     wf_env.wf_clickhouse_disable_query_failure_prediction()
 )
@@ -69,7 +78,8 @@ CLICKHOUSE_BASE_QUERY_SETTINGS: dict[str, int | str] = {
     or DEFAULT_MAX_MEMORY_USAGE,
     "max_execution_time": _max_execution_time,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
-    # Valid values here are 'allow' or 'global', with 'global' slightly outperforming in testing
+    # CH 24.3+ analyzer ignores this, so double-distributed JOINs must also set an
+    # explicit GLOBAL (see token_costs / object_ref); kept as it still applies pre-24.3.
     "distributed_product_mode": "global",
 }
 
@@ -78,7 +88,7 @@ CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS: dict[str, int | str] = {}
 if not _disable_query_failure_prediction:
     CLICKHOUSE_QUERY_FAILURE_PREDICTION_SETTINGS.update(
         {
-            "max_estimated_execution_time": _max_execution_time,
+            "max_estimated_execution_time": _max_estimated_execution_time,
             "timeout_before_checking_execution_speed": DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED,
             "timeout_overflow_mode": "throw",
         }
@@ -110,6 +120,12 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
+# Physical reclamation of soft-deleted calls_complete rows: sync=0 lets the lightweight
+# DELETE return once scheduled (never blocks). A DELETE needs none of the UPDATE settings.
+CLICKHOUSE_ASYNC_DELETE_SETTINGS: dict[str, int | str] = {
+    "lightweight_deletes_sync": 0,
+}
+
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
 # for non-Full sorting modes on distributed tables, which causes error 48
 # ("Serialization of SortingStep is implemented only for Full sorting").
@@ -138,6 +154,17 @@ CLICKHOUSE_ASYNC_INSERT_SETTINGS: dict[str, int | str] = {
     "async_insert_busy_timeout_max_ms": wf_env.wf_clickhouse_async_insert_busy_timeout_max_ms(),
     # Max data size before flushing (10 MB), this is the default
     "async_insert_max_data_size": 10 * 1024 * 1024,
+}
+
+
+# HTTP read timeout for the migration client. Must exceed the server's
+# database_replicated_initial_query_timeout_sec (default 300s) so slow DDL completes.
+MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC = 900
+
+# Bounds only the ON CLUSTER (distributed DDL queue) wait; does not affect the
+# Replicated-DB-engine path, which the client read timeout above covers.
+MIGRATION_DDL_QUERY_SETTINGS: dict[str, int | str] = {
+    "distributed_ddl_task_timeout": 600,
 }
 
 

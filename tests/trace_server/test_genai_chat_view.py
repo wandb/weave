@@ -6,10 +6,13 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 
 import datetime
 import json
+import sys
 
 import pytest
 
 from weave.trace_server.agents.chat_view import (
+    _MAX_REF_SEARCH_DEPTH,
+    _iter_internal_refs,
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
@@ -232,6 +235,74 @@ def test_full_agent_turn() -> None:
     assert _assistant_payload(by_type["assistant_message"]).output_tokens == 105
 
 
+def test_chat_view_aggregates_cost() -> None:
+    """Per-message cost sums across the agent subtree; trace cost sums all spans."""
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+            input_cost_usd=0.001,
+            output_cost_usd=0.002,
+            total_cost_usd=0.003,
+            started_at=at(0),
+        ),
+        _span(
+            span_id="tool",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            tool_name="get_weather",
+            started_at=at(1),
+        ),
+        _span(
+            span_id="llm",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_cost_usd=0.02,
+            output_cost_usd=0.01,
+            total_cost_usd=0.03,
+            started_at=at(2),
+        ),
+    ]
+
+    res = build_trace_chat(spans, "trace-cost")
+
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    # Aggregated across root + llm (tool contributes no cost).
+    assert assistant.input_cost_usd == pytest.approx(0.021)
+    assert assistant.output_cost_usd == pytest.approx(0.012)
+    assert assistant.total_cost_usd == pytest.approx(0.033)
+    # Trace total sums every span's cost.
+    assert res.total_cost_usd == pytest.approx(0.033)
+
+
+def test_chat_view_cost_none_when_unpriced() -> None:
+    """With no priced spans, costs stay None (unknown), not 0."""
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+        ),
+    ]
+    res = build_trace_chat(spans, "trace-unpriced")
+    assistant = _assistant_payload(
+        next(m for m in res.messages if m.type == "assistant_message")
+    )
+    assert assistant.total_cost_usd is None
+    assert res.total_cost_usd is None
+
+
 def test_chat_view_exposes_agent_metadata_for_reactions() -> None:
     """The chat view surfaces agent_version + status_code so reaction feedback
     can carry them: per-message from the message's span, and the trace root's
@@ -318,6 +389,141 @@ def test_anonymous_invoke_without_metadata_skips_empty_agent_start() -> None:
     assert messages[0].agent_name is None
 
 
+def test_content_span_system_instructions_surface_as_agent_start() -> None:
+    """System instructions logged on a bare chat span (no invoke_agent) still
+    reach the chat view via a synthesized agent_start card.
+    """
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="chat",
+                operation_name="chat",
+                request_model="gpt-4o",
+                system_instructions=["You are helpful."],
+                output_messages=[{"role": "assistant", "content": "hello"}],
+            )
+        ]
+    )
+
+    assert [m.type for m in messages] == ["agent_start", "assistant_message"]
+    agent_start = _agent_start_payload(messages[0])
+    assert agent_start.system_instructions == "You are helpful."
+    assert agent_start.model == "gpt-4o"
+
+
+def test_content_span_system_instructions_deduped_across_turns() -> None:
+    """The same system prompt replayed on every turn's chat span renders once."""
+    spans = [
+        _span(
+            span_id=f"chat{i}",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            input_messages=[{"role": "user", "content": f"q{i}"}],
+            output_messages=[{"role": "assistant", "content": f"a{i}"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, i, tzinfo=datetime.timezone.utc
+            ),
+        )
+        for i in range(3)
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [m.type for m in messages].count("agent_start") == 1
+
+
+def test_content_span_system_instructions_change_emits_new_card() -> None:
+    """A genuinely changed system prompt mid-conversation emits a fresh card."""
+    spans = [
+        _span(
+            span_id="chat0",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            output_messages=[{"role": "assistant", "content": "a0"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
+            ),
+        ),
+        _span(
+            span_id="chat1",
+            operation_name="chat",
+            system_instructions=["You are terse."],
+            output_messages=[{"role": "assistant", "content": "a1"}],
+            started_at=datetime.datetime(
+                2026, 1, 1, 0, 0, 1, tzinfo=datetime.timezone.utc
+            ),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    starts = [m for m in messages if m.type == "agent_start"]
+    assert [_agent_start_payload(m).system_instructions for m in starts] == [
+        "You are helpful.",
+        "You are terse.",
+    ]
+
+
+def test_invoke_agent_system_instructions_suppress_descendant_duplicate() -> None:
+    """An invoke_agent's system instructions are not re-emitted by a descendant
+    chat span that replays the same prompt.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            span_name="invoke_agent",
+            system_instructions=["You are helpful."],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            system_instructions=["You are helpful."],
+            output_messages=[{"role": "assistant", "content": "hello"}],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [m.type for m in messages].count("agent_start") == 1
+
+
+def test_invoke_agent_without_prompt_absorbs_descendant_system_instructions() -> None:
+    """A bare invoke_agent agent_start (identity, no prompt) absorbs a child
+    chat span's system instructions instead of emitting a second card.
+
+    Mirrors the prod WB Agent shape: invoke_agent carries the agent name but no
+    instructions, and the prompt is recorded on the child chat span.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            span_name="invoke_agent WB Agent",
+            agent_name="WB Agent",
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            agent_name="WB Agent",
+            request_model="gpt-5.5",
+            system_instructions=["You are ARIA."],
+            output_messages=[{"role": "assistant", "content": "hello"}],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    starts = [m for m in messages if m.type == "agent_start"]
+    assert len(starts) == 1
+    payload = _agent_start_payload(starts[0])
+    assert payload.system_instructions == "You are ARIA."
+    # Model is folded in from the chat span when the invoke_agent lacked one.
+    assert payload.model == "gpt-5.5"
+
+
 def test_build_span_tree_handles_null_started_at() -> None:
     """build_span_tree must not crash when a span has started_at=None.
 
@@ -383,15 +589,17 @@ def test_build_trace_chat_handles_null_started_at() -> None:
             input_messages=[{"role": "user", "content": "hello from now"}],
         ),
     ]
-    # Must not raise. _find_user_prompt prefers invoke_agent spans, so the
-    # null-start invoke_agent's prompt wins over the chat span's prompt.
-    # The important thing is that the sort doesn't crash on the mixed key.
+    # Must not raise. The chat (LLM) span's own user input drives the turn, so
+    # its prompt is what renders; the null-start invoke_agent prompt is only a
+    # fallback for when no LLM span carries user input. The important thing is
+    # that the sort doesn't crash on the mixed (None / datetime) key.
     res = build_trace_chat(spans, "trace-with-null")
     assert res.trace_id == "trace-with-null"
     user_msgs = [m for m in res.messages if m.type == "user_message"]
     assert len(user_msgs) == 1
-    assert _user_payload(user_msgs[0]).text == "hello from the void"
-    assert user_msgs[0].started_at is None
+    assert _user_payload(user_msgs[0]).text == "hello from now"
+    # Sourced from the chat span (which has a real start), not the null one.
+    assert user_msgs[0].started_at is not None
 
 
 def test_build_trace_chat_uses_latest_ended_span_when_root_missing() -> None:
@@ -532,6 +740,148 @@ def test_reasoning_part_not_duplicated_in_assistant_text() -> None:
     assert payload.reasoning_content == reasoning
 
 
+def _tool_call_part(name: str, arguments: str) -> dict:
+    return {"type": "tool_call", "id": "tc1", "name": name, "arguments": arguments}
+
+
+def test_interleaved_reasoning_before_tool_call_is_surfaced() -> None:
+    """Reasoning that precedes a tool call (an LLM step whose only output is a
+    tool call, no assistant text) must still surface as a reasoning-only
+    message, in order before the tool call — not be dropped because the step
+    produced no final text.
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    step_reasoning = "Deciding to inspect the workspace"
+    final_reasoning = "Summarizing what I found"
+    answer = "The eval suite has 17 scenarios."
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "How many scenarios?"}],
+            started_at=at(0),
+        ),
+        # LLM step that reasons then calls a tool: reasoning + tool_call parts,
+        # no text part.
+        _span(
+            span_id="llm1",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        {"type": "reasoning", "content": step_reasoning},
+                        _tool_call_part("shell", '{"command": "ls"}'),
+                    ),
+                }
+            ],
+            reasoning_content=step_reasoning,
+            started_at=at(1),
+        ),
+        _span(
+            span_id="tool1",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            span_name="execute_tool shell",
+            tool_name="shell",
+            tool_call_arguments='{"command": "ls"}',
+            tool_call_result="17 files",
+            started_at=at(2),
+        ),
+        # Final LLM step: reasoning + the answer text.
+        _span(
+            span_id="llm2",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        {"type": "reasoning", "content": final_reasoning},
+                        _text_part(answer),
+                    ),
+                }
+            ],
+            reasoning_content=final_reasoning,
+            started_at=at(3),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    types = [m.type for m in messages]
+
+    # The interleaved reasoning step is emitted before its tool call, and the
+    # final answer (with its own reasoning) comes last.
+    assert types == [
+        "user_message",
+        "agent_start",
+        "assistant_message",  # reasoning-only step
+        "tool_call",
+        "assistant_message",  # final answer
+    ]
+
+    step = _assistant_payload(messages[2])
+    assert step.text == ""
+    assert step.reasoning_content == step_reasoning
+
+    final = _assistant_payload(messages[4])
+    assert final.text == answer
+    assert final.reasoning_content == final_reasoning
+
+
+def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
+    """A tool-calling LLM step that carries neither assistant text nor
+    reasoning must not produce an empty assistant bubble.
+    """
+
+    def at(seconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026, 1, 1, 0, 0, seconds, tzinfo=datetime.timezone.utc
+        )
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "run it"}],
+            started_at=at(0),
+        ),
+        _span(
+            span_id="llm1",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(_tool_call_part("shell", "{}")),
+                }
+            ],
+            started_at=at(1),
+        ),
+        _span(
+            span_id="tool1",
+            parent_span_id="agent",
+            operation_name="execute_tool",
+            span_name="execute_tool shell",
+            tool_name="shell",
+            tool_call_result="done",
+            started_at=at(2),
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    assert [m.type for m in messages if m.type == "assistant_message"] == []
+
+
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
     def at(seconds: int) -> datetime.datetime:
         return datetime.datetime(
@@ -646,6 +996,105 @@ def test_input_media_attaches_to_user_message_not_assistant() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
+    """Server-side content conversion embeds an internal weave ref directly in
+    the message part (e.g. an OpenAI ``image_url``) with no span-level
+    ``content_refs``. The recursive inline-ref sweep surfaces it so the image
+    still renders on the user bubble.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-describer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("What is in this image?")),
+                }
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_internal}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+            # No span-level content_refs — the ref lives only inline in the part.
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    assert _user_payload(user).content_refs == [image_internal]
+    assert _assistant_payload(assistant).content_refs == []
+
+
+@pytest.mark.xfail(
+    reason=(
+        "Known limitation (PR #7489 discussion): the inline-ref sweep "
+        "(_iter_internal_refs) surfaces ANY internal weave ref, not only "
+        "Content/media refs. A message that legitimately carries a ref to a "
+        "non-media object (prompt/model/dataset) in a structured field leaks "
+        "into content_refs and renders as broken media. A media ref is "
+        "indistinguishable from a prompt ref at the string level and the part "
+        "shapes are not normalized, so scoping the sweep is deferred to a "
+        "follow-up (e.g. record converted media refs authoritatively at "
+        "ingest, or scope the sweep to media part positions)."
+    ),
+    strict=False,
+)
+def test_inline_sweep_excludes_non_media_internal_refs() -> None:
+    """The inline-ref sweep must surface only Content/media refs. A message that
+    legitimately carries a ref to a non-media object (a prompt, model, dataset)
+    in a structured field must NOT land in ``content_refs``, or the UI renders
+    it as broken media. Content objects are stored under a sanitized-filename
+    object_id, so a media ref is indistinguishable at the string level from a
+    prompt ref — the walker needs to scope the match.
+    """
+    image_ref = "weave-trace-internal:///PID/object/gift_basket_png:IMGDIGEST"
+    prompt_ref = "weave-trace-internal:///PID/object/describe_image_prompt:PROMPTDIGEST"
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_ref}},
+                        # Agent quoting the prompt object it ran under — not media.
+                        {"type": "tool_use", "input": {"prompt_ref": prompt_ref}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the media ref should render; the prompt ref is a false positive today.
+    assert _user_payload(user).content_refs == [image_ref]
+
+
 def test_output_media_attaches_to_assistant_message() -> None:
     """Model-generated media is a part on the output message and renders on
     the assistant bubble (mirror image of the input case).
@@ -691,6 +1140,66 @@ def test_output_media_attaches_to_assistant_message() -> None:
     assert _assistant_payload(assistant).content_refs == [image_internal]
 
 
+def test_prior_assistant_media_in_input_history_not_attached_to_user() -> None:
+    """Regression: a multi-turn turn replays the prior assistant turn — audio
+    and all — into its ``input_messages`` as an assistant-role message. That
+    echoed model-generated media must NOT surface as the user's attachment.
+
+    Direction is the message *role*, not its input/output position: both the
+    echoed assistant audio and the user's own audio live in this span's
+    ``input_messages``, but only the user-role one belongs to the user. This is
+    the OpenAI Realtime conversations bug — turn 2's user bubble showed turn 1's
+    assistant audio clip.
+    """
+    user_audio_internal = "weave-trace-internal:///PID/object/Content:USERAUDIO"
+    user_audio_external = "weave:///e/p/object/Content:USERAUDIO"
+    asst_audio_internal = "weave-trace-internal:///PID/object/Content:ASSTAUDIO"
+    asst_audio_external = "weave:///e/p/object/Content:ASSTAUDIO"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="voice-agent",
+            input_messages=[
+                {"role": "user", "content": _parts(_text_part("And after that?"))}
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            # The prior assistant turn is replayed as history (assistant role),
+            # followed by the current user turn (user role) with its own audio.
+            input_messages=[
+                {
+                    "role": "assistant",
+                    "content": _parts(
+                        _text_part("It's foggy."), _uri_part(asst_audio_external)
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("And after that?"),
+                        _uri_part(user_audio_external),
+                    ),
+                },
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("Clearing up."))}
+            ],
+            content_refs=[asst_audio_internal, user_audio_internal],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the user's own audio attaches; the echoed assistant audio does not.
+    assert _user_payload(user).content_refs == [user_audio_internal]
+    assert asst_audio_internal not in _user_payload(user).content_refs
+
+
 def test_content_ref_without_inline_part_is_not_attached() -> None:
     """A `content_refs` entry with no matching inline message part has no
     direction signal, so it attaches to neither bubble — only refs anchored to
@@ -713,6 +1222,169 @@ def test_content_ref_without_inline_part_is_not_attached() -> None:
     assistant = next(m for m in messages if m.type == "assistant_message")
     assert _user_payload(user).content_refs == []
     assert _assistant_payload(assistant).content_refs == []
+
+
+def test_realtime_multi_turn_in_one_trace_renders_each_user_turn() -> None:
+    """Regression (OpenAI Realtime): a whole voice session is ONE trace with
+    one chat span per turn. Each turn's user message must render with its OWN
+    audio — not collapse to a single leading bubble holding every turn's audio.
+
+    Each chat span's input replays the prior thread and ends with that turn's
+    new user message; output is that turn's assistant reply. Media is matched
+    per message from the inline part digest to the span's internal content_refs.
+    """
+
+    def at(sec: int) -> datetime.datetime:
+        return datetime.datetime(2026, 1, 1, 0, 0, sec, tzinfo=datetime.timezone.utc)
+
+    def ext(d: str) -> str:
+        return f"weave:///e/p/object/Content:{d}"
+
+    def intl(d: str) -> str:
+        return f"weave-trace-internal:///PID/object/Content:{d}"
+
+    def u(text: str, d: str) -> dict:
+        return {"role": "user", "content": _parts(_text_part(text), _uri_part(ext(d)))}
+
+    def a(text: str, d: str) -> dict:
+        return {
+            "role": "assistant",
+            "content": _parts(_text_part(text), _uri_part(ext(d))),
+        }
+
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="openai_realtime",
+            started_at=at(0),
+        ),
+        _span(
+            span_id="c1",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(1),
+            input_messages=[u("Hello", "U1")],
+            output_messages=[a("Hi there!", "A1")],
+            content_refs=[intl("U1"), intl("A1")],
+        ),
+        _span(
+            span_id="c2",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(3),
+            input_messages=[
+                u("Hello", "U1"),
+                a("Hi there!", "A1"),
+                u("Tell me a fact.", "U2"),
+            ],
+            output_messages=[a("Oceans cover 70%.", "A2")],
+            content_refs=[intl("U1"), intl("A1"), intl("U2"), intl("A2")],
+        ),
+        _span(
+            span_id="c3",
+            parent_span_id="agent",
+            operation_name="chat",
+            started_at=at(5),
+            input_messages=[
+                u("Hello", "U1"),
+                a("Hi there!", "A1"),
+                u("Tell me a fact.", "U2"),
+                a("Oceans cover 70%.", "A2"),
+                u("Thanks!", "U3"),
+            ],
+            output_messages=[a("Anytime!", "A3")],
+            content_refs=[
+                intl("U1"),
+                intl("A1"),
+                intl("U2"),
+                intl("A2"),
+                intl("U3"),
+                intl("A3"),
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    users = [m for m in messages if m.type == "user_message"]
+    assistants = [m for m in messages if m.type == "assistant_message"]
+
+    # All three user turns render, each with only its own audio.
+    assert [_user_payload(m).text for m in users] == [
+        "Hello",
+        "Tell me a fact.",
+        "Thanks!",
+    ]
+    assert [_user_payload(m).content_refs for m in users] == [
+        [intl("U1")],
+        [intl("U2")],
+        [intl("U3")],
+    ]
+    # Assistants keep their own audio (already per-span correct).
+    assert [_assistant_payload(m).content_refs for m in assistants] == [
+        [intl("A1")],
+        [intl("A2")],
+        [intl("A3")],
+    ]
+    # User/assistant alternate in order across the single trace.
+    chat_types = {"user_message", "assistant_message"}
+    assert [m.type for m in messages if m.type in chat_types] == [
+        "user_message",
+        "assistant_message",
+        "user_message",
+        "assistant_message",
+        "user_message",
+        "assistant_message",
+    ]
+
+
+def test_consecutive_user_messages_each_render_with_own_media() -> None:
+    """A turn can be several user messages in a row (no alternation). The
+    trailing run is all of them, and each renders as its own bubble keeping its
+    own media — not a single collapsed bubble that re-groups the audio.
+    """
+
+    def ext(d: str) -> str:
+        return f"weave:///e/p/object/Content:{d}"
+
+    def intl(d: str) -> str:
+        return f"weave-trace-internal:///PID/object/Content:{d}"
+
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("first"), _uri_part(ext("M1"))),
+                },
+                {"role": "assistant", "content": _parts(_text_part("ok"))},
+                # Two user messages in a row before the response.
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("second"), _uri_part(ext("M2"))),
+                },
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("third"), _uri_part(ext("M3"))),
+                },
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("reply"))}
+            ],
+            content_refs=[intl("M1"), intl("M2"), intl("M3")],
+        ),
+    ]
+
+    users = [m for m in build_chat_messages(spans) if m.type == "user_message"]
+    # Only the trailing run ("second", "third") is this span's new turn; the
+    # earlier "first" (before the assistant) is history and is not re-emitted.
+    assert [_user_payload(m).text for m in users] == ["second", "third"]
+    assert [_user_payload(m).content_refs for m in users] == [
+        [intl("M2")],
+        [intl("M3")],
+    ]
 
 
 def test_build_span_tree_sort_is_stable_on_equal_timestamps() -> None:
@@ -771,3 +1443,54 @@ def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
     ]
     roots = build_span_tree(spans)
     assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+
+
+def _nest_in_lists(value: object, levels: int) -> object:
+    """Wrap ``value`` in ``levels`` nested single-element lists.
+
+    Each list level costs one ``_iter_internal_refs`` recursive descent, so the
+    ref sits exactly ``levels`` deep — a deterministic knob for the depth cap.
+    """
+    nested = value
+    for _ in range(levels):
+        nested = [nested]
+    return nested
+
+
+def test_iter_internal_refs_finds_refs_at_normal_depth() -> None:
+    """A realistically nested inline part (message dict -> content JSON ->
+    parts list -> image_url dict -> url string) is well within the cap, so the
+    internal ref is still surfaced exactly as before.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    message = {
+        "role": "user",
+        "content": _parts(
+            _text_part("What is in this image?"),
+            {"type": "image_url", "image_url": {"url": image_internal}},
+        ),
+        "finish_reason": "",
+    }
+    assert list(_iter_internal_refs(message)) == [image_internal]
+
+
+def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
+    """A pathologically deep payload terminates without ``RecursionError``.
+
+    The recursion limit is dwarfed by the nesting depth, so an uncapped walk
+    would blow the interpreter stack. With the cap in place the walk returns
+    cleanly; refs at the cap boundary are surfaced and deeper refs are dropped.
+    """
+    ref = "weave-trace-internal:///PID/object/deep:DIGEST"
+
+    # A ref sitting exactly at the cap is still found; one level deeper is not.
+    assert list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH))) == [
+        ref
+    ]
+    assert (
+        list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH + 1))) == []
+    )
+
+    # Far beyond sys.getrecursionlimit(): must not raise, must yield nothing.
+    pathological = _nest_in_lists(ref, sys.getrecursionlimit() * 2)
+    assert list(_iter_internal_refs(pathological)) == []

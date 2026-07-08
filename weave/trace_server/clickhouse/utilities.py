@@ -12,7 +12,6 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
-import ddtrace
 import sqlparse
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.exceptions import DatabaseError
@@ -23,6 +22,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InsertTooLarge
 from weave.trace_server.kafka import KafkaProducer
+from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +224,24 @@ def datetime_to_microseconds(dt: datetime.datetime) -> int:
     return int(dt.timestamp() * 1_000_000)
 
 
+def started_at_gte_query(dt: datetime.datetime) -> tsi.Query:
+    """A calls query selecting calls with started_at >= dt.
+
+    The literal is unix seconds; the query builder converts it to a datetime
+    string so ClickHouse can prune on the started_at primary key / partition.
+    """
+    return tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [
+                    {"$getField": "started_at"},
+                    {"$literal": datetime_to_microseconds(dt) / 1_000_000},
+                ]
+            }
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # ClickHouse query helpers
 # ---------------------------------------------------------------------------
@@ -380,7 +398,7 @@ def maybe_enqueue_minimal_call_end(
 # ---------------------------------------------------------------------------
 
 
-@ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.find_call_descendants")
+@traced(name="clickhouse_trace_server_batched.find_call_descendants")
 def find_call_descendants(
     root_ids: list[str],
     all_calls: list[tsi.CallSchema],

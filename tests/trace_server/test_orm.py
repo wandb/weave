@@ -1,6 +1,7 @@
 import pytest
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.orm import (
     Column,
     ParamBuilder,
@@ -8,6 +9,8 @@ from weave.trace_server.orm import (
     _transform_external_field_to_internal_field,
     combine_conditions,
     python_value_to_ch_type,
+    quote_json_path,
+    quote_json_path_parts,
     split_escaped_field_path,
 )
 
@@ -61,6 +64,28 @@ def test_combine_conditions():
         combine_conditions(["foo = 'bar'", "bim = 12"], "OR")
         == "((foo = 'bar') OR (bim = 12))"
     )
+
+
+def test_quote_json_path_array_indices():
+    """Non-negative ints bracket-index; negative indices are rejected.
+
+    ClickHouse JSON_VALUE's JSONPath grammar rejects negative array indices
+    (`[-1]`) with BAD_ARGUMENTS, 502-ing the whole request. We reject them at
+    compile time as a client-facing InvalidFieldError (HTTP 422) instead.
+    """
+    assert quote_json_path_parts(["a", "0", "2"]) == '$."a"[0][2]'
+    assert quote_json_path("output.scores.0") == '$."output"."scores"[0]'
+
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        quote_json_path_parts(["turn", "user_prompt_parts", "-1"])
+    with pytest.raises(InvalidFieldError, match="Negative array index '-1'"):
+        quote_json_path("turn.user_prompt_parts.-1")
+    with pytest.raises(InvalidFieldError, match="Negative array index '-2'"):
+        _transform_external_field_to_internal_field(
+            "payload.turn.user_prompt_parts.-2",
+            all_columns=["payload_dump"],
+            json_columns=["payload"],
+        )
 
 
 def test_transform_external_field_to_internal_field():
@@ -255,6 +280,66 @@ def test_join_with_join_type():
         == """SELECT id, name
 FROM users
 inner JOIN roles ON (table1.id = table2.id)"""
+    )
+
+
+def test_join_global():
+    table1 = Table(
+        "users",
+        [
+            Column("id", "string"),
+            Column("creator", "string", nullable=True),
+            Column("payload", "json", db_name="payload_dump"),
+        ],
+    )
+    table2 = Table(
+        "roles",
+        [
+            Column("id", "string"),
+            Column("name", "string"),
+        ],
+    )
+
+    select = (
+        table1.select()
+        .fields(["id", "name"])
+        .join(
+            table2,
+            tsi.Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "table1.id"},
+                            {"$getField": "table2.id"},
+                        ]
+                    }
+                }
+            ),
+            "LEFT",
+            global_=True,
+        )
+    )
+
+    prepared = select.prepare()
+
+    assert (
+        prepared.sql
+        == """SELECT id, name
+FROM users
+GLOBAL LEFT JOIN roles ON (table1.id = table2.id)"""
+    )
+
+    join_query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "table1.id"}, {"$getField": "table2.id"}]}}
+    )
+    no_type = (
+        table1.select().fields(["id", "name"]).join(table2, join_query, global_=True)
+    )
+    assert (
+        no_type.prepare().sql
+        == """SELECT id, name
+FROM users
+GLOBAL JOIN roles ON (table1.id = table2.id)"""
     )
 
 

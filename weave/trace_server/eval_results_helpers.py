@@ -12,7 +12,6 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from typing import Any
 
-import ddtrace
 from pydantic import ValidationError
 
 from weave.shared import refs_internal as ri
@@ -21,6 +20,7 @@ from weave.trace_server import constants
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.tracing import traced
 
 _SUPPORTED_SORT_PREFIXES = (
     "scores.",
@@ -238,6 +238,47 @@ def extract_total_tokens(
     return total_tokens if found_any else None
 
 
+# The four components of a call's spent cost, summed to the canonical total_cost
+# (see the total_cost definition in trace_server_interface.py). Populated in
+# summary.weave.costs when calls are read with include_costs=True.
+_COST_COMPONENT_KEYS = (
+    "prompt_tokens_total_cost",
+    "completion_tokens_total_cost",
+    "cache_read_input_tokens_total_cost",
+    "cache_creation_input_tokens_total_cost",
+)
+
+
+def extract_total_cost(
+    summary: "dict[str, Any] | tsi.SummaryMap | None",
+) -> float | None:
+    """Return the total cost from summary.weave.costs if present.
+
+    Sums the four spent-cost components across all models. Returns None when no
+    cost data is present (e.g. the model is not in the cost table) so callers
+    can tell "no cost reported" apart from a real $0.
+    """
+    if not isinstance(summary, dict):
+        return None
+    weave_summary = summary.get("weave")
+    if not isinstance(weave_summary, dict):
+        return None
+    costs = weave_summary.get("costs")
+    if not isinstance(costs, dict):
+        return None
+    total_cost = 0.0
+    found_any = False
+    for model_cost in costs.values():
+        if not isinstance(model_cost, dict):
+            continue
+        for key in _COST_COMPONENT_KEYS:
+            value = model_cost.get(key)
+            if isinstance(value, (int, float)):
+                total_cost += float(value)
+                found_any = True
+    return total_cost if found_any else None
+
+
 def best_effort_scorer_call_ids(
     scores: dict[str, Any], child_calls: list[tsi.CallSchema]
 ) -> dict[str, str]:
@@ -361,12 +402,16 @@ def _build_trial(
         total_tokens=extract_total_tokens(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
+        # Predict-only: read cost from the predict call alone. Unlike tokens, do
+        # not fall back to the predict_and_score summary, whose cost rollup would
+        # include the LLM-as-a-judge scorer.
+        total_cost=extract_total_cost(predict_call.summary) if predict_call else None,
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
         genai_span_ref=_combine_genai_span_refs(predict_call, predict_and_score_call),
     )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows_from_calls")
+@traced(name="eval_results_helpers.build_eval_rows_from_calls")
 def build_eval_rows_from_calls(
     predict_and_score_calls: list[tsi.CallSchema],
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -432,7 +477,7 @@ def finalize_rows(
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows")
+@traced(name="eval_results_helpers.build_eval_rows")
 def build_eval_rows(
     page_calls: list[tsi.CallSchema],
     eval_root_ids: list[str],
@@ -541,7 +586,7 @@ def resolve_eval_row_refs(
     return []
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_grouped_rows")
+@traced(name="eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
     req: tsi.EvalResultsQueryReq,
     eval_root_ids: list[str],
@@ -575,7 +620,7 @@ def eval_results_grouped_rows(
     )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.fetch_eval_root_metadata")
+@traced(name="eval_results_helpers.fetch_eval_root_metadata")
 def fetch_eval_root_metadata(
     server: tsi.TraceServerInterface,
     project_id: str,
@@ -617,7 +662,7 @@ def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
                 )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_query")
+@traced(name="eval_results_helpers.eval_results_query")
 def eval_results_query(
     server: tsi.TraceServerInterface,
     req: tsi.EvalResultsQueryReq,
@@ -743,7 +788,7 @@ def _process_scorer_output(
             )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.compute_summary_from_rows")
+@traced(name="eval_results_helpers.compute_summary_from_rows")
 def compute_summary_from_rows(
     rows: list[tsi.EvalResultsRow],
     eval_call_metadata: dict[str, dict[str, Any]] | None = None,
@@ -784,6 +829,14 @@ def compute_summary_from_rows(
 
             for trial in eval_entry.trials:
                 eval_summary_map[eval_call_id].trial_count += 1
+                if trial.total_tokens is not None:
+                    eval_summary_map[eval_call_id].predict_total_tokens = (
+                        eval_summary_map[eval_call_id].predict_total_tokens or 0
+                    ) + trial.total_tokens
+                if trial.total_cost is not None:
+                    eval_summary_map[eval_call_id].predict_total_cost = (
+                        eval_summary_map[eval_call_id].predict_total_cost or 0.0
+                    ) + trial.total_cost
                 for scorer_key, scorer_val in trial.scores.items():
                     _process_scorer_output(
                         scorer_val,

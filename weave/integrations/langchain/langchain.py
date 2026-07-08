@@ -53,6 +53,7 @@ from weave.integrations.patcher import Patcher
 from weave.trace.call import Call
 from weave.trace.context import call_context, weave_client_context
 from weave.trace.op_protocol import OpKind
+from weave.trace.serialization.serialize import stable_repr
 
 import_failed = False
 
@@ -97,7 +98,7 @@ if not import_failed:
             return list(obj)
 
         try:
-            return repr(obj)
+            return stable_repr(obj)
         except Exception:
             return f"<{type(obj).__name__}>"
 

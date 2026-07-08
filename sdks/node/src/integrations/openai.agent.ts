@@ -13,7 +13,7 @@
 
 import type OpenAIAgents from '@openai/agents';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import type {SpanData, TracingProcessor} from '@openai/agents';
+import type {TracingProcessor} from '@openai/agents';
 import {getGlobalClient} from '../clientApi';
 import {defaultSettings} from '../settings';
 import {WeaveOtelTracingProcessor} from './openai-agents/weave-otel-tracing-processor';

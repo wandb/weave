@@ -251,7 +251,7 @@ export class InMemoryTraceServer {
   };
 
   feedback = {
-    feedbackCreateFeedbackCreatePost: async (req: any) => {
+    feedbackCreateFeedbackCreatePost: async (_req: any) => {
       // Stub implementation for feedback API (used by scorer feedback attachment)
       return {
         data: {
@@ -261,7 +261,7 @@ export class InMemoryTraceServer {
     },
   };
 
-  private generateDigest(data: any): string {
+  private generateDigest(_data: any): string {
     // In a real implementation, you'd want to use a proper hashing algorithm.
     // For simplicity, we're using uuidv7 here.
     return uuidv7();

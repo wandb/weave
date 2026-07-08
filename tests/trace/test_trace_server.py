@@ -2,7 +2,6 @@ import urllib
 
 import pytest
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.shared.refs_internal import InvalidInternalRef
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import RefObjectsNotFoundError
@@ -85,7 +84,6 @@ def test_robust_to_url_sensitive_chars(client):
     assert read_res.vals[0] == bad_val[bad_key]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_refs_read_batch_missing_refs_reports_digests(client):
     project_id = client.project_id
     create_res = client.server.obj_create(

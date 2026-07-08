@@ -229,6 +229,11 @@ class EndedCallSchemaForInsert(BaseModel):
     # /call/upsert_batch, and v2 call/end (via EndedCallSchemaForInsertWithStartedAt).
     trace_id: str | None = None
 
+    # Eval marker the SDK sets on the call-end so a server-side ingest sampler
+    # can keep/drop eval calls whose end arrives bare. Optional for backward
+    # compatibility: None/absent means "client did not say" (server keeps).
+    is_eval: bool | None = None
+
     # End time is required
     ended_at: datetime.datetime
 
@@ -2062,6 +2067,170 @@ class AnnotatorQueueItemsProgressUpdateRes(BaseModel):
     item: AnnotationQueueItemSchema
 
 
+# ============================================================================
+# Dataset Sources API
+#
+# `dataset_sources` links dataset rows to their provenance sources (a "source"
+# is either a Weave call or an agent span). This is the second instance of the
+# membership pattern (see annotation_queue_items, migration 023/034).
+# ============================================================================
+
+# Maximum number of (row_digest, source) tuples that may be linked in a single
+# dataset_sources_link request (after flattening DatasetSourceLinkPayload.sources).
+MAX_DATASET_SOURCE_LINKS_PER_REQUEST = 1000
+
+# Maximum number of row_digests returned per SourceDatasetMembership; beyond
+# this the list is truncated and row_digests_truncated is set True.
+MAX_ROW_DIGESTS_PER_RESULT = 100
+
+
+class SourceKind(str, Enum):
+    CALL = "call"
+    SPAN = "span"
+    CONVERSATION = "conversation"
+
+
+class SourceRef(BaseModel):
+    """Reference to a provenance source (a call, an agent span, or a
+    conversation).
+    """
+
+    source_kind: SourceKind
+    # call_id for calls, span_id for spans, conversation_id for conversations.
+    source_id: str
+    # Part of the logical key: lookup key for spans, cached display field for
+    # calls. Conversations span traces, so this is "" for conversation refs
+    # (conversation_id is self-sufficient identity).
+    source_trace_id: str
+
+
+class DatasetSourceLinkPayload(BaseModel):
+    """A single dataset row and the sources to link to it."""
+
+    row_digest: str
+    sources: list[SourceRef]
+    link_metadata: dict[str, Any] | None = None
+
+
+class DatasetSourcesLinkReq(BaseModelStrict):
+    """Request to link dataset rows to their provenance sources."""
+
+    project_id: str = Field(examples=["entity/project"])
+    dataset_object_id: str
+    # Audit-log only, not stored on the dataset_sources rows.
+    dataset_digest: str
+    links: list[DatasetSourceLinkPayload]
+    # When False, skip the pre-insert lookup; entries return created=None
+    # (strictly meaning "not requested").
+    include_created_status: bool = False
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesLinkResEntry(BaseModel):
+    """Result for a single flattened (row_digest, source) link."""
+
+    link_id: str
+    # None strictly means include_created_status was False on the request.
+    created: bool | None = None
+
+
+class DatasetSourcesLinkRes(BaseModel):
+    """Response from linking dataset rows to sources.
+
+    One entry per flattened (row_digest, source) tuple, in input order.
+    """
+
+    entries: list[DatasetSourcesLinkResEntry]
+
+
+class DatasetSourcesLinkDeleteReq(BaseModelStrict):
+    """Request to soft-delete dataset source links by id."""
+
+    project_id: str = Field(examples=["entity/project"])
+    link_ids: list[str]
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesLinkDeleteResEntry(BaseModel):
+    """Result for a single link deletion."""
+
+    link_id: str
+    deleted: bool  # False = was already soft-deleted
+
+
+class DatasetSourcesLinkDeleteRes(BaseModel):
+    """Response from deleting dataset source links."""
+
+    entries: list[DatasetSourcesLinkDeleteResEntry]
+
+
+class DatasetSourceLinkSchema(BaseModel):
+    """Schema for a single dataset source link row."""
+
+    id: str
+    row_digest: str
+    source_kind: SourceKind
+    source_id: str
+    source_trace_id: str
+    source_started_at: datetime.datetime
+    source_display_name: str
+    link_metadata: dict[str, Any] | None = None
+    added_by: str | None = None  # wb_user_id (nullable)
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    deleted_at: datetime.datetime | None = None
+
+
+class DatasetSourcesQueryReq(BaseModelStrict):
+    """Forward query: dataset -> sources."""
+
+    project_id: str = Field(examples=["entity/project"])
+    dataset_object_id: str
+    row_digests: list[str] | None = None
+    source_kinds: list[SourceKind] | None = None
+    include_deleted: bool = False
+    limit: int | None = None
+    offset: int | None = None
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class DatasetSourcesQueryRes(BaseModel):
+    """Response from the forward dataset -> sources query."""
+
+    links: list[DatasetSourceLinkSchema]
+
+
+class SourceDatasetsQueryReq(BaseModelStrict):
+    """Reverse query: sources -> datasets."""
+
+    project_id: str = Field(examples=["entity/project"])
+    sources: list[SourceRef]
+    include_deleted: bool = False
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class SourceDatasetMembership(BaseModel):
+    """Membership of a single (source, dataset) pair in the reverse query."""
+
+    source_kind: SourceKind
+    source_id: str
+    source_trace_id: str
+    dataset_object_id: str
+    # Capped at MAX_ROW_DIGESTS_PER_RESULT. When truncated, this is the
+    # deterministic lexicographically-smallest N digests, not an arbitrary subset.
+    row_digests: list[str]
+    row_digests_truncated: bool
+    row_digests_total_count: int
+    # Earliest created_at across non-deleted links for this (source, dataset) pair.
+    first_seen_at: datetime.datetime
+
+
+class SourceDatasetsQueryRes(BaseModel):
+    """Response from the reverse sources -> datasets query."""
+
+    memberships: list[SourceDatasetMembership]
+
+
 # Thread API
 
 
@@ -3123,6 +3292,14 @@ class EvalResultsQueryBody(BaseModelStrict):
             "scorer_call_ids will be null/empty)."
         ),
     )
+    include_costs: bool = Field(
+        default=False,
+        description=(
+            "When true, enrich the predict-and-score child calls with cost so "
+            "the summary can report predict-only `predict_total_cost`. Opt-in: "
+            "other callers skip the cost computation."
+        ),
+    )
     sort_by: list[EvalResultsSortBy] | None = Field(
         default=None,
         description=(
@@ -3134,6 +3311,14 @@ class EvalResultsQueryBody(BaseModelStrict):
     filters: list[EvalResultsFilter] | None = Field(
         default=None,
         description="Filters applied to grouped rows. Multiple filters are AND'd together.",
+    )
+    filter_logic_operator: Literal["and", "or"] = Field(
+        default="or",
+        description=(
+            "How to combine filters across evaluations: 'and' (Match All - row must "
+            "match in ALL evals) or 'or' (Match Any - row must match in ANY eval). "
+            "Defaults to 'or' (Match Any)."
+        ),
     )
     limit: int | None = Field(
         default=None,
@@ -3167,6 +3352,7 @@ class EvalResultsTrial(BaseModel):
     scores: dict[str, Any] = Field(default_factory=dict)
     model_latency_seconds: float | None = None
     total_tokens: int | None = None
+    total_cost: float | None = None
     scorer_call_ids: dict[str, str] = Field(default_factory=dict)
     genai_span_ref: list[GenAISpanRef] | None = None
 
@@ -3220,6 +3406,22 @@ class EvalResultsEvaluationSummary(BaseModel):
     evaluation_call_id: str
     trial_count: int = 0
     scorer_stats: list[EvalResultsScorerStats] = Field(default_factory=list)
+    predict_total_tokens: int | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only token usage for this evaluation "
+            "(the model's predict() tokens only, excluding LLM-as-a-judge "
+            "scorer usage); None when no trial reports usage."
+        ),
+    )
+    predict_total_cost: float | None = Field(
+        default=None,
+        description=(
+            "Sum of per-trial predict-only cost for this evaluation (the "
+            "model's predict() cost only, excluding LLM-as-a-judge scorer "
+            "cost); None when no trial reports cost."
+        ),
+    )
     evaluation_ref: str | None = None
     model_ref: str | None = None
     display_name: str | None = None
@@ -3264,6 +3466,9 @@ class TraceServerInterface(Protocol):
     def agent_conversation_chat(
         self, req: agent_types.AgentConversationChatReq
     ) -> agent_types.AgentConversationChatRes: ...
+    def agent_conversation_spans(
+        self, req: agent_types.AgentConversationSpansReq
+    ) -> agent_types.AgentConversationSpansRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
@@ -3402,6 +3607,23 @@ class TraceServerInterface(Protocol):
     def annotator_queue_items_progress_update(
         self, req: AnnotatorQueueItemsProgressUpdateReq
     ) -> AnnotatorQueueItemsProgressUpdateRes: ...
+
+    # Dataset Sources API
+    def dataset_sources_link(
+        self, req: DatasetSourcesLinkReq
+    ) -> DatasetSourcesLinkRes: ...
+
+    def dataset_sources_link_delete(
+        self, req: DatasetSourcesLinkDeleteReq
+    ) -> DatasetSourcesLinkDeleteRes: ...
+
+    def dataset_sources_query(
+        self, req: DatasetSourcesQueryReq
+    ) -> DatasetSourcesQueryRes: ...
+
+    def source_datasets_query(
+        self, req: SourceDatasetsQueryReq
+    ) -> SourceDatasetsQueryRes: ...
 
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...

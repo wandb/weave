@@ -271,9 +271,7 @@ class ObjectRefCondition(BaseModel):
         field_sql = f"{table_alias}.{root_field}"
         if use_agg_fn:
             field_sql = f"any({field_sql})"
-        json_extract_sql = json_dump_field_as_sql(
-            pb, table_alias, field_sql, key_parts, use_agg_fn=use_agg_fn
-        )
+        json_extract_sql = json_dump_field_as_sql(pb, table_alias, field_sql, key_parts)
 
         if is_order_join:
             # For joins, we need to handle both object refs and table row refs

@@ -215,14 +215,20 @@ def validate_feedback_create_req(
         data = trace_server.refs_read_batch(
             tsi.RefsReadBatchReq(refs=[req.annotation_ref])
         )
-        if len(data.vals) == 0:
+        # A deleted annotation spec resolves to a None val, not an empty list.
+        spec = data.vals[0] if data.vals else None
+        if spec is None:
             raise InvalidRequest(f"Annotation ref {req.annotation_ref} not found")
 
         # 3. Validate the payload against the annotation spec
         value = req.payload["value"]
-        spec = data.vals[0]
-        is_valid = AnnotationSpec.model_validate(spec).value_is_valid(value)
-        if not is_valid:
+        try:
+            annotation_spec = AnnotationSpec.model_validate(spec)
+        except ValidationError as e:
+            raise InvalidRequest(
+                f"Annotation ref {req.annotation_ref} is not a valid annotation spec"
+            ) from e
+        if not annotation_spec.value_is_valid(value):
             raise InvalidRequest("Feedback payload does not match annotation spec")
     if req.runnable_ref:
         ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))

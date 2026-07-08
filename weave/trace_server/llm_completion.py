@@ -7,7 +7,6 @@ from cachetools import TTLCache
 from litellm import CustomStreamWrapper
 from pydantic import BaseModel
 
-from weave.prompt.prompt import format_message_with_template_vars
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -36,6 +35,45 @@ _custom_provider_cache: TTLCache[tuple[str, str, str], "CustomProviderInfo"] = T
     ttl=CUSTOM_PROVIDER_CACHE_TTL_SECONDS,
 )
 _custom_provider_cache_lock = threading.Lock()
+
+
+# Vendored from weave.prompt.prompt to keep the trace server free of client-SDK
+# imports (the client keeps its own copy). The logic is small and the two are
+# deliberately not shared via a common module.
+class IncorrectPromptVarError(Exception):
+    """Raised when prompt template variables are incorrect or missing."""
+
+
+def format_message_with_template_vars(message: dict, **kwargs: Any) -> dict:
+    """Format a message dictionary by replacing template variables.
+
+    Recursively processes message dictionaries, replacing template variables in
+    string values using Python's ``.format()`` syntax, including nested
+    multimodal content lists.
+
+    Raises:
+        IncorrectPromptVarError: If a template variable is not found in kwargs.
+    """
+    formatted: dict[str, Any] = {}
+    for key, value in message.items():
+        if isinstance(value, str):
+            try:
+                formatted[key] = value.format(**kwargs)
+            except KeyError as e:
+                missing_key = e.args[0] if e.args else str(e).strip("'\"")
+                available_keys = ", ".join(sorted(kwargs.keys()))
+                raise IncorrectPromptVarError(
+                    f"Prompt template variable '{missing_key}' not found. "
+                    f"Available variables: {available_keys}"
+                ) from e
+        elif isinstance(value, list) and all(isinstance(d, dict) for d in value):
+            # Recursively format nested dicts in lists
+            formatted[key] = [
+                format_message_with_template_vars(d, **kwargs) for d in value
+            ]
+        else:
+            formatted[key] = value
+    return formatted
 
 
 def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
@@ -345,9 +383,20 @@ def _build_litellm_kwargs(
     return completion_kwargs
 
 
+# Key in the `CompletionsCreateRes.response` error payload holding the provider
+# HTTP status code, so consumers can classify a failure by status class (4xx
+# account/config vs 5xx availability) instead of matching the error string.
+ERROR_STATUS_CODE_KEY = "error_status_code"
+
+
 def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
-    error_message = str(e).replace("litellm.", "")
-    return tsi.CompletionsCreateRes(response={"error": error_message})
+    response: dict[str, Any] = {"error": str(e).replace("litellm.", "", 1)}
+    # litellm exceptions subclass the openai error hierarchy and carry the
+    # provider HTTP status code; preserve it for status-class classification.
+    status_code = getattr(e, "status_code", None)
+    if isinstance(status_code, int):
+        response[ERROR_STATUS_CODE_KEY] = status_code
+    return tsi.CompletionsCreateRes(response=response)
 
 
 def get_bedrock_credentials(

@@ -827,7 +827,7 @@ function commonProxy(exports: any) {
   const OriginalOpenAIClass = exports.OpenAI;
 
   return new Proxy(OriginalOpenAIClass, {
-    construct(target, args, newTarget) {
+    construct(target, args, _newTarget) {
       const instance = new target(...args);
       return wrapOpenAI(instance);
     },

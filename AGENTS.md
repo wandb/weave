@@ -94,6 +94,32 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
 
+### Assert on the complete payload (no substring / membership checks)
+
+Assert on the **full value**, not that a fragment appears somewhere inside a
+stringified payload. Substring (`in`) and membership checks pass on accidental
+matches and let the rest of the payload drift undetected, so prefer them only
+when membership in a collection is genuinely the contract under test.
+
+❌ **Never do this:**
+
+```python
+assert "short memo" in msg                 # substring of a serialized blob
+assert "error" in str(response)
+assert "note" in feedback.payload          # key-presence instead of value
+```
+
+✅ **Always do this:**
+
+```python
+assert feedback.payload == {"note": "short memo", "emoji": "👍"}  # whole object
+assert feedback.payload["note"] == "short memo"                   # exact field
+```
+
+If you only care about one field, pin that field with `==`; if you care about
+the shape, compare the whole dict/object. The same rule applies to SQL: assert
+the complete query string, never `assert "WHERE x" in sql`.
+
 ### VCR + ClickHouse isolation (integration tests)
 
 - Integration tests replay provider traffic from VCR cassettes while the weave
@@ -240,20 +266,45 @@ nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langch
 
 ## Typescript Testing Guidelines
 
+The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
+and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
+`npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
+(`TypeError: Cannot read properties of null (reading 'matches')`).
+
 ```
 cd sdks/node
-npm i
-npm run test
+pnpm install
+pnpm test
+```
+
+To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
+(`import 'weave'` self-resolves via the package `exports` to `dist/index.mjs`);
+`pnpm install` builds it via the `prepare` script. Then:
+
+```
+pnpm exec tsx examples/claudeAgents.ts
 ```
 
 ## Code Review & PR Guidelines
 
 ### PR Requirements
 
-- Title format: Must start with one of:
-  - `chore(weave):` - For maintenance tasks
-  - `feat(weave):` - For new features
-  - `fix(weave):` - For bug fixes
+- Title format: `<type>(<scope>): <description>`, where `<type>` is one of
+  `chore`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `security`,
+  `test`. A scope is **required** (`requireScope: true`) and CI validates it
+  (`.github/workflows/pr.yaml`).
+- **Pick the scope by which SDK/area the change touches:**
+  - `weave_ts` — **required for ALL TypeScript / Node SDK changes** (anything
+    under `sdks/node/`). Any PR that modifies the TS SDK must be marked
+    `(weave_ts)`, e.g. `fix(weave_ts): ...`, `feat(weave_ts): ...`,
+    `chore(weave_ts): ...`.
+  - `weave` — the Python SDK and trace server (the default for `weave/…`
+    changes), e.g. `fix(weave): ...`, `feat(weave): ...`, `chore(weave): ...`.
+  - Other valid scopes (see `pr.yaml` for the authoritative list): `ui`, `app`,
+    `dev`, `deps`, `inference`.
+- If a single PR spans both the Python and TS SDKs, prefer splitting it; if that
+  isn't practical, scope it to the SDK that carries the primary change and call
+  out the other in the PR body.
 - Provide detailed PR summaries including:
   - Purpose of changes
   - Testing performed

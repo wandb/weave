@@ -1,40 +1,159 @@
-"""Datadog integration utilities for trace server."""
+"""DogStatsD counter emission + DD-flavored OTel span-tag helpers.
+
+Emits a single counter (`weave_trace_server.db_inserts`) over a UDP socket.
+Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import logging
-from collections.abc import Callable, Generator, Iterator
+import os
+import socket
+import threading
+from collections.abc import Callable, Generator
 from contextvars import ContextVar
-from functools import lru_cache, wraps
-from typing import TYPE_CHECKING, Any
+from functools import wraps
+from typing import Any
+from urllib.parse import urlparse
 
-import ddtrace
-from ddtrace.internal.agent import config as _agent_config
-from ddtrace.internal.dogstatsd import get_dogstatsd_client
+from opentelemetry import trace as _otel_trace
 
-if TYPE_CHECKING:
-    from ddtrace.vendor.dogstatsd.base import DogStatsd
+from weave.trace_server.tracing_root import get_local_root
 
 logger = logging.getLogger(__name__)
 
 DB_INSERT_METRIC = "weave_trace_server.db_inserts"
 DB_INSERT_PATH_UNKNOWN = "unknown"
 
+_DEFAULT_HOST = "localhost"
+_DEFAULT_PORT = 8125
+
 _db_insert_path: ContextVar[str] = ContextVar(
     "_db_insert_path", default=DB_INSERT_PATH_UNKNOWN
 )
 
 
-@lru_cache(maxsize=1)
-def _dogstatsd_client() -> DogStatsd:
-    """Process-wide DogStatsd client; lazy so import is side-effect free.
+def _parse_port(raw: str | None, *, default: int = _DEFAULT_PORT) -> int:
+    """Parse a port string, falling back to `default` for missing or invalid.
 
-    URL resolves from `DD_DOGSTATSD_URL` via ddtrace's agent config, so
-    Helm-injected env vars flow through without extra wiring.
+    A non-numeric `DD_DOGSTATSD_PORT` must not crash the process at import
+    time — this module is imported by ~11 callers, and one bad env var
+    would take the whole trace server down.
     """
-    return get_dogstatsd_client(str(_agent_config.dogstatsd_url))
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid port %r; falling back to %d", raw, default)
+        return default
+
+
+def _resolve_dogstatsd_addr() -> tuple[str, int]:
+    """Honor `DD_DOGSTATSD_URL` (`udp://host:port`), then
+    `DD_AGENT_HOST` + `DD_DOGSTATSD_PORT`, then `localhost:8125`.
+    """
+    url = os.environ.get("DD_DOGSTATSD_URL")
+    if url:
+        try:
+            parsed = urlparse(url if "://" in url else f"udp://{url}")
+            if parsed.hostname:
+                return parsed.hostname, parsed.port or _DEFAULT_PORT
+        except ValueError:
+            logger.warning(
+                "Could not parse DD_DOGSTATSD_URL=%r; falling back to %s:%d",
+                url,
+                _DEFAULT_HOST,
+                _DEFAULT_PORT,
+            )
+    host = os.environ.get("DD_AGENT_HOST", _DEFAULT_HOST)
+    port = _parse_port(os.environ.get("DD_DOGSTATSD_PORT"))
+    return host, port
+
+
+def _resolve_unified_tags() -> list[str]:
+    """Constant `service`/`env`/`version` tags from the DD unified-service env vars.
+
+    Sent on every counter so the metric is attributed even over transports
+    without agent origin detection (UDP host-port, including QA).
+    """
+    by_tag = {
+        "service": os.environ.get("DD_SERVICE"),
+        "env": os.environ.get("DD_ENV"),
+        "version": os.environ.get("DD_VERSION"),
+    }
+    return [f"{tag}:{value}" for tag, value in by_tag.items() if value]
+
+
+def format_packet(metric: str, value: int, tags: list[str]) -> bytes:
+    """Format a DogStatsD counter packet. Public so tests can pin the wire format."""
+    tag_suffix = f"|#{','.join(tags)}" if tags else ""
+    return f"{metric}:{value}|c{tag_suffix}".encode()
+
+
+class _StatsDClient:
+    """Best-effort, fire-and-forget DogStatsD UDP client.
+
+    Resolves the address once and connects the socket, so each `emit`
+    is a single non-blocking `send()` — no per-call DNS, no per-call
+    address lookup. A failed `connect()` (e.g. DNS resolution failure
+    at startup) disables the client; subsequent emits are no-ops.
+    """
+
+    def __init__(self, host: str, port: int) -> None:
+        self._addr = (host, port)
+        self._sock: socket.socket | None = None
+        self._init_failed = False
+        self._lock = threading.Lock()
+
+    def _ensure_socket(self) -> socket.socket | None:
+        # Fast path: already initialized.
+        if self._sock is not None:
+            return self._sock
+        if self._init_failed:
+            return None
+        with self._lock:
+            # Re-check under lock — another thread may have set it up.
+            if self._sock is not None:
+                return self._sock
+            if self._init_failed:
+                return None
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setblocking(False)
+                # `connect()` resolves the hostname once and binds the
+                # UDP socket's default destination — eliminates per-call
+                # DNS on `sendto` (which `setblocking(False)` does NOT
+                # make non-blocking).
+                sock.connect(self._addr)
+            except OSError as exc:
+                logger.warning(
+                    "DogStatsD init failed for %s:%d (%s); metrics disabled",
+                    self._addr[0],
+                    self._addr[1],
+                    exc,
+                )
+                self._init_failed = True
+                return None
+            self._sock = sock
+            return sock
+
+    def emit(self, metric: str, value: int, tags: list[str]) -> None:
+        sock = self._ensure_socket()
+        if sock is None:
+            return
+        try:
+            sock.send(format_packet(metric, value, tags))
+        except OSError:
+            # Transient send failures don't interrupt the caller. We do
+            # not log here — a noisy agent restart would flood logs.
+            pass
+
+
+_client = _StatsDClient(*_resolve_dogstatsd_addr())
+_UNIFIED_TAGS = _resolve_unified_tags()
 
 
 @contextlib.contextmanager
@@ -62,13 +181,11 @@ def db_insert_path(path: str) -> Generator[None, None, None]:
 def tag_db_insert_path(
     path: str,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Decorator: tag DB inserts done inside `func` with `path:<path>`.
+    """Decorator form of `db_insert_path`.
 
-    Convenience over `db_insert_path` for decorating public API methods
-    whose entire body should be attributed to a single ingestion path.
-
-    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry the
-    contextvar, so a caller handing CH writes to an executor must `copy_context().run`.
+    Coroutine-safe (tag spans awaits). `run_in_executor` does NOT carry
+    the contextvar, so a caller handing CH writes to an executor must
+    `copy_context().run`.
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
@@ -92,87 +209,36 @@ def tag_db_insert_path(
 
 
 def record_db_insert(*, table: str, count: int, path: str | None = None) -> None:
-    """Emit a dogstatsd counter for rows inserted into the trace-server DB.
+    """Emit a counter for rows inserted into the trace-server DB.
 
     `path` falls back to the current `db_insert_path()` contextvar if
-    not provided; pass it explicitly from background flushers where the
+    not provided; pass explicitly from background flushers where the
     contextvar may not be set.
     """
     if count <= 0:
         return
     resolved_path = path if path is not None else _db_insert_path.get()
-    _dogstatsd_client().increment(
+    _client.emit(
         DB_INSERT_METRIC,
-        value=count,
-        tags=[f"table:{table}", f"path:{resolved_path}"],
+        count,
+        [f"table:{table}", f"path:{resolved_path}", *_UNIFIED_TAGS],
     )
 
 
-def generator_trace(
-    span_name: str,
-) -> Callable[
-    [Callable[..., Iterator[Any]]], Callable[..., Generator[Any, None, None]]
-]:
-    """Like @ddtrace.tracer.wrap but treats GeneratorExit as a normal completion.
-
-    @ddtrace.tracer.wrap on a generator function marks the span as an error when
-    the consumer closes the iterator early (e.g. explicit gen.close() call or client
-    disconnect), because ddtrace propagates GeneratorExit through yield from and marks
-    the span as errored. This decorator catches GeneratorExit and lets the span finish
-    cleanly instead.
-    """
-
-    def decorator(
-        func: Callable[..., Iterator[Any]],
-    ) -> Callable[..., Generator[Any, None, None]]:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Generator[Any, None, None]:
-            with ddtrace.tracer.trace(span_name):
-                try:
-                    yield from func(*args, **kwargs)
-                except GeneratorExit:
-                    pass  # Normal early-close — not an application error
-
-        return wrapper
-
-    return decorator
+def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
+    """Set attributes on the currently active OTel span. No-op if none recording."""
+    span = _otel_trace.get_current_span()
+    if span.is_recording():
+        span.set_attributes(tags)
 
 
 def set_root_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set tags on the current root span for Datadog tracing.
+    """Set attributes on the local root span (the entry-point span recorded
+    by `local_root_scope` at the request / batch boundary).
 
-    Args:
-        tags: Dictionary of tags to set on the root span.
-            Keys should be tag names and values can be strings, floats, or ints.
-
-    Examples:
-        Set performance metrics on the root span:
-        >>> set_root_span_dd_tags({"query.duration_ms": 42.5, "query.rows": 100})
-
-        Set status information:
-        >>> set_root_span_dd_tags({"cache.hit": "true", "cache.key": "abc123"})
+    No-op if no `local_root_scope` is active.
     """
-    root_span = ddtrace.tracer.current_root_span()
-    if root_span is None:
-        logger.debug("No root span")
-    else:
-        root_span.set_tags(tags)
-
-
-def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:
-    """Set tags on the current span for Datadog tracing.
-
-    This sets tags on the current span (which may be nested), as opposed to
-    the root span of the trace.
-
-    Args:
-        tags: Dictionary of tags to set on the current span.
-            Keys should be tag names and values can be strings, floats, or ints.
-
-    Examples:
-        Set operation metadata on the current span:
-        >>> set_current_span_dd_tags({"operation.count": 100, "operation.table": "calls"})
-    """
-    current_span = ddtrace.tracer.current_span()
-    if current_span is not None:
-        current_span.set_tags(tags)
+    span = get_local_root()
+    if span is None:
+        return
+    span.set_attributes(tags)

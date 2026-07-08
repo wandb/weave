@@ -4,10 +4,8 @@ import uuid
 from datetime import datetime
 from unittest.mock import patch
 
-import pytest
 from litellm.types.utils import ModelResponse
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.settings import override_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
@@ -270,7 +268,6 @@ def test_custom_provider_model_classes():
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_custom_provider_completions_create(client):
     """Test the completions_create endpoint with a custom provider.
 
@@ -380,7 +377,6 @@ def test_custom_provider_completions_create(client):
             _secret_fetcher_context.reset(token)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_custom_provider_ollama_model(client):
     """Test handling of ollama models that need special prefixing."""
     # Create provider ID and model ID for testing
@@ -453,7 +449,6 @@ def test_custom_provider_ollama_model(client):
             _secret_fetcher_context.reset(token)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_custom_provider_trailing_slash_normalization(client):
     """Test that trailing slashes in base_url are stripped to prevent redirect issues.
 
@@ -569,7 +564,6 @@ def test_get_custom_provider_info():
         _secret_fetcher_context.reset(token)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_error_handling_custom_provider(client):
     """Test error handling for custom provider."""
     # Create provider ID and model ID for testing
@@ -611,7 +605,6 @@ def test_error_handling_custom_provider(client):
             _secret_fetcher_context.reset(token)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_custom_provider_invalid_model_format(client):
     """Test error handling for invalid model format."""
     # Use an invalid model format (no slash)

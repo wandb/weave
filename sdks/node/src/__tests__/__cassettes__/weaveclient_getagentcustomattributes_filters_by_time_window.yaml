@@ -1,0 +1,66 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:20:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.16.0
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Fri, 26 Jun 2026 15:20:22 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: c6029ef8eb03f99c18b46c1d5573ee44
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/spans/custom-attrs/schema
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","started_after":"2026-06-15T00:00:00Z","started_before":"2026-06-23T00:00:00Z"}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      content-length: "1105"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 15:20:22 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"attributes":[{"source":"custom_attrs_string","key":"weave.openai_agents.span_id","value_type":"string","span_count":56},{"source":"custom_attrs_string","key":"weave.openai_agents.trace_id","value_type":"string","span_count":56},{"source":"custom_attrs_string","key":"weave.openai_agents.agent.output_type","value_type":"string","span_count":13},{"source":"custom_attrs_string","key":"weave.openai_agents.agent.tools","value_type":"string","span_count":13},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.city","value_type":"string","span_count":12},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.unit","value_type":"string","span_count":12},{"source":"custom_attrs_string","key":"gen_ai.tool.call.arguments.expression","value_type":"string","span_count":6},{"source":"custom_attrs_int","key":"weave.another","value_type":"int","span_count":6},{"source":"custom_attrs_string","key":"weave.something","value_type":"string","span_count":6},{"source":"custom_attrs_string","key":"weave.tag","value_type":"string","span_count":6}],"limit":200,"offset":0,"has_more":false}'

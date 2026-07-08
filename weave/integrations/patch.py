@@ -464,11 +464,19 @@ def patch_llamaindex() -> None:
 
 
 def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
-    """Enable Weave tracing for OpenAI Realtime."""
+    """Enable Weave tracing for OpenAI Realtime.
+
+    Triggers on the real modules the websocket patcher instruments
+    (``websocket``, ``websockets``, ``aiohttp``) rather than a synthetic
+    ``openai_realtime`` symbol that no user imports — that synthetic key never
+    matched ``sys.modules`` or the import hook, so realtime never auto-patched.
+    The wrappers guard by URL, so non-realtime websocket/aiohttp traffic passes
+    through untouched.
+    """
     _patch_integration(
         module_path="weave.integrations.openai_realtime",
         patcher_func_getter_name="get_openai_realtime_websocket_patcher",
-        triggering_symbols=["openai_realtime"],
+        triggering_symbols=["websocket", "websockets", "aiohttp"],
         settings=settings,
     )
 
@@ -509,7 +517,11 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "langchain": patch_langchain,
     "langchain_core": patch_langchain,
     "llama_index": patch_llamaindex,
-    "openai_realtime": patch_openai_realtime,
+    # Realtime wraps these three real modules; its wrappers guard by URL, so
+    # non-realtime websocket/aiohttp traffic passes through untouched.
+    "websocket": patch_openai_realtime,
+    "websockets": patch_openai_realtime,
+    "aiohttp": patch_openai_realtime,
 }
 
 
