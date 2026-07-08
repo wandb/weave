@@ -115,8 +115,7 @@ MOCK_STREAM_EVENTS = [
 ]
 
 # Converse stream whose metadata reports prompt-cache token counts. Bedrock
-# names these cacheReadInputTokens / cacheWriteInputTokens (TokenUsage shape
-# in the botocore bedrock-runtime service model — there is no *Count variant).
+# names these cacheReadInputTokens / cacheWriteInputTokens.
 MOCK_STREAM_EVENTS_CACHE = [
     {"messageStart": {"role": "assistant"}},
     {
@@ -810,6 +809,8 @@ def test_bedrock_mock_usage_keys_match_service_model() -> None:
             MOCK_STREAM_EVENTS,
             MOCK_STREAM_EVENTS_CACHE,
             MOCK_STREAM_EVENTS_CACHE_ZERO,
+            MOCK_STREAM_EVENTS_TOOL_USE,
+            MOCK_STREAM_EVENTS_TEXT_AND_TOOLS,
         )
         for event in events
         if "metadata" in event
@@ -819,7 +820,10 @@ def test_bedrock_mock_usage_keys_match_service_model() -> None:
         MOCK_CONVERSE_RESPONSE_CACHE["usage"],
         *stream_usages,
     ]:
-        assert set(usage) <= real_keys
+        unknown_keys = set(usage) - real_keys
+        assert not unknown_keys, (
+            f"mock usage keys Bedrock never sends: {sorted(unknown_keys)}"
+        )
 
 
 @mock_aws
