@@ -790,6 +790,38 @@ def test_bedrock_converse_stream_cache_tokens_zero(
     assert model_usage["prompt_tokens"] == 100
 
 
+def test_bedrock_mock_usage_keys_match_service_model() -> None:
+    """Pin the mocks' usage keys to the botocore service model.
+
+    The cache-token capture shipped broken twice because the code and the
+    test mocks agreed on a field name (cacheReadInputTokenCount) that real
+    Bedrock never sends. Mocked responses bypass botocore's parser, so a
+    made-up key sails through every other test; this check fails instead.
+    """
+    token_usage_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .shape_for("TokenUsage")
+    )
+    real_keys = set(token_usage_shape.members)
+    stream_usages = [
+        event["metadata"]["usage"]
+        for events in (
+            MOCK_STREAM_EVENTS,
+            MOCK_STREAM_EVENTS_CACHE,
+            MOCK_STREAM_EVENTS_CACHE_ZERO,
+        )
+        for event in events
+        if "metadata" in event
+    ]
+    for usage in [
+        MOCK_CONVERSE_RESPONSE["usage"],
+        MOCK_CONVERSE_RESPONSE_CACHE["usage"],
+        *stream_usages,
+    ]:
+        assert set(usage) <= real_keys
+
+
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
 def test_bedrock_invoke(
