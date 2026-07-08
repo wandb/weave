@@ -38,11 +38,14 @@ import argparse
 import datetime
 import json
 import os
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 
 import clickhouse_connect
 from clickhouse_connect.driver.client import Client
+from clickhouse_connect.driver.exceptions import DatabaseError
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 STAGING_TABLE_DEFAULT = "calls_complete_backfill_staging"
 SENTINEL_DT64_3 = "toDateTime64(0, 3)"
@@ -58,6 +61,11 @@ FILL_SETTINGS = {
 # SELECT right after an INSERT can land on a replica that hasn't seen the new
 # parts yet and silently undercount (observed on QA: 0 of 100k rows visible).
 READ_SETTINGS = {"select_sequential_consistency": 1}
+# Same transient codes the migrator retries, plus 244 (UNEXPECTED_ZOOKEEPER_ERROR):
+# SharedMergeTree occasionally races Keeper znode cleanup when a staging table is
+# dropped and recreated under the same name (observed ~0.4% of QA fills). All abort
+# atomically, so a plain retry is safe.
+TRANSIENT_CH_ERROR_CODES = {244, 517, 999}
 
 
 @dataclass
@@ -78,6 +86,28 @@ class Journal:
     projects: dict[str, ProjectState]
     stats_inserted: bool = False
     attached_partitions: list[str] = field(default_factory=list)
+
+
+def _is_transient_ch_error(exc: BaseException) -> bool:
+    if not isinstance(exc, DatabaseError):
+        return False
+    match = re.search(r"Code:\s*(\d+)", str(exc))
+    return match is not None and int(match.group(1)) in TRANSIENT_CH_ERROR_CODES
+
+
+@retry(
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=1, min=1, max=30),
+    retry=retry_if_exception(_is_transient_ch_error),
+    reraise=True,
+)
+def ch_command(
+    client: Client,
+    sql: str,
+    parameters: dict | None = None,
+    settings: dict | None = None,
+) -> None:
+    client.command(sql, parameters=parameters, settings=settings)
 
 
 def main() -> int:
@@ -156,7 +186,8 @@ def fill(
             print(f"dry-run: would fill {pid} with {args.id_buckets} bucket(s)")
             continue
         for bucket in range(args.id_buckets):
-            client.command(
+            ch_command(
+                client,
                 transform_sql(journal.staging_table, args.id_buckets, bucket),
                 parameters={"pid": pid},
                 settings=FILL_SETTINGS,
@@ -238,7 +269,7 @@ def stats(
     if args.dry_run:
         print("dry-run: would insert stats rows")
         return True
-    client.command(stats_sql(journal.staging_table), settings=FILL_SETTINGS)
+    ch_command(client, stats_sql(journal.staging_table), settings=FILL_SETTINGS)
     journal.stats_inserted = True
     print("stats: inserted")
     return True
@@ -265,8 +296,9 @@ def attach(
             print(f"dry-run: would attach partition {part}")
             continue
         started = datetime.datetime.now(datetime.timezone.utc)
-        client.command(
-            f"ALTER TABLE calls_complete ATTACH PARTITION ID '{int(part)}' FROM {journal.staging_table}"
+        ch_command(
+            client,
+            f"ALTER TABLE calls_complete ATTACH PARTITION ID '{int(part)}' FROM {journal.staging_table}",
         )
         journal.attached_partitions.append(part)
         elapsed = (
@@ -370,7 +402,7 @@ def preflight(client: Client, journal: Journal, projects: list[str]) -> None:
 
 
 def ensure_staging(client: Client, staging_table: str) -> None:
-    client.command(f"CREATE TABLE IF NOT EXISTS {staging_table} AS calls_complete")
+    ch_command(client, f"CREATE TABLE IF NOT EXISTS {staging_table} AS calls_complete")
     src = client.query("DESCRIBE calls_complete").result_rows
     dst = client.query(f"DESCRIBE {staging_table}").result_rows
     if src != dst:
