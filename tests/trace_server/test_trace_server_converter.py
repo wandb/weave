@@ -5,6 +5,7 @@ import logging
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace.refs import ObjectRef
 from weave.trace_server.errors import InvalidExternalRef
 from weave.trace_server.interface.query import Query
@@ -17,6 +18,8 @@ from weave.trace_server.trace_server_converter import (
 from weave.trace_server.trace_server_interface import (
     CallStartReq,
     ObjCreateReq,
+    ObjQueryReq,
+    ObjReadReq,
     ObjSchemaForInsert,
     StartedCallSchemaForInsert,
 )
@@ -232,7 +235,6 @@ def test_replace_external_weave_ref_rejects_malformed_tail():
         replace_external_weave_ref("weave:///just-entity", lambda p: p)
 
 
-@pytest.mark.disable_logging_error_check
 def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
     """Egress: internal refs externalize and unresolvable projects fall back to
     a private ref. A stored external ref raises by default (surfacing
@@ -258,7 +260,7 @@ def test_universal_int_to_ext_ref_converter_tolerate_external_refs(caplog):
         "plain": "no-ref-here",
     }
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         converted = universal_int_to_ext_ref_converter(
             payload, int_to_ext, tolerate_external_refs=True
         )
@@ -425,10 +427,9 @@ def test_json_string_without_refs_is_not_reserialized():
     assert converted["content"] is blob
 
 
-@pytest.mark.disable_logging_error_check
 def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(caplog):
-    """When an embedded ref does not change (already-external + tolerate), the
-    ORIGINAL string is returned with no re-serialization (spacing preserved).
+    """When an embedded ref does not change (already external), the ORIGINAL
+    string is returned with no re-serialization (spacing preserved).
     """
     external_ref = "weave:///entity/project/object/x:d"
 
@@ -439,40 +440,36 @@ def test_json_string_with_only_tolerated_external_ref_is_returned_unchanged(capl
     blob = json.dumps([{"type": "image", "url": external_ref}], indent=2)
     payload = {"content": blob}
 
-    with caplog.at_level(logging.ERROR):
-        converted = universal_int_to_ext_ref_converter(
-            payload, int_to_ext, tolerate_external_refs=True
-        )
+    with caplog.at_level(logging.WARNING):
+        converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
 
     assert converted is payload
     assert converted["content"] is blob
     assert "Returning stored external ref unchanged" in caplog.text
 
 
-@pytest.mark.disable_logging_error_check
-def test_embedded_external_ref_respects_tolerate_flag_int_to_ext(caplog):
-    """An embedded external ref obeys the same tolerate/raise policy as a
-    top-level external ref on the int->ext path.
+def test_embedded_external_ref_passes_through_int_to_ext(caplog):
+    """An embedded external ref passes through under the strict default (rows
+    written before the converter descended into JSON strings contain them),
+    while an embedded internal ref in the same blob still converts.
     """
-    external_ref = "weave:///entity/project/object/x:d"
+    internal_project_id = "internal-project"
+    external_ref = "weave:///entity/project/op/scorer:abc"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/call/123"
 
     def int_to_ext(project_id: str) -> str | None:
-        return "entity/project"
+        return "entity/project" if project_id == internal_project_id else None
 
-    content = json.dumps([{"type": "image", "url": external_ref}])
-    payload = {"content": content}
+    content = json.dumps({"source_refs": [external_ref], "call": internal_ref})
+    payload = {"description": content}
 
-    # Strict default: embedded external ref raises, same as top-level.
-    with pytest.raises(InvalidInternalRef):
-        universal_int_to_ext_ref_converter(payload, int_to_ext)
+    with caplog.at_level(logging.WARNING):
+        converted = universal_int_to_ext_ref_converter(payload, int_to_ext)
 
-    # Tolerant: passed through + logged, embedded JSON preserved unchanged.
-    with caplog.at_level(logging.ERROR):
-        converted = universal_int_to_ext_ref_converter(
-            payload, int_to_ext, tolerate_external_refs=True
-        )
-
-    assert json.loads(converted["content"]) == [{"type": "image", "url": external_ref}]
+    assert json.loads(converted["description"]) == {
+        "source_refs": [external_ref],
+        "call": "weave:///entity/project/call/123",
+    }
     assert "Returning stored external ref unchanged" in caplog.text
 
 
@@ -524,3 +521,38 @@ def test_deeply_nested_json_in_json_terminates_without_recursion_error():
     # Termination + no RecursionError is the contract; the buried ref is below
     # the cap so the string comes back unchanged.
     assert converted["content"] == nested
+
+
+@pytest.mark.disable_logging_error_check
+def test_stored_embedded_external_ref_reads_back_through_server(trace_server):
+    """Functional guard for the legacy-data regression: rows written before the
+    converter descended into JSON strings hold external refs inside stringified
+    blobs. Reads through the external adapter must return them unchanged, not
+    raise InvalidInternalRef.
+    """
+    project_id = f"{TEST_ENTITY}/test-embedded-ext-ref-legacy"
+    external_ref = f"weave:///{project_id}/op/scorer:abc"
+    blob = json.dumps({"source_refs": [external_ref], "note": "legacy"})
+
+    # Register the ext<->int project mapping, then write the legacy row through
+    # the internal server (no ref conversion), exactly as pre-descent
+    # deployments persisted it.
+    internal_project_id = trace_server._idc.ext_to_int_project_id(project_id)
+    trace_server._internal_trace_server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=internal_project_id,
+                object_id="legacy-obj",
+                val={"description": blob},
+            )
+        )
+    )
+
+    read = trace_server.obj_read(
+        ObjReadReq(project_id=project_id, object_id="legacy-obj", digest="latest")
+    )
+    assert read.obj.val == {"description": blob}
+
+    query = trace_server.objs_query(ObjQueryReq(project_id=project_id))
+    assert [obj.object_id for obj in query.objs] == ["legacy-obj"]
+    assert query.objs[0].val == {"description": blob}

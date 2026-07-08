@@ -13,6 +13,7 @@ import importlib
 import pytest
 
 import weave
+from weave.conversation.conversation import LLM, Conversation, SubAgent, Tool, Turn
 
 
 def test_start_session_forwards_and_warns() -> None:
@@ -86,3 +87,24 @@ def test_legacy_import_path_warns_and_reexports() -> None:
     assert legacy.TextPart is TextPart
     assert legacy.start_session is weave.start_session
     assert legacy.Session is weave.Session
+
+
+def test_turn_factory_aliases_warn_and_forward() -> None:
+    """``turn.llm``/``tool``/``subagent`` are deprecated aliases of ``start_*``."""
+    with Conversation(conversation_id="c"), Turn(agent_name="bot") as turn:
+        with pytest.warns(DeprecationWarning, match="start_llm"):
+            assert isinstance(turn.llm(model="gpt-4o"), LLM)
+        with pytest.warns(DeprecationWarning, match="start_tool"):
+            assert isinstance(turn.tool(name="t"), Tool)
+        with pytest.warns(DeprecationWarning, match="start_subagent"):
+            assert isinstance(turn.subagent(name="r"), SubAgent)
+
+
+def test_subagent_factory_aliases_warn_and_forward() -> None:
+    """``sub.llm``/``tool`` are deprecated aliases of ``start_*``."""
+    with Conversation(conversation_id="c"), Turn(agent_name="bot") as turn:
+        with turn.start_subagent(name="r") as sa:
+            with pytest.warns(DeprecationWarning, match="start_llm"):
+                assert isinstance(sa.llm(model="gpt-4o"), LLM)
+            with pytest.warns(DeprecationWarning, match="start_tool"):
+                assert isinstance(sa.tool(name="t"), Tool)
