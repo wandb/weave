@@ -71,8 +71,8 @@ MOCK_CONVERSE_RESPONSE_CACHE = {
         "inputTokens": 100,
         "outputTokens": 20,
         "totalTokens": 120,
-        "cacheReadInputTokenCount": 80,
-        "cacheWriteInputTokenCount": 15,
+        "cacheReadInputTokens": 80,
+        "cacheWriteInputTokens": 15,
     },
 }
 
@@ -115,7 +115,8 @@ MOCK_STREAM_EVENTS = [
 ]
 
 # Converse stream whose metadata reports prompt-cache token counts. Bedrock
-# names these cacheReadInputTokenCount / cacheWriteInputTokenCount.
+# names these cacheReadInputTokens / cacheWriteInputTokens (TokenUsage shape
+# in the botocore bedrock-runtime service model — there is no *Count variant).
 MOCK_STREAM_EVENTS_CACHE = [
     {"messageStart": {"role": "assistant"}},
     {
@@ -132,8 +133,8 @@ MOCK_STREAM_EVENTS_CACHE = [
                 "inputTokens": 100,
                 "outputTokens": 20,
                 "totalTokens": 120,
-                "cacheReadInputTokenCount": 80,
-                "cacheWriteInputTokenCount": 15,
+                "cacheReadInputTokens": 80,
+                "cacheWriteInputTokens": 15,
             },
             "metrics": {"latencyMs": 500},
         }
@@ -153,8 +154,8 @@ MOCK_STREAM_EVENTS_CACHE_ZERO = [
                 "inputTokens": 100,
                 "outputTokens": 20,
                 "totalTokens": 120,
-                "cacheReadInputTokenCount": 0,
-                "cacheWriteInputTokenCount": 0,
+                "cacheReadInputTokens": 0,
+                "cacheWriteInputTokens": 0,
             },
             "metrics": {"latencyMs": 500},
         }
