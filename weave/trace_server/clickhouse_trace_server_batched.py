@@ -434,6 +434,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._call_batch
             or self._calls_complete_batch
             or self._file_batch
+            or self._content_obj_batch
             or self._bucket_uploads
         ):
             try:
@@ -444,6 +445,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
                 self._flush_immediately = True
 
@@ -503,6 +505,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
+        if not hasattr(self._thread_local, "content_obj_batch"):
+            self._thread_local.content_obj_batch = []
+        return self._thread_local.content_obj_batch
+
+    @_content_obj_batch.setter
+    def _content_obj_batch(self, value: list[tsi.ObjSchemaForInsert]) -> None:
+        self._thread_local.content_obj_batch = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -894,6 +906,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
             self._flush_immediately = True
 
@@ -904,13 +917,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            atomically with any inline-CH chunks accumulated alongside.
         2. File chunks, if this fails, we raise so that we don't insert calls that
            are missing file data. Forces retry.
-        3. Calls, if this fails, we raise so that clients can retry, and so we don't
+        3. Content objects, if this fails, we raise. Written after their file
+           bytes so a committed object row never references unwritten content.
+        4. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
-        4. Produce to kafka, if this fails, we don't raise because all of the data
+        5. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
         self._flush_file_batches()
+
+        # Raises on fail
+        try:
+            self._flush_content_objs()
+        except Exception:
+            logger.exception("Failed to flush content objects")
+            raise
 
         # Raises on fail
         try:
@@ -1083,10 +1105,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 process_complete_call_to_content(complete_call, self, pending_objs)
                 for complete_call in req.batch
             ]
-            # Content objects are written before the calls flush (on with-exit)
-            # so a committed call never references an unwritten object; refs of
-            # collision-skipped objects are swapped back to their raw values.
-            raw_by_ref = self._flush_pending_content_objs(pending_objs)
+            # Resolve collisions now (read-only) so call payloads can restore
+            # the raw values of skipped objects; the surviving object rows are
+            # staged and written on with-exit, after their file bytes.
+            raw_by_ref = self._resolve_pending_content_objs(pending_objs)
 
             for processed_complete_call in processed_calls:
                 if raw_by_ref:
@@ -1124,14 +1146,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pending_objs.publish_refs()
         return tsi.CallsUpsertCompleteRes()
 
-    def _flush_pending_content_objs(
+    def _resolve_pending_content_objs(
         self, pending_objs: PendingContentObjs
     ) -> dict[str, str]:
-        """Write content objects queued by calls_complete's base64 walk.
+        """Resolve content objects queued by calls_complete's base64 walk.
 
-        Dedupes by (project_id, object_id, digest) so identical content
-        embedded in multiple calls of the batch is written once, then runs
-        one WB-30574 collision check and one obj_create_batch per project.
+        Read-only: dedupes by (project_id, object_id, digest) so identical
+        content embedded in multiple calls is written once, runs one WB-30574
+        collision check per project, and stages the survivors into
+        _content_obj_batch for the ordered flush. The actual obj_create_batch
+        write happens later in _flush_content_objs, after file bytes land.
+
         A collision must not fail the calls batch: the colliding object is
         skipped and reported in the returned {ref: raw_value} map so the
         caller can restore the original inline values in the call payloads.
@@ -1162,11 +1187,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 pending_objs.mark_skipped(project_id, collision.object_id)
 
             colliding_ids = {c.object_id for c in collisions}
-            to_write = [o for o in project_objs if o.object_id not in colliding_ids]
-            if to_write:
-                self.obj_create_batch(to_write)
+            self._content_obj_batch.extend(
+                o for o in project_objs if o.object_id not in colliding_ids
+            )
 
         return pending_objs.restore_map()
+
+    def _flush_content_objs(self) -> None:
+        """Write staged content objects, grouped by project (obj_create_batch
+        takes a single project). Runs after _flush_file_batches so a committed
+        object row never references content that has not landed in storage.
+        """
+        by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
+        for obj in self._content_obj_batch:
+            by_project.setdefault(obj.project_id, []).append(obj)
+        for project_objs in by_project.values():
+            self.obj_create_batch(project_objs)
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
@@ -2309,7 +2345,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Unlike obj_create, no WB-30574 name/type collision guard runs here:
         callers must know their object_ids are fresh or check beforehand
-        (see _flush_pending_content_objs).
+        (see _resolve_pending_content_objs).
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
