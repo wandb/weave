@@ -3,7 +3,8 @@
 Flow (per wave of allowlisted projects):
   plan    -> per-project inventory: unique calls, orphan ends, past-retention rows,
              partitions, expected staging rows. No writes.
-  fill    -> INSERT INTO <staging> SELECT <transform> per project (id-bucket chunked).
+  fill    -> INSERT INTO <staging> SELECT <transform> per project, chunked into
+             adaptive id ranges of <= --chunk-rows rows each.
   verify  -> per-project gates against staging: row parity vs expectation, zero dupes,
              sample field spot-check vs source, partition sanity.
   stats   -> INSERT INTO calls_complete_stats from staging (the stats MV does not fire
@@ -51,10 +52,15 @@ STAGING_TABLE_DEFAULT = "calls_complete_backfill_staging"
 SENTINEL_DT64_3 = "toDateTime64(0, 3)"
 SENTINEL_DT64_6 = "toDateTime64(0, 6)"
 VERIFY_SAMPLE_ROWS = 1000
+CHUNK_ROWS_DEFAULT = 1_000_000
+# External spill plus single-replica aggregation keep per-chunk fills under the
+# query memory cap; parallel replicas merge partial states on the initiator unspilled.
 FILL_SETTINGS = {
     "insert_deduplicate": 0,
     "optimize_on_insert": 0,
     "max_memory_usage": 16_000_000_000,
+    "max_bytes_before_external_group_by": 8_000_000_000,
+    "enable_parallel_replicas": 0,
     "max_execution_time": 3600,
 }
 # Verification reads must not race replica metadata sync: on ClickHouse Cloud a
@@ -141,31 +147,38 @@ def plan(
         state = journal.projects[pid]
         if state.phase != "pending":
             continue
-        row = client.query(
-            """
-            SELECT
-                toInt64(count()) AS unique_calls,
-                toInt64(countIf(isNull(s))) AS orphan_ends,
-                toInt64(countIf(isNotNull(s) AND exp < now())) AS past_retention,
-                toInt64(countIf(isNotNull(s) AND exp >= now())) AS expected_rows,
-                arraySort(groupUniqArrayIf(toString(toYYYYMM(s)), isNotNull(s))) AS partitions
-            FROM (
-                SELECT anyIf(started_at, isNotNull(started_at)) AS s,
-                       toDateTime(min(expire_at)) AS exp
-                FROM calls_merged WHERE project_id = {pid:String}
-                GROUP BY project_id, id
-            )
-            """,
-            parameters={"pid": pid},
-            settings=READ_SETTINGS,
-        ).result_rows[0]
+        totals = [0, 0, 0, 0]
+        partitions: set[str] = set()
+        for lo, hi in id_chunk_ranges(client, pid, args.chunk_rows):
+            row = client.query(
+                f"""
+                SELECT
+                    toInt64(count()) AS unique_calls,
+                    toInt64(countIf(isNull(s))) AS orphan_ends,
+                    toInt64(countIf(isNotNull(s) AND exp < now())) AS past_retention,
+                    toInt64(countIf(isNotNull(s) AND exp >= now())) AS expected_rows,
+                    groupUniqArrayIf(toString(toYYYYMM(s)), isNotNull(s)) AS partitions
+                FROM (
+                    SELECT anyIf(started_at, isNotNull(started_at)) AS s,
+                           toDateTime(min(expire_at)) AS exp
+                    FROM calls_merged
+                    WHERE project_id = {{pid:String}} {_range_pred(lo, hi)}
+                    GROUP BY project_id, id
+                )
+                """,
+                parameters={"pid": pid},
+                settings=READ_SETTINGS,
+            ).result_rows[0]
+            for i in range(4):
+                totals[i] += row[i]
+            partitions.update(row[4])
         (
             state.unique_calls,
             state.orphan_ends,
             state.past_retention,
             state.expected_rows,
-        ) = row[:4]
-        state.partitions = list(row[4])
+        ) = totals
+        state.partitions = sorted(partitions)
         print(
             f"plan {pid}: calls={state.unique_calls} expected={state.expected_rows} "
             f"orphan_ends={state.orphan_ends} past_retention={state.past_retention} "
@@ -182,18 +195,19 @@ def fill(
         state = journal.projects[pid]
         if state.phase != "pending":
             continue
+        ranges = id_chunk_ranges(client, pid, args.chunk_rows)
         if args.dry_run:
-            print(f"dry-run: would fill {pid} with {args.id_buckets} bucket(s)")
+            print(f"dry-run: would fill {pid} in {len(ranges)} chunk(s)")
             continue
-        for bucket in range(args.id_buckets):
+        for lo, hi in ranges:
             ch_command(
                 client,
-                transform_sql(journal.staging_table, args.id_buckets, bucket),
+                transform_sql(journal.staging_table, _range_pred(lo, hi)),
                 parameters={"pid": pid},
                 settings=FILL_SETTINGS,
             )
         state.phase = "filled"
-        print(f"fill {pid}: done ({args.id_buckets} bucket(s))")
+        print(f"fill {pid}: done ({len(ranges)} chunk(s))")
     return True
 
 
@@ -205,39 +219,47 @@ def verify(
         state = journal.projects[pid]
         if state.phase not in {"filled", "verified"}:
             continue
-        staging_rows, dupes, bogus_parts = client.query(
-            f"""
-            SELECT toInt64(count()),
-                   toInt64(count()) - toInt64(uniqExact(id)),
-                   toInt64(countIf(toYYYYMM(started_at) < 201801))
-            FROM {journal.staging_table} WHERE project_id = {{pid:String}}
-            """,
-            parameters={"pid": pid},
-            settings=READ_SETTINGS,
-        ).result_rows[0]
+        staging_rows = dupes = bogus_parts = mismatches = 0
+        for lo, hi in id_chunk_ranges(client, pid, args.chunk_rows):
+            # dupe counting stays exact under chunking: duplicate ids share a range
+            rows, chunk_dupes, chunk_bogus = client.query(
+                f"""
+                SELECT toInt64(count()),
+                       toInt64(count()) - toInt64(uniqExact(id)),
+                       toInt64(countIf(toYYYYMM(started_at) < 201801))
+                FROM {journal.staging_table}
+                WHERE project_id = {{pid:String}} {_range_pred(lo, hi)}
+                """,
+                parameters={"pid": pid},
+                settings=READ_SETTINGS,
+            ).result_rows[0]
+            staging_rows += rows
+            dupes += chunk_dupes
+            bogus_parts += chunk_bogus
+            mismatches += client.query(
+                f"""
+                SELECT toInt64(countIf(NOT trace_ok OR NOT op_ok OR NOT refs_ok))
+                FROM (
+                    SELECT c.trace_id = m.trace_id AS trace_ok,
+                           c.op_name = coalesce(m.op_name, '') AS op_ok,
+                           length(c.input_refs) >= length(m.input_refs) AS refs_ok
+                    FROM {journal.staging_table} AS c
+                    INNER JOIN (
+                        SELECT id, anyIf(trace_id, isNotNull(trace_id)) AS trace_id,
+                               anyIf(op_name, isNotNull(op_name)) AS op_name,
+                               arrayDistinct(groupArrayArray(input_refs)) AS input_refs
+                        FROM calls_merged
+                        WHERE project_id = {{pid:String}} {_range_pred(lo, hi)}
+                        GROUP BY project_id, id
+                    ) AS m ON c.id = m.id
+                    WHERE c.project_id = {{pid:String}} {_range_pred(lo, hi, "c.id")}
+                    LIMIT {VERIFY_SAMPLE_ROWS}
+                )
+                """,
+                parameters={"pid": pid},
+                settings=READ_SETTINGS,
+            ).result_rows[0][0]
         state.staging_rows = staging_rows
-        mismatches = client.query(
-            f"""
-            SELECT toInt64(countIf(NOT trace_ok OR NOT op_ok OR NOT refs_ok))
-            FROM (
-                SELECT c.trace_id = m.trace_id AS trace_ok,
-                       c.op_name = coalesce(m.op_name, '') AS op_ok,
-                       length(c.input_refs) >= length(m.input_refs) AS refs_ok
-                FROM {journal.staging_table} AS c
-                INNER JOIN (
-                    SELECT id, anyIf(trace_id, isNotNull(trace_id)) AS trace_id,
-                           anyIf(op_name, isNotNull(op_name)) AS op_name,
-                           arrayDistinct(groupArrayArray(input_refs)) AS input_refs
-                    FROM calls_merged WHERE project_id = {{pid:String}}
-                    GROUP BY project_id, id
-                ) AS m ON c.id = m.id
-                WHERE c.project_id = {{pid:String}}
-                LIMIT {VERIFY_SAMPLE_ROWS}
-            )
-            """,
-            parameters={"pid": pid},
-            settings=READ_SETTINGS,
-        ).result_rows[0][0]
         # past_retention rows may or may not have been TTL-reaped in staging yet.
         low = state.expected_rows
         high = state.expected_rows + state.past_retention
@@ -269,7 +291,14 @@ def stats(
     if args.dry_run:
         print("dry-run: would insert stats rows")
         return True
-    ch_command(client, stats_sql(journal.staging_table), settings=FILL_SETTINGS)
+    for pid in journal.projects:
+        for lo, hi in id_chunk_ranges(client, pid, args.chunk_rows):
+            ch_command(
+                client,
+                stats_sql(journal.staging_table, _range_pred(lo, hi)),
+                parameters={"pid": pid},
+                settings=FILL_SETTINGS,
+            )
     journal.stats_inserted = True
     print("stats: inserted")
     return True
@@ -313,11 +342,8 @@ def attach(
 # --- helpers -----------------------------------------------------------------
 
 
-def transform_sql(staging_table: str, n_buckets: int, bucket: int) -> str:
-    """The validated merged->complete transform for one project id-bucket."""
-    bucket_pred = (
-        f"AND cityHash64(id) % {n_buckets} = {bucket}" if n_buckets > 1 else ""
-    )
+def transform_sql(staging_table: str, range_pred: str) -> str:
+    """The validated merged->complete transform for one project id range."""
     return f"""
 INSERT INTO {staging_table}
 (id, project_id, created_at, trace_id, op_name, started_at, ended_at, updated_at,
@@ -353,13 +379,13 @@ SELECT
     toDateTime(min(expire_at)),
     'migration'
 FROM calls_merged
-WHERE project_id = {{pid:String}} {bucket_pred}
+WHERE project_id = {{pid:String}} {range_pred}
 GROUP BY project_id, id
 HAVING isNotNull(anyIf(started_at, isNotNull(started_at)))
 """
 
 
-def stats_sql(staging_table: str) -> str:
+def stats_sql(staging_table: str, range_pred: str) -> str:
     return f"""
 INSERT INTO calls_complete_stats
 (project_id, id, trace_id, parent_id, op_name, started_at, ended_at,
@@ -382,8 +408,66 @@ SELECT project_id, id, anySimpleState(trace_id), anySimpleState(parent_id),
        argMaxState(display_name, created_at),
        minSimpleState(toDateTime64(expire_at, 3)), anySimpleState(source)
 FROM {staging_table}
+WHERE project_id = {{pid:String}} {range_pred}
 GROUP BY project_id, id
 """
+
+
+def id_chunk_ranges(
+    client: Client, pid: str, chunk_rows: int
+) -> list[tuple[str | None, str | None]]:
+    """Split a project's id space into sort-key-prunable (lo, hi) ranges of roughly
+    <= chunk_rows rows, drilling prefixes so time-ordered (UUIDv7) ids still balance.
+    """
+
+    def prefix_counts(
+        depth: int, lo: str | None, hi: str | None
+    ) -> list[tuple[str, int]]:
+        rows = client.query(
+            f"""
+            SELECT substring(id, 1, {depth}) AS p, toInt64(count()) AS c
+            FROM calls_merged
+            WHERE project_id = {{pid:String}} {_range_pred(lo, hi)}
+            GROUP BY p ORDER BY p
+            """,
+            parameters={"pid": pid},
+            settings=READ_SETTINGS,
+        ).result_rows
+        return [(str(p), int(c)) for p, c in rows]
+
+    leaves = prefix_counts(2, None, None)
+    depth = 2
+    while depth < 12 and any(c > chunk_rows for _, c in leaves):
+        depth += 2
+        leaves = [
+            child
+            for p, c in leaves
+            for child in (
+                prefix_counts(depth, p, _bump(p)) if c > chunk_rows else [(p, c)]
+            )
+        ]
+    ranges: list[tuple[str | None, str | None]] = []
+    start: str | None = None
+    acc = 0
+    for p, c in leaves:
+        if acc and acc + c > chunk_rows:
+            ranges.append((start, p))
+            start, acc = p, 0
+        elif start is None:
+            start = p
+        acc += c
+    ranges.append((start, None))
+    ranges[0] = (None, ranges[0][1])
+    return ranges
+
+
+def _range_pred(lo: str | None, hi: str | None, col: str = "id") -> str:
+    parts = ([f"{col} >= '{lo}'"] if lo else []) + ([f"{col} < '{hi}'"] if hi else [])
+    return ("AND " + " AND ".join(parts)) if parts else ""
+
+
+def _bump(prefix: str) -> str:
+    return prefix[:-1] + chr(ord(prefix[-1]) + 1)
 
 
 def preflight(client: Client, journal: Journal, projects: list[str]) -> None:
@@ -497,7 +581,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--staging-table", default=STAGING_TABLE_DEFAULT)
     parser.add_argument(
-        "--id-buckets", type=int, default=1, help="chunk fills by cityHash64(id) %% N"
+        "--chunk-rows",
+        type=int,
+        default=CHUNK_ROWS_DEFAULT,
+        help="max rows per adaptive id-range chunk in plan/fill/verify/stats",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
