@@ -61,8 +61,8 @@ def build_signal_filter_clause(
 
     having = " AND ".join(having_terms)
     return (
-        f"{conversation_col} IN (SELECT conversation_id FROM feedback "
+        f"{conversation_col} IN (SELECT span_conversation_id FROM feedback "
         f"WHERE project_id = {pid_slot} AND {_AGENT_FEEDBACK_TYPES_SQL} "
-        f"AND conversation_id != '' "
-        f"GROUP BY conversation_id HAVING {having})"
+        f"AND span_conversation_id != '' "
+        f"GROUP BY span_conversation_id HAVING {having})"
     )

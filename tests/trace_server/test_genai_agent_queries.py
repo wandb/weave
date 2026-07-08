@@ -3002,11 +3002,15 @@ def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["conversation_id", "trace_id", "scorer_tags"],
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
         )
     )
     assert res.result == [
-        {"conversation_id": conv_id, "trace_id": "", "scorer_tags": ["hallucination"]}
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
     ]
 
 
@@ -3034,13 +3038,13 @@ def test_feedback_create_persists_supplied_span_target_ids(ch_server):
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["conversation_id", "trace_id", "scorer_tags"],
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
         )
     )
     assert res.result == [
         {
-            "conversation_id": conv_id,
-            "trace_id": trace_id,
+            "span_conversation_id": conv_id,
+            "span_trace_id": trace_id,
             "scorer_tags": ["needs-review"],
         }
     ]
@@ -3101,7 +3105,12 @@ def test_feedback_create_batch_persists_supplied_agent_target_ids(ch_server):
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["weave_ref", "conversation_id", "trace_id", "scorer_tags"],
+            fields=[
+                "weave_ref",
+                "span_conversation_id",
+                "span_trace_id",
+                "scorer_tags",
+            ],
         )
     )
     actual = sorted(res.result, key=lambda row: row["weave_ref"])
@@ -3109,20 +3118,20 @@ def test_feedback_create_batch_persists_supplied_agent_target_ids(ch_server):
         [
             {
                 "weave_ref": conv_ref,
-                "conversation_id": conv_ref_id,
-                "trace_id": "",
+                "span_conversation_id": conv_ref_id,
+                "span_trace_id": "",
                 "scorer_tags": ["conv-tag"],
             },
             {
                 "weave_ref": turn_ref,
-                "conversation_id": turn_conv_id,
-                "trace_id": turn_trace_id,
+                "span_conversation_id": turn_conv_id,
+                "span_trace_id": turn_trace_id,
                 "scorer_tags": ["turn-tag"],
             },
             {
                 "weave_ref": span_ref,
-                "conversation_id": span_conv_id,
-                "trace_id": span_trace_id,
+                "span_conversation_id": span_conv_id,
+                "span_trace_id": span_trace_id,
                 "scorer_tags": ["span-tag"],
             },
         ],

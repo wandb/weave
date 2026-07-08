@@ -849,12 +849,12 @@ class TestMakeGroupedSpansCountQuery:
             SELECT count() FROM (
                 SELECT s.conversation_id FROM {src.sql} s
                 WHERE s.project_id = {{genai_0:String}}
-                  AND s.conversation_id IN (SELECT conversation_id FROM feedback
+                  AND s.conversation_id IN (SELECT span_conversation_id FROM feedback
                                             WHERE project_id = {{genai_1:String}}
                                               AND feedback_type IN ('wandb.agent_monitor',
                                                                     'wandb.agent_user_feedback')
-                                              AND conversation_id != ''
-                                            GROUP BY conversation_id
+                                              AND span_conversation_id != ''
+                                            GROUP BY span_conversation_id
                                             HAVING sum(hasAny(scorer_tags, {{genai_2:Array(String)}})) > 0)
                 GROUP BY s.conversation_id
             )
@@ -1266,13 +1266,13 @@ class TestMakeGroupedSpansListQuery:
                    {_GROUPED_AGG_TAIL}
             FROM {src.sql} s
             WHERE s.project_id = {{genai_0:String}}
-              AND s.conversation_id IN (SELECT conversation_id
+              AND s.conversation_id IN (SELECT span_conversation_id
                                         FROM feedback
                                         WHERE project_id = {{genai_3:String}}
                                           AND feedback_type IN ('wandb.agent_monitor',
                                                                 'wandb.agent_user_feedback')
-                                          AND conversation_id != ''
-                                        GROUP BY conversation_id
+                                          AND span_conversation_id != ''
+                                        GROUP BY span_conversation_id
                                         HAVING sum(hasAny(scorer_tags, {{genai_4:Array(String)}})) > 0)
             GROUP BY conversation_id
             ORDER BY last_seen DESC
@@ -2215,11 +2215,11 @@ def test_build_signal_filter_clause() -> None:
     params = pb.get_params()
     pid_p, tags_p = list(params.keys())
     assert " ".join(clause.split()) == (
-        f"s.conversation_id IN (SELECT conversation_id FROM feedback "
+        f"s.conversation_id IN (SELECT span_conversation_id FROM feedback "
         f"WHERE project_id = {{{pid_p}:String}} "
         f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
-        f"AND conversation_id != '' "
-        f"GROUP BY conversation_id "
+        f"AND span_conversation_id != '' "
+        f"GROUP BY span_conversation_id "
         f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0)"
     )
     assert params[pid_p] == "ent/proj"
@@ -2241,11 +2241,11 @@ def test_build_signal_filter_clause() -> None:
     params = pb.get_params()
     pid_p, tags_p, key_p, val_p = list(params.keys())
     assert " ".join(clause.split()) == (
-        f"s.conversation_id IN (SELECT conversation_id FROM feedback "
+        f"s.conversation_id IN (SELECT span_conversation_id FROM feedback "
         f"WHERE project_id = {{{pid_p}:String}} "
         f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
-        f"AND conversation_id != '' "
-        f"GROUP BY conversation_id "
+        f"AND span_conversation_id != '' "
+        f"GROUP BY span_conversation_id "
         f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0 "
         f"AND sum(mapContains(scorer_ratings, {{{key_p}:String}}) "
         f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) > 0)"
