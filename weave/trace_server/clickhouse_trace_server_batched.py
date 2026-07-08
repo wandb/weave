@@ -8,6 +8,7 @@ import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
 from re import sub
@@ -911,28 +912,37 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
-        """Flush all batches in order of dependency.
+        """Flush all batches, respecting cross-table write dependencies.
         1. Bucket uploads, fanned out in parallel. Resulting chunks join
            _file_batch before the file_chunks insert so URIs are persisted
            atomically with any inline-CH chunks accumulated alongside.
-        2. File chunks, if this fails, we raise so that we don't insert calls that
-           are missing file data. Forces retry.
-        3. Content objects, if this fails, we raise. Written after their file
-           bytes so a committed object row never references unwritten content.
-        4. Calls, if this fails, we raise so that clients can retry, and so we don't
+        2. File chunks and content objects, inserted concurrently. Both must be
+           durable before calls and neither reads the other. If either fails we
+           raise, so calls (below) never commit referencing unwritten data.
+        3. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
-        5. Produce to kafka, if this fails, we don't raise because all of the data
+        4. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
-        self._flush_file_batches()
+        self._flush_immediately = True
 
         # Raises on fail
         try:
-            self._flush_content_objs()
+            self._file_batch.extend(
+                self._bucket_uploads.flush(self.file_storage_client)
+            )
         except Exception:
-            logger.exception("Failed to flush content objects")
+            logger.exception("Failed to flush bucket uploads")
             raise
+
+        # File chunks || content objects. Snapshot the thread-local batches so
+        # each worker inserts an explicit list on its own pooled ch_client.
+        file_rows = self._file_batch
+        content_objs = self._content_obj_batch
+        self._file_batch = []
+        self._content_obj_batch = []
+        self._flush_referenced_data_in_parallel(file_rows, content_objs)
 
         # Raises on fail
         try:
@@ -947,6 +957,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_kafka_producer()
         except Exception:
             logger.exception("Failed to flush kafka producer")
+
+    @traced(name="clickhouse_trace_server_batched._flush_referenced_data_in_parallel")
+    def _flush_referenced_data_in_parallel(
+        self,
+        file_rows: list[FileChunkCreateCHInsertable],
+        content_objs: list[tsi.ObjSchemaForInsert],
+    ) -> None:
+        """Insert file chunks and content objects concurrently.
+
+        Both must commit before the calls that reference them, and neither reads
+        the other, so they run in parallel on separate ch_clients (ch_client is
+        thread-local, so each worker mints its own from the shared pool). Every
+        task is joined before returning; if either raises, the first error is
+        re-raised so the caller skips the calls insert and the client retries.
+        """
+        tasks: list[tuple[str, Callable[[], None]]] = []
+        if file_rows:
+            tasks.append(("files", lambda: self._insert_file_chunks(file_rows)))
+        if content_objs:
+            tasks.append(
+                ("content_objs", lambda: self._flush_content_objs_batch(content_objs))
+            )
+        if len(tasks) < 2:
+            for _, run in tasks:
+                run()
+            return
+
+        with ThreadPoolExecutor(
+            max_workers=len(tasks), thread_name_prefix="flush-insert"
+        ) as pool:
+            futures = {pool.submit(run): label for label, run in tasks}
+            errors: list[Exception] = []
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.exception("Failed to flush %s", futures[future])
+                    errors.append(e)
+        if errors:
+            raise errors[0]
 
     def _flush_file_batches(self) -> None:
         """Fan out staged bucket uploads in parallel, then insert their chunk rows.
@@ -1154,8 +1204,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Read-only: dedupes by (project_id, object_id, digest) so identical
         content embedded in multiple calls is written once, runs one WB-30574
         collision check per project, and stages the survivors into
-        _content_obj_batch for the ordered flush. The actual obj_create_batch
-        write happens later in _flush_content_objs, after file bytes land.
+        _content_obj_batch for the parallel flush. The actual obj_create_batch
+        write happens later in _flush_content_objs_batch, alongside file chunks.
 
         A collision must not fail the calls batch: the colliding object is
         skipped and reported in the returned {ref: raw_value} map so the
@@ -1193,13 +1243,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return pending_objs.restore_map()
 
-    def _flush_content_objs(self) -> None:
-        """Write staged content objects, grouped by project (obj_create_batch
-        takes a single project). Runs after _flush_file_batches so a committed
-        object row never references content that has not landed in storage.
+    def _flush_content_objs_batch(
+        self, content_objs: list[tsi.ObjSchemaForInsert]
+    ) -> None:
+        """Write content objects, grouped by project (obj_create_batch takes a
+        single project). Runs concurrently with the file-chunk insert; both land
+        before the calls that reference them.
         """
         by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
-        for obj in self._content_obj_batch:
+        for obj in content_objs:
             by_project.setdefault(obj.project_id, []).append(obj)
         for project_objs in by_project.values():
             self.obj_create_batch(project_objs)
