@@ -82,9 +82,11 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
 )
 from weave.trace_server.base64_content_conversion import (
+    PendingContentObjs,
     process_call_req_to_content,
     process_complete_call_to_content,
     replace_base64_with_content_objects,
+    restore_raw_content_values,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -432,6 +434,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._call_batch
             or self._calls_complete_batch
             or self._file_batch
+            or self._content_obj_batch
             or self._bucket_uploads
         ):
             try:
@@ -442,6 +445,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
                 self._flush_immediately = True
 
@@ -501,6 +505,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
+        if not hasattr(self._thread_local, "content_obj_batch"):
+            self._thread_local.content_obj_batch = []
+        return self._thread_local.content_obj_batch
+
+    @_content_obj_batch.setter
+    def _content_obj_batch(self, value: list[tsi.ObjSchemaForInsert]) -> None:
+        self._thread_local.content_obj_batch = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -892,6 +906,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
             self._flush_immediately = True
 
@@ -902,13 +917,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
            atomically with any inline-CH chunks accumulated alongside.
         2. File chunks, if this fails, we raise so that we don't insert calls that
            are missing file data. Forces retry.
-        3. Calls, if this fails, we raise so that clients can retry, and so we don't
+        3. Content objects, if this fails, we raise. Written after their file
+           bytes so a committed object row never references unwritten content.
+        4. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
-        4. Produce to kafka, if this fails, we don't raise because all of the data
+        5. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
         self._flush_file_batches()
+
+        # Raises on fail
+        try:
+            self._flush_content_objs()
+        except Exception:
+            logger.exception("Failed to flush content objects")
+            raise
 
         # Raises on fail
         try:
@@ -1075,11 +1099,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             {"weave_trace_server.insert_call_count": len(req.batch)}
         )
 
+        pending_objs = PendingContentObjs()
         with self.call_batch():
-            for complete_call in req.batch:
-                processed_complete_call = process_complete_call_to_content(
-                    complete_call, self
-                )
+            processed_calls = [
+                process_complete_call_to_content(complete_call, self, pending_objs)
+                for complete_call in req.batch
+            ]
+            # Resolve collisions now (read-only) so call payloads can restore
+            # the raw values of skipped objects; the surviving object rows are
+            # staged and written on with-exit, after their file bytes.
+            raw_by_ref = self._resolve_pending_content_objs(pending_objs)
+
+            for processed_complete_call in processed_calls:
+                if raw_by_ref:
+                    restore_raw_content_values(processed_complete_call, raw_by_ref)
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
@@ -1108,7 +1141,68 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     processed_complete_call.ended_at,
                 )
 
+        # Only now is a cached ref guaranteed to resolve: objects, files,
+        # and calls have all committed.
+        pending_objs.publish_refs()
         return tsi.CallsUpsertCompleteRes()
+
+    def _resolve_pending_content_objs(
+        self, pending_objs: PendingContentObjs
+    ) -> dict[str, str]:
+        """Resolve content objects queued by calls_complete's base64 walk.
+
+        Read-only: dedupes by (project_id, object_id, digest) so identical
+        content embedded in multiple calls is written once, runs one WB-30574
+        collision check per project, and stages the survivors into
+        _content_obj_batch for the ordered flush. The actual obj_create_batch
+        write happens later in _flush_content_objs, after file bytes land.
+
+        A collision must not fail the calls batch: the colliding object is
+        skipped and reported in the returned {ref: raw_value} map so the
+        caller can restore the original inline values in the call payloads.
+        """
+        deduped: dict[tuple[str, str, str | None], tsi.ObjSchemaForInsert] = {}
+        for obj in pending_objs.objs:
+            deduped.setdefault(
+                (obj.project_id, obj.object_id, obj.expected_digest), obj
+            )
+
+        by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
+        for obj in deduped.values():
+            by_project.setdefault(obj.project_id, []).append(obj)
+
+        for project_id, project_objs in by_project.items():
+            checks: list[tuple[str, str, str | None]] = []
+            for obj in project_objs:
+                digest_result = compute_object_digest_result(
+                    obj.val, obj.builtin_object_class
+                )
+                kind = get_kind(digest_result.processed_val)
+                checks.append((obj.object_id, kind, digest_result.base_object_class))
+            collisions = self._find_obj_name_type_collisions(project_id, checks)
+            for collision in collisions:
+                logger.warning(
+                    "Skipping content object with name/type collision: %s", collision
+                )
+                pending_objs.mark_skipped(project_id, collision.object_id)
+
+            colliding_ids = {c.object_id for c in collisions}
+            self._content_obj_batch.extend(
+                o for o in project_objs if o.object_id not in colliding_ids
+            )
+
+        return pending_objs.restore_map()
+
+    def _flush_content_objs(self) -> None:
+        """Write staged content objects, grouped by project (obj_create_batch
+        takes a single project). Runs after _flush_file_batches so a committed
+        object row never references content that has not landed in storage.
+        """
+        by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
+        for obj in self._content_obj_batch:
+            by_project.setdefault(obj.project_id, []).append(obj)
+        for project_objs in by_project.values():
+            self.obj_create_batch(project_objs)
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
@@ -2179,19 +2273,59 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         (WB-30574). Weave refs do not carry type, so allowing same-name
         different-type would make refs ambiguous.
         """
-        query, parameters = make_obj_name_type_collision_query(
-            project_id=project_id, object_id=object_id, kind=kind
+        collisions = self._find_obj_name_type_collisions(
+            project_id, [(object_id, kind, new_base_object_class)]
         )
-        result = self._query(query, parameters)
-        existing_classes = [row[0] for row in result.result_rows]
-        mismatched = [c for c in existing_classes if c != new_base_object_class]
-        if mismatched:
-            raise ObjectNameTypeCollision(
-                object_id=object_id,
-                kind=kind,
-                new_base_object_class=new_base_object_class,
-                existing_base_object_classes=mismatched,
+        if collisions:
+            raise collisions[0]
+
+    def _find_obj_name_type_collisions(
+        self,
+        project_id: str,
+        checks: list[tuple[str, str, str | None]],
+    ) -> list[ObjectNameTypeCollision]:
+        """WB-30574 collision check: one query per distinct kind, returning
+        one ObjectNameTypeCollision per object_id bound to more than one
+        base_object_class, by committed rows or by conflicting entries
+        within ``checks`` itself. Callers decide whether to raise.
+
+        ``checks`` is a list of (object_id, kind, new_base_object_class).
+        """
+        by_kind: dict[str, dict[str, set[str | None]]] = {}
+        for object_id, kind, new_base_object_class in checks:
+            by_kind.setdefault(kind, {}).setdefault(object_id, set()).add(
+                new_base_object_class
             )
+
+        collisions: list[ObjectNameTypeCollision] = []
+        for kind, object_id_to_classes in by_kind.items():
+            query, parameters = make_obj_name_type_collision_query(
+                project_id=project_id,
+                object_ids=sorted(object_id_to_classes),
+                kind=kind,
+            )
+            result = self._query(query, parameters)
+            existing_by_object_id: dict[str, set[str | None]] = {}
+            for object_id, base_object_class in result.result_rows:
+                existing_by_object_id.setdefault(object_id, set()).add(
+                    base_object_class
+                )
+
+            for object_id, new_classes in object_id_to_classes.items():
+                bound = existing_by_object_id.get(object_id, set()) | new_classes
+                if len(bound) > 1:
+                    new_class = sorted(new_classes, key=str)[0]
+                    collisions.append(
+                        ObjectNameTypeCollision(
+                            object_id=object_id,
+                            kind=kind,
+                            new_base_object_class=new_class,
+                            existing_base_object_classes=sorted(
+                                (c for c in bound if c != new_class), key=str
+                            ),
+                        )
+                    )
+        return collisions
 
     @traced(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
@@ -2208,6 +2342,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         inserted first; if the subsequent batched alias INSERT fails, the
         new versions exist but their "latest" alias is missing — readers
         see the prior latest until the alias write succeeds on retry.
+
+        Unlike obj_create, no WB-30574 name/type collision guard runs here:
+        callers must know their object_ids are fresh or check beforehand
+        (see _resolve_pending_content_objs).
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -2234,6 +2372,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             processed_val = digest_result.processed_val
             json_val = digest_result.json_val
             digest = digest_result.digest
+            validate_expected_digest(
+                expected=obj.expected_digest,
+                actual=digest,
+                label=f"obj {obj.object_id!r}",
+            )
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
