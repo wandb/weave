@@ -5735,7 +5735,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(parent_ids=batch),
                     columns=child_columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-                    include_costs=req.include_costs,
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
@@ -5746,6 +5745,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_raw_data_rows if req.include_rows else False,
             req.include_predict_and_score_children,
         )
+
+        # Cost is read from the predict call only (see _build_trial), so the
+        # children above are fetched without cost enrichment and only the
+        # predict calls are priced here — before compute_summary_from_rows,
+        # which sums trial.total_cost.
+        if req.include_costs:
+            eval_helpers.apply_predict_costs(
+                all_rows, req.project_id, self.calls_query_stream
+            )
 
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:

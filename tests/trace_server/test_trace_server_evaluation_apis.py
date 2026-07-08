@@ -1273,6 +1273,200 @@ def test_eval_results_summary_predict_total_cost_none_when_absent(client):
     assert res.summary.evaluations[0].predict_total_cost is None
 
 
+def test_eval_results_rows_trial_total_cost_predict_only(client):
+    """Per-trial total_cost in rows: predict-only, filled without a summary.
+
+    include_summary=False pins that the cost fill is not tied to the summary
+    path. The judge's (differently priced) usage must not leak into the trial,
+    and a trial without a predict call reports None, not the judge's cost.
+    """
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={"predict-llm": _PREDICT_PRICE, "judge-llm": _JUDGE_PRICE},
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [
+            ({"predict-llm": _PREDICT_USAGE}, {"judge-llm": _JUDGE_USAGE}),
+            (None, {"judge-llm": _JUDGE_USAGE}),
+        ],
+        eval_name="row-cost",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=True,
+            include_summary=False,
+            include_predict_and_score_children=True,
+            include_costs=True,
+        )
+    )
+    trial_costs = [
+        trial.total_cost
+        for row in res.rows
+        for evaluation in row.evaluations
+        for trial in evaluation.trials
+    ]
+    assert len(trial_costs) == 2
+    assert trial_costs.count(None) == 1
+    assert [c for c in trial_costs if c is not None] == [
+        pytest.approx(_PREDICT_COST_PER_TRIAL)
+    ]
+
+
+def test_eval_results_sorted_rows_trial_total_cost(client):
+    """Costs fill on the sorted path too, and land on the right trial.
+
+    Sorting takes a separate branch on the in-memory backend; two trials with
+    different predict usage pin that each sorted row keeps its own cost.
+    """
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={"predict-llm": _PREDICT_PRICE},
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    double_usage = {"prompt_tokens": 200, "completion_tokens": 100, "total_tokens": 300}
+    eval_id = _create_eval_run_with_cost_trials(
+        client,
+        [
+            ({"predict-llm": _PREDICT_USAGE}, None),
+            ({"predict-llm": double_usage}, None),
+        ],
+        eval_name="sorted-cost",
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[eval_id],
+            include_rows=True,
+            include_summary=False,
+            include_predict_and_score_children=True,
+            include_costs=True,
+            sort_by=[EvalResultsSortBy(field="output.output", direction="desc")],
+        )
+    )
+    trial_costs = [
+        trial.total_cost
+        for row in res.rows
+        for evaluation in row.evaluations
+        for trial in evaluation.trials
+    ]
+    # Descending by output: "answer_1" (the double-usage trial) sorts first.
+    assert trial_costs == [
+        pytest.approx(2 * _PREDICT_COST_PER_TRIAL),
+        pytest.approx(_PREDICT_COST_PER_TRIAL),
+    ]
+
+
+def test_eval_results_trial_genai_span_ref_preserved_with_costs(client):
+    """A summary-carried genai_span_ref survives include_costs=True.
+
+    Regression pin: the ClickHouse cost enrichment used to rebuild the child
+    summary and drop summary.weave.genai_span_ref. With costs now read via a
+    separate predict-only query, the children keep their raw summary, so the
+    ref reaches the trial alongside the cost.
+    """
+    project_id = client.project_id
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=project_id,
+            costs={"predict-llm": _PREDICT_PRICE},
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    model_ref = "model://genai-cost"
+    run = client.server.evaluation_run_create(
+        EvaluationRunCreateReq(
+            project_id=project_id,
+            evaluation="eval://genai-cost",
+            model=model_ref,
+        )
+    )
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    pas_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=pas_id,
+                trace_id=run.evaluation_run_id,
+                parent_id=run.evaluation_run_id,
+                op_name="Evaluation.predict_and_score",
+                started_at=now,
+                attributes={},
+                inputs={"example": {"idx": 0}, "model": model_ref},
+            )
+        )
+    )
+    predict_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_id,
+                trace_id=run.evaluation_run_id,
+                parent_id=pas_id,
+                op_name="Model.predict",
+                started_at=now,
+                attributes={},
+                inputs={"self": model_ref, "example": {"idx": 0}},
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=predict_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                output="answer",
+                summary={
+                    "usage": {"predict-llm": _PREDICT_USAGE},
+                    "weave": {
+                        "genai_span_ref": [
+                            {"trace_id": "agent-trace-1", "span_id": "span-1"}
+                        ]
+                    },
+                },
+            )
+        )
+    )
+    client.server.call_end(
+        CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=pas_id,
+                ended_at=now + datetime.timedelta(seconds=2),
+                output={"output": "answer", "scores": {}},
+                summary={},
+            )
+        )
+    )
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(
+            project_id=project_id,
+            evaluation_call_ids=[run.evaluation_run_id],
+            include_rows=True,
+            include_summary=False,
+            include_predict_and_score_children=True,
+            include_costs=True,
+        )
+    )
+    trial = res.rows[0].evaluations[0].trials[0]
+    assert trial.genai_span_ref == [
+        GenAISpanRef(trace_id="agent-trace-1", span_id="span-1")
+    ]
+    assert trial.total_cost == pytest.approx(_PREDICT_COST_PER_TRIAL)
+
+
 def test_eval_results_resolved_inputs_inline(client):
     """Inline inputs should be available as dicts in raw_data_row."""
     project_id = client.project_id

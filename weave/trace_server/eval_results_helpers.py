@@ -279,6 +279,51 @@ def extract_total_cost(
     return total_cost if found_any else None
 
 
+def apply_predict_costs(
+    rows: list[tsi.EvalResultsRow],
+    project_id: str,
+    fetch_calls: Callable[[tsi.CallsQueryReq], Iterable[tsi.CallSchema]],
+) -> None:
+    """Fill each trial's total_cost from its predict call, in place.
+
+    Trial children are fetched without cost enrichment (pricing every scorer
+    child just to read the predict cost is wasted work), so trials start with
+    total_cost=None. This re-reads only the predict calls by id with
+    include_costs=True and copies their cost onto the trials. Must run before
+    compute_summary_from_rows, which sums trial.total_cost.
+    """
+    predict_call_ids = sorted(
+        {
+            trial.predict_call_id
+            for row in rows
+            for evaluation in row.evaluations
+            for trial in evaluation.trials
+            if trial.predict_call_id is not None
+        }
+    )
+    if not predict_call_ids:
+        return
+    cost_by_call_id: dict[str, float] = {}
+    for i in range(0, len(predict_call_ids), tsc.MAX_FILTER_LENGTH):
+        batch = predict_call_ids[i : i + tsc.MAX_FILTER_LENGTH]
+        cost_req = tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=batch),
+            columns=["id"],
+            sort_by=[],
+            include_costs=True,
+        )
+        for call in fetch_calls(cost_req):
+            cost = extract_total_cost(call.summary)
+            if cost is not None:
+                cost_by_call_id[call.id] = cost
+    for row in rows:
+        for evaluation in row.evaluations:
+            for trial in evaluation.trials:
+                if trial.predict_call_id is not None:
+                    trial.total_cost = cost_by_call_id.get(trial.predict_call_id)
+
+
 def best_effort_scorer_call_ids(
     scores: dict[str, Any], child_calls: list[tsi.CallSchema]
 ) -> dict[str, str]:
@@ -685,6 +730,9 @@ def eval_results_query(
         offset=0,
     )
     all_rows, _ = eval_results_grouped_rows(all_rows_req, eval_root_ids, all_calls)
+
+    if req.include_costs:
+        apply_predict_costs(all_rows, req.project_id, server.calls_query_stream)
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0
