@@ -94,6 +94,7 @@ __all__ = [
     "end_turn",
     "get_current_conversation",
     "get_current_llm",
+    "get_current_subagent",
     "get_current_turn",
     "log_conversation",
     "log_turn",
@@ -771,6 +772,7 @@ class SubAgent(_SpanBase):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
+    _token: Token[SubAgent | None] | None = PrivateAttr(default=None)
 
     def start_llm(
         self,
@@ -781,10 +783,10 @@ class SubAgent(_SpanBase):
     ) -> LLM:
         """Start an LLM call within this sub-agent.
 
-        Sets the ``_current_llm`` contextvar so the LLM is visible via
-        ``get_current_llm()`` regardless of whether a context manager is used.
-        Pins the LLM's OTel parent to this SubAgent's span when the SubAgent
-        has been entered.
+        The returned LLM sets the ``_current_llm`` contextvar when entered
+        (``with``), so ``get_current_llm()`` reflects it inside the block. Pins
+        the LLM's OTel parent to this SubAgent's span when the SubAgent has been
+        entered.
         """
         llm = LLM(
             model=model or self.model,
@@ -792,7 +794,6 @@ class SubAgent(_SpanBase):
             system_instructions=system_instructions or [],
         )
         self._thread_otel_context(llm)
-        llm._token = _current_llm.set(llm)
         return llm
 
     def start_tool(
@@ -807,13 +808,25 @@ class SubAgent(_SpanBase):
         self._thread_otel_context(tool)
         return tool
 
-    def start_subagent(self, *, name: str, model: str = "") -> SubAgent:
+    def start_subagent(
+        self,
+        *,
+        name: str,
+        model: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> SubAgent:
         """Start a nested sub-agent under this one.
 
         Pins the nested SubAgent's OTel parent to this SubAgent's span when
-        this SubAgent has been entered.
+        this SubAgent has been entered. Signature mirrors ``Turn.start_subagent``
+        so the top-level ``start_subagent`` can delegate here without dropping
+        ``system_instructions``.
         """
-        sub = SubAgent(name=name, model=model or self.model)
+        sub = SubAgent(
+            name=name,
+            model=model or self.model,
+            system_instructions=system_instructions or [],
+        )
         self._thread_otel_context(sub)
         return sub
 
@@ -924,9 +937,19 @@ class SubAgent(_SpanBase):
             conversation_name=conversation.conversation_name if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
+
+        if self._token is not None:
+            try:
+                _current_subagent.reset(self._token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
+            self._token = None
+
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
+        if self._token is None:
+            self._token = _current_subagent.set(self)
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
         start_ns = int(self.started_at.timestamp() * 1_000_000_000)
@@ -997,8 +1020,8 @@ class Turn(_SpanBase):
     ) -> LLM:
         """Start an LLM call (chat span, child of this turn).
 
-        Sets the ``_current_llm`` contextvar so the LLM is visible via
-        ``get_current_llm()`` regardless of whether a context manager is used.
+        The returned LLM sets the ``_current_llm`` contextvar when entered
+        (``with``), so ``get_current_llm()`` reflects it inside the block.
         """
         llm = LLM(
             model=model or self.model,
@@ -1006,7 +1029,6 @@ class Turn(_SpanBase):
             system_instructions=system_instructions or [],
         )
         self._thread_otel_context(llm)
-        llm._token = _current_llm.set(llm)
         return llm
 
     def start_tool(
@@ -1248,8 +1270,8 @@ class Conversation(BaseModel):
     ) -> Turn:
         """Create a new turn. Auto-ends the previous turn if still open.
 
-        Sets the ``_current_turn`` contextvar so the turn is visible via
-        ``get_current_turn()`` regardless of whether a context manager is used.
+        The returned turn sets the ``_current_turn`` contextvar when entered
+        (``with``), so ``get_current_turn()`` reflects it inside the block.
         Each of ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description``
         / ``agent_version`` falls back to the conversation's default when left
         empty; ``continue_parent_trace`` is inherited. Override any of them later
@@ -1272,7 +1294,6 @@ class Conversation(BaseModel):
         )
         if user_message:
             turn.messages.append(Message(role="user", content=user_message))
-        turn._token = _current_turn.set(turn)
         self._current_turn = turn
         return turn
 
@@ -1312,6 +1333,9 @@ _current_conversation: ContextVar[Conversation | None] = ContextVar(
     "_current_conversation", default=None
 )
 _current_turn: ContextVar[Turn | None] = ContextVar("_current_turn", default=None)
+_current_subagent: ContextVar[SubAgent | None] = ContextVar(
+    "_current_subagent", default=None
+)
 _current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
 
 
@@ -1361,19 +1385,27 @@ def start_turn(
 ) -> Turn:
     """Create and activate a turn. Uses the current conversation if available.
 
-    If no conversation is active, returns a disconnected Turn that is NOT set
-    in the contextvar. This means ``get_current_turn()`` will return None.
-    Use ``conversation.start_turn()`` instead if you need contextvar-based
-    cross-module access.
+    When a conversation is active, sets the ``_current_turn`` contextvar so the
+    turn is visible via ``get_current_turn()`` without a ``with`` block. If no
+    conversation is active, returns a disconnected Turn that is NOT set in the
+    contextvar (``get_current_turn()`` returns None); enter it with ``with`` to
+    activate it.
     """
     conversation = get_current_conversation()
     if conversation is not None:
-        return conversation.start_turn(
+        turn = conversation.start_turn(
             user_message=user_message,
             model=model,
             agent_name=agent_name,
             system_instructions=system_instructions,
         )
+        # Eager-set on this top-level (imperative) entry point (4c): the object
+        # factory ``conversation.start_turn`` no longer sets the contextvar at
+        # construction — it's set at ``Turn.__enter__`` so a cross-thread
+        # build->enter resets in the entering context — so the imperative
+        # no-``with`` contract is satisfied here instead.
+        turn._token = _current_turn.set(turn)
+        return turn
     turn = Turn(
         agent_name=agent_name,
         model=model,
@@ -1390,22 +1422,30 @@ def start_llm(
     provider_name: str = "",
     system_instructions: list[str] | None = None,
 ) -> LLM:
-    """Create and activate an LLM call. Uses the current turn if available.
+    """Create and activate an LLM call under the active sub-agent or turn.
 
-    If no turn is active, returns a disconnected LLM (no contextvar set).
+    Resolves the parent as the current sub-agent (preferred) or, failing that,
+    the current turn — so an LLM started inside a sub-agent nests under the
+    sub-agent, not the turn. When a parent is active, sets the ``_current_llm``
+    contextvar so the LLM is visible via ``get_current_llm()`` without a
+    ``with`` block. If neither is active, returns a disconnected LLM (no
+    contextvar set).
 
     Pass ``provider_name`` explicitly. The SDK does not infer it from the
     model identifier: prefix-based guessing misattributes user fine-tunes
     (e.g. a model named ``text-...``) and bakes assumptions about future
     model names into telemetry that's expensive to correct after the fact.
     """
-    turn = get_current_turn()
-    if turn is not None:
-        return turn.start_llm(
+    parent = get_current_subagent() or get_current_turn()
+    if parent is not None:
+        llm = parent.start_llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,
         )
+        # Eager-set for the imperative no-``with`` contract; see ``start_turn``.
+        llm._token = _current_llm.set(llm)
+        return llm
     return LLM(
         model=model,
         provider_name=provider_name,
@@ -1414,26 +1454,37 @@ def start_llm(
 
 
 def start_tool(*, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
-    """Create a tool execution span.
+    """Create a tool execution span under the active sub-agent or turn.
 
-    The Tool's OTel span automatically becomes a child of whatever span is
-    current in OTel context — typically a Turn span if one is active. No
-    explicit turn delegation is needed: parent-child propagation happens
-    via OTel context, not via the Conversation SDK contextvars.
+    Delegates to the current sub-agent (preferred) or turn so the Tool's OTel
+    parent is pinned to that span explicitly — it then nests correctly even when
+    entered out-of-block or in another thread, matching ``start_llm``. Falls back
+    to a bare Tool (parented via ambient OTel context) when neither is active.
     """
+    parent = get_current_subagent() or get_current_turn()
+    if parent is not None:
+        return parent.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
     return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
 
 
 def start_subagent(
     *, name: str, model: str = "", system_instructions: list[str] | None = None
 ) -> SubAgent:
-    """Create a sub-agent invocation span.
+    """Create a sub-agent invocation span under the active sub-agent or turn.
 
-    The SubAgent's OTel span automatically becomes a child of whatever span
-    is current in OTel context — typically a Turn span if one is active.
-    Mirrors ``start_tool`` in shape; OTel context handles parent-child
-    propagation, no explicit delegation is needed.
+    Delegates to the current sub-agent (preferred — enabling agent→agent
+    nesting) or turn so the SubAgent's OTel parent is pinned explicitly — it then
+    nests correctly even when entered out-of-block or in another thread, matching
+    ``start_llm``. Falls back to a bare SubAgent (parented via ambient OTel
+    context) when neither is active.
     """
+    parent = get_current_subagent() or get_current_turn()
+    if parent is not None:
+        return parent.start_subagent(
+            name=name, model=model, system_instructions=system_instructions
+        )
     return SubAgent(
         name=name, model=model, system_instructions=system_instructions or []
     )
@@ -1468,6 +1519,17 @@ def get_current_conversation() -> Conversation | None:
 def get_current_turn() -> Turn | None:
     """Return the active turn from contextvar, or None."""
     return _current_turn.get()
+
+
+def get_current_subagent() -> SubAgent | None:
+    """Return the active sub-agent from contextvar, or None.
+
+    Set while inside a ``with sub_agent:`` block (nested sub-agents stack, so
+    this returns the innermost). The implicit top-level ``start_llm`` /
+    ``start_tool`` / ``start_subagent`` factories prefer it over the current
+    turn, so children created inside a sub-agent nest under the sub-agent.
+    """
+    return _current_subagent.get()
 
 
 def get_current_llm() -> LLM | None:
