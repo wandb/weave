@@ -15,6 +15,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_base64_with_content_objects,
     store_content_object,
 )
+from weave.trace_server.content.content import Content as ServerContent
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallStartReq,
@@ -341,6 +342,34 @@ class TestContentRefCache:
             {"img": data_uri}, "proj_fail", working_server
         )
         _assert_content_ref(result["img"], "proj_fail")
+
+    def test_mimetype_rejected_blob_is_negative_cached(self, monkeypatch):
+        """A blob the mimetype filter keeps inline is decoded once, then cached."""
+        b64_text = base64.b64encode(b"plain text " * 1000).decode("ascii")
+        assert len(b64_text) > AUTO_CONVERSION_MIN_SIZE
+
+        decode_count = 0
+        real_from_base64 = ServerContent.from_base64
+
+        def counting_from_base64(val: str) -> ServerContent:
+            nonlocal decode_count
+            decode_count += 1
+            return real_from_base64(val)
+
+        monkeypatch.setattr(ServerContent, "from_base64", counting_from_base64)
+
+        trace_server = MagicMock()
+        first = replace_base64_with_content_objects(
+            {"doc": b64_text}, "proj", trace_server
+        )
+        second = replace_base64_with_content_objects(
+            {"doc": b64_text}, "proj", trace_server
+        )
+        assert first["doc"] == b64_text
+        assert second["doc"] == b64_text
+        assert decode_count == 1
+        assert trace_server.file_create.call_count == 0
+        assert trace_server.obj_create.call_count == 0
 
 
 class TestStandaloneBase64Detection:

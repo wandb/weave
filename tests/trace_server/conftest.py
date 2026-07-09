@@ -112,10 +112,12 @@ def reset_project_version_cache():
 
 @pytest.fixture(autouse=True)
 def reset_content_ref_cache():
-    """The module-level published-content ref cache would leak refs across tests."""
+    """The module-level published-content ref caches would leak refs across tests."""
     base64_content_conversion._content_ref_cache.clear()
+    base64_content_conversion._rejected_blob_cache.clear()
     yield
     base64_content_conversion._content_ref_cache.clear()
+    base64_content_conversion._rejected_blob_cache.clear()
 
 
 def _get_worker_db_suffix(request, default: str = "_test") -> str:

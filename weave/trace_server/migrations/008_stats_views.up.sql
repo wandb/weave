@@ -1,4 +1,4 @@
-CREATE TABLE files_stats
+CREATE TABLE IF NOT EXISTS files_stats
 (
     project_id String,
     digest String,
@@ -11,7 +11,7 @@ CREATE TABLE files_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
 
-CREATE MATERIALIZED VIEW files_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS files_stats_view
 TO files_stats
 AS
 SELECT
@@ -29,7 +29,7 @@ GROUP BY
     files.digest,
     files.chunk_index;
 
-CREATE TABLE table_rows_stats
+CREATE TABLE IF NOT EXISTS table_rows_stats
 (
     project_id String,
     digest String,
@@ -39,7 +39,7 @@ CREATE TABLE table_rows_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, digest);
 
-CREATE MATERIALIZED VIEW table_rows_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS table_rows_stats_view
 TO table_rows_stats
 AS
 SELECT
@@ -54,7 +54,7 @@ GROUP BY
     table_rows.digest;
 
 
-CREATE TABLE object_versions_stats
+CREATE TABLE IF NOT EXISTS object_versions_stats
 (
     project_id String,
     kind Enum('op', 'object'),
@@ -67,7 +67,7 @@ CREATE TABLE object_versions_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, kind, object_id, digest);
 
-CREATE MATERIALIZED VIEW object_versions_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS object_versions_stats_view
 TO object_versions_stats
 AS
 SELECT
@@ -86,7 +86,7 @@ GROUP BY
     object_versions.object_id,
     object_versions.digest;
 
-CREATE TABLE feedback_stats
+CREATE TABLE IF NOT EXISTS feedback_stats
 (
     project_id String,
     weave_ref String,
@@ -100,7 +100,7 @@ CREATE TABLE feedback_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, weave_ref, wb_user_id, id);
 
-CREATE MATERIALIZED VIEW feedback_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS feedback_stats_view
 TO feedback_stats
 AS
 SELECT
@@ -120,7 +120,7 @@ GROUP BY
     feedback.wb_user_id,
     feedback.id;
 
-CREATE TABLE calls_merged_stats
+CREATE TABLE IF NOT EXISTS calls_merged_stats
 (
     project_id String,
     id String,
@@ -143,7 +143,7 @@ CREATE TABLE calls_merged_stats
 ORDER BY (project_id, id);
 
 -- NOTE: This needs to be generally kept in sync with calls_merged.
-CREATE MATERIALIZED VIEW calls_merged_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_stats_view
 TO calls_merged_stats
 AS
 SELECT

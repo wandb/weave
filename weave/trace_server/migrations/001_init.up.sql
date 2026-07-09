@@ -6,7 +6,7 @@ end data, but this is not practically possible given the current APIs. The
 `calls_merged` table is a materialized view that aggregates the start and end
 data into a single row.
 */
-CREATE TABLE call_parts (
+CREATE TABLE IF NOT EXISTS call_parts (
     /*
     `id`: The unique identifier for the call. This is typically a UUID.
     */
@@ -103,7 +103,7 @@ CREATE TABLE call_parts (
 ) ENGINE = MergeTree
 ORDER BY (project_id, id);
 
-CREATE TABLE calls_merged (
+CREATE TABLE IF NOT EXISTS calls_merged (
     project_id String,
     id String,
     # While these fields are all marked as null, the practical expectation
@@ -127,7 +127,7 @@ CREATE TABLE calls_merged (
 ) ENGINE = AggregatingMergeTree
 ORDER BY (project_id, id);
 
-CREATE MATERIALIZED VIEW calls_merged_view TO calls_merged AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_merged_view TO calls_merged AS
 SELECT project_id,
     id,
     anySimpleState(wb_run_id) as wb_run_id,
@@ -148,7 +148,7 @@ FROM call_parts
 GROUP BY project_id,
     id;
 
-CREATE TABLE object_versions (
+CREATE TABLE IF NOT EXISTS object_versions (
     project_id String,
     object_id String,
     kind Enum('op', 'object'),
@@ -160,7 +160,7 @@ CREATE TABLE object_versions (
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, kind, object_id, digest);
 
-CREATE VIEW object_versions_deduped AS
+CREATE VIEW IF NOT EXISTS object_versions_deduped AS
 SELECT project_id,
     object_id,
     created_at,
@@ -201,7 +201,7 @@ ORDER BY project_id,
     object_id,
     created_at;
 
-CREATE TABLE table_rows (
+CREATE TABLE IF NOT EXISTS table_rows (
     project_id String,
     digest String,
     refs Array(String),
@@ -209,7 +209,7 @@ CREATE TABLE table_rows (
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
-CREATE VIEW table_rows_deduped AS
+CREATE VIEW IF NOT EXISTS table_rows_deduped AS
 SELECT project_id, digest, val_dump
 FROM (
         SELECT *,
@@ -220,14 +220,14 @@ WHERE rn = 1
 ORDER BY project_id,
     digest;
 
-CREATE TABLE tables (
+CREATE TABLE IF NOT EXISTS tables (
     project_id String,
     digest String,
     row_digests Array(String),
     created_at DateTime64(3) DEFAULT now64(3)
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest);
-CREATE VIEW tables_deduped AS
+CREATE VIEW IF NOT EXISTS tables_deduped AS
 SELECT *
 FROM (
         SELECT *,
@@ -238,7 +238,7 @@ WHERE rn = 1
 ORDER BY project_id,
     digest;
 
-CREATE TABLE files (
+CREATE TABLE IF NOT EXISTS files (
     project_id String,
     digest String,
     chunk_index UInt32,
@@ -249,7 +249,7 @@ CREATE TABLE files (
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (project_id, digest, chunk_index);
 
-CREATE VIEW files_deduped AS
+CREATE VIEW IF NOT EXISTS files_deduped AS
 SELECT *
 FROM (
         SELECT *,

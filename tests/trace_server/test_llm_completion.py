@@ -3,7 +3,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import llm_completion as llm_mod
@@ -1621,17 +1620,17 @@ def test_provider_base_url_validation():
     assert p.base_url == "http://my-ollama-server.example.com:11434"
 
     # Non-http schemes rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("ftp://bad.example.com")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("file:///etc/passwd")
 
     # Query strings, bare '?', and fragments rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("https://api.example.com/v1?foo=bar")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("https://api.example.com/v1#section")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://10.0.0.1/path?")
 
     # Blocked hostnames rejected
@@ -1641,28 +1640,28 @@ def test_provider_base_url_validation():
         "foo.metadata.google.internal",
         "169.254.169.254",
     ):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{hostname}/v1")
 
     # Non-globally-routable IPs rejected
     for addr in ("10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{addr}/v1")
 
     # Alternative IP encodings rejected
     for alt_ip in ("0xa9fea9fe", "2852039166", "0x7f000001", "0"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{alt_ip}/v1")
 
     # IPv6 non-global addresses rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://[::1]/v1")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://[::ffff:169.254.169.254]/v1")
 
     # Blocked extra_headers rejected
     for blocked in ("Metadata-Flavor", "METADATA-FLAVOR", "X-aws-ec2-metadata-token"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider("https://api.example.com", extra_headers={blocked: "val"})
 
     # Allowed headers accepted
@@ -1674,9 +1673,9 @@ def test_provider_base_url_validation():
 
     # Validation also runs on assignment, not just init
     p = _make_provider("https://api.example.com")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         p.base_url = "http://169.254.169.254/v1"
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         p.extra_headers = {"Metadata-Flavor": "Google"}
 
 

@@ -28,21 +28,21 @@ ALTER TABLE feedback
     `annotation_ref`: The ref pointing to the annotation definition for this feedback.
     Expected to be present on any feedback type starting with `wandb.annotation`.
     */
-    ADD COLUMN annotation_ref Nullable(String) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS annotation_ref Nullable(String) DEFAULT NULL,
     /*
     `runnable_ref`: The ref pointing to the runnable definition for this feedback.
     This can be an op, a configured action, etc...
     Expected to be present on any feedback type starting with `wandb.runnable`.
     */
-    ADD COLUMN runnable_ref Nullable(String) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS runnable_ref Nullable(String) DEFAULT NULL,
     /*
     `call_ref`: The ref pointing to the resulting call associated with generating this feedback.
     Expected (but not required) to be present on any feedback that has `runnable_ref` as a
     call-producing op.
     */
-    ADD COLUMN call_ref Nullable(String) DEFAULT NULL,
+    ADD COLUMN IF NOT EXISTS call_ref Nullable(String) DEFAULT NULL,
     /*
     `trigger_ref`: The ref pointing to the trigger definition which resulted in this feedback.
     Will be present when the runnable_ref has been executed by a trigger, not a human/small batch job.
     */
-    ADD COLUMN trigger_ref Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS trigger_ref Nullable(String) DEFAULT NULL;

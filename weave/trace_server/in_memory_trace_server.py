@@ -2461,7 +2461,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
         eval_root_ids: list[str],
         include_children: bool = True,
-        include_costs: bool = False,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -2494,7 +2493,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
                         columns=columns,
                         sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-                        include_costs=include_costs,
                     )
                 )
 
@@ -6813,7 +6811,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 eval_root_ids,
                 include_children=req.include_predict_and_score_children,
-                include_costs=req.include_costs,
             )
         )
         if req.resolve_row_refs:
@@ -6915,6 +6912,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         all_rows, _ = eval_helpers.eval_results_grouped_rows(
             all_rows_req, eval_root_ids, all_calls
         )
+
+        # ---- Fill predict-call costs onto trials ----
+        if req.include_costs:
+            eval_helpers.apply_predict_costs(
+                all_rows, req.project_id, self.calls_query_stream
+            )
 
         # ---- Apply per-evaluation filters ----
         if req.filters:
