@@ -662,7 +662,8 @@ def test_calls_complete_batches_content_object_inserts(
 
     Duplicate content across calls in the batch collapses to the same ref,
     and the whole batch issues exactly one insert into object_versions and
-    one into aliases instead of one pair of inserts per object.
+    none into aliases: content refs pin the version digest, so the "latest"
+    alias is never written or read for these objects.
     """
     project_id = f"{TEST_ENTITY}/calls_complete_batched_objects"
     internal_project_id = b64(project_id)
@@ -717,7 +718,7 @@ def test_calls_complete_batches_content_object_inserts(
     trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=calls))
 
     assert insert_tables.count("object_versions") == 1
-    assert insert_tables.count("aliases") == 1
+    assert insert_tables.count("aliases") == 0
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "object_versions", internal_project_id
@@ -728,7 +729,7 @@ def test_calls_complete_batches_content_object_inserts(
         _count_project_rows(
             clickhouse_trace_server.ch_client, "aliases", internal_project_id
         )
-        == 2
+        == 0
     )
 
     inputs_1, output_1 = _fetch_call_dumps(
@@ -783,6 +784,19 @@ def test_calls_complete_batches_content_object_inserts(
     }
     assert obj_b.obj.val["_type"] == "CustomWeaveType"
     assert obj_a.obj.val != obj_b.obj.val
+
+    # No "latest" alias row is written, yet "latest" still resolves to the sole
+    # version via the query builder's computed is_latest fallback: dropping the
+    # alias insert is read-transparent for these single-version objects.
+    latest_a = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_a.project_id,
+            object_id=parsed_a.name,
+            digest="latest",
+        )
+    )
+    assert latest_a.obj.digest == parsed_a.version
+    assert latest_a.obj.val == obj_a.obj.val
 
 
 def test_calls_complete_tolerates_content_object_name_collision(
