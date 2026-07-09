@@ -66,11 +66,15 @@ class GCSMockState:
     Read-back:
       `blob_data`        - the in-memory backing store, keyed by full path.
       `upload_count`     - total successful uploads (skips not counted).
+      `upload_attempts`  - total upload_from_string calls, including ones that
+                     412 on `if_generation_match=0`; a cross-pod pre-check that
+                     skips the redundant write shows up here, not in upload_count.
       `concurrent_peak`  - max in-flight uploads observed across threads.
     """
 
     blob_data: dict[str, bytes] = field(default_factory=dict)
     upload_count: int = 0
+    upload_attempts: int = 0
     concurrent_peak: int = 0
     fail_paths: set[str] = field(default_factory=set)
     expected_concurrency: int | None = None
@@ -133,6 +137,8 @@ def gcs():
         blob.name = path
 
         def upload_from_string(data, timeout=None, if_generation_match=None, **kwargs):
+            with state_lock:
+                state.upload_attempts += 1
             if if_generation_match == 0 and path in state.blob_data:
                 raise gcp_exceptions.PreconditionFailed("Object already exists")
             if path in state.fail_paths:
