@@ -1266,8 +1266,10 @@ def make_conversation_previews_query(
     before LIMIT.) The bloom-filter skip index on `conversation_id` plus the
     optional time range bound the scan further.
 
-    `argMinIf`/`argMaxIf` pick the earliest input and latest output span that
-    actually carries messages; the handler turns the arrays into preview text.
+    `first_input_messages` is the earliest message-bearing span; its
+    accumulated history starts at the conversation opening, and the handler
+    extracts the first user entry from it. `last_output_messages` is the latest
+    output span that actually carries messages.
     """
     pid_slot = pb.add(project_id, param_type="String")
     ids_slot = pb.add(list(conversation_ids), param_type="Array(String)")

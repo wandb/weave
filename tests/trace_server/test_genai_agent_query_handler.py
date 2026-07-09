@@ -195,8 +195,8 @@ def test_grouped_rows_hydrate_message_previews() -> None:
             ],
         ),
         # bounded preview query, keyed by conversation_id. ClickHouse returns
-        # Array(Tuple(role, content, finish_reason)); first span carries a
-        # system + user prompt and the user text wins.
+        # Array(Tuple(role, content, finish_reason)); first_input_messages is
+        # accumulated history from the opening, so the first user text wins.
         _FakeQueryResult(
             column_names=[
                 "conversation_id",
@@ -206,7 +206,12 @@ def test_grouped_rows_hydrate_message_previews() -> None:
             result_rows=[
                 (
                     "conv-a",
-                    [("system", "be helpful", ""), ("user", "what is 2+2?", "")],
+                    [
+                        ("system", "be helpful", ""),
+                        ("user", "what is 2+2?", ""),
+                        ("assistant", "It is 4.", ""),
+                        ("user", "and 3+3?", ""),
+                    ],
                     [("assistant", "It is 4.", "stop")],
                 ),
                 ("conv-empty", [], []),

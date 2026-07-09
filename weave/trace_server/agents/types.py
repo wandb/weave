@@ -625,7 +625,7 @@ class AgentConversationMessagePreview(BaseModel):
     chat view; `text` is the trimmed, length-capped preview content.
     """
 
-    role: str = ""
+    role: Literal["user_message", "assistant_message"]
     text: str = ""
 
 
