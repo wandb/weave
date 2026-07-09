@@ -15,6 +15,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.errors import (
     CallsCompleteModeRequired,
@@ -1749,6 +1750,58 @@ def test_calls_delete(trace_server, clickhouse_trace_server):
     )
     assert res.num_deleted == 2
     assert len(_fetch_calls_stream(trace_server, project_id)) == 0
+
+
+def test_calls_delete_marks_deleted_at_and_expire_at(
+    trace_server, clickhouse_trace_server
+):
+    """Delete sets deleted_at (read hiding) and expire_at (native TTL reclamation) in one UPDATE.
+
+    Both markers are the same instant on the deleted row (expire_at is a second-precision
+    DateTime, so it is deleted_at floored to the second); the surviving sibling keeps its
+    sentinels, so TTL never reclaims it.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_delete_markers"
+    internal_project_id = b64(project_id)
+    ch_client = clickhouse_trace_server.ch_client
+
+    deleted_id, kept_id = str(uuid.uuid4()), str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+    trace_server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                _make_completed_call(project_id, cid, str(uuid.uuid4()), now, now)
+                for cid in (deleted_id, kept_id)
+            ]
+        )
+    )
+
+    res = trace_server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[deleted_id])
+    )
+    assert res.num_deleted == 1
+    assert {c.id for c in _fetch_calls_stream(trace_server, project_id)} == {kept_id}
+
+    deleted_at, expire_at = _fetch_call_row(
+        ch_client,
+        "calls_complete",
+        internal_project_id,
+        deleted_id,
+        ["deleted_at", "expire_at"],
+    )
+    assert deleted_at != SENTINEL_EPOCH.replace(tzinfo=None)
+    assert expire_at != EXPIRE_AT_NEVER.replace(tzinfo=None)
+    assert expire_at == deleted_at.replace(microsecond=0)
+
+    kept_deleted_at, kept_expire_at = _fetch_call_row(
+        ch_client,
+        "calls_complete",
+        internal_project_id,
+        kept_id,
+        ["deleted_at", "expire_at"],
+    )
+    assert kept_deleted_at == SENTINEL_EPOCH.replace(tzinfo=None)
+    assert kept_expire_at == EXPIRE_AT_NEVER.replace(tzinfo=None)
 
 
 def test_calls_delete_cascade(trace_server, clickhouse_trace_server):

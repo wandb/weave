@@ -3717,10 +3717,14 @@ def build_calls_complete_soft_delete_query(
     started_at_max_param: str | None = None,
     cluster_name: str | None = None,
 ) -> str:
-    """Build the calls_complete soft-delete: a lightweight UPDATE marking deleted_at.
+    """Build the calls_complete soft-delete: a lightweight UPDATE of deleted_at and expire_at.
 
-    This writes a patch part (no mutation, no part rewrite) that the read path
-    applies on the fly via its deleted_at filter, so the calls disappear immediately.
+    Writes one patch part (no mutation, no part rewrite) that the read path applies
+    on the fly via its deleted_at filter, so the calls disappear immediately. expire_at
+    is set to the same instant so the table's native `TTL expire_at DELETE` reclaims the
+    rows physically in the background. expire_at now means the earliest permitted physical
+    reclamation (retention or deletion); an undelete, if ever added, must recompute it from
+    started_at + the project's retention.
     """
     formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
     where_clause = _calls_complete_id_window_where(
@@ -3728,27 +3732,7 @@ def build_calls_complete_soft_delete_query(
     )
     raw_sql = f"""
         UPDATE {formatted_table}
-        SET deleted_at = now64(3)
-        WHERE {where_clause}
-        """
-    return safely_format_sql(raw_sql, logger)
-
-
-def build_calls_complete_delete_query(
-    table_name: str,
-    project_id_param: str,
-    call_ids_param: str,
-    started_at_min_param: str | None = None,
-    started_at_max_param: str | None = None,
-    cluster_name: str | None = None,
-) -> str:
-    """Build the calls_complete physical DELETE (async reclamation after soft-delete)."""
-    formatted_table = _format_table_name_with_cluster(table_name, cluster_name)
-    where_clause = _calls_complete_id_window_where(
-        project_id_param, call_ids_param, started_at_min_param, started_at_max_param
-    )
-    raw_sql = f"""
-        DELETE FROM {formatted_table}
+        SET deleted_at = now64(3), expire_at = now64(3)
         WHERE {where_clause}
         """
     return safely_format_sql(raw_sql, logger)
