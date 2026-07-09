@@ -910,31 +910,27 @@ def test_group_by_conversation_id_message_previews(ch_server):
     """Grouped conversation rows carry first/last message previews computed via
     argMin/argMax over the spans — no per-row hydration needed.
 
-    Validates the real ClickHouse aggregate semantics: the earliest span's user
-    prompt becomes `first_message`; the latest span's assistant output becomes
-    `last_message`. Spans with no renderable text are skipped by the -If guard.
+    Validates the real ClickHouse aggregate semantics: empty turn-1 spans are
+    skipped, the earliest message-bearing span's opening user prompt becomes
+    `first_message`, and the latest span's assistant output becomes
+    `last_message`.
     """
     project_id = _make_project_id("conv-previews")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     conv = f"conv-{uuid.uuid4().hex[:8]}"
 
     spans = [
-        # Earliest span: opening turn. Carries system + user input. Its user
-        # text should win as the first-message preview.
+        # Turn-1 span with no messages. It must be skipped by the -If guard
+        # before selecting first_input_messages.
         _make_span(
             project_id,
             conversation_id=conv,
             operation_name="invoke_agent",
             started_at=now,
             ended_at=now + datetime.timedelta(seconds=1),
-            input_messages=[
-                NormalizedMessage(role="system", content="be terse"),
-                NormalizedMessage(role="user", content="hello first"),
-            ],
-            output_messages=[NormalizedMessage(role="assistant", content="reply one")],
+            input_messages=[],
+            output_messages=[],
         ),
-        # A later tool span with no messages — must be skipped by the -If guard
-        # even though it is not the earliest/latest by timestamp checks below.
         _make_span(
             project_id,
             conversation_id=conv,
@@ -944,14 +940,19 @@ def test_group_by_conversation_id_message_previews(ch_server):
             input_messages=[],
             output_messages=[],
         ),
-        # Latest span by ended_at: its assistant output is the last-message preview.
+        # Earliest span with messages: accumulated history starts at the
+        # opening, even though the current turn's user text is the last entry.
         _make_span(
             project_id,
             conversation_id=conv,
             operation_name="chat",
             started_at=now + datetime.timedelta(seconds=4),
             ended_at=now + datetime.timedelta(seconds=5),
-            input_messages=[NormalizedMessage(role="user", content="hello second")],
+            input_messages=[
+                NormalizedMessage(role="user", content="opening"),
+                NormalizedMessage(role="assistant", content="r1"),
+                NormalizedMessage(role="user", content="follow-up"),
+            ],
             output_messages=[
                 NormalizedMessage(role="assistant", content="final reply")
             ],
@@ -971,7 +972,7 @@ def test_group_by_conversation_id_message_previews(ch_server):
 
     assert row.first_message is not None
     assert row.first_message.role == "user_message"
-    assert row.first_message.text == "hello first"
+    assert row.first_message.text == "opening"
 
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
