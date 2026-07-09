@@ -835,8 +835,18 @@ class ObjDeleteReq(BaseModelStrict):
     )
 
 
+class DeletedObjVersion(BaseModel):
+    digest: str
+    base_object_class: str | None = None
+    leaf_object_class: str | None = None
+
+
 class ObjDeleteRes(BaseModel):
     num_deleted: int
+    deleted_versions: list[DeletedObjVersion] | None = Field(
+        default=None,
+        description="Metadata for each deleted object version, with digest aliases resolved to content digests. None when the backing server does not report it.",
+    )
 
 
 # --- Tag and Alias types ---
