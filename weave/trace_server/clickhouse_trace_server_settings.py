@@ -120,12 +120,6 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
-# Physical reclamation of soft-deleted calls_complete rows: sync=0 lets the lightweight
-# DELETE return once scheduled (never blocks). A DELETE needs none of the UPDATE settings.
-CLICKHOUSE_ASYNC_DELETE_SETTINGS: dict[str, int | str] = {
-    "lightweight_deletes_sync": 0,
-}
-
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
 # for non-Full sorting modes on distributed tables, which causes error 48
 # ("Serialization of SortingStep is implemented only for Full sorting").
