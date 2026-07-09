@@ -184,21 +184,7 @@ class CallSchema(BaseModel):
                         "trace_name": {"anyOf": [{"type": "string"}, {"type": "null"}]},
                         "costs": {
                             "additionalProperties": {
-                                "allOf": [{"$ref": "#/components/schemas/LLMUsageSchema"}],
-                                "properties": {
-                                    "prompt_tokens_total_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
-                                    "completion_tokens_total_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
-                                    "prompt_token_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
-                                    "completion_token_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
-                                    "prompt_token_cost_unit": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "completion_token_cost_unit": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "effective_date": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "provider_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "pricing_level": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "pricing_level_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "created_at": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                    "created_by": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-                                },
+                                "$ref": "#/components/schemas/LLMCostSchema"
                             },
                             "type": "object",
                         },
