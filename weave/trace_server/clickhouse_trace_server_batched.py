@@ -2587,7 +2587,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     deleted_at=now,
                 )
 
-        return tsi.ObjDeleteRes(num_deleted=num_deleted)
+        return tsi.ObjDeleteRes(
+            num_deleted=num_deleted,
+            deleted_versions=[
+                tsi.DeletedObjVersion(
+                    digest=obj.digest,
+                    base_object_class=obj.base_object_class,
+                    leaf_object_class=obj.leaf_object_class,
+                )
+                for obj in delete_insertables
+            ],
+        )
 
     # --- Tags & Aliases ---
 
