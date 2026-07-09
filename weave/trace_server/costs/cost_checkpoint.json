@@ -28124,5 +28124,165 @@
       "cache_creation_input": 0.0,
       "created_at": "2026-07-07 13:24:02"
     }
+  ],
+  "azure/us/gpt-5.4": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.4": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.4-2026-03-05": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.4-2026-03-05": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.5": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.5": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.5-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.5-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-sol": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-terra": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 2.5e-07,
+      "cache_creation_input": 3.125e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-luna": [
+    {
+      "provider": "openai",
+      "input": 1e-06,
+      "output": 6e-06,
+      "cache_read_input": 1e-07,
+      "cache_creation_input": 1.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-realtime-2.1": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 2.4e-05,
+      "cache_read_input": 4e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-realtime-2.1-mini": [
+    {
+      "provider": "openai",
+      "input": 6e-07,
+      "output": 2.4e-06,
+      "cache_read_input": 6e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "xai/grok-4.5": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "xai/grok-4.5-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
   ]
 }
