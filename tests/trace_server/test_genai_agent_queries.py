@@ -2979,6 +2979,72 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
 # ---------------------------------------------------------------------------
 
 
+def test_feedback_create_derives_conversation_target_id_from_ref(ch_server):
+    """Conversation-targeted agent feedback derives the denormalized ID."""
+    project_id = _make_project_id("fb-conv-id-derived")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
+    ]
+
+
+def test_feedback_create_derives_turn_target_id_from_ref(ch_server):
+    """Turn-targeted agent feedback derives the denormalized trace ID."""
+    project_id = _make_project_id("fb-turn-id-derived")
+    trace_id = uuid.uuid4().hex
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": "",
+            "span_trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
 def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
     """Conversation-targeted feedback persists the supplied denormalized ID."""
     project_id = _make_project_id("fb-conv-id")

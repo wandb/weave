@@ -307,6 +307,27 @@ def validate_feedback_agent_req_targets(req: tsi.FeedbackCreateReq) -> None:
             )
 
 
+def _agent_feedback_target_ids_from_ref(
+    feedback_req: tsi.FeedbackCreateReq,
+) -> tuple[str, str]:
+    """Return denormalized agent target IDs, deriving what the ref encodes."""
+    span_conversation_id = feedback_req.span_conversation_id
+    span_trace_id = feedback_req.span_trace_id
+    if feedback_req.feedback_type not in AGENT_SPAN_FEEDBACK_TYPES:
+        return span_conversation_id, span_trace_id
+
+    try:
+        ref = ri.parse_internal_uri(feedback_req.weave_ref)
+    except ri.InvalidInternalRef:
+        return span_conversation_id, span_trace_id
+
+    if isinstance(ref, ri.InternalAgentConversationRef) and not span_conversation_id:
+        span_conversation_id = ref.conversation_id
+    elif isinstance(ref, ri.InternalAgentTurnRef) and not span_trace_id:
+        span_trace_id = ref.trace_id
+    return span_conversation_id, span_trace_id
+
+
 def format_feedback_to_row(
     feedback_req: tsi.FeedbackCreateReq,
     processed_payload: dict[str, Any],
@@ -328,6 +349,9 @@ def format_feedback_to_row(
     """
     feedback_id = feedback_req.id or generate_id()
     created_at = datetime.datetime.now(ZoneInfo("UTC"))
+    span_conversation_id, span_trace_id = _agent_feedback_target_ids_from_ref(
+        feedback_req
+    )
 
     return {
         "id": feedback_id,
@@ -352,8 +376,8 @@ def format_feedback_to_row(
         "span_agent_name": feedback_req.span_agent_name,
         "span_agent_version": feedback_req.span_agent_version,
         "span_status_code": feedback_req.span_status_code,
-        "span_conversation_id": feedback_req.span_conversation_id,
-        "span_trace_id": feedback_req.span_trace_id,
+        "span_conversation_id": span_conversation_id,
+        "span_trace_id": span_trace_id,
     }
 
 
