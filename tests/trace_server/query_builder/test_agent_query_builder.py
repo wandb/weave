@@ -1396,6 +1396,13 @@ class TestResolveGroupBy:
         out = resolve_group_by(pb, [AgentGroupByRef(source="field", key="agent.name")])
         assert out == [("s.agent_name", "agent_name")]
 
+    def test_field_source_resolves_eval_semconv_key(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(
+            pb, [AgentGroupByRef(source="field", key="eval.row_digest")]
+        )
+        assert out == [("s.eval_row_digest", "eval_row_digest")]
+
     def test_rejects_invalid_alias(self) -> None:
         pb = ParamBuilder("genai")
         with pytest.raises(ValueError, match="must match"):
