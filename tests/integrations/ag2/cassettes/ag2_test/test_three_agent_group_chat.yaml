@@ -1,0 +1,702 @@
+interactions:
+- request:
+    body: '{"messages":[{"content":"Research the topic briefly.","role":"system"},{"content":"Explain
+      quantum computing in one line.","name":"user","role":"user"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '190'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/6rmUlBQykxRslJQSs5ILEnOLcjRdfFOLE238AAAAAD//41TTW/bMAy951cIPm1A
+        XLix26THYrtsO/XSw4bCUGQ6USNLrkhlDYb891FyUrtdB/Qiw3zkIx8/vtwc7n/ob7vt15Z+lrd3
+        j99led9m8xjh1o+g6Bx1oRzHAWlnB1h5kASR9XK5LFdFsVpcJ6BzDZgYtukpr1zeaavzRbGo8mKZ
+        X65O0VunFSC7/eJfIf6kN9ZpG3hmczE/WzpAlBtg29mJjd6ZaMkkokaSlrL5CCpnCWwq/S4wFjoR
+        qw+k7UZoFFLQoQfh2omZWKMwsAfPuZB/QfReW6VZNEbXpxNTB9wOqxX7OHZxrAKFtq3znYzdEQEj
+        39l9rQnFp6cQv5+HLEpaAc9cNoeJLhiKOQSrIM6EOlqkBRfQHOYCrFybSNi7qElLYw5iL1NwHAFC
+        zH4SkgqQhn1/gxdcklDgSTJOEnd4MW2ShzagjIOywZgJIK11A1Maz8MJOb4MxLgN617jm9Cs5UHj
+        to5F8ZJw85FcnyX0yO9DGnx4NcuMibqeanI7SOkW1UCXjes2gtUZJC7QjPbr1fwdtroBlm5wsjiZ
+        kmoLzRg5bpkMjXYTYDbR/G8x73EPunlUH6EfAaWg5zuqew+NVq8Fj24e4jH+z+2lx6ngDMHv+bpq
+        0uDjHBpoJS/VcHl4QIKu5mFtwMcVT3fS9nVRwlV1U15VMpsdZ38BIquX+DUEAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbda9dcd4f5c-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:07 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '941'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=btLMHobTjYx6WVA08ABn_8x.KsUq9EqCklEHnDt3Ofo-1773800826.0121076-1.0.1.1-4iYPDFsis6Du6MV7iQforpgS0mZfZ_HjWEroyhQ3zCSOxu8zdcQg4RsXQHgk7p.BeaLr6cyeGvpC8Au6UD4z8YNdVPF60hCZexIDFw6lRZ.s0EZcR5IdrZTbchHR0zPR;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:07 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999980'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_cb33a5a7ebdf48fbbae41311b6011d96
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are in a role play game. The following roles
+      are available:\n                _Group_Tool_Executor: Tool Execution, do not
+      use this agent directly.\nresearcher: Research the topic briefly.\nwriter: Write
+      a one-sentence summary.\ncritic: Say OK if good. End with TERMINATE.\nuser:
+      You are a helpful AI Assistant..\n                Read the following conversation.\n                Then
+      select the next role from [''_Group_Tool_Executor'', ''researcher'', ''writer'',
+      ''critic'', ''user''] to play. Only return the role.","role":"system"},{"content":"Explain
+      quantum computing in one line.","role":"user","name":"user"},{"content":"Quantum
+      computing is a type of computing that leverages the principles of quantum mechanics
+      to process information using quantum bits (qubits) that can exist in multiple
+      states simultaneously, enabling potentially vast increases in computational
+      power for certain tasks.","role":"user","name":"researcher"},{"content":"Read
+      the above conversation. Then select the next role from [''_Group_Tool_Executor'',
+      ''researcher'', ''writer'', ''critic'', ''user''] to play. Only return the role.","name":"checking_agent","role":"system"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1205'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/6rmUlBQykxRslJQSs5ILEnOLcjRdfFOLM1wTgQAAAD//4xSy27DIBC85ysiznHl
+        OGnsnttjK7Wqcqoii8DaIcWAAPep/HsX7MROH1IvSOzsLDPDrlarm/3j/Uf1cF2s3e3a3LU1N2QW
+        GHq7B+aPrAumkQdeaNXBzAL1EKbO83xRpGmR5RFoNAcZaLXxyVInjVAiydJsmaR5Mi969k4LBg7b
+        nvA6nX7GM+hUHN6wnM6OlQacozVg7diERatlqBDqnHCeKk9mA8i08qCi9FcrPNgxaKFqHQ0CVSvl
+        CKBKaU+DwShr0yOHkxCpa2P11n2jkgoNul2JeTgMBx91XhsS0QOem2i4PfNAcFBjfOn1M8Tnsuyq
+        m0eGnAd03mMeBcoRadGndD6u5OCpkG6UGGGU7YAP1CFe2nKhR8BkZPqnmN9md8aFqv8zfgAYA4ML
+        VBoLXLBzw0ObhbCFf7WdQo6CiQP7gmtVeoF/jh/BoaKt7HaDuHfnoSnxt2qwxopuQSpTppecLiFn
+        RUomh8kXAAAA//8DAOHOsiEuAwAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbe1e9e48695-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:07 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '214'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=VD3Lv4t.pp9KosLbteIGIIqJYa3vzmID0SbkJdp_d6U-1773800827.187722-1.0.1.1-KVen.gfNBcdELvPAHnmURckS64HiV43J2FMiwFh1xQTKbqrKX.q4e1NdrAw7CdkpvOypEGX2QZtH04rwC7xGrAPedqY2wT48aGKjzUgQhwW0.SezojkRZ_NiOrm4ULV0;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:07 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999750'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_b804aead466742e9b27485c655208b99
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"Write a one-sentence summary.","role":"system"},{"content":"Explain
+      quantum computing in one line.","name":"user","role":"user"},{"content":"Quantum
+      computing is a type of computing that leverages the principles of quantum mechanics
+      to process information using quantum bits (qubits) that can exist in multiple
+      states simultaneously, enabling potentially vast increases in computational
+      power for certain tasks.","name":"researcher","role":"user"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '511'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/6rmUlBQykxRslJQSs5ILEnOLcjRdfFOLM2ocAIAAAD//4xTS2/bMAy+51cQPm2A
+        UziPxem12APYYcCuGwpDlmlbmyy5Ir20G/LfRzlxnXYd0IsM8yM/fnxtq/ef8s3N/kP5bRduyurL
+        58PHzS5JY4Qvf6DmKepKe4lDNt6dYB1QMUbWVZ5v9lm2X+cj0PkKbQxrel5u/bIzzizX2Xq7zPLl
+        an+Obr3RSOL2XX4B/oxv1OkqvBdzlk6WDolUg2KbnMQYvI2WRBEZYuU4SWdQe8foRulfB8GGDqL6
+        gY1rQF5rfiMBtwh9ME4bqYvA13B3du5QKnZGi4+HHkPtw8SgYgMIBopUk39pmODN3RC/b1M4tEa3
+        oJUDvBdxYBx0g+WYBkQrSzLF4J3GFJS1/hC5JAeQaZypjUSyfQB0IkJjJSK9tGrMqFWvStHPRkjG
+        kB51DIlOpcWOri4bEbAeSMVhuMHaC0A558+1xBHcnpHjY9OtbyIjPQtNahkmtYXMnmQRpMHEvk9G
+        9Cjv7Tjc4cm8EiHqei7Y/8QxXZ6f6JJ5pWZwM4EsAu1sX6226Qt0RYWsjKWL7Ui00i1Wc+i8Smqo
+        jL8AFhdF/6vmJe5T4TKK19DPgNbYy7EUfcDK6KcVz24B48X9z+2xyaPghDD8khMqZBVCHESFtZIt
+        O50XPRBjV8i0GgxxycdjqPviHZbZWqG+3iWL4+IvAAAA//8DABxV+g4aBAAA
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbe4dd23ba45-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:08 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '1072'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=bRbh_0LtQsu.TCqsZbDL6DS4VzmE0tYkup5a2sEA3FU-1773800827.652609-1.0.1.1-jVgpP3aqkjvRazR5mHwy6QOnG5H33Eu0pgkVwn5.j1Pfw_JahtFyUpGoqc05BF2.CuG7wq9gilO29C2aRINvSX7gQyxt_hi702XTZL3RRhjTAvZUZSofMI1v0LGWf5hn;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:08 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999910'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_26ddf3bc8c27973baf02eaf33287bf2d
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are in a role play game. The following roles
+      are available:\n                _Group_Tool_Executor: Tool Execution, do not
+      use this agent directly.\nresearcher: Research the topic briefly.\nwriter: Write
+      a one-sentence summary.\ncritic: Say OK if good. End with TERMINATE.\nuser:
+      You are a helpful AI Assistant..\n                Read the following conversation.\n                Then
+      select the next role from [''_Group_Tool_Executor'', ''researcher'', ''writer'',
+      ''critic'', ''user''] to play. Only return the role.","role":"system"},{"content":"Explain
+      quantum computing in one line.","role":"user","name":"user"},{"content":"Quantum
+      computing is a type of computing that leverages the principles of quantum mechanics
+      to process information using quantum bits (qubits) that can exist in multiple
+      states simultaneously, enabling potentially vast increases in computational
+      power for certain tasks.","role":"user","name":"researcher"},{"content":"Quantum
+      computing utilizes the principles of quantum mechanics to perform computations
+      using quantum bits (qubits), which can exist in multiple states at once, allowing
+      for significantly enhanced processing capabilities for specific problems.","role":"user","name":"writer"},{"content":"Read
+      the above conversation. Then select the next role from [''_Group_Tool_Executor'',
+      ''researcher'', ''writer'', ''critic'', ''user''] to play. Only return the role.","name":"checking_agent","role":"system"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1492'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/4xS0U7CMBR95yuWPjMzBmbTR+ODCZAYH3zQkKW2l1Hs2treEZTw77YbsKGY+NKk
+        99xze87p3Q2iiAhObiPCVhRZZWR8P6X1+nFjn/P5fCa3Mzl9Wm8eJi8fX+u7kgwDQ7+tgeGRdcW0
+        5wEKrVqYWaAIYeooy8Z5kuTpTQNUmoMMtNJgPNFxJZSI0ySdxEkWj/IDe6UFA+fbXv01inbNGXQq
+        DltfTobHSgXO0RJ87djki1bLUCHUOeGQKiTDDmRaIahWuhUoWB+0sKwdDQJVLWUPoEpppMFgI2tx
+        QPYnIVKXxuo394NKlt6gWxU+D+fD8Y861IY06N6fi8ZwfeaB+EGVwQL1OzTPpVnaziNdzh06OmDo
+        Bco+aTy8MK7ggFRI10uMMMpWwDtqFy+tudA9YNAz/VvMpdmtcaHK/4zvAMbA+AUqjAUu2Lnhrs1C
+        2MK/2k4hN4KJA7vxa1WgABs+gsOS1rLdDeI+HUJV+N8qwRor2gVZmiK55nQCGcsTMtgPvgEAAP//
+        AwA4TmdBLgMAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbed2f4f868f-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:09 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '270'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=3JHk.Zxm2XQnpP8j3IvifBmUph7AICB0jLRsNEkC0IM-1773800828.981192-1.0.1.1-rmoF3RyBmKKTWyVX4GCX8ajo0TxvW5ViUj.5HbGZLhtek.P9h6VDRxISkY7INdAM1Dak.Y8457x72h1fDWaUBNf_8WTol3GtI7vg8_jsfqv2FWd8CnMpJdoI5w2NveCZ;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:09 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999690'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_b77ba70c4a0e451ab76b051aed1fc6cb
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"Say OK if good. End with TERMINATE.","role":"system"},{"content":"Explain
+      quantum computing in one line.","name":"user","role":"user"},{"content":"Quantum
+      computing is a type of computing that leverages the principles of quantum mechanics
+      to process information using quantum bits (qubits) that can exist in multiple
+      states simultaneously, enabling potentially vast increases in computational
+      power for certain tasks.","name":"researcher","role":"user"},{"content":"Quantum
+      computing utilizes the principles of quantum mechanics to perform computations
+      using quantum bits (qubits), which can exist in multiple states at once, allowing
+      for significantly enhanced processing capabilities for specific problems.","name":"writer","role":"user"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '804'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/6rmUlBQykxRslJQSs5ILEnOLcjRdfFOLM2uTAUAAAD//4xSy27CMBC88xXIZ4IS
+        Qpv02APqS7QVQlVRhSJjb4KpY0e204cq/r22AyS0VOrFknd2xjPrDTfT85gnV4/P79OZuH66XVxE
+        iwQNHEOuNkDMnjUk0vLAMCkamCjABpxqlCRxGoZpHHqglBS4oxWVCcYyKJlgwSgcjYMwCaJ0x15L
+        RkDbthd77fe//Ol8Cgoftuy1fKUErXEBtrZvskUluasgrDXTBguDBi1IpDAgvPWHu2F/PplNb+4v
+        55Nht0lBXmvsjIqa8w6AhZAGu6De3nKHbA+GuCwqJVf6BxXlNqheZ3Yu2g7JPq6NrJBHt/Zc+uD1
+        URZkhcrKZEa+gn8uGsWNHmrn3aJnO8xYg7xLSgcn5DIKBjOuO5NDBJM10JbajhnXlMkO0OuE/m3m
+        lHYTnIniP/ItQAhUdpGySgFl5Dhw26bAbeNfbYche8NIg3qz65UZBsp9BIUc17zZEaQ/tYEys79V
+        gKoUaxYlrzKCY0hoEq1y1Nv2vgEAAP//AwDl8hy8NgMAAA==
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbf059300954-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:10 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '368'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=rx9AP4auoWzMhrsv4oj3Eftrg5KlUZIo1YaZJsKZQIw-1773800829.5030215-1.0.1.1-PC05w5RQ_9FwM6ULlwNWgEtQ5AfxJmDTUxR_THJRBx1FLf87b93gYPtIqHSshwxz_wFkbinqKkZjod3iq5WJRy6pJZKw0nKcLvvuK10B3BnoFY47GwuGGhT2oFUigN84;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:10 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999847'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_3683ef310340486b9b75d0a92c25029f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"content":"You are in a role play game. The following roles
+      are available:\n                _Group_Tool_Executor: Tool Execution, do not
+      use this agent directly.\nresearcher: Research the topic briefly.\nwriter: Write
+      a one-sentence summary.\ncritic: Say OK if good. End with TERMINATE.\nuser:
+      You are a helpful AI Assistant..\n                Read the following conversation.\n                Then
+      select the next role from [''_Group_Tool_Executor'', ''researcher'', ''writer'',
+      ''critic'', ''user''] to play. Only return the role.","role":"system"},{"content":"Explain
+      quantum computing in one line.","role":"user","name":"user"},{"content":"Quantum
+      computing is a type of computing that leverages the principles of quantum mechanics
+      to process information using quantum bits (qubits) that can exist in multiple
+      states simultaneously, enabling potentially vast increases in computational
+      power for certain tasks.","role":"user","name":"researcher"},{"content":"Quantum
+      computing utilizes the principles of quantum mechanics to perform computations
+      using quantum bits (qubits), which can exist in multiple states at once, allowing
+      for significantly enhanced processing capabilities for specific problems.","role":"user","name":"writer"},{"content":"OK.
+      TERMINATE.","role":"user","name":"critic"},{"content":"Read the above conversation.
+      Then select the next role from [''_Group_Tool_Executor'', ''researcher'', ''writer'',
+      ''critic'', ''user''] to play. Only return the role.","name":"checking_agent","role":"system"}],"model":"gpt-4o-mini","stream":false}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Authorization:
+      - Bearer DUMMY_API_KEY
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1551'
+      Content-Type:
+      - application/json
+      Host:
+      - api.openai.com
+      User-Agent:
+      - OpenAI/Python 2.29.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 2.29.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.10.17
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+    method: POST
+    uri: https://api.openai.com/v1/chat/completions
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAA/6rmUlBQykxRslJQSs5ILEnOLcjRdfFOLM02TAQAAAD//4xSQW7CMBC88wrkM6kC
+        BCU9tmrFB3qrkGXsTXBxvJbtUKqKv9d2gKQtlXqx5J2d8cx6+XpRHt7noNX8/il/KNb7x61gZBYZ
+        uH0D7i+sO46BB16i7mFugXmIqvOyXFZ5Xi3zBLQoQEVaY3xWYNZKLbNFviiyvMzm1Zm9Q8nBhbbX
+        cJ1OP9MZfWoBx1BOWqnSgnOsgVC7NIWiRRUrhDknnWfak9kActQedLJO1xY7Q18QFX0+Au882nGr
+        hbpzLNrVnVIjgGmNnsW4yeTmjJyuthQ2xuLW/aCSOsR1Oxqm48KoggXn0ZCEnsK5SfG7b4lIEGqN
+        px73kJ5bVMtejwxTH9DVGfPBoBqTqtkNOSrAM6ncaH6EM74DMVCHYbNOSBwBk1Ho32ZuaffBpW7+
+        Iz8AnIMJ60SNBSH598BDm4W4k3+1XYecDBMH9hCWjHoJNn6EgJp1qt8U4j6ch5aG32rAGiv7dakN
+        zVeCFVDyKieT0+QLAAD//wMAnLgk9TwDAAA=
+    headers:
+      CF-Cache-Status:
+      - DYNAMIC
+      CF-Ray:
+      - 9de0cbf73bf07682-SEA
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 18 Mar 2026 02:27:11 GMT
+      Server:
+      - cloudflare
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubDomains; preload
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      access-control-expose-headers:
+      - X-Request-ID
+      alt-svc:
+      - h3=":443"; ma=86400
+      openai-organization:
+      - ag2ai
+      openai-processing-ms:
+      - '286'
+      openai-project:
+      - proj_e3fi8kw0RpExtFHWdfjSHWwZ
+      openai-version:
+      - '2020-10-01'
+      set-cookie:
+      - __cf_bm=vLIY_lO9kJr8c4RL6QG6OX8y_cfH.a5uS4e_Ml4Jf3g-1773800830.5924602-1.0.1.1-_aJsF.Sek4dnbkT8cBJME5qF5t3mikwvY3N4hDMhspQapKQnHfuf_mWOdKswQzHB_nnjYBsrwv8hooX0_N4n06cO93WABo0ejfKjMtslrGHpLKU9TF4iRyE8LEqOkELN;
+        HttpOnly; Secure; Path=/; Domain=api.openai.com; Expires=Wed, 18 Mar 2026
+        02:57:11 GMT
+      x-openai-proxy-wasm:
+      - v0.1
+      x-ratelimit-limit-requests:
+      - '30000'
+      x-ratelimit-limit-tokens:
+      - '150000000'
+      x-ratelimit-remaining-requests:
+      - '29999'
+      x-ratelimit-remaining-tokens:
+      - '149999685'
+      x-ratelimit-reset-requests:
+      - 2ms
+      x-ratelimit-reset-tokens:
+      - 0s
+      x-request-id:
+      - req_16ec39af3ab19267a5337f51096d018b
+    status:
+      code: 200
+      message: OK
+version: 1
