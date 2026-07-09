@@ -12,11 +12,12 @@ from __future__ import annotations
 
 from weave.trace_server.datadog import emit_counter
 
-_METRIC_SEEN = "weave_trace_server.ingest_sampling.spans.seen"
-_METRIC_PARSE_FAILURES = "weave_trace_server.ingest_sampling.spans.parse_failures"
-_METRIC_EVALS_KEPT = "weave_trace_server.ingest_sampling.spans.evals_kept"
-_METRIC_DROPPED = "weave_trace_server.ingest_sampling.spans.dropped"
-_METRIC_DROPPED_BYTES = "weave_trace_server.ingest_sampling.spans.dropped_bytes"
+_PREFIX = "weave_trace_server.ingest_sampling.spans"
+_METRIC_SEEN = f"{_PREFIX}.seen"
+_METRIC_PARSE_FAILURES = f"{_PREFIX}.parse_failures"
+_METRIC_EVALS_KEPT = f"{_PREFIX}.evals_kept"
+_METRIC_DROPPED = f"{_PREFIX}.dropped"
+_METRIC_DROPPED_BYTES = f"{_PREFIX}.dropped_bytes"
 
 _ROUTE_TAG = "route:agents_otel"
 
@@ -39,7 +40,12 @@ def evals_kept(count: int) -> None:
 def dropped(count: int, byte_size: int, dry_run: bool) -> None:
     """Count dropped spans and their serialized protobuf size.
 
-    In dry-run the tag marks a would-drop, not a real one.
+    Emitted in dry-run too (tagged ``dry_run:true``) -- observing would-drops
+    is the whole point of dry-run, whereas the rate stamp is deliberately NOT
+    written in dry-run (nothing was actually sampled). Same metric name for
+    both real and would-drops, so dashboards MUST split this by the ``dry_run``
+    tag; the tag, not a separate metric, is what keeps parity with the
+    calls-model sampler.
     """
     tags = [_ROUTE_TAG, f"dry_run:{str(dry_run).lower()}"]
     emit_counter(_METRIC_DROPPED, count, tags)

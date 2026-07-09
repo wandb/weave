@@ -44,10 +44,15 @@ INGEST_SAMPLE_RATE_ATTR = "weave.ingest_sample_rate"
 
 # sha256(trace_id) is reduced modulo this many buckets; a trace is kept when
 # its bucket falls below rate * buckets. Must stay byte-identical to the
-# calls-model sampler so a mixed trace gets one verdict across both models.
+# calls-model sampler in core (services/weave-trace/src/ingest_sampling.py):
+# a trace that writes into both models must get one verdict. There is no shared
+# source yet -- if you change this or keep_by_hash, change that copy too
+# (cross-repo unification is a tracked follow-up).
 _HASH_BUCKETS = 1_000_000
 
-_ZERO_TRACE_ID = "0" * 32
+# OTel's spec-invalid trace id: 16 zero bytes -> 32 hex zeros. Kept fail-open
+# (see _usable_trace_id) rather than hashed, so it is not a shared drop bucket.
+_INVALID_ALL_ZERO_TRACE_ID = "0" * 32
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,7 @@ def _usable_trace_id(trace_id: str) -> bool:
     such client one collective verdict -- so they fail open instead (kept,
     counted as parse failures).
     """
-    return len(trace_id) == 32 and trace_id != _ZERO_TRACE_ID
+    return len(trace_id) == 32 and trace_id != _INVALID_ALL_ZERO_TRACE_ID
 
 
 class SpanDecision(NamedTuple):
@@ -121,6 +126,12 @@ def decide_spans(
     ``spans`` -- feed the dropped-bytes counter. Metrics count spans, not
     traces, and are emitted once per call.
     """
+    # Two passes, not one: the verdict is per trace, but a request carries many
+    # trace_ids and the eval marker can sit on any span of a trace -- including
+    # one that arrives after other spans of the same trace_id. So we must scan
+    # every span to learn which trace_ids are evals BEFORE deciding any span; a
+    # single loop with a bool cannot keep already-seen spans of a trace whose
+    # marker shows up later, nor track multiple trace_ids at once.
     eval_traces: set[str] = set()
     for span in spans:
         if _usable_trace_id(span.trace_id) and get_attribute(

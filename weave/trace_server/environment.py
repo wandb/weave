@@ -254,18 +254,22 @@ def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
     )
 
 
-# Ingest sampling (spans model) -- shared knobs with the calls-model sampler
+# Ingest sampling -- one shared knob for both data models. The same env vars
+# are read by the calls-model sampler in the trace-server service; these
+# accessors are model-agnostic.
 
 
 def wf_ingest_sample_rate() -> float:
-    """Fraction of non-eval traces to keep at OTel-spans ingest (0.0-1.0).
+    """Fraction of non-eval traces to keep at ingest (0.0-1.0), read per request.
 
-    The same environment variable also governs the calls-model sampler in the
-    trace-server service, so one operator knob covers both data models.
+    Governs BOTH data models: the calls-model sampler reads the same variable.
     Defaults to 1.0 (sampling off); an unparseable or out-of-range value falls
-    back to 1.0, so a bad config can never start dropping data. Change the
-    rate in a quiet traffic window: an in-flight trace hashed at two different
-    rates can be stored partially.
+    back to 1.0, so a bad config can never start dropping data.
+
+    Read from the process environment, so changing the rate means redeploying /
+    restarting the service with the new value -- it is not a live knob. That
+    redeploy is itself the "quiet window" that avoids the one edge case: a trace
+    hashed at two different rates across the transition can be stored partially.
     """
     try:
         rate = float(os.environ.get("WEAVE_INGEST_SAMPLE_RATE", "1.0"))
@@ -277,7 +281,10 @@ def wf_ingest_sample_rate() -> float:
 
 
 def wf_ingest_sample_dry_run() -> bool:
-    """When true, the spans sampler records what it would drop but drops nothing."""
+    """When true, the sampler records what it would drop but drops nothing.
+
+    Shadow mode. The same variable also gates the calls-model sampler's dry-run.
+    """
     return os.environ.get("WEAVE_INGEST_SAMPLE_DRY_RUN", "false").lower() == "true"
 
 

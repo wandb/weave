@@ -232,10 +232,12 @@ def test_unusable_trace_ids_fail_open_in_decisions(
         assert sampler_metrics["parse_failures"] == [1]
 
 
-# --- decision ladder (parsed spans, no backend) -----------------------------
+# --- per-span verdicts (parsed spans, no backend) ----------------------------
 
 
-def test_decide_spans_ladder_at_rate_zero(sampler_metrics: dict[str, list]) -> None:
+def test_decide_spans_all_verdicts_at_rate_zero(
+    sampler_metrics: dict[str, list],
+) -> None:
     config = ingest_sampling.SamplingConfig(rate=0.0, dry_run=False)
     eval_tid = (1).to_bytes(16, "big")
     plain_tid = (2).to_bytes(16, "big")
