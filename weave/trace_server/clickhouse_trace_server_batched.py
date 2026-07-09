@@ -102,7 +102,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_complete_delete_query,
     build_calls_complete_soft_delete_query,
     build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
@@ -1197,12 +1196,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Write staged content objects, grouped by project (obj_create_batch
         takes a single project). Runs after _flush_file_batches so a committed
         object row never references content that has not landed in storage.
+
+        Content refs pin the version digest (see base64_content_conversion.
+        _content_ref), so these objects are never resolved via the "latest"
+        alias; skipping that INSERT drops one CH round-trip per batch.
         """
         by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
         for obj in self._content_obj_batch:
             by_project.setdefault(obj.project_id, []).append(obj)
         for project_objs in by_project.values():
-            self.obj_create_batch(project_objs)
+            self.obj_create_batch(project_objs, write_latest_alias=False)
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
@@ -2095,9 +2098,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 datetime_to_microseconds(started_at_window[1] + pad)
             )
         table_name = self._get_calls_complete_table_name()
-        # Logical delete: a lightweight UPDATE writes a patch part the read path
-        # applies on the fly (via its deleted_at filter), so the calls vanish
-        # immediately with no mutation and no part rewrite.
+        # A single lightweight UPDATE writes one patch part that both hides the
+        # rows (deleted_at, applied on read) and marks them for physical
+        # reclamation by the table's native `TTL expire_at DELETE` (expire_at).
         soft_delete_query = build_calls_complete_soft_delete_query(
             table_name,
             project_id_param,
@@ -2110,21 +2113,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             soft_delete_query,
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
-        )
-        # Physical reclamation runs async (sync=0) and unwaited: the marker above
-        # already hid the rows, so a slow reclaim never blocks the request.
-        delete_query = build_calls_complete_delete_query(
-            table_name,
-            project_id_param,
-            call_ids_param,
-            started_at_min_param=started_at_min_param,
-            started_at_max_param=started_at_max_param,
-            cluster_name=self.clickhouse_cluster_name,
-        )
-        self._command(
-            delete_query,
-            parameters=pb.get_params(),
-            settings=ch_settings.CLICKHOUSE_ASYNC_DELETE_SETTINGS,
         )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
@@ -2330,7 +2318,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @traced(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
     def obj_create_batch(
-        self, batch: list[tsi.ObjSchemaForInsert]
+        self, batch: list[tsi.ObjSchemaForInsert], write_latest_alias: bool = True
     ) -> list[tsi.ObjCreateRes]:
         """This method is for the special case where all objects are known to use a placeholder.
         We lose any knowledge of what version the created object is in return for an enormous
@@ -2346,6 +2334,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Unlike obj_create, no WB-30574 name/type collision guard runs here:
         callers must know their object_ids are fresh or check beforehand
         (see _resolve_pending_content_objs).
+
+        write_latest_alias=False skips the second "latest" alias INSERT. Only
+        safe for objects addressed exclusively by digest (never resolved via
+        the "latest" alias or listed in latest_only object queries), e.g.
+        content objects whose ref pins the version digest.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -2410,7 +2403,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Batch-write the "latest" alias for every row, matching obj_create.
-        if alias_rows:
+        if write_latest_alias and alias_rows:
             ch_alias_rows = [
                 list(
                     AliasCHInsertable(
@@ -2603,7 +2596,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     deleted_at=now,
                 )
 
-        return tsi.ObjDeleteRes(num_deleted=num_deleted)
+        return tsi.ObjDeleteRes(
+            num_deleted=num_deleted,
+            deleted_versions=[
+                tsi.DeletedObjVersion(
+                    digest=obj.digest,
+                    base_object_class=obj.base_object_class,
+                    leaf_object_class=obj.leaf_object_class,
+                )
+                for obj in delete_insertables
+            ],
+        )
 
     # --- Tags & Aliases ---
 

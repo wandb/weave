@@ -3195,7 +3195,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             for rec in self._objs_for_object_id(req.project_id, req.object_id):
                 rec.is_latest = 1 if rec.digest == latest_digest else 0
 
-        return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
+        return tsi.ObjDeleteRes(
+            num_deleted=len(matching_objects),
+            deleted_versions=[
+                tsi.DeletedObjVersion(
+                    digest=rec.digest,
+                    base_object_class=rec.base_object_class,
+                    leaf_object_class=rec.leaf_object_class,
+                )
+                for rec in matching_objects
+            ],
+        )
 
     def _ensure_obj_version_exists(
         self, project_id: str, object_id: str, digest: str
