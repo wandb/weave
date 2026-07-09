@@ -997,6 +997,10 @@ class Turn(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
+    # Token for the ``_current_subagent`` reset (see ``__enter__``): a Turn is
+    # never a child of a SubAgent, so entering one shadows any lingering current
+    # sub-agent to None and restores it on ``end()``.
+    _subagent_token: Token[SubAgent | None] | None = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -1192,11 +1196,24 @@ class Turn(_SpanBase):
                 pass  # entered in a different context/thread; best-effort
             self._token = None
 
+        if self._subagent_token is not None:
+            try:
+                _current_subagent.reset(self._subagent_token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
+            self._subagent_token = None
+
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_turn.set(self)
+        # A turn is a fresh agent invocation with no sub-agent active yet. Drop
+        # any sub-agent left current by a prior turn so this turn's implicit
+        # children (start_llm / start_tool) nest under the turn, not a stale
+        # sub-agent in the previous turn's trace. Restored on end().
+        if self._subagent_token is None:
+            self._subagent_token = _current_subagent.set(None)
         start_ns = (
             int(self.started_at.timestamp() * 1_000_000_000)
             if self.started_at is not None
@@ -1405,6 +1422,10 @@ def start_turn(
         # build->enter resets in the entering context — so the imperative
         # no-``with`` contract is satisfied here instead.
         turn._token = _current_turn.set(turn)
+        # A new turn is never a child of a sub-agent: drop any lingering current
+        # sub-agent so implicit start_llm/start_tool nest under this turn. Mirror
+        # of the shadow in ``Turn.__enter__``; restored on the turn's ``end()``.
+        turn._subagent_token = _current_subagent.set(None)
         return turn
     turn = Turn(
         agent_name=agent_name,

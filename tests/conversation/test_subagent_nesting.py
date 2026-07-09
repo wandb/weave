@@ -28,9 +28,11 @@ from weave.conversation.conversation import (
     Turn,
     get_current_llm,
     get_current_subagent,
+    get_current_turn,
     start_llm,
     start_subagent,
     start_tool,
+    start_turn,
 )
 
 
@@ -500,3 +502,53 @@ class TestNoCrossThreadContextvarLeak:
         sa_span = _by_agent_name(spans, "researcher")
         llm_span = _by_prefix(spans, "chat")
         assert llm_span.parent.span_id == sa_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# A Turn is never a child of a SubAgent ("a sub-agent can't start a turn").
+# Starting a new turn — or entering one — drops any lingering current sub-agent
+# from a prior turn, so the turn's own implicit children nest under the Turn,
+# not a stale sub-agent (which would land them in the previous turn's trace).
+# ---------------------------------------------------------------------------
+
+
+class TestStartTurnSkipsActiveSubagent:
+    def test_implicit_start_turn_clears_current_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa"):
+                assert get_current_subagent() is not None
+                start_turn(agent_name="bot2")  # top-level implicit
+                assert get_current_subagent() is None
+                assert get_current_turn() is not None
+
+    def test_entering_a_turn_clears_subagent_and_restores_on_exit(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa") as sa:
+                with Turn(agent_name="bot2"):
+                    assert get_current_subagent() is None
+                # back inside the enclosing sub-agent's block
+                assert get_current_subagent() is sa
+
+    def test_implicit_llm_after_start_turn_in_subagent_nests_under_new_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """The core bug: an LLM started (implicitly) under a turn begun while a
+        sub-agent was still current must nest under that new turn — same trace —
+        not the stale sub-agent from the previous turn's trace.
+        """
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa"):
+                turn2 = start_turn(agent_name="bot2")
+                with turn2:
+                    with start_llm(model="gpt-4o"):
+                        pass
+        spans = otel_spans.get_finished_spans()
+        turn2_span = _by_agent_name(spans, "bot2")
+        llm_span = _by_prefix(spans, "chat")
+        assert llm_span.parent is not None
+        assert llm_span.parent.span_id == turn2_span.context.span_id
+        assert llm_span.context.trace_id == turn2_span.context.trace_id

@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from weave.conversation.conversation import (
     get_current_conversation,
     get_current_llm,
+    get_current_subagent,
     get_current_turn,
 )
 
@@ -21,6 +22,8 @@ def _reset_contextvars():
     yield
     if (llm := get_current_llm()) is not None:
         llm.end()
+    if (subagent := get_current_subagent()) is not None:
+        subagent.end()
     if (turn := get_current_turn()) is not None:
         turn.end()
     if (conversation := get_current_conversation()) is not None:
