@@ -1,6 +1,9 @@
 -- Rollback Migration 029: Remove TTL support
 
--- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration
+-- Step 1: Remove TTL clauses from all tables that had MODIFY TTL in the up migration.
+-- REMOVE TTL has no IF EXISTS form and errors on a table with no TTL, so this down
+-- is not re-runnable. Downs are manual-only (auto-recovery only re-runs ups), so
+-- an operator applies it once against the state the up left.
 ALTER TABLE call_parts REMOVE TTL;
 ALTER TABLE calls_merged REMOVE TTL;
 ALTER TABLE calls_merged_stats REMOVE TTL;
@@ -102,16 +105,15 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         id;
 
 -- Step 6: Drop expire_at column from calls_merged
-ALTER TABLE calls_merged DROP COLUMN expire_at;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS expire_at;
 
 -- Step 7: Drop expire_at column from call_parts
-ALTER TABLE call_parts DROP COLUMN expire_at;
+ALTER TABLE call_parts DROP COLUMN IF EXISTS expire_at;
 
--- Step 8: Rename expire_at back to ttl_at on calls_complete
-ALTER TABLE calls_complete RENAME COLUMN expire_at TO ttl_at;
-
--- Step 8b: Re-apply TTL expression after column rename.
+-- Step 8: Restore the TTL to ttl_at, then drop the additive expire_at column.
+-- The up migration adds expire_at (keeping ttl_at), so the reverse drops it.
 ALTER TABLE calls_complete MODIFY TTL toDateTime(ttl_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
+ALTER TABLE calls_complete DROP COLUMN IF EXISTS expire_at;
 
 -- Step 9: Drop project_ttl_settings table
 DROP TABLE IF EXISTS project_ttl_settings;

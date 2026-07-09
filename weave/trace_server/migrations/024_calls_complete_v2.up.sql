@@ -9,6 +9,11 @@
 --   7. Add bloom filter index on summary_dump
 --   8. Add table-level settings: min_bytes_for_wide_part=0
 --
+-- One-shot data migration. The backfill INSERT and the RENAME swap below are
+-- not idempotent (a re-run fails once calls_complete_old exists), so recovering
+-- from a partial failure requires manual intervention. CREATE/DROP steps carry
+-- IF [NOT] EXISTS to minimise the manual cleanup surface.
+--
 -- Migration procedure:
 --   Step 1: Create new table calls_complete_new
 --   Step 2: Create materialized view to sync live inserts
@@ -17,7 +22,7 @@
 --   Step 5: Recreate stats table and materialized view
 
 -- Step 1: Create new table
-CREATE TABLE calls_complete_new (
+CREATE TABLE IF NOT EXISTS calls_complete_new (
     -- Primary fields
     id              String,
     project_id      String,
@@ -83,7 +88,7 @@ SETTINGS
 
 -- Step 2: Create materialized view for live sync during migration
 -- This captures any inserts to the old table while backfill is running.
-CREATE MATERIALIZED VIEW calls_complete_migration_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_complete_migration_view
 TO calls_complete_new
 AS
 SELECT
@@ -159,7 +164,7 @@ RENAME TABLE calls_complete_new TO calls_complete;
 
 
 -- Step 5: Recreate stats table with updated types (non-nullable where changed)
-CREATE TABLE calls_complete_stats
+CREATE TABLE IF NOT EXISTS calls_complete_stats
 (
     project_id String,
     id String,
@@ -186,7 +191,7 @@ CREATE TABLE calls_complete_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
 
-CREATE MATERIALIZED VIEW calls_complete_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_complete_stats_view
 TO calls_complete_stats
 AS
 SELECT

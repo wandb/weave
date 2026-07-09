@@ -26,7 +26,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         id;
 
 -- Remove thread_id from aggregated calls table
-ALTER TABLE calls_merged DROP COLUMN thread_id;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS thread_id;
 
 -- Remove thread_id from raw call parts table
-ALTER TABLE call_parts DROP COLUMN thread_id; 
+ALTER TABLE call_parts DROP COLUMN IF EXISTS thread_id; 
