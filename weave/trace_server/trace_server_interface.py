@@ -150,7 +150,54 @@ class CallSchema(BaseModel):
     output: Any | None = None
 
     # Summary: a summary of the call
-    summary: SummaryMap | None = None
+    summary: SummaryMap | None = Field(
+        default=None,
+        json_schema_extra={
+            "properties": {
+                "usage": {
+                    "additionalProperties": {
+                        "$ref": "#/components/schemas/LLMUsageSchema"
+                    },
+                    "type": "object",
+                    "title": "Usage",
+                },
+                "status_counts": {
+                    "additionalProperties": {"type": "integer"},
+                    "propertyNames": {"$ref": "#/components/schemas/TraceStatus"},
+                    "type": "object",
+                    "title": "Status Counts",
+                },
+                "weave": {
+                    "properties": {
+                        "status": {"$ref": "#/components/schemas/TraceStatus"},
+                        "latency_ms": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+                        "trace_name": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                        "costs": {
+                            "additionalProperties": {
+                                "allOf": [{"$ref": "#/components/schemas/LLMUsageSchema"}],
+                                "properties": {
+                                    "prompt_tokens_total_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                                    "completion_tokens_total_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                                    "prompt_token_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                                    "completion_token_cost": {"anyOf": [{"type": "number"}, {"type": "null"}]},
+                                    "prompt_token_cost_unit": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "completion_token_cost_unit": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "effective_date": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "provider_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "pricing_level": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "pricing_level_id": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "created_at": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "created_by": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                },
+                            },
+                            "type": "object",
+                        },
+                    },
+                    "type": "object",
+                },
+            },
+        },
+    )
 
     # WB Metadata
     wb_user_id: str | None = None
