@@ -18,6 +18,7 @@ MODELS_BEGIN_FILE = "../model_providers/modelsBegin.json"
 # The file that stores manually curated cost overrides for models that
 # litellm and modelsBegin do not cover (or cover incorrectly).
 MANUAL_COSTS_FILE = "manual_costs.json"
+CW_PREFIX = "coreweave/"
 # Amount of historical costs to store for each model
 HISTORICAL_COSTS = 3
 HTTP_TIMEOUT = 30.0
@@ -163,10 +164,7 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
             Decimal(output_cents_per_billion) / Decimal("100000000000")
         )
 
-        # Key on the bare idPlayground: that is the model id the inference
-        # service echoes back (e.g. "openai/gpt-oss-20b"), so it is what call
-        # usage records and what the cost join matches on.
-        costs[model_id_playground] = CostDetails(
+        detail = CostDetails(
             provider=provider,
             input=input_cost_per_token,
             output=output_cost_per_token,
@@ -174,6 +172,12 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
             cache_creation_input=0,
             created_at=current_time,
         )
+        # Price under the bare idPlayground: that is the id the inference
+        # service echoes back (e.g. "openai/gpt-oss-20b"), so it is what call
+        # usage records and what the cost join matches on. Keep the coreweave/
+        # alias too so a call ever logged under the prefixed id still prices.
+        costs[model_id_playground] = detail
+        costs[CW_PREFIX + model_id_playground] = detail
 
     return costs
 

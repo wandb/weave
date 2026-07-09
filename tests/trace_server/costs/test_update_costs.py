@@ -509,24 +509,26 @@ class TestFetchManualCosts(unittest.TestCase):
         ]
     ),
 )
-def test_fetch_models_begin_costs_keys_on_bare_playground_id(mock_file, mock_exists):
-    """W&B Inference prices are keyed on the bare idPlayground.
+def test_fetch_models_begin_costs_prices_bare_and_prefixed_id(mock_file, mock_exists):
+    """W&B Inference prices land under the bare idPlayground and the coreweave/ alias.
 
     The inference service echoes the playground id back (e.g. "openai/gpt-oss-20b"),
-    so that is the id call usage records and what the cost join matches on. Keying
-    under a "coreweave/" prefix would never match, leaving every inference call unpriced.
-    A model missing idPlayground is skipped. Cents-per-billion-tokens converts to
-    dollars-per-token (divide by 1e11).
+    so that bare id is what call usage records and what the cost join matches on. The
+    coreweave/-prefixed alias is kept so a call logged under the prefixed id still
+    prices; both carry the same numbers. A model missing idPlayground is skipped.
+    Cents-per-billion-tokens converts to dollars-per-token (divide by 1e11).
     """
     mock_exists.return_value = True
     costs = fetch_models_begin_costs()
 
-    assert set(costs.keys()) == {"openai/gpt-oss-20b"}
-    assert "coreweave/openai/gpt-oss-20b" not in costs
-    entry = costs["openai/gpt-oss-20b"]
-    assert entry["input"] == 5e-08
-    assert entry["output"] == 2e-07
-    assert entry["provider"] == "coreweave"
+    assert set(costs.keys()) == {
+        "openai/gpt-oss-20b",
+        "coreweave/openai/gpt-oss-20b",
+    }
+    for key in ("openai/gpt-oss-20b", "coreweave/openai/gpt-oss-20b"):
+        assert costs[key]["input"] == 5e-08
+        assert costs[key]["output"] == 2e-07
+        assert costs[key]["provider"] == "coreweave"
 
 
 if __name__ == "__main__":
