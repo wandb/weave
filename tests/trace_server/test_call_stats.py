@@ -56,6 +56,30 @@ def test_cost_dependencies_add_sum_without_mutating_requested_aggregations() -> 
     assert usage_metrics[1].aggregations == [AggregationType.MAX]
 
 
+@pytest.mark.parametrize(
+    ("cost_metric", "token_metric"),
+    [
+        ("input_cost", "input_tokens"),
+        ("output_cost", "output_tokens"),
+    ],
+)
+def test_cost_dependencies_add_missing_sum_metric(
+    cost_metric: tsi.UsageMetric, token_metric: tsi.UsageMetric
+) -> None:
+    token_metrics, cost_metrics = split_usage_metrics(
+        [UsageMetricSpec(metric=cost_metric, aggregations=[AggregationType.SUM])]
+    )
+
+    assert [metric.model_dump() for metric in token_metrics] == [
+        {
+            "metric": token_metric,
+            "aggregations": ["sum"],
+            "percentiles": [],
+        }
+    ]
+    assert cost_metrics == {cost_metric}
+
+
 def force_merge_calls(client: weave_client.WeaveClient):
     """Force ClickHouse to merge calls_merged table for test consistency.
 

@@ -19,6 +19,8 @@ from weave.integrations.anthropic.anthropic_sdk import (
 from weave.trace.autopatch import OpSettings
 from weave.trace.weave_client import WeaveClient
 
+pytestmark = pytest.mark.trace_server
+
 
 def _cache_message() -> Message:
     return Message(
