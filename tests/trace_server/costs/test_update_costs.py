@@ -9,6 +9,7 @@ import pytest
 from weave.trace_server.costs.update_costs import (
     COST_FILE,
     fetch_manual_costs,
+    fetch_models_begin_costs,
     fetch_new_costs,
     get_current_costs,
     main,
@@ -490,6 +491,44 @@ class TestFetchManualCosts(unittest.TestCase):
         # Manual-only model still lands in the checkpoint (no collision)
         assert written_costs["manual-only-model"][-1]["input"] == 1.5e-06
         assert written_costs["manual-only-model"][-1]["provider"] == "manual"
+
+
+@patch("weave.trace_server.costs.update_costs.os.path.exists")
+@patch(
+    "builtins.open",
+    new_callable=mock_open,
+    read_data=json.dumps(
+        [
+            {
+                "idPlayground": "openai/gpt-oss-20b",
+                "provider": "coreweave",
+                "priceCentsPerBillionTokensInput": 5000,
+                "priceCentsPerBillionTokensOutput": 20000,
+            },
+            {"provider": "coreweave", "priceCentsPerBillionTokensInput": 1},
+        ]
+    ),
+)
+def test_fetch_models_begin_costs_prices_bare_and_prefixed_id(mock_file, mock_exists):
+    """W&B Inference prices land under the bare idPlayground and the coreweave/ alias.
+
+    The inference service echoes the playground id back (e.g. "openai/gpt-oss-20b"),
+    so that bare id is what call usage records and what the cost join matches on. The
+    coreweave/-prefixed alias is kept so a call logged under the prefixed id still
+    prices; both carry the same numbers. A model missing idPlayground is skipped.
+    Cents-per-billion-tokens converts to dollars-per-token (divide by 1e11).
+    """
+    mock_exists.return_value = True
+    costs = fetch_models_begin_costs()
+
+    assert set(costs.keys()) == {
+        "openai/gpt-oss-20b",
+        "coreweave/openai/gpt-oss-20b",
+    }
+    for key in ("openai/gpt-oss-20b", "coreweave/openai/gpt-oss-20b"):
+        assert costs[key]["input"] == 5e-08
+        assert costs[key]["output"] == 2e-07
+        assert costs[key]["provider"] == "coreweave"
 
 
 if __name__ == "__main__":

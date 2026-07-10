@@ -197,6 +197,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    validate_feedback_agent_req_targets,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -213,7 +214,9 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -6630,6 +6633,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
+        validate_feedback_agent_req_targets(req)
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
@@ -6658,6 +6662,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
+            validate_feedback_agent_req_targets(feedback_req)
 
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
@@ -6716,7 +6721,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Validate the replacement payload before purging — if validation
         # rejects we want the old row preserved, not destroyed. This duplicates
         # the validation that feedback_create() runs internally (one extra
-        # ref-lookup network call on annotation/agent-monitor paths), which is
+        # refs_read on annotation paths), which is
         # acceptable to preserve the no-data-loss guarantee on replace.
         create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         validate_feedback_create_req(create_req, self)

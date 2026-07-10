@@ -773,6 +773,20 @@ class AgentSpanGroupRow(BaseModel):
     )
 
 
+class RatingCondition(BaseModel):
+    scorer_key: str
+    op: Literal["gte", "gt", "lte", "lt", "eq"]
+    value: float
+
+
+class AgentSignalFilter(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+    ratings: list[RatingCondition] = Field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        return not self.tags and not self.ratings
+
+
 class AgentSpansQueryReq(BaseModel):
     """Request to query agent spans for a project.
 
@@ -809,6 +823,7 @@ class AgentSpansQueryReq(BaseModel):
     offset: int = Field(default=0, ge=0)
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
+    signal_filters: AgentSignalFilter | None = None
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
@@ -818,6 +833,14 @@ class AgentSpansQueryReq(BaseModel):
             raise ValueError(
                 "grouped measures, distributions, and filters require group_by"
             )
+        # `signal_filters` currently only apply when grouping by conversation_id.
+        # Later we may add support for filtering on ungrouped or turn-level data.
+        if (
+            self.signal_filters is not None
+            and not self.signal_filters.is_empty()
+            and not self.group_by
+        ):
+            raise ValueError("signal_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:

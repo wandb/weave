@@ -1,10 +1,15 @@
 {
   "openapi": "3.1.0",
-  "info": {"title": "FastAPI", "version": "0.1.0"},
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
   "paths": {
     "/health": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Read Root",
         "operationId": "read_root_health_get",
         "responses": {
@@ -21,7 +26,9 @@
     },
     "/version": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Read Version",
         "operationId": "read_version_version_get",
         "responses": {
@@ -38,7 +45,9 @@
     },
     "/geolocate": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Get Caller Location",
         "description": "Lookup the geographic location of a user based on their IP address.\n\nThis API exists for debugging purposes and may not be available in the future.",
         "operationId": "get_caller_location_geolocate_get",
@@ -57,7 +66,9 @@
                 }
               ],
               "description": "IP address to geolocate, defaults to client IP address",
-              "examples": ["1.2.3.4"],
+              "examples": [
+                "1.2.3.4"
+              ],
               "title": "Ip"
             },
             "description": "IP address to geolocate, defaults to client IP address"
@@ -89,7 +100,9 @@
     },
     "/server_info": {
       "get": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Server Info",
         "operationId": "server_info_server_info_get",
         "responses": {
@@ -108,7 +121,9 @@
     },
     "/otel/v1/traces": {
       "post": {
-        "tags": ["OpenTelemetry"],
+        "tags": [
+          "OpenTelemetry"
+        ],
         "summary": "Export Trace",
         "operationId": "export_trace_otel_v1_traces_post",
         "responses": {
@@ -125,7 +140,9 @@
     },
     "/agents/otel/v1/traces": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Export Genai Trace",
         "description": "Ingest OTel spans into the GenAI observability system.",
         "operationId": "export_genai_trace_agents_otel_v1_traces_post",
@@ -143,7 +160,9 @@
     },
     "/agents/spans/query": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Spans Query",
         "description": "Query agent spans, either as raw rows or grouped aggregates.",
         "operationId": "genai_spans_query_agents_spans_query_post",
@@ -183,7 +202,9 @@
     },
     "/agents/spans/stats": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Spans Stats",
         "description": "Query chart-ready aggregations over agent spans.",
         "operationId": "genai_spans_stats_agents_spans_stats_post",
@@ -223,7 +244,9 @@
     },
     "/agents/spans/custom-attrs/schema": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Custom Attrs Schema",
         "description": "Discover typed custom attribute keys on matching agent spans.",
         "operationId": "genai_custom_attrs_schema_agents_spans_custom_attrs_schema_post",
@@ -263,7 +286,9 @@
     },
     "/agents/query": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Agents Query",
         "operationId": "genai_agents_query_agents_query_post",
         "requestBody": {
@@ -302,7 +327,9 @@
     },
     "/agents/agent-versions/query": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Agent Versions Query",
         "operationId": "genai_agent_versions_query_agents_agent_versions_query_post",
         "requestBody": {
@@ -341,7 +368,9 @@
     },
     "/agents/search": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Search",
         "operationId": "genai_search_agents_search_post",
         "requestBody": {
@@ -380,7 +409,9 @@
     },
     "/agents/traces/chat": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Traces Chat",
         "operationId": "genai_traces_chat_agents_traces_chat_post",
         "requestBody": {
@@ -419,7 +450,9 @@
     },
     "/agents/conversations/chat": {
       "post": {
-        "tags": ["Agents"],
+        "tags": [
+          "Agents"
+        ],
         "summary": "Genai Conversation Chat",
         "operationId": "genai_conversation_chat_agents_conversations_chat_post",
         "requestBody": {
@@ -456,9 +489,52 @@
         }
       }
     },
+    "/agents/conversations/spans": {
+      "post": {
+        "tags": [
+          "Agents"
+        ],
+        "summary": "Genai Conversation Spans",
+        "operationId": "genai_conversation_spans_agents_conversations_spans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentConversationSpansReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentConversationSpansRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/call/start": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Start",
         "operationId": "call_start_call_start_post",
         "requestBody": {
@@ -497,7 +573,9 @@
     },
     "/call/end": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call End",
         "operationId": "call_end_call_end_post",
         "requestBody": {
@@ -536,7 +614,9 @@
     },
     "/call/upsert_batch": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Start Batch",
         "operationId": "call_start_batch_call_upsert_batch_post",
         "requestBody": {
@@ -575,7 +655,9 @@
     },
     "/calls/delete": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Delete",
         "operationId": "calls_delete_calls_delete_post",
         "requestBody": {
@@ -614,7 +696,9 @@
     },
     "/call/update": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Update",
         "operationId": "call_update_call_update_post",
         "requestBody": {
@@ -653,7 +737,9 @@
     },
     "/call/read": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Read",
         "operationId": "call_read_call_read_post",
         "requestBody": {
@@ -692,7 +778,9 @@
     },
     "/inference/catalog/models": {
       "get": {
-        "tags": ["Inference"],
+        "tags": [
+          "Inference"
+        ],
         "summary": "Inference Catalog Models",
         "description": "Returns a list of available Serverless Inference models.\n\nThis API is available without authentication.",
         "operationId": "inference_catalog_models_inference_catalog_models_get",
@@ -713,7 +801,9 @@
     },
     "/inference/analysis/artificialanalysis/models": {
       "get": {
-        "tags": ["Inference"],
+        "tags": [
+          "Inference"
+        ],
         "summary": "Inference Analysis Artificialanalysis Models",
         "description": "Returns a list of available models for Artificial Analysis.\n\nThis API is available without authentication.",
         "operationId": "inference_analysis_artificialanalysis_models_inference_analysis_artificialanalysis_models_get",
@@ -734,7 +824,9 @@
     },
     "/inference/router/openrouter/models": {
       "get": {
-        "tags": ["Inference"],
+        "tags": [
+          "Inference"
+        ],
         "summary": "Inference Router Openrouter Models",
         "description": "Returns a list of models that are available to be used with OpenRouter.\n\nThis API is available without authentication.",
         "operationId": "inference_router_openrouter_models_inference_router_openrouter_models_get",
@@ -755,7 +847,9 @@
     },
     "/inference/modelsdev/models": {
       "get": {
-        "tags": ["Inference"],
+        "tags": [
+          "Inference"
+        ],
         "summary": "Inference Modelsdev Models",
         "description": "Returns the available models in the models.dev `api.json` schema.\n\nThis API is available without authentication.",
         "operationId": "inference_modelsdev_models_inference_modelsdev_models_get",
@@ -780,7 +874,9 @@
     },
     "/inference/nvidia/v2/hardware": {
       "get": {
-        "tags": ["Inference"],
+        "tags": [
+          "Inference"
+        ],
         "summary": "Nvidia Hardware",
         "description": "Returns available hardware and pricing for a given model.\n\nCalled by NVIDIA to show users their options and redirect them\nbased on what we support.  Only serverless options are returned.",
         "operationId": "nvidia_hardware_inference_nvidia_v2_hardware_get",
@@ -829,7 +925,9 @@
     },
     "/calls/query_stats": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Query Stats",
         "operationId": "calls_query_stats_calls_query_stats_post",
         "requestBody": {
@@ -868,7 +966,9 @@
     },
     "/trace/usage": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Trace Usage",
         "description": "Compute per-call usage for a trace, with descendant rollup.",
         "operationId": "trace_usage_trace_usage_post",
@@ -908,7 +1008,9 @@
     },
     "/calls/usage": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Usage",
         "description": "Compute aggregated usage for multiple root calls, with descendant rollup.",
         "operationId": "calls_usage_calls_usage_post",
@@ -948,7 +1050,9 @@
     },
     "/calls/stream_query": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Query Stream",
         "operationId": "calls_query_stream_calls_stream_query_post",
         "parameters": [
@@ -997,7 +1101,9 @@
     },
     "/obj/create": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Create",
         "operationId": "obj_create_obj_create_post",
         "requestBody": {
@@ -1036,7 +1142,9 @@
     },
     "/obj/read": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Read",
         "operationId": "obj_read_obj_read_post",
         "requestBody": {
@@ -1075,7 +1183,9 @@
     },
     "/objs/query": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Objs Query",
         "operationId": "objs_query_objs_query_post",
         "requestBody": {
@@ -1114,7 +1224,9 @@
     },
     "/obj/delete": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Delete",
         "operationId": "obj_delete_obj_delete_post",
         "requestBody": {
@@ -1153,7 +1265,9 @@
     },
     "/objs/{object_id}/versions/{digest}/tags": {
       "put": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Add Tags",
         "description": "Add tags to an object version.",
         "operationId": "obj_add_tags_objs__object_id__versions__digest__tags_put",
@@ -1213,7 +1327,9 @@
     },
     "/objs/{object_id}/versions/{digest}/tags/remove": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Remove Tags",
         "description": "Remove tags from an object version.",
         "operationId": "obj_remove_tags_objs__object_id__versions__digest__tags_remove_post",
@@ -1273,7 +1389,9 @@
     },
     "/objs/{object_id}/aliases": {
       "put": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Set Aliases",
         "description": "Set aliases for an object version.",
         "operationId": "obj_set_aliases_objs__object_id__aliases_put",
@@ -1324,7 +1442,9 @@
     },
     "/objs/{object_id}/aliases/remove": {
       "post": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Obj Remove Aliases",
         "description": "Remove aliases from an object.",
         "operationId": "obj_remove_aliases_objs__object_id__aliases_remove_post",
@@ -1375,7 +1495,9 @@
     },
     "/tags": {
       "get": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Tags List",
         "description": "List all tags in a project.",
         "operationId": "tags_list_tags_get",
@@ -1416,7 +1538,9 @@
     },
     "/aliases": {
       "get": {
-        "tags": ["Objects"],
+        "tags": [
+          "Objects"
+        ],
         "summary": "Aliases List",
         "description": "List all aliases in a project.",
         "operationId": "aliases_list_aliases_get",
@@ -1457,7 +1581,9 @@
     },
     "/table/create": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Create",
         "operationId": "table_create_table_create_post",
         "requestBody": {
@@ -1496,7 +1622,9 @@
     },
     "/table/update": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Update",
         "operationId": "table_update_table_update_post",
         "requestBody": {
@@ -1535,7 +1663,9 @@
     },
     "/table/create_from_digests": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Create From Digests",
         "operationId": "table_create_from_digests_table_create_from_digests_post",
         "requestBody": {
@@ -1574,7 +1704,9 @@
     },
     "/table/query": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Query",
         "operationId": "table_query_table_query_post",
         "requestBody": {
@@ -1613,7 +1745,9 @@
     },
     "/table/query_stats": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Query Stats",
         "operationId": "table_query_stats_table_query_stats_post",
         "requestBody": {
@@ -1652,7 +1786,9 @@
     },
     "/table/query_stats_batch": {
       "post": {
-        "tags": ["Tables"],
+        "tags": [
+          "Tables"
+        ],
         "summary": "Table Query Stats Batch",
         "operationId": "table_query_stats_batch_table_query_stats_batch_post",
         "requestBody": {
@@ -1691,7 +1827,9 @@
     },
     "/refs/read_batch": {
       "post": {
-        "tags": ["Refs"],
+        "tags": [
+          "Refs"
+        ],
         "summary": "Refs Read Batch",
         "operationId": "refs_read_batch_refs_read_batch_post",
         "requestBody": {
@@ -1730,7 +1868,9 @@
     },
     "/file/create": {
       "post": {
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "File Create",
         "operationId": "file_create_file_create_post",
         "requestBody": {
@@ -1769,7 +1909,9 @@
     },
     "/file/content": {
       "post": {
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "File Content",
         "operationId": "file_content_file_content_post",
         "requestBody": {
@@ -1806,7 +1948,9 @@
     },
     "/files/query_stats": {
       "post": {
-        "tags": ["Files"],
+        "tags": [
+          "Files"
+        ],
         "summary": "Files Stats",
         "operationId": "files_stats_files_query_stats_post",
         "requestBody": {
@@ -1845,7 +1989,9 @@
     },
     "/cost/create": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Create",
         "operationId": "cost_create_cost_create_post",
         "requestBody": {
@@ -1884,7 +2030,9 @@
     },
     "/cost/query": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Query",
         "operationId": "cost_query_cost_query_post",
         "requestBody": {
@@ -1923,7 +2071,9 @@
     },
     "/cost/purge": {
       "post": {
-        "tags": ["Costs"],
+        "tags": [
+          "Costs"
+        ],
         "summary": "Cost Purge",
         "operationId": "cost_purge_cost_purge_post",
         "requestBody": {
@@ -1962,7 +2112,9 @@
     },
     "/feedback/create": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Create",
         "description": "Add feedback to a call or object.",
         "operationId": "feedback_create_feedback_create_post",
@@ -2002,7 +2154,9 @@
     },
     "/feedback/batch/create": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Create Batch",
         "description": "Add multiple feedback items to calls or objects.",
         "operationId": "feedback_create_batch_feedback_batch_create_post",
@@ -2042,7 +2196,9 @@
     },
     "/feedback/query": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Query",
         "description": "Query for feedback.",
         "operationId": "feedback_query_feedback_query_post",
@@ -2082,7 +2238,9 @@
     },
     "/feedback/purge": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Purge",
         "description": "Permanently delete feedback.",
         "operationId": "feedback_purge_feedback_purge_post",
@@ -2122,7 +2280,9 @@
     },
     "/feedback/replace": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Replace",
         "operationId": "feedback_replace_feedback_replace_post",
         "requestBody": {
@@ -2161,7 +2321,9 @@
     },
     "/feedback/stats": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Stats",
         "description": "Return aggregated feedback statistics over time buckets.",
         "operationId": "feedback_stats_feedback_stats_post",
@@ -2201,7 +2363,9 @@
     },
     "/feedback/aggregate": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Aggregate",
         "description": "Aggregate typed scorer feedback (tags, ratings) over time buckets.",
         "operationId": "feedback_aggregate_feedback_aggregate_post",
@@ -2241,7 +2405,9 @@
     },
     "/feedback/payload_schema": {
       "post": {
-        "tags": ["Feedback"],
+        "tags": [
+          "Feedback"
+        ],
         "summary": "Feedback Payload Schema",
         "description": "Discover feedback payload schema (paths and types) from sample rows.",
         "operationId": "feedback_payload_schema_feedback_payload_schema_post",
@@ -2281,7 +2447,9 @@
     },
     "/service/projects_info": {
       "post": {
-        "tags": ["Service"],
+        "tags": [
+          "Service"
+        ],
         "summary": "Projects Info",
         "operationId": "projects_info_service_projects_info_post",
         "requestBody": {
@@ -2324,7 +2492,9 @@
     },
     "/threads/stream_query": {
       "post": {
-        "tags": ["Threads"],
+        "tags": [
+          "Threads"
+        ],
         "summary": "Threads Query Stream",
         "operationId": "threads_query_stream_threads_stream_query_post",
         "requestBody": {
@@ -2361,7 +2531,9 @@
     },
     "/annotation_queues": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Create",
         "description": "Create a new annotation queue.",
         "operationId": "annotation_queue_create_annotation_queues_post",
@@ -2401,7 +2573,9 @@
     },
     "/annotation_queues/query": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queues Query Stream",
         "description": "Query annotation queues for a project (streaming NDJSON response).",
         "operationId": "annotation_queues_query_stream_annotation_queues_query_post",
@@ -2439,7 +2613,9 @@
     },
     "/annotation_queues/{queue_id}": {
       "get": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Read",
         "description": "Read a specific annotation queue.",
         "operationId": "annotation_queue_read_annotation_queues__queue_id__get",
@@ -2487,7 +2663,9 @@
         }
       },
       "delete": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Delete",
         "description": "Delete (soft-delete) an annotation queue.",
         "operationId": "annotation_queue_delete_annotation_queues__queue_id__delete",
@@ -2535,7 +2713,9 @@
         }
       },
       "put": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Update",
         "description": "Update an annotation queue's metadata (name, description, scorer_refs).",
         "operationId": "annotation_queue_update_annotation_queues__queue_id__put",
@@ -2586,7 +2766,9 @@
     },
     "/annotation_queues/{queue_id}/items": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Add Calls",
         "description": "Add calls to an annotation queue.",
         "operationId": "annotation_queue_add_calls_annotation_queues__queue_id__items_post",
@@ -2637,7 +2819,9 @@
     },
     "/annotation_queues/{queue_id}/items/query": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Items Query",
         "description": "Query items in an annotation queue with pagination and sorting.",
         "operationId": "annotation_queue_items_query_annotation_queues__queue_id__items_query_post",
@@ -2688,7 +2872,9 @@
     },
     "/annotation_queues/stats": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queues Stats",
         "description": "Get stats for multiple annotation queues.",
         "operationId": "annotation_queues_stats_annotation_queues_stats_post",
@@ -2728,7 +2914,9 @@
     },
     "/annotation_queues/{queue_id}/items/{item_id}/progress": {
       "post": {
-        "tags": ["Annotation Queues"],
+        "tags": [
+          "Annotation Queues"
+        ],
         "summary": "Annotation Queue Item Progress Update",
         "description": "Update the annotation state of a queue item for the current annotator.",
         "operationId": "annotation_queue_item_progress_update_annotation_queues__queue_id__items__item_id__progress_post",
@@ -2788,7 +2976,9 @@
     },
     "/calls/stats": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Call Stats",
         "operationId": "call_stats_calls_stats_post",
         "requestBody": {
@@ -2827,7 +3017,9 @@
     },
     "/evaluations/evaluate_model": {
       "post": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluate Model",
         "operationId": "evaluate_model_evaluations_evaluate_model_post",
         "requestBody": {
@@ -2866,7 +3058,9 @@
     },
     "/evaluations/status": {
       "post": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluation Status",
         "operationId": "evaluation_status_evaluations_status_post",
         "requestBody": {
@@ -2905,7 +3099,9 @@
     },
     "/evaluations/rescore": {
       "post": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Rescore Evaluation",
         "description": "Rescore an existing evaluation run with different scorer(s).\n\nApplies the provided scorer(s) to the predictions from source_evaluation_run_id\nand returns a new evaluation_run_id. Original prediction call IDs are preserved.",
         "operationId": "rescore_evaluation_evaluations_rescore_post",
@@ -2945,7 +3141,9 @@
     },
     "/calls/score": {
       "post": {
-        "tags": ["Scores"],
+        "tags": [
+          "Scores"
+        ],
         "summary": "Calls Score",
         "operationId": "calls_score_calls_score_post",
         "requestBody": {
@@ -2984,7 +3182,9 @@
     },
     "/image/create": {
       "post": {
-        "tags": ["Images"],
+        "tags": [
+          "Images"
+        ],
         "summary": "Image Create",
         "operationId": "image_create_image_create_post",
         "requestBody": {
@@ -3023,7 +3223,9 @@
     },
     "/link_to_registry": {
       "post": {
-        "tags": ["Registry"],
+        "tags": [
+          "Registry"
+        ],
         "summary": "Link To Registry",
         "operationId": "link_to_registry_link_to_registry_post",
         "requestBody": {
@@ -3062,7 +3264,9 @@
     },
     "/v2/{entity}/{project}/calls/complete": {
       "post": {
-        "tags": ["Calls"],
+        "tags": [
+          "Calls"
+        ],
         "summary": "Calls Complete",
         "description": "Upsert a batch of completed calls directly to the calls_complete table.\n\nEach call in the batch contains both start and end information.\nThis endpoint is used when calls are buffered client-side and sent as complete records.",
         "operationId": "calls_complete_v2__entity___project__calls_complete_post",
@@ -3122,7 +3326,9 @@
     },
     "/v2/{entity}/{project}/ops": {
       "post": {
-        "tags": ["Ops"],
+        "tags": [
+          "Ops"
+        ],
         "summary": "Op Create",
         "description": "Create an op object.",
         "operationId": "op_create_v2__entity___project__ops_post",
@@ -3180,7 +3386,9 @@
         }
       },
       "get": {
-        "tags": ["Ops"],
+        "tags": [
+          "Ops"
+        ],
         "summary": "Op List",
         "description": "List op objects.",
         "operationId": "op_list_v2__entity___project__ops_get",
@@ -3264,7 +3472,9 @@
     },
     "/v2/{entity}/{project}/ops/{object_id}/versions/{digest}": {
       "get": {
-        "tags": ["Ops"],
+        "tags": [
+          "Ops"
+        ],
         "summary": "Op Read",
         "description": "Get an op object.",
         "operationId": "op_read_v2__entity___project__ops__object_id__versions__digest__get",
@@ -3344,7 +3554,9 @@
     },
     "/v2/{entity}/{project}/ops/{object_id}": {
       "delete": {
-        "tags": ["Ops"],
+        "tags": [
+          "Ops"
+        ],
         "summary": "Op Delete",
         "description": "Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
         "operationId": "op_delete_v2__entity___project__ops__object_id__delete",
@@ -3424,7 +3636,9 @@
     },
     "/v2/{entity}/{project}/datasets": {
       "post": {
-        "tags": ["Datasets"],
+        "tags": [
+          "Datasets"
+        ],
         "summary": "Dataset Create",
         "description": "Create a dataset object.",
         "operationId": "dataset_create_v2__entity___project__datasets_post",
@@ -3482,7 +3696,9 @@
         }
       },
       "get": {
-        "tags": ["Datasets"],
+        "tags": [
+          "Datasets"
+        ],
         "summary": "Dataset List",
         "description": "List dataset objects.",
         "operationId": "dataset_list_v2__entity___project__datasets_get",
@@ -3566,7 +3782,9 @@
     },
     "/v2/{entity}/{project}/datasets/{object_id}/versions/{digest}": {
       "get": {
-        "tags": ["Datasets"],
+        "tags": [
+          "Datasets"
+        ],
         "summary": "Dataset Read",
         "description": "Get a dataset object.",
         "operationId": "dataset_read_v2__entity___project__datasets__object_id__versions__digest__get",
@@ -3634,7 +3852,9 @@
     },
     "/v2/{entity}/{project}/datasets/{object_id}": {
       "delete": {
-        "tags": ["Datasets"],
+        "tags": [
+          "Datasets"
+        ],
         "summary": "Dataset Delete",
         "description": "Delete a dataset object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
         "operationId": "dataset_delete_v2__entity___project__datasets__object_id__delete",
@@ -3714,7 +3934,9 @@
     },
     "/v2/{entity}/{project}/scorers": {
       "post": {
-        "tags": ["Scorers"],
+        "tags": [
+          "Scorers"
+        ],
         "summary": "Scorer Create",
         "description": "Create a scorer object.",
         "operationId": "scorer_create_v2__entity___project__scorers_post",
@@ -3772,7 +3994,9 @@
         }
       },
       "get": {
-        "tags": ["Scorers"],
+        "tags": [
+          "Scorers"
+        ],
         "summary": "Scorer List",
         "description": "List scorer objects.",
         "operationId": "scorer_list_v2__entity___project__scorers_get",
@@ -3820,7 +4044,9 @@
     },
     "/v2/{entity}/{project}/scorers/{object_id}/versions/{digest}": {
       "get": {
-        "tags": ["Scorers"],
+        "tags": [
+          "Scorers"
+        ],
         "summary": "Scorer Read",
         "description": "Get a scorer object.",
         "operationId": "scorer_read_v2__entity___project__scorers__object_id__versions__digest__get",
@@ -3888,7 +4114,9 @@
     },
     "/v2/{entity}/{project}/scorers/{object_id}": {
       "delete": {
-        "tags": ["Scorers"],
+        "tags": [
+          "Scorers"
+        ],
         "summary": "Scorer Delete",
         "description": "Delete a scorer object.",
         "operationId": "scorer_delete_v2__entity___project__scorers__object_id__delete",
@@ -3968,7 +4196,9 @@
     },
     "/v2/{entity}/{project}/evaluations": {
       "post": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluation Create",
         "description": "Create an evaluation object.",
         "operationId": "evaluation_create_v2__entity___project__evaluations_post",
@@ -4026,7 +4256,9 @@
         }
       },
       "get": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluation List",
         "description": "List evaluation objects.",
         "operationId": "evaluation_list_v2__entity___project__evaluations_get",
@@ -4074,7 +4306,9 @@
     },
     "/v2/{entity}/{project}/evaluations/{object_id}/versions/{digest}": {
       "get": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluation Read",
         "description": "Get an evaluation object.",
         "operationId": "evaluation_read_v2__entity___project__evaluations__object_id__versions__digest__get",
@@ -4142,7 +4376,9 @@
     },
     "/v2/{entity}/{project}/evaluations/{object_id}": {
       "delete": {
-        "tags": ["Evaluations"],
+        "tags": [
+          "Evaluations"
+        ],
         "summary": "Evaluation Delete",
         "description": "Delete an evaluation object.",
         "operationId": "evaluation_delete_v2__entity___project__evaluations__object_id__delete",
@@ -4222,7 +4458,9 @@
     },
     "/v2/{entity}/{project}/models": {
       "post": {
-        "tags": ["Models"],
+        "tags": [
+          "Models"
+        ],
         "summary": "Model Create",
         "description": "Create a model object.",
         "operationId": "model_create_v2__entity___project__models_post",
@@ -4280,7 +4518,9 @@
         }
       },
       "get": {
-        "tags": ["Models"],
+        "tags": [
+          "Models"
+        ],
         "summary": "Model List",
         "description": "List model objects.",
         "operationId": "model_list_v2__entity___project__models_get",
@@ -4364,7 +4604,9 @@
     },
     "/v2/{entity}/{project}/models/{object_id}/versions/{digest}": {
       "get": {
-        "tags": ["Models"],
+        "tags": [
+          "Models"
+        ],
         "summary": "Model Read",
         "description": "Get a model object.",
         "operationId": "model_read_v2__entity___project__models__object_id__versions__digest__get",
@@ -4432,7 +4674,9 @@
     },
     "/v2/{entity}/{project}/models/{object_id}": {
       "delete": {
-        "tags": ["Models"],
+        "tags": [
+          "Models"
+        ],
         "summary": "Model Delete",
         "description": "Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted.",
         "operationId": "model_delete_v2__entity___project__models__object_id__delete",
@@ -4512,7 +4756,9 @@
     },
     "/v2/{entity}/{project}/evaluation_runs": {
       "post": {
-        "tags": ["Evaluation Runs"],
+        "tags": [
+          "Evaluation Runs"
+        ],
         "summary": "Evaluation Run Create",
         "description": "Create an evaluation run.",
         "operationId": "evaluation_run_create_v2__entity___project__evaluation_runs_post",
@@ -4570,7 +4816,9 @@
         }
       },
       "get": {
-        "tags": ["Evaluation Runs"],
+        "tags": [
+          "Evaluation Runs"
+        ],
         "summary": "Evaluation Run List",
         "description": "List evaluation runs.",
         "operationId": "evaluation_run_list_v2__entity___project__evaluation_runs_get",
@@ -4720,7 +4968,9 @@
         }
       },
       "delete": {
-        "tags": ["Evaluation Runs"],
+        "tags": [
+          "Evaluation Runs"
+        ],
         "summary": "Evaluation Run Delete",
         "description": "Delete evaluation runs.",
         "operationId": "evaluation_run_delete_v2__entity___project__evaluation_runs_delete",
@@ -4784,7 +5034,9 @@
     },
     "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}": {
       "get": {
-        "tags": ["Evaluation Runs"],
+        "tags": [
+          "Evaluation Runs"
+        ],
         "summary": "Evaluation Run Read",
         "description": "Read an evaluation run.",
         "operationId": "evaluation_run_read_v2__entity___project__evaluation_runs__evaluation_run_id__get",
@@ -4843,7 +5095,9 @@
     },
     "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}/finish": {
       "post": {
-        "tags": ["Evaluation Runs"],
+        "tags": [
+          "Evaluation Runs"
+        ],
         "summary": "Evaluation Run Finish",
         "description": "Finish an evaluation run.",
         "operationId": "evaluation_run_finish_v2__entity___project__evaluation_runs__evaluation_run_id__finish_post",
@@ -4912,7 +5166,9 @@
     },
     "/v2/{entity}/{project}/predictions": {
       "post": {
-        "tags": ["Predictions"],
+        "tags": [
+          "Predictions"
+        ],
         "summary": "Prediction Create",
         "description": "Create a prediction.",
         "operationId": "prediction_create_v2__entity___project__predictions_post",
@@ -4970,7 +5226,9 @@
         }
       },
       "get": {
-        "tags": ["Predictions"],
+        "tags": [
+          "Predictions"
+        ],
         "summary": "Prediction List",
         "description": "List predictions.",
         "operationId": "prediction_list_v2__entity___project__predictions_get",
@@ -5075,7 +5333,9 @@
         }
       },
       "delete": {
-        "tags": ["Predictions"],
+        "tags": [
+          "Predictions"
+        ],
         "summary": "Prediction Delete",
         "description": "Delete predictions.",
         "operationId": "prediction_delete_v2__entity___project__predictions_delete",
@@ -5139,7 +5399,9 @@
     },
     "/v2/{entity}/{project}/predictions/{prediction_id}": {
       "get": {
-        "tags": ["Predictions"],
+        "tags": [
+          "Predictions"
+        ],
         "summary": "Prediction Read",
         "description": "Read a prediction.",
         "operationId": "prediction_read_v2__entity___project__predictions__prediction_id__get",
@@ -5198,7 +5460,9 @@
     },
     "/v2/{entity}/{project}/predictions/{prediction_id}/finish": {
       "post": {
-        "tags": ["Predictions"],
+        "tags": [
+          "Predictions"
+        ],
         "summary": "Prediction Finish",
         "description": "Finish a prediction.",
         "operationId": "prediction_finish_v2__entity___project__predictions__prediction_id__finish_post",
@@ -5257,7 +5521,9 @@
     },
     "/v2/{entity}/{project}/scores": {
       "post": {
-        "tags": ["Scores"],
+        "tags": [
+          "Scores"
+        ],
         "summary": "Score Create",
         "description": "Create a score.",
         "operationId": "score_create_v2__entity___project__scores_post",
@@ -5315,7 +5581,9 @@
         }
       },
       "get": {
-        "tags": ["Scores"],
+        "tags": [
+          "Scores"
+        ],
         "summary": "Score List",
         "description": "List scores.",
         "operationId": "score_list_v2__entity___project__scores_get",
@@ -5420,7 +5688,9 @@
         }
       },
       "delete": {
-        "tags": ["Scores"],
+        "tags": [
+          "Scores"
+        ],
         "summary": "Score Delete",
         "description": "Delete scores.",
         "operationId": "score_delete_v2__entity___project__scores_delete",
@@ -5484,7 +5754,9 @@
     },
     "/v2/{entity}/{project}/scores/{score_id}": {
       "get": {
-        "tags": ["Scores"],
+        "tags": [
+          "Scores"
+        ],
         "summary": "Score Read",
         "description": "Read a score.",
         "operationId": "score_read_v2__entity___project__scores__score_id__get",
@@ -5543,7 +5815,9 @@
     },
     "/v2/{entity}/{project}/eval_results/query": {
       "post": {
-        "tags": ["Eval Results"],
+        "tags": [
+          "Eval Results"
+        ],
         "summary": "Eval Results Query",
         "description": "Read grouped evaluation result rows for one or more evaluations.",
         "operationId": "eval_results_query_v2__entity___project__eval_results_query_post",
@@ -5649,7 +5923,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -5771,7 +6049,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -5788,7 +6070,9 @@
           }
         },
         "type": "object",
-        "required": ["text"],
+        "required": [
+          "text"
+        ],
         "title": "AgentChatAssistantMessage",
         "description": "Payload for assistant text emitted by an agent or LLM span."
       },
@@ -5883,7 +6167,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -5980,7 +6268,9 @@
           }
         },
         "type": "object",
-        "required": ["type"],
+        "required": [
+          "type"
+        ],
         "title": "AgentChatMessage",
         "description": "A single element in the structured agent trajectory / chat view.\n\nCommon event fields live at the top level. Type-specific fields are\ngrouped under the payload matching `type`, and exactly one payload must be\nset. This keeps subtype nullability explicit while preserving a single\nordered timeline model for callers."
       },
@@ -6034,7 +6324,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -6069,7 +6363,9 @@
           }
         },
         "type": "object",
-        "required": ["text"],
+        "required": [
+          "text"
+        ],
         "title": "AgentChatUserMessage",
         "description": "Payload for a user prompt in the chat timeline."
       },
@@ -6105,7 +6401,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "conversation_id"],
+        "required": [
+          "project_id",
+          "conversation_id"
+        ],
         "title": "AgentConversationChatReq",
         "description": "Request to get the multi-turn chat view for a conversation."
       },
@@ -6170,7 +6469,9 @@
           }
         },
         "type": "object",
-        "required": ["conversation_id"],
+        "required": [
+          "conversation_id"
+        ],
         "title": "AgentConversationChatRes",
         "description": "Multi-turn chat view: an ordered list of per-turn chat responses.\n\nEach entry in `turns` corresponds to one trace_id, which Weave treats as\none conversation turn. This is not necessarily one `invoke_agent` span:\na turn can contain zero, one, or many agent invocations. The frontend can\nrender turn-number dividers between entries and still reuse\n`AgentTraceChatRes` rendering for each individual turn."
       },
@@ -6191,6 +6492,227 @@
         "title": "AgentConversationMessagePreview",
         "description": "A truncated first/last message snippet for a grouped conversation row.\n\n`role` is the chat-timeline message type (e.g. \"user_message\",\n\"assistant_message\") so clients can style it consistently with the full\nchat view; `text` is the trimmed, length-capped preview content."
       },
+      "AgentConversationSpan": {
+        "properties": {
+          "operation_name": {
+            "type": "string",
+            "title": "Operation Name"
+          },
+          "trace_id": {
+            "type": "string",
+            "title": "Trace Id"
+          },
+          "span_id": {
+            "type": "string",
+            "title": "Span Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNSET",
+              "OK",
+              "ERROR"
+            ],
+            "title": "Status"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation_name",
+          "trace_id",
+          "span_id",
+          "status",
+          "duration_ms"
+        ],
+        "title": "AgentConversationSpan",
+        "description": "One span in a conversation's trace.\n\nReturned by `agent_conversation_spans`, which reads span scalar columns\nonly (no message bodies). Spans are ordered by `started_at`, which\napproximates \u2014 but does not exactly match \u2014 the detail chat view's\nparent/child tree-walk order. `operation_name` is the raw OTel value; the\nclient maps it to a display category."
+      },
+      "AgentConversationSpanFeedback": {
+        "properties": {
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "The turn this feedback is anchored to; None for conversation-level."
+          },
+          "feedback_type": {
+            "type": "string",
+            "enum": [
+              "wandb.agent_user_feedback",
+              "wandb.agent_monitor"
+            ],
+            "title": "Feedback Type"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "Arbitrary descriptive tags applied to this feedback.",
+            "examples": [
+              [
+                "\ud83d\udc4d",
+                "needs-review"
+              ]
+            ]
+          },
+          "ratings": {
+            "items": {
+              "$ref": "#/components/schemas/AgentConversationSpanRating"
+            },
+            "type": "array",
+            "title": "Ratings",
+            "description": "Numeric scorer ratings applied to this feedback."
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_id",
+          "feedback_type"
+        ],
+        "title": "AgentConversationSpanFeedback",
+        "description": "Tags and ratings applied to a conversation's turn (or the conversation).\n\nPositioned client-side by matching `trace_id` (turn) against the spans;\n`trace_id` is None for conversation-level feedback."
+      },
+      "AgentConversationSpanRating": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "AgentConversationSpanRating",
+        "description": "One numeric rating (a scorer score) applied to a turn or conversation."
+      },
+      "AgentConversationSpans": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "title": "Conversation Id"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/AgentConversationSpan"
+            },
+            "type": "array",
+            "title": "Spans"
+          },
+          "spans_feedback": {
+            "items": {
+              "$ref": "#/components/schemas/AgentConversationSpanFeedback"
+            },
+            "type": "array",
+            "title": "Spans Feedback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id"
+        ],
+        "title": "AgentConversationSpans",
+        "description": "One conversation's span sequence and its feedback markers."
+      },
+      "AgentConversationSpansReq": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "conversation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Conversation Ids"
+          },
+          "started_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started After"
+          },
+          "started_before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started Before"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id"
+        ],
+        "title": "AgentConversationSpansReq",
+        "description": "Request the span sequences for an explicit set of conversations.\n\nReads span scalar columns only (no message bodies) for the given\n`conversation_ids`. Powers the conversations-list spans minimap."
+      },
+      "AgentConversationSpansRes": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/AgentConversationSpans"
+            },
+            "type": "array",
+            "title": "Conversations"
+          }
+        },
+        "type": "object",
+        "title": "AgentConversationSpansRes",
+        "description": "Span sequences + feedback markers, one entry per requested conversation."
+      },
       "AgentCustomAttrSchemaItem": {
         "properties": {
           "source": {
@@ -6209,7 +6731,12 @@
           },
           "value_type": {
             "type": "string",
-            "enum": ["string", "int", "float", "bool"],
+            "enum": [
+              "string",
+              "int",
+              "float",
+              "bool"
+            ],
             "title": "Value Type"
           },
           "span_count": {
@@ -6218,7 +6745,12 @@
           }
         },
         "type": "object",
-        "required": ["source", "key", "value_type", "span_count"],
+        "required": [
+          "source",
+          "key",
+          "value_type",
+          "span_count"
+        ],
         "title": "AgentCustomAttrSchemaItem",
         "description": "One custom attribute key/type observed in the matching spans."
       },
@@ -6277,7 +6809,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AgentCustomAttrsSchemaReq",
         "description": "Request to discover typed custom attribute keys for matching spans."
       },
@@ -6342,7 +6876,9 @@
           }
         },
         "type": "object",
-        "required": ["key"],
+        "required": [
+          "key"
+        ],
         "title": "AgentGroupByRef",
         "description": "Reference to a field or map-key that spans should be grouped by.\n\n`source=\"field\"` targets a semantic span field (`agent.name`) or direct\nspan column (`agent_name`), allowlisted server-side. `source=\"column\"` is\naccepted for existing callers.\nThe other sources target keys inside the typed custom attribute Map columns,\nwhich accept arbitrary user-defined keys."
       },
@@ -6652,7 +7188,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AgentSearchReq",
         "description": "Query the `messages` table by content and/or span-level filters.\n\nScans the `messages` table (one row per message occurrence, populated by an\nMV from spans) and returns matching span-level hits. Full-text search sets\n`query`; structured retrieval (e.g. all messages in a trace) leaves `query`\nempty and uses the filters below. The caller groups by conversation for the\nresponse shape."
       },
@@ -6672,9 +7210,31 @@
           }
         },
         "type": "object",
-        "required": ["results"],
+        "required": [
+          "results"
+        ],
         "title": "AgentSearchRes",
         "description": "Response from a full-text search across agent messages."
+      },
+      "AgentSignalFilter": {
+        "properties": {
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "ratings": {
+            "items": {
+              "$ref": "#/components/schemas/RatingCondition"
+            },
+            "type": "array",
+            "title": "Ratings"
+          }
+        },
+        "type": "object",
+        "title": "AgentSignalFilter"
       },
       "AgentSortBy": {
         "properties": {
@@ -6684,13 +7244,18 @@
           },
           "direction": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "title": "Direction",
             "default": "desc"
           }
         },
         "type": "object",
-        "required": ["field"],
+        "required": [
+          "field"
+        ],
         "title": "AgentSortBy",
         "description": "Sort specification for agent query endpoints."
       },
@@ -6714,7 +7279,12 @@
           }
         },
         "type": "object",
-        "required": ["index", "min", "max", "count"],
+        "required": [
+          "index",
+          "min",
+          "max",
+          "count"
+        ],
         "title": "AgentSpanGroupDistributionBin",
         "description": "One numeric histogram bin for a custom attribute in a span group."
       },
@@ -6740,7 +7310,12 @@
           },
           "value_type": {
             "type": "string",
-            "enum": ["string", "int", "float", "bool"],
+            "enum": [
+              "string",
+              "int",
+              "float",
+              "bool"
+            ],
             "title": "Value Type"
           },
           "total_count": {
@@ -6779,7 +7354,12 @@
           }
         },
         "type": "object",
-        "required": ["alias", "source", "key", "value_type"],
+        "required": [
+          "alias",
+          "source",
+          "key",
+          "value_type"
+        ],
         "title": "AgentSpanGroupDistributionItem",
         "description": "Distribution data for one span-group/custom-attribute pair."
       },
@@ -6809,7 +7389,10 @@
           }
         },
         "type": "object",
-        "required": ["alias", "value"],
+        "required": [
+          "alias",
+          "value"
+        ],
         "title": "AgentSpanGroupDistributionSpec",
         "description": "One custom attribute distribution to compute per returned span group."
       },
@@ -6825,7 +7408,10 @@
           }
         },
         "type": "object",
-        "required": ["value", "count"],
+        "required": [
+          "value",
+          "count"
+        ],
         "title": "AgentSpanGroupDistributionValue",
         "description": "One categorical custom attribute value count in a span group."
       },
@@ -6873,7 +7459,9 @@
           }
         },
         "type": "object",
-        "required": ["measure"],
+        "required": [
+          "measure"
+        ],
         "title": "AgentSpanGroupFilter",
         "description": "Range filter over one grouped span measure."
       },
@@ -7138,7 +7726,12 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["datetime", "number", "boolean", "string"]
+                "enum": [
+                  "datetime",
+                  "number",
+                  "boolean",
+                  "string"
+                ]
               },
               {
                 "type": "null"
@@ -7158,7 +7751,10 @@
           }
         },
         "type": "object",
-        "required": ["alias", "aggregation"],
+        "required": [
+          "alias",
+          "aggregation"
+        ],
         "title": "AgentSpanMeasureSpec",
         "description": "One aggregate measure computed over spans in a group or bucket."
       },
@@ -7245,7 +7841,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -7878,7 +8478,11 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "trace_id", "span_id"],
+        "required": [
+          "project_id",
+          "trace_id",
+          "span_id"
+        ],
         "title": "AgentSpanSchema",
         "description": "A normalized agent span returned by query APIs."
       },
@@ -7890,12 +8494,22 @@
           },
           "role": {
             "type": "string",
-            "enum": ["time", "bucket", "group", "metric"],
+            "enum": [
+              "time",
+              "bucket",
+              "group",
+              "metric"
+            ],
             "title": "Role"
           },
           "value_type": {
             "type": "string",
-            "enum": ["datetime", "number", "boolean", "string"],
+            "enum": [
+              "datetime",
+              "number",
+              "boolean",
+              "string"
+            ],
             "title": "Value Type"
           },
           "metric": {
@@ -7922,7 +8536,11 @@
           }
         },
         "type": "object",
-        "required": ["name", "role", "value_type"],
+        "required": [
+          "name",
+          "role",
+          "value_type"
+        ],
         "title": "AgentSpanStatsColumn",
         "description": "Metadata describing one column in an agent span stats result row."
       },
@@ -7935,7 +8553,12 @@
           },
           "value_type": {
             "type": "string",
-            "enum": ["datetime", "number", "boolean", "string"],
+            "enum": [
+              "datetime",
+              "number",
+              "boolean",
+              "string"
+            ],
             "title": "Value Type"
           },
           "aggregations": {
@@ -7967,7 +8590,11 @@
           }
         },
         "type": "object",
-        "required": ["alias", "value_type", "value"],
+        "required": [
+          "alias",
+          "value_type",
+          "value"
+        ],
         "title": "AgentSpanStatsMetricSpec",
         "description": "Metric to extract from each matching span and aggregate into chart rows."
       },
@@ -8151,7 +8778,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "start"],
+        "required": [
+          "project_id",
+          "start"
+        ],
         "title": "AgentSpanStatsReq",
         "description": "Request chart-ready aggregations over GenAI agent spans."
       },
@@ -8184,7 +8814,10 @@
           },
           "bucket_type": {
             "type": "string",
-            "enum": ["time", "number"],
+            "enum": [
+              "time",
+              "number"
+            ],
             "title": "Bucket Type",
             "default": "time"
           },
@@ -8227,7 +8860,11 @@
           }
         },
         "type": "object",
-        "required": ["start", "end", "timezone"],
+        "required": [
+          "start",
+          "end",
+          "timezone"
+        ],
         "title": "AgentSpanStatsRes",
         "description": "Response containing chart-ready agent span stats rows."
       },
@@ -8265,7 +8902,9 @@
           }
         },
         "type": "object",
-        "required": ["key"],
+        "required": [
+          "key"
+        ],
         "title": "AgentSpanValueRef",
         "description": "Reference to a span field or typed custom attribute map value."
       },
@@ -8388,10 +9027,22 @@
               }
             ],
             "title": "Started Before"
+          },
+          "signal_filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSignalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AgentSpansQueryReq",
         "description": "Request to query agent spans for a project.\n\nWhen `group_by` is empty (or omitted), returns raw span rows in the\nresponse's `spans` field. When `group_by` is non-empty, returns\naggregate group rows in the response's `groups` field."
       },
@@ -8438,7 +9089,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "trace_id"],
+        "required": [
+          "project_id",
+          "trace_id"
+        ],
         "title": "AgentTraceChatReq",
         "description": "Request to get the structured chat / trajectory view for a trace."
       },
@@ -8485,7 +9139,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["UNSET", "OK", "ERROR"]
+                "enum": [
+                  "UNSET",
+                  "OK",
+                  "ERROR"
+                ]
               },
               {
                 "type": "null"
@@ -8551,7 +9209,9 @@
           }
         },
         "type": "object",
-        "required": ["trace_id"],
+        "required": [
+          "trace_id"
+        ],
         "title": "AgentTraceChatRes",
         "description": "Structured chat view: a linear sequence of messages representing\nthe agent trajectory for a single trace."
       },
@@ -8690,7 +9350,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "agent_name"],
+        "required": [
+          "project_id",
+          "agent_name"
+        ],
         "title": "AgentVersionsQueryReq",
         "description": "Request to list versions for an agent."
       },
@@ -8710,7 +9373,9 @@
           }
         },
         "type": "object",
-        "required": ["versions"],
+        "required": [
+          "versions"
+        ],
         "title": "AgentVersionsQueryRes",
         "description": "Response containing agent version stats."
       },
@@ -8782,7 +9447,9 @@
           }
         },
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AgentsQueryReq",
         "description": "Request to list agents with aggregated stats for a project."
       },
@@ -8802,7 +9469,9 @@
           }
         },
         "type": "object",
-        "required": ["agents"],
+        "required": [
+          "agents"
+        ],
         "title": "AgentsQueryRes",
         "description": "Response containing aggregated agent stats."
       },
@@ -8831,7 +9500,9 @@
           }
         },
         "type": "object",
-        "required": ["aliases"],
+        "required": [
+          "aliases"
+        ],
         "title": "AliasesListRes"
       },
       "AndOperation": {
@@ -8885,7 +9556,9 @@
           }
         },
         "type": "object",
-        "required": ["$and"],
+        "required": [
+          "$and"
+        ],
         "title": "AndOperation",
         "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```"
       },
@@ -8894,7 +9567,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "call_ids": {
             "items": {
@@ -8902,7 +9577,13 @@
             },
             "type": "array",
             "title": "Call Ids",
-            "examples": [["call-1", "call-2", "call-3"]]
+            "examples": [
+              [
+                "call-1",
+                "call-2",
+                "call-3"
+              ]
+            ]
           },
           "display_fields": {
             "items": {
@@ -8911,12 +9592,21 @@
             "type": "array",
             "title": "Display Fields",
             "description": "JSON paths to display to annotators",
-            "examples": [["input.prompt", "output.text"]]
+            "examples": [
+              [
+                "input.prompt",
+                "output.text"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_ids", "display_fields"],
+        "required": [
+          "project_id",
+          "call_ids",
+          "display_fields"
+        ],
         "title": "AnnotationQueueAddCallsBody",
         "description": "Request body for adding calls to an annotation queue (queue_id comes from path)."
       },
@@ -8932,7 +9622,10 @@
           }
         },
         "type": "object",
-        "required": ["added_count", "duplicates"],
+        "required": [
+          "added_count",
+          "duplicates"
+        ],
         "title": "AnnotationQueueAddCallsRes",
         "description": "Response from adding calls to a queue."
       },
@@ -8941,18 +9634,24 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "examples": ["Error Review Queue"]
+            "examples": [
+              "Error Review Queue"
+            ]
           },
           "description": {
             "type": "string",
             "title": "Description",
             "default": "",
-            "examples": ["Review calls with exceptions"]
+            "examples": [
+              "Review calls with exceptions"
+            ]
           },
           "scorer_refs": {
             "items": {
@@ -8982,7 +9681,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "name", "scorer_refs"],
+        "required": [
+          "project_id",
+          "name",
+          "scorer_refs"
+        ],
         "title": "AnnotationQueueCreateReq",
         "description": "Request to create a new annotation queue."
       },
@@ -8994,7 +9697,9 @@
           }
         },
         "type": "object",
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "title": "AnnotationQueueCreateRes",
         "description": "Response from creating an annotation queue."
       },
@@ -9005,7 +9710,9 @@
           }
         },
         "type": "object",
-        "required": ["queue"],
+        "required": [
+          "queue"
+        ],
         "title": "AnnotationQueueDeleteRes",
         "description": "Response from deleting an annotation queue."
       },
@@ -9014,18 +9721,27 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "annotation_state": {
             "type": "string",
             "title": "Annotation State",
             "description": "New state: 'in_progress', 'completed', or 'skipped'",
-            "examples": ["in_progress", "completed", "skipped"]
+            "examples": [
+              "in_progress",
+              "completed",
+              "skipped"
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "annotation_state"],
+        "required": [
+          "project_id",
+          "annotation_state"
+        ],
         "title": "AnnotationQueueItemProgressUpdateBody",
         "description": "Request body for updating annotation progress (queue_id and item_id come from path).\n\nNote: wb_user_id is not included in the body - it's set server-side from the authenticated session."
       },
@@ -9092,7 +9808,12 @@
           },
           "annotation_state": {
             "type": "string",
-            "enum": ["unstarted", "in_progress", "completed", "skipped"],
+            "enum": [
+              "unstarted",
+              "in_progress",
+              "completed",
+              "skipped"
+            ],
             "title": "Annotation State"
           },
           "annotator_user_id": {
@@ -9229,7 +9950,12 @@
               {
                 "items": {
                   "type": "string",
-                  "enum": ["unstarted", "in_progress", "completed", "skipped"]
+                  "enum": [
+                    "unstarted",
+                    "in_progress",
+                    "completed",
+                    "skipped"
+                  ]
                 },
                 "type": "array"
               },
@@ -9239,7 +9965,12 @@
             ],
             "title": "Annotation States",
             "description": "Filter by annotation states (unstarted, in_progress, completed, skipped)",
-            "examples": [["unstarted", "in_progress"]]
+            "examples": [
+              [
+                "unstarted",
+                "in_progress"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -9251,7 +9982,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "filter": {
             "anyOf": [
@@ -9289,7 +10022,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [50]
+            "examples": [
+              50
+            ]
           },
           "offset": {
             "anyOf": [
@@ -9301,7 +10036,9 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           },
           "include_position": {
             "type": "boolean",
@@ -9312,7 +10049,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AnnotationQueueItemsQueryBody",
         "description": "Request body for querying items in an annotation queue (queue_id comes from path)."
       },
@@ -9327,7 +10066,9 @@
           }
         },
         "type": "object",
-        "required": ["items"],
+        "required": [
+          "items"
+        ],
         "title": "AnnotationQueueItemsQueryRes",
         "description": "Response from querying annotation queue items."
       },
@@ -9338,7 +10079,9 @@
           }
         },
         "type": "object",
-        "required": ["queue"],
+        "required": [
+          "queue"
+        ],
         "title": "AnnotationQueueReadRes",
         "description": "Response from reading an annotation queue."
       },
@@ -9414,7 +10157,9 @@
             "type": "string",
             "title": "Queue Id",
             "description": "The queue ID",
-            "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+            "examples": [
+              "550e8400-e29b-41d4-a716-446655440000"
+            ]
           },
           "total_items": {
             "type": "integer",
@@ -9428,7 +10173,11 @@
           }
         },
         "type": "object",
-        "required": ["queue_id", "total_items", "completed_items"],
+        "required": [
+          "queue_id",
+          "total_items",
+          "completed_items"
+        ],
         "title": "AnnotationQueueStatsSchema",
         "description": "Statistics for a single annotation queue."
       },
@@ -9437,7 +10186,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "name": {
             "anyOf": [
@@ -9449,7 +10200,9 @@
               }
             ],
             "title": "Name",
-            "examples": ["Updated Queue Name"]
+            "examples": [
+              "Updated Queue Name"
+            ]
           },
           "description": {
             "anyOf": [
@@ -9461,7 +10214,9 @@
               }
             ],
             "title": "Description",
-            "examples": ["Updated description"]
+            "examples": [
+              "Updated description"
+            ]
           },
           "scorer_refs": {
             "anyOf": [
@@ -9486,7 +10241,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AnnotationQueueUpdateBody",
         "description": "Request body for updating an annotation queue (queue_id comes from path).\n\nAll fields except project_id are optional - only provided fields will be updated."
       },
@@ -9497,7 +10254,9 @@
           }
         },
         "type": "object",
-        "required": ["queue"],
+        "required": [
+          "queue"
+        ],
         "title": "AnnotationQueueUpdateRes",
         "description": "Response from updating an annotation queue."
       },
@@ -9506,7 +10265,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "name": {
             "anyOf": [
@@ -9519,7 +10280,9 @@
             ],
             "title": "Name",
             "description": "Filter by queue name (case-insensitive partial match)",
-            "examples": ["Error"]
+            "examples": [
+              "Error"
+            ]
           },
           "sort_by": {
             "anyOf": [
@@ -9546,7 +10309,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "offset": {
             "anyOf": [
@@ -9558,12 +10323,16 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "AnnotationQueuesQueryReq",
         "description": "Request to query annotation queues for a project."
       },
@@ -9572,7 +10341,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "queue_ids": {
             "items": {
@@ -9591,7 +10362,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "queue_ids"],
+        "required": [
+          "project_id",
+          "queue_ids"
+        ],
         "title": "AnnotationQueuesStatsReq",
         "description": "Request to get stats for multiple annotation queues."
       },
@@ -9606,7 +10380,9 @@
           }
         },
         "type": "object",
-        "required": ["stats"],
+        "required": [
+          "stats"
+        ],
         "title": "AnnotationQueuesStatsRes",
         "description": "Response with stats for multiple annotation queues."
       },
@@ -9617,7 +10393,9 @@
           }
         },
         "type": "object",
-        "required": ["item"],
+        "required": [
+          "item"
+        ],
         "title": "AnnotatorQueueItemsProgressUpdateRes",
         "description": "Response from updating annotation state."
       },
@@ -9645,7 +10423,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "file"],
+        "required": [
+          "project_id",
+          "file"
+        ],
         "title": "Body_file_create_file_create_post"
       },
       "CallBatchEndMode": {
@@ -9660,7 +10441,9 @@
           }
         },
         "type": "object",
-        "required": ["req"],
+        "required": [
+          "req"
+        ],
         "title": "CallBatchEndMode"
       },
       "CallBatchStartMode": {
@@ -9675,7 +10458,9 @@
           }
         },
         "type": "object",
-        "required": ["req"],
+        "required": [
+          "req"
+        ],
         "title": "CallBatchStartMode"
       },
       "CallCreateBatchReq": {
@@ -9696,7 +10481,9 @@
           }
         },
         "type": "object",
-        "required": ["batch"],
+        "required": [
+          "batch"
+        ],
         "title": "CallCreateBatchReq"
       },
       "CallCreateBatchRes": {
@@ -9717,7 +10504,9 @@
           }
         },
         "type": "object",
-        "required": ["res"],
+        "required": [
+          "res"
+        ],
         "title": "CallCreateBatchRes"
       },
       "CallEndReq": {
@@ -9728,7 +10517,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["end"],
+        "required": [
+          "end"
+        ],
         "title": "CallEndReq"
       },
       "CallEndRes": {
@@ -9740,7 +10531,11 @@
         "properties": {
           "metric": {
             "type": "string",
-            "enum": ["latency_ms", "call_count", "error_count"],
+            "enum": [
+              "latency_ms",
+              "call_count",
+              "error_count"
+            ],
             "title": "Metric",
             "description": "Metric to aggregate."
           },
@@ -9751,7 +10546,9 @@
             "type": "array",
             "title": "Aggregations",
             "description": "Basic aggregation functions to apply",
-            "default": ["sum"]
+            "default": [
+              "sum"
+            ]
           },
           "percentiles": {
             "items": {
@@ -9765,7 +10562,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["metric"],
+        "required": [
+          "metric"
+        ],
         "title": "CallMetricSpec",
         "description": "Specification for a call-level metric to aggregate (not grouped by model)."
       },
@@ -9818,7 +10617,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "id"],
+        "required": [
+          "project_id",
+          "id"
+        ],
         "title": "CallReadReq"
       },
       "CallReadRes": {
@@ -9835,7 +10637,9 @@
           }
         },
         "type": "object",
-        "required": ["call"],
+        "required": [
+          "call"
+        ],
         "title": "CallReadRes"
       },
       "CallSchema": {
@@ -10074,7 +10878,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["start"],
+        "required": [
+          "start"
+        ],
         "title": "CallStartReq"
       },
       "CallStartRes": {
@@ -10089,7 +10895,10 @@
           }
         },
         "type": "object",
-        "required": ["id", "trace_id"],
+        "required": [
+          "id",
+          "trace_id"
+        ],
         "title": "CallStartRes"
       },
       "CallStatsReq": {
@@ -10178,7 +10987,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "start"],
+        "required": [
+          "project_id",
+          "start"
+        ],
         "title": "CallStatsReq",
         "description": "Request for aggregated call statistics over a time range."
       },
@@ -10228,7 +11040,12 @@
           }
         },
         "type": "object",
-        "required": ["start", "end", "granularity", "timezone"],
+        "required": [
+          "start",
+          "end",
+          "granularity",
+          "timezone"
+        ],
         "title": "CallStatsRes",
         "description": "Response containing time-series call statistics."
       },
@@ -10268,7 +11085,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_id"],
+        "required": [
+          "project_id",
+          "call_id"
+        ],
         "title": "CallUpdateReq"
       },
       "CallUpdateRes": {
@@ -10304,7 +11124,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_ids"],
+        "required": [
+          "project_id",
+          "call_ids"
+        ],
         "title": "CallsDeleteReq"
       },
       "CallsDeleteRes": {
@@ -10316,7 +11139,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "CallsDeleteRes"
       },
       "CallsFilter": {
@@ -10632,7 +11457,12 @@
             ],
             "title": "Expand Columns",
             "description": "Columns to expand, i.e. refs to other objects",
-            "examples": [["inputs.self.message", "inputs.model.prompt"]]
+            "examples": [
+              [
+                "inputs.self.message",
+                "inputs.model.prompt"
+              ]
+            ]
           },
           "return_expanded_column_values": {
             "anyOf": [
@@ -10650,7 +11480,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CallsQueryReq"
       },
       "CallsQueryStatsReq": {
@@ -10716,12 +11548,19 @@
             ],
             "title": "Expand Columns",
             "description": "Columns with refs to objects or table rows that require expansion during filtering or ordering.",
-            "examples": [["inputs.self.message", "inputs.model.prompt"]]
+            "examples": [
+              [
+                "inputs.self.message",
+                "inputs.model.prompt"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CallsQueryStatsReq"
       },
       "CallsQueryStatsRes": {
@@ -10748,7 +11587,9 @@
           }
         },
         "type": "object",
-        "required": ["count"],
+        "required": [
+          "count"
+        ],
         "title": "CallsQueryStatsRes"
       },
       "CallsScoreReq": {
@@ -10788,7 +11629,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_ids", "scorer_refs"],
+        "required": [
+          "project_id",
+          "call_ids",
+          "scorer_refs"
+        ],
         "title": "CallsScoreReq",
         "description": "Request to enqueue scoring jobs for a list of calls.\n\nScoring is performed asynchronously by the call_scoring_worker, which\nconsumes messages from Kafka and applies each scorer_ref to each call_id."
       },
@@ -10809,7 +11654,9 @@
           }
         },
         "type": "object",
-        "required": ["batch"],
+        "required": [
+          "batch"
+        ],
         "title": "CallsUpsertCompleteReq",
         "description": "Request for upserting a batch of completed calls."
       },
@@ -10848,7 +11695,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_ids"],
+        "required": [
+          "project_id",
+          "call_ids"
+        ],
         "title": "CallsUsageReq",
         "description": "Request to compute aggregated usage for multiple root calls.\n\nThis endpoint returns usage metrics for each requested root call, where each\nroot's metrics include the sum of its own usage plus all descendants' usage.\n\nNote: All matching calls are loaded into memory for aggregation. For very large\nresult sets (>10k calls), consider batching root call IDs or using narrower\nfilters at the application layer."
       },
@@ -10887,7 +11737,9 @@
           }
         },
         "type": "object",
-        "required": ["models"],
+        "required": [
+          "models"
+        ],
         "title": "CatalogModelsRes"
       },
       "CompletedCallSchemaForInsert": {
@@ -11075,7 +11927,9 @@
           }
         },
         "type": "object",
-        "required": ["$contains"],
+        "required": [
+          "$contains"
+        ],
         "title": "ContainsOperation",
         "description": "Case-insensitive substring match.\n\nNot part of MongoDB. Weave-specific addition.\n\nExample:\n    ```\n    {\n        \"$contains\": {\n            \"input\": {\"$getField\": \"display_name\"},\n            \"substr\": {\"$literal\": \"llm\"},\n            \"case_insensitive\": true\n        }\n    }\n    ```"
       },
@@ -11183,7 +12037,10 @@
           }
         },
         "type": "object",
-        "required": ["input", "substr"],
+        "required": [
+          "input",
+          "substr"
+        ],
         "title": "ContainsSpec",
         "description": "Specification for the `$contains` operation.\n\n- `input`: The string to search.\n- `substr`: The substring to search for.\n- `case_insensitive`: If true, match is case-insensitive."
       },
@@ -11194,7 +12051,9 @@
           }
         },
         "type": "object",
-        "required": ["$convert"],
+        "required": [
+          "$convert"
+        ],
         "title": "ConvertOperation",
         "description": "Convert the input value to a specific type (e.g., `int`, `bool`, `string`).\n\nExample:\n    ```\n    {\n        \"$convert\": {\n            \"input\": {\"$getField\": \"inputs.value\"},\n            \"to\": \"int\"\n        }\n    }\n    ```"
       },
@@ -11246,12 +12105,21 @@
           },
           "to": {
             "type": "string",
-            "enum": ["double", "string", "int", "bool", "exists"],
+            "enum": [
+              "double",
+              "string",
+              "int",
+              "bool",
+              "exists"
+            ],
             "title": "To"
           }
         },
         "type": "object",
-        "required": ["input", "to"],
+        "required": [
+          "input",
+          "to"
+        ],
         "title": "ConvertSpec",
         "description": "Specifies conversion details for `$convert`.\n\n- `input`: The operand to convert.\n- `to`: The type to convert to."
       },
@@ -11329,7 +12197,10 @@
           }
         },
         "type": "object",
-        "required": ["input", "output"],
+        "required": [
+          "input",
+          "output"
+        ],
         "title": "Cost",
         "description": "Costs are expressed in USD per million tokens."
       },
@@ -11407,7 +12278,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["prompt_token_cost", "completion_token_cost"],
+        "required": [
+          "prompt_token_cost",
+          "completion_token_cost"
+        ],
         "title": "CostCreateInput"
       },
       "CostCreateReq": {
@@ -11415,7 +12289,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "costs": {
             "additionalProperties": {
@@ -11439,7 +12315,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "costs"],
+        "required": [
+          "project_id",
+          "costs"
+        ],
         "title": "CostCreateReq"
       },
       "CostCreateRes": {
@@ -11463,7 +12342,9 @@
           }
         },
         "type": "object",
-        "required": ["ids"],
+        "required": [
+          "ids"
+        ],
         "title": "CostCreateRes"
       },
       "CostPurgeReq": {
@@ -11471,7 +12352,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "query": {
             "$ref": "#/components/schemas/Query"
@@ -11479,7 +12362,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "query"],
+        "required": [
+          "project_id",
+          "query"
+        ],
         "title": "CostPurgeReq"
       },
       "CostPurgeRes": {
@@ -11499,7 +12385,9 @@
               }
             ],
             "title": "Id",
-            "examples": ["2341-asdf-asdf"]
+            "examples": [
+              "2341-asdf-asdf"
+            ]
           },
           "llm_id": {
             "anyOf": [
@@ -11511,7 +12399,9 @@
               }
             ],
             "title": "Llm Id",
-            "examples": ["gpt4"]
+            "examples": [
+              "gpt4"
+            ]
           },
           "prompt_token_cost": {
             "anyOf": [
@@ -11523,7 +12413,9 @@
               }
             ],
             "title": "Prompt Token Cost",
-            "examples": [1.0]
+            "examples": [
+              1.0
+            ]
           },
           "completion_token_cost": {
             "anyOf": [
@@ -11535,7 +12427,9 @@
               }
             ],
             "title": "Completion Token Cost",
-            "examples": [1.0]
+            "examples": [
+              1.0
+            ]
           },
           "prompt_token_cost_unit": {
             "anyOf": [
@@ -11547,7 +12441,9 @@
               }
             ],
             "title": "Prompt Token Cost Unit",
-            "examples": ["USD"]
+            "examples": [
+              "USD"
+            ]
           },
           "completion_token_cost_unit": {
             "anyOf": [
@@ -11559,7 +12455,9 @@
               }
             ],
             "title": "Completion Token Cost Unit",
-            "examples": ["USD"]
+            "examples": [
+              "USD"
+            ]
           },
           "effective_date": {
             "anyOf": [
@@ -11572,7 +12470,9 @@
               }
             ],
             "title": "Effective Date",
-            "examples": ["2024-01-01T00:00:00Z"]
+            "examples": [
+              "2024-01-01T00:00:00Z"
+            ]
           },
           "provider_id": {
             "anyOf": [
@@ -11584,7 +12484,9 @@
               }
             ],
             "title": "Provider Id",
-            "examples": ["openai"]
+            "examples": [
+              "openai"
+            ]
           }
         },
         "type": "object",
@@ -11595,7 +12497,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "fields": {
             "anyOf": [
@@ -11657,7 +12561,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "offset": {
             "anyOf": [
@@ -11669,12 +12575,16 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "CostQueryReq"
       },
       "CostQueryRes": {
@@ -11688,7 +12598,9 @@
           }
         },
         "type": "object",
-        "required": ["results"],
+        "required": [
+          "results"
+        ],
         "title": "CostQueryRes"
       },
       "CreateAndLinkPayload": {
@@ -11711,7 +12623,10 @@
           }
         },
         "type": "object",
-        "required": ["ref", "target"],
+        "required": [
+          "ref",
+          "target"
+        ],
         "title": "CreateAndLinkPayload"
       },
       "CreateAndLinkTarget": {
@@ -11733,7 +12648,11 @@
           }
         },
         "type": "object",
-        "required": ["portfolio_name", "entity_name", "project_name"],
+        "required": [
+          "portfolio_name",
+          "entity_name",
+          "project_name"
+        ],
         "title": "CreateAndLinkTarget"
       },
       "CreateAndLinkWeaveAssetRes": {
@@ -11761,7 +12680,9 @@
           }
         },
         "type": "object",
-        "required": ["country_code"],
+        "required": [
+          "country_code"
+        ],
         "title": "Datacenter"
       },
       "DatasetCreateBody": {
@@ -11801,7 +12722,9 @@
           }
         },
         "type": "object",
-        "required": ["rows"],
+        "required": [
+          "rows"
+        ],
         "title": "DatasetCreateBody"
       },
       "DatasetCreateRes": {
@@ -11823,7 +12746,11 @@
           }
         },
         "type": "object",
-        "required": ["digest", "object_id", "version_index"],
+        "required": [
+          "digest",
+          "object_id",
+          "version_index"
+        ],
         "title": "DatasetCreateRes"
       },
       "DatasetDeleteRes": {
@@ -11835,7 +12762,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "DatasetDeleteRes"
       },
       "DatasetReadRes": {
@@ -11894,6 +12823,41 @@
           "rows"
         ],
         "title": "DatasetReadRes"
+      },
+      "DeletedObjVersion": {
+        "properties": {
+          "digest": {
+            "type": "string",
+            "title": "Digest"
+          },
+          "base_object_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Object Class"
+          },
+          "leaf_object_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaf Object Class"
+          }
+        },
+        "type": "object",
+        "required": [
+          "digest"
+        ],
+        "title": "DeletedObjVersion"
       },
       "EndedCallSchemaForInsert": {
         "properties": {
@@ -11980,7 +12944,12 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "id", "ended_at", "summary"],
+        "required": [
+          "project_id",
+          "id",
+          "ended_at",
+          "summary"
+        ],
         "title": "EndedCallSchemaForInsert"
       },
       "EqOperation": {
@@ -12081,7 +13050,9 @@
           }
         },
         "type": "object",
-        "required": ["$eq"],
+        "required": [
+          "$eq"
+        ],
         "title": "EqOperation",
         "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```"
       },
@@ -12114,6 +13085,18 @@
             ],
             "title": "Predict Total Tokens",
             "description": "Sum of per-trial predict-only token usage for this evaluation (the model's predict() tokens only, excluding LLM-as-a-judge scorer usage); None when no trial reports usage."
+          },
+          "predict_total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predict Total Cost",
+            "description": "Sum of per-trial predict-only cost for this evaluation (the model's predict() cost only, excluding LLM-as-a-judge scorer cost); None when no trial reports cost."
           },
           "evaluation_ref": {
             "anyOf": [
@@ -12172,7 +13155,9 @@
           }
         },
         "type": "object",
-        "required": ["evaluation_call_id"],
+        "required": [
+          "evaluation_call_id"
+        ],
         "title": "EvalResultsEvaluationSummary"
       },
       "EvalResultsFilter": {
@@ -12196,7 +13181,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "title": "EvalResultsFilter",
         "description": "A filter scoped to an optional evaluation."
       },
@@ -12280,6 +13267,12 @@
             "description": "When true (default), fetch child calls (predict/score) of each predict_and_score call to populate predict_call_id, scorer_call_ids, and more precise latency/token data. When false, these fields are derived from the predict_and_score call itself (predict_call_id and scorer_call_ids will be null/empty).",
             "default": true
           },
+          "include_costs": {
+            "type": "boolean",
+            "title": "Include Costs",
+            "description": "When true, price each trial's predict call so rows and summary report predict-only cost (`total_cost` / `predict_total_cost`); scorer costs are excluded. Opt-in: other callers skip the cost computation.",
+            "default": false
+          },
           "sort_by": {
             "anyOf": [
               {
@@ -12312,7 +13305,10 @@
           },
           "filter_logic_operator": {
             "type": "string",
-            "enum": ["and", "or"],
+            "enum": [
+              "and",
+              "or"
+            ],
             "title": "Filter Logic Operator",
             "description": "How to combine filters across evaluations: 'and' (Match All - row must match in ALL evals) or 'or' (Match Any - row must match in ANY eval). Defaults to 'or' (Match Any).",
             "default": "or"
@@ -12373,7 +13369,10 @@
           }
         },
         "type": "object",
-        "required": ["rows", "total_rows"],
+        "required": [
+          "rows",
+          "total_rows"
+        ],
         "title": "EvalResultsQueryRes"
       },
       "EvalResultsRow": {
@@ -12400,7 +13399,9 @@
           }
         },
         "type": "object",
-        "required": ["row_digest"],
+        "required": [
+          "row_digest"
+        ],
         "title": "EvalResultsRow"
       },
       "EvalResultsRowEvaluation": {
@@ -12418,7 +13419,9 @@
           }
         },
         "type": "object",
-        "required": ["evaluation_call_id"],
+        "required": [
+          "evaluation_call_id"
+        ],
         "title": "EvalResultsRowEvaluation"
       },
       "EvalResultsScorerStats": {
@@ -12443,7 +13446,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["binary", "continuous", "text"]
+                "enum": [
+                  "binary",
+                  "continuous",
+                  "text"
+                ]
               },
               {
                 "type": "null"
@@ -12507,7 +13514,9 @@
           }
         },
         "type": "object",
-        "required": ["scorer_key"],
+        "required": [
+          "scorer_key"
+        ],
         "title": "EvalResultsScorerStats",
         "description": "Stats for a single flattened score dimension (scorer_key or scorer_key.path.to.leaf)."
       },
@@ -12519,7 +13528,10 @@
           },
           "direction": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "title": "Direction"
           },
           "evaluation_call_id": {
@@ -12536,7 +13548,10 @@
           },
           "mode": {
             "type": "string",
-            "enum": ["value", "difference"],
+            "enum": [
+              "value",
+              "difference"
+            ],
             "title": "Mode",
             "description": "When 'value', sort by the field value for the specified evaluation. When 'difference', sort by max-min spread of the field across all evaluations (evaluation_call_id is ignored).",
             "default": "value"
@@ -12544,7 +13559,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["field", "direction"],
+        "required": [
+          "field",
+          "direction"
+        ],
         "title": "EvalResultsSortBy",
         "description": "Sort specification for evaluation results, extending SortBy"
       },
@@ -12619,6 +13637,17 @@
             ],
             "title": "Total Tokens"
           },
+          "total_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Cost"
+          },
           "scorer_call_ids": {
             "additionalProperties": {
               "type": "string"
@@ -12642,7 +13671,9 @@
           }
         },
         "type": "object",
-        "required": ["predict_and_score_call_id"],
+        "required": [
+          "predict_and_score_call_id"
+        ],
         "title": "EvalResultsTrial"
       },
       "EvaluateModelReq": {
@@ -12674,7 +13705,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "evaluation_ref", "model_ref"],
+        "required": [
+          "project_id",
+          "evaluation_ref",
+          "model_ref"
+        ],
         "title": "EvaluateModelReq"
       },
       "EvaluateModelRes": {
@@ -12685,7 +13720,9 @@
           }
         },
         "type": "object",
-        "required": ["call_id"],
+        "required": [
+          "call_id"
+        ],
         "title": "EvaluateModelRes"
       },
       "EvaluationCreateBody": {
@@ -12760,7 +13797,10 @@
           }
         },
         "type": "object",
-        "required": ["name", "dataset"],
+        "required": [
+          "name",
+          "dataset"
+        ],
         "title": "EvaluationCreateBody"
       },
       "EvaluationCreateRes": {
@@ -12787,7 +13827,12 @@
           }
         },
         "type": "object",
-        "required": ["digest", "object_id", "version_index", "evaluation_ref"],
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "evaluation_ref"
+        ],
         "title": "EvaluationCreateRes"
       },
       "EvaluationDeleteRes": {
@@ -12799,7 +13844,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "EvaluationDeleteRes"
       },
       "EvaluationReadRes": {
@@ -12944,11 +13991,14 @@
               }
             ],
             "title": "Source Evaluation Run Id",
-            "description": "Source evaluation run ID if this run was created by rescoring — provenance link"
+            "description": "Source evaluation run ID if this run was created by rescoring \u2014 provenance link"
           }
         },
         "type": "object",
-        "required": ["evaluation", "model"],
+        "required": [
+          "evaluation",
+          "model"
+        ],
         "title": "EvaluationRunCreateBody"
       },
       "EvaluationRunCreateRes": {
@@ -12960,7 +14010,9 @@
           }
         },
         "type": "object",
-        "required": ["evaluation_run_id"],
+        "required": [
+          "evaluation_run_id"
+        ],
         "title": "EvaluationRunCreateRes"
       },
       "EvaluationRunDeleteRes": {
@@ -12972,7 +14024,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "EvaluationRunDeleteRes"
       },
       "EvaluationRunFinishBody": {
@@ -13004,7 +14058,9 @@
           }
         },
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "title": "EvaluationRunFinishRes"
       },
       "EvaluationRunReadRes": {
@@ -13089,7 +14145,11 @@
           }
         },
         "type": "object",
-        "required": ["evaluation_run_id", "evaluation", "model"],
+        "required": [
+          "evaluation_run_id",
+          "evaluation",
+          "model"
+        ],
         "title": "EvaluationRunReadRes"
       },
       "EvaluationStatusComplete": {
@@ -13108,7 +14168,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["output"],
+        "required": [
+          "output"
+        ],
         "title": "EvaluationStatusComplete"
       },
       "EvaluationStatusFailed": {
@@ -13161,7 +14223,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "call_id"],
+        "required": [
+          "project_id",
+          "call_id"
+        ],
         "title": "EvaluationStatusReq"
       },
       "EvaluationStatusRes": {
@@ -13185,7 +14250,9 @@
           }
         },
         "type": "object",
-        "required": ["status"],
+        "required": [
+          "status"
+        ],
         "title": "EvaluationStatusRes"
       },
       "EvaluationStatusRunning": {
@@ -13207,7 +14274,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["completed_rows", "total_rows"],
+        "required": [
+          "completed_rows",
+          "total_rows"
+        ],
         "title": "EvaluationStatusRunning"
       },
       "FeedbackAggregateBucket": {
@@ -13240,7 +14310,7 @@
           "scored_count": {
             "type": "integer",
             "title": "Scored Count",
-            "description": "Rows that emitted a score (at least one tag or rating). Excludes agent-monitor rows that scored nothing — use this for score volume."
+            "description": "Rows that emitted a score (at least one tag or rating). Excludes agent-monitor rows that scored nothing \u2014 use this for score volume."
           },
           "tag_counts": {
             "additionalProperties": {
@@ -13268,7 +14338,10 @@
           }
         },
         "type": "object",
-        "required": ["total_count", "scored_count"],
+        "required": [
+          "total_count",
+          "scored_count"
+        ],
         "title": "FeedbackAggregateBucket",
         "description": "One (time bucket, group) row of aggregated scorer feedback."
       },
@@ -13277,7 +14350,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "after_ms": {
             "type": "integer",
@@ -13375,7 +14450,10 @@
           "span_types": {
             "items": {
               "type": "string",
-              "enum": ["agent_turn", "agent_conversation"]
+              "enum": [
+                "agent_turn",
+                "agent_conversation"
+              ]
             },
             "type": "array",
             "title": "Span Types",
@@ -13398,7 +14476,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "after_ms", "before_ms"],
+        "required": [
+          "project_id",
+          "after_ms",
+          "before_ms"
+        ],
         "title": "FeedbackAggregateReq",
         "description": "Query for aggregate scores by time bucket and dimension."
       },
@@ -13435,7 +14517,10 @@
           }
         },
         "type": "object",
-        "required": ["after_ms", "before_ms"],
+        "required": [
+          "after_ms",
+          "before_ms"
+        ],
         "title": "FeedbackAggregateRes",
         "description": "Sparse time-series of aggregated scorer feedback (empty buckets omitted)."
       },
@@ -13451,7 +14536,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["batch"],
+        "required": [
+          "batch"
+        ],
         "title": "FeedbackCreateBatchReq"
       },
       "FeedbackCreateBatchRes": {
@@ -13465,7 +14552,9 @@
           }
         },
         "type": "object",
-        "required": ["res"],
+        "required": [
+          "res"
+        ],
         "title": "FeedbackCreateBatchRes"
       },
       "FeedbackCreateReq": {
@@ -13481,17 +14570,23 @@
             ],
             "title": "Id",
             "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
-            "examples": ["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"]
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
           },
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "weave_ref": {
             "type": "string",
             "title": "Weave Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "creator": {
             "anyOf": [
@@ -13503,12 +14598,16 @@
               }
             ],
             "title": "Creator",
-            "examples": ["Jane Smith"]
+            "examples": [
+              "Jane Smith"
+            ]
           },
           "feedback_type": {
             "type": "string",
             "title": "Feedback Type",
-            "examples": ["custom"]
+            "examples": [
+              "custom"
+            ]
           },
           "payload": {
             "additionalProperties": true,
@@ -13530,7 +14629,9 @@
               }
             ],
             "title": "Annotation Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "runnable_ref": {
             "anyOf": [
@@ -13542,7 +14643,9 @@
               }
             ],
             "title": "Runnable Ref",
-            "examples": ["weave:///entity/project/op/name:digest"]
+            "examples": [
+              "weave:///entity/project/op/name:digest"
+            ]
           },
           "call_ref": {
             "anyOf": [
@@ -13554,7 +14657,9 @@
               }
             ],
             "title": "Call Ref",
-            "examples": ["weave:///entity/project/call/call_id"]
+            "examples": [
+              "weave:///entity/project/call/call_id"
+            ]
           },
           "trigger_ref": {
             "anyOf": [
@@ -13566,7 +14671,9 @@
               }
             ],
             "title": "Trigger Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "queue_id": {
             "anyOf": [
@@ -13579,7 +14686,9 @@
             ],
             "title": "Queue Id",
             "description": "The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
-            "examples": ["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"]
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
           },
           "scorer_tags": {
             "items": {
@@ -13588,7 +14697,12 @@
             "type": "array",
             "title": "Scorer Tags",
             "description": "Tags applied to the ref by a scorer",
-            "examples": [["nsfw", "high-quality"]]
+            "examples": [
+              [
+                "nsfw",
+                "high-quality"
+              ]
+            ]
           },
           "scorer_tag_reasons": {
             "additionalProperties": {
@@ -13660,21 +14774,39 @@
             "title": "Span Agent Name",
             "description": "Display name of the scored agent (from spans.agent_name)",
             "default": "",
-            "examples": ["midi-generator"]
+            "examples": [
+              "midi-generator"
+            ]
           },
           "span_agent_version": {
             "type": "string",
             "title": "Span Agent Version",
             "description": "Version of the scored agent (from spans.agent_version)",
             "default": "",
-            "examples": ["1.2.0"]
+            "examples": [
+              "1.2.0"
+            ]
           },
           "span_status_code": {
             "type": "string",
             "title": "Span Status Code",
             "description": "Status of the scored turn (from spans.status_code)",
             "default": "UNSET",
-            "examples": ["SUCCESS"]
+            "examples": [
+              "OK"
+            ]
+          },
+          "span_conversation_id": {
+            "type": "string",
+            "title": "Span Conversation Id",
+            "description": "Conversation the feedback belongs to (from spans.conversation_id)",
+            "default": ""
+          },
+          "span_trace_id": {
+            "type": "string",
+            "title": "Span Trace Id",
+            "description": "Turn the feedback belongs to (from spans.trace_id)",
+            "default": ""
           },
           "wb_user_id": {
             "anyOf": [
@@ -13691,7 +14823,12 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "weave_ref", "feedback_type", "payload"],
+        "required": [
+          "project_id",
+          "weave_ref",
+          "feedback_type",
+          "payload"
+        ],
         "title": "FeedbackCreateReq"
       },
       "FeedbackCreateRes": {
@@ -13716,7 +14853,12 @@
           }
         },
         "type": "object",
-        "required": ["id", "created_at", "wb_user_id", "payload"],
+        "required": [
+          "id",
+          "created_at",
+          "wb_user_id",
+          "payload"
+        ],
         "title": "FeedbackCreateRes"
       },
       "FeedbackMetricSpec": {
@@ -13728,7 +14870,11 @@
           },
           "value_type": {
             "type": "string",
-            "enum": ["numeric", "boolean", "categorical"],
+            "enum": [
+              "numeric",
+              "boolean",
+              "categorical"
+            ],
             "title": "Value Type",
             "description": "Type of value at path. numeric: avg/min/max; boolean: count_true/count_false.",
             "default": "numeric"
@@ -13747,12 +14893,14 @@
             },
             "type": "array",
             "title": "Percentiles",
-            "description": "Percentile values to compute (0–100), e.g. [5, 50, 95]. Only applicable for numeric value_type fields; ignored for boolean/categorical."
+            "description": "Percentile values to compute (0\u2013100), e.g. [5, 50, 95]. Only applicable for numeric value_type fields; ignored for boolean/categorical."
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["json_path"],
+        "required": [
+          "json_path"
+        ],
         "title": "FeedbackMetricSpec",
         "description": "Specification for a feedback payload metric to aggregate."
       },
@@ -13765,7 +14913,11 @@
           },
           "value_type": {
             "type": "string",
-            "enum": ["numeric", "boolean", "categorical"],
+            "enum": [
+              "numeric",
+              "boolean",
+              "categorical"
+            ],
             "title": "Value Type",
             "description": "Inferred type of value at path.",
             "default": "numeric"
@@ -13773,7 +14925,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["json_path"],
+        "required": [
+          "json_path"
+        ],
         "title": "FeedbackPayloadPath",
         "description": "Discovered path in feedback payload with inferred type."
       },
@@ -13837,7 +14991,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "start"],
+        "required": [
+          "project_id",
+          "start"
+        ],
         "title": "FeedbackPayloadSchemaReq",
         "description": "Request for feedback payload schema discovery."
       },
@@ -13861,7 +15018,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "query": {
             "$ref": "#/components/schemas/Query"
@@ -13869,7 +15028,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "query"],
+        "required": [
+          "project_id",
+          "query"
+        ],
         "title": "FeedbackPurgeReq"
       },
       "FeedbackPurgeRes": {
@@ -13882,7 +15044,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "fields": {
             "anyOf": [
@@ -13897,7 +15061,13 @@
               }
             ],
             "title": "Fields",
-            "examples": [["id", "feedback_type", "payload.note"]]
+            "examples": [
+              [
+                "id",
+                "feedback_type",
+                "payload.note"
+              ]
+            ]
           },
           "query": {
             "anyOf": [
@@ -13933,7 +15103,9 @@
               }
             ],
             "title": "Limit",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "offset": {
             "anyOf": [
@@ -13945,12 +15117,16 @@
               }
             ],
             "title": "Offset",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "FeedbackQueryReq"
       },
       "FeedbackQueryRes": {
@@ -13965,7 +15141,9 @@
           }
         },
         "type": "object",
-        "required": ["result"],
+        "required": [
+          "result"
+        ],
         "title": "FeedbackQueryRes"
       },
       "FeedbackReplaceReq": {
@@ -13981,17 +15159,23 @@
             ],
             "title": "Id",
             "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
-            "examples": ["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"]
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
           },
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "weave_ref": {
             "type": "string",
             "title": "Weave Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "creator": {
             "anyOf": [
@@ -14003,12 +15187,16 @@
               }
             ],
             "title": "Creator",
-            "examples": ["Jane Smith"]
+            "examples": [
+              "Jane Smith"
+            ]
           },
           "feedback_type": {
             "type": "string",
             "title": "Feedback Type",
-            "examples": ["custom"]
+            "examples": [
+              "custom"
+            ]
           },
           "payload": {
             "additionalProperties": true,
@@ -14030,7 +15218,9 @@
               }
             ],
             "title": "Annotation Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "runnable_ref": {
             "anyOf": [
@@ -14042,7 +15232,9 @@
               }
             ],
             "title": "Runnable Ref",
-            "examples": ["weave:///entity/project/op/name:digest"]
+            "examples": [
+              "weave:///entity/project/op/name:digest"
+            ]
           },
           "call_ref": {
             "anyOf": [
@@ -14054,7 +15246,9 @@
               }
             ],
             "title": "Call Ref",
-            "examples": ["weave:///entity/project/call/call_id"]
+            "examples": [
+              "weave:///entity/project/call/call_id"
+            ]
           },
           "trigger_ref": {
             "anyOf": [
@@ -14066,7 +15260,9 @@
               }
             ],
             "title": "Trigger Ref",
-            "examples": ["weave:///entity/project/object/name:digest"]
+            "examples": [
+              "weave:///entity/project/object/name:digest"
+            ]
           },
           "queue_id": {
             "anyOf": [
@@ -14079,7 +15275,9 @@
             ],
             "title": "Queue Id",
             "description": "The annotation queue ID this feedback was created from. References annotation_queues.id. NULL when feedback is created outside of queues.",
-            "examples": ["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"]
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
           },
           "scorer_tags": {
             "items": {
@@ -14088,7 +15286,12 @@
             "type": "array",
             "title": "Scorer Tags",
             "description": "Tags applied to the ref by a scorer",
-            "examples": [["nsfw", "high-quality"]]
+            "examples": [
+              [
+                "nsfw",
+                "high-quality"
+              ]
+            ]
           },
           "scorer_tag_reasons": {
             "additionalProperties": {
@@ -14160,21 +15363,39 @@
             "title": "Span Agent Name",
             "description": "Display name of the scored agent (from spans.agent_name)",
             "default": "",
-            "examples": ["midi-generator"]
+            "examples": [
+              "midi-generator"
+            ]
           },
           "span_agent_version": {
             "type": "string",
             "title": "Span Agent Version",
             "description": "Version of the scored agent (from spans.agent_version)",
             "default": "",
-            "examples": ["1.2.0"]
+            "examples": [
+              "1.2.0"
+            ]
           },
           "span_status_code": {
             "type": "string",
             "title": "Span Status Code",
             "description": "Status of the scored turn (from spans.status_code)",
             "default": "UNSET",
-            "examples": ["SUCCESS"]
+            "examples": [
+              "OK"
+            ]
+          },
+          "span_conversation_id": {
+            "type": "string",
+            "title": "Span Conversation Id",
+            "description": "Conversation the feedback belongs to (from spans.conversation_id)",
+            "default": ""
+          },
+          "span_trace_id": {
+            "type": "string",
+            "title": "Span Trace Id",
+            "description": "Turn the feedback belongs to (from spans.trace_id)",
+            "default": ""
           },
           "wb_user_id": {
             "anyOf": [
@@ -14226,7 +15447,12 @@
           }
         },
         "type": "object",
-        "required": ["id", "created_at", "wb_user_id", "payload"],
+        "required": [
+          "id",
+          "created_at",
+          "wb_user_id",
+          "payload"
+        ],
         "title": "FeedbackReplaceRes"
       },
       "FeedbackStatsReq": {
@@ -14307,7 +15533,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "start"],
+        "required": [
+          "project_id",
+          "start"
+        ],
         "title": "FeedbackStatsReq",
         "description": "Request for aggregated feedback statistics over time buckets."
       },
@@ -14371,7 +15600,12 @@
           }
         },
         "type": "object",
-        "required": ["start", "end", "granularity", "timezone"],
+        "required": [
+          "start",
+          "end",
+          "granularity",
+          "timezone"
+        ],
         "title": "FeedbackStatsRes",
         "description": "Response with time-series feedback statistics."
       },
@@ -14388,7 +15622,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "FileContentReadReq"
       },
       "FileCreateRes": {
@@ -14399,7 +15636,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "FileCreateRes"
       },
       "FilesStatsReq": {
@@ -14411,7 +15650,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "FilesStatsReq"
       },
       "FilesStatsRes": {
@@ -14422,7 +15663,9 @@
           }
         },
         "type": "object",
-        "required": ["total_size_bytes"],
+        "required": [
+          "total_size_bytes"
+        ],
         "title": "FilesStatsRes"
       },
       "GenAISpanRef": {
@@ -14437,7 +15680,10 @@
           }
         },
         "type": "object",
-        "required": ["trace_id", "span_id"],
+        "required": [
+          "trace_id",
+          "span_id"
+        ],
         "title": "GenAISpanRef"
       },
       "Geolocation": {
@@ -14522,7 +15768,9 @@
           }
         },
         "type": "object",
-        "required": ["ip"],
+        "required": [
+          "ip"
+        ],
         "title": "GeolocationRes"
       },
       "GetFieldOperator": {
@@ -14533,7 +15781,9 @@
           }
         },
         "type": "object",
-        "required": ["$getField"],
+        "required": [
+          "$getField"
+        ],
         "title": "GetFieldOperator",
         "description": "Access a field on the traced call.\n\nSupports dot notation for nested access, e.g. `summary.usage.tokens`.\n\nOnly works on fields present in the `CallSchema`, including:\n- Top-level fields like `op_name`, `trace_id`, `started_at`\n- Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.\n\nExample:\n    ```\n    {\"$getField\": \"op_name\"}\n    ```"
       },
@@ -14635,7 +15885,9 @@
           }
         },
         "type": "object",
-        "required": ["$gt"],
+        "required": [
+          "$gt"
+        ],
         "title": "GtOperation",
         "description": "Greater than comparison.\n\nExample:\n    ```\n    {\n        \"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
@@ -14737,7 +15989,9 @@
           }
         },
         "type": "object",
-        "required": ["$gte"],
+        "required": [
+          "$gte"
+        ],
         "title": "GteOperation",
         "description": "Greater than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$gte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
@@ -14790,7 +16044,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "inputs"],
+        "required": [
+          "project_id",
+          "inputs"
+        ],
         "title": "ImageGenerationCreateReq"
       },
       "ImageGenerationCreateRes": {
@@ -14813,7 +16070,9 @@
           }
         },
         "type": "object",
-        "required": ["response"],
+        "required": [
+          "response"
+        ],
         "title": "ImageGenerationCreateRes"
       },
       "ImageGenerationRequestInputs": {
@@ -14839,7 +16098,10 @@
           }
         },
         "type": "object",
-        "required": ["model", "prompt"],
+        "required": [
+          "model",
+          "prompt"
+        ],
         "title": "ImageGenerationRequestInputs"
       },
       "InOperation": {
@@ -14943,7 +16205,9 @@
           }
         },
         "type": "object",
-        "required": ["$in"],
+        "required": [
+          "$in"
+        ],
         "title": "InOperation",
         "description": "Membership check.\n\nReturns true if the left operand is in the list provided as the second operand.\n\nExample:\n    ```\n    {\n        \"$in\": [\n            {\"$getField\": \"op_name\"},\n            [{\"$literal\": \"predict\"}, {\"$literal\": \"generate\"}]\n        ]\n    }\n    ```"
       },
@@ -14951,13 +16215,18 @@
         "properties": {
           "field": {
             "type": "string",
-            "enum": ["reasoning_content", "reasoning_details"],
+            "enum": [
+              "reasoning_content",
+              "reasoning_details"
+            ],
             "title": "Field",
             "description": "Format identifier for interleaved reasoning."
           }
         },
         "type": "object",
-        "required": ["field"],
+        "required": [
+          "field"
+        ],
         "title": "Interleaved",
         "description": "Reasoning interleaving support details."
       },
@@ -15074,13 +16343,21 @@
           },
           "lifecycleStage": {
             "type": "string",
-            "enum": ["general-availability", "experimental", "retired"],
+            "enum": [
+              "experimental",
+              "general-availability",
+              "deprecated",
+              "retired"
+            ],
             "title": "Lifecyclestage"
           },
           "availableIn": {
             "items": {
               "type": "string",
-              "enum": ["cw-prod", "cw-qa"]
+              "enum": [
+                "cw-prod",
+                "cw-qa"
+              ]
             },
             "type": "array",
             "title": "Availablein"
@@ -15365,7 +16642,11 @@
           }
         },
         "type": "object",
-        "required": ["context", "input", "output"],
+        "required": [
+          "context",
+          "input",
+          "output"
+        ],
         "title": "Limit",
         "description": "Token limits for a model."
       },
@@ -15405,7 +16686,9 @@
           }
         },
         "type": "object",
-        "required": ["$literal"],
+        "required": [
+          "$literal"
+        ],
         "title": "LiteralOperation",
         "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```"
       },
@@ -15507,7 +16790,9 @@
           }
         },
         "type": "object",
-        "required": ["$lt"],
+        "required": [
+          "$lt"
+        ],
         "title": "LtOperation",
         "description": "Less than comparison.\n\nExample:\n    ```\n    {\n        \"$lt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
@@ -15609,7 +16894,9 @@
           }
         },
         "type": "object",
-        "required": ["$lte"],
+        "required": [
+          "$lte"
+        ],
         "title": "LteOperation",
         "description": "Less than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$lte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
@@ -15633,7 +16920,10 @@
           }
         },
         "type": "object",
-        "required": ["input", "output"],
+        "required": [
+          "input",
+          "output"
+        ],
         "title": "Modalities",
         "description": "Supported input and output modalities."
       },
@@ -15676,7 +16966,10 @@
           }
         },
         "type": "object",
-        "required": ["name", "source_code"],
+        "required": [
+          "name",
+          "source_code"
+        ],
         "title": "ModelCreateBody"
       },
       "ModelCreateRes": {
@@ -15703,7 +16996,12 @@
           }
         },
         "type": "object",
-        "required": ["digest", "object_id", "version_index", "model_ref"],
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "model_ref"
+        ],
         "title": "ModelCreateRes"
       },
       "ModelDeleteRes": {
@@ -15715,7 +17013,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "ModelDeleteRes"
       },
       "ModelReadRes": {
@@ -15800,6 +17100,18 @@
             "title": "Name",
             "description": "Display name."
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the model."
+          },
           "attachment": {
             "type": "boolean",
             "title": "Attachment",
@@ -15809,6 +17121,31 @@
             "type": "boolean",
             "title": "Reasoning",
             "description": "Chain-of-thought reasoning support."
+          },
+          "reasoning_options": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ReasoningToggle"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ReasoningEffortOption"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ReasoningBudgetTokens"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Options",
+            "description": "How reasoning is controlled. Set (possibly to an empty list, meaning always-on) when reasoning is supported; omitted otherwise."
           },
           "tool_call": {
             "type": "boolean",
@@ -15870,7 +17207,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "enum": ["alpha", "beta", "deprecated"]
+                "enum": [
+                  "alpha",
+                  "beta",
+                  "deprecated"
+                ]
               },
               {
                 "type": "null"
@@ -15994,7 +17335,13 @@
           }
         },
         "type": "object",
-        "required": ["id", "name", "npm", "env", "doc"],
+        "required": [
+          "id",
+          "name",
+          "npm",
+          "env",
+          "doc"
+        ],
         "title": "ModelsDevProvider",
         "description": "A provider entry in the models.dev schema."
       },
@@ -16016,7 +17363,9 @@
           }
         },
         "type": "object",
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "title": "NormalizedMessage",
         "description": "A single message normalized from any provider format.\n\nMaps to ClickHouse ``Tuple(role String, content String, finish_reason String)``.\n\n- role: message role (user, assistant, tool, system)\n- content: plain text for simple messages, or JSON-serialized parts\n  array for multimodal/structured messages\n- finish_reason: per-message finish reason (output messages only)"
       },
@@ -16075,7 +17424,9 @@
           }
         },
         "type": "object",
-        "required": ["$not"],
+        "required": [
+          "$not"
+        ],
         "title": "NotOperation",
         "description": "Logical NOT. Inverts the condition.\n\nExample:\n    ```\n    {\n        \"$not\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"debug\"}]}\n        ]\n    }\n    ```"
       },
@@ -16112,7 +17463,12 @@
           }
         },
         "type": "object",
-        "required": ["id", "name", "type", "pricing"],
+        "required": [
+          "id",
+          "name",
+          "type",
+          "pricing"
+        ],
         "title": "NvidiaHardwareOption"
       },
       "NvidiaHardwareRes": {
@@ -16126,7 +17482,9 @@
           }
         },
         "type": "object",
-        "required": ["hardware"],
+        "required": [
+          "hardware"
+        ],
         "title": "NvidiaHardwareRes"
       },
       "NvidiaServerlessPricing": {
@@ -16160,7 +17518,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["obj"],
+        "required": [
+          "obj"
+        ],
         "title": "ObjCreateReq"
       },
       "ObjCreateRes": {
@@ -16182,7 +17542,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "ObjCreateRes"
       },
       "ObjDeleteReq": {
@@ -16213,7 +17575,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "object_id"],
+        "required": [
+          "project_id",
+          "object_id"
+        ],
         "title": "ObjDeleteReq"
       },
       "ObjDeleteRes": {
@@ -16221,10 +17586,27 @@
           "num_deleted": {
             "type": "integer",
             "title": "Num Deleted"
+          },
+          "deleted_versions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeletedObjVersion"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted Versions",
+            "description": "Metadata for each deleted object version, with digest aliases resolved to content digests. None when the backing server does not report it."
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "ObjDeleteRes"
       },
       "ObjQueryReq": {
@@ -16233,7 +17615,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project to query",
-            "examples": ["user/project"]
+            "examples": [
+              "user/project"
+            ]
           },
           "filter": {
             "anyOf": [
@@ -16248,7 +17632,9 @@
             "examples": [
               {
                 "latest_only": true,
-                "object_ids": ["my_favorite_model"]
+                "object_ids": [
+                  "my_favorite_model"
+                ]
               }
             ]
           },
@@ -16263,7 +17649,9 @@
             ],
             "title": "Limit",
             "description": "Maximum number of results to return",
-            "examples": [100]
+            "examples": [
+              100
+            ]
           },
           "offset": {
             "anyOf": [
@@ -16276,7 +17664,9 @@
             ],
             "title": "Offset",
             "description": "Number of results to skip before returning",
-            "examples": [0]
+            "examples": [
+              0
+            ]
           },
           "sort_by": {
             "anyOf": [
@@ -16343,7 +17733,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "ObjQueryReq"
       },
       "ObjQueryRes": {
@@ -16357,7 +17749,9 @@
           }
         },
         "type": "object",
-        "required": ["objs"],
+        "required": [
+          "objs"
+        ],
         "title": "ObjQueryRes"
       },
       "ObjReadReq": {
@@ -16403,7 +17797,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "object_id", "digest"],
+        "required": [
+          "project_id",
+          "object_id",
+          "digest"
+        ],
         "title": "ObjReadReq"
       },
       "ObjReadRes": {
@@ -16413,7 +17811,9 @@
           }
         },
         "type": "object",
-        "required": ["obj"],
+        "required": [
+          "obj"
+        ],
         "title": "ObjReadRes"
       },
       "ObjRemoveAliasesBody": {
@@ -16421,7 +17821,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "aliases": {
             "items": {
@@ -16429,12 +17831,19 @@
             },
             "type": "array",
             "title": "Aliases",
-            "examples": [["staging"]]
+            "examples": [
+              [
+                "staging"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "aliases"],
+        "required": [
+          "project_id",
+          "aliases"
+        ],
         "title": "ObjRemoveAliasesBody",
         "description": "Request body for removing aliases (object_id comes from path)."
       },
@@ -16644,7 +18053,11 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "object_id", "val"],
+        "required": [
+          "project_id",
+          "object_id",
+          "val"
+        ],
         "title": "ObjSchemaForInsert"
       },
       "ObjSetAliasesBody": {
@@ -16652,12 +18065,16 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "digest": {
             "type": "string",
             "title": "Digest",
-            "examples": ["abc123def"]
+            "examples": [
+              "abc123def"
+            ]
           },
           "aliases": {
             "items": {
@@ -16665,12 +18082,21 @@
             },
             "type": "array",
             "title": "Aliases",
-            "examples": [["staging", "v1-candidate"]]
+            "examples": [
+              [
+                "staging",
+                "v1-candidate"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "digest", "aliases"],
+        "required": [
+          "project_id",
+          "digest",
+          "aliases"
+        ],
         "title": "ObjSetAliasesBody",
         "description": "Request body for setting aliases (object_id comes from path)."
       },
@@ -16684,7 +18110,9 @@
           "project_id": {
             "type": "string",
             "title": "Project Id",
-            "examples": ["entity/project"]
+            "examples": [
+              "entity/project"
+            ]
           },
           "tags": {
             "items": {
@@ -16692,12 +18120,20 @@
             },
             "type": "array",
             "title": "Tags",
-            "examples": [["production", "reviewed"]]
+            "examples": [
+              [
+                "production",
+                "reviewed"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "tags"],
+        "required": [
+          "project_id",
+          "tags"
+        ],
         "title": "ObjTagsBody",
         "description": "Request body for adding/removing tags (object_id and digest come from path)."
       },
@@ -16717,7 +18153,14 @@
             ],
             "title": "Base Object Classes",
             "description": "Filter objects by their base classes",
-            "examples": [["Model"], ["Dataset"]]
+            "examples": [
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ]
+            ]
           },
           "exclude_base_object_classes": {
             "anyOf": [
@@ -16733,7 +18176,14 @@
             ],
             "title": "Exclude Base Object Classes",
             "description": "Exclude objects by their base classes",
-            "examples": [["Model"], ["Dataset"]]
+            "examples": [
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ]
+            ]
           },
           "leaf_object_classes": {
             "anyOf": [
@@ -16750,9 +18200,15 @@
             "title": "Leaf Object Classes",
             "description": "Filter objects by their leaf classes",
             "examples": [
-              ["Model"],
-              ["Dataset"],
-              ["LLMStructuredCompletionModel"]
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ],
+              [
+                "LLMStructuredCompletionModel"
+              ]
             ]
           },
           "object_ids": {
@@ -16769,7 +18225,10 @@
             ],
             "title": "Object Ids",
             "description": "Filter objects by their IDs",
-            "examples": ["my_favorite_model", "my_favorite_dataset"]
+            "examples": [
+              "my_favorite_model",
+              "my_favorite_dataset"
+            ]
           },
           "is_op": {
             "anyOf": [
@@ -16782,7 +18241,11 @@
             ],
             "title": "Is Op",
             "description": "Filter objects based on whether they are weave.ops or not. `True` will only return ops, `False` will return non-ops, and `None` will return all objects",
-            "examples": [true, false, null]
+            "examples": [
+              true,
+              false,
+              null
+            ]
           },
           "latest_only": {
             "anyOf": [
@@ -16795,7 +18258,10 @@
             ],
             "title": "Latest Only",
             "description": "If True, return only the latest version of each object. `False` and `None` will return all versions",
-            "examples": [true, false]
+            "examples": [
+              true,
+              false
+            ]
           },
           "tags": {
             "anyOf": [
@@ -16882,7 +18348,11 @@
           }
         },
         "type": "object",
-        "required": ["digest", "object_id", "version_index"],
+        "required": [
+          "digest",
+          "object_id",
+          "version_index"
+        ],
         "title": "OpCreateRes",
         "description": "Response model for creating an Op object."
       },
@@ -16895,7 +18365,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "OpDeleteRes"
       },
       "OpReadRes": {
@@ -16989,7 +18461,9 @@
           }
         },
         "type": "object",
-        "required": ["$or"],
+        "required": [
+          "$or"
+        ],
         "title": "OrOperation",
         "description": "Logical OR. At least one condition must be true.\n\nExample:\n    ```\n    {\n        \"$or\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"a\"}]},\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"b\"}]}\n        ]\n    }\n    ```"
       },
@@ -17039,7 +18513,11 @@
           }
         },
         "type": "object",
-        "required": ["model", "inputs", "output"],
+        "required": [
+          "model",
+          "inputs",
+          "output"
+        ],
         "title": "PredictionCreateBody",
         "description": "Request body for creating a Prediction via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
       },
@@ -17052,7 +18530,9 @@
           }
         },
         "type": "object",
-        "required": ["prediction_id"],
+        "required": [
+          "prediction_id"
+        ],
         "title": "PredictionCreateRes"
       },
       "PredictionDeleteRes": {
@@ -17064,7 +18544,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "PredictionDeleteRes"
       },
       "PredictionFinishRes": {
@@ -17076,7 +18558,9 @@
           }
         },
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "title": "PredictionFinishRes"
       },
       "PredictionReadRes": {
@@ -17127,7 +18611,12 @@
           }
         },
         "type": "object",
-        "required": ["prediction_id", "model", "inputs", "output"],
+        "required": [
+          "prediction_id",
+          "model",
+          "inputs",
+          "output"
+        ],
         "title": "PredictionReadRes"
       },
       "Pricing": {
@@ -17173,12 +18662,19 @@
             "type": "array",
             "title": "Project Ids",
             "description": "External project IDs in 'entity/project' format.",
-            "examples": [["entity-a/project-a", "entity-b/project-b"]]
+            "examples": [
+              [
+                "entity-a/project-a",
+                "entity-b/project-b"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_ids"],
+        "required": [
+          "project_ids"
+        ],
         "title": "ProjectsInfoReq"
       },
       "ProjectsInfoRes": {
@@ -17195,7 +18691,10 @@
           }
         },
         "type": "object",
-        "required": ["external_project_id", "internal_project_id"],
+        "required": [
+          "external_project_id",
+          "internal_project_id"
+        ],
         "title": "ProjectsInfoRes"
       },
       "Query": {
@@ -17238,8 +18737,131 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["$expr"],
+        "required": [
+          "$expr"
+        ],
         "title": "Query"
+      },
+      "RatingCondition": {
+        "properties": {
+          "scorer_key": {
+            "type": "string",
+            "title": "Scorer Key"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "gte",
+              "gt",
+              "lte",
+              "lt",
+              "eq"
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scorer_key",
+          "op",
+          "value"
+        ],
+        "title": "RatingCondition"
+      },
+      "ReasoningBudgetTokens": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "budget_tokens",
+            "title": "Type",
+            "default": "budget_tokens"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min",
+            "description": "Minimum reasoning budget."
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max",
+            "description": "Maximum reasoning budget."
+          }
+        },
+        "type": "object",
+        "title": "ReasoningBudgetTokens",
+        "description": "Reasoning is controlled via a token budget."
+      },
+      "ReasoningEffortOption": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "effort",
+            "title": "Type",
+            "default": "effort"
+          },
+          "values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                    "default"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "Accepted effort levels (null denotes an implicit default)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "ReasoningEffortOption",
+        "description": "Reasoning effort can be selected from a set of levels."
+      },
+      "ReasoningToggle": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "toggle",
+            "title": "Type",
+            "default": "toggle"
+          }
+        },
+        "type": "object",
+        "title": "ReasoningToggle",
+        "description": "Reasoning can be turned on or off."
       },
       "RefsReadBatchReq": {
         "properties": {
@@ -17253,7 +18875,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["refs"],
+        "required": [
+          "refs"
+        ],
         "title": "RefsReadBatchReq"
       },
       "RefsReadBatchRes": {
@@ -17265,7 +18889,9 @@
           }
         },
         "type": "object",
-        "required": ["vals"],
+        "required": [
+          "vals"
+        ],
         "title": "RefsReadBatchRes"
       },
       "RescoreReq": {
@@ -17302,7 +18928,11 @@
           }
         },
         "type": "object",
-        "required": ["source_evaluation_run_id", "scorer_refs", "project_id"],
+        "required": [
+          "source_evaluation_run_id",
+          "scorer_refs",
+          "project_id"
+        ],
         "title": "RescoreReq",
         "description": "Full rescore request including server-set fields."
       },
@@ -17320,7 +18950,10 @@
           }
         },
         "type": "object",
-        "required": ["call_id", "evaluation_run_id"],
+        "required": [
+          "call_id",
+          "evaluation_run_id"
+        ],
         "title": "RescoreRes",
         "description": "Response for a rescore request."
       },
@@ -17461,7 +19094,9 @@
           }
         },
         "type": "object",
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "RouterOpenRouterModelsRes"
       },
       "ScoreCreateBody": {
@@ -17494,7 +19129,11 @@
           }
         },
         "type": "object",
-        "required": ["prediction_id", "scorer", "value"],
+        "required": [
+          "prediction_id",
+          "scorer",
+          "value"
+        ],
         "title": "ScoreCreateBody",
         "description": "Request body for creating a Score via REST API.\n\nThis model excludes project_id since it comes from the URL path in RESTful endpoints."
       },
@@ -17507,7 +19146,9 @@
           }
         },
         "type": "object",
-        "required": ["score_id"],
+        "required": [
+          "score_id"
+        ],
         "title": "ScoreCreateRes"
       },
       "ScoreDeleteRes": {
@@ -17519,7 +19160,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "ScoreDeleteRes"
       },
       "ScoreReadRes": {
@@ -17564,7 +19207,11 @@
           }
         },
         "type": "object",
-        "required": ["score_id", "scorer", "value"],
+        "required": [
+          "score_id",
+          "scorer",
+          "value"
+        ],
         "title": "ScoreReadRes"
       },
       "ScorerCreateBody": {
@@ -17593,7 +19240,10 @@
           }
         },
         "type": "object",
-        "required": ["name", "op_source_code"],
+        "required": [
+          "name",
+          "op_source_code"
+        ],
         "title": "ScorerCreateBody"
       },
       "ScorerCreateRes": {
@@ -17620,7 +19270,12 @@
           }
         },
         "type": "object",
-        "required": ["digest", "object_id", "version_index", "scorer"],
+        "required": [
+          "digest",
+          "object_id",
+          "version_index",
+          "scorer"
+        ],
         "title": "ScorerCreateRes"
       },
       "ScorerDeleteRes": {
@@ -17632,7 +19287,9 @@
           }
         },
         "type": "object",
-        "required": ["num_deleted"],
+        "required": [
+          "num_deleted"
+        ],
         "title": "ScorerDeleteRes"
       },
       "ScorerReadRes": {
@@ -17718,13 +19375,19 @@
           },
           "direction": {
             "type": "string",
-            "enum": ["asc", "desc"],
+            "enum": [
+              "asc",
+              "desc"
+            ],
             "title": "Direction"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["field", "direction"],
+        "required": [
+          "field",
+          "direction"
+        ],
         "title": "SortBy"
       },
       "StartedCallSchemaForInsert": {
@@ -17906,7 +19569,9 @@
           }
         },
         "type": "object",
-        "required": ["append"],
+        "required": [
+          "append"
+        ],
         "title": "TableAppendSpec"
       },
       "TableAppendSpecPayload": {
@@ -17918,7 +19583,9 @@
           }
         },
         "type": "object",
-        "required": ["row"],
+        "required": [
+          "row"
+        ],
         "title": "TableAppendSpecPayload"
       },
       "TableCreateFromDigestsReq": {
@@ -17949,7 +19616,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "row_digests"],
+        "required": [
+          "project_id",
+          "row_digests"
+        ],
         "title": "TableCreateFromDigestsReq"
       },
       "TableCreateFromDigestsRes": {
@@ -17960,7 +19630,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "TableCreateFromDigestsRes"
       },
       "TableCreateReq": {
@@ -17971,7 +19643,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["table"],
+        "required": [
+          "table"
+        ],
         "title": "TableCreateReq"
       },
       "TableCreateRes": {
@@ -17990,7 +19664,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "TableCreateRes"
       },
       "TableInsertSpec": {
@@ -18000,7 +19676,9 @@
           }
         },
         "type": "object",
-        "required": ["insert"],
+        "required": [
+          "insert"
+        ],
         "title": "TableInsertSpec"
       },
       "TableInsertSpecPayload": {
@@ -18016,7 +19694,10 @@
           }
         },
         "type": "object",
-        "required": ["index", "row"],
+        "required": [
+          "index",
+          "row"
+        ],
         "title": "TableInsertSpecPayload"
       },
       "TablePopSpec": {
@@ -18026,7 +19707,9 @@
           }
         },
         "type": "object",
-        "required": ["pop"],
+        "required": [
+          "pop"
+        ],
         "title": "TablePopSpec"
       },
       "TablePopSpecPayload": {
@@ -18037,7 +19720,9 @@
           }
         },
         "type": "object",
-        "required": ["index"],
+        "required": [
+          "index"
+        ],
         "title": "TablePopSpecPayload"
       },
       "TableQueryReq": {
@@ -18046,7 +19731,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "digest": {
             "type": "string",
@@ -18086,7 +19773,9 @@
             ],
             "title": "Limit",
             "description": "Maximum number of rows to return",
-            "examples": [100]
+            "examples": [
+              100
+            ]
           },
           "offset": {
             "anyOf": [
@@ -18099,7 +19788,9 @@
             ],
             "title": "Offset",
             "description": "Number of rows to skip before starting to return rows",
-            "examples": [10]
+            "examples": [
+              10
+            ]
           },
           "sort_by": {
             "anyOf": [
@@ -18127,7 +19818,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "TableQueryReq"
       },
       "TableQueryRes": {
@@ -18141,7 +19835,9 @@
           }
         },
         "type": "object",
-        "required": ["rows"],
+        "required": [
+          "rows"
+        ],
         "title": "TableQueryRes"
       },
       "TableQueryStatsBatchReq": {
@@ -18150,7 +19846,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "digests": {
             "anyOf": [
@@ -18169,7 +19867,7 @@
             "default": [],
             "examples": [
               "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims",
-              "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmiераnoa"
+              "smirva431etnsroatsratlrampgrmeangmpr5344aplatmipa31ltvsmi\u0435\u0440\u0430noa"
             ]
           },
           "include_storage_size": {
@@ -18188,7 +19886,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "TableQueryStatsBatchReq"
       },
       "TableQueryStatsBatchRes": {
@@ -18202,7 +19902,9 @@
           }
         },
         "type": "object",
-        "required": ["tables"],
+        "required": [
+          "tables"
+        ],
         "title": "TableQueryStatsBatchRes"
       },
       "TableQueryStatsReq": {
@@ -18211,7 +19913,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "digest": {
             "type": "string",
@@ -18221,7 +19925,10 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "digest"],
+        "required": [
+          "project_id",
+          "digest"
+        ],
         "title": "TableQueryStatsReq"
       },
       "TableQueryStatsRes": {
@@ -18232,7 +19939,9 @@
           }
         },
         "type": "object",
-        "required": ["count"],
+        "required": [
+          "count"
+        ],
         "title": "TableQueryStatsRes"
       },
       "TableRowFilter": {
@@ -18285,7 +19994,10 @@
           }
         },
         "type": "object",
-        "required": ["digest", "val"],
+        "required": [
+          "digest",
+          "val"
+        ],
         "title": "TableRowSchema"
       },
       "TableSchemaForInsert": {
@@ -18316,7 +20028,10 @@
           }
         },
         "type": "object",
-        "required": ["project_id", "rows"],
+        "required": [
+          "project_id",
+          "rows"
+        ],
         "title": "TableSchemaForInsert"
       },
       "TableStatsRow": {
@@ -18342,7 +20057,10 @@
           }
         },
         "type": "object",
-        "required": ["count", "digest"],
+        "required": [
+          "count",
+          "digest"
+        ],
         "title": "TableStatsRow"
       },
       "TableUpdateReq": {
@@ -18375,7 +20093,11 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id", "base_digest", "updates"],
+        "required": [
+          "project_id",
+          "base_digest",
+          "updates"
+        ],
         "title": "TableUpdateReq"
       },
       "TableUpdateRes": {
@@ -18394,7 +20116,9 @@
           }
         },
         "type": "object",
-        "required": ["digest"],
+        "required": [
+          "digest"
+        ],
         "title": "TableUpdateRes"
       },
       "TagsListRes": {
@@ -18408,7 +20132,9 @@
           }
         },
         "type": "object",
-        "required": ["tags"],
+        "required": [
+          "tags"
+        ],
         "title": "TagsListRes"
       },
       "ThreadsQueryFilter": {
@@ -18425,7 +20151,9 @@
             ],
             "title": "After Datetime",
             "description": "Only include threads with start_time after this timestamp",
-            "examples": ["2024-01-01T00:00:00Z"]
+            "examples": [
+              "2024-01-01T00:00:00Z"
+            ]
           },
           "before_datetime": {
             "anyOf": [
@@ -18439,7 +20167,9 @@
             ],
             "title": "Before Datetime",
             "description": "Only include threads with last_updated before this timestamp",
-            "examples": ["2024-12-31T23:59:59Z"]
+            "examples": [
+              "2024-12-31T23:59:59Z"
+            ]
           },
           "thread_ids": {
             "anyOf": [
@@ -18455,7 +20185,13 @@
             ],
             "title": "Thread Ids",
             "description": "Only include threads with thread_ids in this list",
-            "examples": [["thread_1", "thread_2", "my_thread_id"]]
+            "examples": [
+              [
+                "thread_1",
+                "thread_2",
+                "my_thread_id"
+              ]
+            ]
           }
         },
         "additionalProperties": false,
@@ -18468,7 +20204,9 @@
             "type": "string",
             "title": "Project Id",
             "description": "The ID of the project",
-            "examples": ["my_entity/my_project"]
+            "examples": [
+              "my_entity/my_project"
+            ]
           },
           "filter": {
             "anyOf": [
@@ -18531,13 +20269,20 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "ThreadsQueryReq",
         "description": "Query threads with aggregated statistics based on turn calls only.\n\nTurn calls are the immediate children of thread contexts (where call.id == turn_id).\nThis provides meaningful conversation-level statistics rather than including all\nnested implementation details."
       },
       "TraceStatus": {
         "type": "string",
-        "enum": ["success", "error", "running", "descendant_error"],
+        "enum": [
+          "success",
+          "error",
+          "running",
+          "descendant_error"
+        ],
         "title": "TraceStatus"
       },
       "TraceUsageReq": {
@@ -18583,7 +20328,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["project_id"],
+        "required": [
+          "project_id"
+        ],
         "title": "TraceUsageReq",
         "description": "Request to compute per-call usage for a trace, with descendant rollup.\n\nThis endpoint returns usage metrics for each call in the trace, where each\ncall's metrics include the sum of its own usage plus all descendants' usage.\nUse this for trace view where you want to see rolled-up metrics per call.\n\nNote: All matching calls are loaded into memory for aggregation. For very large\nresult sets (>10k calls), consider using more specific filters or pagination\nat the application layer."
       },
@@ -18635,7 +20382,9 @@
             "type": "array",
             "title": "Aggregations",
             "description": "Basic aggregation functions to apply",
-            "default": ["sum"]
+            "default": [
+              "sum"
+            ]
           },
           "percentiles": {
             "items": {
@@ -18649,7 +20398,9 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": ["metric"],
+        "required": [
+          "metric"
+        ],
         "title": "UsageMetricSpec",
         "description": "Specification for a usage metric to aggregate (grouped by model)."
       },
@@ -18679,7 +20430,11 @@
           }
         },
         "type": "object",
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError"
       }
     },
