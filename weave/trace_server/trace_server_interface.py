@@ -1282,6 +1282,15 @@ class FeedbackCreateReq(BaseModelStrict):
         default="",
         description="Turn the feedback belongs to (from spans.trace_id)",
     )
+    scorer_trace_id: str = Field(
+        default="",
+        description=(
+            "Trace of the scorer (judge) invocation that produced this feedback "
+            "(spans.trace_id of the judge call). Distinct from span_trace_id, "
+            "which is the scored turn. Lets signals price the invocation off the "
+            "judge span without joining the calls model."
+        ),
+    )
 
     # wb_user_id is automatically populated by the server
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
