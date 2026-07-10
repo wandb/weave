@@ -816,6 +816,12 @@ class AgentSpansQueryReq(BaseModel):
     # ungrouped span rows, or summed total_cost_usd/total_input_cost_usd/
     # total_output_cost_usd to grouped rows. See agents/span_costs.py.
     include_costs: bool = False
+    # When true, hide delegated sub-agent activity: exclude sub-agent invocation
+    # marker spans (invoke_agent with a non-empty parent_span_id) from results,
+    # and — for grouped queries — drop groups with no root invocation (i.e.
+    # groups that are purely sub-agent activity). Child chat/tool spans of a
+    # sub-agent are kept, so their work stays attributed to the parent.
+    exclude_subagents: bool = False
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT

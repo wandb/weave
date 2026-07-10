@@ -659,6 +659,29 @@ class TestMakeSpansListQuery:
                 include_details=True,
             )
 
+    def test_exclude_subagents_adds_where_exclusion(self) -> None:
+        # exclude_subagents hides sub-agent invocation marker spans (invoke_agent
+        # with a non-empty parent_span_id) from the ungrouped list; it adds only
+        # a static WHERE clause, no new bind params.
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb, AgentSpansQueryReq(project_id="p1", exclude_subagents=True)
+        )
+
+        src = _AttrSrc(3, base_relation="page", fallback_scope_relation="page")
+        expected = _two_pass_expected(
+            base="spans",
+            where=(
+                "s.project_id = {genai_0:String} AND "
+                "NOT (s.operation_name = 'invoke_agent' AND s.parent_span_id != '')"
+            ),
+            order_by="started_at DESC, span_id DESC",
+            projection=SPANS_LIST_COLS,
+            attr_sql=src.sql,
+        )
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_count_query (grouped)
@@ -865,6 +888,36 @@ class TestMakeGroupedSpansCountQuery:
             "genai_2": ["x"],
             **src.params,
         }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_exclude_subagents_true_adds_where_and_having(self) -> None:
+        # Grouping/counting by conversation_id references identity, so the
+        # count subquery reads the attributed source; exclude_subagents must
+        # still only add the WHERE exclusion + HAVING root-invocation guard on
+        # top of it, so the count matches the (also-filtered) list query —
+        # this is what keeps grouped pagination's total_count correct.
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                exclude_subagents=True,
+            ),
+        )
+
+        expected = """
+            SELECT count() FROM (
+                SELECT s.conversation_id FROM {_ATTR_SRC} s
+                WHERE s.project_id = {genai_0:String}
+                  AND NOT (s.operation_name = 'invoke_agent' AND s.parent_span_id != '')
+                GROUP BY s.conversation_id
+                HAVING countIf(s.operation_name = 'invoke_agent' AND s.parent_span_id = '') >= 1
+            )
+        """
+        src = _AttrSrc(1)
+        expected = expected.replace("{_ATTR_SRC}", src.sql)
+        expected_params = {"genai_0": "p1", **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
 
@@ -1246,6 +1299,36 @@ class TestMakeGroupedSpansListQuery:
         expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_exclude_subagents_true_adds_where_and_having(self) -> None:
+        # exclude_subagents both hides sub-agent invocation marker spans from
+        # the WHERE clause and (for grouped queries) drops groups with no root
+        # invocation via HAVING, so a conversation that is purely sub-agent
+        # activity no longer shows up as a row.
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                exclude_subagents=True,
+            ),
+        )
+
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND NOT (s.operation_name = 'invoke_agent' AND s.parent_span_id != '')
+            GROUP BY conversation_id
+            HAVING countIf(s.operation_name = 'invoke_agent' AND s.parent_span_id = '') >= 1
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_grouped_query_with_signal_filter_adds_semijoin(self) -> None:
         """Grouped query with signal_filters appends AND s.conversation_id IN (...)."""
         pb = ParamBuilder("genai")
@@ -1286,6 +1369,34 @@ class TestMakeGroupedSpansListQuery:
             "genai_4": ["x"],
             **src.params,
         }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_exclude_subagents_false_matches_default(self) -> None:
+        """Explicitly setting the flag off must be indistinguishable from the
+        default (flag-omitted) case in `test_group_by_trace_id` — no WHERE
+        exclusion and no HAVING clause are added.
+        """
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="trace_id")],
+                exclude_subagents=False,
+            ),
+        )
+
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT s.trace_id AS trace_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY trace_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
         assert_sql(expected, expected_params, query, pb.get_params())
 
 

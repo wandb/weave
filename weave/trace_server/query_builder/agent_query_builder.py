@@ -848,6 +848,23 @@ def _group_filter_bound_slot(
     return pb.add(value, param_type="Float64")
 
 
+def _spans_group_having(
+    pb: ParamBuilder,
+    req: AgentSpansQueryReq,
+    group_filters: list[AgentSpanGroupFilter],
+) -> str:
+    """Combine the request's group_filters HAVING with the optional
+    root-invocation HAVING added by `exclude_subagents`.
+    """
+    conditions: list[str] = []
+    gf = group_filters_having_sql(pb, group_filters)
+    if gf:
+        conditions.append(gf)
+    if req.exclude_subagents:
+        conditions.append(_HAS_ROOT_INVOCATION_SQL)
+    return " AND ".join(conditions)
+
+
 # ---------------------------------------------------------------------------
 # WHERE builders (private — shared between count + list variants)
 # ---------------------------------------------------------------------------
@@ -883,6 +900,8 @@ def _spans_filter_sql(
         from weave.trace_server.query_builder import agent_query_compiler
 
         where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
+    if isinstance(req, AgentSpansQueryReq) and req.exclude_subagents:
+        where_conditions.append(_EXCLUDE_SUBAGENT_INVOCATIONS_SQL)
     return _FilterSQL(where=" AND ".join(where_conditions))
 
 
@@ -1115,6 +1134,20 @@ def _search_filter_sql(pb: ParamBuilder, req: AgentSearchReq) -> _FilterSQL:
 # ---------------------------------------------------------------------------
 
 
+# A sub-agent invocation is an `invoke_agent` span nested under a parent turn
+# (root/top-level invocations have an empty parent_span_id). Excluding these
+# marker spans hides delegated sub-agents from listings, while their child
+# chat/tool spans (the real work) stay attributed to the parent conversation.
+_EXCLUDE_SUBAGENT_INVOCATIONS_SQL = (
+    "NOT (s.operation_name = 'invoke_agent' AND s.parent_span_id != '')"
+)
+# A grouped result (e.g. a conversation) is "purely sub-agent activity" when it
+# contains no root invocation. This HAVING condition drops such groups when
+# sub-agents are hidden, so sub-agent-only conversations don't appear as rows.
+_HAS_ROOT_INVOCATION_SQL = (
+    "countIf(s.operation_name = 'invoke_agent' AND s.parent_span_id = '') >= 1"
+)
+
 # Aggregate SELECT list shared between grouped list queries.
 # The bundle is intentionally fixed because callers do not pick aggregates.
 # Fields that map to specific UI pivots (invocation_count, conversation_names)
@@ -1159,7 +1192,7 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         default_group_by=req.group_by,
     )
     ensure_group_filters_match(group_filters, req.group_by, context="spans count")
-    having = group_filters_having_sql(pb, group_filters)
+    having = _spans_group_having(pb, req, group_filters)
     having_sql = f" HAVING {having}" if having else ""
     # Apply the signal semi-join here too, so total_count matches the filtered list
     # (an unfiltered count produces phantom empty pages). Filtering on the attributed
@@ -1264,7 +1297,7 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
         default_group_by=req.group_by,
     )
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
-    having = group_filters_having_sql(pb, group_filters)
+    having = _spans_group_having(pb, req, group_filters)
     having_sql = f"HAVING {having}" if having else ""
     signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
     grouped_where = span_filters.where
