@@ -1357,7 +1357,7 @@ class FeedbackPurgeReq(BaseModelStrict):
 
 
 class FeedbackPurgeRes(BaseModel):
-    pass
+    success: bool
 
 
 class FeedbackReplaceReq(FeedbackCreateReq):
