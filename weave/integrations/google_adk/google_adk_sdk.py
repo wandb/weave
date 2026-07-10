@@ -29,11 +29,13 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping
 from functools import wraps
+from typing import cast
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events.event import Event
 from google.adk.models.llm_request import LlmRequest
+from google.adk.models.llm_response import LlmResponse
 from google.adk.telemetry import tracing as adk_tracing
 from google.adk.telemetry.tracing import GenerateContentSpan
 from google.adk.tools.base_tool import BaseTool
@@ -230,7 +232,10 @@ def _wrap_trace_inference_result(
     @wraps(original)
     def wrapper(*args: object) -> None:
         original(*args)
-        span, llm_response = args[-2], args[-1]
+        # ADK keeps ``span`` and ``llm_response`` as the last two positional
+        # args in both shapes; only ``invocation_context`` was prepended.
+        span = cast("Span | GenerateContentSpan", args[-2])
+        llm_response = cast(LlmResponse, args[-1])
         # ADK's own ``trace_inference_result`` bails on partial chunks
         # (``if llm_response.partial: return``) — mirror that contract so
         # the streaming path doesn't stomp the span N times with
