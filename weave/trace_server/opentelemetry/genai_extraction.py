@@ -83,6 +83,17 @@ def _get_str(attrs: dict[str, Any], *keys: str) -> str:
     return str(_get(attrs, *keys) or "")
 
 
+def _get_int(attrs: dict[str, Any], *keys: str, default: int = 0) -> int:
+    """Return the first attribute value as an int, or default if absent/invalid."""
+    val = _get(attrs, *keys)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
 def _json_str(val: Any) -> str:
     if val is None:
         return ""
@@ -597,6 +608,17 @@ def extract_genai_span(
         agent_id=_get_str(attrs, *semconv.AGENT_ID.lookup_keys),
         agent_description=_get_str(attrs, *semconv.AGENT_DESCRIPTION.lookup_keys),
         agent_version=_get_str(attrs, *semconv.AGENT_VERSION.lookup_keys),
+        eval_run_id=_get_str(attrs, *semconv.EVAL_RUN_ID.lookup_keys),
+        eval_predict_and_score_call_id=_get_str(
+            attrs, *semconv.EVAL_PREDICT_AND_SCORE_CALL_ID.lookup_keys
+        ),
+        eval_kind=_get_str(attrs, *semconv.EVAL_KIND.lookup_keys),
+        eval_row_digest=_get_str(attrs, *semconv.EVAL_ROW_DIGEST.lookup_keys),
+        eval_example_id=_get_str(attrs, *semconv.EVAL_EXAMPLE_ID.lookup_keys),
+        eval_trial_index=_get_int(
+            attrs, *semconv.EVAL_TRIAL_INDEX.lookup_keys, default=-1
+        ),
+        eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),

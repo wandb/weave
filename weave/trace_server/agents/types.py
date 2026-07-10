@@ -10,7 +10,13 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -448,6 +454,13 @@ class AgentSpanSchema(BaseModel):
     agent_id: str | None = None
     agent_description: str | None = None
     agent_version: str | None = None
+    eval_run_id: str | None = None
+    eval_predict_and_score_call_id: str | None = None
+    eval_kind: str | None = None
+    eval_row_digest: str | None = None
+    eval_example_id: str | None = None
+    eval_trial_index: int | None = None
+    eval_evaluation_name: str | None = None
     request_model: str | None = None
     response_model: str | None = None
     response_id: str | None = None
@@ -508,6 +521,18 @@ class AgentSpanSchema(BaseModel):
     # OTel JSON dump for the span is large, so it's omitted from list queries
     # by default.
     raw_span_dump: str | None = None
+
+    @field_validator("eval_trial_index", mode="before")
+    @classmethod
+    def _unset_trial_index_is_none(cls, v: Any) -> Any:
+        """Surface an unset trial index as None.
+
+        ClickHouse can't store NULL ints, so the spans table uses -1 as the
+        "unset" storage sentinel for eval_trial_index. That sentinel is an
+        internal detail: API callers should see None, and a real trial index is
+        always >= 0.
+        """
+        return None if v == -1 else v
 
 
 class AgentSortBy(BaseModel):
