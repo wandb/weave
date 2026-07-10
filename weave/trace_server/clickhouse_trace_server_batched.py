@@ -113,6 +113,7 @@ from weave.trace_server.calls_query_builder.monitor_query_validation import (
     validate_monitor_query_fields,
 )
 from weave.trace_server.calls_query_builder.usage_query_builder import (
+    MARKED_CACHE_METRICS,
     build_usage_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
@@ -1530,9 +1531,21 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             input_tokens = bucket.get("sum_input_tokens", 0) or 0
             output_tokens = bucket.get("sum_output_tokens", 0) or 0
-            cache_read_tokens = bucket.get("sum_cache_read_input_tokens", 0) or 0
+            # Explicit public cache sums preserve legacy request behavior;
+            # otherwise costs use cache tokens from gross-marked rows only.
+            cache_read_tokens = (
+                bucket.get(
+                    "sum_cache_read_input_tokens",
+                    bucket.get("sum_marked_cache_read_input_tokens", 0),
+                )
+                or 0
+            )
             cache_creation_tokens = (
-                bucket.get("sum_cache_creation_input_tokens", 0) or 0
+                bucket.get(
+                    "sum_cache_creation_input_tokens",
+                    bucket.get("sum_marked_cache_creation_input_tokens", 0),
+                )
+                or 0
             )
 
             # Subtract cache tokens from input: they are billed at cache
@@ -1558,6 +1571,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     input_cost + output_cost + cache_read_total + cache_creation_total
                 )
 
+            for internal_metric in MARKED_CACHE_METRICS:
+                bucket.pop(f"sum_{internal_metric}", None)
+
     def call_stats(self, req: tsi.CallStatsReq) -> tsi.CallStatsRes:
         """Return call statistics grouped by bucket with requested aggregations.
 
@@ -1579,11 +1595,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         token_metrics, requested_cost_metrics = split_usage_metrics(req.usage_metrics)
+        include_marked_cache_metrics = bool(
+            {"input_cost", "total_cost"} & requested_cost_metrics
+        )
 
         # Process token metrics (grouped by model)
         if token_metrics:
             pb = ParamBuilder()
-            usage_query = build_usage_query(req, token_metrics, pb, read_table)
+            usage_query = build_usage_query(
+                req,
+                token_metrics,
+                pb,
+                read_table,
+                include_marked_cache_metrics=include_marked_cache_metrics,
+            )
             granularity = usage_query.granularity_seconds
             start = usage_query.start
             end = usage_query.end

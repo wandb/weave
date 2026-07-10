@@ -97,8 +97,11 @@ def _extract_call_usage(
         if not isinstance(usage, dict):
             continue
         # Normalize token counts across multiple field names.
-        prompt_tokens = _safe_int(usage.get("prompt_tokens")) + _safe_int(
-            usage.get("input_tokens")
+        prompt_tokens = (
+            _safe_int(usage.get("gross_input_tokens"))
+            if "gross_input_tokens" in usage
+            else _safe_int(usage.get("prompt_tokens"))
+            + _safe_int(usage.get("input_tokens"))
         )
         completion_tokens = _safe_int(usage.get("completion_tokens")) + _safe_int(
             usage.get("output_tokens")

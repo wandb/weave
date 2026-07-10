@@ -16,6 +16,7 @@ from tests.trace.util import client_is_clickhouse
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.call_stats_helpers import split_usage_metrics
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallMetricSpec,
@@ -27,6 +28,32 @@ from weave.trace_server.trace_server_interface import (
 # Fixed base time used by all tests: 2025-01-15 12:00:00 UTC.
 # Chosen to sit well inside an hour boundary so data never straddles buckets.
 _BASE_TIME = datetime.datetime(2025, 1, 15, 12, 0, 0, tzinfo=datetime.timezone.utc)
+
+
+def test_cost_dependencies_add_sum_without_mutating_requested_aggregations() -> None:
+    usage_metrics = [
+        UsageMetricSpec(metric="input_tokens", aggregations=[AggregationType.AVG]),
+        UsageMetricSpec(metric="output_tokens", aggregations=[AggregationType.MAX]),
+        UsageMetricSpec(metric="total_cost", aggregations=[AggregationType.SUM]),
+    ]
+
+    token_metrics, cost_metrics = split_usage_metrics(usage_metrics)
+
+    assert [metric.model_dump() for metric in token_metrics] == [
+        {
+            "metric": "input_tokens",
+            "aggregations": ["avg", "sum"],
+            "percentiles": [],
+        },
+        {
+            "metric": "output_tokens",
+            "aggregations": ["max", "sum"],
+            "percentiles": [],
+        },
+    ]
+    assert cost_metrics == {"total_cost"}
+    assert usage_metrics[0].aggregations == [AggregationType.AVG]
+    assert usage_metrics[1].aggregations == [AggregationType.MAX]
 
 
 def force_merge_calls(client: weave_client.WeaveClient):
@@ -846,3 +873,267 @@ def test_call_stats_date_range_limit_query_layer(client: weave_client.WeaveClien
 
     with pytest.raises(ValidationError):
         client.server.call_stats(req)
+
+
+def test_call_stats_input_tokens_prefer_marked_gross_input(
+    client: weave_client.WeaveClient,
+) -> None:
+    project_id = client.project_id
+    model = "claude-gross-input-test"
+    op_name = f"weave:///{project_id}/op/gross_input:v1"
+    for index, usage in enumerate(
+        [
+            {
+                "input_tokens": 10,
+                "gross_input_tokens": 130,
+                "cache_read_input_tokens": 100,
+                "cache_creation_input_tokens": 20,
+                "output_tokens": 2,
+            },
+            {
+                "input_tokens": 5,
+                "cache_read_input_tokens": 50,
+                "cache_creation_input_tokens": 10,
+                "output_tokens": 3,
+            },
+        ]
+    ):
+        create_call_with_usage(
+            client,
+            op_name,
+            {model: usage},
+            started_at=_BASE_TIME + datetime.timedelta(minutes=index),
+        )
+
+    force_merge_calls(client)
+    result = client.server.call_stats(
+        CallStatsReq(
+            project_id=project_id,
+            start=_BASE_TIME - datetime.timedelta(minutes=1),
+            end=_BASE_TIME + datetime.timedelta(hours=1),
+            granularity=3600,
+            usage_metrics=[
+                UsageMetricSpec(
+                    metric="input_tokens", aggregations=[AggregationType.SUM]
+                )
+            ],
+        )
+    )
+
+    data_buckets = [
+        bucket
+        for bucket in result.usage_buckets
+        if bucket.get("model") == model and bucket.get("sum_input_tokens", 0) > 0
+    ]
+    assert len(data_buckets) == 1
+    assert data_buckets[0]["model"] == model
+    assert data_buckets[0]["sum_input_tokens"] == 135
+
+
+@pytest.mark.parametrize(
+    ("case", "usage_rows", "public_cache_metrics", "expected"),
+    [
+        (
+            "marked",
+            [
+                {
+                    "input_tokens": 10,
+                    "gross_input_tokens": 130,
+                    "cache_read_input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "output_tokens": 2,
+                }
+            ],
+            [],
+            {
+                "sum_input_tokens": 130,
+                "sum_output_tokens": 2,
+                "sum_input_cost": 10,
+                "sum_output_cost": 2,
+                "sum_total_cost": 26,
+                "count": 1,
+            },
+        ),
+        (
+            "legacy",
+            [
+                {
+                    "input_tokens": 5,
+                    "cache_read_input_tokens": 50,
+                    "cache_creation_input_tokens": 10,
+                    "output_tokens": 3,
+                }
+            ],
+            [],
+            {
+                "sum_input_tokens": 5,
+                "sum_output_tokens": 3,
+                "sum_input_cost": 5,
+                "sum_output_cost": 3,
+                "sum_total_cost": 8,
+                "count": 1,
+            },
+        ),
+        (
+            "mixed",
+            [
+                {
+                    "input_tokens": 10,
+                    "gross_input_tokens": 130,
+                    "cache_read_input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "output_tokens": 2,
+                },
+                {
+                    "input_tokens": 5,
+                    "cache_read_input_tokens": 50,
+                    "cache_creation_input_tokens": 10,
+                    "output_tokens": 3,
+                },
+            ],
+            [],
+            {
+                "sum_input_tokens": 135,
+                "sum_output_tokens": 5,
+                "sum_input_cost": 15,
+                "sum_output_cost": 5,
+                "sum_total_cost": 34,
+                "count": 2,
+            },
+        ),
+        (
+            "mixed-explicit-caches",
+            [
+                {
+                    "input_tokens": 10,
+                    "gross_input_tokens": 130,
+                    "cache_read_input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "output_tokens": 2,
+                },
+                {
+                    "input_tokens": 5,
+                    "cache_read_input_tokens": 50,
+                    "cache_creation_input_tokens": 10,
+                    "output_tokens": 3,
+                },
+            ],
+            ["cache_read_input_tokens", "cache_creation_input_tokens"],
+            {
+                "sum_input_tokens": 135,
+                "sum_output_tokens": 5,
+                "sum_cache_read_input_tokens": 150,
+                "sum_cache_creation_input_tokens": 30,
+                "sum_input_cost": -45,
+                "sum_output_cost": 5,
+                "sum_total_cost": -19,
+                "count": 2,
+            },
+        ),
+        (
+            "mixed-explicit-read",
+            [
+                {
+                    "input_tokens": 10,
+                    "gross_input_tokens": 130,
+                    "cache_read_input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "output_tokens": 2,
+                },
+                {
+                    "input_tokens": 5,
+                    "cache_read_input_tokens": 50,
+                    "cache_creation_input_tokens": 10,
+                    "output_tokens": 3,
+                },
+            ],
+            ["cache_read_input_tokens"],
+            {
+                "sum_input_tokens": 135,
+                "sum_output_tokens": 5,
+                "sum_cache_read_input_tokens": 150,
+                "sum_input_cost": -35,
+                "sum_output_cost": 5,
+                "sum_total_cost": -11,
+                "count": 2,
+            },
+        ),
+    ],
+)
+def test_call_stats_cache_costs_preserve_marked_and_legacy_semantics(
+    client: weave_client.WeaveClient,
+    case: str,
+    usage_rows: list[dict[str, int]],
+    public_cache_metrics: list[tsi.UsageMetric],
+    expected: dict[str, int],
+) -> None:
+    if not client_is_clickhouse(client):
+        pytest.skip("CallStats cost metrics are only implemented in ClickHouse")
+
+    project_id = client.project_id
+    model = f"claude-cache-stats-{case}"
+    op_name = f"weave:///{project_id}/op/cache_stats:v1"
+    client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                model: {
+                    "prompt_token_cost": 1,
+                    "completion_token_cost": 1,
+                    "cache_read_input_token_cost": 0.1,
+                    "cache_creation_input_token_cost": 0.2,
+                }
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    for index, usage in enumerate(usage_rows):
+        create_call_with_usage(
+            client,
+            op_name,
+            {model: usage},
+            started_at=_BASE_TIME + datetime.timedelta(minutes=index),
+        )
+
+    usage_metrics = [
+        UsageMetricSpec(metric="input_tokens", aggregations=[AggregationType.SUM]),
+        UsageMetricSpec(metric="output_tokens", aggregations=[AggregationType.SUM]),
+        UsageMetricSpec(metric="input_cost", aggregations=[AggregationType.SUM]),
+        UsageMetricSpec(metric="output_cost", aggregations=[AggregationType.SUM]),
+        UsageMetricSpec(metric="total_cost", aggregations=[AggregationType.SUM]),
+    ]
+    usage_metrics.extend(
+        UsageMetricSpec(metric=metric, aggregations=[AggregationType.SUM])
+        for metric in public_cache_metrics
+    )
+
+    force_merge_calls(client)
+    result = client.server.call_stats(
+        CallStatsReq(
+            project_id=project_id,
+            start=_BASE_TIME - datetime.timedelta(minutes=1),
+            end=_BASE_TIME + datetime.timedelta(hours=1),
+            granularity=3600,
+            usage_metrics=usage_metrics,
+        )
+    )
+
+    assert all(
+        "sum_marked_cache_read_input_tokens" not in bucket
+        and "sum_marked_cache_creation_input_tokens" not in bucket
+        for bucket in result.usage_buckets
+    )
+    data_buckets = [
+        bucket
+        for bucket in result.usage_buckets
+        if bucket.get("model") == model and bucket.get("count", 0) > 0
+    ]
+    assert len(data_buckets) == 1
+    actual = {
+        key: value for key, value in data_buckets[0].items() if key != "timestamp"
+    }
+    expected_payload = {"model": model, **expected}
+    actual_total_cost = actual.pop("sum_total_cost")
+    expected_total_cost = expected_payload.pop("sum_total_cost")
+    assert actual == expected_payload
+    assert actual_total_cost == pytest.approx(expected_total_cost)

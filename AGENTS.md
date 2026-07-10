@@ -89,6 +89,14 @@ When trace-server request/response models or route schemas change, refresh the A
 
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
+## Anthropic cached-input usage
+
+Anthropic summaries keep provider-native `input_tokens` and add
+`gross_input_tokens = input_tokens + cache_read_input_tokens + cache_creation_input_tokens`.
+Trace-server consumers use the presence of `gross_input_tokens` as the marker for
+the new contract. Cost-only CallStats queries aggregate hidden cache totals from
+marked rows; an explicitly requested public cache sum preserves legacy behavior.
+
 ## Python Testing Guidelines
 
 ### Test Framework

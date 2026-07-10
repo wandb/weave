@@ -62,6 +62,7 @@ def test_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+    assert model_usage["gross_input_tokens"] == 10
 
 
 @pytest.mark.vcr(
@@ -107,6 +108,7 @@ def test_anthropic_stream(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 13
     assert output.usage.input_tokens == input_tokens == 10
+    assert model_usage["gross_input_tokens"] == 10
 
 
 @pytest.mark.vcr(
@@ -147,6 +149,7 @@ async def test_async_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+    assert model_usage["gross_input_tokens"] == 10
 
 
 @pytest.mark.vcr(
@@ -196,6 +199,7 @@ async def test_async_anthropic_stream(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 19
     assert output.usage.input_tokens == input_tokens == 10
+    assert model_usage["gross_input_tokens"] == 10
 
 
 @pytest.mark.vcr(
@@ -299,6 +303,7 @@ def test_anthropic_messages_stream_ctx_manager(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"]
     assert output.usage.input_tokens == model_usage["input_tokens"]
+    assert model_usage["gross_input_tokens"] == output.usage.input_tokens
 
 
 @pytest.mark.vcr(
@@ -347,6 +352,7 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"]
     assert output.usage.input_tokens == model_usage["input_tokens"]
+    assert model_usage["gross_input_tokens"] == output.usage.input_tokens
 
 
 @pytest.mark.vcr(
@@ -559,6 +565,7 @@ def test_beta_anthropic(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"] == 19
     assert output.usage.input_tokens == model_usage["input_tokens"] == 10
+    assert model_usage["gross_input_tokens"] == 10
 
 
 @pytest.mark.vcr(
@@ -603,6 +610,7 @@ def test_beta_anthropic_parse(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == model_usage["output_tokens"]
     assert output.usage.input_tokens == model_usage["input_tokens"]
+    assert model_usage["gross_input_tokens"] == output.usage.input_tokens
 
 
 @pytest.mark.vcr(

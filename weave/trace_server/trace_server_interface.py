@@ -3756,7 +3756,7 @@ UsageMetric = Literal[
 """Supported usage metrics grouped by model.
 
 Token metrics are extracted from summary.usage[model]:
-- input_tokens: Sum of prompt_tokens (OpenAI) and input_tokens (Anthropic/others)
+- input_tokens: gross_input_tokens when present, otherwise prompt_tokens + input_tokens
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
 - cache_read_input_tokens: Tokens read from prompt cache (all providers)

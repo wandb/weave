@@ -27,6 +27,11 @@ from weave.trace_server.trace_server_interface import (
 
 logger = logging.getLogger(__name__)
 
+MARKED_CACHE_METRICS = {
+    "marked_cache_read_input_tokens": "cache_read_input_tokens",
+    "marked_cache_creation_input_tokens": "cache_creation_input_tokens",
+}
+
 
 def _normalize_usage_metrics(metrics: list[UsageMetricSpec]) -> list[UsageMetricSpec]:
     """Ensure all usage metrics have at least one aggregation or percentile."""
@@ -49,7 +54,8 @@ def _get_usage_metric_extraction_sql(metric: str, json_col: str) -> str:
     - OpenAI: prompt_tokens, completion_tokens
     - Anthropic/others: input_tokens, output_tokens
 
-    This function normalizes by summing both variants for input/output tokens.
+    This function prefers an explicit gross input count when present. Otherwise,
+    it normalizes input/output tokens by summing the provider aliases.
 
     Note: Cost metrics (input_cost, output_cost, total_cost) are NOT extracted via SQL.
     They are computed post-query by multiplying token counts by prices from llm_token_prices.
@@ -62,9 +68,11 @@ def _get_usage_metric_extraction_sql(metric: str, json_col: str) -> str:
         SQL expression that extracts and normalizes the metric value.
     """
     if metric == "input_tokens":
-        return f"""(
+        return f"""if(
+            JSONHas({json_col}, 'gross_input_tokens'),
+            ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'gross_input_tokens')), 0),
             ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'prompt_tokens')), 0) +
-            ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'input_tokens')), 0)
+                ifNull(toFloat64OrNull(JSONExtractRaw({json_col}, 'input_tokens')), 0)
         )"""
     elif metric == "output_tokens":
         return f"""(
@@ -82,6 +90,7 @@ def build_usage_query(
     metrics: list[UsageMetricSpec],
     pb: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    include_marked_cache_metrics: bool = False,
 ) -> StatsQueryBuildResult:
     """Generate parameterized ClickHouse SQL for usage metrics (grouped by model).
 
@@ -90,6 +99,8 @@ def build_usage_query(
         metrics: Usage metrics to compute (tokens, etc.).
         pb: ParamBuilder for parameterized queries.
         read_table: Which table to query (calls_merged or calls_complete).
+        include_marked_cache_metrics: Whether to aggregate cache tokens from rows
+            marked with gross_input_tokens for internal cost calculation.
 
     Returns:
         Named query build result with SQL, output columns, params, and time bounds.
@@ -109,12 +120,30 @@ def build_usage_query(
     where_filter_sql = build_calls_filter_sql(req.filter, pb, read_table)
 
     normalized_metrics = _normalize_usage_metrics(metrics)
+    public_sum_metrics = {
+        spec.metric
+        for spec in normalized_metrics
+        if AggregationType.SUM in spec.aggregations
+    }
+    marked_cache_metrics = {
+        metric: source_metric
+        for metric, source_metric in MARKED_CACHE_METRICS.items()
+        if include_marked_cache_metrics and source_metric not in public_sum_metrics
+    }
 
     inner_metric_exprs: list[str] = []
     for metric_spec in normalized_metrics:
         metric = metric_spec.metric
         extraction_sql = _get_usage_metric_extraction_sql(metric, "kv.2")
         inner_metric_exprs.append(f"{extraction_sql} AS m_{metric}")
+    for internal_metric, source_metric in marked_cache_metrics.items():
+        inner_metric_exprs.append(
+            f"""if(
+                JSONHas(kv.2, 'gross_input_tokens'),
+                ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, '{source_metric}')), 0),
+                0
+            ) AS m_{internal_metric}"""
+        )
 
     inner_metric_sql = ""
     if inner_metric_exprs:
@@ -137,6 +166,14 @@ def build_usage_query(
                 )
             else:
                 agg_selects_outer.append(f"aggregated_data.{alias} AS {alias}")
+            columns.append(alias)
+
+    for internal_metric in marked_cache_metrics:
+        for select_sql, alias in aggregation_selects_for_metric(
+            internal_metric, [AggregationType.SUM], []
+        ):
+            agg_selects.append(f"{select_sql} AS {alias}")
+            agg_selects_outer.append(f"COALESCE(aggregated_data.{alias}, 0) AS {alias}")
             columns.append(alias)
 
     agg_sql_for_cte = ",\n          ".join(agg_selects)

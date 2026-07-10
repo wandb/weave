@@ -64,29 +64,39 @@ def split_usage_metrics(
             token_metrics.append(metric_spec)
 
     if requested_cost_metrics:
-        existing_token_metrics = {m.metric for m in token_metrics}
+
+        def ensure_sum_metric(metric: tsi.UsageMetric) -> None:
+            for index, metric_spec in enumerate(token_metrics):
+                if metric_spec.metric == metric:
+                    if tsi.AggregationType.SUM not in metric_spec.aggregations:
+                        token_metrics[index] = metric_spec.model_copy(
+                            update={
+                                "aggregations": [
+                                    *metric_spec.aggregations,
+                                    tsi.AggregationType.SUM,
+                                ]
+                            }
+                        )
+                    return
+            token_metrics.append(
+                tsi.UsageMetricSpec(
+                    metric=metric,
+                    aggregations=[tsi.AggregationType.SUM],
+                )
+            )
+
         needs_input = (
             "input_cost" in requested_cost_metrics
             or "total_cost" in requested_cost_metrics
         )
-        if needs_input and "input_tokens" not in existing_token_metrics:
-            token_metrics.append(
-                tsi.UsageMetricSpec(
-                    metric="input_tokens",
-                    aggregations=[tsi.AggregationType.SUM],
-                )
-            )
+        if needs_input:
+            ensure_sum_metric("input_tokens")
         needs_output = (
             "output_cost" in requested_cost_metrics
             or "total_cost" in requested_cost_metrics
         )
-        if needs_output and "output_tokens" not in existing_token_metrics:
-            token_metrics.append(
-                tsi.UsageMetricSpec(
-                    metric="output_tokens",
-                    aggregations=[tsi.AggregationType.SUM],
-                )
-            )
+        if needs_output:
+            ensure_sum_metric("output_tokens")
 
     return token_metrics, requested_cost_metrics
 

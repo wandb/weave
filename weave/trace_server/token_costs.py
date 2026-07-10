@@ -198,9 +198,8 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
             ) AS kv"""
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"
-    # Some libraries return prompt_tokens and completion_tokens, others input_tokens and output_tokens
-    # If both are present, add them together; if only one is present, use that one
-    prompt_tokens = """(if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens"""
+    # Prefer an explicit gross input count. Otherwise normalize provider aliases.
+    prompt_tokens = """if(JSONHas(kv.2, 'gross_input_tokens'), JSONExtractInt(kv.2, 'gross_input_tokens'), if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens"""
     completion_tokens = """(if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens"""
     total_tokens = "JSONExtractInt(kv.2, 'total_tokens') AS total_tokens"
     cache_read_input_tokens = (

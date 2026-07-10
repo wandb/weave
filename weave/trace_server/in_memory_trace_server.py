@@ -646,9 +646,14 @@ def _cost_usage_from_summary(
     for llm_id, usage in usage_map.items():
         if not isinstance(usage, dict):
             continue
+        prompt_tokens = (
+            _safe_int_for_costs(usage.get("gross_input_tokens"))
+            if "gross_input_tokens" in usage
+            else _safe_int_for_costs(usage.get("prompt_tokens"))
+            + _safe_int_for_costs(usage.get("input_tokens"))
+        )
         normalized_usage[str(llm_id)] = {
-            "prompt_tokens": _safe_int_for_costs(usage.get("prompt_tokens"))
-            + _safe_int_for_costs(usage.get("input_tokens")),
+            "prompt_tokens": prompt_tokens,
             "completion_tokens": _safe_int_for_costs(usage.get("completion_tokens"))
             + _safe_int_for_costs(usage.get("output_tokens")),
             "requests": _safe_int_for_costs(usage.get("requests")),
@@ -2579,7 +2584,13 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     if key not in raw:
                         raw[key] = {}
                     for spec in req.usage_metrics:
-                        token_keys = token_keys_map.get(spec.metric, [])
+                        if (
+                            spec.metric == "input_tokens"
+                            and "gross_input_tokens" in model_usage
+                        ):
+                            token_keys = ["gross_input_tokens"]
+                        else:
+                            token_keys = token_keys_map.get(spec.metric, [])
                         val = 0
                         for k in token_keys:
                             raw_val = model_usage.get(k)

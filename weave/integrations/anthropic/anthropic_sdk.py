@@ -90,11 +90,49 @@ def anthropic_accumulator(
     return acc
 
 
+def anthropic_on_finish(
+    call: Any, output: Any, exception: BaseException | None = None
+) -> None:
+    """Add gross Anthropic input tokens without changing provider-native usage."""
+    model = getattr(output, "model", None)
+    if not isinstance(model, str):
+        return
+
+    output_usage = getattr(output, "usage", None)
+    input_tokens = getattr(output_usage, "input_tokens", None)
+    cache_read_tokens = getattr(output_usage, "cache_read_input_tokens", 0)
+    cache_creation_tokens = getattr(output_usage, "cache_creation_input_tokens", 0)
+    if cache_read_tokens is None:
+        cache_read_tokens = 0
+    if cache_creation_tokens is None:
+        cache_creation_tokens = 0
+
+    token_values = (input_tokens, cache_read_tokens, cache_creation_tokens)
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 0
+        for value in token_values
+    ):
+        return
+
+    summary = getattr(call, "summary", None)
+    if not isinstance(summary, dict):
+        return
+    usage_map = summary.get("usage")
+    if not isinstance(usage_map, dict):
+        return
+    model_usage = usage_map.get(model)
+    if not isinstance(model_usage, dict):
+        return
+
+    model_usage["gross_input_tokens"] = sum(token_values)
+
+
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -119,6 +157,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -216,6 +255,7 @@ def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,

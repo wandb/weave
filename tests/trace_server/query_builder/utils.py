@@ -88,6 +88,7 @@ def assert_usage_sql(
     exp_start: datetime.datetime | None = None,
     exp_end: datetime.datetime | None = None,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    include_marked_cache_metrics: bool = False,
 ) -> None:
     """Assert that the CallStatsReq generates the expected usage SQL and parameters.
 
@@ -101,9 +102,16 @@ def assert_usage_sql(
         exp_start: The expected start datetime (if None, not checked)
         exp_end: The expected end datetime (if None, not checked)
         read_table: Which table to query (calls_merged or calls_complete)
+        include_marked_cache_metrics: Whether to include internal marked cache sums.
     """
     pb = ParamBuilder("pb")
-    query_result = build_usage_query(req, metrics, pb, read_table)
+    query_result = build_usage_query(
+        req,
+        metrics,
+        pb,
+        read_table,
+        include_marked_cache_metrics=include_marked_cache_metrics,
+    )
     sql = query_result.sql
     cols = query_result.columns
     params = query_result.parameters

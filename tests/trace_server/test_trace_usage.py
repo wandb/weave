@@ -175,6 +175,57 @@ def _usage_totals(
     return (prompt_tokens, completion_tokens, total_tokens, requests)
 
 
+def test_usage_extraction_prefers_marked_gross_input() -> None:
+    call = usage_utils.UsageCall(
+        id="call",
+        parent_id=None,
+        summary={
+            "usage": {
+                "marked": {
+                    "input_tokens": 10,
+                    "gross_input_tokens": 130,
+                    "cache_read_input_tokens": 100,
+                    "cache_creation_input_tokens": 20,
+                    "output_tokens": 2,
+                },
+                "legacy": {
+                    "input_tokens": 5,
+                    "cache_read_input_tokens": 50,
+                    "cache_creation_input_tokens": 10,
+                    "output_tokens": 3,
+                },
+            }
+        },
+    )
+
+    result = usage_utils.aggregate_usage_with_descendants([call], include_costs=False)
+
+    assert result["call"]["marked"].model_dump() == {
+        "requests": 0,
+        "prompt_tokens": 130,
+        "completion_tokens": 2,
+        "total_tokens": 132,
+        "cache_read_input_tokens": 100,
+        "cache_creation_input_tokens": 20,
+        "prompt_tokens_total_cost": None,
+        "completion_tokens_total_cost": None,
+        "cache_read_input_tokens_total_cost": None,
+        "cache_creation_input_tokens_total_cost": None,
+    }
+    assert result["call"]["legacy"].model_dump() == {
+        "requests": 0,
+        "prompt_tokens": 5,
+        "completion_tokens": 3,
+        "total_tokens": 8,
+        "cache_read_input_tokens": 50,
+        "cache_creation_input_tokens": 10,
+        "prompt_tokens_total_cost": None,
+        "completion_tokens_total_cost": None,
+        "cache_read_input_tokens_total_cost": None,
+        "cache_creation_input_tokens_total_cost": None,
+    }
+
+
 def test_aggregate_usage_with_descendants_rolls_up() -> None:
     root_id = "root"
     child_a_id = "child-a"

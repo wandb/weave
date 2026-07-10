@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+from tests.trace.util import client_is_clickhouse
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
@@ -293,3 +294,109 @@ def test_costs_streamed_with_all_fields(client):
     assert cost_entry["effective_date"] is not None
     assert cost_entry["prompt_token_cost_unit"] == "USD"
     assert cost_entry["completion_token_cost_unit"] == "USD"
+
+
+def test_call_costs_prefer_marked_gross_input_and_preserve_legacy(client):
+    project_id = client.project_id
+    model = "claude-cache-cost-test"
+    client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs={
+                model: {
+                    "prompt_token_cost": 1,
+                    "completion_token_cost": 1,
+                    "cache_read_input_token_cost": 0.1,
+                    "cache_creation_input_token_cost": 0.2,
+                }
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    usage_by_call_id: dict[str, dict[str, int]] = {}
+    for index, usage in enumerate(
+        [
+            {
+                "input_tokens": 10,
+                "gross_input_tokens": 130,
+                "cache_read_input_tokens": 100,
+                "cache_creation_input_tokens": 20,
+                "output_tokens": 2,
+            },
+            {
+                "input_tokens": 5,
+                "cache_read_input_tokens": 50,
+                "cache_creation_input_tokens": 10,
+                "output_tokens": 3,
+            },
+        ]
+    ):
+        call_id = str(uuid.uuid4())
+        usage_by_call_id[call_id] = usage
+        started_at = now + datetime.timedelta(seconds=index * 2)
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=str(uuid.uuid4()),
+                    started_at=started_at,
+                    op_name=f"weave:///{project_id}/op/cache_cost:v1",
+                    attributes={},
+                    inputs={},
+                )
+            )
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=started_at + datetime.timedelta(seconds=1),
+                    summary={"usage": {model: usage}},
+                )
+            )
+        )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                filter=tsi.CallsFilter(call_ids=list(usage_by_call_id)),
+                include_costs=True,
+            )
+        )
+    )
+    calls_by_id = {call.id: call for call in calls}
+
+    marked_call_id = next(
+        call_id
+        for call_id, usage in usage_by_call_id.items()
+        if "gross_input_tokens" in usage
+    )
+    marked_call = calls_by_id[marked_call_id]
+    assert marked_call.summary["usage"][model] == usage_by_call_id[marked_call_id]
+    marked_cost = marked_call.summary["weave"]["costs"][model]
+    assert marked_cost["prompt_tokens"] == 130
+    assert marked_cost["prompt_tokens_total_cost"] == pytest.approx(10)
+    assert marked_cost["completion_tokens_total_cost"] == pytest.approx(2)
+
+    legacy_call_id = next(
+        call_id
+        for call_id, usage in usage_by_call_id.items()
+        if "gross_input_tokens" not in usage
+    )
+    legacy_call = calls_by_id[legacy_call_id]
+    assert legacy_call.summary["usage"][model] == usage_by_call_id[legacy_call_id]
+    legacy_cost = legacy_call.summary["weave"]["costs"][model]
+    assert legacy_cost["prompt_tokens"] == 5
+    assert legacy_cost["prompt_tokens_total_cost"] == pytest.approx(-55)
+    assert legacy_cost["completion_tokens_total_cost"] == pytest.approx(3)
+
+    if client_is_clickhouse(client):
+        assert marked_cost["cache_read_input_tokens_total_cost"] == pytest.approx(10)
+        assert marked_cost["cache_creation_input_tokens_total_cost"] == pytest.approx(4)
+        assert legacy_cost["cache_read_input_tokens_total_cost"] == pytest.approx(5)
+        assert legacy_cost["cache_creation_input_tokens_total_cost"] == pytest.approx(2)

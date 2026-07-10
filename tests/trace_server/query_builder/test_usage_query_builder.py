@@ -390,7 +390,7 @@ def test_multiple_metrics():
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
                      kv.1 AS model,
-                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens,
+                     if(JSONHas(kv.2, 'gross_input_tokens'), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'gross_input_tokens')), 0), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens,
                      (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens,
                      toFloat64OrNull(JSONExtractRaw(kv.2, 'total_tokens')) AS m_total_tokens
               FROM
@@ -443,6 +443,99 @@ def test_multiple_metrics():
         3600,
         exp_start=start_dt,
         exp_end=end_dt,
+    )
+
+
+def test_cost_dependencies_use_marked_cache_metrics():
+    start_dt = datetime.datetime(2024, 12, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    end_dt = datetime.datetime(2024, 12, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+    metrics = [
+        UsageMetricSpec(metric="input_tokens"),
+        UsageMetricSpec(metric="output_tokens"),
+    ]
+    req = CallStatsReq(
+        project_id="entity/project",
+        start=start_dt,
+        end=end_dt,
+        granularity=3600,
+        usage_metrics=[*metrics, UsageMetricSpec(metric="total_cost")],
+    )
+    assert_usage_sql(
+        req,
+        metrics,
+        """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}) + toIntervalSecond(number * {pb_4:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({pb_2:Float64}, {pb_3:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({pb_1:Float64}, {pb_3:String}), INTERVAL 3600 SECOND, {pb_3:String}))) / {pb_4:Float64})))
+           WHERE bucket < toDateTime({pb_2:Float64}, {pb_3:String}) ),
+             aggregated_data AS
+          (SELECT bucket,
+                  model,
+                  sumOrNull(m_input_tokens) AS sum_input_tokens,
+                  sumOrNull(m_output_tokens) AS sum_output_tokens,
+                  sumOrNull(m_marked_cache_read_input_tokens) AS sum_marked_cache_read_input_tokens,
+                  sumOrNull(m_marked_cache_creation_input_tokens) AS sum_marked_cache_creation_input_tokens,
+                  count() AS count
+           FROM
+             (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
+                     kv.1 AS model,
+                     if(JSONHas(kv.2, 'gross_input_tokens'), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'gross_input_tokens')), 0), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens,
+                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'completion_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'output_tokens')), 0)) AS m_output_tokens,
+                     if(JSONHas(kv.2, 'gross_input_tokens'), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'cache_read_input_tokens')), 0), 0) AS m_marked_cache_read_input_tokens,
+                     if(JSONHas(kv.2, 'gross_input_tokens'), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'cache_creation_input_tokens')), 0), 0) AS m_marked_cache_creation_input_tokens
+              FROM
+                (SELECT sortable_datetime,
+                        JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
+                 FROM
+                   (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                    FROM calls_merged AS cm
+                    WHERE cm.project_id = {pb_0:String}
+                      AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
+                      AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
+                      AND cm.deleted_at IS NULL
+                    GROUP BY project_id,
+                             id)) ARRAY
+              JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
+           GROUP BY bucket,
+                    model),
+             all_models AS
+          (SELECT DISTINCT model
+           FROM aggregated_data)
+        SELECT all_buckets.bucket AS timestamp,
+               all_models.model,
+               COALESCE(aggregated_data.sum_input_tokens, 0) AS sum_input_tokens,
+               COALESCE(aggregated_data.sum_output_tokens, 0) AS sum_output_tokens,
+               COALESCE(aggregated_data.sum_marked_cache_read_input_tokens, 0) AS sum_marked_cache_read_input_tokens,
+               COALESCE(aggregated_data.sum_marked_cache_creation_input_tokens, 0) AS sum_marked_cache_creation_input_tokens,
+               COALESCE(aggregated_data.count, 0) AS count
+        FROM all_buckets
+        CROSS JOIN all_models
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        AND all_models.model = aggregated_data.model
+        ORDER BY all_buckets.bucket,
+                 all_models.model
+        """,
+        {
+            "pb_0": "entity/project",
+            "pb_1": 1733011200.0,
+            "pb_2": 1733014800.0,
+            "pb_3": "UTC",
+            "pb_4": 3600,
+        },
+        [
+            "timestamp",
+            "model",
+            "sum_input_tokens",
+            "sum_output_tokens",
+            "sum_marked_cache_read_input_tokens",
+            "sum_marked_cache_creation_input_tokens",
+            "count",
+        ],
+        3600,
+        exp_start=start_dt,
+        exp_end=end_dt,
+        include_marked_cache_metrics=True,
     )
 
 
@@ -1366,7 +1459,7 @@ def test_calls_complete_with_filter():
            FROM
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
                      kv.1 AS model,
-                     (ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens
+                     if(JSONHas(kv.2, 'gross_input_tokens'), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'gross_input_tokens')), 0), ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'prompt_tokens')), 0) + ifNull(toFloat64OrNull(JSONExtractRaw(kv.2, 'input_tokens')), 0)) AS m_input_tokens
               FROM
                 (SELECT started_at,
                         JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
