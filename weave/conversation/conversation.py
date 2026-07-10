@@ -50,13 +50,15 @@ from weave.utils.capture_info import get_capture_info
 # OTel imports — kept top-level under a try/except guard so the module
 # loads cleanly when opentelemetry is not installed. When unavailable,
 # all span operations no-op silently.
+_OTEL_AVAILABLE = True
 try:
     from opentelemetry import context as otel_context
     from opentelemetry import trace as otel_trace
     from opentelemetry.context import Context
     from opentelemetry.trace import StatusCode
-
-    _OTEL_AVAILABLE = True
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
 except ImportError:
     _OTEL_AVAILABLE = False
 
@@ -91,10 +93,14 @@ __all__ = [
     "Usage",
     "end_conversation",
     "end_llm",
+    "end_subagent",
+    "end_tool",
     "end_turn",
     "get_current_conversation",
     "get_current_llm",
+    "get_current_span",
     "get_current_subagent",
+    "get_current_tool",
     "get_current_turn",
     "log_conversation",
     "log_turn",
@@ -149,6 +155,9 @@ class _SpanBase(BaseModel):
     # on the children they create so those children nest under the parent's span
     # regardless of what's on the ambient OTel context stack at ``__enter__`` time.
     _parent_otel_context: _OTelContext | None = PrivateAttr(default=None)
+    # Force a brand-new root trace at ``__enter__`` (set by ``parent="ignore"``).
+    # Only honored when no ``_parent_otel_context`` was provided.
+    _force_new_trace: bool = PrivateAttr(default=False)
 
     def _thread_otel_context(self, child: _SpanBase) -> None:
         """Nest ``child``'s span under this one by handing it an explicit OTel
@@ -262,6 +271,24 @@ class _SpanBase(BaseModel):
             return None
         return self._otel_span
 
+    def traceparent(self) -> str:
+        """Return this span's W3C ``traceparent`` string, or ``""`` if the span
+        isn't started (or OTel is unavailable).
+
+        Put the returned string on the wire (HTTP header, queue message, ...) and
+        pass it back as ``parent=<traceparent>`` to an implicit ``start_*`` in
+        another process to nest that work under this span. Uses the standard
+        ``TraceContextTextMapPropagator`` so it interoperates with any
+        W3C-compliant tracer.
+        """
+        if not _OTEL_AVAILABLE or self._otel_span is None:
+            return ""
+        carrier: dict[str, str] = {}
+        TraceContextTextMapPropagator().inject(
+            carrier, context=otel_trace.set_span_in_context(self._otel_span)
+        )
+        return carrier.get("traceparent", "")
+
     def set_attributes(self, attributes: dict[str, Any]) -> Self:
         """Stamp arbitrary OTel attributes on this span.
 
@@ -306,6 +333,36 @@ class _SpanBase(BaseModel):
         if span := self._recording_span("add_event", name):
             span.add_event(name, attributes=attributes, timestamp=_to_ns(timestamp))
         return self
+
+    if TYPE_CHECKING:
+        # Declared for the type checker only; every concrete span class provides
+        # the real ``__enter__`` / ``__exit__``. Lets the async wrappers below
+        # delegate to them without mypy flagging that ``_SpanBase`` (never
+        # instantiated directly) lacks them.
+        def __enter__(self) -> Self: ...
+
+        def __exit__(
+            self,
+            exc_type: type[BaseException] | None,
+            exc_val: BaseException | None,
+            exc_tb: types.TracebackType | None,
+        ) -> Literal[False]: ...
+
+    async def __aenter__(self) -> Self:
+        """Async context-manager entry — delegates to the sync ``__enter__``.
+
+        Span operations are synchronous (no I/O), so ``async with`` reuses the
+        sync lifecycle; contextvars propagate across ``await``.
+        """
+        return self.__enter__()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> Literal[False]:
+        return self.__exit__(exc_type, exc_val, exc_tb)
 
 
 def _publish_media_content(
@@ -370,6 +427,7 @@ class Tool(_SpanBase):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
+    _token: Token[Tool | None] | None = PrivateAttr(default=None)
 
     def _build_attrs(
         self, *, conversation_id: str, include_content: bool
@@ -418,13 +476,27 @@ class Tool(_SpanBase):
             conversation_id=conversation.conversation_id if conversation else "",
             include_content=conversation.include_content if conversation else True,
         )
+
+        if self._token is not None:
+            try:
+                _current_tool.reset(self._token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
+            self._token = None
+
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
+        if self._token is None:
+            self._token = _current_tool.set(self)
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
         start_ns = int(self.started_at.timestamp() * 1_000_000_000)
-        self._start_otel_span(f"execute_tool {self.name}", start_time_ns=start_ns)
+        self._start_otel_span(
+            f"execute_tool {self.name}",
+            new_trace=self._force_new_trace,
+            start_time_ns=start_ns,
+        )
         return self
 
     def __exit__(
@@ -741,7 +813,11 @@ class LLM(_SpanBase):
             if self.started_at is not None
             else None
         )
-        self._start_otel_span(f"chat {self.model}", start_time_ns=start_ns)
+        self._start_otel_span(
+            f"chat {self.model}",
+            new_trace=self._force_new_trace,
+            start_time_ns=start_ns,
+        )
         return self
 
     def __exit__(
@@ -772,7 +848,9 @@ class SubAgent(_SpanBase):
     ended_at: datetime | None = None
 
     _ended: bool = PrivateAttr(default=False)
-    _token: Token[SubAgent | None] | None = PrivateAttr(default=None)
+    # Token for this sub-agent's push onto the container stack (see
+    # ``_current_container``); reset on ``end()``.
+    _container_token: Token[Turn | SubAgent | None] | None = PrivateAttr(default=None)
 
     def start_llm(
         self,
@@ -938,22 +1016,26 @@ class SubAgent(_SpanBase):
             include_content=conversation.include_content if conversation else True,
         )
 
-        if self._token is not None:
+        if self._container_token is not None:
             try:
-                _current_subagent.reset(self._token)
+                _current_container.reset(self._container_token)
             except ValueError:
                 pass  # entered in a different context/thread; best-effort
-            self._token = None
+            self._container_token = None
 
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
-        if self._token is None:
-            self._token = _current_subagent.set(self)
+        if self._container_token is None:
+            self._container_token = _current_container.set(self)
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
         start_ns = int(self.started_at.timestamp() * 1_000_000_000)
-        self._start_otel_span(f"invoke_agent {self.name}", start_time_ns=start_ns)
+        self._start_otel_span(
+            f"invoke_agent {self.name}",
+            new_trace=self._force_new_trace,
+            start_time_ns=start_ns,
+        )
         return self
 
     def __exit__(
@@ -997,10 +1079,11 @@ class Turn(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
     _token: Token[Turn | None] | None = PrivateAttr(default=None)
-    # Token for the ``_current_subagent`` reset (see ``__enter__``): a Turn is
-    # never a child of a SubAgent, so entering one shadows any lingering current
-    # sub-agent to None and restores it on ``end()``.
-    _subagent_token: Token[SubAgent | None] | None = PrivateAttr(default=None)
+    # Token for this turn's push onto the container stack (see
+    # ``_current_container``). A Turn pushes itself so its children nest under
+    # it; this shadows any active sub-agent for the turn's lifetime (restored on
+    # ``end()``), which replaces the old explicit "drop the sub-agent" step.
+    _container_token: Token[Turn | SubAgent | None] | None = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         if self.started_at is None:
@@ -1196,24 +1279,24 @@ class Turn(_SpanBase):
                 pass  # entered in a different context/thread; best-effort
             self._token = None
 
-        if self._subagent_token is not None:
+        if self._container_token is not None:
             try:
-                _current_subagent.reset(self._subagent_token)
+                _current_container.reset(self._container_token)
             except ValueError:
                 pass  # entered in a different context/thread; best-effort
-            self._subagent_token = None
+            self._container_token = None
 
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
     def __enter__(self) -> Self:
         if self._token is None:
             self._token = _current_turn.set(self)
-        # A turn is a fresh agent invocation with no sub-agent active yet. Drop
-        # any sub-agent left current by a prior turn so this turn's implicit
-        # children (start_llm / start_tool) nest under the turn, not a stale
-        # sub-agent in the previous turn's trace. Restored on end().
-        if self._subagent_token is None:
-            self._subagent_token = _current_subagent.set(None)
+        # Push the turn as the current container so its implicit children nest
+        # under it. Entering a turn shadows any active sub-agent for the turn's
+        # lifetime (restored on end()); the container stack replaces the old
+        # explicit "drop the sub-agent" step.
+        if self._container_token is None:
+            self._container_token = _current_container.set(self)
         start_ns = (
             int(self.started_at.timestamp() * 1_000_000_000)
             if self.started_at is not None
@@ -1246,6 +1329,12 @@ class Conversation(BaseModel):
     trace (the right choice for the standalone Agents tab view). Set ``True``
     when the application has an outer trace (e.g. a fastapi-instrumented
     request) that should contain the agent invocation.
+
+    .. deprecated::
+        Prefer ``weave.start_turn(parent=<traceparent>)`` to nest a turn under a
+        specific (in-process or remote) parent; ``continue_parent_trace`` only
+        inherits the ambient in-process OTel trace and will be removed in a
+        future release.
     """
 
     model_config = ConfigDict(protected_namespaces=())
@@ -1341,6 +1430,17 @@ class Conversation(BaseModel):
         self.end()
         return False
 
+    async def __aenter__(self) -> Self:
+        return self.__enter__()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> Literal[False]:
+        return self.__exit__(exc_type, exc_val, exc_tb)
+
 
 # ---------------------------------------------------------------------------
 # Contextvars
@@ -1350,15 +1450,68 @@ _current_conversation: ContextVar[Conversation | None] = ContextVar(
     "_current_conversation", default=None
 )
 _current_turn: ContextVar[Turn | None] = ContextVar("_current_turn", default=None)
-_current_subagent: ContextVar[SubAgent | None] = ContextVar(
-    "_current_subagent", default=None
+# Single "container" stack: the innermost open Turn or SubAgent. Turn and
+# SubAgent push themselves here on ``__enter__`` and pop on ``end()``; LLM and
+# Tool are leaves and never push. Implicit ``start_*`` nest under whatever is on
+# top, so there is no per-type priority and no "drop the stale sub-agent" step —
+# entering a Turn simply shadows any active sub-agent until the Turn ends.
+_current_container: ContextVar[Turn | SubAgent | None] = ContextVar(
+    "_current_container", default=None
 )
 _current_llm: ContextVar[LLM | None] = ContextVar("_current_llm", default=None)
+# Tools are leaves (never a parent), but tracked here so end_tool() /
+# get_current_tool() can operate on the innermost active tool, mirroring _current_llm.
+_current_tool: ContextVar[Tool | None] = ContextVar("_current_tool", default=None)
 
 
 # ---------------------------------------------------------------------------
 # Top-level functions
 # ---------------------------------------------------------------------------
+
+
+# ``parent=`` override accepted by the implicit ``start_*`` factories. The
+# sentinel ``"ignore"`` forces a brand-new root trace (à la LangSmith's
+# ``parent="ignore"``); any other plain string is treated as a W3C
+# ``traceparent`` to adopt (cross-process).
+_IGNORE_PARENT = "ignore"
+
+
+def _otel_context_from_traceparent(traceparent: str) -> _OTelContext | None:
+    """Build an OTel parent context from a W3C ``traceparent`` string.
+
+    Uses the standard ``TraceContextTextMapPropagator`` so cross-process nesting
+    interoperates with any W3C-compliant tracer; returns ``None`` when OTel is
+    unavailable.
+    """
+    if not _OTEL_AVAILABLE:
+        return None
+    return TraceContextTextMapPropagator().extract({"traceparent": traceparent})
+
+
+def _resolve_parent(
+    parent: Turn | SubAgent | str | None,
+) -> tuple[Turn | SubAgent | None, _OTelContext | None, bool]:
+    """Resolve ``parent=`` to ``(container, otel_context, force_new_root)``.
+
+    - ``None`` -> the nearest open container (the ambient default).
+    - a ``Turn`` / ``SubAgent`` -> that container (explicit override).
+    - ``"ignore"`` -> force a brand-new root trace.
+    - any other string -> a W3C ``traceparent`` to adopt (cross-process).
+
+    At most one of ``container`` / ``otel_context`` is non-``None``.
+    """
+    if parent is None:
+        return (get_current_span(), None, False)
+    if isinstance(parent, (Turn, SubAgent)):
+        return (parent, None, False)
+    if parent == _IGNORE_PARENT:
+        return (None, None, True)
+    if isinstance(parent, str):
+        return (None, _otel_context_from_traceparent(parent), False)
+    raise TypeError(
+        f'parent must be a Turn, SubAgent, W3C traceparent string, "{_IGNORE_PARENT}", '
+        f"or None; got {type(parent).__name__}"
+    )
 
 
 def start_conversation(
@@ -1395,6 +1548,7 @@ def start_conversation(
 
 def start_turn(
     *,
+    parent: str | None = None,
     user_message: str = "",
     model: str = "",
     agent_name: str = "",
@@ -1407,7 +1561,16 @@ def start_turn(
     conversation is active, returns a disconnected Turn that is NOT set in the
     contextvar (``get_current_turn()`` returns None); enter it with ``with`` to
     activate it.
+
+    ``parent`` accepts a W3C ``traceparent`` string to nest this turn under a
+    remote parent span (cross-process); by default each turn starts its own
+    trace.
     """
+    parent_ctx = (
+        _otel_context_from_traceparent(parent)
+        if isinstance(parent, str) and parent != _IGNORE_PARENT
+        else None
+    )
     conversation = get_current_conversation()
     if conversation is not None:
         turn = conversation.start_turn(
@@ -1416,22 +1579,27 @@ def start_turn(
             agent_name=agent_name,
             system_instructions=system_instructions,
         )
+        if parent_ctx is not None:
+            turn._parent_otel_context = parent_ctx
         # Eager-set on this top-level (imperative) entry point (4c): the object
         # factory ``conversation.start_turn`` no longer sets the contextvar at
         # construction — it's set at ``Turn.__enter__`` so a cross-thread
         # build->enter resets in the entering context — so the imperative
         # no-``with`` contract is satisfied here instead.
         turn._token = _current_turn.set(turn)
-        # A new turn is never a child of a sub-agent: drop any lingering current
-        # sub-agent so implicit start_llm/start_tool nest under this turn. Mirror
-        # of the shadow in ``Turn.__enter__``; restored on the turn's ``end()``.
-        turn._subagent_token = _current_subagent.set(None)
+        # Push the turn as the current container so its implicit children nest
+        # under it. This shadows any active sub-agent from a prior turn for the
+        # turn's lifetime (restored on end()) — the container stack replaces the
+        # old explicit "drop the sub-agent" step. Mirror of ``Turn.__enter__``.
+        turn._container_token = _current_container.set(turn)
         return turn
     turn = Turn(
         agent_name=agent_name,
         model=model,
         system_instructions=system_instructions or [],
     )
+    if parent_ctx is not None:
+        turn._parent_otel_context = parent_ctx
     if user_message:
         turn.messages.append(Message(role="user", content=user_message))
     return turn
@@ -1439,27 +1607,33 @@ def start_turn(
 
 def start_llm(
     *,
+    parent: Turn | SubAgent | str | None = None,
     model: str = "",
     provider_name: str = "",
     system_instructions: list[str] | None = None,
 ) -> LLM:
-    """Create and activate an LLM call under the active sub-agent or turn.
+    """Create and activate an LLM call under the nearest open container.
 
-    Resolves the parent as the current sub-agent (preferred) or, failing that,
-    the current turn — so an LLM started inside a sub-agent nests under the
-    sub-agent, not the turn. When a parent is active, sets the ``_current_llm``
-    contextvar so the LLM is visible via ``get_current_llm()`` without a
-    ``with`` block. If neither is active, returns a disconnected LLM (no
-    contextvar set).
+    Resolves the parent via ``get_current_span()`` — the current sub-agent if
+    you're inside one, else the current turn — so an LLM started inside a
+    sub-agent nests under the sub-agent, not the turn. When a container is
+    active, sets the ``_current_llm`` contextvar so the LLM is visible via
+    ``get_current_llm()`` without a ``with`` block. If none is active, returns a
+    disconnected LLM (no contextvar set).
+
+    ``parent`` overrides the ambient container: pass a ``Turn`` / ``SubAgent`` to
+    nest under it explicitly (e.g. hand one across a thread), a W3C
+    ``traceparent`` string to adopt a remote parent (cross-process), or
+    ``"ignore"`` to force a brand-new root trace.
 
     Pass ``provider_name`` explicitly. The SDK does not infer it from the
     model identifier: prefix-based guessing misattributes user fine-tunes
     (e.g. a model named ``text-...``) and bakes assumptions about future
     model names into telemetry that's expensive to correct after the fact.
     """
-    parent = get_current_subagent() or get_current_turn()
-    if parent is not None:
-        llm = parent.start_llm(
+    container, otel_ctx, force_root = _resolve_parent(parent)
+    if container is not None:
+        llm = container.start_llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,
@@ -1467,48 +1641,88 @@ def start_llm(
         # Eager-set for the imperative no-``with`` contract; see ``start_turn``.
         llm._token = _current_llm.set(llm)
         return llm
-    return LLM(
+    llm = LLM(
         model=model,
         provider_name=provider_name,
         system_instructions=system_instructions or [],
     )
+    if otel_ctx is not None:
+        llm._parent_otel_context = otel_ctx
+    llm._force_new_trace = force_root
+    return llm
 
 
-def start_tool(*, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
-    """Create a tool execution span under the active sub-agent or turn.
+def start_tool(
+    *,
+    parent: Turn | SubAgent | str | None = None,
+    name: str,
+    arguments: str = "",
+    tool_call_id: str = "",
+) -> Tool:
+    """Create a tool execution span under the nearest open container.
 
-    Delegates to the current sub-agent (preferred) or turn so the Tool's OTel
-    parent is pinned to that span explicitly — it then nests correctly even when
-    entered out-of-block or in another thread, matching ``start_llm``. Falls back
-    to a bare Tool (parented via ambient OTel context) when neither is active.
+    Delegates to ``get_current_span()`` (the current sub-agent if inside one,
+    else the turn) so the Tool's OTel parent is pinned to that span explicitly —
+    it then nests correctly even when entered out-of-block or in another thread,
+    matching ``start_llm``. Falls back to a bare Tool (parented via ambient OTel
+    context) when no container is active.
+
+    ``parent`` overrides the ambient container (a ``Turn`` / ``SubAgent``, a W3C
+    ``traceparent`` string, or ``"ignore"``); see ``start_llm``.
     """
-    parent = get_current_subagent() or get_current_turn()
-    if parent is not None:
-        return parent.start_tool(
+    container, otel_ctx, force_root = _resolve_parent(parent)
+    if container is not None:
+        tool = container.start_tool(
             name=name, arguments=arguments, tool_call_id=tool_call_id
         )
-    return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        # Eager-set for the imperative no-``with`` contract so end_tool() /
+        # get_current_tool() work without a block; see ``start_turn``. Tools are
+        # leaves, so this contextvar never affects parent resolution.
+        tool._token = _current_tool.set(tool)
+        return tool
+    tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+    if otel_ctx is not None:
+        tool._parent_otel_context = otel_ctx
+    tool._force_new_trace = force_root
+    return tool
 
 
 def start_subagent(
-    *, name: str, model: str = "", system_instructions: list[str] | None = None
+    *,
+    parent: Turn | SubAgent | str | None = None,
+    name: str,
+    model: str = "",
+    system_instructions: list[str] | None = None,
 ) -> SubAgent:
-    """Create a sub-agent invocation span under the active sub-agent or turn.
+    """Create a sub-agent invocation span under the nearest open container.
 
-    Delegates to the current sub-agent (preferred — enabling agent→agent
-    nesting) or turn so the SubAgent's OTel parent is pinned explicitly — it then
-    nests correctly even when entered out-of-block or in another thread, matching
-    ``start_llm``. Falls back to a bare SubAgent (parented via ambient OTel
-    context) when neither is active.
+    Delegates to ``get_current_span()`` (the current sub-agent if inside one —
+    enabling agent→agent nesting — else the turn) so the SubAgent's OTel parent
+    is pinned explicitly — it then nests correctly even when entered
+    out-of-block or in another thread, matching ``start_llm``. Falls back to a
+    bare SubAgent (parented via ambient OTel context) when no container is
+    active.
+
+    ``parent`` overrides the ambient container (a ``Turn`` / ``SubAgent``, a W3C
+    ``traceparent`` string, or ``"ignore"``); see ``start_llm``.
     """
-    parent = get_current_subagent() or get_current_turn()
-    if parent is not None:
-        return parent.start_subagent(
+    container, otel_ctx, force_root = _resolve_parent(parent)
+    if container is not None:
+        sub = container.start_subagent(
             name=name, model=model, system_instructions=system_instructions
         )
-    return SubAgent(
+        # Eager-set as the current container for the imperative no-``with``
+        # contract so end_subagent() / get_current_subagent() work; mirrors
+        # ``start_turn``. Restored on the sub-agent's ``end()``.
+        sub._container_token = _current_container.set(sub)
+        return sub
+    sub = SubAgent(
         name=name, model=model, system_instructions=system_instructions or []
     )
+    if otel_ctx is not None:
+        sub._parent_otel_context = otel_ctx
+    sub._force_new_trace = force_root
+    return sub
 
 
 def end_conversation() -> None:
@@ -1523,6 +1737,20 @@ def end_turn() -> None:
     turn = get_current_turn()
     if turn is not None:
         turn.end()
+
+
+def end_subagent() -> None:
+    """End the current sub-agent (the innermost open one, from the container stack)."""
+    subagent = get_current_subagent()
+    if subagent is not None:
+        subagent.end()
+
+
+def end_tool() -> None:
+    """End the current tool call (from contextvar)."""
+    tool = get_current_tool()
+    if tool is not None:
+        tool.end()
 
 
 def end_llm() -> None:
@@ -1542,20 +1770,39 @@ def get_current_turn() -> Turn | None:
     return _current_turn.get()
 
 
-def get_current_subagent() -> SubAgent | None:
-    """Return the active sub-agent from contextvar, or None.
+def get_current_span() -> Turn | SubAgent | None:
+    """Return the nearest open container — the Turn or SubAgent an implicit
+    ``start_llm`` / ``start_tool`` / ``start_subagent`` would nest under, or
+    None if none is active.
 
-    Set while inside a ``with sub_agent:`` block (nested sub-agents stack, so
-    this returns the innermost). The implicit top-level ``start_llm`` /
-    ``start_tool`` / ``start_subagent`` factories prefer it over the current
-    turn, so children created inside a sub-agent nest under the sub-agent.
+    This is the single "what's active?" accessor. Turn and SubAgent push
+    themselves onto the container stack on ``__enter__`` and pop on ``end()``;
+    LLM and Tool are leaves and never appear here.
     """
-    return _current_subagent.get()
+    return _current_container.get()
+
+
+def get_current_subagent() -> SubAgent | None:
+    """Return the innermost active sub-agent, or None.
+
+    Derived from the container stack (``get_current_span()``): returns the
+    current container only when it is a ``SubAgent`` — a ``Turn`` on top means
+    no sub-agent is active. Nested sub-agents stack, so this is the innermost.
+    Kept for back-compat / introspection; ``get_current_span()`` is the general
+    "current parent" accessor.
+    """
+    container = _current_container.get()
+    return container if isinstance(container, SubAgent) else None
 
 
 def get_current_llm() -> LLM | None:
     """Return the active LLM call from contextvar, or None."""
     return _current_llm.get()
+
+
+def get_current_tool() -> Tool | None:
+    """Return the active tool call from contextvar, or None."""
+    return _current_tool.get()
 
 
 def _to_ns(dt: datetime | None) -> int | None:

@@ -9,6 +9,10 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from weave.conversation.conversation import (
+    _current_container,
+    _current_conversation,
+    _current_llm,
+    _current_turn,
     get_current_conversation,
     get_current_llm,
     get_current_subagent,
@@ -28,6 +32,15 @@ def _reset_contextvars():
         turn.end()
     if (conversation := get_current_conversation()) is not None:
         conversation.end()
+    # Hard-reset the ambient contextvars regardless of the end() calls above.
+    # end() on an already-ended span no-ops and skips its own contextvar reset,
+    # so an imperative start_turn()/start_*() with no matching end() can strand a
+    # stale value that leaks into the next test. This makes teardown
+    # order-independent (test-only).
+    _current_llm.set(None)
+    _current_container.set(None)
+    _current_turn.set(None)
+    _current_conversation.set(None)
 
 
 @pytest.fixture

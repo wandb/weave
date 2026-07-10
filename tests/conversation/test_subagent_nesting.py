@@ -27,6 +27,7 @@ from weave.conversation.conversation import (
     Tool,
     Turn,
     get_current_llm,
+    get_current_span,
     get_current_subagent,
     get_current_turn,
     start_llm,
@@ -552,3 +553,47 @@ class TestStartTurnSkipsActiveSubagent:
         assert llm_span.parent is not None
         assert llm_span.parent.span_id == turn2_span.context.span_id
         assert llm_span.context.trace_id == turn2_span.context.trace_id
+
+
+# ---------------------------------------------------------------------------
+# get_current_span(): the single "what's active?" accessor. Returns the nearest
+# open container (Turn or SubAgent) — the thing an implicit start_* nests under.
+# Turn and SubAgent are containers; LLM and Tool are leaves and never appear.
+# ---------------------------------------------------------------------------
+
+
+class TestGetCurrentSpan:
+    def test_none_when_nothing_active(self) -> None:
+        assert get_current_span() is None
+
+    def test_turn_then_subagent_then_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        assert get_current_span() is None
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            assert get_current_span() is turn  # the turn is the current container
+            with turn.start_subagent(name="researcher") as sa:
+                assert get_current_span() is sa  # sub-agent shadows the turn
+            assert get_current_span() is turn  # restored on sub-agent exit
+        assert get_current_span() is None
+
+    def test_returns_innermost_nested_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="outer") as outer:
+                assert get_current_span() is outer
+                with outer.start_subagent(name="inner") as inner:
+                    assert get_current_span() is inner
+                assert get_current_span() is outer
+            assert get_current_span() is turn
+
+    def test_llm_is_a_leaf_not_a_container(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """An open LLM does not become the current span — it's a leaf, so an
+        implicit tool started alongside it still nests under the turn.
+        """
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_llm(model="gpt-4o"):
+                assert get_current_span() is turn
