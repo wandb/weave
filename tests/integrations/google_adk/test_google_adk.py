@@ -357,6 +357,38 @@ class TestWrappers:
         # must still see every chunk so it can record streaming metrics.
         assert len(original_calls) == 2
 
+    def test_trace_inference_result_supports_3arg_signature(self) -> None:
+        """ADK 2.3.0 prepended ``invocation_context`` to
+        ``trace_inference_result`` — ``(span, llm_response)`` became
+        ``(invocation_context, span, llm_response)``. The wrapper must forward
+        the leading arg to the same-version original and still enrich the span
+        instead of raising ``TypeError``.
+        """
+        forwarded: list[tuple[Any, ...]] = []
+
+        def fake_original(
+            invocation_context: Any, span: Any, llm_response: LlmResponse
+        ) -> None:
+            forwarded.append((invocation_context, span, llm_response))
+
+        wrapped = _wrap_trace_inference_result(fake_original)
+        span = _AttrSpan()
+        response = LlmResponse(
+            content=types.Content(role="model", parts=[types.Part(text="final")]),
+            partial=False,
+            finish_reason=types.FinishReason.STOP,
+            interaction_id="ctx-resp-1",
+            model_version="m",
+        )
+        invocation_context = object()  # opaque; the wrapper only forwards it
+        wrapped(invocation_context, span, response)
+
+        # The original saw all three args in ADK's order.
+        assert forwarded == [(invocation_context, span, response)]
+        # The span still got enriched from the trailing response arg.
+        assert span.attributes["gen_ai.response.id"] == "ctx-resp-1"
+        assert "gen_ai.output.messages" in span.attributes
+
     def test_trace_tool_call_error_keeps_arguments_omits_result(self) -> None:
         """Tool errors land an args-only span — never a half-built result.
 
