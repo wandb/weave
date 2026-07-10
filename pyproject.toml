@@ -679,7 +679,6 @@ ignore_imports = [
   "weave.evaluation.eval -> weave.trace_server.constants",
   "weave.evaluation.eval -> weave.trace_server.trace_server_interface",
   "weave.evaluation.otel_eval_linker -> weave.trace_server.constants",
-  "weave.evaluation.otel_eval_linker -> weave.trace_server.trace_server_interface",
   "weave.flow.annotation_spec -> weave.trace_server.interface.builtin_object_classes.annotation_spec",
   "weave.flow.leaderboard -> weave.trace_server.interface.builtin_object_classes.leaderboard",
   "weave.flow.leaderboard -> weave.trace_server.trace_server_interface",
