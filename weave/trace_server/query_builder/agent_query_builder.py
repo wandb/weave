@@ -57,6 +57,9 @@ from weave.trace_server.query_builder import agent_trace_attribution
 from weave.trace_server.query_builder.agent_custom_attrs import (
     custom_attr_value_or_null,
 )
+from weave.trace_server.query_builder.agent_signal_filters import (
+    build_signal_filter_clause,
+)
 
 # ---------------------------------------------------------------------------
 # Column whitelists — only these can appear in WHERE/ORDER BY/GROUP BY
@@ -1158,10 +1161,18 @@ def make_spans_count_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans count")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f" HAVING {having}" if having else ""
+    # Apply the signal semi-join here too, so total_count matches the filtered list
+    # (an unfiltered count produces phantom empty pages). Filtering on the attributed
+    # conversation_id forces attribution even when the query wouldn't otherwise need it.
+    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
+    count_where = span_filters.where
+    if signal_clause is not None:
+        count_where = f"{count_where} AND {signal_clause}"
+        attribute = True
     source = _spans_source(pb, req, attribute=attribute)
     return (
         f"SELECT count() FROM ("
-        f"SELECT {group_exprs} FROM {source} s WHERE {span_filters.where} "
+        f"SELECT {group_exprs} FROM {source} s WHERE {count_where} "
         f"GROUP BY {group_exprs}"
         f"{having_sql}"
         f")"
@@ -1255,13 +1266,17 @@ def make_spans_list_query(pb: ParamBuilder, req: AgentSpansQueryReq) -> str:
     ensure_group_filters_match(group_filters, req.group_by, context="spans list")
     having = group_filters_having_sql(pb, group_filters)
     having_sql = f"HAVING {having}" if having else ""
+    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
+    grouped_where = span_filters.where
+    if signal_clause is not None:
+        grouped_where = f"{grouped_where} AND {signal_clause}"
     source = _spans_source(pb, req, attribute=True, include_costs=req.include_costs)
 
     return f"""
         SELECT {select_group_cols},
                {aggregate_selects}
         FROM {source} s
-        WHERE {span_filters.where}
+        WHERE {grouped_where}
         GROUP BY {group_by_clause}
         {having_sql}
         ORDER BY {order_by}

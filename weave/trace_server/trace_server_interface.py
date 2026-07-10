@@ -1272,7 +1272,15 @@ class FeedbackCreateReq(BaseModelStrict):
     span_status_code: str = Field(
         default="UNSET",
         description="Status of the scored turn (from spans.status_code)",
-        examples=["SUCCESS"],
+        examples=["OK"],
+    )
+    span_conversation_id: str = Field(
+        default="",
+        description="Conversation the feedback belongs to (from spans.conversation_id)",
+    )
+    span_trace_id: str = Field(
+        default="",
+        description="Turn the feedback belongs to (from spans.trace_id)",
     )
 
     # wb_user_id is automatically populated by the server

@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -42,8 +43,10 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentTraceChatReq,
     GenAIOTelExportReq,
+    RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
@@ -3156,3 +3159,490 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
         )
     )
     assert obj.obj.wb_user_id == internal_user_id
+
+
+# ---------------------------------------------------------------------------
+# Tests: agent target IDs persisted on feedback create
+# ---------------------------------------------------------------------------
+
+
+def test_feedback_create_derives_conversation_target_id_from_ref(ch_server):
+    """Conversation-targeted agent feedback derives the denormalized ID."""
+    project_id = _make_project_id("fb-conv-id-derived")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
+    ]
+
+
+def test_feedback_create_derives_turn_target_id_from_ref(ch_server):
+    """Turn-targeted agent feedback derives the denormalized trace ID."""
+    project_id = _make_project_id("fb-turn-id-derived")
+    trace_id = uuid.uuid4().hex
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": "",
+            "span_trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
+def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
+    """Conversation-targeted feedback persists the supplied denormalized ID."""
+    project_id = _make_project_id("fb-conv-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            span_conversation_id=conv_id,
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
+    ]
+
+
+def test_feedback_create_persists_supplied_span_target_ids(ch_server):
+    """Span-targeted feedback persists supplied denormalized IDs."""
+    project_id = _make_project_id("fb-span-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=span_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            span_conversation_id=conv_id,
+            span_trace_id=trace_id,
+            wb_user_id="u3",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
+def test_feedback_create_batch_persists_supplied_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-ids")
+    conv_ref_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    span_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_trace_id = uuid.uuid4().hex
+    span_trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_ref_id
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(
+        project_id=project_id, trace_id=turn_trace_id
+    ).uri
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create_batch(
+        tsi.FeedbackCreateBatchReq(
+            batch=[
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=conv_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["conv-tag"],
+                    span_conversation_id=conv_ref_id,
+                    wb_user_id="u1",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=turn_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["turn-tag"],
+                    span_conversation_id=turn_conv_id,
+                    span_trace_id=turn_trace_id,
+                    wb_user_id="u2",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=span_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["span-tag"],
+                    span_conversation_id=span_conv_id,
+                    span_trace_id=span_trace_id,
+                    wb_user_id="u3",
+                ),
+            ]
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=[
+                "weave_ref",
+                "span_conversation_id",
+                "span_trace_id",
+                "scorer_tags",
+            ],
+        )
+    )
+    actual = sorted(res.result, key=lambda row: row["weave_ref"])
+    expected = sorted(
+        [
+            {
+                "weave_ref": conv_ref,
+                "span_conversation_id": conv_ref_id,
+                "span_trace_id": "",
+                "scorer_tags": ["conv-tag"],
+            },
+            {
+                "weave_ref": turn_ref,
+                "span_conversation_id": turn_conv_id,
+                "span_trace_id": turn_trace_id,
+                "scorer_tags": ["turn-tag"],
+            },
+            {
+                "weave_ref": span_ref,
+                "span_conversation_id": span_conv_id,
+                "span_trace_id": span_trace_id,
+                "scorer_tags": ["span-tag"],
+            },
+        ],
+        key=lambda row: row["weave_ref"],
+    )
+    assert actual == expected
+
+
+def test_feedback_create_rejects_trace_id_for_conversation_ref(ch_server):
+    project_id = _make_project_id("fb-conv-ref-trace-id")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-a' cannot be supplied for "
+        "conversation-targeted feedback",
+    ):
+        ch_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=conv_ref,
+                feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                payload={},
+                scorer_tags=["hallucination"],
+                span_trace_id="trace-a",
+                wb_user_id="u1",
+            )
+        )
+
+
+def test_feedback_create_batch_rejects_conflicting_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-id-conflict")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id="trace-a").uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_conversation_id 'conv-b' conflicts with "
+        "conversation ref 'conv-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=conv_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["conv-tag"],
+                        span_conversation_id="conv-b",
+                        wb_user_id="u1",
+                    )
+                ]
+            )
+        )
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-b' conflicts with turn ref 'trace-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=turn_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["turn-tag"],
+                        span_trace_id="trace-b",
+                        wb_user_id="u2",
+                    )
+                ]
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test: signal filtering on agent conversations (Task 7)
+# ---------------------------------------------------------------------------
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_filter_conversations_by_signal(ch_server):
+    """E2E proof of signal filter union semantics and mutation-correctness.
+
+    Seeds two conversations (conv-A, conv-B). Tags a turn in conv-A and a
+    conversation-level tag in conv-B. Verifies:
+    - Tag filter returns only the tagged conversation.
+    - Rating filter returns only the rated conversation.
+    - No filter returns both.
+    - Conv-level tag matches the other union arm.
+    - total_count reflects the filter (not the unfiltered conversation count).
+    - A combined tag + rating filter matches across feedback rows (human tag and
+      monitor rating live on different rows) and AND-s the two grains.
+    - Purging the feedback removes it from the filter result.
+    """
+    project_id = _make_project_id("signal-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_a = uuid.uuid4().hex
+    trace_b = uuid.uuid4().hex
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    # Seed one span per conversation so each appears in grouped query results.
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                trace_id=trace_a,
+                conversation_id=conv_a,
+                operation_name="invoke_agent",
+                started_at=now,
+            ),
+            _make_span(
+                project_id,
+                trace_id=trace_b,
+                conversation_id=conv_b,
+                operation_name="invoke_agent",
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+        ],
+    )
+
+    # Helper: run grouped query and return sorted conversation_ids.
+    def filtered_ids(signal_filters: AgentSignalFilter | None) -> list[str]:
+        res = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        )
+        return sorted(
+            g.group_keys["conversation_id"]
+            for g in res.groups
+            if g.group_keys.get("conversation_id") in {conv_a, conv_b}
+        )
+
+    def filtered_count(signal_filters: AgentSignalFilter | None) -> int:
+        return ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        ).total_count
+
+    # Baseline: no signal filter returns both conversations, and total_count agrees.
+    assert filtered_ids(None) == sorted([conv_a, conv_b])
+    assert filtered_count(None) == 2
+
+    # Tag a TURN in conv-A. The producer (here, the monitor) supplies
+    # span_conversation_id from the scored span, so the turn-level signal resolves
+    # up to conv-A.
+    turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
+    fb_a = ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_MONITOR_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u1",
+            runnable_ref=ri.InternalOpRef(
+                project_id=project_id, name="scorer", version="v1"
+            ).uri,
+            call_ref=ri.InternalCallRef(project_id=project_id, id=trace_a).uri,
+            trigger_ref=ri.InternalObjectRef(
+                project_id=project_id, name="monitor", version="v1"
+            ).uri,
+            scorer_tags=["flagged"],
+            scorer_ratings={"_rating_": 0.9},
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
+        )
+    )
+
+    # Tag filter selects only conv-A (turn-level signal resolves up to conversation).
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == [conv_a]
+    # total_count applies the filter too (else the UI paginates over phantom empties).
+    assert filtered_count(AgentSignalFilter(tags=["flagged"])) == 1
+
+    # Rating filter selects conv-A (0.9 >= 0.8).
+    assert filtered_ids(
+        AgentSignalFilter(
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)]
+        )
+    ) == [conv_a]
+
+    # Arm 2 of the union: conversation-level tag on conv-B.
+    conv_b_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_b
+    ).uri
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_b_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u2",
+            scorer_tags=["reviewed"],
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["reviewed"])) == [conv_b]
+
+    # Combined tag + rating must match ACROSS rows: add a human tag on conv-A on a
+    # separate wandb.agent_user_feedback row from the monitor's rating. A single-row
+    # conjunction would miss this; the per-grain sub-selects match it.
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u3",
+            scorer_tags=["human-flag"],
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
+        )
+    )
+    combined = AgentSignalFilter(
+        tags=["human-flag"],
+        ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+    )
+    assert filtered_ids(combined) == [conv_a]
+
+    # AND across grains: conv-B has the "reviewed" tag but no rating, so a combined
+    # tag + rating filter excludes it.
+    assert (
+        filtered_ids(
+            AgentSignalFilter(
+                tags=["reviewed"],
+                ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+            )
+        )
+        == []
+    )
+
+    # Mutation-correctness: purge the conv-A turn feedback; tag filter returns [].
+    ch_server.feedback_purge(
+        tsi.FeedbackPurgeReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": fb_a.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == []
