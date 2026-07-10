@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
+from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
     add_optional_cost,
     build_trace_chat,
@@ -829,6 +830,14 @@ class AgentWriteHandler:
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
+
+        When ingest sampling is enabled (rate < 1.0), spans are parsed first
+        and whole traces are kept or dropped *before* the expensive
+        blob-strip/extraction steps run, so dropped traces never write
+        Content files. Dropped spans are neither stored nor returned (they
+        never reach the scoring Kafka emit) but still count as accepted —
+        the client sees an ordinary success. See agents/ingest_sampling.py
+        (WB-36877).
         """
         span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
@@ -837,59 +846,102 @@ class AgentWriteHandler:
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
 
-        for processed_span in req.processed_spans:
-            resource = Resource.from_proto(processed_span.resource_spans.resource)
+        # Both branches below account every parse/extraction failure through
+        # these two helpers, so the bookkeeping cannot drift between them.
+        def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
+            nonlocal rejected
+            try:
+                return Span.from_proto(protobuf_span, resource)
+            except AttributePathConflictError as e:
+                _record_ingest_failure(
+                    failure_counts,
+                    failure_examples,
+                    type(e).__name__,
+                )
+                rejected += 1
+                errors.append(str(e))
+                return None
 
-            for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                for protobuf_span in protobuf_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(protobuf_span, resource)
-                    except AttributePathConflictError as e:
-                        _record_ingest_failure(
-                            failure_counts,
-                            failure_examples,
-                            type(e).__name__,
-                        )
-                        rejected += 1
-                        errors.append(str(e))
-                        continue
+        def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
+            nonlocal accepted, rejected
+            # Strip inline base64/data-URIs into weave refs before the
+            # pure extraction transform runs.
+            if self._trace_server is not None:
+                strip_inline_blobs_from_span(
+                    span,
+                    req.project_id,
+                    self._trace_server,
+                    wb_user_id=req.wb_user_id,
+                )
+            try:
+                genai_row = extract_genai_span(
+                    span,
+                    project_id=req.project_id,
+                    wb_user_id=req.wb_user_id or "",
+                    wb_run_id=run_id or "",
+                )
+            except Exception as e:
+                error_type = type(e).__name__
+                _record_ingest_failure(
+                    failure_counts,
+                    failure_examples,
+                    error_type,
+                    span_id=span.span_id,
+                )
+                rejected += 1
+                # Don't leak raw `str(e)` to the client — it can
+                # contain server-side state. Exception type is
+                # safe and enough for a caller to triage.
+                errors.append(
+                    f"Extraction failed for span {span.span_id}: {error_type}"
+                )
+                return None
+            accepted += 1
+            return genai_row
 
-                    # Strip inline base64/data-URIs into weave refs before the
-                    # pure extraction transform runs.
-                    if self._trace_server is not None:
-                        strip_inline_blobs_from_span(
-                            span,
-                            req.project_id,
-                            self._trace_server,
-                            wb_user_id=req.wb_user_id,
-                        )
+        sampling = ingest_sampling.request_config()
+        if not sampling.enabled:
+            # Sampler off (the default): the unmodified single-pass path.
+            for processed_span in req.processed_spans:
+                resource = Resource.from_proto(processed_span.resource_spans.resource)
+                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                    for protobuf_span in protobuf_scope_spans.spans:
+                        span = parse_span(protobuf_span, resource)
+                        if span is None:
+                            continue
+                        row = extract_row(span, processed_span.run_id)
+                        if row is not None:
+                            span_rows.append(row)
+        else:
+            # Pass 1 (cheap): parse everything, then decide keep/drop per
+            # trace before any blob-strip/extraction work happens.
+            parsed: list[tuple[Span, str | None]] = []
+            byte_sizes: list[int] = []
+            for processed_span in req.processed_spans:
+                resource = Resource.from_proto(processed_span.resource_spans.resource)
+                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                    for protobuf_span in protobuf_scope_spans.spans:
+                        span = parse_span(protobuf_span, resource)
+                        if span is None:
+                            continue
+                        parsed.append((span, processed_span.run_id))
+                        byte_sizes.append(protobuf_span.ByteSize())
 
-                    try:
-                        genai_row = extract_genai_span(
-                            span,
-                            project_id=req.project_id,
-                            wb_user_id=req.wb_user_id or "",
-                            wb_run_id=processed_span.run_id or "",
-                        )
-                    except Exception as e:
-                        error_type = type(e).__name__
-                        _record_ingest_failure(
-                            failure_counts,
-                            failure_examples,
-                            error_type,
-                            span_id=span.span_id,
-                        )
-                        rejected += 1
-                        # Don't leak raw `str(e)` to the client — it can
-                        # contain server-side state. Exception type is
-                        # safe and enough for a caller to triage.
-                        errors.append(
-                            f"Extraction failed for span {span.span_id}: {error_type}"
-                        )
-                        continue
+            decisions = ingest_sampling.decide_spans(
+                sampling, [span for span, _ in parsed], byte_sizes
+            )
 
-                    span_rows.append(genai_row)
+            # Pass 2 (expensive): blob-strip + extraction for kept spans only.
+            for (span, run_id), decision in zip(parsed, decisions, strict=True):
+                if decision.drop:
                     accepted += 1
+                    continue
+                row = extract_row(span, run_id)
+                if row is None:
+                    continue
+                if decision.sampled_rate is not None:
+                    ingest_sampling.stamp_sample_rate(row, decision.sampled_rate)
+                span_rows.append(row)
 
         if span_rows:
             self.insert_spans(span_rows)
