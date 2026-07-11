@@ -750,18 +750,33 @@ async def test_beta_async_anthropic_stream(
 # cache_read_input_tokens / cache_creation_input_tokens counts. The summary's
 # input_tokens must be the gross sum of the three (Weave's cost math subtracts
 # the cache counts from it), while the raw response usage stays provider-native.
-cache_messages = [
-    {
-        "role": "user",
-        "content": [
-            {
-                "type": "text",
-                "text": "Hello, cached Claude",
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-    }
-]
+#
+# The cache tests are recorded against the live API on a current model
+# (claude-3-haiku-20240307 is retired). Caching needs a minimum prefix
+# (4096 tokens on haiku 4.5), so the cacheable block repeats a fixed sentence
+# well past that, and each test tags it with a unique marker so its first
+# recorded call writes the cache and its second call reads it, independent of
+# the other cache tests.
+cache_model = "claude-haiku-4-5-20251001"
+cache_filler = " ".join(
+    ["Weave prices cached and uncached prompt tokens with separate counters."] * 400
+)
+
+
+def cache_messages(case: str) -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"[cache case: {case}] {cache_filler}",
+                    "cache_control": {"type": "ephemeral"},
+                },
+                {"type": "text", "text": "Reply with the single word: ok"},
+            ],
+        }
+    ]
 
 
 @pytest.mark.vcr(
@@ -772,31 +787,50 @@ def test_anthropic_cache_tokens(
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
-    message = anthropic_client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=cache_messages,
+    write = anthropic_client.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("sync"),
+    )
+    read = anthropic_client.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("sync"),
     )
 
-    assert message.usage.input_tokens == 100
+    # The first recorded call wrote the cache, the second read the same prefix.
+    assert write.usage.cache_creation_input_tokens > 0
+    assert write.usage.cache_read_input_tokens == 0
+    assert read.usage.cache_read_input_tokens == write.usage.cache_creation_input_tokens
+    assert read.usage.cache_creation_input_tokens == 0
+
     calls = list(client.get_calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.exception is None
-    assert call.ended_at is not None
-    output = call.output
-    # The raw response usage stays net.
-    assert output.usage.input_tokens == 100
-    summary = call.summary
-    assert summary is not None
-    model_usage = summary["usage"][output.model]
-    assert model_usage["requests"] == 1
-    # input_tokens is gross: the net count (100) plus the cache read (80) and
-    # cache creation (15) counts.
-    assert model_usage["input_tokens"] == 195
-    assert model_usage["output_tokens"] == 20
-    assert model_usage["cache_read_input_tokens"] == 80
-    assert model_usage["cache_creation_input_tokens"] == 15
+    assert len(calls) == 2
+    for call, message in zip(calls, (write, read), strict=True):
+        assert call.exception is None
+        assert call.ended_at is not None
+        output = call.output
+        # The raw response usage stays net.
+        assert output.usage.input_tokens == message.usage.input_tokens
+        summary = call.summary
+        assert summary is not None
+        model_usage = summary["usage"][output.model]
+        assert model_usage["requests"] == 1
+        # input_tokens is gross: the net count plus both cache counts.
+        assert (
+            model_usage["input_tokens"]
+            == message.usage.input_tokens
+            + message.usage.cache_read_input_tokens
+            + message.usage.cache_creation_input_tokens
+        )
+        assert (
+            model_usage["cache_read_input_tokens"]
+            == message.usage.cache_read_input_tokens
+        )
+        assert (
+            model_usage["cache_creation_input_tokens"]
+            == message.usage.cache_creation_input_tokens
+        )
 
 
 @pytest.mark.vcr(
@@ -809,28 +843,47 @@ async def test_async_anthropic_cache_tokens(
     anthropic_client = AsyncAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
-    message = await anthropic_client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=cache_messages,
+    write = await anthropic_client.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("async"),
+    )
+    read = await anthropic_client.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("async"),
     )
 
-    assert message.usage.input_tokens == 100
+    assert write.usage.cache_creation_input_tokens > 0
+    assert write.usage.cache_read_input_tokens == 0
+    assert read.usage.cache_read_input_tokens == write.usage.cache_creation_input_tokens
+    assert read.usage.cache_creation_input_tokens == 0
+
     calls = list(client.get_calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.exception is None
-    assert call.ended_at is not None
-    output = call.output
-    assert output.usage.input_tokens == 100
-    summary = call.summary
-    assert summary is not None
-    model_usage = summary["usage"][output.model]
-    assert model_usage["requests"] == 1
-    assert model_usage["input_tokens"] == 195
-    assert model_usage["output_tokens"] == 20
-    assert model_usage["cache_read_input_tokens"] == 80
-    assert model_usage["cache_creation_input_tokens"] == 15
+    assert len(calls) == 2
+    for call, message in zip(calls, (write, read), strict=True):
+        assert call.exception is None
+        assert call.ended_at is not None
+        output = call.output
+        assert output.usage.input_tokens == message.usage.input_tokens
+        summary = call.summary
+        assert summary is not None
+        model_usage = summary["usage"][output.model]
+        assert model_usage["requests"] == 1
+        assert (
+            model_usage["input_tokens"]
+            == message.usage.input_tokens
+            + message.usage.cache_read_input_tokens
+            + message.usage.cache_creation_input_tokens
+        )
+        assert (
+            model_usage["cache_read_input_tokens"]
+            == message.usage.cache_read_input_tokens
+        )
+        assert (
+            model_usage["cache_creation_input_tokens"]
+            == message.usage.cache_creation_input_tokens
+        )
 
 
 @pytest.mark.vcr(
@@ -841,33 +894,46 @@ def test_anthropic_stream_cache_tokens(
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
-    stream = anthropic_client.messages.create(
-        model=model,
-        stream=True,
-        max_tokens=1024,
-        messages=cache_messages,
-    )
-    for _event in stream:
-        pass
+    for _ in range(2):
+        stream = anthropic_client.messages.create(
+            model=cache_model,
+            stream=True,
+            max_tokens=32,
+            messages=cache_messages("stream"),
+        )
+        for _event in stream:
+            pass
 
     calls = list(client.get_calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.exception is None
-    assert call.ended_at is not None
-    output = call.output
-    # The accumulated message keeps the net input and both cache counts.
-    assert output.usage.input_tokens == 100
-    assert output.usage.cache_read_input_tokens == 80
-    assert output.usage.cache_creation_input_tokens == 15
-    summary = call.summary
-    assert summary is not None
-    model_usage = summary["usage"][output.model]
-    assert model_usage["requests"] == 1
-    assert model_usage["input_tokens"] == 195
-    assert model_usage["output_tokens"] == 20
-    assert model_usage["cache_read_input_tokens"] == 80
-    assert model_usage["cache_creation_input_tokens"] == 15
+    assert len(calls) == 2
+    write_usage = calls[0].output.usage
+    read_usage = calls[1].output.usage
+    # The accumulated messages keep the net input and both cache counts:
+    # the first recorded stream wrote the cache, the second read it.
+    assert write_usage.cache_creation_input_tokens > 0
+    assert write_usage.cache_read_input_tokens == 0
+    assert read_usage.cache_read_input_tokens == write_usage.cache_creation_input_tokens
+    assert read_usage.cache_creation_input_tokens == 0
+
+    for call in calls:
+        assert call.exception is None
+        assert call.ended_at is not None
+        usage = call.output.usage
+        summary = call.summary
+        assert summary is not None
+        model_usage = summary["usage"][call.output.model]
+        assert model_usage["requests"] == 1
+        assert (
+            model_usage["input_tokens"]
+            == usage.input_tokens
+            + usage.cache_read_input_tokens
+            + usage.cache_creation_input_tokens
+        )
+        assert model_usage["cache_read_input_tokens"] == usage.cache_read_input_tokens
+        assert (
+            model_usage["cache_creation_input_tokens"]
+            == usage.cache_creation_input_tokens
+        )
 
 
 @pytest.mark.vcr(
@@ -878,31 +944,43 @@ def test_anthropic_messages_stream_ctx_manager_cache_tokens(
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
-    with anthropic_client.messages.stream(
-        max_tokens=1024,
-        messages=cache_messages,
-        model=model,
-    ) as stream:
-        for _event in stream:
-            pass
+    for _ in range(2):
+        with anthropic_client.messages.stream(
+            max_tokens=32,
+            messages=cache_messages("ctx"),
+            model=cache_model,
+        ) as stream:
+            for _event in stream:
+                pass
 
     calls = list(client.get_calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.exception is None
-    assert call.ended_at is not None
-    output = call.output
-    assert output.usage.input_tokens == 100
-    assert output.usage.cache_read_input_tokens == 80
-    assert output.usage.cache_creation_input_tokens == 15
-    summary = call.summary
-    assert summary is not None
-    model_usage = summary["usage"][output.model]
-    assert model_usage["requests"] == 1
-    assert model_usage["input_tokens"] == 195
-    assert model_usage["output_tokens"] == 20
-    assert model_usage["cache_read_input_tokens"] == 80
-    assert model_usage["cache_creation_input_tokens"] == 15
+    assert len(calls) == 2
+    write_usage = calls[0].output.usage
+    read_usage = calls[1].output.usage
+    assert write_usage.cache_creation_input_tokens > 0
+    assert write_usage.cache_read_input_tokens == 0
+    assert read_usage.cache_read_input_tokens == write_usage.cache_creation_input_tokens
+    assert read_usage.cache_creation_input_tokens == 0
+
+    for call in calls:
+        assert call.exception is None
+        assert call.ended_at is not None
+        usage = call.output.usage
+        summary = call.summary
+        assert summary is not None
+        model_usage = summary["usage"][call.output.model]
+        assert model_usage["requests"] == 1
+        assert (
+            model_usage["input_tokens"]
+            == usage.input_tokens
+            + usage.cache_read_input_tokens
+            + usage.cache_creation_input_tokens
+        )
+        assert model_usage["cache_read_input_tokens"] == usage.cache_read_input_tokens
+        assert (
+            model_usage["cache_creation_input_tokens"]
+            == usage.cache_creation_input_tokens
+        )
 
 
 @pytest.mark.vcr(
@@ -916,9 +994,9 @@ def test_anthropic_messages_stream_ctx_manager_abandoned(
     anthropic_client = Anthropic(api_key=api_key)
     first_event = None
     with anthropic_client.messages.stream(
-        max_tokens=1024,
-        messages=cache_messages,
-        model=model,
+        max_tokens=32,
+        messages=cache_messages("abandoned"),
+        model=cache_model,
     ) as stream:
         for event in stream:
             first_event = event
@@ -951,8 +1029,8 @@ def test_anthropic_create_with_traced_call_in_response_hook(
 
     def call_anthropic_from_hook(response: httpx.Response) -> None:
         inner_client.messages.create(
-            model=model,
-            max_tokens=1024,
+            model=cache_model,
+            max_tokens=32,
             messages=[{"role": "user", "content": "Hello, Claude"}],
         )
 
@@ -961,27 +1039,29 @@ def test_anthropic_create_with_traced_call_in_response_hook(
         http_client=httpx.Client(event_hooks={"response": [call_anthropic_from_hook]}),
     )
     message = outer_client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=cache_messages,
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("hook"),
     )
 
-    assert message.usage.input_tokens == 100
+    # The outer response has real cache activity of its own.
+    assert message.usage.cache_creation_input_tokens > 0
     calls = list(client.get_calls())
     assert len(calls) == 2
     outer, inner = calls
     assert inner.parent_id == outer.id
     assert outer.exception is None
     assert outer.ended_at is not None
-    # The outer summary is the child rollup; the outer response's own usage
-    # (gross 195) must not overwrite the child's counts.
-    outer_usage = outer.summary["usage"][model]
+    inner_raw = inner.output.usage
+    # The outer summary is the child rollup; the outer response's own gross
+    # count must not overwrite the child's counts.
+    outer_usage = outer.summary["usage"][inner.output.model]
     assert outer_usage["requests"] == 1
-    assert outer_usage["input_tokens"] == 7
-    assert outer_usage["output_tokens"] == 2
-    inner_usage = inner.summary["usage"][model]
-    assert inner_usage["input_tokens"] == 7
-    assert inner_usage["output_tokens"] == 2
+    assert outer_usage["input_tokens"] == inner_raw.input_tokens
+    assert outer_usage["output_tokens"] == inner_raw.output_tokens
+    inner_usage = inner.summary["usage"][inner.output.model]
+    assert inner_usage["input_tokens"] == inner_raw.input_tokens
+    assert inner_usage["output_tokens"] == inner_raw.output_tokens
 
 
 @pytest.mark.vcr(
@@ -990,16 +1070,30 @@ def test_anthropic_create_with_traced_call_in_response_hook(
 def test_anthropic_cache_tokens_zero(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    """A cache count of 0 is meaningful (caching was possible but nothing hit)."""
+    """A cache_control block below the minimum cacheable length is processed
+    without caching and reports both cache counts as 0.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=cache_messages,
+        model=cache_model,
+        max_tokens=32,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Hello, cached Claude",
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+            }
+        ],
     )
 
-    assert message.usage.input_tokens == 100
+    assert message.usage.cache_creation_input_tokens == 0
+    assert message.usage.cache_read_input_tokens == 0
     calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
@@ -1010,7 +1104,7 @@ def test_anthropic_cache_tokens_zero(
     assert summary is not None
     model_usage = summary["usage"][output.model]
     # Zero cache counts add nothing: input_tokens stays at the net count.
-    assert model_usage["input_tokens"] == 100
+    assert model_usage["input_tokens"] == message.usage.input_tokens
     assert model_usage["cache_read_input_tokens"] == 0
     assert model_usage["cache_creation_input_tokens"] == 0
 
@@ -1023,28 +1117,47 @@ def test_beta_anthropic_cache_tokens(
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
-    message = anthropic_client.beta.messages.create(
-        model=model,
-        max_tokens=1024,
-        messages=cache_messages,
+    write = anthropic_client.beta.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("beta"),
+    )
+    read = anthropic_client.beta.messages.create(
+        model=cache_model,
+        max_tokens=32,
+        messages=cache_messages("beta"),
     )
 
-    assert message.usage.input_tokens == 100
+    assert write.usage.cache_creation_input_tokens > 0
+    assert write.usage.cache_read_input_tokens == 0
+    assert read.usage.cache_read_input_tokens == write.usage.cache_creation_input_tokens
+    assert read.usage.cache_creation_input_tokens == 0
+
     calls = list(client.get_calls())
-    assert len(calls) == 1
-    call = calls[0]
-    assert call.exception is None
-    assert call.ended_at is not None
-    output = call.output
-    assert output.usage.input_tokens == 100
-    summary = call.summary
-    assert summary is not None
-    model_usage = summary["usage"][output.model]
-    assert model_usage["requests"] == 1
-    assert model_usage["input_tokens"] == 195
-    assert model_usage["output_tokens"] == 20
-    assert model_usage["cache_read_input_tokens"] == 80
-    assert model_usage["cache_creation_input_tokens"] == 15
+    assert len(calls) == 2
+    for call, message in zip(calls, (write, read), strict=True):
+        assert call.exception is None
+        assert call.ended_at is not None
+        output = call.output
+        assert output.usage.input_tokens == message.usage.input_tokens
+        summary = call.summary
+        assert summary is not None
+        model_usage = summary["usage"][output.model]
+        assert model_usage["requests"] == 1
+        assert (
+            model_usage["input_tokens"]
+            == message.usage.input_tokens
+            + message.usage.cache_read_input_tokens
+            + message.usage.cache_creation_input_tokens
+        )
+        assert (
+            model_usage["cache_read_input_tokens"]
+            == message.usage.cache_read_input_tokens
+        )
+        assert (
+            model_usage["cache_creation_input_tokens"]
+            == message.usage.cache_creation_input_tokens
+        )
 
 
 def test_anthropic_on_finish_recomputes_gross_input_from_raw_usage() -> None:

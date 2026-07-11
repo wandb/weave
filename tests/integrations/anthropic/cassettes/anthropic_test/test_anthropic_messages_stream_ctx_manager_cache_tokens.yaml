@@ -1,60 +1,959 @@
 interactions:
 - request:
-    body: '{"max_tokens": 1024, "messages": [{"role": "user", "content": [{"type":
-      "text", "text": "Hello, cached Claude", "cache_control": {"type": "ephemeral"}}]}],
-      "model": "claude-3-haiku-20240307", "stream": true}'
+    body: '{"max_tokens":32,"messages":[{"role":"user","content":[{"type":"text","text":"[cache
+      case: ctx] Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters.","cache_control":{"type":"ephemeral"}},{"type":"text","text":"Reply
+      with the single word: ok"}]}],"model":"claude-haiku-4-5-20251001","stream":true}'
     headers:
-      accept:
+      Accept:
       - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '28644'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.75.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.75.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.12.13
+      X-Stainless-Stream-Helper:
+      - messages
       anthropic-version:
       - '2023-06-01'
-      content-type:
-      - application/json
-      host:
-      - api.anthropic.com
-      x-stainless-stream-helper:
-      - messages
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-timeout:
+      - NOT_GIVEN
     method: POST
     uri: https://api.anthropic.com/v1/messages
   response:
     body:
-      string: 'event: message_start
-
-        data: {"type":"message_start","message":{"id":"msg_cache_ctx_stream","type":"message","role":"assistant","model":"claude-3-haiku-20240307","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":100,"output_tokens":1,"cache_read_input_tokens":80,"cache_creation_input_tokens":15}}}
-
-
-        event: content_block_start
-
-        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Cached
-        answer."}}
-
-
-        event: content_block_stop
-
-        data: {"type":"content_block_stop","index":0}
-
-
-        event: message_delta
-
-        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":20}}
-
-
-        event: message_stop
-
-        data: {"type":"message_stop"}
-
-
-        '
+      string: !!binary |
+        H4sIAAAAAAAAA2xQwWrDMAy99yuKzg7EZd3B11HYdeywsTGMaquJqWNntpwySv59eKyUdNNNT0/v
+        PYkmCqzWA+WMHenMmHhlkVGtz8BfI4GCxRDEpQd1hiFa8qDAeCyWmh7dsTR3zbbZtJutbFsJApyt
+        GrnTrZQP5iRxet7Yw757et3Jt93p8QXEjRMISNFXAHN2mTFUWxMDU2BQ7x8CMsdRJ8IcA6hQvP+F
+        Mn0WCoYWoCVG5/MFK5f0LoyFNccjhQxKtgIMmp60SYTsYtBLwn17pSRCezP+s14taOxpoIReb4d/
+        5a4E2d8KzgJi4UVGAZnS5AxpdpRAQf2OxWTro8OBUj1edxRBQYiscULnce8J5nn9U/Nq9Q0AAP//
+        SoVEOjRA45Ny8pOzsUc9FiVgi1JSKyAeRpYH+ReqryS1AqQQTFkpKUGtBoFaLi4AAAAA//+CWl+Q
+        mZeOZp+CEkhQqZaLCwAAAP//wurElNSckkT8TgQrQXEiRATVaXBlUAfmZyM7UUGhlosLAAAA///C
+        EUb5BYSCKL8AyXoUIwEAAAD//4IaCctOWH2DIqmE5HqUBK+UmpcSX1JalKdEdLKvpWW6R0ulJqDA
+        rOXiAgAAAP//QvMwttBDllNCjgJwJAAAAAD//wMAwJ8nl54EAAA=
     headers:
+      CF-RAY:
+      - a19b0811ac89cd36-SJC
       Cache-Control:
       - no-cache
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
       Content-Type:
       - text/event-stream; charset=utf-8
+      Date:
+      - Sat, 11 Jul 2026 21:51:48 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - dd9f336b-d0a8-460d-b3f2-69a00c053a88
+      anthropic-ratelimit-input-tokens-limit:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '9996000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-07-11T21:51:47Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-07-11T21:51:47Z'
+      anthropic-ratelimit-requests-limit:
+      - '10000'
+      anthropic-ratelimit-requests-remaining:
+      - '9999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-07-11T21:51:47Z'
+      anthropic-ratelimit-tokens-limit:
+      - '12000000'
+      anthropic-ratelimit-tokens-remaining:
+      - '11996000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-07-11T21:51:47Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011Ccw1auqZWos1BMaN1XEAX
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-61e4c323ca1c6cbf33528b15dcba34a0-e49318d29632b3d5-01
+      vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"max_tokens":32,"messages":[{"role":"user","content":[{"type":"text","text":"[cache
+      case: ctx] Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters. Weave prices cached and uncached prompt tokens with separate counters.
+      Weave prices cached and uncached prompt tokens with separate counters. Weave
+      prices cached and uncached prompt tokens with separate counters. Weave prices
+      cached and uncached prompt tokens with separate counters. Weave prices cached
+      and uncached prompt tokens with separate counters. Weave prices cached and uncached
+      prompt tokens with separate counters. Weave prices cached and uncached prompt
+      tokens with separate counters. Weave prices cached and uncached prompt tokens
+      with separate counters. Weave prices cached and uncached prompt tokens with
+      separate counters. Weave prices cached and uncached prompt tokens with separate
+      counters.","cache_control":{"type":"ephemeral"}},{"type":"text","text":"Reply
+      with the single word: ok"}]}],"model":"claude-haiku-4-5-20251001","stream":true}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '28644'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.75.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.75.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.12.13
+      X-Stainless-Stream-Helper:
+      - messages
+      anthropic-version:
+      - '2023-06-01'
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA2SQQU/DMAyF7/sVk8+p1FQMUG6IGwfEgQsgFHmJaaOlSUmcoTH1v6NIDNTt6PfZ
+        fs+mPQVW65Fyxp50Zky8ssio1kfgw0SgYAFBnGpQRxijJQ8KjMdiqRnQ7Upz1Wyaru02sm0lCHC2
+        7si9bqW8N19y291OfXl++Ma718fD08sNiDMnEJCirwLm7DJjqLYmBqbAoN7eBWSOk06EOQZQoXj/
+        K2X6LBQMLURLjM7nk1ZO6V2YCmuOOwoZlGwFGDQDaZMI2cWglw1/PBHaM3bdXo5XC5oGGimh15vx
+        ct0/lcM5nQXEwouAAjKlvTOk2VECBfU1FpOtXw4flOrluqcICkJkjXt0HreeYJ7X82r1AwAA//9K
+        hUQ2NCDjk3Lyk7OxRzkWJWA7UlIrIOGALA/yJ1RfSWoFSCGYslJSqlVABrVcXAAAAAD//4K6oCAz
+        Lx3NSgUlkKBSLRcXAAAA///C6sqU1JySRPyuBCtBcSVEBNV1cGVQN+ZnK9XWcnEBAAAA///CETT5
+        BYRCJr8AyUpQIAMAAAD//4KaBMs0WB2OIqmE5FCUZK2UmpcSX1JalKdEdOKupWXqRkuOJuA0BQAA
+        AP//QvMutiBDllMCJYhaLi4AAAAA//8DALoiZrJ4BAAA
+    headers:
+      CF-RAY:
+      - a19b081a4b81939b-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Sat, 11 Jul 2026 21:51:49 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - dd9f336b-d0a8-460d-b3f2-69a00c053a88
+      anthropic-ratelimit-input-tokens-limit:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '9996000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-07-11T21:51:48Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-07-11T21:51:48Z'
+      anthropic-ratelimit-requests-limit:
+      - '10000'
+      anthropic-ratelimit-requests-remaining:
+      - '9999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-07-11T21:51:48Z'
+      anthropic-ratelimit-tokens-limit:
+      - '12000000'
+      anthropic-ratelimit-tokens-remaining:
+      - '11996000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-07-11T21:51:48Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011Ccw1b1fYbuDXNKHzta6Dk
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-a641bc419613ebfee81ac163e84a1149-37cefe8e00bc1757-01
+      vary:
+      - Accept-Encoding
     status:
       code: 200
       message: OK
