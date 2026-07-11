@@ -782,6 +782,7 @@ def test_anthropic_cache_tokens(
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     # The raw response usage stays net.
     assert output.usage.input_tokens == 100
@@ -818,6 +819,7 @@ async def test_async_anthropic_cache_tokens(
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.usage.input_tokens == 100
     summary = call.summary
@@ -851,6 +853,7 @@ def test_anthropic_stream_cache_tokens(
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     # The accumulated message keeps the net input and both cache counts.
     assert output.usage.input_tokens == 100
@@ -886,6 +889,7 @@ def test_anthropic_messages_stream_ctx_manager_cache_tokens(
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.usage.input_tokens == 100
     assert output.usage.cache_read_input_tokens == 80
@@ -898,6 +902,32 @@ def test_anthropic_messages_stream_ctx_manager_cache_tokens(
     assert model_usage["output_tokens"] == 20
     assert model_usage["cache_read_input_tokens"] == 80
     assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_messages_stream_ctx_manager_abandoned(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """A stream abandoned before message_stop must still log the call cleanly."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=cache_messages,
+        model=model,
+    ) as stream:
+        for _event in stream:
+            break
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+    # No final message was accumulated, so there is no usage to record.
+    assert "usage" not in call.summary
 
 
 @pytest.mark.vcr(
@@ -919,6 +949,8 @@ def test_anthropic_cache_tokens_zero(
     calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     summary = call.summary
     assert summary is not None
@@ -948,6 +980,7 @@ def test_beta_anthropic_cache_tokens(
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.usage.input_tokens == 100
     summary = call.summary
@@ -1000,7 +1033,7 @@ def test_anthropic_on_finish_recomputes_gross_input_from_raw_usage() -> None:
 
 
 def test_anthropic_on_finish_without_cache_counts_keeps_net_input() -> None:
-    # Older anthropic SDKs report usage without the cache fields (None).
+    # Cache fields reported as None count as 0.
     output = Message(
         id="msg_1",
         type="message",
@@ -1022,6 +1055,17 @@ def test_anthropic_on_finish_without_cache_counts_keeps_net_input() -> None:
         "usage": {model: {"requests": 1, "input_tokens": 10, "output_tokens": 5}}
     }
 
+    # Older anthropic SDKs predate the cache fields entirely (attributes absent).
+    old_sdk_output = Mock()
+    old_sdk_output.model = model
+    old_sdk_output.usage = Mock(spec=["input_tokens"])
+    old_sdk_output.usage.input_tokens = 10
+    anthropic_on_finish(call, old_sdk_output, None)
+
+    assert call.summary == {
+        "usage": {model: {"requests": 1, "input_tokens": 10, "output_tokens": 5}}
+    }
+
 
 def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
     call = Mock(spec=Call)
@@ -1029,20 +1073,29 @@ def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
 
     # A stream that never produced a final message accumulates to "".
     anthropic_on_finish(call, "", None)
-    # A non-string model cannot be a summary usage key.
+    # A non-string model cannot be a summary usage key ({} is unhashable).
     non_string_model = Mock()
-    non_string_model.model = 123
+    non_string_model.model = {}
     non_string_model.usage = Usage(input_tokens=1, output_tokens=1)
     anthropic_on_finish(call, non_string_model, None)
-    # Non-integer token counts are left alone.
-    non_int_tokens = Mock()
-    non_int_tokens.model = model
-    non_int_tokens.usage = Mock(
+    # A non-integer input count is left alone.
+    non_int_input = Mock()
+    non_int_input.model = model
+    non_int_input.usage = Mock(
         input_tokens="100",
         cache_read_input_tokens=80,
         cache_creation_input_tokens=15,
     )
-    anthropic_on_finish(call, non_int_tokens, None)
+    anthropic_on_finish(call, non_int_input, None)
+    # A non-integer cache count next to a valid input count is left alone too.
+    non_int_cache = Mock()
+    non_int_cache.model = model
+    non_int_cache.usage = Mock(
+        input_tokens=100,
+        cache_read_input_tokens="80",
+        cache_creation_input_tokens=15,
+    )
+    anthropic_on_finish(call, non_int_cache, None)
     assert call.summary == {"usage": {model: {"requests": 1, "input_tokens": 7}}}
 
     output = Message(
@@ -1060,4 +1113,4 @@ def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
     anthropic_on_finish(call, output, None)
     assert call.summary == {"usage": {}}
     call.summary = None
-    anthropic_on_finish(call, output, None)
+    anthropic_on_finish(call, output, None)  # must not raise

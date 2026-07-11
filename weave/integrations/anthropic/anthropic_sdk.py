@@ -43,16 +43,14 @@ ANTHROPIC_INTEGRATION = library_integration("anthropic")
 def anthropic_on_finish(
     call: Call, output: Any, exception: BaseException | None
 ) -> None:
-    """Rewrite the summary usage entry so input_tokens is the gross prompt count.
+    """Make the summary usage entry's input_tokens the gross prompt count.
 
     Anthropic's input_tokens excludes cache reads/writes, while Weave's cost
-    math treats the canonical input count as the gross total and subtracts the
-    cache counts from it, so add them in (same convention as the Bedrock
-    converse handler). The raw usage on call.output stays provider-native.
-    Access is structural because beta endpoints return BetaMessage/BetaUsage.
+    math subtracts the cache counts from it, so add them in (same convention
+    as the Bedrock converse handler). The raw usage on call.output stays
+    provider-native. Access is structural: beta endpoints return
+    BetaMessage/BetaUsage.
     """
-    if call.summary is None:
-        return
     model = getattr(output, "model", None)
     usage = getattr(output, "usage", None)
     if not isinstance(model, str) or usage is None:
@@ -66,7 +64,8 @@ def anthropic_on_finish(
         or not isinstance(cache_creation, int)
     ):
         return
-    model_usage = call.summary.get("usage", {}).get(model)
+    usage_map = (call.summary or {}).get("usage")
+    model_usage = usage_map.get(model) if isinstance(usage_map, dict) else None
     if not isinstance(model_usage, dict):
         return
     model_usage["input_tokens"] = input_tokens + cache_read + cache_creation
