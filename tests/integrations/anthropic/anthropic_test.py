@@ -2,6 +2,7 @@ import os
 from collections.abc import Generator
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message, TextBlock, Usage
@@ -913,21 +914,74 @@ def test_anthropic_messages_stream_ctx_manager_abandoned(
     """A stream abandoned before message_stop must still log the call cleanly."""
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
+    first_event = None
     with anthropic_client.messages.stream(
         max_tokens=1024,
         messages=cache_messages,
         model=model,
     ) as stream:
-        for _event in stream:
+        for event in stream:
+            first_event = event
             break
 
+    assert first_event is not None
+    assert first_event.type == "message_start"
     calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
     assert call.exception is None
     assert call.ended_at is not None
     # No final message was accumulated, so there is no usage to record.
-    assert "usage" not in call.summary
+    assert call.output == ""
+    assert call.summary.get("usage") is None
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_create_with_traced_call_in_response_hook(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """A traced call made from an httpx response hook runs inside the patched
+    create and becomes its child; the child-rollup summary must not be
+    rewritten with the outer response's own usage.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    inner_client = Anthropic(api_key=api_key)
+
+    def call_anthropic_from_hook(response: httpx.Response) -> None:
+        inner_client.messages.create(
+            model=model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": "Hello, Claude"}],
+        )
+
+    outer_client = Anthropic(
+        api_key=api_key,
+        http_client=httpx.Client(event_hooks={"response": [call_anthropic_from_hook]}),
+    )
+    message = outer_client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+
+    assert message.usage.input_tokens == 100
+    calls = list(client.get_calls())
+    assert len(calls) == 2
+    outer, inner = calls
+    assert inner.parent_id == outer.id
+    assert outer.exception is None
+    assert outer.ended_at is not None
+    # The outer summary is the child rollup; the outer response's own usage
+    # (gross 195) must not overwrite the child's counts.
+    outer_usage = outer.summary["usage"][model]
+    assert outer_usage["requests"] == 1
+    assert outer_usage["input_tokens"] == 7
+    assert outer_usage["output_tokens"] == 2
+    inner_usage = inner.summary["usage"][model]
+    assert inner_usage["input_tokens"] == 7
+    assert inner_usage["output_tokens"] == 2
 
 
 @pytest.mark.vcr(
@@ -1010,6 +1064,7 @@ def test_anthropic_on_finish_recomputes_gross_input_from_raw_usage() -> None:
         ),
     )
     call = Mock(spec=Call)
+    call._children = []
     call.summary = {
         "usage": {
             model: {
@@ -1045,6 +1100,7 @@ def test_anthropic_on_finish_without_cache_counts_keeps_net_input() -> None:
         usage=Usage(input_tokens=10, output_tokens=5),
     )
     call = Mock(spec=Call)
+    call._children = []
     call.summary = {
         "usage": {model: {"requests": 1, "input_tokens": 10, "output_tokens": 5}}
     }
@@ -1069,6 +1125,7 @@ def test_anthropic_on_finish_without_cache_counts_keeps_net_input() -> None:
 
 def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
     call = Mock(spec=Call)
+    call._children = []
     call.summary = {"usage": {model: {"requests": 1, "input_tokens": 7}}}
 
     # A stream that never produced a final message accumulates to "".
@@ -1108,9 +1165,46 @@ def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
         stop_sequence=None,
         usage=Usage(input_tokens=1, output_tokens=1),
     )
+    # A non-dict usage map (user-mutated summary) is left alone.
+    call.summary = {"usage": []}
+    anthropic_on_finish(call, output, None)
+    assert call.summary == {"usage": []}
     # No summary entry for the model and no summary at all are both no-ops.
     call.summary = {"usage": {}}
     anthropic_on_finish(call, output, None)
     assert call.summary == {"usage": {}}
     call.summary = None
     anthropic_on_finish(call, output, None)  # must not raise
+
+
+def test_anthropic_on_finish_skips_child_rollup_summaries() -> None:
+    # A traced op invoked from an httpx event hook runs inside the patched
+    # create, so the anthropic call can have children; finish_call then builds
+    # the summary from the child rollup and this response's usage has no entry
+    # of its own to rewrite.
+    output = Message(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        model=model,
+        content=[TextBlock(type="text", text="hi")],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=Usage(
+            input_tokens=10,
+            output_tokens=1,
+            cache_read_input_tokens=80,
+            cache_creation_input_tokens=15,
+        ),
+    )
+    call = Mock(spec=Call)
+    call._children = [Mock(spec=Call)]
+    call.summary = {
+        "usage": {model: {"requests": 1, "input_tokens": 500, "output_tokens": 50}}
+    }
+
+    anthropic_on_finish(call, output, None)
+
+    assert call.summary == {
+        "usage": {model: {"requests": 1, "input_tokens": 500, "output_tokens": 50}}
+    }

@@ -51,6 +51,9 @@ def anthropic_on_finish(
     provider-native. Access is structural: beta endpoints return
     BetaMessage/BetaUsage.
     """
+    if call._children:
+        # A summary rolled up from child calls is not this response's usage.
+        return
     model = getattr(output, "model", None)
     usage = getattr(output, "usage", None)
     if not isinstance(model, str) or usage is None:
