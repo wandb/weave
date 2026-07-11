@@ -1,0 +1,27 @@
+interactions:
+- request:
+    body: '{"max_tokens": 1024, "messages": [{"role": "user", "content": [{"type":
+      "text", "text": "Hello, cached Claude", "cache_control": {"type": "ephemeral"}}]}],
+      "model": "claude-3-haiku-20240307"}'
+    headers:
+      accept:
+      - application/json
+      anthropic-version:
+      - '2023-06-01'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"id":"msg_cache_async","type":"message","role":"assistant","model":"claude-3-haiku-20240307","content":[{"type":"text","text":"Cached
+        hello."}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":80,"cache_creation_input_tokens":15}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

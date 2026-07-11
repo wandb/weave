@@ -29,6 +29,7 @@ from weave.integrations.integration_metadata import (
 from weave.integrations.integration_utilities import should_use_accumulator
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.call import Call
 from weave.trace.op import _add_accumulator, _IteratorWrapper
 
 if TYPE_CHECKING:
@@ -37,6 +38,38 @@ if TYPE_CHECKING:
 _anthropic_patcher: MultiPatcher | None = None
 
 ANTHROPIC_INTEGRATION = library_integration("anthropic")
+
+
+def anthropic_on_finish(
+    call: Call, output: Any, exception: BaseException | None
+) -> None:
+    """Rewrite the summary usage entry so input_tokens is the gross prompt count.
+
+    Anthropic's input_tokens excludes cache reads/writes, while Weave's cost
+    math treats the canonical input count as the gross total and subtracts the
+    cache counts from it, so add them in (same convention as the Bedrock
+    converse handler). The raw usage on call.output stays provider-native.
+    Access is structural because beta endpoints return BetaMessage/BetaUsage.
+    """
+    if call.summary is None:
+        return
+    model = getattr(output, "model", None)
+    usage = getattr(output, "usage", None)
+    if not isinstance(model, str) or usage is None:
+        return
+    input_tokens = getattr(usage, "input_tokens", None)
+    cache_read = getattr(usage, "cache_read_input_tokens", None) or 0
+    cache_creation = getattr(usage, "cache_creation_input_tokens", None) or 0
+    if (
+        not isinstance(input_tokens, int)
+        or not isinstance(cache_read, int)
+        or not isinstance(cache_creation, int)
+    ):
+        return
+    model_usage = call.summary.get("usage", {}).get(model)
+    if not isinstance(model_usage, dict):
+        return
+    model_usage["input_tokens"] = input_tokens + cache_read + cache_creation
 
 
 def anthropic_accumulator(
@@ -95,6 +128,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         """We need to do this so we can check if `stream` is used."""
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -119,6 +153,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         "We need to do this so we can check if `stream` is used"
         op_kwargs = settings.model_dump()
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: anthropic_accumulator,
@@ -216,6 +251,7 @@ def create_stream_wrapper(settings: OpSettings) -> Callable[[Callable], Callable
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
+        op._set_on_finish_handler(anthropic_on_finish)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda _: anthropic_stream_accumulator,

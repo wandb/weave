@@ -1,13 +1,19 @@
 import os
 from collections.abc import Generator
+from unittest.mock import Mock
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
+from anthropic.types import Message, TextBlock, Usage
 from pydantic import BaseModel
 
 import weave
-from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
+from weave.integrations.anthropic.anthropic_sdk import (
+    anthropic_on_finish,
+    get_anthropic_patcher,
+)
 from weave.integrations.integration_utilities import op_name_from_call
+from weave.trace.call import Call
 
 model = "claude-3-haiku-20240307"
 parse_model = "claude-sonnet-4-5"
@@ -737,3 +743,321 @@ async def test_beta_async_anthropic_stream(
     assert model_usage["requests"] == 1
     assert output.usage.output_tokens == output_tokens == 12
     assert output.usage.input_tokens == input_tokens == 10
+
+
+# Prompt-cache responses report a net input_tokens next to separate
+# cache_read_input_tokens / cache_creation_input_tokens counts. The summary's
+# input_tokens must be the gross sum of the three (Weave's cost math subtracts
+# the cache counts from it), while the raw response usage stays provider-native.
+cache_messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": "Hello, cached Claude",
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+    }
+]
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    message = anthropic_client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+
+    assert message.usage.input_tokens == 100
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    output = call.output
+    # The raw response usage stays net.
+    assert output.usage.input_tokens == 100
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    # input_tokens is gross: the net count (100) plus the cache read (80) and
+    # cache creation (15) counts.
+    assert model_usage["input_tokens"] == 195
+    assert model_usage["output_tokens"] == 20
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+@pytest.mark.asyncio
+async def test_async_anthropic_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    anthropic_client = AsyncAnthropic(
+        api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
+    )
+    message = await anthropic_client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+
+    assert message.usage.input_tokens == 100
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    output = call.output
+    assert output.usage.input_tokens == 100
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert model_usage["input_tokens"] == 195
+    assert model_usage["output_tokens"] == 20
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_stream_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    stream = anthropic_client.messages.create(
+        model=model,
+        stream=True,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+    for _event in stream:
+        pass
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    output = call.output
+    # The accumulated message keeps the net input and both cache counts.
+    assert output.usage.input_tokens == 100
+    assert output.usage.cache_read_input_tokens == 80
+    assert output.usage.cache_creation_input_tokens == 15
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert model_usage["input_tokens"] == 195
+    assert model_usage["output_tokens"] == 20
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_messages_stream_ctx_manager_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    with anthropic_client.messages.stream(
+        max_tokens=1024,
+        messages=cache_messages,
+        model=model,
+    ) as stream:
+        for _event in stream:
+            pass
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    output = call.output
+    assert output.usage.input_tokens == 100
+    assert output.usage.cache_read_input_tokens == 80
+    assert output.usage.cache_creation_input_tokens == 15
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert model_usage["input_tokens"] == 195
+    assert model_usage["output_tokens"] == 20
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_anthropic_cache_tokens_zero(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """A cache count of 0 is meaningful (caching was possible but nothing hit)."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    message = anthropic_client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+
+    assert message.usage.input_tokens == 100
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    output = call.output
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    # Zero cache counts add nothing: input_tokens stays at the net count.
+    assert model_usage["input_tokens"] == 100
+    assert model_usage["cache_read_input_tokens"] == 0
+    assert model_usage["cache_creation_input_tokens"] == 0
+
+
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+)
+def test_beta_anthropic_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
+    anthropic_client = Anthropic(api_key=api_key)
+    message = anthropic_client.beta.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=cache_messages,
+    )
+
+    assert message.usage.input_tokens == 100
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+    output = call.output
+    assert output.usage.input_tokens == 100
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][output.model]
+    assert model_usage["requests"] == 1
+    assert model_usage["input_tokens"] == 195
+    assert model_usage["output_tokens"] == 20
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+def test_anthropic_on_finish_recomputes_gross_input_from_raw_usage() -> None:
+    output = Message(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        model=model,
+        content=[TextBlock(type="text", text="hi")],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=Usage(
+            input_tokens=100,
+            output_tokens=20,
+            cache_read_input_tokens=80,
+            cache_creation_input_tokens=15,
+        ),
+    )
+    call = Mock(spec=Call)
+    call.summary = {
+        "usage": {
+            model: {
+                "requests": 1,
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_input_tokens": 80,
+                "cache_creation_input_tokens": 15,
+            }
+        }
+    }
+
+    anthropic_on_finish(call, output, None)
+
+    model_usage = call.summary["usage"][model]
+    assert model_usage["input_tokens"] == 195
+    assert output.usage.input_tokens == 100
+    # A second run recomputes from the raw usage instead of compounding.
+    anthropic_on_finish(call, output, None)
+    assert model_usage["input_tokens"] == 195
+
+
+def test_anthropic_on_finish_without_cache_counts_keeps_net_input() -> None:
+    # Older anthropic SDKs report usage without the cache fields (None).
+    output = Message(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        model=model,
+        content=[TextBlock(type="text", text="hi")],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=Usage(input_tokens=10, output_tokens=5),
+    )
+    call = Mock(spec=Call)
+    call.summary = {
+        "usage": {model: {"requests": 1, "input_tokens": 10, "output_tokens": 5}}
+    }
+
+    anthropic_on_finish(call, output, None)
+
+    assert call.summary == {
+        "usage": {model: {"requests": 1, "input_tokens": 10, "output_tokens": 5}}
+    }
+
+
+def test_anthropic_on_finish_ignores_unexpected_shapes() -> None:
+    call = Mock(spec=Call)
+    call.summary = {"usage": {model: {"requests": 1, "input_tokens": 7}}}
+
+    # A stream that never produced a final message accumulates to "".
+    anthropic_on_finish(call, "", None)
+    # A non-string model cannot be a summary usage key.
+    non_string_model = Mock()
+    non_string_model.model = 123
+    non_string_model.usage = Usage(input_tokens=1, output_tokens=1)
+    anthropic_on_finish(call, non_string_model, None)
+    # Non-integer token counts are left alone.
+    non_int_tokens = Mock()
+    non_int_tokens.model = model
+    non_int_tokens.usage = Mock(
+        input_tokens="100",
+        cache_read_input_tokens=80,
+        cache_creation_input_tokens=15,
+    )
+    anthropic_on_finish(call, non_int_tokens, None)
+    assert call.summary == {"usage": {model: {"requests": 1, "input_tokens": 7}}}
+
+    output = Message(
+        id="msg_1",
+        type="message",
+        role="assistant",
+        model=model,
+        content=[TextBlock(type="text", text="hi")],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=Usage(input_tokens=1, output_tokens=1),
+    )
+    # No summary entry for the model and no summary at all are both no-ops.
+    call.summary = {"usage": {}}
+    anthropic_on_finish(call, output, None)
+    assert call.summary == {"usage": {}}
+    call.summary = None
+    anthropic_on_finish(call, output, None)
