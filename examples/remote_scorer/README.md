@@ -20,8 +20,8 @@ is used when registering the scorer.
 
 ### Multi-Tenant Cloud
 
-Enable Remote Scoring for the organization. An organization admin or billing
-admin should open the organization settings page:
+Enable Remote Scoring for the organization. An organization admin should open
+the organization settings page:
 
 ```text
 https://wandb.ai/account-settings/YOUR_ORG_HERE/settings
