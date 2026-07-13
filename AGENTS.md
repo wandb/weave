@@ -73,6 +73,27 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Agent harness integrations and documentation surfaces
+
+Weave traces supported agent SDKs and coding-agent harnesses into the Agents
+view. Keep public documentation aligned with the released implementation and
+use each upstream project's preferred discovery surface.
+
+| Integration | Weave implementation | Preferred upstream surface |
+| --- | --- | --- |
+| Claude Code | `wandb/weave-claude-code` plugin | Anthropic's official plugin directory submission form |
+| Claude Agent SDK | Python and TypeScript SDK integrations | W&B integration guide; the Anthropic SDK repositories do not maintain vendor lists |
+| OpenAI Agents SDK | Python and TypeScript SDK integrations | External tracing processor lists in `openai-agents-python` and `openai-agents-js` |
+| Google ADK | Python patcher and TypeScript `WeaveAdkPlugin` | `google/adk-docs` integration catalog |
+| OpenClaw | `wandb/weave-openclaw` plugin | ClawHub; OpenClaw does not maintain a static third-party plugin catalog |
+| Pi | TypeScript `createOtelExtension` factory | Pi coding-agent SDK documentation, subject to its maintainer preflight |
+
+Pi's `@earendil-works/pi-coding-agent` dependency requires Node.js
+`>=22.19.0`. OpenCode is not supported on `master`: draft PR #7278 closed
+without merging. Do not publish or request upstream OpenCode documentation
+until an integration is merged, released, and validated against OpenCode's
+native OTLP export.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
