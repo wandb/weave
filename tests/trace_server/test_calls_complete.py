@@ -1033,7 +1033,8 @@ def test_call_start_batch_batches_content_object_inserts(
     """The v1 /call/upsert_batch path batches content objects like calls_complete.
 
     Duplicate blobs across the batch collapse to one ref, and the whole batch
-    issues exactly one object_versions insert and one aliases insert instead of
+    issues exactly one object_versions insert and no aliases insert (content
+    refs pin the digest, so the "latest" alias write is skipped) instead of
     an inline obj_create per blob (the serial staircase this replaces).
     """
     internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_batched_objects")
@@ -1067,7 +1068,7 @@ def test_call_start_batch_batches_content_object_inserts(
     clickhouse_trace_server.call_start_batch(batch)
 
     assert insert_tables.count("object_versions") == 1
-    assert insert_tables.count("aliases") == 1
+    assert insert_tables.count("aliases") == 0
     assert (
         _count_project_rows(
             clickhouse_trace_server.ch_client, "object_versions", internal_project_id
