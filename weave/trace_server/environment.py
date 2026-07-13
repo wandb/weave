@@ -263,7 +263,7 @@ def wf_ingest_sample_rate() -> float:
     """Fraction of non-eval traces to keep at ingest (0.0-1.0).
 
     Governs BOTH data models: the calls-model sampler reads the same variable.
-    Defaults to 1.0 (sampling off); an unparseable or out-of-range value falls
+    Defaults to 1.0 (sampling off); an unparsable or out-of-range value falls
     back to 1.0, so a bad config can never start dropping data.
 
     The value comes from the process environment and is not mutated in-process,
