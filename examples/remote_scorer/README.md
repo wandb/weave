@@ -8,6 +8,42 @@ In production, deploy an equivalent `POST /score` endpoint behind your normal
 HTTPS ingress, API gateway, or service platform. `127.0.0.1`, insecure HTTP, and
 tunnels are local-development conveniences only.
 
+## Prerequisites
+
+Remote scoring is coming soon and is not yet generally available. Ask your W&B
+representative for more information about availability.
+
+Before using this sample, deploy the scorer endpoint at a public HTTPS URL and
+store its OAuth client secret or static bearer token in the W&B secret store for
+the entity that owns the project. The secret name, rather than the raw secret,
+is used when registering the scorer.
+
+### Multi-Tenant Cloud
+
+Enable Remote Scoring for the organization. An organization admin or billing
+admin should open the organization settings page:
+
+```text
+https://wandb.ai/account-settings/YOUR_ORG_HERE/settings
+```
+
+Replace `YOUR_ORG_HERE` with the W&B organization that owns your project.
+Navigate to **Remote scoring**, enable remote scoring, and configure **Allowed
+hosts**.
+
+### Dedicated Cloud and Self-Managed
+
+Ask your deployment administrator to enable remote scoring and configure its
+allowed hosts.
+
+### Configuring Allowed Hosts
+
+The scorer endpoint and OAuth token endpoint are validated independently. If
+they use different hosts, allow both. Entries match an exact host and may
+optionally specify a port; wildcards are not supported. Leaving the port blank
+permits any port for that host. Loopback, private, internal, and cloud metadata
+addresses are rejected.
+
 ## Files
 
 - `remote_scorer_app.py`: minimal FastAPI adapter with `GET /health` and
@@ -152,7 +188,7 @@ curl -sS http://127.0.0.1:8000/score \
 ```
 
 This local check only verifies the endpoint contract. It does not prove that a
-managed Weave deployment can reach a loopback URL.
+Weave deployment can reach a loopback URL.
 
 For production, expose the equivalent endpoint at an HTTPS URL such as:
 
@@ -160,10 +196,10 @@ For production, expose the equivalent endpoint at an HTTPS URL such as:
 https://scoring.example.com/weave/score
 ```
 
-The Weave deployment must be able to reach this host. Depending on the
-deployment, the host may need to be added to the remote scorer allowlist. This
-sample does not configure TLS itself; in production TLS is usually terminated by
-your ingress, API gateway, load balancer, or service mesh.
+The Weave deployment must be able to reach this host and its configured
+allowlist must permit it. See [Configuring Allowed Hosts](#configuring-allowed-hosts).
+This sample does not configure TLS itself; in production TLS is usually
+terminated by your ingress, API gateway, load balancer, or service mesh.
 
 ## Register A Remote Scorer
 
@@ -208,8 +244,19 @@ python trigger_test_trace.py \
   --message "test message for scoring"
 ```
 
-Monitor scoring is asynchronous. Confirm the endpoint received a request and
-that Weave recorded feedback for the traced call.
+Monitor scoring is asynchronous, so feedback will not show up immediately.
+Confirm the endpoint received a request and that Weave recorded feedback for
+the traced call.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Remote scorer controls are not visible | Confirm remote scoring is enabled in the owning organization's **Remote scoring** settings. |
+| Destination is rejected | Confirm both the scorer host and, for OAuth, the token host are in **Allowed hosts**. Check for a port mismatch, a non-HTTPS URL, or a private/internal address. |
+| Remote scorer endpoint returns `401` or `403` | Check the W&B secret name, OAuth client credentials, audience, scope, and the scorer endpoint's bearer-token validation. |
+| OAuth succeeds but scoring fails, or the reverse | Check each URL separately. The token endpoint and scorer endpoint are independently validated and may use different hosts. Both must be in the allow list. |
+| Feedback does not appear immediately | Monitor scoring is asynchronous, so feedback will not show up immediately. Confirm the trace matched the configured operation and sampling rate. |
 
 ## Adapting This Sample
 
