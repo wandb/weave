@@ -877,6 +877,7 @@ async def test_async_anthropic_cache_tokens(
             + message.usage.cache_read_input_tokens
             + message.usage.cache_creation_input_tokens
         )
+        assert model_usage["output_tokens"] == message.usage.output_tokens
         assert (
             model_usage["cache_read_input_tokens"]
             == message.usage.cache_read_input_tokens
@@ -1153,6 +1154,7 @@ def test_beta_anthropic_cache_tokens(
             + message.usage.cache_read_input_tokens
             + message.usage.cache_creation_input_tokens
         )
+        assert model_usage["output_tokens"] == message.usage.output_tokens
         assert (
             model_usage["cache_read_input_tokens"]
             == message.usage.cache_read_input_tokens
