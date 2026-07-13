@@ -147,9 +147,17 @@ def tests(session: nox.Session, shard: str):
     session.run(*sync_args)
 
     if shard == "openai_agents":
-        # Keep the public extra broad for runtime compatibility, but exercise the
-        # newer SDK span classes in CI.
-        session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
+        # Exercise the newer SDK span classes in CI. Cap openai below 2.45.0:
+        # it made InputTokensDetails.cache_write_tokens required, but openai-agents
+        # still constructs InputTokensDetails without it.
+        session.run(
+            "uv",
+            "pip",
+            "install",
+            "--upgrade",
+            "openai-agents>=0.14.7",
+            "openai<2.45.0",
+        )
 
     if shard == "google_adk":
         # Installed here (not via an extra) so it stays out of the shared

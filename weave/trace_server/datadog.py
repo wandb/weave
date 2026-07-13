@@ -1,7 +1,7 @@
 """DogStatsD counter emission + DD-flavored OTel span-tag helpers.
 
-Emits a single counter (`weave_trace_server.db_inserts`) over a UDP socket.
-Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
+Emits best-effort counters (the `weave_trace_server.*` family) over a UDP
+socket. Wire format: `metric.name:value|c|#tag1:val1,tag2:val2`.
 """
 
 from __future__ import annotations
@@ -208,21 +208,25 @@ def tag_db_insert_path(
     return decorator
 
 
-def record_db_insert(*, table: str, count: int, path: str | None = None) -> None:
-    """Emit a counter for rows inserted into the trace-server DB.
-
-    `path` falls back to the current `db_insert_path()` contextvar if
-    not provided; pass explicitly from background flushers where the
-    contextvar may not be set.
+def emit_counter(metric: str, value: int, tags: list[str]) -> None:
+    """Emit one best-effort counter: appends the unified service tags and skips
+    non-positive values. The low-level counter emitter for this module.
     """
-    if count <= 0:
+    if value <= 0:
         return
+    _client.emit(metric, value, [*tags, *_UNIFIED_TAGS])
+
+
+def record_db_insert(*, table: str, count: int, path: str | None = None) -> None:
+    """Emit the DB-rows-inserted counter -- a thin wrapper over `emit_counter`
+    with the fixed metric name and `table`/`path` tags.
+
+    `path` falls back to the current `db_insert_path()` contextvar if not
+    provided; pass explicitly from background flushers where the contextvar
+    may not be set.
+    """
     resolved_path = path if path is not None else _db_insert_path.get()
-    _client.emit(
-        DB_INSERT_METRIC,
-        count,
-        [f"table:{table}", f"path:{resolved_path}", *_UNIFIED_TAGS],
-    )
+    emit_counter(DB_INSERT_METRIC, count, [f"table:{table}", f"path:{resolved_path}"])
 
 
 def set_current_span_dd_tags(tags: dict[str, str | float | int]) -> None:

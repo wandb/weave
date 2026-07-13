@@ -259,6 +259,114 @@ export interface AgentConversationMessagePreview {
 }
 
 /**
+ * AgentConversationSpan
+ * One span in a conversation's trace.
+ *
+ * Returned by `agent_conversation_spans`, which reads span scalar columns
+ * only (no message bodies). Spans are ordered by `started_at`, which
+ * approximates — but does not exactly match — the detail chat view's
+ * parent/child tree-walk order. `operation_name` is the raw OTel value; the
+ * client maps it to a display category.
+ */
+export interface AgentConversationSpan {
+  /** Operation Name */
+  operation_name: string;
+  /** Trace Id */
+  trace_id: string;
+  /** Span Id */
+  span_id: string;
+  /** Status */
+  status: 'UNSET' | 'OK' | 'ERROR';
+  /** Duration Ms */
+  duration_ms: number;
+}
+
+/**
+ * AgentConversationSpanFeedback
+ * Tags and ratings applied to a conversation's turn (or the conversation).
+ *
+ * Positioned client-side by matching `trace_id` (turn) against the spans;
+ * `trace_id` is None for conversation-level feedback.
+ */
+export interface AgentConversationSpanFeedback {
+  /**
+   * Trace Id
+   * The turn this feedback is anchored to; None for conversation-level.
+   */
+  trace_id: string | null;
+  /** Feedback Type */
+  feedback_type: 'wandb.agent_user_feedback' | 'wandb.agent_monitor';
+  /**
+   * Tags
+   * Arbitrary descriptive tags applied to this feedback.
+   */
+  tags?: string[];
+  /**
+   * Ratings
+   * Numeric scorer ratings applied to this feedback.
+   */
+  ratings?: AgentConversationSpanRating[];
+}
+
+/**
+ * AgentConversationSpanRating
+ * One numeric rating (a scorer score) applied to a turn or conversation.
+ */
+export interface AgentConversationSpanRating {
+  /** Name */
+  name: string;
+  /** Value */
+  value: number;
+  /** Reason */
+  reason?: string | null;
+  /** Confidence */
+  confidence?: number | null;
+}
+
+/**
+ * AgentConversationSpans
+ * One conversation's span sequence and its feedback markers.
+ */
+export interface AgentConversationSpans {
+  /** Conversation Id */
+  conversation_id: string;
+  /** Spans */
+  spans?: AgentConversationSpan[];
+  /** Spans Feedback */
+  spans_feedback?: AgentConversationSpanFeedback[];
+}
+
+/**
+ * AgentConversationSpansReq
+ * Request the span sequences for an explicit set of conversations.
+ *
+ * Reads span scalar columns only (no message bodies) for the given
+ * `conversation_ids`. Powers the conversations-list spans minimap.
+ */
+export interface AgentConversationSpansReq {
+  /** Project Id */
+  project_id: string;
+  /**
+   * Conversation Ids
+   * @maxItems 10000
+   */
+  conversation_ids?: string[];
+  /** Started After */
+  started_after?: string | null;
+  /** Started Before */
+  started_before?: string | null;
+}
+
+/**
+ * AgentConversationSpansRes
+ * Span sequences + feedback markers, one entry per requested conversation.
+ */
+export interface AgentConversationSpansRes {
+  /** Conversations */
+  conversations?: AgentConversationSpans[];
+}
+
+/**
  * AgentCustomAttrSchemaItem
  * One custom attribute key/type observed in the matching spans.
  */
@@ -510,6 +618,14 @@ export interface AgentSearchRes {
    * @default 0
    */
   total_conversations?: number;
+}
+
+/** AgentSignalFilter */
+export interface AgentSignalFilter {
+  /** Tags */
+  tags?: string[];
+  /** Ratings */
+  ratings?: RatingCondition[];
 }
 
 /**
@@ -1149,6 +1265,7 @@ export interface AgentSpansQueryReq {
   started_after?: string | null;
   /** Started Before */
   started_before?: string | null;
+  signal_filters?: AgentSignalFilter | null;
 }
 
 /**
@@ -2722,6 +2839,16 @@ export interface DatasetReadRes {
   rows: string;
 }
 
+/** DeletedObjVersion */
+export interface DeletedObjVersion {
+  /** Digest */
+  digest: string;
+  /** Base Object Class */
+  base_object_class?: string | null;
+  /** Leaf Object Class */
+  leaf_object_class?: string | null;
+}
+
 /** EndedCallSchemaForInsert */
 export interface EndedCallSchemaForInsert {
   /** Project Id */
@@ -2785,6 +2912,11 @@ export interface EvalResultsEvaluationSummary {
    * Sum of per-trial predict-only token usage for this evaluation (the model's predict() tokens only, excluding LLM-as-a-judge scorer usage); None when no trial reports usage.
    */
   predict_total_tokens?: number | null;
+  /**
+   * Predict Total Cost
+   * Sum of per-trial predict-only cost for this evaluation (the model's predict() cost only, excluding LLM-as-a-judge scorer cost); None when no trial reports cost.
+   */
+  predict_total_cost?: number | null;
   /** Evaluation Ref */
   evaluation_ref?: string | null;
   /** Model Ref */
@@ -2864,6 +2996,12 @@ export interface EvalResultsQueryBody {
    * @default true
    */
   include_predict_and_score_children?: boolean;
+  /**
+   * Include Costs
+   * When true, price each trial's predict call so rows and summary report predict-only cost (`total_cost` / `predict_total_cost`); scorer costs are excluded. Opt-in: other callers skip the cost computation.
+   * @default false
+   */
+  include_costs?: boolean;
   /**
    * Sort By
    * Sort specification for result rows. Supported field prefixes: scores.<name>, inputs.<path>, outputs.<path>. When null, rows are sorted by row_digest ASC.
@@ -3017,6 +3155,8 @@ export interface EvalResultsTrial {
   model_latency_seconds?: number | null;
   /** Total Tokens */
   total_tokens?: number | null;
+  /** Total Cost */
+  total_cost?: number | null;
   /** Scorer Call Ids */
   scorer_call_ids?: Record<string, string>;
   /** Genai Span Ref */
@@ -3586,6 +3726,18 @@ export interface FeedbackCreateReq {
    */
   span_status_code?: string;
   /**
+   * Span Conversation Id
+   * Conversation the feedback belongs to (from spans.conversation_id)
+   * @default ""
+   */
+  span_conversation_id?: string;
+  /**
+   * Span Trace Id
+   * Turn the feedback belongs to (from spans.trace_id)
+   * @default ""
+   */
+  span_trace_id?: string;
+  /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
    */
@@ -3812,6 +3964,18 @@ export interface FeedbackReplaceReq {
    * @default "UNSET"
    */
   span_status_code?: string;
+  /**
+   * Span Conversation Id
+   * Conversation the feedback belongs to (from spans.conversation_id)
+   * @default ""
+   */
+  span_conversation_id?: string;
+  /**
+   * Span Trace Id
+   * Turn the feedback belongs to (from spans.trace_id)
+   * @default ""
+   */
+  span_trace_id?: string;
   /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
@@ -4212,7 +4376,11 @@ export interface LLMModelDetails {
   /** Status */
   status: string;
   /** Lifecyclestage */
-  lifecycleStage: 'general-availability' | 'experimental' | 'retired';
+  lifecycleStage:
+    | 'experimental'
+    | 'general-availability'
+    | 'deprecated'
+    | 'retired';
   /** Availablein */
   availableIn: ('cw-prod' | 'cw-qa')[];
   /** Launchedquarter */
@@ -4517,6 +4685,11 @@ export interface ModelsDevModel {
    */
   name: string;
   /**
+   * Description
+   * Human-readable description of the model.
+   */
+  description?: string | null;
+  /**
    * Attachment
    * File attachment support.
    */
@@ -4526,6 +4699,13 @@ export interface ModelsDevModel {
    * Chain-of-thought reasoning support.
    */
   reasoning: boolean;
+  /**
+   * Reasoning Options
+   * How reasoning is controlled. Set (possibly to an empty list, meaning always-on) when reasoning is supported; omitted otherwise.
+   */
+  reasoning_options?:
+    | (ReasoningToggle | ReasoningEffortOption | ReasoningBudgetTokens)[]
+    | null;
   /**
    * Tool Call
    * Tool calling support.
@@ -4729,6 +4909,11 @@ export interface ObjDeleteReq {
 export interface ObjDeleteRes {
   /** Num Deleted */
   num_deleted: number;
+  /**
+   * Deleted Versions
+   * Metadata for each deleted object version, with digest aliases resolved to content digests. None when the backing server does not report it.
+   */
+  deleted_versions?: DeletedObjVersion[] | null;
 }
 
 /** ObjQueryReq */
@@ -5232,6 +5417,77 @@ export interface Query {
     | LteOperation
     | InOperation
     | ContainsOperation;
+}
+
+/** RatingCondition */
+export interface RatingCondition {
+  /** Scorer Key */
+  scorer_key: string;
+  /** Op */
+  op: 'gte' | 'gt' | 'lte' | 'lt' | 'eq';
+  /** Value */
+  value: number;
+}
+
+/**
+ * ReasoningBudgetTokens
+ * Reasoning is controlled via a token budget.
+ */
+export interface ReasoningBudgetTokens {
+  /**
+   * Type
+   * @default "budget_tokens"
+   */
+  type?: 'budget_tokens';
+  /**
+   * Min
+   * Minimum reasoning budget.
+   */
+  min?: number | null;
+  /**
+   * Max
+   * Maximum reasoning budget.
+   */
+  max?: number | null;
+}
+
+/**
+ * ReasoningEffortOption
+ * Reasoning effort can be selected from a set of levels.
+ */
+export interface ReasoningEffortOption {
+  /**
+   * Type
+   * @default "effort"
+   */
+  type?: 'effort';
+  /**
+   * Values
+   * Accepted effort levels (null denotes an implicit default).
+   */
+  values: (
+    | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh'
+    | 'max'
+    | 'default'
+    | null
+  )[];
+}
+
+/**
+ * ReasoningToggle
+ * Reasoning can be turned on or off.
+ */
+export interface ReasoningToggle {
+  /**
+   * Type
+   * @default "toggle"
+   */
+  type?: 'toggle';
 }
 
 /** RefsReadBatchReq */
@@ -6485,6 +6741,27 @@ export class Api<
     ) =>
       this.request<AgentConversationChatRes, HTTPValidationError>({
         path: `/agents/conversations/chat`,
+        method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Agents
+     * @name GenaiConversationSpansAgentsConversationsSpansPost
+     * @summary Genai Conversation Spans
+     * @request POST:/agents/conversations/spans
+     */
+    genaiConversationSpansAgentsConversationsSpansPost: (
+      data: AgentConversationSpansReq,
+      params: RequestParams = {}
+    ) =>
+      this.request<AgentConversationSpansRes, HTTPValidationError>({
+        path: `/agents/conversations/spans`,
         method: 'POST',
         body: data,
         type: ContentType.Json,

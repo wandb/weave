@@ -635,13 +635,41 @@ def _extract_user_text(
 ) -> str:
     """Extract user text from normalized input_messages.
 
+    Role resolution is delegated to `_user_prompt_texts` so preview and
+    per-turn extraction stay consistent.
+    """
+    texts = _user_prompt_texts(messages)
+    if not texts:
+        return ""
+    return texts[-1] if last_only else "\n\n".join(texts)
+
+
+def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: opening user-prompt text from a span's `input_messages`.
+
+    The opening user prompt is the first user entry of the earliest
+    message-bearing span; that span's `input_messages` begins at the
+    conversation opening.
+    """
+    texts = _user_prompt_texts(messages)
+    return texts[0] if texts else ""
+
+
+def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: final assistant/output text from a span's `output_messages`."""
+    return _extract_non_user_output_text(messages)
+
+
+def _user_prompt_texts(messages: list[NormalizedMessage]) -> list[str]:
+    """Return candidate user-prompt texts using two-pass role resolution.
+
     First pass: entries tagged `role == "user"`. Fallback pass: entries
     that could plausibly be the user prompt: provider-specific or empty-role
     messages. We intentionally exclude assistant, system, and tool roles so
     those do not render as a user prompt.
     """
     if not messages:
-        return ""
+        return []
     texts = _filter_message_texts(messages, include_roles={_USER_ROLE})
     if not texts:
         texts = _filter_message_texts(messages, exclude_roles=_NON_USER_PROMPT_ROLES)
@@ -650,24 +678,7 @@ def _extract_user_text(
                 "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
                 [m.role for m in messages],
             )
-    if last_only and texts:
-        return texts[-1]
-    return "\n\n".join(texts)
-
-
-def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: opening user-prompt text from a span's `input_messages`.
-
-    Used to build the conversation table's "first message" preview directly
-    from the grouped spans query, applying the same role resolution as the
-    full chat view so previews match the opened conversation.
-    """
-    return _extract_user_text(messages, last_only=True)
-
-
-def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: final assistant/output text from a span's `output_messages`."""
-    return _extract_non_user_output_text(messages)
+    return texts
 
 
 def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:

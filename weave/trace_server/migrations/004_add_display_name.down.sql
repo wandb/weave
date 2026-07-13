@@ -25,7 +25,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
-ALTER TABLE calls_merged DROP COLUMN display_name;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS display_name;
 
-ALTER TABLE call_parts DROP COLUMN display_name;
+ALTER TABLE call_parts DROP COLUMN IF EXISTS display_name;
 

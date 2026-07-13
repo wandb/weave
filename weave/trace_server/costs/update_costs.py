@@ -164,7 +164,7 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
             Decimal(output_cents_per_billion) / Decimal("100000000000")
         )
 
-        costs[CW_PREFIX + model_id_playground] = CostDetails(
+        detail = CostDetails(
             provider=provider,
             input=input_cost_per_token,
             output=output_cost_per_token,
@@ -172,6 +172,12 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
             cache_creation_input=0,
             created_at=current_time,
         )
+        # Price under the bare idPlayground: that is the id the inference
+        # service echoes back (e.g. "openai/gpt-oss-20b"), so it is what call
+        # usage records and what the cost join matches on. Keep the coreweave/
+        # alias too so a call ever logged under the prefixed id still prices.
+        costs[model_id_playground] = detail
+        costs[CW_PREFIX + model_id_playground] = detail
 
     return costs
 

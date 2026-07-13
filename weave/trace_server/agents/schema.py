@@ -101,6 +101,15 @@ class AgentSpanCHInsertable(BaseModel):
     agent_description: str = ""
     agent_version: str = ""
 
+    # [Weave] eval linkage — weave.eval.*
+    eval_run_id: str = ""
+    eval_predict_and_score_call_id: str = ""
+    eval_kind: str = ""
+    eval_row_digest: str = ""
+    eval_example_id: str = ""
+    eval_trial_index: int = -1
+    eval_evaluation_name: str = ""
+
     # [OTel GenAI] model info — gen_ai.request.model, gen_ai.response.*
     request_model: str = ""
     response_model: str = ""

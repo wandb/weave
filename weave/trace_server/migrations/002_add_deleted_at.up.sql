@@ -6,10 +6,10 @@ This migration adds:
 */
 
 ALTER TABLE object_versions
-    ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
 
-DROP VIEW object_versions_deduped;
-CREATE VIEW object_versions_deduped as
+DROP VIEW IF EXISTS object_versions_deduped;
+CREATE VIEW IF NOT EXISTS object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,
@@ -52,10 +52,10 @@ CREATE VIEW object_versions_deduped as
         created_at;
 
 ALTER TABLE call_parts
-    ADD COLUMN deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS deleted_at Nullable(DateTime64(3)) DEFAULT NULL;
 
 ALTER TABLE calls_merged
-    ADD COLUMN deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3)));
+    ADD COLUMN IF NOT EXISTS deleted_at SimpleAggregateFunction(any, Nullable(DateTime64(3)));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,

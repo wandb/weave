@@ -66,6 +66,14 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.agent.name": "travel-bot",
             "gen_ai.agent.id": "agent-001",
             "gen_ai.agent.version": "1.2.3",
+            # Eval linkage
+            "weave.eval.run_id": "eval-run-001",
+            "weave.eval.predict_and_score_call_id": "pas-001",
+            "weave.eval.kind": "agent",
+            "weave.eval.row_digest": "row-digest-001",
+            "weave.eval.example_id": "example-001",
+            "weave.eval.trial_index": 2,
+            "weave.eval.evaluation_name": "travel-bot-eval",
             "gen_ai.conversation.id": "conv-abc",
             "weave.conversation.name": "My Chat",
             # Model + tokens
@@ -133,6 +141,13 @@ def test_extract_genai_span_comprehensive() -> None:
     # Other gen_ai.* fields pass through
     assert result.agent_id == "agent-001"
     assert result.agent_version == "1.2.3"
+    assert result.eval_run_id == "eval-run-001"
+    assert result.eval_predict_and_score_call_id == "pas-001"
+    assert result.eval_kind == "agent"
+    assert result.eval_row_digest == "row-digest-001"
+    assert result.eval_example_id == "example-001"
+    assert result.eval_trial_index == 2
+    assert result.eval_evaluation_name == "travel-bot-eval"
     assert result.conversation_id == "conv-abc"
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
@@ -181,10 +196,25 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["gen_ai.request.encoding_formats"] == '["float"]'
     assert result.custom_attrs_string["gen_ai.data_source.id"] == "ds-1"
     assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
+    assert "weave.eval.run_id" not in result.custom_attrs_string
+    assert "weave.eval.trial_index" not in result.custom_attrs_int
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""
     assert result.attributes_dump != ""
+
+
+def test_extract_genai_span_defaults_missing_eval_trial_index() -> None:
+    result = extract_genai_span(
+        _make_span(attrs={"weave.eval.run_id": "eval-run-001"}),
+        project_id="p1",
+    )
+
+    assert result.eval_run_id == "eval-run-001"
+    # -1 is the ClickHouse storage sentinel for "unset" (the column can't hold
+    # NULL ints). The read path (AgentSpanSchema) surfaces it to callers as None
+    # -- see test_genai_agent_queries.test_eval_trial_index_unset_reads_as_none.
+    assert result.eval_trial_index == -1
 
 
 def test_extract_genai_span_error_status() -> None:

@@ -79,6 +79,16 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+### Trace Server API / Node SDK Schema
+
+When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
+
+1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
+2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
+3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
+
+If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
+
 ## Python Testing Guidelines
 
 ### Test Framework

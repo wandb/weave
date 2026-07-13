@@ -51,7 +51,7 @@ class Attribute:
 
     @property
     def lookup_keys(self) -> tuple[str, ...]:
-        """Return all recognized keys, ordered weave-canonical first.
+        """All recognized keys, ordered weave-canonical first.
 
         Extraction probes them in order and uses the first non-None hit,
         so callers can rely on the weave.* key winning over OTel aliases
@@ -313,6 +313,41 @@ CONTENT_REFS = Attribute(
 )
 ARTIFACT_REFS = Attribute("weave.artifact_refs", "string[]", "W&B artifact references")
 OBJECT_REFS = Attribute("weave.object_refs", "string[]", "W&B object references")
+EVAL_RUN_ID = Attribute(
+    "weave.eval.run_id",
+    "string",
+    "Root evaluation run call ID associated with this span",
+)
+EVAL_PREDICT_AND_SCORE_CALL_ID = Attribute(
+    "weave.eval.predict_and_score_call_id",
+    "string",
+    "Evaluation predict-and-score call ID associated with this span",
+)
+EVAL_KIND = Attribute(
+    "weave.eval.kind",
+    "string",
+    "Evaluation kind associated with this span: standard, imperative, agent, ...",
+)
+EVAL_ROW_DIGEST = Attribute(
+    "weave.eval.row_digest",
+    "string",
+    "Stable evaluation dataset row digest associated with this span",
+)
+EVAL_EXAMPLE_ID = Attribute(
+    "weave.eval.example_id",
+    "string",
+    "Caller-provided evaluation example identifier associated with this span",
+)
+EVAL_TRIAL_INDEX = Attribute(
+    "weave.eval.trial_index",
+    "int",
+    "Zero-based evaluation trial index for this row",
+)
+EVAL_EVALUATION_NAME = Attribute(
+    "weave.eval.evaluation_name",
+    "string",
+    "Evaluation display name associated with this span",
+)
 
 _DEFS: list[Attribute] = [
     # Keep this registry in sync with Attribute constants. The unit tests
@@ -366,6 +401,13 @@ _DEFS: list[Attribute] = [
     CONTENT_REFS,
     ARTIFACT_REFS,
     OBJECT_REFS,
+    EVAL_RUN_ID,
+    EVAL_PREDICT_AND_SCORE_CALL_ID,
+    EVAL_KIND,
+    EVAL_ROW_DIGEST,
+    EVAL_EXAMPLE_ID,
+    EVAL_TRIAL_INDEX,
+    EVAL_EVALUATION_NAME,
 ]
 
 
@@ -439,6 +481,12 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     ERROR_TYPE.key: "error_type",
     SERVER_ADDRESS.key: "server_address",
     COMPACTION_SUMMARY.key: "compaction_summary",
+    EVAL_RUN_ID.key: "eval_run_id",
+    EVAL_PREDICT_AND_SCORE_CALL_ID.key: "eval_predict_and_score_call_id",
+    EVAL_KIND.key: "eval_kind",
+    EVAL_ROW_DIGEST.key: "eval_row_digest",
+    EVAL_EXAMPLE_ID.key: "eval_example_id",
+    EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",
@@ -451,6 +499,7 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     SERVER_PORT.key: "server_port",
     COMPACTION_ITEMS_BEFORE.key: "compaction_items_before",
     COMPACTION_ITEMS_AFTER.key: "compaction_items_after",
+    EVAL_TRIAL_INDEX.key: "eval_trial_index",
     # float scalars
     REQUEST_TEMPERATURE.key: "request_temperature",
     REQUEST_TOP_P.key: "request_top_p",

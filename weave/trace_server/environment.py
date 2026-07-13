@@ -254,6 +254,41 @@ def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
     )
 
 
+# Ingest sampling -- shared knobs for both data models. The same env vars are
+# read by the calls-model sampler in the trace-server service; these accessors
+# are model-agnostic.
+
+
+def wf_ingest_sample_rate() -> float:
+    """Fraction of non-eval traces to keep at ingest (0.0-1.0).
+
+    Governs BOTH data models: the calls-model sampler reads the same variable.
+    Defaults to 1.0 (sampling off); an unparseable or out-of-range value falls
+    back to 1.0, so a bad config can never start dropping data.
+
+    The value comes from the process environment and is not mutated in-process,
+    so changing the rate means redeploying / restarting the service with the new
+    value -- it is not a live knob. A redeploy briefly runs old and new
+    instances at different rates, and a trace whose spans hit both can be stored
+    partially; do rate changes in a low-traffic window to minimize that.
+    """
+    try:
+        rate = float(os.environ.get("WEAVE_INGEST_SAMPLE_RATE", "1.0"))
+    except ValueError:
+        return 1.0
+    if not 0.0 <= rate <= 1.0:
+        return 1.0
+    return rate
+
+
+def wf_ingest_sample_dry_run() -> bool:
+    """When true, the sampler records what it would drop but drops nothing.
+
+    Shadow mode. The same variable also gates the calls-model sampler's dry-run.
+    """
+    return os.environ.get("WEAVE_INGEST_SAMPLE_DRY_RUN", "false").lower() == "true"
+
+
 # Clickhouse Settings
 
 

@@ -1,7 +1,7 @@
-ALTER TABLE files ADD COLUMN bytes_stored Nullable(UInt32);
-ALTER TABLE files ADD COLUMN file_storage_uri Nullable(String);
+ALTER TABLE files ADD COLUMN IF NOT EXISTS bytes_stored Nullable(UInt32);
+ALTER TABLE files ADD COLUMN IF NOT EXISTS file_storage_uri Nullable(String);
 
-ALTER TABLE files_stats ADD COLUMN file_storage_uri Nullable(String);
+ALTER TABLE files_stats ADD COLUMN IF NOT EXISTS file_storage_uri Nullable(String);
 
 ALTER TABLE files_stats_view MODIFY QUERY
 SELECT

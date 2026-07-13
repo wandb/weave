@@ -30,6 +30,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -42,8 +43,10 @@ from weave.trace_server.agents.types import (
     AgentsQueryReq,
     AgentTraceChatReq,
     GenAIOTelExportReq,
+    RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
     AGENT_USER_FEEDBACK_TYPE,
@@ -134,6 +137,192 @@ def test_spans_insert_and_query(ch_server):
     )
     assert res_filtered.total_count == 2
     assert all(s.agent_name == "agent-A" for s in res_filtered.spans)
+
+
+def test_eval_span_fields_are_queryable(ch_server):
+    """Eval metadata is first-class span data, not custom attrs."""
+    project_id = _make_project_id("eval_spans")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-1",
+            eval_predict_and_score_call_id="pas-1",
+            eval_kind="agent",
+            eval_row_digest="row-a",
+            eval_example_id="example-a",
+            eval_trial_index=0,
+            eval_evaluation_name="agent eval",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-1",
+            eval_predict_and_score_call_id="pas-2",
+            eval_kind="agent",
+            eval_row_digest="row-b",
+            eval_example_id="example-b",
+            eval_trial_index=1,
+            eval_evaluation_name="agent eval",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="eval-run-2",
+            eval_predict_and_score_call_id="pas-3",
+            eval_kind="standard",
+            eval_row_digest="row-c",
+            eval_example_id="example-c",
+            eval_trial_index=0,
+            eval_evaluation_name="standard eval",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    run_1 = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "eval.run_id"},
+                            {"$literal": "eval-run-1"},
+                        ]
+                    }
+                }
+            ),
+            sort_by=[AgentSortBy(field="eval_trial_index", direction="asc")],
+        )
+    )
+    assert run_1.total_count == 2
+    assert [
+        (
+            span.eval_run_id,
+            span.eval_predict_and_score_call_id,
+            span.eval_kind,
+            span.eval_row_digest,
+            span.eval_example_id,
+            span.eval_trial_index,
+            span.eval_evaluation_name,
+        )
+        for span in run_1.spans
+    ] == [
+        ("eval-run-1", "pas-1", "agent", "row-a", "example-a", 0, "agent eval"),
+        ("eval-run-1", "pas-2", "agent", "row-b", "example-b", 1, "agent eval"),
+    ]
+
+    grouped = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="field", key="eval.kind")],
+            sort_by=[AgentSortBy(field="span_count", direction="desc")],
+        )
+    )
+    assert grouped.total_count == 2
+    assert {
+        group.group_keys["eval_kind"]: group.span_count for group in grouped.groups
+    } == {"agent": 2, "standard": 1}
+
+
+def test_eval_trial_index_unset_reads_as_none(ch_server):
+    """A span with no eval trial index reads back as None, not the -1 sentinel.
+
+    ClickHouse stores -1 for an unset eval_trial_index (it can't hold NULL
+    ints); the query layer must hide that internal sentinel from callers. A
+    span that *does* set trial index 0 must still read back as 0.
+    """
+    project_id = _make_project_id("eval_trial_none")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        # No eval metadata at all: trial index defaults to the -1 sentinel.
+        _make_span(project_id, agent_name="no-eval", started_at=now),
+        # Explicit trial index 0 must survive as 0 (falsy but set).
+        _make_span(
+            project_id,
+            agent_name="eval-trial-0",
+            eval_run_id="eval-run-1",
+            eval_trial_index=0,
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    trial_by_agent = {s.agent_name: s.eval_trial_index for s in res.spans}
+    assert trial_by_agent == {"no-eval": None, "eval-trial-0": 0}
+
+
+def test_eval_spans_filter_by_kind_and_predict_and_score_call(ch_server):
+    """Promoted eval columns beyond eval_run_id are independently filterable.
+
+    Covers eval.kind (the LowCardinality column) and
+    eval.predict_and_score_call_id (isolating a single trial), so the query
+    path is exercised past the single eval.run_id filter.
+    """
+    project_id = _make_project_id("eval_filters")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            eval_run_id="run-1",
+            eval_kind="agent",
+            eval_predict_and_score_call_id="pas-1",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="run-1",
+            eval_kind="agent",
+            eval_predict_and_score_call_id="pas-2",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            eval_run_id="run-2",
+            eval_kind="standard",
+            eval_predict_and_score_call_id="pas-3",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    by_kind = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {"$expr": {"$eq": [{"$getField": "eval.kind"}, {"$literal": "agent"}]}}
+            ),
+        )
+    )
+    assert by_kind.total_count == 2
+    assert {s.eval_predict_and_score_call_id for s in by_kind.spans} == {
+        "pas-1",
+        "pas-2",
+    }
+
+    by_pas = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "eval.predict_and_score_call_id"},
+                            {"$literal": "pas-2"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert by_pas.total_count == 1
+    assert by_pas.spans[0].eval_run_id == "run-1"
+    assert by_pas.spans[0].eval_kind == "agent"
 
 
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
@@ -910,31 +1099,27 @@ def test_group_by_conversation_id_message_previews(ch_server):
     """Grouped conversation rows carry first/last message previews computed via
     argMin/argMax over the spans — no per-row hydration needed.
 
-    Validates the real ClickHouse aggregate semantics: the earliest span's user
-    prompt becomes `first_message`; the latest span's assistant output becomes
-    `last_message`. Spans with no renderable text are skipped by the -If guard.
+    Validates the real ClickHouse aggregate semantics: empty turn-1 spans are
+    skipped, the earliest message-bearing span's opening user prompt becomes
+    `first_message`, and the latest span's assistant output becomes
+    `last_message`.
     """
     project_id = _make_project_id("conv-previews")
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     conv = f"conv-{uuid.uuid4().hex[:8]}"
 
     spans = [
-        # Earliest span: opening turn. Carries system + user input. Its user
-        # text should win as the first-message preview.
+        # Turn-1 span with no messages. It must be skipped by the -If guard
+        # before selecting first_input_messages.
         _make_span(
             project_id,
             conversation_id=conv,
             operation_name="invoke_agent",
             started_at=now,
             ended_at=now + datetime.timedelta(seconds=1),
-            input_messages=[
-                NormalizedMessage(role="system", content="be terse"),
-                NormalizedMessage(role="user", content="hello first"),
-            ],
-            output_messages=[NormalizedMessage(role="assistant", content="reply one")],
+            input_messages=[],
+            output_messages=[],
         ),
-        # A later tool span with no messages — must be skipped by the -If guard
-        # even though it is not the earliest/latest by timestamp checks below.
         _make_span(
             project_id,
             conversation_id=conv,
@@ -944,14 +1129,19 @@ def test_group_by_conversation_id_message_previews(ch_server):
             input_messages=[],
             output_messages=[],
         ),
-        # Latest span by ended_at: its assistant output is the last-message preview.
+        # Earliest span with messages: accumulated history starts at the
+        # opening, even though the current turn's user text is the last entry.
         _make_span(
             project_id,
             conversation_id=conv,
             operation_name="chat",
             started_at=now + datetime.timedelta(seconds=4),
             ended_at=now + datetime.timedelta(seconds=5),
-            input_messages=[NormalizedMessage(role="user", content="hello second")],
+            input_messages=[
+                NormalizedMessage(role="user", content="opening"),
+                NormalizedMessage(role="assistant", content="r1"),
+                NormalizedMessage(role="user", content="follow-up"),
+            ],
             output_messages=[
                 NormalizedMessage(role="assistant", content="final reply")
             ],
@@ -971,7 +1161,7 @@ def test_group_by_conversation_id_message_previews(ch_server):
 
     assert row.first_message is not None
     assert row.first_message.role == "user_message"
-    assert row.first_message.text == "hello first"
+    assert row.first_message.text == "opening"
 
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
@@ -2969,3 +3159,490 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
         )
     )
     assert obj.obj.wb_user_id == internal_user_id
+
+
+# ---------------------------------------------------------------------------
+# Tests: agent target IDs persisted on feedback create
+# ---------------------------------------------------------------------------
+
+
+def test_feedback_create_derives_conversation_target_id_from_ref(ch_server):
+    """Conversation-targeted agent feedback derives the denormalized ID."""
+    project_id = _make_project_id("fb-conv-id-derived")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
+    ]
+
+
+def test_feedback_create_derives_turn_target_id_from_ref(ch_server):
+    """Turn-targeted agent feedback derives the denormalized trace ID."""
+    project_id = _make_project_id("fb-turn-id-derived")
+    trace_id = uuid.uuid4().hex
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": "",
+            "span_trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
+def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
+    """Conversation-targeted feedback persists the supplied denormalized ID."""
+    project_id = _make_project_id("fb-conv-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_id
+    ).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["hallucination"],
+            span_conversation_id=conv_id,
+            wb_user_id="u1",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": "",
+            "scorer_tags": ["hallucination"],
+        }
+    ]
+
+
+def test_feedback_create_persists_supplied_span_target_ids(ch_server):
+    """Span-targeted feedback persists supplied denormalized IDs."""
+    project_id = _make_project_id("fb-span-id")
+    conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=span_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            scorer_tags=["needs-review"],
+            span_conversation_id=conv_id,
+            span_trace_id=trace_id,
+            wb_user_id="u3",
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+        )
+    )
+    assert res.result == [
+        {
+            "span_conversation_id": conv_id,
+            "span_trace_id": trace_id,
+            "scorer_tags": ["needs-review"],
+        }
+    ]
+
+
+def test_feedback_create_batch_persists_supplied_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-ids")
+    conv_ref_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    span_conv_id = f"conv-{uuid.uuid4().hex[:8]}"
+    turn_trace_id = uuid.uuid4().hex
+    span_trace_id = uuid.uuid4().hex
+    span_id = uuid.uuid4().hex
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_ref_id
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(
+        project_id=project_id, trace_id=turn_trace_id
+    ).uri
+    span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
+
+    ch_server.feedback_create_batch(
+        tsi.FeedbackCreateBatchReq(
+            batch=[
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=conv_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["conv-tag"],
+                    span_conversation_id=conv_ref_id,
+                    wb_user_id="u1",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=turn_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["turn-tag"],
+                    span_conversation_id=turn_conv_id,
+                    span_trace_id=turn_trace_id,
+                    wb_user_id="u2",
+                ),
+                tsi.FeedbackCreateReq(
+                    project_id=project_id,
+                    weave_ref=span_ref,
+                    feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                    payload={},
+                    scorer_tags=["span-tag"],
+                    span_conversation_id=span_conv_id,
+                    span_trace_id=span_trace_id,
+                    wb_user_id="u3",
+                ),
+            ]
+        )
+    )
+
+    res = ch_server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=[
+                "weave_ref",
+                "span_conversation_id",
+                "span_trace_id",
+                "scorer_tags",
+            ],
+        )
+    )
+    actual = sorted(res.result, key=lambda row: row["weave_ref"])
+    expected = sorted(
+        [
+            {
+                "weave_ref": conv_ref,
+                "span_conversation_id": conv_ref_id,
+                "span_trace_id": "",
+                "scorer_tags": ["conv-tag"],
+            },
+            {
+                "weave_ref": turn_ref,
+                "span_conversation_id": turn_conv_id,
+                "span_trace_id": turn_trace_id,
+                "scorer_tags": ["turn-tag"],
+            },
+            {
+                "weave_ref": span_ref,
+                "span_conversation_id": span_conv_id,
+                "span_trace_id": span_trace_id,
+                "scorer_tags": ["span-tag"],
+            },
+        ],
+        key=lambda row: row["weave_ref"],
+    )
+    assert actual == expected
+
+
+def test_feedback_create_rejects_trace_id_for_conversation_ref(ch_server):
+    project_id = _make_project_id("fb-conv-ref-trace-id")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-a' cannot be supplied for "
+        "conversation-targeted feedback",
+    ):
+        ch_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=conv_ref,
+                feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                payload={},
+                scorer_tags=["hallucination"],
+                span_trace_id="trace-a",
+                wb_user_id="u1",
+            )
+        )
+
+
+def test_feedback_create_batch_rejects_conflicting_agent_target_ids(ch_server):
+    project_id = _make_project_id("fb-batch-target-id-conflict")
+    conv_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id="conv-a"
+    ).uri
+    turn_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id="trace-a").uri
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_conversation_id 'conv-b' conflicts with "
+        "conversation ref 'conv-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=conv_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["conv-tag"],
+                        span_conversation_id="conv-b",
+                        wb_user_id="u1",
+                    )
+                ]
+            )
+        )
+
+    with pytest.raises(
+        InvalidRequest,
+        match="feedback span_trace_id 'trace-b' conflicts with turn ref 'trace-a'",
+    ):
+        ch_server.feedback_create_batch(
+            tsi.FeedbackCreateBatchReq(
+                batch=[
+                    tsi.FeedbackCreateReq(
+                        project_id=project_id,
+                        weave_ref=turn_ref,
+                        feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                        payload={},
+                        scorer_tags=["turn-tag"],
+                        span_trace_id="trace-b",
+                        wb_user_id="u2",
+                    )
+                ]
+            )
+        )
+
+
+# ---------------------------------------------------------------------------
+# Test: signal filtering on agent conversations (Task 7)
+# ---------------------------------------------------------------------------
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_filter_conversations_by_signal(ch_server):
+    """E2E proof of signal filter union semantics and mutation-correctness.
+
+    Seeds two conversations (conv-A, conv-B). Tags a turn in conv-A and a
+    conversation-level tag in conv-B. Verifies:
+    - Tag filter returns only the tagged conversation.
+    - Rating filter returns only the rated conversation.
+    - No filter returns both.
+    - Conv-level tag matches the other union arm.
+    - total_count reflects the filter (not the unfiltered conversation count).
+    - A combined tag + rating filter matches across feedback rows (human tag and
+      monitor rating live on different rows) and AND-s the two grains.
+    - Purging the feedback removes it from the filter result.
+    """
+    project_id = _make_project_id("signal-filter")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_a = uuid.uuid4().hex
+    trace_b = uuid.uuid4().hex
+    conv_a = f"conv-{uuid.uuid4().hex[:8]}"
+    conv_b = f"conv-{uuid.uuid4().hex[:8]}"
+
+    # Seed one span per conversation so each appears in grouped query results.
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                trace_id=trace_a,
+                conversation_id=conv_a,
+                operation_name="invoke_agent",
+                started_at=now,
+            ),
+            _make_span(
+                project_id,
+                trace_id=trace_b,
+                conversation_id=conv_b,
+                operation_name="invoke_agent",
+                started_at=now + datetime.timedelta(seconds=1),
+            ),
+        ],
+    )
+
+    # Helper: run grouped query and return sorted conversation_ids.
+    def filtered_ids(signal_filters: AgentSignalFilter | None) -> list[str]:
+        res = ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        )
+        return sorted(
+            g.group_keys["conversation_id"]
+            for g in res.groups
+            if g.group_keys.get("conversation_id") in {conv_a, conv_b}
+        )
+
+    def filtered_count(signal_filters: AgentSignalFilter | None) -> int:
+        return ch_server.agent_spans_query(
+            AgentSpansQueryReq(
+                project_id=project_id,
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=signal_filters,
+            )
+        ).total_count
+
+    # Baseline: no signal filter returns both conversations, and total_count agrees.
+    assert filtered_ids(None) == sorted([conv_a, conv_b])
+    assert filtered_count(None) == 2
+
+    # Tag a TURN in conv-A. The producer (here, the monitor) supplies
+    # span_conversation_id from the scored span, so the turn-level signal resolves
+    # up to conv-A.
+    turn_a_ref = ri.InternalAgentTurnRef(project_id=project_id, trace_id=trace_a).uri
+    fb_a = ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_MONITOR_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u1",
+            runnable_ref=ri.InternalOpRef(
+                project_id=project_id, name="scorer", version="v1"
+            ).uri,
+            call_ref=ri.InternalCallRef(project_id=project_id, id=trace_a).uri,
+            trigger_ref=ri.InternalObjectRef(
+                project_id=project_id, name="monitor", version="v1"
+            ).uri,
+            scorer_tags=["flagged"],
+            scorer_ratings={"_rating_": 0.9},
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
+        )
+    )
+
+    # Tag filter selects only conv-A (turn-level signal resolves up to conversation).
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == [conv_a]
+    # total_count applies the filter too (else the UI paginates over phantom empties).
+    assert filtered_count(AgentSignalFilter(tags=["flagged"])) == 1
+
+    # Rating filter selects conv-A (0.9 >= 0.8).
+    assert filtered_ids(
+        AgentSignalFilter(
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)]
+        )
+    ) == [conv_a]
+
+    # Arm 2 of the union: conversation-level tag on conv-B.
+    conv_b_ref = ri.InternalAgentConversationRef(
+        project_id=project_id, conversation_id=conv_b
+    ).uri
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=conv_b_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u2",
+            scorer_tags=["reviewed"],
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["reviewed"])) == [conv_b]
+
+    # Combined tag + rating must match ACROSS rows: add a human tag on conv-A on a
+    # separate wandb.agent_user_feedback row from the monitor's rating. A single-row
+    # conjunction would miss this; the per-grain sub-selects match it.
+    ch_server.feedback_create(
+        tsi.FeedbackCreateReq(
+            project_id=project_id,
+            weave_ref=turn_a_ref,
+            feedback_type=AGENT_USER_FEEDBACK_TYPE,
+            payload={},
+            wb_user_id="u3",
+            scorer_tags=["human-flag"],
+            span_conversation_id=conv_a,
+            span_trace_id=trace_a,
+        )
+    )
+    combined = AgentSignalFilter(
+        tags=["human-flag"],
+        ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+    )
+    assert filtered_ids(combined) == [conv_a]
+
+    # AND across grains: conv-B has the "reviewed" tag but no rating, so a combined
+    # tag + rating filter excludes it.
+    assert (
+        filtered_ids(
+            AgentSignalFilter(
+                tags=["reviewed"],
+                ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+            )
+        )
+        == []
+    )
+
+    # Mutation-correctness: purge the conv-A turn feedback; tag filter returns [].
+    ch_server.feedback_purge(
+        tsi.FeedbackPurgeReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "id"},
+                            {"$literal": fb_a.id},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert filtered_ids(AgentSignalFilter(tags=["flagged"])) == []

@@ -131,6 +131,16 @@ _MAX_RETRIES = 3
 _RETRY_MAX_WAIT_SECONDS = 8
 _COMMAND_PREVIEW_LENGTH = 100
 
+# Migrations that are one-shot by design and MUST NOT be auto-recovered: re-running
+# them is not a safe no-op. 006 re-inserts cost seed rows; 024 is a table-swap
+# RENAME that can half-apply and cross-wire tables on re-run. A partial application
+# of these needs manual repair. This set is the single source of truth for "not
+# re-runnable": test_production_migrations_are_idempotent excludes exactly it from
+# the re-run and asserts both schema AND row counts are unchanged, so any other
+# migration that isn't schema- and data-idempotent (e.g. a new hardcoded seed)
+# fails that test until it is added here.
+_NON_RECOVERABLE_MIGRATION_VERSIONS = frozenset({6, 24})
+
 
 def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
@@ -341,6 +351,29 @@ class BaseClickHouseTraceServerMigrator(ABC):
             > 0
         )
 
+    def _migration_row_exists(self, db_name: str) -> bool:
+        """Whether the migrations table already tracks `db_name`."""
+        res = self.ch_client.query(
+            f"SELECT count() FROM {self.management_db}.migrations "
+            f"WHERE db_name = %(db_name)s",
+            parameters={"db_name": db_name},
+        )
+        return res.result_rows[0][0] > 0
+
+    def _target_db_initialized(self, db_name: str) -> bool:
+        """Whether `db_name` already holds migration-managed tables.
+
+        `call_parts` is created by migration 001 and never dropped by an up
+        migration, so its presence marks a database migrations have already run
+        against.
+        """
+        res = self.ch_client.query(
+            "SELECT count() FROM system.tables "
+            "WHERE database = %(db_name)s AND name = 'call_parts'",
+            parameters={"db_name": db_name},
+        )
+        return res.result_rows[0][0] > 0
+
     def _read_migration_status(self, db_name: str) -> MigrationStatus:
         """Read migration status without writing.
 
@@ -364,13 +397,30 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self, target_db: str, target_version: int | None = None
     ) -> None:
         """Inner migration logic, called while holding the migration lock."""
+        # Refuse to migrate a database we have no history for but that already
+        # holds migration-managed tables: no row in the migrations table means we
+        # would start from version 0, yet the tables exist, so the management and
+        # data databases have diverged (a renamed management_db, a restore of one
+        # without the other). Running from 0 would re-apply DDL against tables of
+        # unknown schema; the IF NOT EXISTS guards would let it pass silently.
+        if not self._migration_row_exists(target_db) and self._target_db_initialized(
+            target_db
+        ):
+            raise MigrationError(
+                f"`{target_db}` already contains migration-managed tables but has no "
+                f"history in `{self.management_db}.migrations`. The management and "
+                f"data databases have diverged (e.g. a renamed management_db, or a "
+                f"restore of one without the other). Refusing to run migrations from "
+                f"scratch to avoid applying DDL to tables of unknown schema. To adopt "
+                f"this database deliberately, insert a row into "
+                f"`{self.management_db}.migrations` with its true curr_version."
+            )
         status = self._get_migration_status(target_db)
         logger.info("""`%s` migration status: %s""", target_db, status)
-        if status["partially_applied_version"]:
-            raise MigrationError(
-                f"Unable to apply migrations to `{target_db}`. Found partially applied "
-                f"migration version {status['partially_applied_version']}. "
-                f"Please fix the database manually and try again."
+        partial_version = status["partially_applied_version"]
+        if partial_version is not None:
+            status = self._recover_partial_migration(
+                target_db, status["curr_version"], partial_version
             )
         migration_map = self._get_migrations()
         migrations_to_apply = self._determine_migrations_to_apply(
@@ -391,6 +441,50 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self._run_post_migration_hook(
             target_db, status["curr_version"], applied_target_version
         )
+
+    def _recover_partial_migration(
+        self, target_db: str, curr_version: int, partial_version: int
+    ) -> MigrationStatus:
+        """Re-run an interrupted migration instead of dead-ending on it.
+
+        A migration that times out mid-DDL leaves partially_applied_version set,
+        which otherwise hard-blocks every restart. Migration DDL is idempotent,
+        so re-running the interrupted version converges the schema and clears the
+        flag. Recovery always rolls the interrupted version forward (target_version
+        is not consulted); a requested downgrade resumes after the flag clears.
+        Only the expected next version, and only an idempotent one, is recovered;
+        anything else, or a re-run failure, falls back to requiring manual repair.
+
+        Convergence is schema-level: in distributed/replicated mode a re-run of a
+        MODIFY QUERY drops and recreates the `_local` materialized view, so rows
+        inserted in that window are not aggregated into the target until the next
+        write. Data already at rest is unaffected.
+        """
+        migration = self._get_migrations().get(partial_version)
+        if (
+            partial_version != curr_version + 1
+            or partial_version in _NON_RECOVERABLE_MIGRATION_VERSIONS
+            or migration is None
+            or migration["up"] is None
+        ):
+            raise MigrationError(
+                f"Unable to apply migrations to `{target_db}`. Found partially applied "
+                f"migration version {partial_version} that cannot be auto-recovered. "
+                f"Please fix the database manually and try again."
+            )
+        logger.warning(
+            "Found partially applied migration %s on `%s`; re-running it idempotently to recover.",
+            partial_version,
+            target_db,
+        )
+        try:
+            self._apply_migration(target_db, partial_version, migration["up"])
+        except Exception as exc:
+            raise MigrationError(
+                f"Unable to auto-recover partially applied migration {partial_version} "
+                f"on `{target_db}`: {exc}. Please fix the database manually and try again."
+            ) from exc
+        return self._get_migration_status(target_db)
 
     def _run_post_migration_hook(
         self, target_db: str, current_version: int, target_version: int | None
@@ -431,7 +525,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         """
         return add_heartbeat_column_sql(self.management_db)
 
-    def _get_migration_status(self, db_name: str) -> dict:
+    def _get_migration_status(self, db_name: str) -> MigrationStatus:
         column_names = ["db_name", "curr_version", "partially_applied_version"]
         select_columns = ", ".join(column_names)
         query = f"""
@@ -450,7 +544,11 @@ class BaseClickHouseTraceServerMigrator(ABC):
         if res is None or len(result_rows) == 0:
             raise MigrationError("Migration table not found")
 
-        return dict(zip(column_names, result_rows[0], strict=False))
+        _, curr_version, partially_applied_version = result_rows[0]
+        return {
+            "curr_version": curr_version,
+            "partially_applied_version": partially_applied_version,
+        }
 
     def _get_migrations(
         self,

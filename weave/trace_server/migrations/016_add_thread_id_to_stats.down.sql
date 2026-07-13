@@ -25,4 +25,4 @@ GROUP BY
     call_parts.id;
 
 -- Remove thread_id from stats table
-ALTER TABLE calls_merged_stats DROP COLUMN thread_id; 
+ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS thread_id; 

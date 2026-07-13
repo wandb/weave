@@ -835,8 +835,18 @@ class ObjDeleteReq(BaseModelStrict):
     )
 
 
+class DeletedObjVersion(BaseModel):
+    digest: str
+    base_object_class: str | None = None
+    leaf_object_class: str | None = None
+
+
 class ObjDeleteRes(BaseModel):
     num_deleted: int
+    deleted_versions: list[DeletedObjVersion] | None = Field(
+        default=None,
+        description="Metadata for each deleted object version, with digest aliases resolved to content digests. None when the backing server does not report it.",
+    )
 
 
 # --- Tag and Alias types ---
@@ -1262,7 +1272,15 @@ class FeedbackCreateReq(BaseModelStrict):
     span_status_code: str = Field(
         default="UNSET",
         description="Status of the scored turn (from spans.status_code)",
-        examples=["SUCCESS"],
+        examples=["OK"],
+    )
+    span_conversation_id: str = Field(
+        default="",
+        description="Conversation the feedback belongs to (from spans.conversation_id)",
+    )
+    span_trace_id: str = Field(
+        default="",
+        description="Turn the feedback belongs to (from spans.trace_id)",
     )
 
     # wb_user_id is automatically populated by the server
@@ -3295,9 +3313,10 @@ class EvalResultsQueryBody(BaseModelStrict):
     include_costs: bool = Field(
         default=False,
         description=(
-            "When true, enrich the predict-and-score child calls with cost so "
-            "the summary can report predict-only `predict_total_cost`. Opt-in: "
-            "other callers skip the cost computation."
+            "When true, price each trial's predict call so rows and summary "
+            "report predict-only cost (`total_cost` / `predict_total_cost`); "
+            "scorer costs are excluded. Opt-in: other callers skip the cost "
+            "computation."
         ),
     )
     sort_by: list[EvalResultsSortBy] | None = Field(
