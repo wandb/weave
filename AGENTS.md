@@ -452,4 +452,8 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
+- [ ] Fix the `@wandb/weave-openclaw` ClawHub release artifact and add an
+  isolated install smoke test. Version `0.1.1` resolves successfully from
+  ClawHub but `openclaw plugins install clawhub:@wandb/weave-openclaw` fails
+  because the published archive omits `dist/index.js`.
 - [ ] ...
