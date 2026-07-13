@@ -111,6 +111,12 @@ class UserInjectingExternalTraceServer(
         req.start.wb_user_id = self._user_id
         return super().call_start(req)
 
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        for item in req.batch:
+            if isinstance(item, tsi.CallBatchStartMode):
+                item.req.start.wb_user_id = self._user_id
+        return super().call_start_batch(req)
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.wb_user_id = self._user_id
         return super().calls_delete(req)

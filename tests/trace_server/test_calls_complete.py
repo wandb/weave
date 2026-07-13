@@ -1028,16 +1028,19 @@ def _make_content_start_batch(
 
 
 def test_call_start_batch_batches_content_object_inserts(
-    clickhouse_trace_server, monkeypatch
+    trace_server, clickhouse_trace_server, monkeypatch
 ):
     """The v1 /call/upsert_batch path batches content objects like calls_complete.
 
-    Duplicate blobs across the batch collapse to one ref, and the whole batch
+    Driven through the external adapter (the real HTTP entry converts project
+    ids the same way), so this also guards the adapter's call_start_batch
+    ext->int encoding. Duplicate blobs collapse to one ref, and the whole batch
     issues exactly one object_versions insert and no aliases insert (content
-    refs pin the digest, so the "latest" alias write is skipped) instead of
-    an inline obj_create per blob (the serial staircase this replaces).
+    refs pin the digest, so the "latest" alias write is skipped) instead of an
+    inline obj_create per blob (the serial staircase this replaces).
     """
-    internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_batched_objects")
+    project_id = f"{TEST_ENTITY}/call_start_batch_batched_objects"
+    internal_project_id = b64(project_id)
 
     raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
@@ -1047,7 +1050,7 @@ def test_call_start_batch_batches_content_object_inserts(
     started_at = datetime.datetime.now(datetime.timezone.utc)
     call_a1, call_a2, call_b = (str(uuid.uuid4()) for _ in range(3))
     batch = _make_content_start_batch(
-        internal_project_id,
+        project_id,
         started_at,
         [
             (call_a1, {"image": data_uri_a}),
@@ -1065,7 +1068,7 @@ def test_call_start_batch_batches_content_object_inserts(
 
     monkeypatch.setattr(type(clickhouse_trace_server), "_insert", _spy_insert)
 
-    clickhouse_trace_server.call_start_batch(batch)
+    trace_server.call_start_batch(batch)
 
     assert insert_tables.count("object_versions") == 1
     assert insert_tables.count("aliases") == 0
