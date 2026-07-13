@@ -751,13 +751,13 @@ async def test_beta_async_anthropic_stream(
 # input_tokens must be the gross sum of the three (Weave's cost math subtracts
 # the cache counts from it), while the raw response usage stays provider-native.
 #
-# The cache tests are recorded against the live API on a current model
-# (claude-3-haiku-20240307 is retired). Caching needs a minimum prefix
-# (4096 tokens on haiku 4.5), so the cacheable block repeats a fixed sentence
-# well past that, and each test tags it with a unique marker so its first
-# recorded call writes the cache and its second call reads it, independent of
-# the other cache tests.
-cache_model = "claude-haiku-4-5-20251001"
+# The tests below are recorded against a current model (claude-3-haiku-20240307
+# is retired; the tests above keep replaying their historical cassettes).
+# Caching needs a minimum prefix (4096 tokens on haiku 4.5), so the cacheable
+# block repeats a fixed sentence well past that, and each test tags it with a
+# unique marker so its first recorded call writes the cache and its second call
+# reads it, independent of the other cache tests.
+live_model = "claude-haiku-4-5-20251001"
 cache_filler = " ".join(
     ["Weave prices cached and uncached prompt tokens with separate counters."] * 400
 )
@@ -788,12 +788,12 @@ def test_anthropic_cache_tokens(
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
     write = anthropic_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("sync"),
     )
     read = anthropic_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("sync"),
     )
@@ -823,6 +823,7 @@ def test_anthropic_cache_tokens(
             + message.usage.cache_read_input_tokens
             + message.usage.cache_creation_input_tokens
         )
+        assert model_usage["output_tokens"] == message.usage.output_tokens
         assert (
             model_usage["cache_read_input_tokens"]
             == message.usage.cache_read_input_tokens
@@ -844,12 +845,12 @@ async def test_async_anthropic_cache_tokens(
         api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
     )
     write = await anthropic_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("async"),
     )
     read = await anthropic_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("async"),
     )
@@ -896,7 +897,7 @@ def test_anthropic_stream_cache_tokens(
     anthropic_client = Anthropic(api_key=api_key)
     for _ in range(2):
         stream = anthropic_client.messages.create(
-            model=cache_model,
+            model=live_model,
             stream=True,
             max_tokens=32,
             messages=cache_messages("stream"),
@@ -929,6 +930,7 @@ def test_anthropic_stream_cache_tokens(
             + usage.cache_read_input_tokens
             + usage.cache_creation_input_tokens
         )
+        assert model_usage["output_tokens"] == usage.output_tokens
         assert model_usage["cache_read_input_tokens"] == usage.cache_read_input_tokens
         assert (
             model_usage["cache_creation_input_tokens"]
@@ -948,7 +950,7 @@ def test_anthropic_messages_stream_ctx_manager_cache_tokens(
         with anthropic_client.messages.stream(
             max_tokens=32,
             messages=cache_messages("ctx"),
-            model=cache_model,
+            model=live_model,
         ) as stream:
             for _event in stream:
                 pass
@@ -976,6 +978,7 @@ def test_anthropic_messages_stream_ctx_manager_cache_tokens(
             + usage.cache_read_input_tokens
             + usage.cache_creation_input_tokens
         )
+        assert model_usage["output_tokens"] == usage.output_tokens
         assert model_usage["cache_read_input_tokens"] == usage.cache_read_input_tokens
         assert (
             model_usage["cache_creation_input_tokens"]
@@ -995,8 +998,8 @@ def test_anthropic_messages_stream_ctx_manager_abandoned(
     first_event = None
     with anthropic_client.messages.stream(
         max_tokens=32,
-        messages=cache_messages("abandoned"),
-        model=cache_model,
+        messages=[{"role": "user", "content": "Say hello there!"}],
+        model=live_model,
     ) as stream:
         for event in stream:
             first_event = event
@@ -1029,7 +1032,7 @@ def test_anthropic_create_with_traced_call_in_response_hook(
 
     def call_anthropic_from_hook(response: httpx.Response) -> None:
         inner_client.messages.create(
-            model=cache_model,
+            model=live_model,
             max_tokens=32,
             messages=[{"role": "user", "content": "Hello, Claude"}],
         )
@@ -1039,7 +1042,7 @@ def test_anthropic_create_with_traced_call_in_response_hook(
         http_client=httpx.Client(event_hooks={"response": [call_anthropic_from_hook]}),
     )
     message = outer_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("hook"),
     )
@@ -1076,7 +1079,7 @@ def test_anthropic_cache_tokens_zero(
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=[
             {
@@ -1118,12 +1121,12 @@ def test_beta_anthropic_cache_tokens(
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
     write = anthropic_client.beta.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("beta"),
     )
     read = anthropic_client.beta.messages.create(
-        model=cache_model,
+        model=live_model,
         max_tokens=32,
         messages=cache_messages("beta"),
     )
