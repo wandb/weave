@@ -53,6 +53,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
     span_value_sql,
 )
 from weave.trace_server.query_builder.agent_query_compiler import compile_agent_query
+from weave.trace_server.query_builder.agent_signal_filters import (
+    build_signal_filter_clause,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -426,6 +429,9 @@ def _spans_source_filter_sql(
     )
     if req.query is not None:
         where_conditions.append(compile_agent_query(req.query, pb))
+    signal_clause = build_signal_filter_clause(pb, req.project_id, req.signal_filters)
+    if signal_clause is not None:
+        where_conditions.append(signal_clause)
     # The base relation carries cost columns only when the request needs them;
     # attribution then wraps that base so identity columns inherit from their
     # trace while any cost columns pass through untouched.
@@ -435,7 +441,7 @@ def _spans_source_filter_sql(
         else _SPANS_TABLE
     )
     source = base
-    if _stats_references_identity(req):
+    if signal_clause is not None or _stats_references_identity(req):
         source = agent_trace_attribution.attributed_spans_source(
             pb,
             project_id=req.project_id,

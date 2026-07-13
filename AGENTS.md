@@ -72,6 +72,9 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+  - Agent span list and stats requests both support conversation Signal filters;
+    use the shared `agent_signal_filters` semi-join so list rows, counts, and
+    histogram buckets apply identical tag/rating semantics.
 
 ## Generated Files — Do Not Hand-Edit
 
