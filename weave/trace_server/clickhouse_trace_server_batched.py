@@ -84,8 +84,7 @@ from weave.trace_server.agents.types import (
 )
 from weave.trace_server.base64_content_conversion import (
     PendingContentObjs,
-    process_call_req_to_content,
-    process_complete_call_to_content,
+    process_call_content,
     replace_base64_with_content_objects,
     restore_raw_content_values,
 )
@@ -1023,7 +1022,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush file chunks")
             raise
 
-    def _offload_call_content(self, req: _CallReqT) -> _CallReqT:
+    def _offload_call_content(
+        self, req: _CallReqT, pending_objs: PendingContentObjs | None = None
+    ) -> _CallReqT:
         """Replace inline base64 content with file refs, uploading in parallel.
 
         Each extracted attachment becomes a file_create; staging them and
@@ -1031,12 +1032,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         one parallel batch. Files persist before this returns, so the caller's
         call insert/UPDATE can reference them. Deferral is a no-op when already
         inside call_batch(), which owns the flush.
+
+        When ``pending_objs`` is given, content objects are staged there for a
+        batched flush instead of written inline; the caller resolves and flushes
+        them (see call_start_batch). Without it, each object is written inline.
         """
         if not self._flush_immediately:
-            return process_call_req_to_content(req, self)
+            return process_call_content(req, self, pending_objs)
         self._flush_immediately = False
         try:
-            processed = process_call_req_to_content(req, self)
+            processed = process_call_content(req, self, pending_objs)
             self._flush_immediately = True
             self._flush_file_batches()
             return processed
@@ -1047,26 +1052,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("call_start_batch")
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        """Insert a batch of start/end ops, batching their content objects.
+
+        Content objects embedded across the batch are staged into one
+        PendingContentObjs, deduped and collision-checked once per project, and
+        written in a single obj_create_batch (parallel with file chunks) before
+        the calls that reference them, instead of one inline obj_create per blob.
+        Mirrors calls_complete; standalone call_start/call_end keep inline writes.
+        """
+        set_current_span_dd_tags(
+            {"weave_trace_server.insert_call_count": len(req.batch)}
+        )
+        pending_objs = PendingContentObjs()
         with self.call_batch():
+            for item in req.batch:
+                self._offload_call_content(item.req, pending_objs)
+
+            raw_by_ref = self._resolve_pending_content_objs(pending_objs)
+
             res = []
             for item in req.batch:
+                if raw_by_ref:
+                    restore_raw_content_values(item.req, raw_by_ref)
                 if item.mode == "start":
-                    res.append(self.call_start(item.req))
+                    res.append(self._call_start_processed(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self._call_end_processed(item.req))
                 else:
                     raise ValueError("Invalid mode")
+        pending_objs.publish_refs()
         return tsi.CallCreateBatchRes(res=res)
 
     @tag_db_insert_path("call_start")
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Creates a new call."""
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
+        req = self._offload_call_content(req)
+        return self._call_start_processed(req)
+
+    def _call_start_processed(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        """Insert a start whose content was already offloaded (batch or inline)."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
-
-        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(
             req.start.project_id, self.ch_client
         )
@@ -1096,10 +1124,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req: tsi.CallEndReq,
         publish: bool = True,
     ) -> tsi.CallEndRes:
+        req = self._offload_call_content(req)
+        return self._call_end_processed(req, publish)
+
+    def _call_end_processed(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+    ) -> tsi.CallEndRes:
+        """Insert an end whose content was already offloaded (batch or inline)."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
         ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
@@ -1154,7 +1190,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         pending_objs = PendingContentObjs()
         with self.call_batch():
             processed_calls = [
-                process_complete_call_to_content(complete_call, self, pending_objs)
+                process_call_content(complete_call, self, pending_objs)
                 for complete_call in req.batch
             ]
             # Resolve collisions now (read-only) so call payloads can restore

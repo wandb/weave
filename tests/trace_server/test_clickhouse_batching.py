@@ -160,13 +160,14 @@ def test_clickhouse_batching():
         # Execute the batch
         trace_server.call_start_batch(batch_req)
 
-        # THE KEY ASSERTION: one batched files insert and one batched
-        # call_parts insert for the whole request. The 3 distinct content
-        # objects each publish via obj_create (unbatched on this path), so
-        # object_versions and aliases get one insert per object.
+        # THE KEY ASSERTION: the whole request issues one insert per table.
+        # The 3 distinct content objects are staged and written in a single
+        # obj_create_batch (one object_versions + one aliases insert) alongside
+        # the batched files and call_parts inserts, instead of one obj_create
+        # round-trip per object.
         insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
         assert sorted(insert_tables) == sorted(
-            ["files", "call_parts"] + ["object_versions", "aliases"] * 3
+            ["files", "call_parts", "object_versions", "aliases"]
         ), f"Unexpected inserts: {insert_tables}"
 
 
