@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.export_targets import EXPORT_TARGET_NAMES, build_export_query
 from weave.trace_server.file_storage import (
@@ -45,6 +46,7 @@ class ResolvedExportTarget:
 
 
 def start_export(
+    ch_client: CHClient,
     mint_client: Callable[[], CHClient],
     file_storage_client: FileStorageClient | None,
     project_id: str,
@@ -59,10 +61,23 @@ def start_export(
             "EXPORT_STORAGE_UNAVAILABLE",
             "export storage is not configured",
         )
+    # Fail closed before a job or artifact exists, so a rejected request cannot
+    # leave an object the status API might later discover.
+    targets_with_counts: list[tuple[str, int]] = []
+    cap = wf_env.wf_export_max_rows()
+    for target in targets:
+        rows = precount_rows(ch_client, project_id, target)
+        if rows > cap:
+            raise ExportError(
+                409,
+                "TOO_LARGE",
+                f"target {target.name!r} has {rows} rows > cap {cap}",
+            )
+        targets_with_counts.append((target.name, rows))
     job_id = str(uuid.uuid4())
     if not JOB_ID_RE.match(job_id):
         raise ExportError(500, "BAD_JOB_ID", f"job_id {job_id!r} fails validation")
-    _write_manifest(file_storage_client, project_id, job_id, target_names)
+    _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
     threading.Thread(
         target=_run_export,
         args=(mint_client, project_id, job_id, targets),
@@ -124,6 +139,17 @@ def poll_query_status(
     return "running", 0, None
 
 
+def precount_rows(
+    ch_client: CHClient, project_id: str, target: ResolvedExportTarget
+) -> int:
+    """Count the rows a target would export, project_id bound as a param."""
+    result = ch_client.query(
+        f"SELECT count() FROM ({target.source_sql})",
+        parameters={"project_id": project_id},
+    )
+    return int(result.result_rows[0][0])
+
+
 def build_export_insert_sql(target: ResolvedExportTarget, filename: str) -> str:
     """Build the detached export INSERT.
 
@@ -146,14 +172,21 @@ def export_job_prefix(project_id: str, job_id: str) -> str:
     return f"exports/{project_id}/{job_id}/"
 
 
-def build_manifest_json(job_id: str, target_names: list[str]) -> bytes:
+def build_manifest_json(
+    job_id: str, targets_with_counts: list[tuple[str, int]]
+) -> bytes:
     """Build the durable job index without exposing the internal project id."""
     manifest = {
         "job_id": job_id,
         "format": "parquet",
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "targets": [
-            {"target": name, "object": f"{name}/data.parquet"} for name in target_names
+            {
+                "target": name,
+                "expected_rows": rows,
+                "object": f"{name}/data.parquet",
+            }
+            for name, rows in targets_with_counts
         ],
     }
     return json.dumps(manifest, sort_keys=True).encode()
@@ -163,14 +196,14 @@ def _write_manifest(
     file_storage_client: FileStorageClient,
     project_id: str,
     job_id: str,
-    target_names: list[str],
+    targets_with_counts: list[tuple[str, int]],
 ) -> None:
     """Persist the job record before accepting detached work."""
     try:
         store_in_bucket(
             file_storage_client,
             export_job_prefix(project_id, job_id) + "manifest.json",
-            build_manifest_json(job_id, target_names),
+            build_manifest_json(job_id, targets_with_counts),
         )
     except FileStorageWriteError as exc:
         raise ExportError(
