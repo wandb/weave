@@ -45,6 +45,7 @@ from weave.shared.trace_server_interface_util import (
 from weave.trace_server import (
     ch_sentinel_values,
     constants,
+    export,
     object_creation_utils,
     usage_utils,
 )
@@ -7367,6 +7368,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
 
         return res
+
+    def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
+        calls_read_table = ReadTable.CALLS_COMPLETE
+        if "calls" in req.targets:
+            calls_read_table = self.table_routing_resolver.resolve_read_table(
+                req.project_id, self.ch_client
+            )
+        job_id = export.start_export(
+            lambda: self._mint_client(
+                send_receive_timeout=export.EXPORT_MAX_EXECUTION_SECONDS
+            ),
+            self.file_storage_client,
+            req.project_id,
+            req.targets,
+            calls_read_table,
+        )
+        return tsi.ExportStartRes(job_id=job_id)
 
     # Private Methods
     @property
