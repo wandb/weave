@@ -392,7 +392,10 @@ describe('genai api (top-level functions)', () => {
     runIsolated(() => {
       const convo = startConversation({
         conversationId: 'session-x',
-        attributes: {'weave.integration.name': 'claude-code', 'tenant.id': 'acme'},
+        attributes: {
+          'weave.integration.name': 'claude-code',
+          'tenant.id': 'acme',
+        },
       });
       turn = convo.startTurn({agentName: 'claude-code'});
     });
@@ -418,7 +421,9 @@ describe('genai api (top-level functions)', () => {
   });
 
   test('rootless startTurn attributes propagate to child spans', () => {
-    const turn = startTurn({attributes: {'weave.integration.name': 'my-harness'}});
+    const turn = startTurn({
+      attributes: {'weave.integration.name': 'my-harness'},
+    });
     turn.startTool({name: 'search'}).end();
     turn.end();
 
