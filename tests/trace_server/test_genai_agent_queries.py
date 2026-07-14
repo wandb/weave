@@ -2808,6 +2808,34 @@ def test_message_search_indexes_tool_calls(ch_server):
     assert res_tool_alias.results[0].matched_messages[0].role == "tool_call"
 
 
+def test_message_search_passes_through_noncanonical_role(ch_server):
+    """A stored message role that is not a canonical value (e.g. 'toolResult'
+    from a client sending camelCase OTel roles) must not 500 the search; it is
+    returned verbatim on `AgentSearchMatchedMessage.role`.
+    """
+    project_id = _make_project_id("search_role_passthrough")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            conversation_id="camel-role-conv",
+            output_messages=[
+                NormalizedMessage(role="toolResult", content="the weather is sunny"),
+            ],
+            started_at=now,
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    res = ch_server.agent_search(AgentSearchReq(project_id=project_id, query="sunny"))
+    assert len(res.results) == 1
+    matched = res.results[0].matched_messages
+    assert len(matched) == 1
+    assert matched[0].role == "toolResult"
+    assert matched[0].content_preview == "the weather is sunny"
+
+
 # ---------------------------------------------------------------------------
 # Test: Query DSL end-to-end
 # ---------------------------------------------------------------------------

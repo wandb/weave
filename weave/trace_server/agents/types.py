@@ -980,7 +980,9 @@ class AgentSearchMatchedMessage(BaseModel):
 
     span_id: str
     trace_id: str
-    role: SearchMessageRole
+    # Canonical roles are in SearchMessageRole; stored data may carry
+    # arbitrary client-supplied role strings, so accept both.
+    role: SearchMessageRole | str
     content_preview: str
     content_digest: str
     started_at: datetime.datetime
