@@ -365,6 +365,10 @@ class AgentSpanStatsReq(BaseModel):
     )
     bucket_by: AgentSpanStatsBucketSpec | None = None
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
+    # Restrict stats to spans belonging to conversations that carry all of the
+    # requested signal tags/ratings. Signal timestamps are intentionally not
+    # constrained by the stats window; they annotate the conversation.
+    signal_filters: AgentSignalFilter | None = None
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:

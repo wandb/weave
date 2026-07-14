@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from weave.trace_server.agents.constants import MAX_AGENT_STATS_RESULT_ROWS
 from weave.trace_server.agents.types import (
     AgentGroupByRef,
+    AgentSignalFilter,
     AgentSpanGroupFilter,
     AgentSpanMeasureSpec,
     AgentSpanStatsMetricSpec,
@@ -18,6 +19,8 @@ from weave.trace_server.agents.types import (
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_stats_query_builder import (
+    _spans_source_filter_sql,
+    _SpanSourceFilterSQL,
     build_agent_span_stats_query,
 )
 from weave.trace_server.query_builder.agent_trace_attribution import (
@@ -107,6 +110,44 @@ def test_time_bucket_epoch_bounds_are_whole_second_ints() -> None:
     assert end_epoch in params.values()
     epochs = [v for v in params.values() if v in {start_epoch, end_epoch}]
     assert [type(v) for v in epochs] == [int, int]
+
+
+def test_signal_filters_add_conversation_semi_join_and_attribution() -> None:
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+    pb = ParamBuilder("genai")
+
+    result = _spans_source_filter_sql(
+        pb,
+        _req(signal_filters=AgentSignalFilter(tags=["flagged"])),
+        start,
+        end,
+    )
+
+    expected_source, source_params = _attr_src(
+        5, started_after=start, started_before=end
+    )
+    assert result == _SpanSourceFilterSQL(
+        where=(
+            "s.project_id = {genai_0:String} "
+            "AND s.started_at >= {genai_1:DateTime64(6)} "
+            "AND s.started_at < {genai_2:DateTime64(6)} "
+            "AND s.conversation_id IN (SELECT span_conversation_id FROM feedback "
+            "WHERE project_id = {genai_3:String} AND feedback_type IN "
+            "('wandb.agent_monitor', 'wandb.agent_user_feedback') "
+            "AND span_conversation_id != '' GROUP BY span_conversation_id "
+            "HAVING sum(hasAny(scorer_tags, {genai_4:Array(String)})) > 0)"
+        ),
+        source=expected_source,
+    )
+    assert pb.get_params() == {
+        "genai_0": "p1",
+        "genai_1": start,
+        "genai_2": end,
+        "genai_3": "p1",
+        "genai_4": ["flagged"],
+        **source_params,
+    }
 
 
 def test_ungrouped_stats_query_full_sql_shape() -> None:
