@@ -3296,10 +3296,15 @@ def test_feedback_create_persists_supplied_conversation_target_id(ch_server):
 
 
 def test_feedback_create_persists_supplied_span_target_ids(ch_server):
-    """Span-targeted feedback persists supplied denormalized IDs."""
+    """Span-targeted feedback persists supplied denormalized IDs.
+
+    scorer_trace_id (the judge's own trace) round-trips alongside span_trace_id
+    (the scored turn), and the two are stored independently.
+    """
     project_id = _make_project_id("fb-span-id")
     conv_id = f"conv-{uuid.uuid4().hex[:8]}"
     trace_id = uuid.uuid4().hex
+    scorer_trace_id = uuid.uuid4().hex
     span_id = uuid.uuid4().hex
     span_ref = ri.InternalAgentSpanRef(project_id=project_id, span_id=span_id).uri
 
@@ -3312,6 +3317,7 @@ def test_feedback_create_persists_supplied_span_target_ids(ch_server):
             scorer_tags=["needs-review"],
             span_conversation_id=conv_id,
             span_trace_id=trace_id,
+            scorer_trace_id=scorer_trace_id,
             wb_user_id="u3",
         )
     )
@@ -3319,13 +3325,19 @@ def test_feedback_create_persists_supplied_span_target_ids(ch_server):
     res = ch_server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
-            fields=["span_conversation_id", "span_trace_id", "scorer_tags"],
+            fields=[
+                "span_conversation_id",
+                "span_trace_id",
+                "scorer_trace_id",
+                "scorer_tags",
+            ],
         )
     )
     assert res.result == [
         {
             "span_conversation_id": conv_id,
             "span_trace_id": trace_id,
+            "scorer_trace_id": scorer_trace_id,
             "scorer_tags": ["needs-review"],
         }
     ]
