@@ -33,8 +33,9 @@ export function startConversation(opts: ConversationInit = {}): Conversation {
 export const startSession = startConversation;
 
 /**
- * Start a new Turn. If a Conversation is active, the turn inherits its
- * `conversationId`; otherwise the turn has no conversation id.
+ * Start a `Turn` as a child of the current `Conversation`.
+ *
+ * Starts without a `conversation_id` if no `Conversation` is active.
  *
  * @example
  * weave.startTurn();
@@ -50,6 +51,12 @@ export const startSession = startConversation;
  *   systemInstructions: ['You are a helpful weather bot.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
+ *
+ * @remarks
+ * Prefer `conversation.startTurn(...)` when you have a handle on the parent.
+ * `weave.startTurn(...)` may be helpful when it is impractical for the
+ * code that starts the span to receive the parent handle directly.
+ *
  */
 export function startTurn(opts: TurnInit = {}): Turn {
   const conversation = getGenaiState().conversation;
@@ -60,8 +67,9 @@ export function startTurn(opts: TurnInit = {}): Turn {
 }
 
 /**
- * Start an LLM span as a child of the current Turn. Throws if no Turn is
- * active.
+ * Start an `LLM` span as a child of the current `Turn`.
+ *
+ * Throws if no `Turn` is active.
  *
  * @example
  * weave.startLLM({model: 'gpt-4o-mini', providerName: 'openai'});
@@ -73,6 +81,13 @@ export function startTurn(opts: TurnInit = {}): Turn {
  *   systemInstructions: ['You are a helpful weather bot.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
+ *
+ * @remarks
+ * Prefer `turn.startLLM(...)` or `subagent.startLLM(...)` when you have
+ * a handle on the parent. `weave.startLLM(...)` may be helpful when it is
+ * impractical for the code that starts the span to receive the parent
+ * handle directly.
+ *
  */
 export function startLLM(opts: LLMInit): LLM {
   const turn = getGenaiState().turn;
@@ -85,12 +100,9 @@ export function startLLM(opts: LLMInit): LLM {
 }
 
 /**
- * Start a Tool span. Parent resolution (matches the design's "flat by
- * default, hierarchical if you nest"):
- * - If an LLM is active, the Tool nests under it.
- * - Otherwise, the Tool is a sibling under the current Turn.
+ * Start a `Tool` span as a child of the current `LLM` or `Turn`.
  *
- * Throws if neither a Turn nor an LLM is active.
+ * Throws if neither an `LLM` nor `Turn` is active.
  *
  * @example
  * weave.startTool({
@@ -106,6 +118,13 @@ export function startLLM(opts: LLMInit): LLM {
  *   toolCallId: 'call_t1',
  *   startTime: new Date('2026-05-29T10:00:00.800Z'),
  * });
+ *
+ * @remarks
+ * Prefer `llm.startTool(...)`, `turn.startTool(...)`, or
+ * `subagent.startTool(...)` when you have a handle on the parent.
+ * `weave.startTool(...)` may be helpful when it is impractical for
+ * the code that starts the span to receive the parent handle directly.
+ *
  */
 export function startTool(opts: ToolInit): Tool {
   const state = getGenaiState();
@@ -121,7 +140,9 @@ export function startTool(opts: ToolInit): Tool {
 }
 
 /**
- * Start a SubAgent span. Same parent-resolution rules as `startTool`.
+ * Start a `SubAgent` span as a child of the current `LLM` or `Turn`.
+ *
+ * Throws if neither an `LLM` nor `Turn` is active.
  *
  * @example
  * weave.startSubagent({name: 'critic'});
@@ -133,6 +154,13 @@ export function startTool(opts: ToolInit): Tool {
  *   systemInstructions: ['Critique the proposed plan.'],
  *   startTime: new Date('2026-05-29T10:00:00.000Z'),
  * });
+ *
+ * @remarks
+ * Prefer `llm.startSubagent(...)`, `turn.startSubagent(...)`, or
+ * `subagent.startSubagent(...)` when you have a handle on the parent.
+ * `weave.startSubagent(...)` may be helpful when it is impractical for
+ * the code that starts the span to receive the parent handle directly.
+ *
  */
 export function startSubagent(opts: SubAgentInit): SubAgent {
   const state = getGenaiState();
