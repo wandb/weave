@@ -1719,6 +1719,53 @@ class FilesStatsRes(BaseModel):
     total_size_bytes: int
 
 
+# Export API
+ExportJobStatus = Literal["running", "done", "error"]
+
+
+class ExportStartReq(BaseModelStrict):
+    project_id: str = Field(examples=["entity/project"])
+    targets: list[str] = Field(
+        description="Export target names resolved against the server-side registry, e.g. ['calls', 'objects', 'feedback']."
+    )
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ExportStartRes(BaseModel):
+    job_id: str = Field(
+        description="Server-generated uuid4 identifying the export job."
+    )
+
+
+class ExportStatusReq(BaseModelStrict):
+    project_id: str = Field(examples=["entity/project"])
+    job_id: str = Field(description="Export job id returned by export_start.")
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ExportManifestEntry(BaseModel):
+    target: str
+    status: ExportJobStatus
+    rows: int = 0
+    objects: list[str] = Field(
+        default_factory=list,
+        description="Artifact object keys written for this target.",
+    )
+    urls: list[str] = Field(
+        default_factory=list,
+        description="Per-object short-lived presigned GET URLs (only when status is done).",
+    )
+    expires_at: str | None = Field(
+        None, description="ISO-8601 expiry of the presigned URLs."
+    )
+    error: str | None = None
+
+
+class ExportStatusRes(BaseModel):
+    status: ExportJobStatus
+    manifest: list[ExportManifestEntry] = Field(default_factory=list)
+
+
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
@@ -3543,6 +3590,10 @@ class TraceServerInterface(Protocol):
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
+
+    # Export API
+    def export_start(self, req: ExportStartReq) -> ExportStartRes: ...
+    def export_status(self, req: ExportStatusReq) -> ExportStatusRes: ...
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
