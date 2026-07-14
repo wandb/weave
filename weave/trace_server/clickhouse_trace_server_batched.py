@@ -7386,6 +7386,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         return tsi.ExportStartRes(job_id=job_id)
 
+    def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes:
+        return export.get_export_status(
+            self.ch_client, self.file_storage_client, req.project_id, req.job_id
+        )
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
