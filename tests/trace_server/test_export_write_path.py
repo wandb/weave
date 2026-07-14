@@ -29,6 +29,12 @@ QUERY_LOG_POLL_SECONDS = 20
 BUCKET = "weave-export-write-path"
 
 
+def _counting_client():
+    client = MagicMock()
+    client.query.return_value.result_rows = [(0,)]
+    return client
+
+
 @pytest.fixture
 def storage_client():
     with mock_aws():
@@ -93,6 +99,7 @@ def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
     monkeypatch.setattr(export.threading, "Thread", _ImmediateThread)
 
     job_id = export.start_export(
+        _counting_client(),
         mint_client,
         storage_client,
         "project",
@@ -134,8 +141,12 @@ def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
         "job_id": job_id,
         "format": "parquet",
         "targets": [
-            {"target": "objects", "object": "objects/data.parquet"},
-            {"target": "feedback", "object": "feedback/data.parquet"},
+            {"target": "objects", "expected_rows": 0, "object": "objects/data.parquet"},
+            {
+                "target": "feedback",
+                "expected_rows": 0,
+                "object": "feedback/data.parquet",
+            },
         ],
     }
 
@@ -166,8 +177,12 @@ def test_export_start_persists_manifest(
         "job_id": res.job_id,
         "format": "parquet",
         "targets": [
-            {"target": "objects", "object": "objects/data.parquet"},
-            {"target": "feedback", "object": "feedback/data.parquet"},
+            {"target": "objects", "expected_rows": 0, "object": "objects/data.parquet"},
+            {
+                "target": "feedback",
+                "expected_rows": 0,
+                "object": "feedback/data.parquet",
+            },
         ],
     }
 
@@ -207,6 +222,7 @@ def test_start_export_requires_durable_manifest(
     mint_client = MagicMock()
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
+            _counting_client(),
             mint_client,
             None,
             "project",
@@ -222,6 +238,7 @@ def test_start_export_requires_durable_manifest(
     monkeypatch.setattr(export, "store_in_bucket", failed_write)
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
+            _counting_client(),
             mint_client,
             MagicMock(),
             "project",
@@ -245,6 +262,7 @@ def test_start_export_rejects_invalid_targets_before_writing(
         mint_client = MagicMock()
         with pytest.raises(export.ExportError) as exc_info:
             export.start_export(
+                _counting_client(),
                 mint_client,
                 MagicMock(),
                 "project",
