@@ -45,11 +45,12 @@ import socket
 import threading
 from abc import abstractmethod
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import TypeVar, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError, ResourceExistsError
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobSasPermissions, BlobServiceClient, generate_blob_sas
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from cachetools import LRUCache
@@ -157,6 +158,15 @@ class FileStorageClient:
     @abstractmethod
     def read(self, uri: FileStorageURI) -> bytes:
         """Read data from the specified URI location in cloud storage."""
+        pass
+
+    @abstractmethod
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        """Return a short-lived read-only URL for exactly one object.
+
+        Self-signed with this client's first-party credentials; grants a single
+        GET of `uri` for `ttl` seconds and nothing else (no write, no listing).
+        """
         pass
 
 
@@ -328,6 +338,15 @@ class S3StorageClient(FileStorageClient):
         response = self.client.get_object(Bucket=uri.bucket, Key=uri.path)
         return response["Body"].read()
 
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": uri.bucket, "Key": uri.path},
+            ExpiresIn=ttl,
+        )
+
 
 class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
@@ -372,6 +391,18 @@ class GCSStorageClient(FileStorageClient):
         blob = bucket.blob(uri.path)
         return blob.download_as_bytes(
             timeout=(DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT), retry=None
+        )
+
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        blob = self.client.bucket(uri.bucket).blob(uri.path)
+        # V4 signing needs a signer key: a service-account key, or ADC creds with
+        # IAM signBlob (keyless node identity). Raises at call time if unavailable.
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=ttl),
+            method="GET",
         )
 
 
@@ -438,6 +469,23 @@ class AzureStorageClient(FileStorageClient):
         blob_client = container_client.get_blob_client(uri.path)
         stream = blob_client.download_blob()
         return stream.readall()
+
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        client = self._get_client(uri.account)
+        blob_client = client.get_container_client(uri.container).get_blob_client(
+            uri.path
+        )
+        sas = generate_blob_sas(
+            account_name=client.account_name,
+            container_name=uri.container,
+            blob_name=uri.path,
+            account_key=client.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=ttl),
+        )
+        return f"{blob_client.url}?{sas}"
 
 
 class _KeepAliveHTTPAdapter(HTTPAdapter):
