@@ -16,6 +16,7 @@ from weave.integrations.patch import (
     _patch_integration,
     implicit_patch,
     patch_openai,
+    patch_openai_agents,
     register_import_hook,
     reset_patched_integrations,
     unregister_import_hook,
@@ -397,6 +398,109 @@ def test_patch_integration(setup_env, success):
             mock_getter.assert_called_once()
             mock_patcher.attempt_patch.assert_called_once()
         assert ("single_symbol" in patch_module._PATCHED_INTEGRATIONS) is success
+
+
+def test_direct_openai_patched_by_default_without_agents(setup_env, monkeypatch):
+    """Direct openai use is implicitly patched under the default settings
+    (``use_otel_v2=True``) when the Agents SDK is not imported.
+
+    Pins the WB-37240 regression where ``_dispatch_openai`` skipped openai
+    entirely in OTel V2 mode, silently dropping spans/usage for direct calls.
+    """
+    assert patch_module.INTEGRATION_MODULE_MAPPING["openai"] is patch_openai
+    _reset_import(monkeypatch, "agents")
+    _inject_fake_module(monkeypatch, "openai")
+
+    openai_patcher = MagicMock()
+    openai_patcher.attempt_patch.return_value = True
+    fake_openai_sdk = cast(
+        Any, types.ModuleType("weave.integrations.openai.openai_sdk")
+    )
+    fake_openai_sdk.get_openai_patcher = MagicMock(return_value=openai_patcher)
+
+    def fake_import(path: str) -> types.ModuleType:
+        if path == "weave.integrations.openai.openai_sdk":
+            return fake_openai_sdk
+        raise ImportError(path)
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module", side_effect=fake_import
+    ):
+        implicit_patch()
+
+    openai_patcher.attempt_patch.assert_called_once()
+    assert "openai" in patch_module._PATCHED_INTEGRATIONS
+    assert "openai" not in patch_module._SUPPRESSED_INTEGRATIONS
+
+
+def test_openai_agents_otel_suppresses_direct_openai(setup_env, monkeypatch):
+    """When the OTel agents processor patches, direct openai patching is
+    suppressed on every path (implicit, explicit, import hook) so in-agent
+    LLM calls are not double-logged.
+    """
+    # Agents must precede openai in the mapping so the suppression lands
+    # before implicit_patch reaches openai.
+    keys = list(patch_module.INTEGRATION_MODULE_MAPPING)
+    assert keys.index("agents") < keys.index("openai")
+
+    _inject_fake_module(monkeypatch, "agents")
+    _inject_fake_module(monkeypatch, "openai")
+
+    agents_patcher = MagicMock()
+    agents_patcher.attempt_patch.return_value = True
+    fake_agents_mod = cast(
+        Any, types.ModuleType("weave.integrations.openai_agents.patcher")
+    )
+    fake_agents_mod.get_openai_agents_otel_patcher = MagicMock(
+        return_value=agents_patcher
+    )
+
+    openai_factory = MagicMock()
+    fake_openai_sdk = cast(
+        Any, types.ModuleType("weave.integrations.openai.openai_sdk")
+    )
+    fake_openai_sdk.get_openai_patcher = openai_factory
+
+    def fake_import(path: str) -> types.ModuleType:
+        if path == "weave.integrations.openai_agents.patcher":
+            return fake_agents_mod
+        if path == "weave.integrations.openai.openai_sdk":
+            return fake_openai_sdk
+        raise ImportError(path)
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module", side_effect=fake_import
+    ):
+        implicit_patch()
+        agents_patcher.attempt_patch.assert_called_once()
+        assert "openai_agents_otel" in patch_module._PATCHED_INTEGRATIONS
+        assert "openai" in patch_module._SUPPRESSED_INTEGRATIONS
+        assert "openai" not in patch_module._PATCHED_INTEGRATIONS
+
+        patch_openai()
+        _patch_if_needed("openai")
+        openai_factory.assert_not_called()
+
+
+def test_legacy_openai_agents_patch_does_not_suppress_openai(setup_env):
+    """The calls-based agents patcher (non-OTel path) leaves direct openai
+    patching enabled, preserving pre-OTel-V2 behavior.
+    """
+    agents_patcher = MagicMock()
+    agents_patcher.attempt_patch.return_value = True
+    fake_agents_mod = cast(
+        Any, types.ModuleType("weave.integrations.openai_agents.patcher")
+    )
+    fake_agents_mod.get_openai_agents_patcher = MagicMock(return_value=agents_patcher)
+
+    with patch(
+        "weave.integrations.patch.importlib.import_module",
+        return_value=fake_agents_mod,
+    ):
+        patch_openai_agents()
+
+    assert "openai_agents" in patch_module._PATCHED_INTEGRATIONS
+    assert "openai" not in patch_module._SUPPRESSED_INTEGRATIONS
 
 
 @pytest.mark.parametrize("success", [True, False])
