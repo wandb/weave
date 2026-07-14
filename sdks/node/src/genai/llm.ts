@@ -116,7 +116,8 @@ export class LLM extends SpanBase {
     private readonly conversationId: string,
     public readonly model: string,
     public readonly providerName: string,
-    private readonly systemInstructions: string[]
+    private readonly systemInstructions: string[],
+    private readonly attributes: Attributes
   ) {
     super(span);
   }
@@ -129,7 +130,9 @@ export class LLM extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(state.conversation?.attributes ?? {})};
+    // Attributes arrive from the parent handle, not ambient state, so they
+    // survive across runIsolated frames.
+    const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'chat',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
@@ -141,7 +144,8 @@ export class LLM extends SpanBase {
       opts.conversationId ?? '',
       opts.model,
       opts.providerName ?? '',
-      opts.systemInstructions ?? []
+      opts.systemInstructions ?? [],
+      opts.attributes ?? {}
     );
     state.llm = llm;
     return llm;
@@ -254,6 +258,7 @@ export class LLM extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      attributes: this.attributes,
     });
   }
 
@@ -263,6 +268,7 @@ export class LLM extends SpanBase {
       ...opts,
       parentContext: this.context,
       conversationId: this.conversationId,
+      attributes: this.attributes,
     });
   }
 

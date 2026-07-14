@@ -36,6 +36,12 @@ export interface TurnInit extends SpanInitBase {
   agentName?: string;
   agentDescription?: string;
   agentVersion?: string;
+  /**
+   * Custom attributes set on this turn and passed to every child span.
+   * Normally seeded from the conversation via `startConversation({ attributes })`;
+   * set here for a rootless `startTurn({ attributes })` with no conversation.
+   */
+  attributes?: Attributes;
 }
 
 type Opts = {
@@ -98,6 +104,7 @@ export class Turn extends SpanBase {
   private _model: string;
   private _messages: Message[];
   private _systemInstructions: string[];
+  private _attributes: Attributes;
 
   public get agentName() {
     return this._agentName;
@@ -118,6 +125,7 @@ export class Turn extends SpanBase {
     this._messages = opts.messages;
     this._model = opts.model;
     this._systemInstructions = opts.systemInstructions;
+    this._attributes = opts.attributes;
   }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
@@ -128,7 +136,10 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(state.conversation?.attributes ?? {})};
+    // Attributes arrive on the handle (from the conversation, or from a
+    // rootless startTurn), never read from ambient state, so they survive
+    // across runIsolated frames.
+    const attributes: Attributes = {...(opts.attributes ?? {})};
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];
@@ -151,6 +162,7 @@ export class Turn extends SpanBase {
       agentId: opts.agentId ?? '',
       agentDescription: opts.agentDescription ?? '',
       agentVersion: opts.agentVersion ?? '',
+      attributes: opts.attributes ?? {},
     });
     state.turn = turn;
     return turn;
@@ -162,6 +174,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 
@@ -171,6 +184,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 
@@ -180,6 +194,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 
