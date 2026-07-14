@@ -487,6 +487,166 @@ def test_span_with_own_identity_is_not_reattributed(ch_server):
     assert {s.span_id for s in coordinator.spans} == {coordinator_span_id}
 
 
+def test_execute_tool_span_inherits_identity_from_its_owning_subagent(ch_server):
+    """A tool-execution span with no direct agent metadata inherits its
+    *immediate parent's* identity, not the trace's root agent.
+
+    Reproduces a production bug: a subagent's `invoke_agent` span declares its
+    own identity, but its `execute_tool` children carry no agent_name (the
+    OTel emitter never sets it on tool spans). Before the one-hop parent
+    lookup, the flat per-trace fallback always inherited the root agent's
+    identity, since the root's `invoke_agent` span necessarily starts first —
+    so `agent_name=<subagent> AND operation_name=execute_tool` matched nothing.
+    """
+    project_id = _make_project_id("attribution_subagent_tool")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_id = uuid.uuid4().hex
+    root_span_id = uuid.uuid4().hex
+    subagent_span_id = uuid.uuid4().hex
+    subagent_tool_span_id = uuid.uuid4().hex
+    root_tool_span_id = uuid.uuid4().hex
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=root_span_id,
+            operation_name="invoke_agent",
+            agent_name="claude-code",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=subagent_span_id,
+            parent_span_id=root_span_id,
+            operation_name="invoke_agent",
+            agent_name="Explore",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # Direct child of the subagent's invoke_agent span; no own identity.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=subagent_tool_span_id,
+            parent_span_id=subagent_span_id,
+            operation_name="execute_tool",
+            agent_name="",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+        # Direct child of the root's invoke_agent span; no own identity.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=root_tool_span_id,
+            parent_span_id=root_span_id,
+            operation_name="execute_tool",
+            agent_name="",
+            started_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    listed = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    by_id = {s.span_id: s for s in listed.spans}
+    assert by_id[subagent_tool_span_id].agent_name == "Explore"
+    assert by_id[root_tool_span_id].agent_name == "claude-code"
+
+    # Filtering execute_tool spans by the subagent now matches its own tool
+    # call — not zero rows (the bug), and not the root's tool call either.
+    matched = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": "agent.name"},
+                                    {"$literal": "Explore"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "operation_name"},
+                                    {"$literal": "execute_tool"},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert {s.span_id for s in matched.spans} == {subagent_tool_span_id}
+
+
+def test_span_separated_from_subagent_by_identity_less_span_falls_back_to_trace(
+    ch_server,
+):
+    """A span two hops below its owning subagent, with an identity-less
+    intermediate span in between, is a documented limitation of the one-hop
+    parent lookup: it falls through to the flat, trace-wide fallback rather
+    than resolving to the subagent.
+    """
+    project_id = _make_project_id("attribution_subagent_grandchild")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    trace_id = uuid.uuid4().hex
+    root_span_id = uuid.uuid4().hex
+    subagent_span_id = uuid.uuid4().hex
+    intermediate_span_id = uuid.uuid4().hex
+    grandchild_span_id = uuid.uuid4().hex
+
+    spans = [
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=root_span_id,
+            operation_name="invoke_agent",
+            agent_name="claude-code",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=subagent_span_id,
+            parent_span_id=root_span_id,
+            operation_name="invoke_agent",
+            agent_name="Explore",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        # No own identity; direct child of subagent, so it resolves to Explore.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=intermediate_span_id,
+            parent_span_id=subagent_span_id,
+            operation_name="chat",
+            agent_name="",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+        # No own identity, and its parent (intermediate_span) has no own
+        # identity either -> the one-hop lookup misses, so this falls back to
+        # the trace's earliest-declared agent (claude-code), not Explore.
+        _make_span(
+            project_id,
+            trace_id=trace_id,
+            span_id=grandchild_span_id,
+            parent_span_id=intermediate_span_id,
+            operation_name="execute_tool",
+            agent_name="",
+            started_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    listed = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    by_id = {s.span_id: s for s in listed.spans}
+    assert by_id[intermediate_span_id].agent_name == "Explore"
+    assert by_id[grandchild_span_id].agent_name == "claude-code"
+
+
 def _identity(span: object) -> tuple[str, str, str, str]:
     return (
         span.agent_name,
