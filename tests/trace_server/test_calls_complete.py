@@ -799,6 +799,61 @@ def test_calls_complete_batches_content_object_inserts(
     assert latest_a.obj.val == obj_a.obj.val
 
 
+@pytest.mark.disable_logging_error_check
+def test_calls_complete_content_obj_failure_skips_calls_insert(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """File chunks and content objects flush concurrently. If the content-object
+    insert fails, the peer file insert may still commit, but the calls insert
+    must not run: calls_complete raises so the client retries the whole batch,
+    and the content-addressed peer write reconciles idempotently on retry.
+    """
+    project_id = f"{TEST_ENTITY}/calls_complete_parallel_failure"
+    internal_project_id = b64(project_id)
+
+    raw = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    ended_at = started_at + datetime.timedelta(seconds=1)
+    call_id = str(uuid.uuid4())
+    call = _make_completed_call(
+        project_id,
+        call_id,
+        str(uuid.uuid4()),
+        started_at,
+        ended_at,
+        inputs={"image": data_uri},
+    )
+
+    original_insert = type(clickhouse_trace_server)._insert
+
+    def _fail_object_versions(self, table, *args, **kwargs):
+        if table == "object_versions":
+            raise RuntimeError("simulated content object insert failure")
+        return original_insert(self, table, *args, **kwargs)
+
+    monkeypatch.setattr(type(clickhouse_trace_server), "_insert", _fail_object_versions)
+
+    with pytest.raises(RuntimeError, match="simulated content object insert failure"):
+        trace_server.calls_complete(tsi.CallsUpsertCompleteReq(batch=[call]))
+
+    # The call was never written: the client can safely retry.
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "calls_complete", internal_project_id
+        )
+        == 0
+    )
+    # The peer file insert committed independently (joined before we raised);
+    # a retry re-writes the object over the same content-addressed file rows.
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "files", internal_project_id
+        )
+        >= 1
+    )
+
+
 def test_calls_complete_tolerates_content_object_name_collision(
     trace_server, clickhouse_trace_server
 ):
