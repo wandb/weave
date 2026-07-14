@@ -58,31 +58,6 @@ SearchMessageRole = Literal[
     "tool_result",
 ]
 
-# Ingested message roles are unvalidated client OTel attribute strings (see
-# `opentelemetry/genai_extraction.py::_normalize_single_message`), so known
-# non-canonical spellings must be mapped to the search response Literal.
-_SEARCH_MESSAGE_ROLE_ALIASES: dict[str, SearchMessageRole] = {
-    "": "",
-    "user": "user",
-    "assistant": "assistant",
-    "system": "system",
-    "tool": "tool",
-    "tool_call": "tool_call",
-    "tool_result": "tool_result",
-    "toolcall": "tool_call",
-    "toolresult": "tool_result",
-}
-
-
-def normalize_search_message_role(role: str) -> SearchMessageRole:
-    """Canonicalize a raw stored message role for the search response model.
-
-    Unrecognized roles fall back to `""` (already a valid, neutral role) rather
-    than raising, since malformed ingest data must not break search.
-    """
-    return _SEARCH_MESSAGE_ROLE_ALIASES.get(role.lower(), "")
-
-
 AgentSpanStatsValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsColumnValueType = Literal["datetime", "number", "boolean", "string"]
 AgentSpanStatsCell = datetime.datetime | str | int | float | bool | None
@@ -1005,7 +980,7 @@ class AgentSearchMatchedMessage(BaseModel):
 
     span_id: str
     trace_id: str
-    role: SearchMessageRole
+    role: str
     content_preview: str
     content_digest: str
     started_at: datetime.datetime

@@ -81,7 +81,6 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportReq,
     GenAIOTelExportRes,
     group_by_ref_alias,
-    normalize_search_message_role,
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
@@ -625,7 +624,7 @@ class AgentQueryHandler:
                 AgentSearchMatchedMessage(
                     span_id=safe_str(r.get("span_id")),
                     trace_id=safe_str(r.get("trace_id")),
-                    role=normalize_search_message_role(safe_str(r.get("role"))),
+                    role=safe_str(r.get("role")),
                     content_preview=safe_str(r.get("content")),
                     content_digest=safe_str(r.get("content_digest")),
                     started_at=started_at,
