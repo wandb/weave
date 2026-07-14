@@ -379,6 +379,8 @@ def format_feedback_to_row(
         "span_status_code": feedback_req.span_status_code,
         "span_conversation_id": span_conversation_id,
         "span_trace_id": span_trace_id,
+        # Raw pass-through: no ref encodes the judge's own trace, so there is
+        # nothing to derive or cross-check it against (unlike span_trace_id).
         "scorer_trace_id": feedback_req.scorer_trace_id,
     }
 
