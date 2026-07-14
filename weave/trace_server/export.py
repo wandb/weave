@@ -1,4 +1,4 @@
-"""Detached ClickHouse -> S3 export write path.
+"""Detached ClickHouse -> S3 export write and status paths.
 
 `start_export` writes the job's manifest object before starting one background
 worker. The worker runs each `INSERT INTO FUNCTION s3()` serially, while the
@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.export_targets import EXPORT_TARGET_NAMES, build_export_query
 from weave.trace_server.file_storage import (
     FileStorageClient,
@@ -68,6 +69,59 @@ def start_export(
         daemon=True,
     ).start()
     return job_id
+
+
+def get_export_status(
+    ch_client: CHClient,
+    file_storage_client: FileStorageClient | None,
+    project_id: str,
+    job_id: str,
+) -> tsi.ExportStatusRes:
+    """Read the job manifest, then derive target status from ``query_log``."""
+    if not JOB_ID_RE.match(job_id):
+        # job_id is the only caller-influenced path segment; bar traversal.
+        raise ExportError(400, "BAD_JOB_ID", f"job_id {job_id!r} fails validation")
+    if file_storage_client is None:
+        raise ExportError(
+            503,
+            "EXPORT_STORAGE_UNAVAILABLE",
+            "export storage is not configured",
+        )
+    targets = _read_manifest_targets(file_storage_client, project_id, job_id)
+    ch_client.command("SYSTEM FLUSH LOGS")
+    manifest = [
+        _manifest_entry(ch_client, file_storage_client, project_id, job_id, target)
+        for target in targets
+    ]
+    overall: tsi.ExportJobStatus
+    if any(entry.status == "error" for entry in manifest):
+        overall = "error"
+    elif any(entry.status == "running" for entry in manifest):
+        overall = "running"
+    else:
+        overall = "done"
+    return tsi.ExportStatusRes(status=overall, manifest=manifest)
+
+
+def poll_query_status(
+    ch_client: CHClient, query_id: str
+) -> tuple[tsi.ExportJobStatus, int, str | None]:
+    """query_log oracle: map the latest event for query_id to (status, rows, error)."""
+    rows = ch_client.query(
+        "SELECT type, written_rows, exception FROM system.query_log "
+        "WHERE query_id = {qid:String} AND event_date >= today() - 1 "
+        "ORDER BY event_time_microseconds DESC LIMIT 1",
+        parameters={"qid": query_id},
+    ).result_rows
+    if not rows:
+        return "running", 0, None
+    event_type, written_rows, exception = rows[0]
+    if event_type == "QueryFinish":
+        return "done", int(written_rows), None
+    if str(event_type).startswith("Exception"):
+        return "error", 0, exception or "exception"
+    # Any other event (QueryStart): the insert is still in flight.
+    return "running", 0, None
 
 
 def build_export_insert_sql(target: ResolvedExportTarget, filename: str) -> str:
@@ -124,6 +178,78 @@ def _write_manifest(
             "EXPORT_STORAGE_UNAVAILABLE",
             "failed to persist export manifest",
         ) from exc
+
+
+def _read_manifest_targets(
+    file_storage_client: FileStorageClient, project_id: str, job_id: str
+) -> list[str]:
+    """Load and validate the job record under the authorized project prefix."""
+    uri = file_storage_client.base_uri.with_path(
+        export_job_prefix(project_id, job_id) + "manifest.json"
+    )
+    try:
+        manifest_bytes = file_storage_client.read(uri)
+    except Exception as exc:
+        # A different project's prefix resolves to a miss as well, so status
+        # never confirms the existence of another tenant's job.
+        raise ExportError(404, "NOT_FOUND", f"no such export job {job_id}") from exc
+    try:
+        manifest = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExportError(
+            500, "BAD_EXPORT_MANIFEST", "export manifest is invalid"
+        ) from exc
+    if not isinstance(manifest, dict) or manifest.get("job_id") != job_id:
+        raise ExportError(500, "BAD_EXPORT_MANIFEST", "export manifest is invalid")
+    raw_targets = manifest.get("targets")
+    if not isinstance(raw_targets, list) or not raw_targets:
+        raise ExportError(500, "BAD_EXPORT_MANIFEST", "export manifest is invalid")
+    targets: list[str] = []
+    for entry in raw_targets:
+        if (
+            not isinstance(entry, dict)
+            or entry.get("target") not in EXPORT_TARGET_NAMES
+        ):
+            raise ExportError(500, "BAD_EXPORT_MANIFEST", "export manifest is invalid")
+        targets.append(entry["target"])
+    if len(set(targets)) != len(targets):
+        raise ExportError(500, "BAD_EXPORT_MANIFEST", "export manifest is invalid")
+    return targets
+
+
+def _manifest_entry(
+    ch_client: CHClient,
+    file_storage_client: FileStorageClient,
+    project_id: str,
+    job_id: str,
+    target: str,
+) -> tsi.ExportManifestEntry:
+    status, rows, error = poll_query_status(ch_client, f"{job_id}:{target}")
+    objects: list[str] = []
+    urls: list[str] = []
+    expires_at: str | None = None
+    if status == "done":
+        # MVP writes exactly one deterministic object per target (no PARTITION BY);
+        # phase-2 partitioning will need real object listing here.
+        key = export_object_prefix(project_id, job_id, target) + "data.parquet"
+        objects = [key]
+        # Presigns against the configured file-storage bucket under exports/;
+        # this MUST be the same physical bucket the weave_exports collection writes to.
+        uri = file_storage_client.base_uri.with_path(key)
+        urls = [file_storage_client.presign_read(uri, PRESIGN_TTL_SECONDS)]
+        expires_at = (
+            datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(seconds=PRESIGN_TTL_SECONDS)
+        ).isoformat()
+    return tsi.ExportManifestEntry(
+        target=target,
+        status=status,
+        rows=rows,
+        objects=objects,
+        urls=urls,
+        expires_at=expires_at,
+        error=error,
+    )
 
 
 def _run_export(
@@ -183,3 +309,5 @@ EXPORT_S3_NAMED_COLLECTION = "weave_exports"
 # Bounds CH cost per detached insert via max_execution_time.
 EXPORT_MAX_EXECUTION_SECONDS = 300
 JOB_ID_RE = re.compile(r"^[0-9a-f-]{36}$")
+# Download-link lifetime for presigned GETs in the status manifest.
+PRESIGN_TTL_SECONDS = 3600
