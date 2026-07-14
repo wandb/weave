@@ -56,7 +56,8 @@ addresses are rejected.
 - `trigger_test_trace.py`: sends a small traced call that can trigger the
   monitor.
 - `sample_request.json`: representative request body sent by Weave.
-- `requirements.txt`: packages needed to run the reference endpoint.
+- `requirements.txt`: packages needed to run the endpoint, register the scorer,
+  and trigger a test trace.
 
 ## Remote Scorer Contract
 
@@ -148,25 +149,15 @@ secret names are stored in the Weave `RemoteScorer` configuration.
 
 ## Local Reference Run
 
-From this directory, install the endpoint dependencies:
+From this directory, install the sample dependencies:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-`requirements.txt` installs only the packages needed to run the reference HTTP
-endpoint. To run `register_remote_scorer.py` or `trigger_test_trace.py` from the
-repo checkout, also install Weave in editable mode with the scorer extras:
-
-```bash
-python -m pip install -e "../..[scorers]"
-```
-
-The editable install is needed because these scripts depend on Weave `>=0.52.43`,
-which has not been released yet. The scorer extras are needed by the current
-Weave package import path used by the registration script.
+The minimum supported Weave version is `0.53.0`.
 
 Run the reference endpoint locally:
 
