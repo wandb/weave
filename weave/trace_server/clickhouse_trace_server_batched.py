@@ -270,6 +270,7 @@ from weave.trace_server.query_builder.annotation_queues_query_builder import (
 )
 from weave.trace_server.query_builder.files_query_builder import (
     make_file_content_read_query,
+    make_files_digests_existence_query,
     make_files_stats_query,
 )
 from weave.trace_server.query_builder.obj_tags_query_builder import (
@@ -959,8 +960,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         # Raises on fail
         try:
+            already_stored = self._query_existing_file_digests(
+                self._bucket_uploads.pending_keys()
+            )
             self._file_batch.extend(
-                self._bucket_uploads.flush(self.file_storage_client)
+                self._bucket_uploads.flush(
+                    self.file_storage_client, already_stored=already_stored
+                )
             )
         except Exception:
             logger.exception("Failed to flush bucket uploads")
@@ -972,6 +978,38 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         except Exception:
             logger.exception("Failed to flush file chunks")
             raise
+
+    def _query_existing_file_digests(
+        self, keys: list[tuple[str, str]]
+    ) -> frozenset[tuple[str, str]]:
+        """`(project_id, digest)` pairs from `keys` that already have a files row.
+
+        Cross-pod dedup against shared ClickHouse: a hit means the content is
+        already stored, so the bucket upload the provider would reject with a
+        412 (and its duplicate files row) is skipped. Advisory only. Any failure
+        returns the empty set, degrading to an unconditional upload backstopped
+        by GCS if_generation_match=0.
+        """
+        if not keys:
+            return frozenset()
+        try:
+            digests_by_project: dict[str, list[str]] = defaultdict(list)
+            for project_id, digest in keys:
+                digests_by_project[project_id].append(digest)
+            existing: set[tuple[str, str]] = set()
+            for project_id, digests in digests_by_project.items():
+                pb = ParamBuilder()
+                query = make_files_digests_existence_query(project_id, digests, pb)
+                res = self._query(query, pb.get_params())
+                for row in res.result_rows:
+                    existing.add((project_id, row[0]))
+            return frozenset(existing)
+        except Exception:
+            logger.warning(
+                "files existence pre-check failed; uploading without cross-pod dedup",
+                exc_info=True,
+            )
+            return frozenset()
 
     def _offload_call_content(self, req: _CallReqT) -> _CallReqT:
         """Replace inline base64 content with file refs, uploading in parallel.

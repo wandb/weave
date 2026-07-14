@@ -125,18 +125,30 @@ class BucketUploadBatch:
         """True if `(project_id, digest)` was already staged in this batch."""
         return (project_id, digest) in self._seen
 
+    def pending_keys(self) -> list[tuple[str, str]]:
+        """`(project_id, digest)` for every staged upload, for a cross-pod pre-check."""
+        return [(p.req.project_id, p.digest) for p in self._pending]
+
     def __bool__(self) -> bool:
         return bool(self._pending)
 
     @traced(name="bucket_upload_batch.flush")
     def flush(
-        self, client: FileStorageClient | None
+        self,
+        client: FileStorageClient | None,
+        already_stored: frozenset[tuple[str, str]] = frozenset(),
     ) -> list[FileChunkCreateCHInsertable]:
         """Run staged uploads in parallel; return chunk rows for the caller to insert.
 
         Each pending upload becomes either a single bucket-URI chunk
         (success) or N inline ClickHouse chunks (FileStorageWriteError
         fallback). Order is not preserved.
+
+        `already_stored` are `(project_id, digest)` keys the caller confirmed
+        already have a files row (cross-pod dedup); those uploads are skipped
+        entirely, yielding no rows since the existing row already serves reads.
+        This relies on files rows never being deleted; revisit if files-row GC
+        is ever introduced.
 
         `client` must be non-None whenever items have been staged. The
         staging path is gated on a non-None client at the call site, so
@@ -154,38 +166,51 @@ class BucketUploadBatch:
         pending, self._pending = self._pending, []
         self._seen = set()
         self._total_bytes = 0
+        staged_total = len(pending)
+
+        precheck_skipped = 0
+        if already_stored:
+            kept: list[_Pending] = []
+            for p in pending:
+                if (p.req.project_id, p.digest) in already_stored:
+                    precheck_skipped += 1
+                else:
+                    kept.append(p)
+            pending = kept
 
         rows: list[FileChunkCreateCHInsertable] = []
         bucket_success = 0
         ch_fallback = 0
-        with ThreadPoolExecutor(
-            max_workers=min(DEFAULT_BUCKET_UPLOAD_CONCURRENCY, len(pending)),
-            thread_name_prefix="bucket-upload",
-        ) as pool:
-            futs = [pool.submit(_upload_one, p, client) for p in pending]
-            try:
-                for fut in as_completed(futs):
-                    fut_rows = fut.result()
-                    # Single bucket-URI row vs N inline-CH rows; we use the URI
-                    # presence to classify the per-file outcome.
-                    if fut_rows and fut_rows[0].file_storage_uri is not None:
-                        bucket_success += 1
-                    else:
-                        ch_fallback += 1
-                    rows.extend(fut_rows)
-            except Exception:
-                logger.warning(
-                    "BucketUploadBatch worker raised an unwrapped exception; "
-                    "peer uploads may have completed without a files row. "
-                    "Retry will reconcile via if_generation_match=0.",
-                    exc_info=True,
-                )
-                raise
+        if pending:
+            with ThreadPoolExecutor(
+                max_workers=min(DEFAULT_BUCKET_UPLOAD_CONCURRENCY, len(pending)),
+                thread_name_prefix="bucket-upload",
+            ) as pool:
+                futs = [pool.submit(_upload_one, p, client) for p in pending]
+                try:
+                    for fut in as_completed(futs):
+                        fut_rows = fut.result()
+                        # Single bucket-URI row vs N inline-CH rows; we use the URI
+                        # presence to classify the per-file outcome.
+                        if fut_rows and fut_rows[0].file_storage_uri is not None:
+                            bucket_success += 1
+                        else:
+                            ch_fallback += 1
+                        rows.extend(fut_rows)
+                except Exception:
+                    logger.warning(
+                        "BucketUploadBatch worker raised an unwrapped exception; "
+                        "peer uploads may have completed without a files row. "
+                        "Retry will reconcile via if_generation_match=0.",
+                        exc_info=True,
+                    )
+                    raise
         set_current_span_dd_tags(
             {
                 "bucket_upload_batch.bucket_success": bucket_success,
                 "bucket_upload_batch.ch_fallback": ch_fallback,
-                "bucket_upload_batch.staged": len(pending),
+                "bucket_upload_batch.staged": staged_total,
+                "bucket_upload_batch.precheck_skipped": precheck_skipped,
             }
         )
         return rows

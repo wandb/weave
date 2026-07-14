@@ -23,7 +23,11 @@ from moto import mock_aws
 from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_settings, file_storage
+from weave.trace_server import (
+    clickhouse_trace_server_batched,
+    clickhouse_trace_server_settings,
+    file_storage,
+)
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallEndV2Req,
@@ -688,6 +692,154 @@ def test_call_batch_uploads_files_to_bucket_in_parallel(client: WeaveClient, gcs
     project_b64 = base64.b64encode(client.project_id.encode()).decode()
     expected_prefix = f"weave/projects/{project_b64}/files/"
     assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+@pytest.fixture
+def no_server_cache(monkeypatch: pytest.MonkeyPatch):
+    """Disable the client-side file_create cache.
+
+    It memoizes file_create by (project, digest) and would mask the server-side
+    cross-pod pre-check under test (the prod trace server has no such client
+    cache). With it on, a repeat file_create never reaches ClickHouse.
+    """
+    monkeypatch.setattr(
+        "weave.trace_server_bindings.caching_middleware_trace_server.use_server_cache",
+        lambda: False,
+    )
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials", "no_server_cache")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+def test_cross_pod_precheck_skips_redundant_bucket_upload(client: WeaveClient, gcs):
+    """A digest already recorded in the shared `files` table is not re-uploaded
+    even after the per-pod stored-key cache is cleared (simulating a second
+    pod). Genuinely new content in the same later batch still uploads, and both
+    digests read back byte-for-byte.
+    """
+    server = client.server
+    shared = _unique_payload("shared", 50_000)
+    shared_digest = compute_file_digest(shared)
+
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="a.bin", content=shared)
+        )
+    assert gcs.state.upload_attempts == 1
+    assert gcs.state.upload_count == 1
+
+    # Second pod: same shared ClickHouse, cold per-pod LRU. The cross-pod
+    # pre-check must recognize `shared` is already stored and skip its upload.
+    file_storage.reset_stored_key_cache()
+
+    fresh = _unique_payload("fresh", 50_000)
+    fresh_digest = compute_file_digest(fresh)
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="a.bin", content=shared)
+        )
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="b.bin", content=fresh)
+        )
+
+    # Only the new payload is attempted; the redundant 412 write is avoided.
+    assert gcs.state.upload_attempts == 2
+    assert gcs.state.upload_count == 2
+
+    for digest, expected in ((shared_digest, shared), (fresh_digest, fresh)):
+        read = server.file_content_read(
+            FileContentReadReq(project_id=client.project_id, digest=digest)
+        )
+        assert read.content == expected
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials", "no_server_cache")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+def test_precheck_skips_bucket_upload_when_only_inline_row_exists(
+    client: WeaveClient, gcs
+):
+    """A digest first stored as inline-CH chunks (storage disabled) is still
+    recognized by the pre-check on a later bucket-enabled write: the row means
+    the content is readable, so no bucket upload is attempted and the read path
+    serves the inline chunks.
+    """
+    server = client.server
+    payload = _unique_payload("inline", 50_000)
+    digest = compute_file_digest(payload)
+
+    # Storage disabled for this project => inline CH chunks, no bucket URI row.
+    with mock.patch.dict(
+        os.environ, {"WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "some-other-project"}
+    ):
+        with server.call_batch():
+            server.file_create(
+                FileCreateReq(
+                    project_id=client.project_id, name="i.bin", content=payload
+                )
+            )
+    assert gcs.state.upload_attempts == 0
+
+    file_storage.reset_stored_key_cache()
+
+    # Storage now enabled: the pre-check sees the inline row and skips the upload.
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="i.bin", content=payload)
+        )
+    assert gcs.state.upload_attempts == 0
+
+    read = server.file_content_read(
+        FileContentReadReq(project_id=client.project_id, digest=digest)
+    )
+    assert read.content == payload
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials", "no_server_cache")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+def test_precheck_failure_falls_back_to_upload(
+    client: WeaveClient, gcs, monkeypatch: pytest.MonkeyPatch
+):
+    """If the existence pre-check query throws, the write proceeds unconditionally
+    (backstopped by GCS if_generation_match=0) rather than failing the batch.
+    """
+    server = client.server
+    payload = _unique_payload("boom", 50_000)
+    digest = compute_file_digest(payload)
+
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="c.bin", content=payload)
+        )
+    assert gcs.state.upload_attempts == 1
+    file_storage.reset_stored_key_cache()
+
+    def _raise(*args: object, **kwargs: object) -> str:
+        raise RuntimeError("pre-check boom")
+
+    monkeypatch.setattr(
+        clickhouse_trace_server_batched,
+        "make_files_digests_existence_query",
+        _raise,
+    )
+    with server.call_batch():
+        server.file_create(
+            FileCreateReq(project_id=client.project_id, name="c.bin", content=payload)
+        )
+    # No dedup => the upload is attempted again (and 412s harmlessly at GCS).
+    assert gcs.state.upload_attempts == 2
+
+    read = server.file_content_read(
+        FileContentReadReq(project_id=client.project_id, digest=digest)
+    )
+    assert read.content == payload
 
 
 @pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
