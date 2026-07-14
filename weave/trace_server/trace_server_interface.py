@@ -1735,7 +1735,7 @@ ExportJobStatus = Literal["running", "done", "error"]
 class ExportStartReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     targets: list[str] = Field(
-        description="Export target names resolved against the server-side registry, e.g. ['calls', 'objects', 'feedback']."
+        description="Supported server-side export targets, e.g. ['calls', 'objects', 'feedback']."
     )
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
