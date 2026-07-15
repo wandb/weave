@@ -1,13 +1,7 @@
 import type {Attributes} from '@opentelemetry/api';
 import {uuidv7} from 'uuidv7';
 
-import {
-  assertSlotAvailable,
-  clearActive,
-  getCurrentLLM,
-  getCurrentTurn,
-  setActive,
-} from './context';
+import {getGenaiState} from './context';
 import {Turn, type TurnInit} from './turn';
 import type {SpanEndOptions} from './spanBase';
 
@@ -119,7 +113,12 @@ export class Conversation {
   }
 
   static create(opts: ConversationInit = {}): Conversation {
-    assertSlotAvailable('conversation');
+    const state = getGenaiState();
+    if (state.conversation !== null) {
+      throw new Error(
+        'A Conversation is already active in this async chain. End it before starting a new one.'
+      );
+    }
     const conversation = new Conversation({
       model: opts.model ?? '',
       agentId: opts.agentId ?? '',
@@ -129,7 +128,7 @@ export class Conversation {
       conversationId: opts.conversationId ?? opts.sessionId ?? uuidv7(),
       attributes: opts.attributes ?? {},
     });
-    setActive('conversation', conversation);
+    state.conversation = conversation;
     return conversation;
   }
 
@@ -176,11 +175,18 @@ export class Conversation {
       return;
     }
     this._ended = true;
+    const state = getGenaiState();
     // Cascade: end any active descendants innermost-first so each child span
     // closes before its parent.
-    getCurrentLLM()?.end(opts);
-    getCurrentTurn()?.end(opts);
-    clearActive('conversation', this);
+    if (state.llm) {
+      state.llm.end(opts);
+    }
+    if (state.turn) {
+      state.turn.end(opts);
+    }
+    if (state.conversation === this) {
+      state.conversation = null;
+    }
   }
 }
 
