@@ -8,7 +8,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 
-import {getGenaiState} from './context';
+import {assertSlotAvailable, clearActive, setActive} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
@@ -129,16 +129,11 @@ export class Turn extends SpanBase {
   }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
-    const state = getGenaiState();
-    if (state.turn !== null) {
-      throw new Error(
-        'A Turn is already active in this async chain. End it before starting a new one.'
-      );
-    }
+    assertSlotAvailable('turn');
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    // Attributes arrive on the handle (from the conversation, or from a
-    // rootless startTurn), never read from ambient state, so they survive
-    // across runIsolated frames.
+    // Attributes are supplied by the caller — seeded from the conversation via
+    // startConversation, or passed to a rootless startTurn — and forwarded to
+    // every child span this turn creates.
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
@@ -164,7 +159,7 @@ export class Turn extends SpanBase {
       agentVersion: opts.agentVersion ?? '',
       attributes: opts.attributes ?? {},
     });
-    state.turn = turn;
+    setActive('turn', turn);
     return turn;
   }
 
@@ -294,9 +289,6 @@ export class Turn extends SpanBase {
       );
     }
     this._closeSpan(opts);
-    const state = getGenaiState();
-    if (state.turn === this) {
-      state.turn = null;
-    }
+    clearActive('turn', this);
   }
 }

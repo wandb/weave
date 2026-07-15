@@ -112,8 +112,7 @@ export class SubAgent extends SpanBase {
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    // Attributes arrive from the parent handle, not ambient state, so they
-    // survive across runIsolated frames.
+    // Attributes are forwarded from the parent handle and set on this span.
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'invoke_agent',

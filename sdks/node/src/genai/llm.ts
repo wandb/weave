@@ -7,7 +7,7 @@ import {
 } from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
-import {getGenaiState} from './context';
+import {assertSlotAvailable, clearActive, setActive} from './context';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
@@ -123,15 +123,9 @@ export class LLM extends SpanBase {
   }
 
   static create(opts: LLMInit & ChildSpanContext): LLM {
-    const state = getGenaiState();
-    if (state.llm !== null) {
-      throw new Error(
-        'An LLM is already active in this async chain. End it before starting a new one.'
-      );
-    }
+    assertSlotAvailable('llm');
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    // Attributes arrive from the parent handle, not ambient state, so they
-    // survive across runIsolated frames.
+    // Attributes are forwarded from the parent handle and set on this span.
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'chat',
@@ -147,7 +141,7 @@ export class LLM extends SpanBase {
       opts.systemInstructions ?? [],
       opts.attributes ?? {}
     );
-    state.llm = llm;
+    setActive('llm', llm);
     return llm;
   }
 
@@ -382,10 +376,7 @@ export class LLM extends SpanBase {
     }
 
     this._closeSpan(opts);
-    const state = getGenaiState();
-    if (state.llm === this) {
-      state.llm = null;
-    }
+    clearActive('llm', this);
   }
 
   // ---------------------------------------------------------------------------
