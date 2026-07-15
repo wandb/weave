@@ -68,6 +68,7 @@ from weave.trace_server.query_builder.agent_signal_filters import (
 # Columns on spans that can be filtered with equality/IN.
 SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
     {
+        "span_name",
         "operation_name",
         "provider_name",
         "agent_name",
