@@ -103,6 +103,21 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
     )
 
 
+def _dispatch_openai() -> None:
+    """Implicit/import-hook entry for ``openai``.
+
+    ``agents`` imports ``openai`` internally, so under the import hook openai's
+    patcher can fire before the agents patcher (dict order only governs
+    ``implicit_patch``). When the Agents SDK is present under otel_v2, patch it
+    first so it can claim (suppress) openai before we'd patch openai directly
+    and double-log every in-agent LLM call.
+    """
+    if should_use_otel_v2() and "agents" in sys.modules:
+        _dispatch_openai_agents()
+    if "openai" not in _SUPPRESSED_INTEGRATIONS:
+        patch_openai()
+
+
 def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave tracing for Anthropic."""
     _patch_integration(
@@ -485,7 +500,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     # ``patch_openai_agents_otel``), but the suppression only takes effect
     # if agents is patched first.
     "agents": _dispatch_openai_agents,
-    "openai": patch_openai,
+    "openai": _dispatch_openai,
     "anthropic": patch_anthropic,
     "mistralai": patch_mistral,
     "groq": patch_groq,
@@ -619,7 +634,10 @@ def _patch_if_needed(module_name: str) -> None:
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
             patch_func()
-            _PATCHED_INTEGRATIONS.add(module_name)
+            # ``patch_func`` may suppress this module instead of patching it
+            # (e.g. ``_dispatch_openai`` deferring to the agents processor).
+            if module_name not in _SUPPRESSED_INTEGRATIONS:
+                _PATCHED_INTEGRATIONS.add(module_name)
         except Exception:
             # Silently skip if patching fails - this maintains backward compatibility
             # and doesn't break existing code if an integration can't be patched
