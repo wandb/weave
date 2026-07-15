@@ -30,7 +30,7 @@ from typing import Any, NamedTuple, TypeVar, cast
 from pydantic import BaseModel
 
 from weave.shared import refs_internal as ri
-from weave.trace_server.errors import InvalidExternalRef
+from weave.trace_server.errors import InvalidExternalRef, RequestTooLarge
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +47,23 @@ weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 # ``chat_view._MAX_REF_SEARCH_DEPTH``.
 _MAX_REF_SEARCH_DEPTH = 8
 
+# Caps the copy-on-write walk over the payload's own container nesting
+# (dict / list / tuple / set / pydantic model). Without it a deeply-nested
+# body exhausts the Python stack and surfaces as an unhandled RecursionError
+# (HTTP 500); the guard converts that into a typed RequestTooLarge (HTTP 413).
+# The measured natural failure depth is ~330 for models on a shallow stack, so
+# 200 fires first with headroom for the request's own call stack, while staying
+# far above any realistic payload (real nesting is a handful of levels).
+_MAX_STRUCTURE_DEPTH = 200
+
 
 class InvalidInternalRef(ValueError):
     pass
 
 
-def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
+def _convert_embedded_json_refs(
+    s: str, mapper: Callable[[Any, int], Any], depth: int
+) -> str:
     """Rewrite refs buried inside a JSON-serialized string ``s``.
 
     Decode ``s`` as JSON and re-run ``mapper`` over the result so embedded refs
@@ -66,7 +77,7 @@ def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
         parsed = json.loads(s)
     except (ValueError, TypeError):
         return s
-    result = _map_values(parsed, mapper)
+    result = _map_values(parsed, mapper, depth)
     if result is parsed:
         return s
     return json.dumps(result)
@@ -74,7 +85,7 @@ def _convert_embedded_json_refs(s: str, mapper: Callable[[Any], Any]) -> str:
 
 def _make_ref_string_mapper(
     convert_ref: Callable[[str, bool], str],
-) -> Callable[[B], B]:
+) -> Callable[[B, int], B]:
     """Build a copy-on-write mapper that rewrites weave refs in string leaves.
 
     ``convert_ref`` handles a string that starts with a ref prefix (plus a bool
@@ -86,22 +97,24 @@ def _make_ref_string_mapper(
     ``json.loads`` path, and ``_MAX_REF_SEARCH_DEPTH`` caps the JSON-in-JSON
     descent.
     """
-    depth = 0
+    search_depth = 0
 
-    def mapper(obj: B) -> B:
-        nonlocal depth
+    def mapper(obj: B, structure_depth: int) -> B:
+        nonlocal search_depth
         if not isinstance(obj, str):
             return obj
         if obj.startswith(weave_prefix) or obj.startswith(weave_internal_prefix):
-            return cast(B, convert_ref(obj, depth > 0))
-        if depth < _MAX_REF_SEARCH_DEPTH and (
+            return cast(B, convert_ref(obj, search_depth > 0))
+        if search_depth < _MAX_REF_SEARCH_DEPTH and (
             weave_prefix in obj or weave_internal_prefix in obj
         ):
-            depth += 1
+            search_depth += 1
             try:
-                return cast(B, _convert_embedded_json_refs(obj, mapper))
+                return cast(
+                    B, _convert_embedded_json_refs(obj, mapper, structure_depth)
+                )
             finally:
-                depth -= 1
+                search_depth -= 1
         return obj
 
     return mapper
@@ -264,39 +277,48 @@ class _MapResult(NamedTuple):
     fast_path_safe: bool
 
 
-def _map_values(obj: E, func: Callable[[E], E]) -> E:
-    """Apply `func` to every scalar in `obj`, reusing untouched subtrees."""
-    return cast(E, _walk(obj, cast(Callable[[Any], Any], func)).value)
+def _map_values(obj: E, func: Callable[[E, int], E], depth: int = 0) -> E:
+    """Apply `func` to every scalar in `obj`, reusing untouched subtrees.
+
+    `depth` seeds the structure-depth guard; re-entrant walks over a decoded
+    JSON-string leaf pass the leaf's own depth so the cap bounds total nesting.
+    """
+    return cast(E, _walk(obj, cast(Callable[[Any, int], Any], func), depth).value)
 
 
-def _walk(obj: Any, func: Callable[[Any], Any]) -> _MapResult:
+def _walk(obj: Any, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     """Recursive copy-on-write dispatcher; one container kind per arm."""
+    if depth > _MAX_STRUCTURE_DEPTH:
+        raise RequestTooLarge(
+            f"Request payload nesting exceeds the maximum supported depth of "
+            f"{_MAX_STRUCTURE_DEPTH}."
+        )
     if isinstance(obj, BaseModel):
-        return _walk_model(obj, func)
+        return _walk_model(obj, func, depth)
     if isinstance(obj, dict):
-        return _walk_mapping(obj, func)
+        return _walk_mapping(obj, func, depth)
     if isinstance(obj, list):
-        return _walk_sequence(obj, func, rebuild=list)
+        return _walk_sequence(obj, func, rebuild=list, depth=depth)
     if isinstance(obj, tuple):
-        return _walk_sequence(obj, func, rebuild=tuple)
+        return _walk_sequence(obj, func, rebuild=tuple, depth=depth)
     if isinstance(obj, set):
-        return _walk_set(obj, func)
+        return _walk_set(obj, func, depth)
 
     # Scalar leaf: ask the mapper for a replacement. Dataclasses are leaves
     # too, but trip the fast-path flag so any ancestor model knows to
     # round-trip via model_dump.
-    new_obj = func(obj)
+    new_obj = func(obj, depth)
     if new_obj is not obj:
         return _MapResult(new_obj, True, True)
     return _MapResult(obj, False, not dataclasses.is_dataclass(obj))
 
 
-def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_mapping(obj: dict, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     # Allocate a copy only on the first changed child, then write through it.
     clone: dict | None = None
     fast_path_safe = True
     for key, value in obj.items():
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         if result.changed:
             if clone is None:
                 clone = dict(obj)
@@ -309,15 +331,16 @@ def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
 
 def _walk_sequence(
     obj: Any,
-    func: Callable[[Any], Any],
+    func: Callable[[Any, int], Any],
     rebuild: Callable[[list[Any]], Any],
+    depth: int,
 ) -> _MapResult:
     # Lists and tuples share an identical walk; only the final constructor
     # differs (`list` returns the buffer, `tuple` freezes it).
     clone: list[Any] | None = None
     fast_path_safe = True
     for index, value in enumerate(obj):
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         if result.changed:
             if clone is None:
                 clone = list(obj)
@@ -328,14 +351,14 @@ def _walk_sequence(
     return _MapResult(rebuild(clone), True, fast_path_safe)
 
 
-def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_set(obj: set, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     # Sets have no useful index to write through, so we collect into a list
     # and rebuild only when something changed.
     values: list[Any] = []
     changed = False
     fast_path_safe = True
     for value in obj:
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         values.append(result.value)
         changed = changed or result.changed
         fast_path_safe = fast_path_safe and result.fast_path_safe
@@ -344,7 +367,9 @@ def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
     return _MapResult(set(values), True, fast_path_safe)
 
 
-def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_model(
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
+) -> _MapResult:
     """Walk a pydantic model with copy-on-write semantics.
 
     Three outcomes, in order:
@@ -356,17 +381,17 @@ def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
          shape the legacy round-trip would have produced.
       3. Something changed -> apply updates and revalidate.
     """
-    updates, fast_path_safe = _collect_model_updates(obj, func)
+    updates, fast_path_safe = _collect_model_updates(obj, func, depth)
 
     if not fast_path_safe:
-        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+        return _MapResult(_model_via_roundtrip(obj, func, depth), True, True)
     if not updates:
         return _MapResult(obj.__class__.model_validate(obj), False, True)
     return _MapResult(_apply_model_updates(obj, updates), True, True)
 
 
 def _collect_model_updates(
-    obj: BaseModel, func: Callable[[Any], Any]
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
 ) -> tuple[dict[str, Any], bool]:
     """Walk every declared field + every extra; collect what changed.
 
@@ -382,13 +407,13 @@ def _collect_model_updates(
     for field_name, field_info in obj.__class__.model_fields.items():
         if field_info.exclude is True:
             continue
-        result = _walk(getattr(obj, field_name), func)
+        result = _walk(getattr(obj, field_name), func, depth + 1)
         if result.changed:
             updates[field_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
 
     for extra_name, extra_value in (obj.model_extra or {}).items():
-        result = _walk(extra_value, func)
+        result = _walk(extra_value, func, depth + 1)
         if result.changed:
             updates[extra_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
@@ -414,7 +439,9 @@ def _apply_model_updates(obj: BaseModel, updates: dict[str, Any]) -> BaseModel:
     return obj.__class__.model_validate(obj)
 
 
-def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseModel:
+def _model_via_roundtrip(
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
+) -> BaseModel:
     """Fallback used when a model contains a nested dataclass.
 
     `by_alias=True` is required: query models have Mongo-style aliased
@@ -422,5 +449,5 @@ def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseMode
     without it.
     """
     orig = obj.model_dump(by_alias=True)
-    walked = _walk(orig, func)
+    walked = _walk(orig, func, depth)
     return obj.model_validate(walked.value)
