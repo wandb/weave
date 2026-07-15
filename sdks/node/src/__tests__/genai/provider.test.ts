@@ -44,7 +44,12 @@ describe('otel/provider', () => {
     // Exact match over our own attributes (ignoring OTel defaults) guards
     // against `wandb.entity`/`wandb.project` reappearing on the Resource, which
     // would misroute spans (the server ranks those above the project_id header).
-    const attrs = provider!.resource.attributes;
+    // SDK 2.x made the provider's resource private; reach in for the assertion.
+    const attrs = (
+      provider as unknown as {
+        _resource: {attributes: Record<string, unknown>};
+      }
+    )._resource.attributes;
     const weaveOwned = Object.fromEntries(
       Object.entries(attrs).filter(
         ([k]) => k.startsWith('weave.') || k.startsWith('wandb.')
@@ -107,10 +112,18 @@ describe('otel/provider', () => {
     // routing target a re-init must follow, but it's coupled to exporter
     // internals — better replaced by an integration test that asserts the
     // header on a captured export once we have that harness.
-    function exporterProjectId(provider: BasicTracerProvider): string {
-      const processor = (provider as any)._registeredSpanProcessors?.[0];
+    // (Chain per otlp-exporter-base 0.2xx: exporter._delegate wraps a
+    // retrying transport around the HTTP transport, and `headers` became an
+    // async provider function.)
+    async function exporterProjectId(
+      provider: BasicTracerProvider
+    ): Promise<string | undefined> {
+      const processor = (provider as any)._activeSpanProcessor
+        ?._spanProcessors?.[0];
       const exporter = processor?._exporter;
-      const headers = exporter?._transport?._transport?._parameters?.headers;
+      const headersFn =
+        exporter?._delegate?._transport?._transport?._parameters?.headers;
+      const headers = headersFn ? await headersFn() : undefined;
       return headers?.project_id;
     }
 
@@ -149,12 +162,16 @@ describe('otel/provider', () => {
       shutdownSpy.mockRestore();
     });
 
-    it('routes the rebuilt provider to the new project via the project_id header', () => {
+    it('routes the rebuilt provider to the new project via the project_id header', async () => {
       reinit('ent/A');
-      expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/A');
+      await expect(exporterProjectId(getWeaveTracerProvider()!)).resolves.toBe(
+        'ent/A'
+      );
 
       reinit('ent/B');
-      expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/B');
+      await expect(exporterProjectId(getWeaveTracerProvider()!)).resolves.toBe(
+        'ent/B'
+      );
     });
   });
 });

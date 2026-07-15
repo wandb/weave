@@ -4,6 +4,12 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Upgrade OpenTelemetry JS SDK dependencies to the 2.x line (`@opentelemetry/sdk-trace-base` / `@opentelemetry/resources` `^2.8.0`, `@opentelemetry/exporter-trace-otlp-proto` `^0.219.0`). Fixes a load-time crash (`Cannot read properties of undefined (reading 'AlwaysOn')`) in host applications that force-resolve `@opentelemetry/core@2.x` via npm overrides (e.g. OpenClaw's managed dependency pins), where the 1.x trace SDK is incompatible with the 2.x core.
+
 ## [0.16.2] - 2026-07-06
 
 ### Added

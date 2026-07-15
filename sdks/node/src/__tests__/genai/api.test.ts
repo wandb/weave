@@ -79,8 +79,8 @@ describe('genai api (top-level functions)', () => {
     const turnSpan = findSpan(spans, 'invoke_agent');
     const llmSpan = findSpan(spans, 'chat');
     const toolSpan = findSpan(spans, 'execute_tool');
-    expect(llmSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
-    expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
+    expect(llmSpan.parentSpanContext?.spanId).toBe(turnSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(llmSpan.spanContext().spanId);
     for (const s of spans) {
       expect(s.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     }
@@ -128,7 +128,7 @@ describe('genai api (top-level functions)', () => {
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
     const llmSpan = findSpan(spans, 'chat');
-    expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(llmSpan.spanContext().spanId);
   });
 
   it('startTool without an active LLM places the Tool as a sibling under Turn', () => {
@@ -140,7 +140,7 @@ describe('genai api (top-level functions)', () => {
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
     const turnSpan = findSpan(spans, 'invoke_agent');
-    expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(turnSpan.spanContext().spanId);
   });
 
   // -------------------------------------------------------------------------

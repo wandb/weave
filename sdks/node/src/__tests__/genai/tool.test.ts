@@ -47,7 +47,7 @@ describe('Tool', () => {
     );
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('75F');
     expect(toolSpan.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
-    expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(turnSpan.spanContext().spanId);
   });
 
   it('attaches to the LLM span when started via llm.startTool() (nested)', () => {
@@ -61,7 +61,7 @@ describe('Tool', () => {
     const spans = getExporter().getFinishedSpans();
     const toolSpan = findSpan(spans, 'execute_tool');
     const llmSpan = findSpan(spans, 'chat');
-    expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
+    expect(toolSpan.parentSpanContext?.spanId).toBe(llmSpan.spanContext().spanId);
   });
 
   it('setAttributes records attributes on the tool span; warns + no-op after end()', () => {

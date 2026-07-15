@@ -1,6 +1,6 @@
 import type {Tracer} from '@opentelemetry/api';
 import {OTLPTraceExporter} from '@opentelemetry/exporter-trace-otlp-proto';
-import {Resource} from '@opentelemetry/resources';
+import {resourceFromAttributes} from '@opentelemetry/resources';
 import {
   AlwaysOffSampler,
   BasicTracerProvider,
@@ -90,7 +90,7 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     return cached.tracerProvider;
   }
 
-  const resource = new Resource({
+  const resource = resourceFromAttributes({
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_VERSION]: packageVersion,
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
