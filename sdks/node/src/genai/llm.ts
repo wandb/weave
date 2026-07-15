@@ -130,8 +130,6 @@ export class LLM extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    // Attributes arrive from the parent handle, not ambient state, so they
-    // survive across runIsolated frames.
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'chat',

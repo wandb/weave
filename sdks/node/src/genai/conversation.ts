@@ -162,8 +162,7 @@ export class Conversation {
       agentDescription: opts.agentDescription ?? this._agentDescription,
       agentVersion: opts.agentVersion ?? this._agentVersion,
       conversationId: this._conversationId,
-      // Seed the turn with the conversation's attributes so they flow down the
-      // handle chain to every child span. A per-turn value wins on collision.
+      // Turn inherits the conversation's attributes; a per-turn key wins.
       attributes: opts.attributes
         ? {...this._attributes, ...opts.attributes}
         : this._attributes,

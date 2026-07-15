@@ -136,16 +136,12 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    // Attributes arrive on the handle (from the conversation, or from a
-    // rootless startTurn), never read from ambient state, so they survive
-    // across runIsolated frames.
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];
-    // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
-    // accidentally inherits a parent from some other OTel-instrumented
-    // library's active context.
+    // ROOT_CONTEXT keeps Turn a root span, never inheriting another OTel
+    // library's active span as a parent.
     const span = tracer.startSpan(
       'invoke_agent',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
