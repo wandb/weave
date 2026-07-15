@@ -935,6 +935,40 @@ class TestMakeGroupedSpansListQuery:
         }
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_span_name_sorted_by_count(self) -> None:
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="span_name")],
+                sort_by=[AgentSortBy(field="span_count", direction="desc")],
+                started_after=start,
+                limit=1000,
+            ),
+        )
+
+        src = _AttrSrc(4, started_after=start)
+        expected = f"""
+            SELECT s.span_name AS span_name,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.started_at >= {{genai_1:DateTime64(6)}}
+            GROUP BY span_name
+            ORDER BY span_count desc
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": start,
+            "genai_2": 1000,
+            "genai_3": 0,
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
     def test_group_by_custom_attr(self) -> None:
         pb = ParamBuilder("genai")
         query = make_spans_list_query(
