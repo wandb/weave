@@ -74,22 +74,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.trace_server_bindings.http_utils import _ENDPOINT_CACHE
 
 
-def test_obj_read_error_message_includes_ref_status_and_json_detail():
-    response = httpx.Response(
-        403,
-        json={"detail": "Project not found"},
-        request=httpx.Request("POST", "https://trace.wandb.ai/obj/read"),
-    )
-
-    assert weave_client._obj_read_error_message(
-        response, "weave:///test/test-project/object/frozen-dataset:abc123"
-    ) == (
-        "Unable to read object for ref uri: "
-        "weave:///test/test-project/object/frozen-dataset:abc123 "
-        "(status 403): Project not found"
-    )
-
-
 @pytest.mark.flaky(reruns=3, reruns_delay=0.2)
 def test_table_create(client):
     res = client.server.table_create(

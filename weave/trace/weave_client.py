@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import dataclasses
 import datetime
-import json
 import logging
 import os
 import re
@@ -15,7 +14,6 @@ from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
-from httpx import Response
 
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -41,6 +39,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.errors import format_http_error
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -364,30 +363,6 @@ def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     return obj
 
 
-def _obj_read_error_message(response: Response, ref_uri: str) -> str:
-    """Return actionable context for an object-read HTTP failure."""
-    body: Any = response.text or "<empty response body>"
-    try:
-        parsed_body = json.loads(response.content)
-    except json.JSONDecodeError:
-        pass
-    else:
-        if isinstance(parsed_body, dict):
-            body = (
-                parsed_body.get("reason")
-                or parsed_body.get("detail")
-                or parsed_body.get("message")
-                or parsed_body
-            )
-        else:
-            body = parsed_body
-
-    return (
-        f"Unable to read object for ref uri: {ref_uri} "
-        f"(status {response.status_code}): {body}"
-    )
-
-
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -609,7 +584,12 @@ class WeaveClient:
             )
         except HTTPError as e:
             if e.response is not None:
-                raise ValueError(_obj_read_error_message(e.response, ref.uri)) from None
+                raise ValueError(
+                    format_http_error(
+                        e.response,
+                        f"Unable to read object for ref uri: {ref.uri}",
+                    )
+                ) from None
             raise
 
         # At this point, `ref.digest` is one of three things:
