@@ -8,4 +8,7 @@ update_model_providers:
 	python trace_server/model_providers/model_providers.py
 
 update_model_catalog:
-	python trace_server/model_providers/catalog_augment_hf.py
+	uv run trace_server/model_providers/catalog_augment_hf.py
+
+sync_model_catalog:
+	uv run trace_server/model_providers/catalog_augment_hf.py --skip-hugging-face

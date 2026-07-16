@@ -11,11 +11,12 @@ with information such as number of likes and downloads and license.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict, cast
 
 import httpx
 
@@ -73,8 +74,25 @@ HF_KEYS_TO_KEEP = {
     "downloads": "downloadsHuggingFace",
 }
 
+# Fields written into modelsFinal.json that are sourced from the Hugging Face
+# Hub API. When --skip-hugging-face is set these are reused from the existing
+# modelsFinal.json rather than re-requested.
+HF_DERIVED_FIELDS = ("likesHuggingFace", "downloadsHuggingFace", "license")
 
-def _hf_defaults_on_fetch_failure() -> dict[str, Any]:
+
+class HfModelInfo(TypedDict, total=False):
+    """Hugging Face-derived fields stored in the model catalog.
+
+    ``total=False`` because different code paths populate different subsets
+    (e.g. ``_hf_license_from_response`` only sets ``license``).
+    """
+
+    likesHuggingFace: int
+    downloadsHuggingFace: int
+    license: str | list[str]
+
+
+def _hf_defaults_on_fetch_failure() -> HfModelInfo:
     """Default HuggingFace-derived fields when the API request fails."""
     return {
         "likesHuggingFace": 0,
@@ -117,7 +135,7 @@ def _hf_license_from_response(d: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
-def _hf_fields_from_response(d: dict[str, Any]) -> dict[str, Any]:
+def _hf_fields_from_response(d: dict[str, Any]) -> HfModelInfo:
     """Map a successful Hub API model JSON object to our stored fields.
 
     Args:
@@ -126,19 +144,19 @@ def _hf_fields_from_response(d: dict[str, Any]) -> dict[str, Any]:
     Returns:
         Dict with ``likesHuggingFace``, ``downloadsHuggingFace``, and optionally ``license``.
     """
-    out = _hf_likes_downloads_from_response(d)
+    out: dict[str, Any] = _hf_likes_downloads_from_response(d)
     out.update(_hf_license_from_response(d))
-    return out
+    return cast(HfModelInfo, out)
 
 
-def get_hf_info(model_name: str) -> dict[str, Any]:
+def get_hf_info(model_name: str) -> HfModelInfo:
     """Get HuggingFace information for a given model name (one API call).
 
     Args:
         model_name (str): The HuggingFace model name/ID.
 
     Returns:
-        dict[str, Any]: Dictionary containing filtered HuggingFace model information.
+        HfModelInfo: Dictionary containing filtered HuggingFace model information.
     """
     d = _fetch_hf_model_json(model_name)
     if d is None:
@@ -146,7 +164,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     return _hf_fields_from_response(d)
 
 
-def get_hf_info_from_lineage(lineage: list[str]) -> dict[str, Any]:
+def get_hf_info_from_lineage(lineage: list[str]) -> HfModelInfo:
     """Get HuggingFace fields using ``idLineage``: likes/downloads from the earliest id, license from the latest.
 
     Index ``0`` is the earliest model; the last index is the latest. If earliest and latest are the same
@@ -180,7 +198,53 @@ def get_hf_info_from_lineage(lineage: list[str]) -> dict[str, Any]:
     else:
         merged.update(_hf_license_from_response(d_latest))
 
-    return merged
+    return cast(HfModelInfo, merged)
+
+
+def _existing_hf_fields_by_id() -> dict[str, HfModelInfo]:
+    """Read existing modelsFinal.json and map model id -> HuggingFace-derived fields.
+
+    Used by ``--skip-hugging-face`` to reuse previously fetched Hugging Face data
+    instead of re-requesting it from the API. Returns an empty dict if the file
+    does not exist or cannot be parsed.
+    """
+    if not file_out.exists():
+        return {}
+    try:
+        with open(file_out, encoding="utf-8") as f:
+            existing = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    models = existing.get("models", [])
+    lookup: dict[str, HfModelInfo] = {}
+    for model in models:
+        model_id = model.get("id")
+        if model_id is None:
+            continue
+        lookup[model_id] = cast(
+            HfModelInfo,
+            {k: model[k] for k in HF_DERIVED_FIELDS if k in model},
+        )
+    return lookup
+
+
+def _hf_fields_from_existing(
+    model_id: str, lookup: dict[str, HfModelInfo]
+) -> HfModelInfo:
+    """Return cached HuggingFace fields for a model id.
+
+    Falls back to the default values used on fetch failure when the model is
+    not present in the existing catalog (e.g. a model newly added to
+    ``modelsBegin.json`` that has never been synced), and prints a warning so
+    the placeholder values aren't mistaken for real HuggingFace data.
+    """
+    if model_id in lookup:
+        return lookup[model_id]
+    print(
+        f"No cached HuggingFace data for {model_id}; using placeholder values. "
+        "Run `make update_model_catalog` (without --skip-hugging-face) to fetch real data."
+    )
+    return _hf_defaults_on_fetch_failure()
 
 
 def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) -> None:
@@ -196,27 +260,51 @@ def main() -> None:
     This function iterates over the source models data, augments each model with additional
     information from HuggingFace, adds the isNew flag if appropriate, and writes the resulting list to a JSON file.
 
+    When ``--skip-hugging-face`` is passed, existing HuggingFace-derived fields
+    are reused from modelsFinal.json instead of requesting them from the
+    Hugging Face API.
+
     Examples:
         >>> main()
         Augmenting some-model-id
         JSON file written, you may wish to run prettier on it
     """
+    parser = argparse.ArgumentParser(
+        description="Augment model data with HuggingFace info and write to a JSON file."
+    )
+    parser.add_argument(
+        "--skip-hugging-face",
+        action="store_true",
+        help="Reuse existing HuggingFace-derived fields from modelsFinal.json "
+        "instead of requesting them from the Hugging Face API.",
+    )
+    args = parser.parse_args()
+    skip_hugging_face = args.skip_hugging_face
+
     with open(file_in, encoding="utf-8") as f:
         models = json.load(f)
+
+    existing_hf_lookup: dict[str, HfModelInfo] = {}
+    if skip_hugging_face:
+        existing_hf_lookup = _existing_hf_fields_by_id()
 
     models_data: list[dict[str, Any]] = []
 
     # Augment models with HuggingFace info
     for model in models:
         our_id = model["id"]
-        lineage = model.get("idLineage")
-        if isinstance(lineage, list) and len(lineage) > 0:
-            print(f"Augmenting {our_id} (lineage {lineage[0]} ... {lineage[-1]})")
-            hf_info = get_hf_info_from_lineage(lineage)
+        if skip_hugging_face:
+            print(f"Syncing {our_id} (reusing existing HuggingFace info)")
+            hf_info = _hf_fields_from_existing(our_id, existing_hf_lookup)
         else:
-            model_id = model["idHuggingFace"]
-            print(f"Augmenting {model_id}")
-            hf_info = get_hf_info(model_id)
+            lineage = model.get("idLineage")
+            if isinstance(lineage, list) and len(lineage) > 0:
+                print(f"Augmenting {our_id} (lineage {lineage[0]} ... {lineage[-1]})")
+                hf_info = get_hf_info_from_lineage(lineage)
+            else:
+                model_id = model["idHuggingFace"]
+                print(f"Augmenting {model_id}")
+                hf_info = get_hf_info(model_id)
         # This order puts our fields first, keeps id overriding
         info = {**model, **hf_info, "id": our_id}
         models_data.append(info)
