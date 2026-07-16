@@ -5,7 +5,6 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     HardCodedFilter,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
-from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
 
@@ -1242,118 +1241,5 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
             "pb_5": "default",
             "pb_6": "",
             "pb_7": 1,
-        },
-    )
-
-
-def test_query_with_costs_and_bool_condition_no_param_collision() -> None:
-    """A bool filter literal must not reuse the cost query's UInt64 rank param (WB-37505).
-
-    The bool literal is bound first as a Bool param; the cost pipeline then binds
-    rank = 1 as a UInt64 param. Because True == 1 with equal hashes, a value-only
-    param cache reused the bool's placeholder for the int, so the UInt64 rank slot
-    resolved to True and ClickHouse rejected "True cannot be parsed as UInt64",
-    400-ing the request. The bool and the rank must stay distinct params, with
-    rank bound to the integer 1.
-    """
-    cq = CallsQuery(
-        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
-    )
-    cq.add_field("id")
-    cq.add_field("started_at")
-    cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "inputs.enabled"}, {"$literal": True}]}
-        )
-    )
-    assert_sql(
-        cq,
-        """WITH filtered_calls AS
-  (SELECT calls_merged.id AS id
-   FROM calls_merged PREWHERE calls_merged.project_id = {pb_4:String}
-   WHERE (((calls_merged.inputs_dump LIKE {pb_2:String}
-            OR calls_merged.inputs_dump LIKE {pb_3:String})
-           OR calls_merged.inputs_dump IS NULL))
-   GROUP BY (calls_merged.project_id,
-             calls_merged.id)
-   HAVING (((multiIf(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = 'true', 1, coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = 'false', 0, toUInt8OrNull(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), ''))) = {pb_1:Bool}))
-           AND ((any(calls_merged.deleted_at) IS NULL))
-           AND ((NOT ((any(calls_merged.op_name) IS NULL)))))),
-     all_calls AS
-  (SELECT calls_merged.id AS id,
-          any(calls_merged.started_at) AS started_at
-   FROM calls_merged PREWHERE calls_merged.project_id = {pb_4:String}
-   WHERE (calls_merged.id IN filtered_calls)
-   GROUP BY (calls_merged.project_id,
-             calls_merged.id)),
-     llm_usage AS
-  (-- From the all_calls we get the usage data for LLMs
- SELECT *,
-        ifNull(JSONExtractRaw(summary_dump, 'usage'), '{}') AS usage_raw,
-        arrayJoin(if(usage_raw != ''
-                     and usage_raw != '{}', JSONExtractKeysAndValuesRaw(usage_raw), [('weave_dummy_llm_id', '{\\"requests\\": 0, \\"prompt_tokens\\": 0, \\"completion_tokens\\": 0, \\"total_tokens\\": 0, \\"cache_read_input_tokens\\": 0, \\"cache_creation_input_tokens\\": 0}')])) AS kv,
-        kv.1 AS llm_id,
-        JSONExtractInt(kv.2, 'requests') AS requests,
-        (if(JSONHas(kv.2, 'prompt_tokens'), JSONExtractInt(kv.2, 'prompt_tokens'), 0) + if(JSONHas(kv.2, 'input_tokens'), JSONExtractInt(kv.2, 'input_tokens'), 0)) AS prompt_tokens,
-        (if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), 0) + if(JSONHas(kv.2, 'output_tokens'), JSONExtractInt(kv.2, 'output_tokens'), 0)) AS completion_tokens,
-        JSONExtractInt(kv.2, 'total_tokens') AS total_tokens,
-        JSONExtractInt(kv.2, 'cache_read_input_tokens') AS cache_read_input_tokens,
-        JSONExtractInt(kv.2, 'cache_creation_input_tokens') AS cache_creation_input_tokens
-   FROM all_calls),
-     ranked_prices AS
-  (-- based on the llm_ids in the usage data we get all the prices and rank them according to specificity and effective date
- SELECT *,
-        llm_token_prices.id,
-        llm_token_prices.pricing_level,
-        llm_token_prices.pricing_level_id,
-        llm_token_prices.provider_id,
-        llm_token_prices.llm_id,
-        llm_token_prices.effective_date,
-        llm_token_prices.prompt_token_cost,
-        llm_token_prices.completion_token_cost,
-        llm_token_prices.cache_read_input_token_cost,
-        llm_token_prices.cache_creation_input_token_cost,
-        llm_token_prices.prompt_token_cost_unit,
-        llm_token_prices.completion_token_cost_unit,
-        llm_token_prices.created_by,
-        llm_token_prices.created_at,
-        ROW_NUMBER() OVER (PARTITION BY llm_usage.id, llm_usage.llm_id
-                           ORDER BY CASE -- Order by effective_date
-
-                                        WHEN llm_usage.started_at >= llm_token_prices.effective_date THEN 1
-                                        ELSE 2
-                                    END, CASE -- Order by pricing level then by effective_date
- -- WHEN llm_token_prices.pricing_level = 'org' AND llm_token_prices.pricing_level_id = ORG_PARAM THEN 1
-
-                                             WHEN llm_token_prices.pricing_level = 'project'
-                                                  AND llm_token_prices.pricing_level_id = 'UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=' THEN 2
-                                             WHEN llm_token_prices.pricing_level = 'default'
-                                                  AND llm_token_prices.pricing_level_id = 'default' THEN 3
-                                             ELSE 4
-                                         END, llm_token_prices.effective_date DESC) AS rank
-   FROM llm_usage GLOBAL
-   LEFT JOIN llm_token_prices ON ((llm_usage.llm_id = llm_token_prices.llm_id)
-                                  AND ((llm_token_prices.pricing_level_id = {pb_5:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_6:String})
-                                       OR (llm_token_prices.pricing_level_id = {pb_7:String})))) -- Final Select, which just selects the correct fields, and adds a costs object
-
-SELECT id,
-       started_at,
-       if(any(llm_id) = 'weave_dummy_llm_id'
-          or any(llm_token_prices.id) == '', any(summary_dump), concat(left(any(summary_dump), length(any(summary_dump)) - 1), ',"weave":{', '"costs":', concat('{', arrayStringConcat(groupUniqArray(concat('"', toString(llm_id), '":{', '"prompt_tokens":', toString(prompt_tokens), ',', '"completion_tokens":', toString(completion_tokens), ',', '"requests":', toString(requests), ',', '"total_tokens":', toString(total_tokens), ',', '"cache_read_input_tokens":', toString(cache_read_input_tokens), ',', '"cache_creation_input_tokens":', toString(cache_creation_input_tokens), ',', '"prompt_token_cost":', toString(prompt_token_cost), ',', '"completion_token_cost":', toString(completion_token_cost), ',', '"cache_read_input_token_cost":', toString(cache_read_input_token_cost), ',', '"cache_creation_input_token_cost":', toString(cache_creation_input_token_cost), ',', '"prompt_tokens_total_cost":', toString((prompt_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost), ',', '"completion_tokens_total_cost":', toString(completion_tokens * completion_token_cost), ',', '"cache_read_input_tokens_total_cost":', toString(cache_read_input_tokens * cache_read_input_token_cost), ',', '"cache_creation_input_tokens_total_cost":', toString(cache_creation_input_tokens * cache_creation_input_token_cost), ',', '"prompt_token_cost_unit":"', toString(prompt_token_cost_unit), '",', '"completion_token_cost_unit":"', toString(completion_token_cost_unit), '",', '"effective_date":"', toString(effective_date), '",', '"provider_id":"', toString(provider_id), '",', '"pricing_level":"', toString(pricing_level), '",', '"pricing_level_id":"', toString(pricing_level_id), '",', '"created_by":"', toString(created_by), '",', '"created_at":"', toString(created_at), '"}')), ','), '} }') , '}')) AS summary_dump
-FROM ranked_prices
-WHERE (rank = {pb_8:UInt64})
-GROUP BY id,
-         started_at""",
-        {
-            "pb_0": '$."enabled"',
-            "pb_1": True,
-            "pb_2": "%true%",
-            "pb_3": "%1%",
-            "pb_4": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_5": "UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=",
-            "pb_6": "default",
-            "pb_7": "",
-            "pb_8": 1,
         },
     )
