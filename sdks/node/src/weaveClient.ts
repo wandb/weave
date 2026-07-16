@@ -911,9 +911,17 @@ export class WeaveClient {
     this.isBatchProcessing = true;
 
     try {
-      await this.sendBatch(batchToProcess);
-      // A clean send clears the streak: errorCount is consecutive, not lifetime.
-      this.errorCount = 0;
+      const requeued = await this.sendBatch(batchToProcess);
+      if (requeued) {
+        // A per-item send requeued a retryable failure without throwing (eager
+        // starts/ends and per-item completes are isolated so one poison item
+        // can't drop its batch-mates); count it so a sustained outage still
+        // trips the breaker instead of requeuing forever.
+        this.registerSendFailure();
+      } else {
+        // A fully clean send clears the streak: errorCount is consecutive.
+        this.errorCount = 0;
+      }
     } catch (error) {
       // The project is pinned to calls_complete mode: switch paths and re-pair
       // the failed legacy items instead of dropping them back as-is.
@@ -929,7 +937,6 @@ export class WeaveClient {
         );
       } else {
         console.error('Error processing batch:', error);
-        this.errorCount++;
         fs.appendFileSync(
           WEAVE_ERRORS_LOG_FNAME,
           `Error processing batch: ${error}\n`
@@ -939,21 +946,7 @@ export class WeaveClient {
         // TODO: retry with exponential backoff (mirror the Python SDK's
         // tenacity-based retry) instead of an immediate requeue at BATCH_INTERVAL.
         this.callQueue.unshift(...batchToProcess);
-
-        // Give up gracefully after too many errors. An SDK must never kill the
-        // host process; disable tracing and let the program continue. Buffered
-        // calls that could not be sent are dropped (the server is unreachable).
-        if (this.errorCount > this.MAX_ERRORS) {
-          console.error(
-            `Weave: exceeded ${this.MAX_ERRORS} consecutive send errors; ` +
-              `disabling tracing for this process. Buffered calls may be lost.`
-          );
-          this.tracingDisabled = true;
-          this.callQueue = [];
-          this.pendingStarts.clear();
-          this.pendingEnds.clear();
-          this.eagerCallIds.clear();
-        }
+        this.registerSendFailure();
       }
     } finally {
       this.isBatchProcessing = false;
@@ -964,10 +957,31 @@ export class WeaveClient {
     }
   }
 
+  // Count a consecutive send failure. An SDK must never kill or hang the host
+  // process, so after MAX_ERRORS in a row we give up gracefully: disable
+  // tracing and drop buffered calls (the server is unreachable) rather than
+  // requeuing forever.
+  private registerSendFailure() {
+    this.errorCount++;
+    if (this.errorCount > this.MAX_ERRORS) {
+      console.error(
+        `Weave: exceeded ${this.MAX_ERRORS} consecutive send errors; ` +
+          `disabling tracing for this process. Buffered calls may be lost.`
+      );
+      this.tracingDisabled = true;
+      this.callQueue = [];
+      this.pendingStarts.clear();
+      this.pendingEnds.clear();
+      this.eagerCallIds.clear();
+    }
+  }
+
   // Routes a drained batch to the right endpoint(s): in calls_complete mode,
   // paired completes go to `calls/complete` and any queued (eager) starts/ends
   // go to the v2 single endpoints; otherwise the legacy upsert_batch path.
-  private async sendBatch(batch: BatchItem[]) {
+  // Returns true if any item was requeued for retry (a retryable failure that
+  // did not throw), so the caller can advance the give-up counter.
+  private async sendBatch(batch: BatchItem[]): Promise<boolean> {
     if (!this.useCallsComplete) {
       const startEnds = batch.filter(
         (i): i is Extract<BatchItem, {mode: 'start' | 'end'}> =>
@@ -983,9 +997,10 @@ export class WeaveClient {
       await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
         batchReq
       );
-      return;
+      return false;
     }
 
+    let requeued = false;
     const completes: CompletedCallParams[] = [];
     for (const item of batch) {
       if (item.mode === 'complete') {
@@ -993,7 +1008,7 @@ export class WeaveClient {
       }
     }
     if (completes.length > 0) {
-      await this.sendCompletes(completes);
+      requeued = (await this.sendCompletes(completes)) || requeued;
     }
     // Eager start/end items are sent individually and isolated per item: a
     // non-retryable failure drops just that item; a retryable one requeues it.
@@ -1008,51 +1023,59 @@ export class WeaveClient {
           await this.sendCallEndV2(item.data.end);
         }
       } catch (error) {
-        this.requeueOrDrop(item, error);
+        requeued = this.requeueOrDrop(item, error) || requeued;
       }
     }
+    return requeued;
   }
 
   // Send paired completes as one request. A retryable failure propagates so the
   // whole batch requeues; a non-retryable batch rejection means at least one
   // call is bad, so retry each alone (mirrors the Python SDK's per-item
   // fallback) and one poison call cannot drop its batch-mates.
-  private async sendCompletes(completes: CompletedCallParams[]) {
+  private async sendCompletes(
+    completes: CompletedCallParams[]
+  ): Promise<boolean> {
     try {
       await this.sendCallsComplete(completes);
-      return;
+      return false;
     } catch (error) {
       if (isRetryableError(error)) {
         throw error;
       }
       if (completes.length === 1) {
-        this.requeueOrDrop(
+        return this.requeueOrDrop(
           {mode: 'complete', data: {complete: completes[0]}},
           error
         );
-        return;
       }
     }
+    let requeued = false;
     for (const complete of completes) {
       try {
         await this.sendCallsComplete([complete]);
       } catch (itemError) {
-        this.requeueOrDrop({mode: 'complete', data: {complete}}, itemError);
+        requeued =
+          this.requeueOrDrop({mode: 'complete', data: {complete}}, itemError) ||
+          requeued;
       }
     }
+    return requeued;
   }
 
-  // Requeue a failed item on a retryable error; drop it (with a log) otherwise.
-  private requeueOrDrop(item: BatchItem, error: unknown) {
+  // Requeue a failed item on a retryable error (returns true); drop it (with a
+  // log) and return false otherwise.
+  private requeueOrDrop(item: BatchItem, error: unknown): boolean {
     if (isRetryableError(error)) {
       this.callQueue.unshift(item);
-    } else {
-      console.error(`Dropping ${item.mode} (non-retryable error):`, error);
-      fs.appendFileSync(
-        WEAVE_ERRORS_LOG_FNAME,
-        `Dropping ${item.mode} (non-retryable): ${error}\n`
-      );
+      return true;
     }
+    console.error(`Dropping ${item.mode} (non-retryable error):`, error);
+    fs.appendFileSync(
+      WEAVE_ERRORS_LOG_FNAME,
+      `Dropping ${item.mode} (non-retryable): ${error}\n`
+    );
+    return false;
   }
 
   private postV2(
@@ -1941,7 +1964,6 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
-      started_at: call.callSchema.started_at,
       is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
@@ -1980,7 +2002,6 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
-      started_at: call.callSchema.started_at,
       is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.

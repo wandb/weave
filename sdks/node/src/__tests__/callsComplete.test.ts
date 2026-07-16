@@ -345,6 +345,26 @@ describe('send error handling', () => {
     });
     expect(queue.callQueue.length).toBe(before);
   });
+
+  test('sustained errors on the eager path also trip the breaker', async () => {
+    // Eager start/end go via the v2 single endpoints and requeue in place
+    // (they never throw out of sendBatch), so their failures must still feed
+    // the give-up counter or a down server would requeue forever and hang.
+    jest.spyOn(traceServer, 'request').mockRejectedValue({status: 503});
+    const c = client();
+    (c as unknown as {BATCH_INTERVAL: number}).BATCH_INTERVAL = 1;
+
+    const doomedEager = op(function doomedEager(x: number) {
+      return x;
+    });
+    markOpEager(doomedEager);
+    await doomedEager(1);
+    await c.waitForBatchProcessing();
+
+    expect((c as unknown as {tracingDisabled: boolean}).tracingDisabled).toBe(
+      true
+    );
+  });
 });
 
 describe('flush + pendingCallCount (clean-shutdown surface)', () => {
