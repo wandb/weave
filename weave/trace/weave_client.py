@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, TypeVar, cast
 
 import pydantic
 from httpx import HTTPStatusError as HTTPError
+from httpx import Response
 
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -363,6 +364,30 @@ def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     return obj
 
 
+def _obj_read_error_message(response: Response, ref_uri: str) -> str:
+    """Return actionable context for an object-read HTTP failure."""
+    body: Any = response.text or "<empty response body>"
+    try:
+        parsed_body = json.loads(response.content)
+    except json.JSONDecodeError:
+        pass
+    else:
+        if isinstance(parsed_body, dict):
+            body = (
+                parsed_body.get("reason")
+                or parsed_body.get("detail")
+                or parsed_body.get("message")
+                or parsed_body
+            )
+        else:
+            body = parsed_body
+
+    return (
+        f"Unable to read object for ref uri: {ref_uri} "
+        f"(status {response.status_code}): {body}"
+    )
+
+
 def map_to_refs(obj: Any) -> Any:
     if isinstance(obj, Ref):
         return obj
@@ -584,16 +609,7 @@ class WeaveClient:
             )
         except HTTPError as e:
             if e.response is not None:
-                if e.response.content:
-                    try:
-                        reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason) from None
-                    except json.JSONDecodeError:
-                        raise ValueError(e.response.content) from None
-                if e.response.status_code == 404:
-                    raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri}"
-                    ) from e
+                raise ValueError(_obj_read_error_message(e.response, ref.uri)) from None
             raise
 
         # At this point, `ref.digest` is one of three things:
