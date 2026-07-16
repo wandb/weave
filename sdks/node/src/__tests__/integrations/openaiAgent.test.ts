@@ -146,7 +146,13 @@ describe('OpenAI Agents Integration', () => {
 
     expect(calls).toHaveLength(3);
 
-    expect(callData(calls[0])).toMatchInlineSnapshot(`
+    // calls_complete writes each call when it closes, so the root trace lands
+    // last; assert by op_name rather than by write order.
+    const traceCall = calls.find(c => c.op_name === 'openai_agent_trace')!;
+    const agentCall = calls.find(c => c.op_name === 'openai_agent_agent')!;
+    const funcCall = calls.find(c => c.op_name === 'openai_agent_function')!;
+
+    expect(callData(traceCall)).toMatchInlineSnapshot(`
       {
         "attributes": {
           "kind": "agent",
@@ -164,7 +170,7 @@ describe('OpenAI Agents Integration', () => {
         "project_id": "test-project",
       }
     `);
-    expect(callData(calls[1])).toMatchInlineSnapshot(`
+    expect(callData(agentCall)).toMatchInlineSnapshot(`
       {
         "attributes": {
           "kind": "agent",
@@ -189,7 +195,7 @@ describe('OpenAI Agents Integration', () => {
         "project_id": "test-project",
       }
     `);
-    expect(callData(calls[2])).toMatchInlineSnapshot(`
+    expect(callData(funcCall)).toMatchInlineSnapshot(`
       {
         "attributes": {
           "kind": "tool",
@@ -222,11 +228,11 @@ describe('OpenAI Agents Integration', () => {
     // openai_agent_trace
     // ├── openai_agent_agent
     //     └── openai_agent_function
-    expect(calls[1].parent_id).toBe(calls[0].id);
-    expect(calls[2].parent_id).toBe(calls[1].id);
+    expect(agentCall.parent_id).toBe(traceCall.id);
+    expect(funcCall.parent_id).toBe(agentCall.id);
 
     for (const call of calls) {
-      expect(call.trace_id).toBe(calls[0].trace_id);
+      expect(call.trace_id).toBe(traceCall.trace_id);
     }
   });
 });

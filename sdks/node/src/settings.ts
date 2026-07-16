@@ -20,6 +20,14 @@ export type Settings = {
    */
   useOTelV2: boolean;
 
+  /**
+   * Sends finished calls to the `calls/complete` endpoint (start+end paired
+   * client-side) instead of the legacy `call/upsert_batch` path.
+   *
+   * @default `true`
+   */
+  useCallsComplete: boolean;
+
   readonly genai: {
     /**
      * How GenAI spans are exported.
@@ -52,9 +60,15 @@ export function makeSettings(settings: Partial<Settings> = {}): Settings {
   const useOTelV2 =
     parseEnvVar(process.env.WEAVE_USE_OTEL_V2) ?? settings.useOTelV2 ?? true;
 
+  const useCallsComplete =
+    parseEnvVar(process.env.WEAVE_USE_CALLS_COMPLETE) ??
+    settings.useCallsComplete ??
+    true;
+
   return {
     printCallLink,
     useOTelV2,
+    useCallsComplete,
     attributes: settings.attributes ?? {},
     genai: settings.genai ?? {},
   };

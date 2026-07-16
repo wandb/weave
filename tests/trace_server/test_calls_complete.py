@@ -993,6 +993,242 @@ def test_calls_complete_tolerates_content_object_name_collision(
     assert inputs_c["image"] == data_uri_a
 
 
+def _fetch_v1_call_inputs(ch_client, project_id: str, call_id: str) -> dict[str, Any]:
+    """Read a v1 start row's inputs from call_parts (start rows carry no output)."""
+    row = _fetch_call_row(ch_client, "call_parts", project_id, call_id, ["inputs_dump"])
+    assert row is not None
+    return json.loads(row[0])
+
+
+def _make_content_start_batch(
+    project_id: str,
+    started_at: datetime.datetime,
+    calls: list[tuple[str, dict[str, Any]]],
+) -> tsi.CallCreateBatchReq:
+    """Build a v1 upsert batch of start ops, one per (call_id, inputs) pair."""
+    return tsi.CallCreateBatchReq(
+        batch=[
+            tsi.CallBatchStartMode(
+                mode="start",
+                req=tsi.CallStartReq(
+                    start=tsi.StartedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call_id,
+                        trace_id=str(uuid.uuid4()),
+                        op_name="test_op",
+                        started_at=started_at,
+                        attributes={},
+                        inputs=inputs,
+                    )
+                ),
+            )
+            for call_id, inputs in calls
+        ]
+    )
+
+
+def test_call_start_batch_batches_content_object_inserts(
+    trace_server, clickhouse_trace_server, monkeypatch
+):
+    """The v1 /call/upsert_batch path batches content objects like calls_complete.
+
+    Driven through the external adapter (the real HTTP entry converts project
+    ids the same way), so this also guards the adapter's call_start_batch
+    ext->int encoding. Duplicate blobs collapse to one ref, and the whole batch
+    issues exactly one object_versions insert and no aliases insert (content
+    refs pin the digest, so the "latest" alias write is skipped) instead of an
+    inline obj_create per blob (the serial staircase this replaces).
+    """
+    project_id = f"{TEST_ENTITY}/call_start_batch_batched_objects"
+    internal_project_id = b64(project_id)
+
+    raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri_a = f"data:image/png;base64,{base64.b64encode(raw_a).decode('ascii')}"
+    data_uri_b = f"data:image/png;base64,{base64.b64encode(raw_b).decode('ascii')}"
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_a1, call_a2, call_b = (str(uuid.uuid4()) for _ in range(3))
+    batch = _make_content_start_batch(
+        project_id,
+        started_at,
+        [
+            (call_a1, {"image": data_uri_a}),
+            (call_a2, {"image": data_uri_a}),
+            (call_b, {"image": data_uri_b}),
+        ],
+    )
+
+    insert_tables = []
+    original_insert = type(clickhouse_trace_server)._insert
+
+    def _spy_insert(self, table, *args, **kwargs):
+        insert_tables.append(table)
+        return original_insert(self, table, *args, **kwargs)
+
+    monkeypatch.setattr(type(clickhouse_trace_server), "_insert", _spy_insert)
+
+    trace_server.call_start_batch(batch)
+
+    assert insert_tables.count("object_versions") == 1
+    assert insert_tables.count("aliases") == 0
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "object_versions", internal_project_id
+        )
+        == 2
+    )
+
+    inputs_a1 = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, internal_project_id, call_a1
+    )
+    inputs_a2 = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, internal_project_id, call_a2
+    )
+    inputs_b = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, internal_project_id, call_b
+    )
+
+    ref_a1 = inputs_a1["image"]
+    assert ref_a1.startswith(f"weave-trace-internal:///{internal_project_id}/object/")
+    assert ref_a1 == inputs_a2["image"]
+    assert inputs_b["image"] != ref_a1
+
+    parsed_a = ri.parse_internal_uri(ref_a1)
+    obj_a = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_a.project_id,
+            object_id=parsed_a.name,
+            digest=parsed_a.version,
+        )
+    )
+    assert obj_a.obj.val["_type"] == "CustomWeaveType"
+    assert obj_a.obj.val["weave_type"] == {
+        "type": "weave.type_wrappers.Content.content.Content"
+    }
+
+
+@pytest.mark.disable_logging_error_check
+def test_call_start_batch_content_obj_failure_skips_calls_insert(
+    clickhouse_trace_server, monkeypatch
+):
+    """A failed content-object insert must skip the v1 calls insert.
+
+    call_start_batch raises so the client retries the whole batch, and no
+    call_parts row is written referencing an object that never landed.
+    """
+    internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_obj_failure")
+
+    raw = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode('ascii')}"
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    call_id = str(uuid.uuid4())
+    batch = _make_content_start_batch(
+        internal_project_id, started_at, [(call_id, {"image": data_uri})]
+    )
+
+    original_insert = type(clickhouse_trace_server)._insert
+
+    def _fail_object_versions(self, table, *args, **kwargs):
+        if table == "object_versions":
+            raise RuntimeError("simulated content object insert failure")
+        return original_insert(self, table, *args, **kwargs)
+
+    monkeypatch.setattr(type(clickhouse_trace_server), "_insert", _fail_object_versions)
+
+    with pytest.raises(RuntimeError, match="simulated content object insert failure"):
+        clickhouse_trace_server.call_start_batch(batch)
+
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "call_parts", internal_project_id
+        )
+        == 0
+    )
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "files", internal_project_id
+        )
+        >= 1
+    )
+
+
+def test_call_start_batch_tolerates_content_object_name_collision(
+    clickhouse_trace_server,
+):
+    """A colliding content object is skipped on the v1 batch path too.
+
+    Its call keeps the original inline data URI (no dangling ref), the batch's
+    other content object still lands, and object_versions holds only the seeded
+    object plus the non-colliding one.
+    """
+    seed_project_id = b64(f"{TEST_ENTITY}/call_start_batch_collision_seed")
+    internal_project_id = b64(f"{TEST_ENTITY}/call_start_batch_collision")
+
+    raw_a = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    raw_b = b"b" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    data_uri_a = f"data:image/png;base64,{base64.b64encode(raw_a).decode('ascii')}"
+    data_uri_b = f"data:image/png;base64,{base64.b64encode(raw_b).decode('ascii')}"
+
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+
+    # Learn the deterministic content object_id for payload a in a seed project.
+    seed_call_id = str(uuid.uuid4())
+    clickhouse_trace_server.call_start_batch(
+        _make_content_start_batch(
+            seed_project_id, started_at, [(seed_call_id, {"image": data_uri_a})]
+        )
+    )
+    seed_inputs = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, seed_project_id, seed_call_id
+    )
+    content_object_id_a = ri.parse_internal_uri(seed_inputs["image"]).name
+
+    # Bind that object_id to a different base_object_class in the target project.
+    clickhouse_trace_server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=internal_project_id,
+                object_id=content_object_id_a,
+                val={"_bases": ["Object", "BaseModel"], "_class_name": "TypeA"},
+            )
+        )
+    )
+
+    call_a_id, call_b_id = str(uuid.uuid4()), str(uuid.uuid4())
+    clickhouse_trace_server.call_start_batch(
+        _make_content_start_batch(
+            internal_project_id,
+            started_at,
+            [(call_a_id, {"image": data_uri_a}), (call_b_id, {"image": data_uri_b})],
+        )
+    )
+
+    inputs_a = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, internal_project_id, call_a_id
+    )
+    inputs_b = _fetch_v1_call_inputs(
+        clickhouse_trace_server.ch_client, internal_project_id, call_b_id
+    )
+
+    assert inputs_a["image"] == data_uri_a
+    parsed_b = ri.parse_internal_uri(inputs_b["image"])
+    obj_b = clickhouse_trace_server.obj_read(
+        tsi.ObjReadReq(
+            project_id=parsed_b.project_id,
+            object_id=parsed_b.name,
+            digest=parsed_b.version,
+        )
+    )
+    assert obj_b.obj.val["_type"] == "CustomWeaveType"
+    assert (
+        _count_project_rows(
+            clickhouse_trace_server.ch_client, "object_versions", internal_project_id
+        )
+        == 2
+    )
+
+
 def test_call_start_end_v2_updates_calls_complete(
     trace_server, clickhouse_trace_server
 ):

@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict
 
 from tests.trace_server.conftest import TEST_ENTITY
 from weave.trace.refs import ObjectRef
-from weave.trace_server.errors import InvalidExternalRef
+from weave.trace_server.errors import InvalidExternalRef, RequestTooLarge
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_converter import (
     InvalidInternalRef,
@@ -521,6 +521,61 @@ def test_deeply_nested_json_in_json_terminates_without_recursion_error():
     # Termination + no RecursionError is the contract; the buried ref is below
     # the cap so the string comes back unchanged.
     assert converted["content"] == nested
+
+
+def test_deeply_nested_structure_raises_request_too_large():
+    """A payload nested past the structure-depth cap surfaces as a typed
+    RequestTooLarge (HTTP 413), never an unhandled RecursionError (500).
+
+    Regression for WB-37414: the copy-on-write container walk was unbounded, so
+    a deeply-nested body exhausted the Python stack. 800 and 40 straddle the cap
+    (200); the walk over dicts, lists and pydantic models must reject the deep
+    payloads and still convert the shallow one.
+    """
+    internal_project_id = "internal-project"
+    external_ref = "weave:///entity/project/object/x:y"
+    internal_ref = f"weave-trace-internal:///{internal_project_id}/object/x:y"
+
+    over_cap = 800
+    nested_dict: dict = {}
+    nested_list: list = []
+    dict_cursor, list_cursor = nested_dict, nested_list
+    for _ in range(over_cap):
+        dict_cursor["k"] = {}
+        dict_cursor = dict_cursor["k"]
+        list_cursor.append([])
+        list_cursor = list_cursor[0]
+
+    class _Node(BaseModel):
+        child: object | None = None
+
+    nested_model = _Node()
+    model_cursor = nested_model
+    for _ in range(over_cap):
+        model_cursor.child = _Node()
+        model_cursor = model_cursor.child
+
+    for payload in (nested_dict, nested_list, nested_model):
+        with pytest.raises(RequestTooLarge):
+            universal_ext_to_int_ref_converter(
+                payload, lambda project: internal_project_id
+            )
+
+    # Positive control: nesting well within the cap still converts its ref.
+    within_cap = 40
+    shallow: dict = {}
+    cursor = shallow
+    for _ in range(within_cap):
+        cursor["k"] = {}
+        cursor = cursor["k"]
+    cursor["ref"] = external_ref
+    converted = universal_ext_to_int_ref_converter(
+        shallow, lambda project: internal_project_id
+    )
+    leaf = converted
+    for _ in range(within_cap):
+        leaf = leaf["k"]
+    assert leaf == {"ref": internal_ref}
 
 
 @pytest.mark.disable_logging_error_check

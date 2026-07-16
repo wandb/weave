@@ -10,7 +10,7 @@ from weave.trace_server.base64_content_conversion import (
     AUTO_CONVERSION_MIN_SIZE,
     is_base64,
     is_data_uri,
-    process_call_req_to_content,
+    process_call_content,
     replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
     store_content_object,
@@ -216,7 +216,7 @@ class TestBase64Replacement:
         obj_create_req = trace_server.obj_create.call_args.args[0]
         assert obj_create_req.obj.wb_user_id == "user-123"
 
-    def test_process_call_req_to_content_start_and_end(self):
+    def test_process_call_content_start_and_end(self):
         """Test the main entry point for processing CallStartReq and CallEndReq."""
         # Mock trace server
         trace_server = MagicMock()
@@ -248,7 +248,7 @@ class TestBase64Replacement:
             )
         )
 
-        processed_start = process_call_req_to_content(start_req, trace_server)
+        processed_start = process_call_content(start_req, trace_server)
         assert processed_start.start.inputs["text"] == "Some normal text"
         _assert_content_ref(processed_start.start.inputs["image"], "proj")
 
@@ -264,7 +264,7 @@ class TestBase64Replacement:
             )
         )
 
-        processed_end = process_call_req_to_content(end_req, trace_server)
+        processed_end = process_call_content(end_req, trace_server)
         assert processed_end.end.output == long_b64
 
 
@@ -636,7 +636,7 @@ class TestThresholdAndStructuralIdentity:
 
         Confirms the no-copy path doesn't introduce a subtle aliasing bug:
         even though the result is the same object as the input, the
-        ``CallStartReq`` machinery in ``process_call_req_to_content`` just
+        ``CallStartReq`` machinery in ``process_call_content`` just
         rebinds the field, which is fine.
         """
         from datetime import datetime, timezone
@@ -652,7 +652,7 @@ class TestThresholdAndStructuralIdentity:
                 inputs=inputs_before,
             )
         )
-        processed = process_call_req_to_content(start_req, trace_server)
+        processed = process_call_content(start_req, trace_server)
         # Pydantic shallow-copies inputs at model construction, so we compare
         # by value rather than identity here — content must round-trip
         # unchanged regardless of the SDK copy.

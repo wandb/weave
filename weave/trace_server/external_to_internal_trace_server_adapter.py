@@ -341,21 +341,43 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         req = req.model_copy(deep=True)
+        pid = self._encode_call_start_inplace(req)
+        return self._ref_apply(self._internal_trace_server.call_start, req, pid)
+
+    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+        req = req.model_copy(deep=True)
+        pid = self._encode_call_end_inplace(req)
+        return self._ref_apply(self._internal_trace_server.call_end, req, pid)
+
+    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        """Batch of start/end ops, converting each item's ids ext->int.
+
+        Delegates the whole batch to the internal batched writer in one call so
+        content objects are staged and written once (see call_start_batch there),
+        instead of a per-item round-trip.
+        """
+        req = req.model_copy(deep=True)
+        pid = ""
+        for item in req.batch:
+            if isinstance(item, tsi.CallBatchStartMode):
+                pid = self._encode_call_start_inplace(item.req)
+            elif isinstance(item, tsi.CallBatchEndMode):
+                pid = self._encode_call_end_inplace(item.req)
+            else:
+                raise TypeError(f"Unsupported batch item mode: {type(item)}")
+        return self._ref_apply(self._internal_trace_server.call_start_batch, req, pid)
+
+    def _encode_call_start_inplace(self, req: tsi.CallStartReq) -> str:
         req.start.project_id = self._idc.ext_to_int_project_id(req.start.project_id)
         if req.start.wb_run_id is not None:
             req.start.wb_run_id = self._idc.ext_to_int_run_id(req.start.wb_run_id)
         if req.start.wb_user_id is not None:
             req.start.wb_user_id = self._idc.ext_to_int_user_id(req.start.wb_user_id)
-        return self._ref_apply(
-            self._internal_trace_server.call_start, req, req.start.project_id
-        )
+        return req.start.project_id
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        req = req.model_copy(deep=True)
+    def _encode_call_end_inplace(self, req: tsi.CallEndReq) -> str:
         req.end.project_id = self._idc.ext_to_int_project_id(req.end.project_id)
-        return self._ref_apply(
-            self._internal_trace_server.call_end, req, req.end.project_id
-        )
+        return req.end.project_id
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         req = req.model_copy(deep=True)

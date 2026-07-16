@@ -114,6 +114,25 @@ function normalizeUsage(u: Record<string, any>): Record<string, number> {
 // WeaveRealtimeTracingAdapter
 // ============================================================================
 
+export interface WeaveRealtimeTracingAdapterOptions {
+  /**
+   * Send the session-root call start eagerly, so the session is visible in the
+   * UI immediately instead of only after it closes (or the client flushes).
+   *
+   * Default `false`. Under the default calls_complete path the root start is
+   * held client-side and paired with its end on close, so the session appears
+   * once it finishes. Inner spans (generations, voice input) are short-lived
+   * and land on their own close regardless, so this only affects the root.
+   *
+   * Enable only for long-lived, low-frequency sessions where early visibility
+   * matters. Eager sends an extra, non-batched v2 request per session start:
+   * opening sessions faster than ~1/s makes those starts a per-session round
+   * trip that adds latency and can hit server rate limits. For high session
+   * churn, leave this off and rely on close/flush.
+   */
+  eagerSessionRoot?: boolean;
+}
+
 /**
  * Attaches to a RealtimeSession and emits Weave calls for the session
  * lifecycle, each model generation turn, and audio output segments.
@@ -146,7 +165,10 @@ export class WeaveRealtimeTracingAdapter {
   // In-flight tool calls: toolCallId → Weave callId
   private toolCalls = new Map<string, string>();
 
-  constructor(private readonly session: RealtimeSession) {
+  constructor(
+    private readonly session: RealtimeSession,
+    private readonly options: WeaveRealtimeTracingAdapterOptions = {}
+  ) {
     this.attachListeners();
   }
 
@@ -402,20 +424,23 @@ export class WeaveRealtimeTracingAdapter {
     const callId = uuidv7();
     const traceId = uuidv7();
 
-    client.saveCallStart({
-      project_id: client.projectId,
-      id: callId,
-      op_name: 'realtime.session',
-      display_name: 'Realtime Session',
-      trace_id: traceId,
-      parent_id: null,
-      started_at: new Date().toISOString(),
-      inputs: sessionData,
-      attributes: {
-        kind: 'agent',
-        ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+    client.saveCallStart(
+      {
+        project_id: client.projectId,
+        id: callId,
+        op_name: 'realtime.session',
+        display_name: 'Realtime Session',
+        trace_id: traceId,
+        parent_id: null,
+        started_at: new Date().toISOString(),
+        inputs: sessionData,
+        attributes: {
+          kind: 'agent',
+          ...asAttributes(OPENAI_REALTIME_AGENT_INTEGRATION),
+        },
       },
-    });
+      {eager: this.options.eagerSessionRoot ?? false}
+    );
 
     this.sessionCallId = callId;
     this.sessionTraceId = traceId;

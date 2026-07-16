@@ -383,4 +383,114 @@ describe('genai api (top-level functions)', () => {
     const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(turnSpan.attributes['gen_ai.operation.name']).toBe('invoke_agent');
   });
+
+  test('conversation attributes reach spans created in a separate runIsolated frame', () => {
+    // The conversation and its turn are created in one frame; a later, unrelated
+    // frame reuses the turn handle. The attributes must still land on the child,
+    // since the frame-B container has no ambient conversation.
+    let turn!: ReturnType<typeof startTurn>;
+    runIsolated(() => {
+      const convo = startConversation({
+        conversationId: 'session-x',
+        attributes: {
+          'weave.integration.name': 'claude-code',
+          'tenant.id': 'acme',
+        },
+      });
+      turn = convo.startTurn({agentName: 'claude-code'});
+    });
+    runIsolated(() => {
+      turn.startTool({name: 'read_file'}).end();
+    });
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes['weave.integration.name']).toBe('claude-code');
+    expect(toolSpan.attributes['tenant.id']).toBe('acme');
+  });
+
+  test('per-turn attributes override conversation attributes on key collision', () => {
+    const convo = startConversation({attributes: {env: 'prod', team: 'core'}});
+    const turn = convo.startTurn({attributes: {env: 'staging'}});
+    turn.end();
+    convo.end();
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(turnSpan.attributes['env']).toBe('staging'); // per-turn wins
+    expect(turnSpan.attributes['team']).toBe('core'); // conversation value kept
+  });
+
+  test('rootless startTurn attributes propagate to child spans', () => {
+    const turn = startTurn({
+      attributes: {'weave.integration.name': 'my-harness'},
+    });
+    turn.startTool({name: 'search'}).end();
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes['weave.integration.name']).toBe('my-harness');
+  });
+
+  test('conversation attributes reach a tool nested under an LLM across frames', () => {
+    // The claude-code daemon nests tool spans under the active chat (LLM) span,
+    // opening the chat in one frame and its tools in later ones. The identity
+    // must forward conversation -> turn -> llm -> tool, never read from ambient.
+    let turn!: ReturnType<typeof startTurn>;
+    let llm!: ReturnType<typeof startLLM>;
+    runIsolated(() => {
+      const convo = startConversation({
+        conversationId: 'session-y',
+        attributes: {'weave.integration.name': 'weave-claude-code'},
+      });
+      turn = convo.startTurn({agentName: 'claude-code'});
+      llm = turn.startLLM({model: 'claude-opus-4'});
+    });
+    runIsolated(() => {
+      llm.startTool({name: 'Bash'}).end();
+    });
+    llm.end();
+    turn.end();
+
+    const spans = getExporter().getFinishedSpans();
+    expect(findSpan(spans, 'chat').attributes['weave.integration.name']).toBe(
+      'weave-claude-code'
+    );
+    expect(
+      findSpan(spans, 'execute_tool').attributes['weave.integration.name']
+    ).toBe('weave-claude-code');
+  });
+
+  test('conversation attributes reach a subagent and the tools nested under it', () => {
+    // Both plugins spawn subagents, whose own tools nest under the subagent's
+    // invoke_agent span. The identity must reach the subagent and forward on.
+    let turn!: ReturnType<typeof startTurn>;
+    let subagent!: ReturnType<typeof startSubagent>;
+    runIsolated(() => {
+      const convo = startConversation({
+        conversationId: 'session-z',
+        attributes: {'weave.integration.name': 'weave-openclaw'},
+      });
+      turn = convo.startTurn({agentName: 'openclaw'});
+      subagent = turn.startSubagent({name: 'researcher'});
+    });
+    runIsolated(() => {
+      subagent.startTool({name: 'search'}).end();
+    });
+    subagent.end();
+    turn.end();
+
+    const spans = getExporter().getFinishedSpans();
+    // Two invoke_agent spans (turn + subagent); pick the subagent's by its name.
+    const subagentSpan = spans.find(
+      s =>
+        s.name === 'invoke_agent' &&
+        s.attributes['gen_ai.agent.name'] === 'researcher'
+    );
+    expect(subagentSpan?.attributes['weave.integration.name']).toBe(
+      'weave-openclaw'
+    );
+    expect(
+      findSpan(spans, 'execute_tool').attributes['weave.integration.name']
+    ).toBe('weave-openclaw');
+  });
 });

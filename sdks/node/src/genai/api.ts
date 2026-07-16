@@ -10,7 +10,7 @@ import {Turn, type TurnInit} from './turn';
  * Start a new Conversation and install it as the current conversation.
  * Subsequent calls to `startTurn` will pick it up automatically.
  *
- * Pass `attributes` to stamp custom (non-semconv) attributes on every
+ * Pass `attributes` to propagate custom (non-semconv) attributes to every
  * span the conversation emits.
  *
  * @example

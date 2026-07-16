@@ -410,23 +410,21 @@ def replace_base64_with_content_objects(
     return _visit(vals)
 
 
-R = TypeVar("R", bound=CallStartReq | CallEndReq | CallEndV2Req)
+R = TypeVar(
+    "R", bound=CallStartReq | CallEndReq | CallEndV2Req | CompletedCallSchemaForInsert
+)
 
 
-def process_call_req_to_content(
+def process_call_content(
     req: R,
     trace_server: TraceServerInterface,
+    pending_objs: PendingContentObjs | None = None,
 ) -> R:
-    """Process call inputs/outputs to replace base64 content.
+    """Replace base64 content in a call's inputs/outputs with Content refs.
 
-    This is the main entry point for processing trace data before insertion.
-
-    Args:
-        req: Call request (start, end, or end v2)
-        trace_server: Trace server instance
-
-    Returns:
-        Request with base64 content replaced by Content objects.
+    Single entry point for every write path. ``pending_objs`` queues the
+    objects for a batched flush instead of writing each inline; passing None
+    keeps the immediate obj_create behavior for standalone calls.
     """
     if isinstance(req, CallStartReq):
         req.start.inputs = replace_base64_with_content_objects(
@@ -434,6 +432,7 @@ def process_call_req_to_content(
             req.start.project_id,
             trace_server,
             req.start.wb_user_id,
+            pending_objs,
         )
     elif isinstance(req, (CallEndReq, CallEndV2Req)):
         # NOTE: EndedCallSchemaForInsert has no ``wb_user_id`` field, so Content
@@ -442,58 +441,41 @@ def process_call_req_to_content(
         # to the ``wb_user_id=None`` default (unattributed) — see the report /
         # PR discussion for the required follow-up.
         req.end.output = replace_base64_with_content_objects(
-            req.end.output, req.end.project_id, trace_server
+            req.end.output, req.end.project_id, trace_server, None, pending_objs
         )
+    elif isinstance(req, CompletedCallSchemaForInsert):
+        req.inputs = replace_base64_with_content_objects(
+            req.inputs, req.project_id, trace_server, req.wb_user_id, pending_objs
+        )
+        req.output = replace_base64_with_content_objects(
+            req.output, req.project_id, trace_server, req.wb_user_id, pending_objs
+        )
+    else:
+        raise TypeError(f"Unsupported call request type: {type(req)}")
 
     return req
 
 
-def process_complete_call_to_content(
-    complete_call: CompletedCallSchemaForInsert,
-    trace_server: TraceServerInterface,
-    pending_objs: PendingContentObjs | None = None,
-) -> CompletedCallSchemaForInsert:
-    """Process a complete call to replace base64 content in inputs and outputs.
-
-    Args:
-        complete_call: Complete call schema with both inputs and outputs.
-        trace_server: Trace server instance for file storage.
-        pending_objs: When given, content objects are queued here instead of
-            being written immediately, so a caller can batch the writes.
-
-    Returns:
-        CompletedCallSchemaForInsert with base64 content replaced by Content objects.
-    """
-    complete_call.inputs = replace_base64_with_content_objects(
-        complete_call.inputs,
-        complete_call.project_id,
-        trace_server,
-        complete_call.wb_user_id,
-        pending_objs,
-    )
-    complete_call.output = replace_base64_with_content_objects(
-        complete_call.output,
-        complete_call.project_id,
-        trace_server,
-        complete_call.wb_user_id,
-        pending_objs,
-    )
-    return complete_call
-
-
 def restore_raw_content_values(
-    complete_call: CompletedCallSchemaForInsert,
+    req: R,
     raw_by_ref: dict[str, str],
-) -> CompletedCallSchemaForInsert:
+) -> R:
     """Replace embedded content refs with the raw values they came from.
 
     Used when a queued content object was skipped at flush time (name/type
     collision): the call payload keeps the original inline value instead of
     a ref that resolves to nothing.
     """
-    complete_call.inputs = _restore_refs(complete_call.inputs, raw_by_ref)
-    complete_call.output = _restore_refs(complete_call.output, raw_by_ref)
-    return complete_call
+    if isinstance(req, CallStartReq):
+        req.start.inputs = _restore_refs(req.start.inputs, raw_by_ref)
+    elif isinstance(req, (CallEndReq, CallEndV2Req)):
+        req.end.output = _restore_refs(req.end.output, raw_by_ref)
+    elif isinstance(req, CompletedCallSchemaForInsert):
+        req.inputs = _restore_refs(req.inputs, raw_by_ref)
+        req.output = _restore_refs(req.output, raw_by_ref)
+    else:
+        raise TypeError(f"Unsupported call request type: {type(req)}")
+    return req
 
 
 def _restore_refs(val: Any, raw_by_ref: dict[str, str]) -> Any:
