@@ -1249,12 +1249,12 @@ def test_query_calls_complete_with_costs_and_trace_name_order() -> None:
 def test_query_with_costs_and_bool_condition_no_param_collision() -> None:
     """A bool filter literal must not reuse the cost query's UInt64 rank param (WB-37505).
 
-    The bool literal True is bound first as a Bool param; the cost pipeline then
-    binds rank = 1 as a UInt64 param. Python treats True == 1 with equal hashes,
-    so a value-only param cache reused the bool's placeholder for the int, and
-    the UInt64 rank slot then resolved to True -> ClickHouse rejected "True
-    cannot be parsed as UInt64" -> 400 on the whole request. The bool (pb_1) and
-    the rank (pb_8) must stay distinct params, with rank bound to the integer 1.
+    The bool literal is bound first as a Bool param; the cost pipeline then binds
+    rank = 1 as a UInt64 param. Because True == 1 with equal hashes, a value-only
+    param cache reused the bool's placeholder for the int, so the UInt64 rank slot
+    resolved to True and ClickHouse rejected "True cannot be parsed as UInt64",
+    400-ing the request. The bool and the rank must stay distinct params, with
+    rank bound to the integer 1.
     """
     cq = CallsQuery(
         project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True

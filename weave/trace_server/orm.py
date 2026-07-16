@@ -51,10 +51,10 @@ class ParamBuilder:
 
         # Only attempt caching for hashable values
         if isinstance(param_value, Hashable):
-            # Dedup on (type, value): Python treats True == 1 == 1.0 as equal
-            # with equal hashes, so a value-only key would give a bool literal
-            # and an int the same param — which then renders under two
-            # ClickHouse types (e.g. Bool and UInt64) and fails to parse.
+            # Dedup on (type, value), not value alone: True == 1 == 1.0 in
+            # Python (with equal hashes), so a value-only key could bind a bool
+            # and an int to one param rendered as both Bool and UInt64 (a parse
+            # error in ClickHouse).
             cache_key = (type(param_value), param_value)
             if cache_key in self._param_to_name:
                 return self._param_to_name[cache_key]
