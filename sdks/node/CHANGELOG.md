@@ -4,6 +4,18 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.3] - 2026-07-15
+
+### Added
+
+- Add `SubAgent.startLLM()`, `SubAgent.startTool()`, and `SubAgent.startSubagent()` to nest a subagent's child spans under its `invoke_agent` span. ([#7077](https://github.com/wandb/weave/pull/7077))
+
+### Fixed
+
+- Propagate conversation attributes across `runIsolated` frames. ([#7577](https://github.com/wandb/weave/pull/7577))
+- Keep typedoc reference docs rendering on `Turn`. ([#7521](https://github.com/wandb/weave/pull/7521))
+
+
 ## [0.16.2] - 2026-07-06
 
 ### Added
