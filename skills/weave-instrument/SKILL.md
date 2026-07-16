@@ -16,12 +16,14 @@ description: >-
 Your job is to add Weave tracing to someone's LLM or agent code so their runs show up in the W&B Weave
 UI. Fit the approach to their codebase instead of applying a one-size-fits-all template.
 
-This skill works for any agent, whatever libraries it uses or none at all. Choose the approach based
-on two things:
+This skill works for any agent, whatever libraries it uses or none at all. Establish three things
+before choosing an approach:
 
+- the data policy that decides whether a trace, or its content, may leave the process;
 - the telemetry *shape* the user wants;
 - the *structure* of their code.
 
+The data policy gates whether instrumentation may run. Shape and structure choose the mechanism.
 Never choose based on whether you recognize the framework. There are two mechanisms, and one of them
 always applies when tracing is allowed.
 
@@ -46,15 +48,19 @@ easy to get subtly wrong.
 
 - `references/decision.md` is the full decision procedure (shape, then structure, then probe, then
   strategy) and the coverage examples. Read it during "Choose a strategy" below.
-- `references/session_sdk_python.md` covers the Python Session SDK: the classes, the context-manager
-  pattern, the batch path, and the data types. Read it when instrumenting Python with the Session SDK.
-- `references/session_sdk_typescript.md` covers the TypeScript Session SDK: the `start*` functions, the
+- `references/session_sdk_python.md` covers the Python Conversation SDK: the classes, the context-manager
+  pattern, the batch path, and the data types. Read it when instrumenting Python with the Conversation SDK.
+- `references/session_sdk_typescript.md` covers the TypeScript Conversation SDK: the `start*` functions, the
   try/finally pattern, async init, and concurrency. Read it when instrumenting TypeScript or Node.
 - `references/otel_auto.md` covers the OTEL auto path: what `weave.init()` captures on its own, the
   default-mode gotchas, and the framework caveats. Read it when OTEL auto is the chosen strategy.
 - `references/otel_endpoint.md` covers exporting OTEL directly to Weave's endpoint (the raw-OTEL
   path): the environment-variable config, and how to add Weave's exporter to an app's own
   `TracerProvider`. Read it when the app already emits OTel spans or owns its OTel setup.
+- `references/failure_modes.md` is the observed-failure catalog: consent bypass, disconnected model
+  calls, post-hoc tool spans, missing outcomes, credential leakage, lost feedback/ref correlation,
+  and tests that prove only wiring. Read it when repairing existing instrumentation and during
+  verification.
 
 ## Workflow
 
@@ -62,13 +68,15 @@ Work through these steps in order. Steps 1 and 4 always run. Use your judgement 
 
 ### 1. Establish the connection (always; confirm before editing widely)
 
-A user's traces need three things:
+A usable Weave connection needs three things:
 
 1. the package installed;
 2. credentials present;
 3. a `weave.init()` call.
 
-Settle these first. There is no point instrumenting code that cannot authenticate.
+Before any of them, identify the application's data-sharing policy. There is no point instrumenting
+code that cannot authenticate, and it is unsafe to export content that the application would not
+otherwise share.
 
 - **Install or confirm the package.** In Python, the package is `weave` on PyPI (`pip install weave`,
   or add it to their manifest). The current Conversation SDK names and `set_attributes` need
@@ -80,16 +88,27 @@ Settle these first. There is no point instrumenting code that cannot authenticat
   `await weave.login(key)` once (Node). You may check *that* a key is reachable (the env var is set,
   or `~/.netrc` has an `api.wandb.ai` entry), but never read or print its value, and never write it
   into source code or into a committed `.env`.
+- **Keep tracing identity isolated.** A service may already use `WANDB_API_KEY` for a different W&B
+  or proxy identity. Wire a dedicated tracing setting from its secret store and scope any temporary
+  `WANDB_API_KEY` override to Weave initialization, restoring the process environment afterward. Do
+  not replace a process-wide credential merely because `weave.init()` reads it.
 - **Get the project name.** Ask for it as `entity/project`, or as just `project` to use their default
   entity. Show them the URL their traces will land at up front,
   `https://wandb.ai/<entity>/<project>/weave`, so there are no surprises about where the data goes.
+- **Establish the data boundary.** Find per-request consent, tenant policy, content-capture flags,
+  redaction, and existing tracing enable/disable checks. When policy denies tracing, skip creating
+  the turn and all descendants. When metadata-only tracing is allowed, omit prompts, outputs, tool
+  arguments, and tool results (Python conversations support `include_content=False`) and verify the
+  exported payload. Missing auth or missing `weave.init()` is not a consent mechanism. In Python,
+  Conversation SDK spans can still reach an application-owned OTel provider; in Node, initialization is
+  process-wide, so it cannot express a later per-turn denial.
 - **Add `weave.init("entity/project")` once** at each real entry point: the `main()` function, the
   server startup, or the top of a script. Do not put it inside a hot loop. In Python:
   `import weave; weave.init("entity/project")`. In Node: `await weave.init('entity/project')`. It is
-  async, so you must await it before any traced work. If the app installs its own global
-  `TracerProvider`, `weave.init()` backs off and will not export to Weave; add Weave's exporter to
-  their provider instead (see `references/otel_endpoint.md`). The calls are safe no-ops when init or
-  auth is missing, so leaving instrumentation in place never breaks their program.
+  async, so you must await it before any traced work. In Python, if the app installs its own global
+  `TracerProvider`, `weave.init()` backs off and will not add a Weave exporter; add Weave's exporter
+  to that provider instead (see `references/otel_endpoint.md`). Instrumentation must preserve
+  program behavior, but do not rely on absent init/auth to suppress spans or protect content.
 
 Before touching many files, state the plan in a sentence or two ("I'll use the Conversation SDK to wrap
 your agent loop in `agent.py`, and add `weave.init` in `main.py`") and let the user redirect you.
@@ -112,6 +131,15 @@ You cannot choose a strategy without knowing what they run. Find the following.
 - **The agent's shape.** Is there a hand-rolled loop (a `while` that calls the model, dispatches
   tools, and repeats)? Where is each model call? Where are tools dispatched? Is there delegation to
   sub-agents? These map directly onto `Turn`, `LLM`, `Tool`, and `SubAgent`.
+- **The real lifecycle boundaries.** Locate the actual awaited model request and actual tool/function
+  execution, not only the aggregated result returned later. Find streaming consumption, retries,
+  timeouts, exceptions, cancellation, and the representation of returned terminal states.
+- **The data policy and auth owners.** Trace the consent/content decision into the worker that runs
+  the turn. Identify which component owns each W&B credential and whether the process already has a
+  distinct W&B identity.
+- **Downstream trace contracts.** Search for persisted call/turn refs, deep links, feedback routes,
+  and retroactive recovery. Emitting a new span is not a complete migration if the application can no
+  longer find that span afterward.
 - **Existing OTel or telemetry.** Look for any `TracerProvider`, `opentelemetry` setup, or a competing
   tracing vendor. This affects where you place init, and whether auto-capture already flows somewhere.
 
@@ -137,12 +165,18 @@ for coverage, and fall back to the universal path.
 When you instrument with the Conversation SDK, the mapping is the heart of the work.
 
 - **`Turn`** is one cycle of the top-level agent loop handling one user input, and it opens its own
-  trace root. Wrap the loop body, not the whole program.
-- **`LLM`** is one model API call. Wrap the call site, and record the input messages, the output, and
-  the token usage when it is available.
-- **`Tool`** is one tool or function execution. Wrap the dispatch, and record the name, the arguments,
-  and the result.
+  trace root. Apply the policy gate outside this boundary, then wrap the loop body, not the whole
+  program.
+- **`LLM`** is one model API call. Keep the span open across the real request/stream, and record input
+  messages, output, usage, response identity, and errors. A generic Calls-tab patch is not proof of
+  a child `chat` span; assert parent and trace ids.
+- **`Tool`** is one tool or function execution. Keep the span open across the real dispatch so its
+  duration, exception, timeout, and cancellation are truthful. Replaying completed tool entries into
+  new spans records serialization time, not execution time.
 - **`SubAgent`** is a delegated or nested agent invocation. Wrap the sub-call.
+- **`Outcome`** closes the semantic turn. Before the turn span ends, record non-exception terminal
+  states such as completed, errored, cancelled, or permission-required with stable attributes. A
+  context manager records raised exceptions, but it cannot infer an error returned as data.
 
 Map to the agent's *real* semantic boundaries. Not every helper function is a `Tool`, and a retry of
 one model call is still one `LLM`. Over-instrumenting produces noisy, misleading traces.
@@ -158,6 +192,9 @@ you cannot wrap cleanly without restructuring their code, prefer the batch path 
 
 Instrumentation you cannot see is worthless, so confirm that traces actually arrive.
 
+Open `references/failure_modes.md` when repairing existing instrumentation. Its probes are mandatory
+for any matching condition.
+
 - If the app is runnable and credentials are present, run a minimal path (their quickstart, a smoke
   test, or a tiny script that exercises one turn) and confirm a trace shows up at the project URL.
   Both the Python and Node `weave.init()` print `View Weave data at
@@ -167,8 +204,17 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
   path, capture the emitted spans with an in-memory OTel exporter (no credentials needed) and confirm
   the operations are what you intended: a `gen_ai.operation.name` of `invoke_agent` for turns and
   sub-agents, `chat` for model calls, and `execute_tool` for tools, with the turn nesting its LLM and
-  tool spans. This is also how you confirm that an *auto* strategy emits agent shape rather than flat
-  calls, since registry membership alone does not prove it.
+  tool spans. Assert exact parent span ids and trace ids, plus complete content/usage fields that are
+  part of the contract. This is also how you confirm that an *auto* strategy emits agent shape rather
+  than flat calls, since registry membership alone does not prove it.
+- **Run negative controls.** A policy-denied turn must emit zero spans. A sleeping tool must have a
+  span covering the sleep; a raising tool must export error status without changing the exception. A
+  returned errored/cancelled result must carry its outcome before the turn closes. A model request
+  inside a turn must not appear only as a separate root call. Tests that merely assert
+  `weave.init()` or a patcher was called do not verify instrumentation.
+- If the old integration returned or persisted a trace reference, exercise its real consumer: save
+  the new reference, build the deep link, attach feedback, and simulate the recovery path after an
+  initial write failure.
 - If you cannot run it (because of missing provider keys or heavy setup), give the user an exact
   copy-paste command to run themselves, and tell them what to look for: the `View Weave data at
   https://wandb.ai/.../weave` line that `weave.init()` prints, and a trace in the Agents or Calls tab.
@@ -179,9 +225,19 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
 ## Hygiene checklist
 
 - The API key is never touched, read, printed, or committed.
+- The tracing credential does not overwrite another process-wide W&B identity.
+- The application policy gates the complete turn tree; metadata-only mode contains no prompt,
+  response, tool argument, or tool result content.
 - Behavior is unchanged: the same outputs, the same exceptions, and spans always closed.
 - No double-instrumentation. Do not add Conversation SDK spans around calls a framework already
   auto-captures, or you will get duplicate traces.
+- Every LLM and tool span is a child of the intended turn, not a disconnected Calls-tab root.
+- Live spans cover the actual work; batch/post-hoc spans are used only when live boundaries are truly
+  unavailable and do not claim real execution latency or exception capture.
+- Returned terminal states and errors are observable before the turn span closes.
+- Persisted trace references, deep links, feedback, and recovery flows still work when they were part
+  of the previous integration contract.
 - `weave.init()` appears once per entry point, ordered correctly relative to any user OTel setup.
 - The version is pinned high enough for the APIs you used.
+- Verification includes a policy-denied negative control and exact topology/lifecycle assertions.
 - The user knows the destination URL and how to verify.

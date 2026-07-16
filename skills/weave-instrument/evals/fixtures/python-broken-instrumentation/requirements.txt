@@ -1,0 +1,4 @@
+openai>=1.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+weave>=0.53.0

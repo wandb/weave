@@ -363,6 +363,13 @@ pnpm exec tsx examples/claudeAgents.ts
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Agent Instrumentation Testing
+
+- For changes to `skills/weave-instrument` or an agent integration, wiring-only tests that mock
+  `weave.init()` or a patcher are insufficient. Exercise a real turn with an in-memory OTel exporter
+  and assert the complete span payload, exact parent/trace IDs, live tool duration/error behavior,
+  returned terminal states, and a policy-denied negative control that exports zero spans.
+
 ### Documentation
 
 - Update relevant docstrings for Python code

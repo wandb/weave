@@ -4,8 +4,9 @@ Decide by the **span shape** the user wants and the **structure** of their code.
 recognizing a framework. The framework names below are *examples*; the source of truth is what the
 *installed* Weave auto-instruments, which you check in step 3.
 
-The invariant: detect the structure, choose the least-manual mechanism that emits the required shape,
-then verify the emitted spans.
+The invariant: apply the application's data policy, detect the structure, choose the least-manual
+mechanism that emits the required shape, then verify the emitted spans and a policy-denied negative
+control.
 
 There are three mechanisms.
 
@@ -18,29 +19,32 @@ There are three mechanisms.
 - **Raw OTEL export** applies when the app *already emits* OTel GenAI spans, whether from its own
   `TracerProvider` or from a third-party instrumentor such as OpenInference, OpenLLMetry, or Logfire.
   Point that pipeline at Weave's endpoint; no Weave SDK call is needed. This is also the fix when a
-  global `TracerProvider` already exists, because `weave.init()` then backs off. See
+  Python global `TracerProvider` already exists, because Python `weave.init()` then backs off. See
   `otel_endpoint.md`.
 
 ## Procedure
 
-1. **What shape is wanted?** An agent-shaped tree goes to the Agents tab. Flat model-call traces
+1. **Is tracing allowed?** Find the per-request consent and content-capture policy at the execution
+   boundary. Decide no trace versus metadata-only versus content-bearing trace before creating spans.
+2. **What shape is wanted?** An agent-shaped tree goes to the Agents tab. Flat model-call traces
    ("just my LLM calls") go to the Calls tab.
-2. **What is the structure?** The turn boundary (one input maps to one cycle), the model calls, tool
+3. **What is the structure?** The turn boundary (one input maps to one cycle), the model calls, tool
    dispatch, sub-agents, and any streaming or concurrency. This is what you instrument, and it exists
    whatever the library is.
-3. **Probe auto-coverage.** Do not rely on a memorized list; it can go stale. Check whether the
+4. **Probe auto-coverage.** Do not rely on a memorized list; it can go stale. Check whether the
    installed Weave auto-instruments this library, and in what shape. In Python, read
    `weave.integrations.patch.INTEGRATION_MODULE_MAPPING`. In TypeScript, read `integrations/hooks.ts`
    or `Symbol.for('_weave_{cjs,esm}_instrumentations')`. Membership means "patchable", not
    "agent-shaped" or "active", so confirm with the span-shape check (SKILL.md step 4) wherever you can
    run it.
-4. **Choose.** If coverage emits the wanted shape, use **OTEL auto** (`weave.init()` plus auth; do not
+5. **Choose.** If coverage emits the wanted shape, use **OTEL auto** (`weave.init()` plus auth; do not
    also hand-wrap, or you double-log). If there is no coverage, an unknown library, or the wrong
-   shape, use the **Session SDK** and map step 2. If the app already emits OTel GenAI spans or owns a
-   `TracerProvider`, use **raw OTEL export** (`otel_endpoint.md`); `weave.init()` will not auto-attach
-   to an existing provider. A **mixed** approach is normal: auto for the covered parts, and the
-   Session SDK around bespoke orchestration.
-5. **Verify the emitted spans** (SKILL.md step 4).
+   shape, use the **Conversation SDK** and map step 2. If the app already emits OTel GenAI spans or
+   owns a Python `TracerProvider`, use **raw OTEL export** (`otel_endpoint.md`); Python `weave.init()`
+   will not auto-attach to an existing provider. A **mixed** approach is normal: auto for the covered
+   parts, and the Conversation SDK around bespoke orchestration. Mixing a legacy Calls patch with
+   Conversation OTel is not automatically one tree; prove exact parent and trace ids.
+6. **Verify the emitted spans and policy negative control** (SKILL.md step 4).
 
 ## Auto-coverage examples (illustrative, not an allow-list)
 

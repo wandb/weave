@@ -14,6 +14,11 @@ must carry the GenAI semantic conventions (a `gen_ai.operation.name` of `invoke_
   `Authorization: Basic <base64("api:" + WANDB_API_KEY)>`.
 - **Routing:** the project comes from the resource attributes `wandb.entity=<entity>` and
   `wandb.project=<project>`. Without them, spans do not reach the right project.
+- **Identity isolation:** if the process already uses `WANDB_API_KEY` for another W&B client or
+  proxy, keep the tracing key in a dedicated application setting and build only this exporter's
+  Authorization header from it. Do not replace the process-wide identity.
+- **Policy:** the exporter sends every span it receives. Enforce per-request no-trace or
+  metadata-only policy where the spans are created; exporter setup is not a consent gate.
 
 ## Case A — generic env-var config (any language or framework, no code change)
 
@@ -50,3 +55,7 @@ provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(
 The provider's `Resource` must carry `wandb.entity` and `wandb.project` (or you can set them through
 `OTEL_RESOURCE_ATTRIBUTES`) so that spans route to the right project. This keeps the app's existing
 export *and* fans out to Weave, which is the right move whenever the app owns its OTel setup.
+
+For a multi-identity service, substitute its dedicated tracing setting when constructing `token`;
+leave the existing `WANDB_API_KEY` untouched. Verify both exporters still receive the intended spans
+and temporary tracing configuration does not remain in the process environment.

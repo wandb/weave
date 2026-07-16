@@ -48,10 +48,23 @@ The object methods (`conversation.start_turn()` and `turn.start_llm/start_tool/s
 build the tree directly, which is clearest in a self-contained loop. The module functions
 (`weave.start_turn/start_llm/start_tool/start_subagent()`) read the current conversation and turn from
 context vars, so use them when the pieces live in different functions or callbacks. They attach only
-when a parent is active; with no parent they return a *disconnected* object, which is still a safe
-no-op. Introspect with `get_current_session/turn/llm()`. Close non-`with` spans with
-`end_session/turn/llm()`, which suits frameworks that have separate start and stop callbacks. Prefer
-`with`.
+when a parent is active; with no parent they create a *disconnected* span rather than a no-op. That
+can preserve application behavior while still producing the wrong trace tree. Introspect with
+`get_current_conversation/turn/llm()`. Close non-`with` spans with
+`end_conversation/turn/llm()`, which suits frameworks that have separate start and stop callbacks.
+Prefer `with`.
+
+## Policy and terminal outcomes
+
+Apply a no-trace consent gate before `start_conversation`. For metadata-only traces,
+use `weave.start_conversation(..., include_content=False)` and verify the complete exported payload;
+metadata-only still emits a trace.
+
+Context managers mark raised exceptions. They cannot infer a failure returned as data. Before the
+Turn exits, record completed/errored/cancelled/permission-required outcomes with the application's
+stable attribute vocabulary, using `turn.set_attributes({...})` when the installed version supports
+it. If the SDK cannot express required error status, surface that limitation instead of exporting a
+returned failure as an unexplained success.
 
 ## Naming auto-instrumented agents (composing with integrations)
 
@@ -112,8 +125,8 @@ cache_read_input_tokens=)`. The JSON-string fields (tool `arguments` and `result
 `arguments`, and tool-response `response`) accept a native dict, list, or scalar and encode it
 automatically.
 
-## set_attributes / add_event (newer builds only)
+## set_attributes / add_event
 
-Inside the `with`, on any span: `llm.set_attributes({"weave.experiment": "v3"})` or
-`llm.add_event("first_token", {"latency_ms": 120})`. Both no-op (with a warning) if the span is not
-recording. Gate on the installed version.
+Inside the `with`, on any span, use `llm.set_attributes({"weave.experiment": "v3"})`. The older
+`llm.add_event("first_token", {"latency_ms": 120})` still works but is deprecated because OTel is
+phasing out Span Events. Both no-op with a warning if the span is not recording.

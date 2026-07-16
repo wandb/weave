@@ -43,7 +43,7 @@
     {
       "id": 3,
       "prompt": "add weave tracing to this typescript agent (agent.ts + main.ts). i want the turns / llm calls / tool calls showing up as proper agent traces, not just flat call logs. project is my-team/ts-agent",
-      "expected_output": "TypeScript Session SDK instrumentation: await weave.init at the entry point, per-question loop wrapped in a Turn, model calls in LLM spans, tool executions in Tool spans, all via the start* functions and closed in finally blocks. Behavior unchanged. User told to authenticate.",
+      "expected_output": "TypeScript Conversation SDK instrumentation: await weave.init at the entry point, per-question loop wrapped in a Turn, model calls in LLM spans, tool executions in Tool spans, all via the start* functions and closed in finally blocks. Thrown errors are passed to end({error}) rather than merely closing success-looking spans. Behavior unchanged. User told to authenticate.",
       "files": [
         "evals/fixtures/ts-custom-agent/agent.ts",
         "evals/fixtures/ts-custom-agent/main.ts",
@@ -53,7 +53,7 @@
         "await weave.init(\"my-team/ts-agent\") is called at the entry point (main.ts) before any traced work, and is awaited",
         "Spans are created with the start* functions (weave.startConversation / startTurn / startLLM / startTool), NOT via `new Turn()` or direct class construction",
         "The per-question loop body is wrapped in a Turn, each model call in an LLM span, and each tool execution in a Tool span",
-        "Every span is ended in a finally block (try/finally) so an exception cannot leak an open span",
+        "Every span is ended in a finally block (try/finally) so an exception cannot leak an open span, and caught thrown errors are passed to end({error}) so the exported status is not falsely successful",
         "runAgent still returns the answer string and the original behavior is unchanged",
         "No W&B API key is hardcoded; the user is told to authenticate (WANDB_API_KEY or weave.login)",
         "The TypeScript imports weave correctly and uses real method/function names (no invented APIs)"
@@ -109,6 +109,27 @@
         "Spans are opened via context managers so they close on exceptions; the agent's return values and control flow are unchanged",
         "No W&B API key is hardcoded; the user is told to authenticate themselves (wandb login or WANDB_API_KEY)",
         "All modified Python files are syntactically valid, and every Weave API used is real (exists in the installed weave package)"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "The Weave logging in agent.py was added during a wb_agent-style migration, and its mocked test passes, but the runtime traces are wrong. Repair the instrumentation without changing agent behavior. Preserve sharing_with_wandb_allowed, keep the tracing service account separate from the process's existing W&B identity, make the model chat and tool execution children of the same agent turn, and expose returned cancellation/error states. Replace or supplement the wiring-only test with an end-to-end span test that proves the logging behavior. Project is my-team/support-agent.",
+      "expected_output": "Repairs all runtime boundaries rather than moving wrappers around: denied requests emit no spans; initialization/auth are startup-scoped and do not overwrite the process W&B identity; the actual model request runs inside a child LLM/chat span; the actual tool dispatch runs inside a Tool/execute_tool span so duration and failures are truthful; returned terminal states are recorded before the turn closes. Adds an in-memory-exporter end-to-end regression asserting exact topology and payloads, including negative controls. A green mock asserting weave.init/patch calls alone is explicitly insufficient.",
+      "files": [
+        "evals/fixtures/python-broken-instrumentation/agent.py",
+        "evals/fixtures/python-broken-instrumentation/test_agent.py",
+        "evals/fixtures/python-broken-instrumentation/requirements.txt"
+      ],
+      "expectations": [
+        "sharing_with_wandb_allowed gates the complete trace tree before a Conversation/Turn/model/tool span or patched provider request can be exported; the denied-path regression asserts zero exported spans and no prompt, output, argument, or result content",
+        "The dedicated tracing_api_key is not assigned permanently to process-wide WANDB_API_KEY and is never printed or hardcoded; any temporary environment override is limited to initialization and restored, or a dedicated exporter Authorization header is used",
+        "The real chat.completions.create call executes while a Conversation SDK LLM span is active, or a framework-native OTel patcher is used; the solution does not treat generic patch_openai Calls logging as proof of an Agents-tab child chat span",
+        "The end-to-end test asserts the chat span's parent span id equals the invoke_agent turn span id and both have the same trace id, rather than merely asserting that both spans exist",
+        "The Tool span encloses the live lookup_account dispatch rather than replaying result.tool_records after runner.run; a sleeping or raising tool proves truthful duration and error behavior while preserving the original result or exception",
+        "Returned completed, errored, and cancelled states are recorded with stable attributes before the turn closes; the solution does not rely on a context manager to infer failures represented as return data",
+        "The regression test inspects complete exported span payloads (operation names, parent/trace ids, content or content absence, result, usage/error/outcome fields) through an in-memory OTel exporter; tests that only mock weave.init or patch_openai do not satisfy this expectation",
+        "weave.init and authentication are moved out of the per-turn hot path without changing Runner outputs, exceptions, cancellation behavior, or tool behavior",
+        "All modified Python files are syntactically valid and every Weave API/import used exists in the installed package"
       ]
     }
   ]

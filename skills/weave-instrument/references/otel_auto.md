@@ -8,9 +8,11 @@ shape.
 
 | Condition | Fix |
 |---|---|
-| Python, plain `openai`, default `use_otel_v2=True` | `patch_openai()` after init, or `WEAVE_USE_OTEL_V2=false`, or Session SDK `LLM` spans |
+| Python, plain `openai`, default `use_otel_v2=True` | `patch_openai()` after init, or `WEAVE_USE_OTEL_V2=false`, or Conversation SDK `LLM` spans |
+| Conversation Turn plus generic `patch_openai()` | Generic patching can emit a separate Calls-tab root; use a live Conversation `LLM` span or the framework's native OTel patcher, then assert parent/trace ids |
+| `implicitly_patch_integrations=False` with an agent SDK | Call its explicit native OTel patcher from `weave.integrations.patch`, or instrument the real boundaries with the Conversation SDK |
 | Python, `import google.adk` *after* `weave.init()` | import ADK before init, or call `patch_google_adk()` |
-| Python, a global `TracerProvider` already installed | init backs off, so add Weave's exporter to their provider (`otel_endpoint.md`), or use the Session SDK |
+| Python, a global `TracerProvider` already installed | init backs off; add Weave's exporter to that provider (`otel_endpoint.md`) because Conversation spans use it too |
 | Node, ESM, relying on auto-patch | launch with `node --import=weave/instrument` |
 | An auto agent framework, but agents are unnamed or share one generic name | `weave.conversation.agent_name_override(...)` |
 | Auto already emits agent shape | do not also wrap it with the Conversation SDK, or it double-logs |
@@ -26,8 +28,29 @@ openai.chat.completions.create(...)   # NOT traced by default
 ```
 
 The fix depends on intent. For the **Calls tab**, call `weave.integrations.patch_openai()` after init
-(or set `WEAVE_USE_OTEL_V2=false`). For the **Agents tab**, use Session SDK `LLM` spans. This is
-Python-only; Node auto-captures plain `openai`.
+(or set `WEAVE_USE_OTEL_V2=false`). For the **Agents tab**, use Conversation SDK `LLM` spans. This is
+Python-only; Node auto-captures plain `openai`. Running the generic patch inside a Conversation Turn
+does not prove it emitted a child `chat` span: it can write a separate root call. Verify exact parent
+and trace ids.
+
+## Python: explicitly disabling implicit integrations
+
+`weave.init(..., settings={"implicitly_patch_integrations": False})` disables the native framework
+patchers. Calling only `patch_openai()` afterward restores plain OpenAI Calls-tab logging, not the
+OpenAI Agents SDK's agent-shaped OTel processor. Either keep implicit patching enabled or call the
+exact patcher from its defining module:
+
+```python
+from weave.integrations.patch import (
+    patch_claude_agent_sdk_otel,
+    patch_google_adk,
+    patch_openai_agents_otel,
+)
+```
+
+Use only the patcher matching the installed framework. These OTel-specific functions are defined in
+`weave.integrations.patch`; do not assume `weave.integrations` re-exports them. Run a span-shape probe
+after explicit patching to catch detached or duplicate model calls.
 
 ## Python: Google ADK import order
 
@@ -39,10 +62,10 @@ intentional.
 ## Python: init does NOT attach to an existing TracerProvider
 
 If a global OTel `TracerProvider` already exists, `weave.init()` **backs off**. It adds no Weave
-exporter, so spans silently never reach Weave. There are two fixes. **(a)** Add Weave's exporter as a
-span processor on their provider; this is the right move when the app owns its OTel (the recipe is in
-`otel_endpoint.md`). **(b)** Use the **Session SDK**, whose spans go through Weave's own tracer. (There
-is no `WEAVE_ATTACH_OTEL_TO_EXISTING_PROVIDER` setting, so do not reference one.)
+exporter, so spans silently never reach Weave. Add Weave's exporter as a span processor on the
+application provider and preserve its existing processors (the recipe is in `otel_endpoint.md`). The
+Python Conversation SDK also uses the global provider, so switching to it does not fix export. There
+is no `WEAVE_ATTACH_OTEL_TO_EXISTING_PROVIDER` setting; do not reference one.
 
 ## Node: ESM needs a preload flag
 
