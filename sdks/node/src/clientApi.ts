@@ -152,12 +152,43 @@ export async function init(
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);
+    registerExitFlush();
     console.log(`View Weave data at https://${domain}/${projectId}/weave`);
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
     throw error;
   }
+}
+
+/** Deliver all buffered calls to the server. Await before `process.exit()`. */
+export async function flush(): Promise<void> {
+  await getGlobalClient()?.flush();
+}
+
+let exitFlushRegistered = false;
+
+// Buffered calls are sent asynchronously, so an exit before they drain loses
+// them. Auto-flush on a normal exit; `process.exit()` skips `beforeExit` and
+// can't flush from the sync `exit` event, so warn loudly instead of dropping
+// silently. Registered once per process.
+function registerExitFlush(): void {
+  if (exitFlushRegistered) {
+    return;
+  }
+  exitFlushRegistered = true;
+  process.once('beforeExit', () => {
+    void getGlobalClient()?.flush();
+  });
+  process.on('exit', () => {
+    const pending = getGlobalClient()?.pendingCallCount() ?? 0;
+    if (pending > 0) {
+      console.warn(
+        `Weave: ${pending} traced call(s) were not delivered before exit. ` +
+          'Call `await weave.flush()` before process.exit() to avoid losing trace data.'
+      );
+    }
+  });
 }
 
 export function requireCurrentCallStackEntry(): CallStackEntry {

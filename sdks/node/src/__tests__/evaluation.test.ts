@@ -268,34 +268,25 @@ describe('Evaluation - declarative eval metadata', () => {
   });
 
   // is_eval rides each eval call-end (root matched by op_name, children by
-  // attrs) for a server-side sampler. Write-only, so inspect the outgoing batch.
+  // attrs) for a server-side sampler.
   test('stamps is_eval on every eval call-end', async () => {
-    const batchSpy = jest.spyOn(
-      traceServer.call,
-      'callStartBatchCallUpsertBatchPost'
-    );
     const evaluation = createMockEvaluation(false);
     const model = createMockModel(false);
 
     await evaluation.evaluate({model, nTrials: 2, maxConcurrency: 2});
-    await traceServer.waitForPendingOperations();
 
-    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
-    const starts = items.filter(i => i.mode === 'start');
-    const ends = items.filter(i => i.mode === 'end');
-
+    const calls = await traceServer.getCalls(projectId);
     // Root: matched by op_name (it carries no _weave_eval_meta) -> true.
-    const rootStart = starts.find(i =>
-      i.req.start.op_name.includes(EVALUATION_RUN_OP_NAME)
+    const rootCall = calls.find(c =>
+      c.op_name.includes(EVALUATION_RUN_OP_NAME)
     );
-    expect(rootStart).toBeDefined();
-    const rootEnd = ends.find(e => e.req.end.id === rootStart!.req.start.id);
-    expect(rootEnd!.req.end.is_eval).toBe(true);
+    expect(rootCall).toBeDefined();
+    expect(rootCall!.is_eval).toBe(true);
 
-    // Every eval call-end is marked (children via attributes).
-    expect(ends.length).toBeGreaterThan(1);
-    for (const e of ends) {
-      expect(e.req.end.is_eval).toBe(true);
+    // Every eval call is marked (children via attributes).
+    expect(calls.length).toBeGreaterThan(1);
+    for (const call of calls) {
+      expect(call.is_eval).toBe(true);
     }
   });
 });

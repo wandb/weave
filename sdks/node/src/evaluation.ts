@@ -4,7 +4,7 @@ import {EVAL_META_KEY} from './constants';
 import {type Dataset, type DatasetRow} from './dataset';
 import {type ColumnMapping, mapArgs} from './fn';
 import {isMedia} from './media';
-import {op} from './op';
+import {markOpEager, op} from './op';
 import {type Op, getOpName} from './opType';
 import {WeaveObject, type WeaveObjectParameters} from './weaveObject';
 
@@ -156,6 +156,9 @@ export class Evaluation<
       callDisplayName: inputs =>
         `${this.name}_${weaveCallableName(inputs.model)}`,
     });
+    // Long-running root: send its start eagerly so the eval is visible in the
+    // UI before it finishes (internal-only; not a public op option).
+    markOpEager(this.evaluate);
     this.predictAndScore = op(this, this.predictAndScore, {
       parameterNames: 'useParam0Object',
     });

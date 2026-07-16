@@ -8,6 +8,7 @@ import {
   MAX_OBJECT_NAME_LENGTH,
 } from './constants';
 import {computeDigest} from './digest';
+import {ContentType} from './generated/traceServerApi';
 import type {
   AgentChatMessage as AgentChatMessageSchema,
   AgentSearchConversationResult,
@@ -80,7 +81,8 @@ interface SerializedFileBlob {
  */
 type BatchItem =
   | {mode: 'start'; data: {start: CallStartParams}}
-  | {mode: 'end'; data: {end: CallEndParams}};
+  | {mode: 'end'; data: {end: CallEndParams}}
+  | {mode: 'complete'; data: {complete: CompletedCallParams}};
 
 export type CallStackEntry = {
   callId: string;
@@ -427,7 +429,18 @@ export class CallStack {
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
-type CallEndParams = EndedCallSchemaForInsert;
+type CallEndParams = EndedCallSchemaForInsert & {display_name?: string | null};
+
+// Merged start + end payload for the `calls/complete` endpoint.
+type CompletedCallParams = StartedCallSchemaForInsert & {
+  id: string;
+  trace_id: string;
+  ended_at: string;
+  output?: EndedCallSchemaForInsert['output'];
+  summary: EndedCallSchemaForInsert['summary'];
+  exception?: string | null;
+  wb_run_step_end?: number | null;
+};
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
@@ -446,6 +459,14 @@ export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
   private callQueue: BatchItem[] = [];
+  // calls_complete pairing state: starts/ends wait here for their counterpart.
+  private pendingStarts: Map<string, CallStartParams> = new Map();
+  private pendingEnds: Map<string, CallEndParams> = new Map();
+  private eagerCallIds: Set<string> = new Set();
+  private useCallsComplete: boolean;
+  // Set after exhausting retries: tracing gives up gracefully rather than
+  // killing the host process.
+  private tracingDisabled = false;
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -468,6 +489,7 @@ export class WeaveClient {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
     this.settings = makeSettings(settings);
+    this.useCallsComplete = this.settings.useCallsComplete;
   }
 
   /**
@@ -785,6 +807,7 @@ export class WeaveClient {
   }
 
   private scheduleBatchProcessing() {
+    if (this.tracingDisabled) return;
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
     const promise = new Promise<void>(resolve => {
       this.batchProcessTimeout = setTimeout(
@@ -799,13 +822,51 @@ export class WeaveClient {
   }
 
   public async waitForBatchProcessing() {
+    this.flushPendingCallsToQueue();
     while (this.batchProcessingPromises.size > 0) {
       await Promise.all(this.batchProcessingPromises);
+      this.flushPendingCallsToQueue();
+      if (this.callQueue.length > 0) {
+        this.scheduleBatchProcessing();
+      }
     }
   }
 
+  /** Deliver all buffered calls to the server. Await before `process.exit()`. */
+  public async flush(): Promise<void> {
+    await this.waitForBatchProcessing();
+  }
+
+  /** Calls buffered client-side but not yet delivered to the server. */
+  public pendingCallCount(): number {
+    return (
+      this.callQueue.length + this.pendingStarts.size + this.pendingEnds.size
+    );
+  }
+
+  // Unpaired starts/ends at flush time (interrupted calls) are sent via the v2
+  // single endpoints so nothing is dropped.
+  private flushPendingCallsToQueue() {
+    if (this.pendingStarts.size === 0 && this.pendingEnds.size === 0) {
+      return;
+    }
+    for (const start of this.pendingStarts.values()) {
+      this.callQueue.push({mode: 'start', data: {start}});
+    }
+    this.pendingStarts.clear();
+    for (const end of this.pendingEnds.values()) {
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
+    this.pendingEnds.clear();
+    this.scheduleBatchProcessing();
+  }
+
   private async processBatch() {
-    if (this.isBatchProcessing || this.callQueue.length === 0) {
+    if (
+      this.tracingDisabled ||
+      this.isBatchProcessing ||
+      this.callQueue.length === 0
+    ) {
       this.batchProcessTimeout = null;
       return;
     }
@@ -849,40 +910,222 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    const batchReq = {
-      batch: batchToProcess.map(item => {
-        if (item.mode === 'start') {
-          return {mode: 'start' as const, req: item.data};
-        }
-        return {mode: 'end' as const, req: item.data};
-      }),
-    };
-
     try {
-      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
-        batchReq
-      );
+      const requeued = await this.sendBatch(batchToProcess);
+      if (requeued) {
+        // A per-item send requeued a retryable failure without throwing (eager
+        // starts/ends and per-item completes are isolated so one poison item
+        // can't drop its batch-mates); count it so a sustained outage still
+        // trips the breaker instead of requeuing forever.
+        this.registerSendFailure();
+      } else {
+        // A fully clean send clears the streak: errorCount is consecutive.
+        this.errorCount = 0;
+      }
     } catch (error) {
-      console.error('Error processing batch:', error);
-      this.errorCount++;
-      fs.appendFileSync(
-        WEAVE_ERRORS_LOG_FNAME,
-        `Error processing batch: ${error}\n`
-      );
+      // The project is pinned to calls_complete mode: switch paths and re-pair
+      // the failed legacy items instead of dropping them back as-is.
+      if (!this.useCallsComplete && isCallsCompleteModeError(error)) {
+        this.upgradeToCallsComplete(batchToProcess);
+      } else if (!isRetryableError(error)) {
+        // Non-retryable (4xx): drop these items so one rejected call can't
+        // wedge the queue and crash the process.
+        console.error('Dropping batch (non-retryable error):', error);
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Dropping ${batchToProcess.length} items (non-retryable): ${error}\n`
+        );
+      } else {
+        console.error('Error processing batch:', error);
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Error processing batch: ${error}\n`
+        );
 
-      // Put failed items back at the front of the queue
-      this.callQueue.unshift(...batchToProcess);
-
-      // Exit if we have too many errors
-      if (this.errorCount > this.MAX_ERRORS) {
-        console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
-        process.exit(1);
+        // Put failed items back at the front of the queue.
+        // TODO: retry with exponential backoff (mirror the Python SDK's
+        // tenacity-based retry) instead of an immediate requeue at BATCH_INTERVAL.
+        this.callQueue.unshift(...batchToProcess);
+        this.registerSendFailure();
       }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
       if (this.callQueue.length > 0) {
         this.scheduleBatchProcessing();
+      }
+    }
+  }
+
+  // Count a consecutive send failure. An SDK must never kill or hang the host
+  // process, so after MAX_ERRORS in a row we give up gracefully: disable
+  // tracing and drop buffered calls (the server is unreachable) rather than
+  // requeuing forever.
+  private registerSendFailure() {
+    this.errorCount++;
+    if (this.errorCount > this.MAX_ERRORS) {
+      console.error(
+        `Weave: exceeded ${this.MAX_ERRORS} consecutive send errors; ` +
+          `disabling tracing for this process. Buffered calls may be lost.`
+      );
+      this.tracingDisabled = true;
+      this.callQueue = [];
+      this.pendingStarts.clear();
+      this.pendingEnds.clear();
+      this.eagerCallIds.clear();
+    }
+  }
+
+  // Routes a drained batch to the right endpoint(s): in calls_complete mode,
+  // paired completes go to `calls/complete` and any queued (eager) starts/ends
+  // go to the v2 single endpoints; otherwise the legacy upsert_batch path.
+  // Returns true if any item was requeued for retry (a retryable failure that
+  // did not throw), so the caller can advance the give-up counter.
+  private async sendBatch(batch: BatchItem[]): Promise<boolean> {
+    if (!this.useCallsComplete) {
+      const startEnds = batch.filter(
+        (i): i is Extract<BatchItem, {mode: 'start' | 'end'}> =>
+          i.mode === 'start' || i.mode === 'end'
+      );
+      const batchReq = {
+        batch: startEnds.map(item =>
+          item.mode === 'start'
+            ? {mode: 'start' as const, req: item.data}
+            : {mode: 'end' as const, req: item.data}
+        ),
+      };
+      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
+        batchReq
+      );
+      return false;
+    }
+
+    let requeued = false;
+    const completes: CompletedCallParams[] = [];
+    for (const item of batch) {
+      if (item.mode === 'complete') {
+        completes.push(item.data.complete);
+      }
+    }
+    if (completes.length > 0) {
+      requeued = (await this.sendCompletes(completes)) || requeued;
+    }
+    // Eager start/end items are sent individually and isolated per item: a
+    // non-retryable failure drops just that item; a retryable one requeues it.
+    for (const item of batch) {
+      if (item.mode !== 'start' && item.mode !== 'end') {
+        continue;
+      }
+      try {
+        if (item.mode === 'start') {
+          await this.sendCallStartV2(item.data.start);
+        } else {
+          await this.sendCallEndV2(item.data.end);
+        }
+      } catch (error) {
+        requeued = this.requeueOrDrop(item, error) || requeued;
+      }
+    }
+    return requeued;
+  }
+
+  // Send paired completes as one request. A retryable failure propagates so the
+  // whole batch requeues; a non-retryable batch rejection means at least one
+  // call is bad, so retry each alone (mirrors the Python SDK's per-item
+  // fallback) and one poison call cannot drop its batch-mates.
+  private async sendCompletes(
+    completes: CompletedCallParams[]
+  ): Promise<boolean> {
+    try {
+      await this.sendCallsComplete(completes);
+      return false;
+    } catch (error) {
+      if (isRetryableError(error)) {
+        throw error;
+      }
+      if (completes.length === 1) {
+        return this.requeueOrDrop(
+          {mode: 'complete', data: {complete: completes[0]}},
+          error
+        );
+      }
+    }
+    let requeued = false;
+    for (const complete of completes) {
+      try {
+        await this.sendCallsComplete([complete]);
+      } catch (itemError) {
+        requeued =
+          this.requeueOrDrop({mode: 'complete', data: {complete}}, itemError) ||
+          requeued;
+      }
+    }
+    return requeued;
+  }
+
+  // Requeue a failed item on a retryable error (returns true); drop it (with a
+  // log) and return false otherwise.
+  private requeueOrDrop(item: BatchItem, error: unknown): boolean {
+    if (isRetryableError(error)) {
+      this.callQueue.unshift(item);
+      return true;
+    }
+    console.error(`Dropping ${item.mode} (non-retryable error):`, error);
+    fs.appendFileSync(
+      WEAVE_ERRORS_LOG_FNAME,
+      `Dropping ${item.mode} (non-retryable): ${error}\n`
+    );
+    return false;
+  }
+
+  private postV2(
+    pathSuffix: string,
+    body: {start: CallStartParams} | {end: Omit<CallEndParams, 'display_name'>}
+  ) {
+    return this.traceServerApi.request({
+      path: `/v2/${this.projectId}/${pathSuffix}`,
+      method: 'POST',
+      body,
+      type: ContentType.Json,
+      format: 'json',
+    });
+  }
+
+  private sendCallsComplete(batch: CompletedCallParams[]) {
+    const [entity, project] = this.projectId.split('/');
+    return this.traceServerApi.v2.callsCompleteV2EntityProjectCallsCompletePost(
+      entity,
+      project,
+      {batch}
+    );
+  }
+
+  private sendCallStartV2(start: CallStartParams) {
+    return this.postV2('call/start', {start});
+  }
+
+  private sendCallEndV2(end: CallEndParams) {
+    // The v2 end schema has no display_name (post-start renames go via
+    // updateCall, matching the Python client); strip it before sending.
+    const {display_name: _displayName, ...endReq} = end;
+    return this.postV2('call/end', {end: endReq});
+  }
+
+  // Re-pair the failed legacy batch through the calls_complete path.
+  private upgradeToCallsComplete(batch: BatchItem[]) {
+    if (!this.useCallsComplete) {
+      console.warn(
+        'Project requires calls_complete mode; upgrading the SDK to the calls_complete path.'
+      );
+      this.useCallsComplete = true;
+    }
+    for (const item of batch) {
+      if (item.mode === 'start') {
+        this.saveCallStart(item.data.start);
+      } else if (item.mode === 'end') {
+        this.saveCallEnd(item.data.end);
+      } else {
+        this.callQueue.push(item);
       }
     }
   }
@@ -1469,13 +1712,76 @@ export class WeaveClient {
     }
   }
 
-  public saveCallStart(callStart: CallStartParams) {
-    this.callQueue.push({mode: 'start', data: {start: callStart}});
-    this.scheduleBatchProcessing();
+  public saveCallStart(
+    callStart: CallStartParams,
+    opts: {eager?: boolean} = {}
+  ) {
+    if (this.tracingDisabled) return;
+    const callId = callStart.id;
+    if (!this.useCallsComplete || callId == null) {
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    // Eager: send the start now via the v2 single endpoint so long-running ops
+    // are visible before they finish; the end is routed the same way.
+    if (opts.eager) {
+      this.eagerCallIds.add(callId);
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      const racedEnd = this.pendingEnds.get(callId);
+      if (racedEnd) {
+        this.pendingEnds.delete(callId);
+        this.callQueue.push({mode: 'end', data: {end: racedEnd}});
+      }
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingEnd = this.pendingEnds.get(callId);
+    if (pendingEnd) {
+      this.pendingEnds.delete(callId);
+      this.queueComplete(callStart, pendingEnd);
+    } else {
+      this.pendingStarts.set(callId, callStart);
+    }
   }
 
   public saveCallEnd(callEnd: CallEndParams) {
-    this.callQueue.push({mode: 'end', data: {end: callEnd}});
+    if (this.tracingDisabled) return;
+    const callId = callEnd.id;
+    if (!this.useCallsComplete) {
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    if (this.eagerCallIds.has(callId)) {
+      this.eagerCallIds.delete(callId);
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingStart = this.pendingStarts.get(callId);
+    if (pendingStart) {
+      this.pendingStarts.delete(callId);
+      this.queueComplete(pendingStart, callEnd);
+    } else {
+      this.pendingEnds.set(callId, callEnd);
+    }
+  }
+
+  // Pair a start with its end into one complete, or fall back to shipping them
+  // as separate start/end items when they cannot be merged.
+  private queueComplete(start: CallStartParams, end: CallEndParams) {
+    const complete = mergeToComplete(start, end);
+    if (complete) {
+      this.callQueue.push({mode: 'complete', data: {complete}});
+    } else {
+      this.callQueue.push({mode: 'start', data: {start}});
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
     this.scheduleBatchProcessing();
   }
 
@@ -1577,7 +1883,8 @@ export class WeaveClient {
     parentCall: CallStackEntry | undefined,
     startTime: Date,
     displayName?: string,
-    attributes?: Record<string, any>
+    attributes?: Record<string, any>,
+    eagerCallStart: boolean = false
   ) {
     // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
     // the in-memory call stack. Store the short op name for stack lookup
@@ -1624,7 +1931,7 @@ export class WeaveClient {
     };
     internalCall.updateWithCallSchemaData(startReq);
     internalCall.state = CallState.pending;
-    return this.saveCallStart(startReq);
+    return this.saveCallStart(startReq, {eager: eagerCallStart});
   }
 
   public async finishCall(
@@ -1766,6 +2073,54 @@ export class WeaveClient {
 
     return response.data.id;
   }
+}
+
+// Server error_code returned on the legacy path when a project is pinned to
+// calls_complete mode.
+const CALLS_COMPLETE_MODE_REQUIRED = 'CALLS_COMPLETE_MODE_REQUIRED';
+
+// Returns null (rather than throwing) when the start lacks id/trace_id so the
+// caller can fall back to separate start/end items: tracing must never throw
+// into user code (mirrors the Python SDK, which swallows logging errors).
+function mergeToComplete(
+  start: CallStartParams,
+  end: CallEndParams
+): CompletedCallParams | null {
+  if (start.id == null || start.trace_id == null) {
+    return null;
+  }
+  // Spread both so any field added to the end payload flows through without
+  // editing this function; the start is authoritative for the identity/timing
+  // fields the two share.
+  return {
+    ...start,
+    ...end,
+    id: start.id,
+    trace_id: start.trace_id,
+    started_at: start.started_at,
+  };
+}
+
+function isCallsCompleteModeError(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') {
+    return false;
+  }
+  const body = (error as {error?: unknown}).error;
+  if (body == null || typeof body !== 'object') {
+    return false;
+  }
+  return (
+    (body as {error_code?: unknown}).error_code === CALLS_COMPLETE_MODE_REQUIRED
+  );
+}
+
+// Network/unknown and 5xx/408/429 are retryable; other 4xx are permanent.
+function isRetryableError(error: unknown): boolean {
+  const status = (error as {status?: unknown} | null)?.status;
+  if (typeof status !== 'number') {
+    return true;
+  }
+  return status === 408 || status === 429 || status >= 500;
 }
 
 /**

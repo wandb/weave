@@ -1,6 +1,6 @@
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 import {wrapOpenAIChatCompletionsCreate} from '../integrations/openai';
-import {op} from '../op';
+import {markOpEager, op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {makeMockOpenAIChat} from './openaiMock';
 
@@ -336,47 +336,38 @@ describe('Op Flow', () => {
     });
   });
 
-  test('call-end carries the same trace_id as the call-start', async () => {
-    // Inspect the raw upsert batch instead of reading calls back: the in-memory
-    // server merges end fields onto the start record, and the start already
-    // carries trace_id, so a merged read would pass even without the fix.
-    const batchSpy = jest.spyOn(
-      traceServer.call,
-      'callStartBatchCallUpsertBatchPost'
-    );
+  test('eager call-end carries the same trace_id as the call-start', async () => {
+    // The eager path sends start and end as separate v2 requests, so the end
+    // payload must independently carry trace_id (a merged read would mask it).
+    const requestSpy = jest.spyOn(traceServer, 'request');
 
     const myOp = op((x: number) => x * 2, {name: 'myOp'});
+    markOpEager(myOp);
     await myOp(21);
 
     await traceServer.waitForPendingOperations();
 
-    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
-    const startItem = items.find(item => item.mode === 'start');
-    const endItem = items.find(item => item.mode === 'end');
+    const startReq = requestSpy.mock.calls.find(([p]) =>
+      p.path.endsWith('/call/start')
+    )?.[0];
+    const endReq = requestSpy.mock.calls.find(([p]) =>
+      p.path.endsWith('/call/end')
+    )?.[0];
 
-    expect(startItem).toBeDefined();
-    expect(endItem).toBeDefined();
+    expect(startReq).toBeDefined();
+    expect(endReq).toBeDefined();
 
-    const startTraceId = startItem!.req.start.trace_id;
+    const startTraceId = startReq!.body!.start!.trace_id;
     expect(startTraceId).toBeTruthy();
-    expect(endItem!.req.end.trace_id).toBe(startTraceId);
+    expect(endReq!.body!.end!.trace_id).toBe(startTraceId);
   });
 
   test('call-end carries is_eval=false for a non-eval op', async () => {
-    const batchSpy = jest.spyOn(
-      traceServer.call,
-      'callStartBatchCallUpsertBatchPost'
-    );
-
     const myOp = op((x: number) => x * 2, {name: 'myOp'});
     await myOp(21);
 
-    await traceServer.waitForPendingOperations();
-
-    const items = batchSpy.mock.calls.flatMap(([batchReq]) => batchReq.batch);
-    const endItem = items.find(item => item.mode === 'end');
-
-    expect(endItem).toBeDefined();
-    expect(endItem!.req.end.is_eval).toBe(false);
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].is_eval).toBe(false);
   });
 });
