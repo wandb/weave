@@ -293,3 +293,63 @@ def test_costs_streamed_with_all_fields(client):
     assert cost_entry["effective_date"] is not None
     assert cost_entry["prompt_token_cost_unit"] == "USD"
     assert cost_entry["completion_token_cost_unit"] == "USD"
+
+
+def test_calls_query_bool_filter_with_costs_does_not_collide(client):
+    """Regression for WB-37505: a boolean filter literal plus include_costs=True
+    must not 400 the whole calls query.
+
+    The boolean literal is bound as a Bool param; the cost query binds rank = 1
+    as UInt64. On the shared ParamBuilder these used to dedup to one param
+    (True == 1 in Python with equal hashes), so the UInt64 slot resolved to True
+    and ClickHouse rejected the request with "cannot be parsed as UInt64". This
+    exercises the reported path end-to-end against ClickHouse.
+    """
+    project_id = client.project_id
+
+    call_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=str(uuid.uuid4()),
+                started_at=now,
+                op_name=f"weave:///{project_id}/op/test_op:v1",
+                attributes={},
+                inputs={"enabled": True},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                summary={},
+            )
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "inputs.enabled"},
+                                {"$literal": True},
+                            ]
+                        }
+                    }
+                ),
+                include_costs=True,
+            )
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].id == call_id
