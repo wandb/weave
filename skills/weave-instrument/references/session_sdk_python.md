@@ -39,8 +39,9 @@ then use its `start_llm(...)` or `start_tool(...)` methods inside.
 
 **`LLM` helpers:** `.output(content)` appends an assistant message. `.think(content)` sets the
 reasoning. `.record(input_messages=, output_messages=, usage=, reasoning=, response_id=,
-finish_reasons=)` bulk-sets the fields. `.attach_media(...)` and `.attach_media_url(url, modality=)`
-attach media. Always pass `provider_name`, because the SDK will not guess it.
+response_model=, finish_reasons=)` bulk-sets the fields. `.attach_media(...)` and
+`.attach_media_url(url, modality=)` attach media. Always pass `provider_name`, because the SDK will not
+guess it.
 
 ## Methods vs. top-level functions
 

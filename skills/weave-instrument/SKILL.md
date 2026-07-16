@@ -57,10 +57,10 @@ easy to get subtly wrong.
 - `references/otel_endpoint.md` covers exporting OTEL directly to Weave's endpoint (the raw-OTEL
   path): the environment-variable config, and how to add Weave's exporter to an app's own
   `TracerProvider`. Read it when the app already emits OTel spans or owns its OTel setup.
-- `references/failure_modes.md` is the observed-failure catalog: consent bypass, disconnected model
-  calls, post-hoc tool spans, missing outcomes, credential leakage, lost feedback/ref correlation,
-  and tests that prove only wiring. Read it when repairing existing instrumentation and during
-  verification.
+- `references/failure_modes.md` is the observed-failure catalog: consent bypass, inert deployment
+  config, disconnected or hollow model calls, post-hoc tool spans, missing semantic outcomes,
+  credential/endpoint drift, lost feedback/ref correlation, and tests that prove only wiring. Read it
+  when repairing existing instrumentation and during verification.
 
 ## Workflow
 
@@ -68,15 +68,16 @@ Work through these steps in order. Steps 1 and 4 always run. Use your judgement 
 
 ### 1. Establish the connection (always; confirm before editing widely)
 
-A usable Weave connection needs three things:
+A usable Weave connection needs four things:
 
 1. the package installed;
-2. credentials present;
-3. a `weave.init()` call.
+2. the application's policy permits the intended export;
+3. project, endpoint, and the appropriate credentials reach the running process; and
+4. `weave.init()` or the exporter consumes those exact settings.
 
-Before any of them, identify the application's data-sharing policy. There is no point instrumenting
-code that cannot authenticate, and it is unsafe to export content that the application would not
-otherwise share.
+Before editing instrumentation, identify the application's data-sharing policy. There is no point
+instrumenting code that cannot authenticate, and it is unsafe to export content that the application
+would not otherwise share.
 
 - **Install or confirm the package.** In Python, the package is `weave` on PyPI (`pip install weave`,
   or add it to their manifest). The current Conversation SDK names and `set_attributes` need
@@ -92,6 +93,12 @@ otherwise share.
   or proxy identity. Wire a dedicated tracing setting from its secret store and scope any temporary
   `WANDB_API_KEY` override to Weave initialization, restoring the process environment afterward. Do
   not replace a process-wide credential merely because `weave.init()` reads it.
+- **Trace configuration end to end.** For a deployed service, follow the project, tracing credential,
+  base URL, and trace-server URL from values/secrets through the rendered manifest, process
+  environment, application accessor, and initialization call. A new accessor with an empty default
+  is an explicit disabled mode until deployment sets it; its presence is not runtime wiring. If the
+  application uses prefixed setting names, bridge them to the exact SDK inputs only around
+  initialization and restore the previous environment afterward.
 - **Get the project name.** Ask for it as `entity/project`, or as just `project` to use their default
   entity. Show them the URL their traces will land at up front,
   `https://wandb.ai/<entity>/<project>/weave`, so there are no surprises about where the data goes.
@@ -195,6 +202,12 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
 Open `references/failure_modes.md` when repairing existing instrumentation. Its probes are mandatory
 for any matching condition.
 
+- **Probe startup configuration.** Run the real entry point with synthetic marker configuration. For a
+  deployed service, assemble or render that environment from the same values, manifests, and secret
+  references used in deployment. Capture the project, destination, and credential *source* consumed by
+  initialization without printing a key. Assert that enabled startup cannot silently no-op or inherit
+  ambient auth/endpoint state, that disabled startup is intentional, and that temporary SDK aliases
+  are restored even when initialization fails.
 - If the app is runnable and credentials are present, run a minimal path (their quickstart, a smoke
   test, or a tiny script that exercises one turn) and confirm a trace shows up at the project URL.
   Both the Python and Node `weave.init()` print `View Weave data at
@@ -205,12 +218,17 @@ for any matching condition.
   the operations are what you intended: a `gen_ai.operation.name` of `invoke_agent` for turns and
   sub-agents, `chat` for model calls, and `execute_tool` for tools, with the turn nesting its LLM and
   tool spans. Assert exact parent span ids and trace ids, plus complete content/usage fields that are
-  part of the contract. This is also how you confirm that an *auto* strategy emits agent shape rather
-  than flat calls, since registry membership alone does not prove it.
+  part of the contract. For streaming adapters, make a local transport emit a tool-selecting
+  completion and a final completion, then assert exact input/output messages, structured tool calls,
+  response id/model, usage, and finish reasons. A correctly nested span containing only output text is
+  still broken. This is also how you confirm that an *auto* strategy emits agent shape rather than
+  flat calls, since registry membership alone does not prove it.
 - **Run negative controls.** A policy-denied turn must emit zero spans. A sleeping tool must have a
   span covering the sleep; a raising tool must export error status without changing the exception. A
-  returned errored/cancelled result must carry its outcome before the turn closes. A model request
-  inside a turn must not appear only as a separate root call. Tests that merely assert
+  returned errored/cancelled result must carry its outcome before the turn closes. Preserve
+  orthogonal result facts too: a nominally completed result that asks questions or requests
+  permission must export those fields rather than collapsing them into the terminal enum. A model
+  request inside a turn must not appear only as a separate root call. Tests that merely assert
   `weave.init()` or a patcher was called do not verify instrumentation.
 - If the old integration returned or persisted a trace reference, exercise its real consumer: save
   the new reference, build the deep link, attach feedback, and simulate the recovery path after an
@@ -226,15 +244,20 @@ for any matching condition.
 
 - The API key is never touched, read, printed, or committed.
 - The tracing credential does not overwrite another process-wide W&B identity.
+- Deployment-like startup supplies the intended project, credential source, and endpoint to the SDK;
+  enabled tracing cannot silently default to a no-op or ambient configuration.
 - The application policy gates the complete turn tree; metadata-only mode contains no prompt,
   response, tool argument, or tool result content.
 - Behavior is unchanged: the same outputs, the same exceptions, and spans always closed.
 - No double-instrumentation. Do not add Conversation SDK spans around calls a framework already
   auto-captures, or you will get duplicate traces.
 - Every LLM and tool span is a child of the intended turn, not a disconnected Calls-tab root.
+- Every LLM span contains the complete request and completion contract, including structured tool
+  calls, response identity/model, usage, and finish reasons when the provider supplies them.
 - Live spans cover the actual work; batch/post-hoc spans are used only when live boundaries are truly
   unavailable and do not claim real execution latency or exception capture.
-- Returned terminal states and errors are observable before the turn span closes.
+- Returned terminal states, errors, questions, and permission requests are observable before the turn
+  span closes, including valid combinations that are not represented by one enum value.
 - Persisted trace references, deep links, feedback, and recovery flows still work when they were part
   of the previous integration contract.
 - `weave.init()` appears once per entry point, ordered correctly relative to any user OTel setup.

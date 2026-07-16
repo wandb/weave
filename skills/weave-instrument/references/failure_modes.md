@@ -37,6 +37,25 @@ exporter. Node initialization is process-wide, so it cannot represent a later pe
 the complete exported payload. Denied must mean zero spans when policy forbids any trace; metadata-only
 must retain the expected operation/identity attributes and contain no content fields.
 
+## Initialization exists but deployed startup never enables it
+
+**Failure signature** — A helper conditionally calls `weave.init(project)`, but the new project setting
+defaults to an empty string and the deployment never supplies it. Unit tests that call the helper with
+a project pass while every deployed worker takes the no-op branch. The source contains instrumentation,
+but the runtime emits nothing.
+
+**Correction** — Trace every required setting across the complete startup path: values or secret
+source, rendered manifest, process environment, application accessor, and `weave.init()` or exporter.
+Make disabled mode explicit. Add the project, dedicated credential, and destination wiring to each
+deployment that is expected to trace; an accessor or environment-variable name in application code is
+not deployment wiring.
+
+**Proof** — Render or assemble the deployment environment with synthetic marker values, run the real
+entry point, and capture the project and destination consumed by initialization. Assert the enabled
+configuration initializes exactly once with the intended values, the disabled configuration is an
+intentional no-op, and no secret value is printed. Pair this startup probe with an emitted-span test;
+mocking `weave.init()` alone still does not prove export.
+
 ## Model call logged as a disconnected root
 
 **Failure signature** — A Conversation SDK Turn is active, but the model is instrumented only with generic
@@ -65,6 +84,27 @@ duplicate nor a detached call.
 **Proof** — Assert exactly one `invoke_agent` turn and the intended `chat` children. For every child,
 assert `child.parent.span_id == turn.context.span_id` and identical trace ids. Pin complete input,
 output, response identity, usage, and error fields.
+
+## Model span is nested correctly but its completion payload is hollow
+
+**Failure signature** — The real provider stream runs inside an LLM span, so parentage and duration
+look correct, but the adapter retains only text deltas and calls `llm.output(text)`. The request input
+and the provider's completed event with structured output or tool calls, response id/model, token
+usage, and finish reasons disappear from telemetry before the span closes. A topology-only test passes.
+
+**Cause** — Streaming adapters often reduce provider events to the data needed by the application.
+Telemetry added after that reduction cannot reconstruct discarded completion metadata.
+
+**Correction** — Carry the provider's terminal completion metadata across the adapter boundary while
+the LLM span is recording. Set the requested provider/model when starting the span, then use
+`llm.record(...)` or the equivalent field setters to record input and output messages, structured tool
+calls, usage, reasoning, response id/model, and finish reasons that the provider supplies. Keep
+text-delta handling for application behavior; do not treat it as the telemetry contract.
+
+**Proof** — Use a local provider transport that emits both a tool-selecting completion and a final
+text completion. Assert the exact exported input/output messages, tool-call ids and arguments,
+response id/model, usage, and finish reasons on the correctly nested `chat` spans. Include a control
+that would fail if the implementation recorded only output text.
 
 ## Tool span reconstructed after execution
 
@@ -97,40 +137,48 @@ recover runtime exceptions or timing that was never captured.
 sleep, the failure exports error status and the exact exception, both have the intended turn parent,
 and the original exception still reaches the caller.
 
-## Returned error or cancellation exported as success
+## Returned semantic result collapses to success
 
-**Failure signature** — The runner represents completion, error, cancellation, timeout, or a
-permission request in a result object. The tracing wrapper records only final text and tools. No
-exception crosses the Turn context manager, so the exported turn looks successful and carries no
-terminal outcome.
+**Failure signature** — The runner represents completion, error, cancellation, or timeout in a result
+object, sometimes alongside orthogonal fields such as `agent_questions` or `permission_requests`. The
+tracing wrapper records only final text, tools, or one terminal enum. No exception crosses the Turn
+context manager, so a returned failure looks successful; a result marked completed can also lose the
+fact that it asks a question or requests permission.
 
 **Cause** — Session context managers automatically record raised exceptions. They cannot infer an
 error encoded as ordinary return data.
 
 **Correction** — Before the Turn closes, map every terminal variant to stable attributes. When the
 installed Python version supports it, use `turn.set_attributes({...})` while the span is recording.
-Keep the application's existing outcome vocabulary rather than inventing a second state machine. If
-the required OTel error status cannot be expressed through the installed Conversation SDK, state that
-limitation and use the app's OTel span surface or request the missing SDK capability; do not silently
-mark a returned failure successful.
+Record independent semantic fields independently rather than deriving them from one enum. Keep the
+application's existing outcome vocabulary instead of inventing a second state machine. If the required
+OTel error status cannot be expressed through the installed Conversation SDK, state that limitation
+and use the app's OTel span surface or request the missing SDK capability; do not silently mark a
+returned failure successful.
 
-**Proof** — Exercise every terminal enum/variant and compare exact exported attributes. Include a
-raised exception separately to prove the context manager records exception status while preserving
-the throw.
+**Proof** — Exercise every terminal enum/variant and the valid combinations of outcome, questions, and
+permission requests. Compare exact exported attributes, including completed-plus-question and
+completed-plus-permission cases when the result model allows them. Include a raised exception
+separately to prove the context manager records exception status while preserving the throw.
 
-## Tracing secret replaces the process W&B identity
+## Tracing initialization replaces or silently inherits the wrong W&B identity
 
-**Failure signature** — Deployment injects an internal tracing secret directly as process-wide
-`WANDB_API_KEY`, even though another client or proxy in the same service already owns that variable.
-Tracing works, but unrelated W&B operations authenticate as the tracing service account.
+**Failure signature** — One variant injects an internal tracing secret directly as process-wide
+`WANDB_API_KEY`, even though another client or proxy in the service already owns that variable. Tracing
+works, but unrelated W&B operations authenticate as the tracing service account. The inverse variant
+adds dedicated application settings but passes only the project to `weave.init()`. The SDK silently
+inherits ambient `WANDB_API_KEY`, `WANDB_BASE_URL`, or `WF_TRACE_SERVER_URL`; an application-prefixed
+endpoint variable is ignored, and traces go to the wrong identity or destination.
 
 **Correction** — Store tracing auth in a dedicated application setting. Scope any temporary
 `WANDB_API_KEY`, `WANDB_BASE_URL`, or trace-server URL override to `weave.init()` and restore the
-environment afterward. For a raw OTel exporter, construct its Authorization header directly from the
-dedicated setting. Never print either credential.
+environment afterward, including when initialization raises. Bridge application-prefixed settings to
+the exact SDK inputs during that scope. For a raw OTel exporter, construct its Authorization header
+directly from the dedicated setting. Never print either credential.
 
-**Proof** — Capture only presence/identity labels, never secret values. Initialize Weave, then prove
-the unrelated client still uses its original configuration and temporary tracing overrides are gone.
+**Proof** — Use distinct synthetic labels for ambient and tracing configurations, never real secret
+values. Initialize Weave and assert it consumed the tracing identity and destination. Then prove the
+unrelated client still uses its original configuration and every temporary SDK override is restored.
 
 ## Trace emission restored but application correlation is lost
 
@@ -171,11 +219,14 @@ complete payload values; do not use substring checks for serialized messages or 
 
 **Minimum regression matrix**
 
-1. Allowed turn with model and tool: one exact `turn -> LLM/tool` tree.
+1. Allowed turn with model and tool: one exact `turn -> LLM/tool` tree with complete model payloads.
 2. Denied turn: zero spans, or exact metadata-only payload if that is the policy.
 3. Sleeping and raising tools: truthful duration and error behavior.
-4. Returned completed, errored, cancelled, timed-out, and permission-required outcomes.
-5. Streaming model completion and any retry behavior the application exposes.
-6. Existing-provider and dedicated-credential configurations.
+4. Returned completed, errored, cancelled, and timed-out outcomes, plus valid combinations with
+   questions and permission requests.
+5. Tool-selecting and final streaming completions: exact messages, structured tool calls, response
+   id/model, usage, finish reasons, and any retry behavior the application exposes.
+6. Deployment-like enabled/disabled startup, existing-provider ownership, dedicated credentials, and
+   application-to-SDK endpoint aliases.
 7. Persisted trace reference, feedback/deep-link, and recovery flows when the application exposes
    them.
