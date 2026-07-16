@@ -150,6 +150,16 @@ class FileStorageClient:
         assert isinstance(base_uri, FileStorageURI)
         self.base_uri = base_uri
 
+    def _validate_presign_read_uri(self, uri: FileStorageURI) -> None:
+        """Ensure a presigned URL is only minted for an object below base_uri."""
+        if type(uri) is not type(self.base_uri):
+            raise ValueError(
+                f"Cannot presign {uri.to_uri_str()} with {self.base_uri.to_uri_str()}"
+            )
+        base_prefix = self.base_uri.to_uri_str().rstrip("/") + "/"
+        if not uri.to_uri_str().startswith(base_prefix):
+            raise ValueError(f"Cannot presign {uri.to_uri_str()} outside {base_prefix}")
+
     @abstractmethod
     def store(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data at the specified URI location in cloud storage."""
@@ -339,11 +349,11 @@ class S3StorageClient(FileStorageClient):
         return response["Body"].read()
 
     def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
-        assert isinstance(uri, S3FileStorageURI)
-        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+        self._validate_presign_read_uri(uri)
+        s3_uri = cast(S3FileStorageURI, uri)
         return self.client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": uri.bucket, "Key": uri.path},
+            Params={"Bucket": s3_uri.bucket, "Key": s3_uri.path},
             ExpiresIn=ttl,
         )
 
@@ -394,9 +404,9 @@ class GCSStorageClient(FileStorageClient):
         )
 
     def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
-        assert isinstance(uri, GCSFileStorageURI)
-        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
-        blob = self.client.bucket(uri.bucket).blob(uri.path)
+        self._validate_presign_read_uri(uri)
+        gcs_uri = cast(GCSFileStorageURI, uri)
+        blob = self.client.bucket(gcs_uri.bucket).blob(gcs_uri.path)
         # V4 signing needs a signer key: a service-account key, or ADC creds with
         # IAM signBlob (keyless node identity). Raises at call time if unavailable.
         return blob.generate_signed_url(
@@ -471,16 +481,16 @@ class AzureStorageClient(FileStorageClient):
         return stream.readall()
 
     def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
-        assert isinstance(uri, AzureFileStorageURI)
-        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
-        client = self._get_client(uri.account)
-        blob_client = client.get_container_client(uri.container).get_blob_client(
-            uri.path
+        self._validate_presign_read_uri(uri)
+        azure_uri = cast(AzureFileStorageURI, uri)
+        client = self._get_client(azure_uri.account)
+        blob_client = client.get_container_client(azure_uri.container).get_blob_client(
+            azure_uri.path
         )
         sas = generate_blob_sas(
             account_name=client.account_name,
-            container_name=uri.container,
-            blob_name=uri.path,
+            container_name=azure_uri.container,
+            blob_name=azure_uri.path,
             account_key=client.credential.account_key,
             permission=BlobSasPermissions(read=True),
             expiry=datetime.now(timezone.utc) + timedelta(seconds=ttl),
