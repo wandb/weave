@@ -82,5 +82,5 @@ requests.
 `await weave.flushOTel()` before exiting.
 
 **ESM vs CJS:** this affects only *auto-instrumentation* (plain `openai`, `anthropic`, and so on), not
-these Session SDK calls. CommonJS auto-activates on `import 'weave'`. **ESM must launch with
+these Conversation SDK calls. CommonJS auto-activates on `import 'weave'`. **ESM must launch with
 `node --import=weave/instrument your-entry.mjs`**.

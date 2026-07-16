@@ -9,7 +9,7 @@ then verify the emitted spans.
 
 There are three mechanisms.
 
-- **Session SDK** (`Turn`, `LLM`, `Tool`, `SubAgent`) is **universal**. It works for any agent,
+- **Conversation SDK** (`Turn`, `LLM`, `Tool`, `SubAgent`) is **universal**. It works for any agent,
   whether a custom loop, an unknown framework, or none, and it is always agent-shaped. Use it as the
   default whenever auto cannot be *proven* to emit the needed shape.
 - **OTEL auto** (`weave.init()` alone) is an **optimization** for libraries that Weave recognizes. Use
@@ -51,18 +51,19 @@ There are three mechanisms.
 - **Flat traces, land in the Calls tab:** plain LLM SDKs and framework hooks. In Python: `anthropic`,
   `mistralai`, `groq`, `litellm`, `cohere`, Google GenAI and Vertex, `huggingface_hub`, `instructor`,
   `langchain`, `llama_index`, `crewai`, `autogen`, `smolagents`, and `dspy`. In Node: `openai`,
-  `@anthropic-ai/sdk`, and `@google/genai`. If you want agent shape from these, use the Session SDK.
-- **Not covered, so use the Session SDK:** hand-rolled loops, any library not in the registry, and
-  plain `openai` in Python under default settings (a gotcha; see `otel_auto.md`). Node plain `openai`
-  *is* auto-captured, though ESM needs the preload flag.
+  `@anthropic-ai/sdk`, and `@google/genai`. If you want agent shape from these, use the Conversation
+  SDK.
+- **Not covered, so use the Conversation SDK:** hand-rolled loops, any library not in the registry,
+  and plain `openai` in Python under default settings (a gotcha; see `otel_auto.md`). Node plain
+  `openai` *is* auto-captured, though ESM needs the preload flag.
 
-## The Session SDK is universal, but it is a tree (not a graph)
+## The Conversation SDK is universal, but it is a tree (not a graph)
 
-The Session SDK models Session, then Turn (`invoke_agent`), then a set of LLM (`chat`), Tool
+The Conversation SDK models Conversation, then Turn (`invoke_agent`), then a set of LLM (`chat`), Tool
 (`execute_tool`), and SubAgent (`invoke_agent`) spans. It covers loops, unknown frameworks, streaming
 (hold the LLM span open, accumulate, then close it), sub-agents, async work (Python contextvars, or
-TypeScript `runIsolated`), and post-hoc logging (`log_turn` / `log_session`, Python only; the TS SDK
-has no `log*` batch functions).
+TypeScript `runIsolated`), and post-hoc logging (`log_turn` / `log_conversation`, Python only; the TS
+SDK has no `log*` batch functions).
 
 State its limits; do not hide them. You project DAGs onto a tree. Parallel TypeScript model calls in
 one async chain need `runIsolated`. Python thread or queue boundaries need explicit wrapping. And if
@@ -70,8 +71,8 @@ there is no observable boundary, that content cannot be captured, so flag it.
 
 ## When you are unsure
 
-- "Agents tab", or "turns and tools": use the Session SDK, unless the probe proves the library
+- "Agents tab", or "turns and tools": use the Conversation SDK, unless the probe proves the library
   auto-emits agent shape.
 - "Just trace my LLM calls": use auto (`weave.init()`), and handle the Python plain-`openai` gotcha.
 - On an auto-mapped agent framework: prefer auto, since it is less code and is robust to version
-  changes. Use the Session SDK only for structure or attributes that auto does not emit.
+  changes. Use the Conversation SDK only for structure or attributes that auto does not emit.

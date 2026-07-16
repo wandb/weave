@@ -3,7 +3,7 @@ name: weave-instrument
 description: >-
   Add Weave (Weights & Biases) observability to an LLM or agent codebase. This covers calling
   `weave.init()`, setting up authentication, and choosing between OTEL auto-instrumentation and the
-  explicit Session SDK agent-logging APIs (Turn, LLM, Tool, SubAgent), based on the libraries the code
+  explicit Conversation SDK agent-logging APIs (Turn, LLM, Tool, SubAgent), based on the libraries the code
   already uses. Works for Python and TypeScript/Node. Use this whenever the user wants to instrument,
   trace, or add observability, logging, or monitoring to an agent, chatbot, RAG pipeline, or LLM app.
   This includes phrasings like "log my agent to weave", "add agent tracing", "get my agent into the
@@ -23,9 +23,9 @@ on two things:
 - the *structure* of their code.
 
 Never choose based on whether you recognize the framework. There are two mechanisms, and one of them
-always applies.
+always applies when tracing is allowed.
 
-1. **Session SDK (the agent-logging APIs)** is the universal path. You wrap the agent's own structure
+1. **Conversation SDK (formerly Session SDK)** is the universal path. You wrap the agent's own structure
    with `Turn`, `LLM`, `Tool`, and `SubAgent` spans. It works for any agent, whether a custom loop, an
    unknown framework, or one that Weave does not map, and it always produces agent-shaped traces. Use
    it whenever you cannot *prove* that auto-instrumentation emits the shape the user needs.
@@ -34,7 +34,7 @@ always applies.
    Weave auto-instruments the user's library *and* the shape it emits is the one they want.
 
 Both paths produce OTEL spans. Agent-shaped spans land in Weave's **Agents** tab; flat call traces
-land in the **Calls** tab. The choice between the Session SDK and OTEL auto-instrumentation is driven
+land in the **Calls** tab. The choice between the Conversation SDK and OTEL auto-instrumentation is driven
 by the shape you need and the structure of the code, not by framework identity. See
 `references/decision.md` for the full procedure.
 
@@ -71,8 +71,8 @@ A user's traces need three things:
 Settle these first. There is no point instrumenting code that cannot authenticate.
 
 - **Install or confirm the package.** In Python, the package is `weave` on PyPI (`pip install weave`,
-  or add it to their manifest). The Session SDK needs `weave>=0.52.42`. `set_attributes` and
-  `add_event` need a newer build, so check the Python reference before relying on those. In Node, run
+  or add it to their manifest). The current Conversation SDK names and `set_attributes` need
+  `weave>=0.53.0`; older v0.52 builds use deprecated Session aliases. In Node, run
   `npm install weave`. The OTEL dependencies ship bundled in both, so the user adds nothing extra.
 - **Authentication is the user's job, not yours, so never handle their key.** A W&B API key is a
   secret, and it must not enter your context or the repo. Tell the user to authenticate in their own
@@ -91,7 +91,7 @@ Settle these first. There is no point instrumenting code that cannot authenticat
   their provider instead (see `references/otel_endpoint.md`). The calls are safe no-ops when init or
   auth is missing, so leaving instrumentation in place never breaks their program.
 
-Before touching many files, state the plan in a sentence or two ("I'll use the Session SDK to wrap
+Before touching many files, state the plan in a sentence or two ("I'll use the Conversation SDK to wrap
 your agent loop in `agent.py`, and add `weave.init` in `main.py`") and let the user redirect you.
 Instrumenting edits their source, so a quick checkpoint beats a large surprise diff.
 
@@ -129,12 +129,12 @@ for coverage, and fall back to the universal path.
    registry: `INTEGRATION_MODULE_MAPPING` in Python, `integrations/hooks.ts` in TypeScript), and does
    it emit the shape from step 1? Do not trust a memorized framework list.
 4. **Choose.** If auto-coverage emits the wanted shape, use **OTEL auto** (`weave.init()` alone; do
-   not also hand-wrap, or you will double-log). Otherwise, use the **Session SDK** and map the
+   not also hand-wrap, or you will double-log). Otherwise, use the **Conversation SDK** and map the
    structure from step 2. If the app already emits OTel spans or owns a `TracerProvider`, use **raw
    OTEL export** (`references/otel_endpoint.md`). A mixed approach is normal. Apply any caveats that
    `references/otel_auto.md` triggers (the gotcha lookup).
 
-When you instrument with the Session SDK, the mapping is the heart of the work.
+When you instrument with the Conversation SDK, the mapping is the heart of the work.
 
 - **`Turn`** is one cycle of the top-level agent loop handling one user input, and it opens its own
   trace root. Wrap the loop body, not the whole program.
@@ -152,7 +152,7 @@ Preserve return values and exceptions. Keep spans closed on every path. Python c
 TypeScript try/finally do this for you, so use them rather than bare `start`/`end` calls, which can
 leak an open span when an exception is raised. Do not reorder the user's logic or gate it on a span. If
 you cannot wrap cleanly without restructuring their code, prefer the batch path (Python `log_turn` or
-`log_session`; see the reference) or flag it to the user, rather than forcing an invasive rewrite.
+`log_conversation`; see the reference) or flag it to the user, rather than forcing an invasive rewrite.
 
 ### 4. Verify
 
@@ -180,7 +180,7 @@ Instrumentation you cannot see is worthless, so confirm that traces actually arr
 
 - The API key is never touched, read, printed, or committed.
 - Behavior is unchanged: the same outputs, the same exceptions, and spans always closed.
-- No double-instrumentation. Do not add Session SDK spans around calls a framework already
+- No double-instrumentation. Do not add Conversation SDK spans around calls a framework already
   auto-captures, or you will get duplicate traces.
 - `weave.init()` appears once per entry point, ordered correctly relative to any user OTel setup.
 - The version is pinned high enough for the APIs you used.

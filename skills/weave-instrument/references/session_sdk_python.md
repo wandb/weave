@@ -1,18 +1,19 @@
-# Session SDK — Python
+# Conversation SDK — Python (formerly Session SDK)
 
 These are the explicit agent-logging APIs. Everything is top-level (`weave.Turn`,
-`weave.start_session`, and so on) except the message-part classes, which come from `weave.session`
-(`from weave.session import TextPart, ToolCallPart, ...`). Every call is a safe no-op if `weave.init()`
-has not run, so instrumentation never breaks the program.
+`weave.start_conversation`, and so on) except the message-part classes, which come from
+`weave.conversation` (`from weave.conversation import TextPart, ToolCallPart, ...`). The APIs preserve
+application behavior when used as context managers, but missing `weave.init()` is not a disable or
+consent switch: Conversation spans can still be recorded by an application-owned OTel provider.
 
-**Version:** `weave>=0.52.42` for the core surface (`start_session`, `Turn`, `LLM`, `Tool`, `SubAgent`,
-`log_turn`, and `log_session`). `set_attributes()` and `add_event()` need a newer (dev) build, so gate
-on it.
+**Version:** Use `weave>=0.53.0` for the current Conversation names and `set_attributes()` surface.
+The `Session`, `start_session`, `log_session`, `get_current_session`, and `end_session` names remain
+deprecated aliases for v0.52 callers; do not introduce them in new instrumentation. Check the
+installed version before writing code.
 
-**Model:** a `Session` groups the turns of one conversation. A `Turn` is one user-input-to-response
-cycle, and it opens its own trace root. Inside a turn, open an `LLM` (one model call), a `Tool` (one
-execution), or a `SubAgent` (a nested agent). Nesting follows the OTel context, so if you use context
-managers the tree builds itself.
+**Model:** a `Conversation` groups related turns. A `Turn` is one user-input-to-response cycle, and it
+opens its own trace root. Inside a turn, open an `LLM` (one model call), a `Tool` (one execution), or
+a `SubAgent` (a nested agent). Nesting follows the OTel context, so context managers build the tree.
 
 ## Canonical pattern (context managers preferred, because they close on exceptions)
 
@@ -22,19 +23,19 @@ from weave import Usage
 
 weave.init("entity/project")
 
-with weave.start_session(agent_name="weather-bot") as session:
-    with session.start_turn(user_message="weather in Tokyo?") as turn:   # one Turn per user input
-        with turn.llm(model="gpt-4o", provider_name="openai") as llm:
+with weave.start_conversation(agent_name="weather-bot") as conversation:
+    with conversation.start_turn(user_message="weather in Tokyo?") as turn:  # one Turn per user input
+        with turn.start_llm(model="gpt-4o", provider_name="openai") as llm:
             resp = client.chat.completions.create(model="gpt-4o", messages=messages)
             llm.output(resp.choices[0].message.content or "")
             llm.usage = Usage(input_tokens=resp.usage.prompt_tokens,
                               output_tokens=resp.usage.completion_tokens)
-        with turn.tool(name="get_weather", arguments={"city": "Tokyo"}, tool_call_id="tc_1") as tool:
+        with turn.start_tool(name="get_weather", arguments={"city": "Tokyo"}, tool_call_id="tc_1") as tool:
             tool.result = "75F"          # arguments and result: dict, list, or scalar, auto-JSON-encoded
 ```
 
-Sub-agents nest the same way: `with turn.subagent(name="researcher", model="gpt-4o") as sub:`, then
-`sub.llm(...)` or `sub.tool(...)` inside.
+Sub-agents nest the same way: `with turn.start_subagent(name="researcher", model="gpt-4o") as sub:`,
+then use its `start_llm(...)` or `start_tool(...)` methods inside.
 
 **`LLM` helpers:** `.output(content)` appends an assistant message. `.think(content)` sets the
 reasoning. `.record(input_messages=, output_messages=, usage=, reasoning=, response_id=,
@@ -43,9 +44,9 @@ attach media. Always pass `provider_name`, because the SDK will not guess it.
 
 ## Methods vs. top-level functions
 
-The object methods (`session.start_turn()`, and `turn.llm/tool/subagent()`) build the tree directly,
-which is clearest in a self-contained loop. The module functions
-(`weave.start_turn/start_llm/start_tool/start_subagent()`) read the current session and turn from
+The object methods (`conversation.start_turn()` and `turn.start_llm/start_tool/start_subagent()`)
+build the tree directly, which is clearest in a self-contained loop. The module functions
+(`weave.start_turn/start_llm/start_tool/start_subagent()`) read the current conversation and turn from
 context vars, so use them when the pieces live in different functions or callbacks. They attach only
 when a parent is active; with no parent they return a *disconnected* object, which is still a safe
 no-op. Introspect with `get_current_session/turn/llm()`. Close non-`with` spans with
@@ -59,7 +60,7 @@ For example, `claude_agent_sdk` otherwise names every agent `"claude_agent_sdk"`
 itself (that is `start_turn(agent_name=...)`); it only relabels spans the integration already makes:
 
 ```python
-from weave.session import agent_name_override
+from weave.conversation import agent_name_override
 
 with agent_name_override("research_agent"):
     async for message in query(prompt="...", options=options):   # e.g. claude_agent_sdk
@@ -75,7 +76,7 @@ There is more in `otel_auto.md`.
 from weave import LLM, Tool, Message, Usage, log_turn
 
 log_turn(
-    session_id="sess-2", agent_name="bot",
+    conversation_id="conv-2", agent_name="bot",
     messages=[Message.user("Search for X")],
     spans=[
         LLM(model="gpt-4o", input_messages=[Message.user("Search for X")],
@@ -84,14 +85,20 @@ log_turn(
         Tool(name="search", arguments={"q": "X"}, result="found", tool_call_id="tc_1"),
     ],
 )
-# Use log_session(turns=[...]) for a whole conversation.
+# Use log_conversation(turns=[...]) for a whole conversation.
 ```
 
-Both return a `LogResult` (`session_id`, `trace_ids`, `root_span_ids`, `span_count`).
+Both return a `LogResult` (`conversation_id`, `trace_ids`, `root_span_ids`, `span_count`).
+
+Batch logging is not a replacement for an observable live boundary. Creating Tool spans after a
+runner returns measures serialization, not tool execution, and cannot recover exceptions, timeouts,
+or cancellation. Prefer live `with turn.start_tool(...): await execute(...)` whenever the dispatch is
+available. Use batch ingest for transcripts or supply trustworthy logical timestamps captured during
+execution.
 
 ## Data types
 
-Top-level: `Message`, `Usage`, `Reasoning`, `MediaAttachment`, `LogResult`. From `weave.session`:
+Top-level: `Message`, `Usage`, `Reasoning`, `MediaAttachment`, `LogResult`. From `weave.conversation`:
 `TextPart`, `ReasoningPart`, `ToolCallPart`, `ToolCallResponsePart`, `BlobPart`, `UriPart`, `FilePart`.
 
 ```python

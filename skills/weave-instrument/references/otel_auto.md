@@ -12,8 +12,8 @@ shape.
 | Python, `import google.adk` *after* `weave.init()` | import ADK before init, or call `patch_google_adk()` |
 | Python, a global `TracerProvider` already installed | init backs off, so add Weave's exporter to their provider (`otel_endpoint.md`), or use the Session SDK |
 | Node, ESM, relying on auto-patch | launch with `node --import=weave/instrument` |
-| An auto agent framework, but agents are unnamed or share one generic name | `weave.session.agent_name_override(...)` |
-| Auto already emits agent shape | do not also wrap it with the Session SDK, or it double-logs |
+| An auto agent framework, but agents are unnamed or share one generic name | `weave.conversation.agent_name_override(...)` |
+| Auto already emits agent shape | do not also wrap it with the Conversation SDK, or it double-logs |
 
 ## Python: plain `openai` is not auto-patched (the most common "no traces")
 
@@ -49,23 +49,23 @@ is no `WEAVE_ATTACH_OTEL_TO_EXISTING_PROVIDER` setting, so do not reference one.
 CommonJS auto-activates on `import 'weave'`. **ESM must launch with
 `node --import=weave/instrument your-entry.mjs`**, or plain `openai`, `@anthropic-ai/sdk`, and
 `@google/genai` will not auto-trace. Add the flag to the start command (the `scripts` in package.json,
-a Dockerfile, or a Procfile). `init()` and the Session SDK work either way.
+a Dockerfile, or a Procfile). `init()` and the Conversation SDK work either way.
 
 ## Agents tab vs Calls tab
 
 An agent-shaped span tree lands in the **Agents tab** (the OpenAI Agents SDK, the Claude Agent SDK,
-Google ADK, and anything via the Session SDK). Flat call traces land in the **Calls tab** (plain
-model-SDK auto-patching). If you want agent shape from a Calls-tab library, use the Session SDK.
+Google ADK, and anything via the Conversation SDK). Flat call traces land in the **Calls tab** (plain
+model-SDK auto-patching). If you want agent shape from a Calls-tab library, use the Conversation SDK.
 
 ## Python: naming auto-instrumented agents
 
 Auto-instrumentation names each `invoke_agent` span from `gen_ai.agent.name`. Some SDKs supply a real
 name (the OpenAI Agents SDK uses `Agent(name=...)`), while `claude_agent_sdk` falls back to the literal
-string `"claude_agent_sdk"`. `weave.session.agent_name_override` (Python only) renames those spans for
-a block:
+string `"claude_agent_sdk"`. `weave.conversation.agent_name_override` (Python only) renames those
+spans for a block:
 
 ```python
-from weave.session import agent_name_override
+from weave.conversation import agent_name_override
 with agent_name_override("research_agent"):
     async for message in query(prompt="...", options=options):
         ...

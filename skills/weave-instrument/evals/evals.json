@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "I hand-rolled a little research agent in Python — it's in agent.py, just a loop that calls the OpenAI chat API and runs some tools, plus main.py (entry point) and tools.py. I want to see each turn, every model call, and every tool call show up in Weave's Agents tab. Can you wire up weave for me? My project is my-team/research-agent.",
-      "expected_output": "Session SDK instrumentation: weave.init at the entry point, the per-question loop wrapped in a Turn, each chat.completions.create wrapped in an LLM span, each tool dispatch wrapped in a Tool span. Behavior unchanged. User told to authenticate themselves. Handles/avoids the plain-openai auto-patch gotcha by using Session SDK spans.",
+      "expected_output": "Conversation SDK instrumentation: weave.init at the entry point, the per-question loop wrapped in a Turn, each chat.completions.create wrapped in an LLM span, each tool dispatch wrapped in a Tool span. Behavior unchanged. User told to authenticate themselves. Handles/avoids the plain-openai auto-patch gotcha by using Conversation SDK spans.",
       "files": [
         "evals/fixtures/python-custom-agent/agent.py",
         "evals/fixtures/python-custom-agent/tools.py",
@@ -13,27 +13,27 @@
       ],
       "expectations": [
         "weave is imported and weave.init(\"my-team/research-agent\") is called exactly once at an entry point (main.py or module top), never inside the per-question loop",
-        "The per-question agent loop is wrapped in a Session SDK Turn (via weave.start_session/start_turn, Turn(...), or session.start_turn)",
-        "Each OpenAI chat.completions.create call is wrapped in an LLM span (turn.llm / start_llm) that records the model and output",
-        "Each tool execution is wrapped in a Tool span (turn.tool / start_tool) capturing the tool name, arguments, and result",
+        "The per-question agent loop is wrapped in a Conversation SDK Turn (via weave.start_conversation/start_turn or conversation.start_turn)",
+        "Each OpenAI chat.completions.create call is wrapped in an LLM span (turn.start_llm / weave.start_llm) that records the model and output",
+        "Each tool execution is wrapped in a Tool span (turn.start_tool / weave.start_tool) capturing the tool name, arguments, and result",
         "Spans are opened via context managers (with-blocks) so they close on exceptions, rather than bare start/end calls",
         "run_agent still returns the final answer string and the original control flow and return values are unchanged",
         "No W&B API key is hardcoded or written into source; the response instructs the user to authenticate in their own terminal (wandb login or WANDB_API_KEY)",
-        "The solution does not depend on plain `openai` being auto-traced (it uses Session SDK LLM spans), or it explicitly notes that plain openai is not auto-patched under use_otel_v2",
+        "The solution does not depend on plain `openai` being auto-traced (it uses Conversation SDK LLM spans), or it explicitly notes that plain openai is not auto-patched under use_otel_v2",
         "All modified Python files are syntactically valid (parse without error)"
       ]
     },
     {
       "id": 2,
       "prompt": "can you set up weave logging for this? it's an agent built on the openai agents sdk (agent.py). project name is my-team/support-bot",
-      "expected_output": "Auto-instrumentation path: add weave.init(\"my-team/support-bot\") before the agent runs and rely on Weave's automatic instrumentation of the agent framework (here the OpenAI Agents SDK; the same auto path covers Claude Agent SDK and Google ADK, all landing in the Agents tab). Crucially, does NOT hand-wrap the code in Session SDK Turn/LLM/Tool spans. User told to authenticate themselves.",
+      "expected_output": "Auto-instrumentation path: add weave.init(\"my-team/support-bot\") before the agent runs and rely on Weave's automatic instrumentation of the agent framework (here the OpenAI Agents SDK; the same auto path covers Claude Agent SDK and Google ADK, all landing in the Agents tab). Crucially, does NOT hand-wrap the code in Conversation SDK Turn/LLM/Tool spans. User told to authenticate themselves.",
       "files": [
         "evals/fixtures/python-auto/agent.py",
         "evals/fixtures/python-auto/requirements.txt"
       ],
       "expectations": [
         "weave.init(\"my-team/support-bot\") is added exactly once, before the agent is run",
-        "The solution does NOT add manual Session SDK spans (no Turn/LLM/Tool/SubAgent wrapping) around the auto-instrumented agent-framework code (the OpenAI Agents SDK here) — it relies on automatic instrumentation",
+        "The solution does NOT add manual Conversation SDK spans (no Turn/LLM/Tool/SubAgent wrapping) around the auto-instrumented agent-framework code (the OpenAI Agents SDK here) — it relies on automatic instrumentation",
         "The response explains that traces appear automatically (in the Agents tab) because Weave auto-instruments the agent framework (the OpenAI Agents SDK here)",
         "Original agent behavior is unchanged (the Agent definition and Runner.run logic are intact)",
         "No W&B API key is hardcoded; the user is told to authenticate themselves",
@@ -51,7 +51,7 @@
       ],
       "expectations": [
         "await weave.init(\"my-team/ts-agent\") is called at the entry point (main.ts) before any traced work, and is awaited",
-        "Spans are created with the start* functions (weave.startSession / startTurn / startLLM / startTool), NOT via `new Turn()` or direct class construction",
+        "Spans are created with the start* functions (weave.startConversation / startTurn / startLLM / startTool), NOT via `new Turn()` or direct class construction",
         "The per-question loop body is wrapped in a Turn, each model call in an LLM span, and each tool execution in a Tool span",
         "Every span is ended in a finally block (try/finally) so an exception cannot leak an open span",
         "runAgent still returns the answer string and the original behavior is unchanged",
@@ -62,14 +62,14 @@
     {
       "id": 4,
       "prompt": "i've got a little python script (main.py) that calls the openai api a few times — i just want to see the calls, prompts and responses show up in weave. can you add that? project is my-team/qa-script",
-      "expected_output": "Handles the plain-openai default-mode gotcha: weave.init() ALONE does not trace plain `openai` under the default use_otel_v2=True (the import hook skips openai). Correct solution adds weave.init AND one of: weave.integrations.patch_openai() after init, WEAVE_USE_OTEL_V2=false in the run environment, or Session SDK LLM spans — and tells the user the calls land in the Calls tab. A solution that stops at weave.init() is wrong (silently zero traces).",
+      "expected_output": "Handles the plain-openai default-mode gotcha: weave.init() ALONE does not trace plain `openai` under the default use_otel_v2=True (the import hook skips openai). Correct solution adds weave.init AND one of: weave.integrations.patch_openai() after init, WEAVE_USE_OTEL_V2=false in the run environment, or Conversation SDK LLM spans — and tells the user the calls land in the Calls tab. A solution that stops at weave.init() is wrong (silently zero traces).",
       "files": [
         "evals/fixtures/python-plain-openai/main.py",
         "evals/fixtures/python-plain-openai/requirements.txt"
       ],
       "expectations": [
         "weave is imported and weave.init(\"my-team/qa-script\") is added exactly once at the entry point",
-        "The solution does NOT rely on weave.init() alone to trace plain `openai`: under the default use_otel_v2=True the import hook skips `openai`, so it must additionally do ONE of — call weave.integrations.patch_openai() after init, set WEAVE_USE_OTEL_V2=false in the run environment, or wrap the calls in Session SDK LLM spans",
+        "The solution does NOT rely on weave.init() alone to trace plain `openai`: under the default use_otel_v2=True the import hook skips `openai`, so it must additionally do ONE of — call weave.integrations.patch_openai() after init, set WEAVE_USE_OTEL_V2=false in the run environment, or wrap the calls in Conversation SDK LLM spans",
         "The response explicitly explains that plain `openai` is not auto-traced by weave.init() alone under the default settings, and states what was added to make the calls actually appear",
         "The openai chat.completions.create calls and the script's control flow and printed output are unchanged",
         "No W&B API key is hardcoded; the user is told to authenticate themselves (wandb login or WANDB_API_KEY)",
@@ -96,7 +96,7 @@
     {
       "id": 6,
       "prompt": "we built our own little agent framework in-house (miniagent.py) and our app (app.py) uses it. i want proper agent traces — turns, llm calls, tool calls — in weave's agents tab. project my-team/inhouse-agent",
-      "expected_output": "Recognizes that the in-house `miniagent` framework is NOT a known Weave integration (it's not in the auto-instrumentation registry), so auto-instrumentation cannot produce agent traces for it. Falls back to the universal Session SDK: weave.init at the entry point, the agent's run cycle wrapped in a Turn, each model call in an LLM span, each tool dispatch in a Tool span — instrumenting the real boundaries inside miniagent.py. Does NOT claim weave.init alone will trace this framework. This is the case that proves the skill is generic for any agent, not a fixed framework list.",
+      "expected_output": "Recognizes that the in-house `miniagent` framework is NOT a known Weave integration (it's not in the auto-instrumentation registry), so auto-instrumentation cannot produce agent traces for it. Falls back to the universal Conversation SDK: weave.init at the entry point, the agent's run cycle wrapped in a Turn, each model call in an LLM span, each tool dispatch in a Tool span — instrumenting the real boundaries inside miniagent.py. Does NOT claim weave.init alone will trace this framework. This is the case that proves the skill is generic for any agent, not a fixed framework list.",
       "files": [
         "evals/fixtures/python-unknown-framework/app.py",
         "evals/fixtures/python-unknown-framework/miniagent.py",
@@ -104,7 +104,7 @@
       ],
       "expectations": [
         "weave is imported and weave.init(\"my-team/inhouse-agent\") is added exactly once at an entry point (app.py main or module top), never inside the agent loop",
-        "The solution uses the Session SDK (Turn/LLM/Tool via start_session/start_turn/start_llm/start_tool or the turn.* / session.* methods); it does NOT assume weave.init() alone auto-instruments the in-house `miniagent` framework",
+        "The solution uses the Conversation SDK (Turn/LLM/Tool via start_conversation/start_turn/start_llm/start_tool or the turn.* / conversation.* methods); it does NOT assume weave.init() alone auto-instruments the in-house `miniagent` framework",
         "The agent's run cycle is wrapped in a Turn, each openai chat.completions.create call inside miniagent is wrapped in an LLM span, and each tool dispatch is wrapped in a Tool span — instrumenting the real boundaries even though they live inside miniagent.py",
         "Spans are opened via context managers so they close on exceptions; the agent's return values and control flow are unchanged",
         "No W&B API key is hardcoded; the user is told to authenticate themselves (wandb login or WANDB_API_KEY)",
