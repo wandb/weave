@@ -246,11 +246,8 @@ export interface AgentConversationChatRes {
  * chat view; `text` is the trimmed, length-capped preview content.
  */
 export interface AgentConversationMessagePreview {
-  /**
-   * Role
-   * @default ""
-   */
-  role?: string;
+  /** Role */
+  role: 'user_message' | 'assistant_message';
   /**
    * Text
    * @default ""
@@ -530,7 +527,8 @@ export interface AgentSearchMatchedMessage {
     | 'system'
     | 'tool'
     | 'tool_call'
-    | 'tool_result';
+    | 'tool_result'
+    | string;
   /** Content Preview */
   content_preview: string;
   /** Content Digest */
@@ -912,6 +910,20 @@ export interface AgentSpanSchema {
   agent_description?: string | null;
   /** Agent Version */
   agent_version?: string | null;
+  /** Eval Run Id */
+  eval_run_id?: string | null;
+  /** Eval Predict And Score Call Id */
+  eval_predict_and_score_call_id?: string | null;
+  /** Eval Kind */
+  eval_kind?: string | null;
+  /** Eval Row Digest */
+  eval_row_digest?: string | null;
+  /** Eval Example Id */
+  eval_example_id?: string | null;
+  /** Eval Trial Index */
+  eval_trial_index?: number | null;
+  /** Eval Evaluation Name */
+  eval_evaluation_name?: string | null;
   /** Request Model */
   request_model?: string | null;
   /** Response Model */
@@ -1147,6 +1159,7 @@ export interface AgentSpanStatsReq {
     | null;
   /** Group Filters */
   group_filters?: AgentSpanGroupFilter[];
+  signal_filters?: AgentSignalFilter | null;
 }
 
 /**
@@ -2869,8 +2882,7 @@ export interface EndedCallSchemaForInsert {
   /** Exception */
   exception?: string | null;
   /** Output */
-  // TODO: This type is manually updated at the moment. https://github.com/wandb/weave/pull/6195/changes#r2850346035
-  output?: any;
+  output?: null;
   summary: SummaryInsertMap;
   /** Wb Run Step End */
   wb_run_step_end?: number | null;
@@ -3738,6 +3750,12 @@ export interface FeedbackCreateReq {
    */
   span_trace_id?: string;
   /**
+   * Scorer Trace Id
+   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
+   * @default ""
+   */
+  scorer_trace_id?: string;
+  /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
    */
@@ -3878,6 +3896,11 @@ export interface FeedbackQueryReq {
   limit?: number | null;
   /** Offset */
   offset?: number | null;
+  /**
+   * Scored Only
+   * Only return feedback with at least one scorer tag or rating.
+   */
+  scored_only?: boolean | null;
 }
 
 /** FeedbackQueryRes */
@@ -3976,6 +3999,12 @@ export interface FeedbackReplaceReq {
    * @default ""
    */
   span_trace_id?: string;
+  /**
+   * Scorer Trace Id
+   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
+   * @default ""
+   */
+  scorer_trace_id?: string;
   /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.

@@ -90,6 +90,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    feedback_has_scorer_output,
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
@@ -3788,6 +3789,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         with self.lock:
             rows = list(self._feedback)
+        if req.scored_only:
+            rows = [row for row in rows if feedback_has_scorer_output(row)]
         result = _orm_select(
             TABLE_FEEDBACK,
             rows,

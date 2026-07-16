@@ -217,6 +217,7 @@ class Select:
     _fields: list[str] | None
     # Fields that we have constructed internally, like cost query fields
     _raw_sql_fields: list[str] | None
+    _any_non_empty_collection_fields: tuple[str, ...]
     _query: tsi.Query | None
     _order_by: list[SortBy] | None
     _limit: int | None
@@ -233,6 +234,7 @@ class Select:
         self._project_id = None
         self._fields = []
         self._raw_sql_fields = []
+        self._any_non_empty_collection_fields = ()
         self._query = None
         self._order_by = None
         self._limit = None
@@ -273,6 +275,21 @@ class Select:
 
     def where(self, query: tsi.Query | None) -> "Select":
         self._query = query
+        return self
+
+    def where_any_collection_non_empty(self, fields: tuple[str, ...]) -> "Select":
+        """Require at least one trusted Array/Map column to be non-empty."""
+        collection_columns = set(
+            self.table.array_string_cols
+            + self.table.map_string_cols
+            + self.table.map_float_cols
+        )
+        invalid_fields = set(fields) - collection_columns
+        if invalid_fields:
+            raise ValueError(
+                f"Non-collection fields cannot use non-empty filtering: {sorted(invalid_fields)}"
+            )
+        self._any_non_empty_collection_fields = fields
         return self
 
     def order_by(self, order_by: list[SortBy] | None) -> "Select":
@@ -373,6 +390,15 @@ class Select:
                 datetime_columns=self.datetime_columns,
             )
             conditions.extend(query_conds)
+        if self._any_non_empty_collection_fields:
+            conditions.append(
+                "("
+                + " OR ".join(
+                    f"notEmpty({field})"
+                    for field in self._any_non_empty_collection_fields
+                )
+                + ")"
+            )
 
         joined = combine_conditions(conditions, "AND")
         if joined:

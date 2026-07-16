@@ -66,6 +66,13 @@ TABLE_FEEDBACK = Table(
     ],
 )
 
+SCORER_OUTPUT_FIELDS = ("scorer_tags", "scorer_ratings")
+
+
+def feedback_has_scorer_output(row: dict[str, Any]) -> bool:
+    """Whether a feedback row contains at least one tag or rating."""
+    return any(bool(row.get(field)) for field in SCORER_OUTPUT_FIELDS)
+
 
 def process_feedback_payload(
     feedback_req: tsi.FeedbackCreateReq,

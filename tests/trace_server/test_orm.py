@@ -146,6 +146,43 @@ def test_map_string_float_column_round_trip():
     }
 
 
+def test_select_where_any_collection_non_empty():
+    table = Table(
+        "feedback",
+        [
+            Column("id", "string"),
+            Column("tags", "array_string"),
+            Column("ratings", "map_string_float"),
+        ],
+    )
+
+    prepared = (
+        table.select()
+        .project_id("entity/project")
+        .where_any_collection_non_empty(("tags", "ratings"))
+        .prepare()
+    )
+
+    assert (
+        prepared.sql
+        == """SELECT id, tags, ratings
+FROM feedback
+WHERE ((project_id = {project_id:String}) AND ((notEmpty(tags) OR notEmpty(ratings))))"""
+    )
+    assert prepared.parameters == {"project_id": "entity/project"}
+    assert prepared.fields == ["id", "tags", "ratings"]
+
+
+def test_select_where_any_collection_non_empty_rejects_scalar_fields():
+    table = Table("feedback", [Column("id", "string")])
+
+    with pytest.raises(
+        ValueError,
+        match=r"Non-collection fields cannot use non-empty filtering: \['id'\]",
+    ):
+        table.select().where_any_collection_non_empty(("id",))
+
+
 def test_select_basic():
     table = Table(
         "users",

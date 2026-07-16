@@ -6479,8 +6479,11 @@
         "properties": {
           "role": {
             "type": "string",
-            "title": "Role",
-            "default": ""
+            "enum": [
+              "user_message",
+              "assistant_message"
+            ],
+            "title": "Role"
           },
           "text": {
             "type": "string",
@@ -6489,6 +6492,9 @@
           }
         },
         "type": "object",
+        "required": [
+          "role"
+        ],
         "title": "AgentConversationMessagePreview",
         "description": "A truncated first/last message snippet for a grouped conversation row.\n\n`role` is the chat-timeline message type (e.g. \"user_message\",\n\"assistant_message\") so clients can style it consistently with the full\nchat view; `text` is the trimmed, length-capped preview content."
       },
@@ -7017,15 +7023,22 @@
             "title": "Trace Id"
           },
           "role": {
-            "type": "string",
-            "enum": [
-              "",
-              "user",
-              "assistant",
-              "system",
-              "tool",
-              "tool_call",
-              "tool_result"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "",
+                  "user",
+                  "assistant",
+                  "system",
+                  "tool",
+                  "tool_call",
+                  "tool_result"
+                ]
+              },
+              {
+                "type": "string"
+              }
             ],
             "title": "Role"
           },
@@ -7930,6 +7943,83 @@
             ],
             "title": "Agent Version"
           },
+          "eval_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Run Id"
+          },
+          "eval_predict_and_score_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Predict And Score Call Id"
+          },
+          "eval_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Kind"
+          },
+          "eval_row_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Row Digest"
+          },
+          "eval_example_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Example Id"
+          },
+          "eval_trial_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Trial Index"
+          },
+          "eval_evaluation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Evaluation Name"
+          },
           "request_model": {
             "anyOf": [
               {
@@ -8775,6 +8865,16 @@
             },
             "type": "array",
             "title": "Group Filters"
+          },
+          "signal_filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSignalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -14808,6 +14908,12 @@
             "description": "Turn the feedback belongs to (from spans.trace_id)",
             "default": ""
           },
+          "scorer_trace_id": {
+            "type": "string",
+            "title": "Scorer Trace Id",
+            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
+            "default": ""
+          },
           "wb_user_id": {
             "anyOf": [
               {
@@ -15120,6 +15226,18 @@
             "examples": [
               0
             ]
+          },
+          "scored_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored Only",
+            "description": "Only return feedback with at least one scorer tag or rating."
           }
         },
         "additionalProperties": false,
@@ -15395,6 +15513,12 @@
             "type": "string",
             "title": "Span Trace Id",
             "description": "Turn the feedback belongs to (from spans.trace_id)",
+            "default": ""
+          },
+          "scorer_trace_id": {
+            "type": "string",
+            "title": "Scorer Trace Id",
+            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
             "default": ""
           },
           "wb_user_id": {
