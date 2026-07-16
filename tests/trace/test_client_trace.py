@@ -1628,6 +1628,74 @@ def test_ops_with_default_params(client):
     assert inner_res.calls[5].inputs == {"a": 1, "b": 5}
 
 
+def test_trace_call_filter_bool_and_int_literals_no_collision(client):
+    """WB-37505: a boolean and an integer literal in one query must not collide.
+
+    `enabled == true AND count == 1` binds True first (a Bool param); the int 1
+    then reused True's param (True == 1 in Python), so the integer comparison
+    slot resolved to True and ClickHouse 400'd with "cannot be parsed as Int64".
+    No costs are involved — the collision is in the shared ParamBuilder, not the
+    cost query. Exercised end-to-end against ClickHouse.
+    """
+    project_id = client.project_id
+
+    call_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=str(uuid.uuid4()),
+                started_at=now,
+                op_name=f"weave:///{project_id}/op/test_op:v1",
+                attributes={},
+                inputs={"enabled": True, "count": 1},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                summary={},
+            )
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=tsi.Query(
+                    **{
+                        "$expr": {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "inputs.enabled"},
+                                        {"$literal": True},
+                                    ]
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "inputs.count"},
+                                        {"$literal": 1},
+                                    ]
+                                },
+                            ]
+                        }
+                    }
+                ),
+            )
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].id == call_id
+
+
 def test_root_type(client):
     class BaseTypeA(weave.Object):
         a: int
