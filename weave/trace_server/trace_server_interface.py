@@ -3856,6 +3856,14 @@ class CallStatsReq(BaseModelStrict):
         default="UTC",
         description="IANA timezone for bucket alignment (e.g., 'America/New_York')",
     )
+    cost_provider_id: str | None = Field(
+        default=None,
+        description="Optional provider ID used when resolving token prices for cost metrics.",
+    )
+    allow_large_range: bool = Field(
+        default=False,
+        description="Allow an all-time, single-bucket usage request. The granularity must cover the entire requested range.",
+    )
 
     @model_validator(mode="after")
     def validate_date_range(self) -> "CallStatsReq":
@@ -3863,9 +3871,17 @@ class CallStatsReq(BaseModelStrict):
         end = self.end or datetime.datetime.now(datetime.timezone.utc)
         if end < self.start:
             raise ValueError("CallStatsReq end must be after start")
-        if end - self.start > MAX_CALL_STATS_RANGE:
+        requested_range = end - self.start
+        if requested_range > MAX_CALL_STATS_RANGE and not self.allow_large_range:
             raise ValueError(
                 f"CallStatsReq date range cannot exceed {MAX_CALL_STATS_RANGE_DAYS} days"
+            )
+        if self.allow_large_range and (
+            self.granularity is None
+            or self.granularity < int(requested_range.total_seconds())
+        ):
+            raise ValueError(
+                "allow_large_range requires granularity to cover the entire requested range"
             )
         return self
 
