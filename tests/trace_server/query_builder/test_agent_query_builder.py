@@ -19,6 +19,7 @@ from weave.trace_server.agents.types import (
     AgentCustomAttrsSchemaReq,
     AgentGroupByRef,
     AgentSearchReq,
+    AgentSignalFilter,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -28,6 +29,7 @@ from weave.trace_server.agents.types import (
     AgentsQueryFilters,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    RatingCondition,
 )
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.query import Query
@@ -56,6 +58,9 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_spans_list_query,
     make_trace_detail_spans_query,
     resolve_group_by,
+)
+from weave.trace_server.query_builder.agent_signal_filters import (
+    build_signal_filter_clause,
 )
 from weave.trace_server.query_builder.agent_trace_attribution import (
     attributed_spans_source,
@@ -357,6 +362,23 @@ class TestMakeSpansListQuery:
                     AgentSpanValueRef(source="custom_attrs_string", key="env")
                 ],
             )
+
+    def test_signal_filters_require_group_by(self) -> None:
+        """signal_filters compile to a conversation_id semi-join applied only on the
+        grouped path, so requiring group_by keeps them from silently no-op'ing on an
+        ungrouped query. An empty filter is a no-op and must not trip the guard.
+        """
+        with pytest.raises(ValidationError):
+            AgentSpansQueryReq(
+                project_id="p1",
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            )
+        AgentSpansQueryReq(project_id="p1", signal_filters=AgentSignalFilter())
+        AgentSpansQueryReq(
+            project_id="p1",
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            signal_filters=AgentSignalFilter(tags=["x"]),
+        )
 
     def test_include_details_projects_detail_columns(self) -> None:
         from weave.trace_server.query_builder.agent_query_builder import (
@@ -807,6 +829,44 @@ class TestMakeGroupedSpansCountQuery:
         expected_params = {"genai_0": "p1", "genai_1": "env"}
         assert_sql(expected, expected_params, query, pb.get_params())
 
+    def test_group_by_conversation_id_with_signal_filter(self) -> None:
+        """Grouped count applies the signal semi-join too, so total_count matches the
+        filtered list instead of counting every conversation.
+        """
+        pb = ParamBuilder("genai")
+        query = make_spans_count_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            ),
+        )
+        # genai_0 = span-filter project_id, genai_1 = signal project_id, genai_2 = tags;
+        # attributed source params come last (genai_3).
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT count() FROM (
+                SELECT s.conversation_id FROM {src.sql} s
+                WHERE s.project_id = {{genai_0:String}}
+                  AND s.conversation_id IN (SELECT span_conversation_id FROM feedback
+                                            WHERE project_id = {{genai_1:String}}
+                                              AND feedback_type IN ('wandb.agent_monitor',
+                                                                    'wandb.agent_user_feedback')
+                                              AND span_conversation_id != ''
+                                            GROUP BY span_conversation_id
+                                            HAVING sum(hasAny(scorer_tags, {{genai_2:Array(String)}})) > 0)
+                GROUP BY s.conversation_id
+            )
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": "p1",
+            "genai_2": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_spans_list_query (grouped)
@@ -871,6 +931,40 @@ class TestMakeGroupedSpansListQuery:
             "genai_2": end,
             "genai_3": 100,
             "genai_4": 0,
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_group_by_span_name_sorted_by_count(self) -> None:
+        start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="span_name")],
+                sort_by=[AgentSortBy(field="span_count", direction="desc")],
+                started_after=start,
+                limit=1000,
+            ),
+        )
+
+        src = _AttrSrc(4, started_after=start)
+        expected = f"""
+            SELECT s.span_name AS span_name,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.started_at >= {{genai_1:DateTime64(6)}}
+            GROUP BY span_name
+            ORDER BY span_count desc
+            LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": start,
+            "genai_2": 1000,
+            "genai_3": 0,
             **src.params,
         }
         assert_sql(expected, expected_params, query, pb.get_params())
@@ -1162,6 +1256,72 @@ class TestMakeGroupedSpansListQuery:
                 ),
             )
 
+    def test_grouped_query_without_signal_filters_unchanged(self) -> None:
+        """Grouped query with no signal_filters produces no semi-join."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+            ),
+        )
+
+        src = _AttrSrc(3)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {"genai_0": "p1", "genai_1": 100, "genai_2": 0, **src.params}
+        assert_sql(expected, expected_params, query, pb.get_params())
+
+    def test_grouped_query_with_signal_filter_adds_semijoin(self) -> None:
+        """Grouped query with signal_filters appends AND s.conversation_id IN (...)."""
+        pb = ParamBuilder("genai")
+        query = make_spans_list_query(
+            pb,
+            AgentSpansQueryReq(
+                project_id="p1",
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                signal_filters=AgentSignalFilter(tags=["x"]),
+            ),
+        )
+
+        # Signal subquery params: genai_3 = project_id, genai_4 = tags array
+        # Source params start at genai_5
+        src = _AttrSrc(5)
+        expected = f"""
+            SELECT s.conversation_id AS conversation_id,
+                   {_GROUPED_AGG_TAIL}
+            FROM {src.sql} s
+            WHERE s.project_id = {{genai_0:String}}
+              AND s.conversation_id IN (SELECT span_conversation_id
+                                        FROM feedback
+                                        WHERE project_id = {{genai_3:String}}
+                                          AND feedback_type IN ('wandb.agent_monitor',
+                                                                'wandb.agent_user_feedback')
+                                          AND span_conversation_id != ''
+                                        GROUP BY span_conversation_id
+                                        HAVING sum(hasAny(scorer_tags, {{genai_4:Array(String)}})) > 0)
+            GROUP BY conversation_id
+            ORDER BY last_seen DESC
+            LIMIT {{genai_1:UInt64}} OFFSET {{genai_2:UInt64}}
+        """
+        expected_params = {
+            "genai_0": "p1",
+            "genai_1": 100,
+            "genai_2": 0,
+            "genai_3": "p1",
+            "genai_4": ["x"],
+            **src.params,
+        }
+        assert_sql(expected, expected_params, query, pb.get_params())
+
 
 # ============================================================================
 # make_span_group_*_distribution_query
@@ -1395,6 +1555,13 @@ class TestResolveGroupBy:
         pb = ParamBuilder("genai")
         out = resolve_group_by(pb, [AgentGroupByRef(source="field", key="agent.name")])
         assert out == [("s.agent_name", "agent_name")]
+
+    def test_field_source_resolves_eval_semconv_key(self) -> None:
+        pb = ParamBuilder("genai")
+        out = resolve_group_by(
+            pb, [AgentGroupByRef(source="field", key="eval.row_digest")]
+        )
+        assert out == [("s.eval_row_digest", "eval_row_digest")]
 
     def test_rejects_invalid_alias(self) -> None:
         pb = ParamBuilder("genai")
@@ -2054,3 +2221,77 @@ class TestBuildOrderBy:
             build_order_by(sort, SPAN_SORTABLE_COLS, "fallback")
             == "started_at desc, input_tokens asc"
         )
+
+
+def test_signal_filter_round_trip() -> None:
+    req = AgentSpansQueryReq(
+        project_id="ent/proj",
+        group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+        signal_filters=AgentSignalFilter(
+            tags=["a", "b"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert req.signal_filters.tags == ["a", "b"]
+    assert req.signal_filters.ratings[0].op == "gte"
+    assert AgentSignalFilter().is_empty() is True
+    assert req.signal_filters.is_empty() is False
+
+
+def test_build_signal_filter_clause() -> None:
+    # Empty / None -> None
+    assert build_signal_filter_clause(ParamBuilder(), "ent/proj", None) is None
+    assert (
+        build_signal_filter_clause(ParamBuilder(), "ent/proj", AgentSignalFilter())
+        is None
+    )
+
+    # Tags only -> one grouped sub-select, HAVING sum(hasAny(...)) > 0. feedback_type
+    # list is sorted from AGENT_SPAN_FEEDBACK_TYPES, not re-hardcoded.
+    pb = ParamBuilder()
+    clause = build_signal_filter_clause(
+        pb, "ent/proj", AgentSignalFilter(tags=["x", "y"])
+    )
+    assert clause is not None
+    params = pb.get_params()
+    pid_p, tags_p = list(params.keys())
+    assert " ".join(clause.split()) == (
+        f"s.conversation_id IN (SELECT span_conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
+        f"AND span_conversation_id != '' "
+        f"GROUP BY span_conversation_id "
+        f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0)"
+    )
+    assert params[pid_p] == "ent/proj"
+    assert params[tags_p] == ["x", "y"]
+
+    # Tags + rating -> one grouped sub-select with a HAVING term per signal. A
+    # conversation can carry the human tag and the monitor rating on different feedback
+    # rows, so the match is per-conversation (sum(...) > 0), not a single-row conjunction.
+    pb = ParamBuilder()
+    clause = build_signal_filter_clause(
+        pb,
+        "ent/proj",
+        AgentSignalFilter(
+            tags=["x"],
+            ratings=[RatingCondition(scorer_key="_rating_", op="gte", value=0.8)],
+        ),
+    )
+    assert clause is not None
+    params = pb.get_params()
+    pid_p, tags_p, key_p, val_p = list(params.keys())
+    assert " ".join(clause.split()) == (
+        f"s.conversation_id IN (SELECT span_conversation_id FROM feedback "
+        f"WHERE project_id = {{{pid_p}:String}} "
+        f"AND feedback_type IN ('wandb.agent_monitor', 'wandb.agent_user_feedback') "
+        f"AND span_conversation_id != '' "
+        f"GROUP BY span_conversation_id "
+        f"HAVING sum(hasAny(scorer_tags, {{{tags_p}:Array(String)}})) > 0 "
+        f"AND sum(mapContains(scorer_ratings, {{{key_p}:String}}) "
+        f"AND scorer_ratings[{{{key_p}:String}}] >= {{{val_p}:Float64}}) > 0)"
+    )
+    assert params[pid_p] == "ent/proj"
+    assert params[tags_p] == ["x"]
+    assert params[key_p] == "_rating_"
+    assert params[val_p] == 0.8

@@ -1,6 +1,9 @@
+from collections.abc import Callable
+
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
 from gql.transport.exceptions import TransportServerError
+from pydantic import ValidationError
 
 from weave.trace_server.errors import (
     BadQueryParameterError,
@@ -9,6 +12,15 @@ from weave.trace_server.errors import (
     ObjectNameTypeCollision,
     handle_clickhouse_query_error,
     handle_server_exception,
+)
+from weave.trace_server.interface.builtin_object_classes.provider import (
+    INVALID_BASE_URL_MSG,
+    Provider,
+)
+from weave.trace_server.trace_server_interface import (
+    ObjAddTagsReq,
+    ObjRemoveAliasesReq,
+    ObjSetAliasesReq,
 )
 
 
@@ -70,6 +82,88 @@ def test_invalid_field_error_maps_to_422() -> None:
     """
     result = handle_server_exception(InvalidFieldError("Field 'foo' is not allowed"))
     assert result.status_code == 422
+
+
+# A *Req validator that rejects user input raises InvalidRequest, which propagates
+# unwrapped (pydantic only wraps ValueError/AssertionError) and hits the exact-type
+# registry -> 400. A bare pydantic ValidationError (a structural failure, e.g. the
+# server deserializing stored data) is not a client error and stays 500. WB-36386.
+@pytest.mark.parametrize(
+    ("build", "reason"),
+    [
+        (
+            lambda: ObjSetAliasesReq(
+                project_id="1", object_id="o", digest="d", aliases=["bad:alias"]
+            ),
+            "alias name cannot contain character ':'",
+        ),
+        (
+            lambda: ObjRemoveAliasesReq(
+                project_id="1", object_id="o", aliases=["bad/alias"]
+            ),
+            "alias name cannot contain character '/'",
+        ),
+        (
+            lambda: ObjAddTagsReq(
+                project_id="1", object_id="o", digest="d", tags=["bad:tag"]
+            ),
+            "tag name 'bad:tag' is invalid: only alphanumeric characters, "
+            "hyphens, underscores, and single spaces between words are allowed",
+        ),
+    ],
+)
+def test_request_validators_map_to_400(
+    build: Callable[[], object], reason: str
+) -> None:
+    with pytest.raises(InvalidRequest) as excinfo:
+        build()
+    result = handle_server_exception(excinfo.value)
+    assert result.status_code == 400
+    assert result.message == {"reason": reason}
+
+
+@pytest.mark.parametrize(
+    ("build", "reason"),
+    [
+        (
+            lambda: Provider(
+                base_url="http://metadata.google.internal", api_key_name="k"
+            ),
+            INVALID_BASE_URL_MSG,
+        ),
+        (
+            lambda: Provider(
+                base_url="https://api.openai.com",
+                api_key_name="k",
+                extra_headers={"Metadata-Flavor": "Google"},
+            ),
+            "extra_headers contains a disallowed header",
+        ),
+    ],
+)
+def test_provider_ssrf_validators_map_to_400(
+    build: Callable[[], object], reason: str
+) -> None:
+    """Provider base_url / extra_headers SSRF defenses (VULNMGMT-770) reject
+    client input -> 400, not 500.
+    """
+    with pytest.raises(InvalidRequest) as excinfo:
+        build()
+    result = handle_server_exception(excinfo.value)
+    assert result.status_code == 400
+    assert result.message == {"reason": reason}
+
+
+def test_structural_validation_error_stays_500() -> None:
+    """A bare pydantic ValidationError (a field structurally mistyped, as when the
+    server deserializes stored data) is not the client's fault -> 500. Guards
+    against blanket-registering ValidationError -> 400.
+    """
+    with pytest.raises(ValidationError) as excinfo:
+        ObjAddTagsReq(project_id="1", object_id="o", digest="d", tags=123)
+    result = handle_server_exception(excinfo.value)
+    assert result.status_code == 500
+    assert result.message == {"reason": "Internal server error"}
 
 
 def test_object_name_type_collision_maps_to_400() -> None:

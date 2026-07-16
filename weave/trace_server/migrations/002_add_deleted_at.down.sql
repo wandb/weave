@@ -4,10 +4,10 @@ This migration undoes adding the `deleted_at` column to:
     - the object_versions_deduped and calls_merged_view views
 */
 
-ALTER TABLE object_versions DROP COLUMN deleted_at;
+ALTER TABLE object_versions DROP COLUMN IF EXISTS deleted_at;
 
-DROP VIEW object_versions_deduped;
-CREATE VIEW object_versions_deduped as
+DROP VIEW IF EXISTS object_versions_deduped;
+CREATE VIEW IF NOT EXISTS object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,
@@ -71,6 +71,6 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
-ALTER TABLE calls_merged DROP COLUMN deleted_at;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS deleted_at;
 
-ALTER TABLE call_parts DROP COLUMN deleted_at;
+ALTER TABLE call_parts DROP COLUMN IF EXISTS deleted_at;

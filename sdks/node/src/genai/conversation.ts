@@ -44,7 +44,7 @@ export interface ConversationInit {
   conversationId?: string;
 
   /**
-   * Custom attributes stamped on every span the conversation emits.
+   * Custom attributes propagated to every span the conversation emits.
    *
    * A key here that collides with a span's own `gen_ai.*` / `weave.*`
    * attribute is unsupported; the span's value wins.
@@ -162,6 +162,10 @@ export class Conversation {
       agentDescription: opts.agentDescription ?? this._agentDescription,
       agentVersion: opts.agentVersion ?? this._agentVersion,
       conversationId: this._conversationId,
+      // Turn inherits the conversation's attributes; a per-turn key wins.
+      attributes: opts.attributes
+        ? {...this._attributes, ...opts.attributes}
+        : this._attributes,
     });
   }
 

@@ -26,6 +26,26 @@ DEFAULT_MIGRATION_DIR = os.path.abspath(
 )
 
 
+def _count_result(n: int) -> Mock:
+    """Mock a `SELECT count()` query result with a single row/column of `n`."""
+    res = Mock()
+    res.result_rows = [(n,)]
+    return res
+
+
+def _stub_divergence_precheck(sql: str) -> Mock | None:
+    """Stub the divergence pre-check queries in `_apply_migrations_locked`.
+
+    A row in the migrations table (count 1) makes the guard a no-op, so tests
+    that mock the inner migration methods reach the path they exercise.
+    """
+    if "system.tables" in sql:
+        return _count_result(0)
+    if "count()" in sql and ".migrations" in sql:
+        return _count_result(1)
+    return None
+
+
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     """Create a mock CH client that returns *database_engine* for system.databases queries.
 
@@ -42,6 +62,9 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     def _query_side_effect(sql, *args, **kwargs):
         if "system.databases" in sql:
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -62,6 +85,9 @@ def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> M
             else:
                 engine_result.result_rows = []
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -331,21 +357,80 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
+def test_apply_migrations_recovers_partially_applied(mock_migration_lock):
+    # partial == curr+1 is recoverable: re-run the interrupted (idempotent)
+    # migration, then continue with the rest instead of dead-ending.
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
     )
+    migrator._migration_row_exists = Mock(return_value=True)
     migrator._get_migration_status = Mock(
+        side_effect=[
+            {"curr_version": 1, "partially_applied_version": 2},
+            {"curr_version": 2, "partially_applied_version": None},
+        ]
+    )
+    migrator._get_migrations = Mock(
         return_value={
-            "curr_version": 1,
-            "partially_applied_version": 2,
+            2: {"up": "2.up.sql", "down": "2.down.sql"},
+            3: {"up": "3.up.sql", "down": "3.down.sql"},
+        }
+    )
+    migrator._determine_migrations_to_apply = Mock(return_value=[(3, "3.up.sql")])
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    migrator.apply_migrations("test_db")
+
+    migrator._apply_migration.assert_any_call("test_db", 2, "2.up.sql")
+    migrator._apply_migration.assert_any_call("test_db", 3, "3.up.sql")
+
+
+def test_apply_migrations_raises_on_unrecoverable_partial(mock_migration_lock):
+    # A partial version that isn't the expected next migration (curr+1) is not
+    # safe to auto-recover; require manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 5}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 6)
         }
     )
     migrator._has_migrations_to_apply = Mock(return_value=True)
 
-    with pytest.raises(MigrationError, match="partially applied migration version 2"):
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
         migrator.apply_migrations("test_db")
+
+
+def test_apply_migrations_raises_on_non_recoverable_one_shot(mock_migration_lock):
+    # A one-shot migration (006 seed, 024 swap) is partial==curr+1 but must NOT be
+    # re-run; recovery refuses it and requires manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 5, "partially_applied_version": 6}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 7)
+        }
+    )
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
+        migrator.apply_migrations("test_db")
+    migrator._apply_migration.assert_not_called()
 
 
 def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):

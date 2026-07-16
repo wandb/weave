@@ -93,6 +93,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    validate_feedback_agent_req_targets,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -2461,7 +2462,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         project_id: str,
         eval_root_ids: list[str],
         include_children: bool = True,
-        include_costs: bool = False,
     ) -> Iterator[tsi.CallSchema]:
         columns = [
             "id",
@@ -2494,7 +2494,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         filter=tsi.CallsFilter(parent_ids=eval_root_children_ids),
                         columns=columns,
                         sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-                        include_costs=include_costs,
                     )
                 )
 
@@ -3197,7 +3196,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             for rec in self._objs_for_object_id(req.project_id, req.object_id):
                 rec.is_latest = 1 if rec.digest == latest_digest else 0
 
-        return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
+        return tsi.ObjDeleteRes(
+            num_deleted=len(matching_objects),
+            deleted_versions=[
+                tsi.DeletedObjVersion(
+                    digest=rec.digest,
+                    base_object_class=rec.base_object_class,
+                    leaf_object_class=rec.leaf_object_class,
+                )
+                for rec in matching_objects
+            ],
+        )
 
     def _ensure_obj_version_exists(
         self, project_id: str, object_id: str, digest: str
@@ -3744,6 +3753,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
+        validate_feedback_agent_req_targets(req)
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
@@ -3761,6 +3771,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
+            validate_feedback_agent_req_targets(feedback_req)
 
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
@@ -6813,7 +6824,6 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 req.project_id,
                 eval_root_ids,
                 include_children=req.include_predict_and_score_children,
-                include_costs=req.include_costs,
             )
         )
         if req.resolve_row_refs:
@@ -6915,6 +6925,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         all_rows, _ = eval_helpers.eval_results_grouped_rows(
             all_rows_req, eval_root_ids, all_calls
         )
+
+        # ---- Fill predict-call costs onto trials ----
+        if req.include_costs:
+            eval_helpers.apply_predict_costs(
+                all_rows, req.project_id, self.calls_query_stream
+            )
 
         # ---- Apply per-evaluation filters ----
         if req.filters:

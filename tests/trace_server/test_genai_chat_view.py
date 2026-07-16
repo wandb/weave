@@ -6,10 +6,13 @@ end-to-end against ClickHouse; these tests pin the pure projection rules.
 
 import datetime
 import json
+import sys
 
 import pytest
 
 from weave.trace_server.agents.chat_view import (
+    _MAX_REF_SEARCH_DEPTH,
+    _iter_internal_refs,
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
@@ -675,6 +678,184 @@ def test_invoke_agent_mirrors_child_llm_output_messages() -> None:
     assert _assistant_payload(agent_messages[0]).text == "It's 72°F."
 
 
+def test_chat_span_mirrors_assistant_text_child() -> None:
+    """Claude Code emits assistant text on both the model chat span and a
+    direct assistant_text transcript child. The child keeps its timeline
+    position and inherits the parent model's richer metadata.
+    """
+
+    def at(milliseconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026,
+            1,
+            1,
+            0,
+            0,
+            0,
+            milliseconds * 1000,
+            tzinfo=datetime.timezone.utc,
+        )
+
+    final_text = [
+        {
+            "role": "assistant",
+            "content": _parts(_text_part("I'll inspect the trace.")),
+        }
+    ]
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            agent_name="claude-code",
+            request_model="claude-opus-4-8",
+            agent_version="1.2.3",
+            output_messages=final_text,
+            reasoning_content="Check the trace structure first.",
+            reasoning_tokens=12,
+            input_tokens=200,
+            output_tokens=40,
+            total_cost_usd=0.03,
+            started_at=at(100),
+            ended_at=at(900),
+        ),
+        _span(
+            span_id="assistant-text",
+            parent_span_id="chat",
+            operation_name="assistant_text",
+            agent_name="claude-code",
+            output_messages=final_text,
+            started_at=at(500),
+            ended_at=at(500),
+        ),
+    ]
+
+    assistant_messages = [
+        message
+        for message in build_chat_messages(spans)
+        if message.type == "assistant_message"
+    ]
+
+    assert len(assistant_messages) == 1
+    message = assistant_messages[0]
+    payload = _assistant_payload(message)
+    assert message.span_id == "assistant-text"
+    assert message.started_at == at(500)
+    assert message.agent_version == "1.2.3"
+    assert payload.text == "I'll inspect the trace."
+    assert payload.model == "claude-opus-4-8"
+    assert payload.reasoning_content == "Check the trace structure first."
+    assert payload.reasoning_tokens == 12
+    assert payload.input_tokens == 200
+    assert payload.output_tokens == 40
+    assert payload.total_cost_usd == 0.03
+    assert payload.duration_ms == 800
+
+
+def test_chat_span_keeps_distinct_child_assistant_text() -> None:
+    """Only exact mirrored text coalesces; distinct parent/child replies stay
+    separate.
+    """
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            output_messages=[{"role": "assistant", "content": "Final answer"}],
+        ),
+        _span(
+            span_id="assistant-text",
+            parent_span_id="chat",
+            operation_name="assistant_text",
+            output_messages=[{"role": "assistant", "content": "Progress update"}],
+        ),
+    ]
+
+    assistant_texts = [
+        _assistant_payload(message).text
+        for message in build_chat_messages(spans)
+        if message.type == "assistant_message"
+    ]
+
+    assert assistant_texts == ["Progress update", "Final answer"]
+
+
+def test_chat_spans_use_assistant_text_children_for_sibling_order() -> None:
+    """Claude Code chat siblings can share a coarse start timestamp while
+    their transcript children retain the true assistant-message order.
+    """
+
+    def at(milliseconds: int) -> datetime.datetime:
+        return datetime.datetime(
+            2026,
+            1,
+            1,
+            0,
+            0,
+            0,
+            milliseconds * 1000,
+            tzinfo=datetime.timezone.utc,
+        )
+
+    first = [{"role": "assistant", "content": "First update"}]
+    second = [{"role": "assistant", "content": "Second update"}]
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            started_at=at(0),
+            ended_at=at(400),
+        ),
+        # The later response has the longer parent span, which is the normal
+        # equal-start tiebreaker. Its transcript child must override that.
+        _span(
+            span_id="chat-second",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=second,
+            started_at=at(100),
+            ended_at=at(300),
+        ),
+        _span(
+            span_id="text-second",
+            parent_span_id="chat-second",
+            operation_name="assistant_text",
+            output_messages=second,
+            started_at=at(250),
+            ended_at=at(250),
+        ),
+        _span(
+            span_id="chat-first",
+            parent_span_id="agent",
+            operation_name="chat",
+            output_messages=first,
+            started_at=at(100),
+            ended_at=at(200),
+        ),
+        _span(
+            span_id="text-first",
+            parent_span_id="chat-first",
+            operation_name="assistant_text",
+            output_messages=first,
+            started_at=at(150),
+            ended_at=at(150),
+        ),
+    ]
+
+    assistants = [
+        message
+        for message in build_chat_messages(spans)
+        if message.type == "assistant_message"
+    ]
+
+    assert [message.span_id for message in assistants] == [
+        "text-first",
+        "text-second",
+    ]
+    assert [_assistant_payload(message).text for message in assistants] == [
+        "First update",
+        "Second update",
+    ]
+
+
 def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     """If an invoke_agent has output_messages but no descendant LLM span
     carries them, the parent still emits — the guard is "child emitted
@@ -700,6 +881,34 @@ def test_invoke_agent_emits_when_no_descendant_llm_span() -> None:
     agent_messages = [m for m in messages if m.type == "assistant_message"]
     assert len(agent_messages) == 1
     assert _assistant_payload(agent_messages[0]).text == "hi there"
+
+
+def test_claude_async_agent_launch_renders_as_tool_activity() -> None:
+    """Claude Code's async launch envelope is execution state, not a reply."""
+    launch = json.dumps(
+        {
+            "isAsync": True,
+            "status": "async_launched",
+            "agentId": "worker-1",
+            "description": "Inspect the frontend cost card",
+        }
+    )
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="explore-agent",
+                operation_name="invoke_agent",
+                agent_name="Explore",
+                output_messages=[{"role": "assistant", "content": launch}],
+            )
+        ]
+    )
+
+    assert [message.type for message in messages] == ["agent_start", "tool_call"]
+    tool = _tool_payload(messages[1])
+    assert tool.tool_name == "Start Explore"
+    assert tool.tool_arguments == "Inspect the frontend cost card"
+    assert tool.tool_result == launch
 
 
 def test_reasoning_part_not_duplicated_in_assistant_text() -> None:
@@ -940,6 +1149,83 @@ def test_system_message_not_used_as_user_prompt_fallback() -> None:
     assert [m.type for m in messages] == ["assistant_message"]
 
 
+def test_claude_task_notification_renders_as_tool_activity() -> None:
+    """Claude Code sends async subagent completions to the model as role=user,
+    but the chat trajectory must not present them as a human prompt.
+    """
+    notification = (
+        "<task-notification>\n"
+        "<task-id>worker-1</task-id>\n"
+        "<output-file>/tmp/worker-1.txt</output-file>\n"
+        "<status>completed</status>\n"
+        "</task-notification>"
+    )
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="claude-chat",
+                operation_name="chat",
+                agent_name="claude-code",
+                input_messages=[{"role": "user", "content": notification}],
+                output_messages=[
+                    {"role": "assistant", "content": "Worker result received."}
+                ],
+            )
+        ]
+    )
+
+    assert [message.type for message in messages] == [
+        "tool_call",
+        "assistant_message",
+    ]
+    tool_message = messages[0]
+    tool = _tool_payload(tool_message)
+    assert tool_message.span_id == "claude-chat"
+    assert tool_message.agent_name == "claude-code"
+    assert tool.tool_name == "Task notification"
+    assert tool.tool_result == notification
+    assert all(message.type != "user_message" for message in messages)
+
+
+def test_claude_task_notification_falls_back_from_invoke_agent() -> None:
+    """Claude session turns can record the notification only on the enclosing
+    invoke_agent span rather than the child chat span.
+    """
+    notification = (
+        "<task-notification>\n"
+        "<task-id>worker-1</task-id>\n"
+        "<status>completed</status>\n"
+        "</task-notification>"
+    )
+    messages = build_chat_messages(
+        [
+            _span(
+                span_id="agent",
+                operation_name="invoke_agent",
+                agent_name="claude-code",
+                input_messages=[{"role": "user", "content": notification}],
+            ),
+            _span(
+                span_id="chat",
+                parent_span_id="agent",
+                operation_name="chat",
+                output_messages=[
+                    {"role": "assistant", "content": "Worker result received."}
+                ],
+            ),
+        ]
+    )
+
+    assert [message.type for message in messages] == [
+        "tool_call",
+        "agent_start",
+        "assistant_message",
+    ]
+    tool_message = messages[0]
+    assert tool_message.span_id == "agent"
+    assert _tool_payload(tool_message).tool_result == notification
+
+
 def test_input_media_attaches_to_user_message_not_assistant() -> None:
     """Regression: media supplied with the user prompt renders on the user
     bubble, not the assistant.
@@ -991,6 +1277,105 @@ def test_input_media_attaches_to_user_message_not_assistant() -> None:
     # Value is the internal (convertible) ref; direction is from the input part.
     assert _user_payload(user).content_refs == [audio_internal]
     assert _assistant_payload(assistant).content_refs == []
+
+
+def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
+    """Server-side content conversion embeds an internal weave ref directly in
+    the message part (e.g. an OpenAI ``image_url``) with no span-level
+    ``content_refs``. The recursive inline-ref sweep surfaces it so the image
+    still renders on the user bubble.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-describer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(_text_part("What is in this image?")),
+                }
+            ],
+        ),
+        _span(
+            span_id="chat",
+            parent_span_id="agent",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_internal}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+            # No span-level content_refs — the ref lives only inline in the part.
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+    assistant = next(m for m in messages if m.type == "assistant_message")
+
+    assert _user_payload(user).content_refs == [image_internal]
+    assert _assistant_payload(assistant).content_refs == []
+
+
+@pytest.mark.xfail(
+    reason=(
+        "Known limitation (PR #7489 discussion): the inline-ref sweep "
+        "(_iter_internal_refs) surfaces ANY internal weave ref, not only "
+        "Content/media refs. A message that legitimately carries a ref to a "
+        "non-media object (prompt/model/dataset) in a structured field leaks "
+        "into content_refs and renders as broken media. A media ref is "
+        "indistinguishable from a prompt ref at the string level and the part "
+        "shapes are not normalized, so scoping the sweep is deferred to a "
+        "follow-up (e.g. record converted media refs authoritatively at "
+        "ingest, or scope the sweep to media part positions)."
+    ),
+    strict=False,
+)
+def test_inline_sweep_excludes_non_media_internal_refs() -> None:
+    """The inline-ref sweep must surface only Content/media refs. A message that
+    legitimately carries a ref to a non-media object (a prompt, model, dataset)
+    in a structured field must NOT land in ``content_refs``, or the UI renders
+    it as broken media. Content objects are stored under a sanitized-filename
+    object_id, so a media ref is indistinguishable at the string level from a
+    prompt ref — the walker needs to scope the match.
+    """
+    image_ref = "weave-trace-internal:///PID/object/gift_basket_png:IMGDIGEST"
+    prompt_ref = "weave-trace-internal:///PID/object/describe_image_prompt:PROMPTDIGEST"
+    spans = [
+        _span(
+            span_id="chat",
+            operation_name="chat",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        _text_part("What is in this image?"),
+                        {"type": "image_url", "image_url": {"url": image_ref}},
+                        # Agent quoting the prompt object it ran under — not media.
+                        {"type": "tool_use", "input": {"prompt_ref": prompt_ref}},
+                    ),
+                }
+            ],
+            output_messages=[
+                {"role": "assistant", "content": _parts(_text_part("A gift basket."))}
+            ],
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    # Only the media ref should render; the prompt ref is a false positive today.
+    assert _user_payload(user).content_refs == [image_ref]
 
 
 def test_output_media_attaches_to_assistant_message() -> None:
@@ -1341,3 +1726,54 @@ def test_build_span_tree_sorts_equal_starts_by_latest_end_first() -> None:
     ]
     roots = build_span_tree(spans)
     assert [r.span.span_id for r in roots] == ["z-long", "a-short", "b-short"]
+
+
+def _nest_in_lists(value: object, levels: int) -> object:
+    """Wrap ``value`` in ``levels`` nested single-element lists.
+
+    Each list level costs one ``_iter_internal_refs`` recursive descent, so the
+    ref sits exactly ``levels`` deep — a deterministic knob for the depth cap.
+    """
+    nested = value
+    for _ in range(levels):
+        nested = [nested]
+    return nested
+
+
+def test_iter_internal_refs_finds_refs_at_normal_depth() -> None:
+    """A realistically nested inline part (message dict -> content JSON ->
+    parts list -> image_url dict -> url string) is well within the cap, so the
+    internal ref is still surfaced exactly as before.
+    """
+    image_internal = "weave-trace-internal:///PID/object/image-abcd.png:IMGDIGEST"
+    message = {
+        "role": "user",
+        "content": _parts(
+            _text_part("What is in this image?"),
+            {"type": "image_url", "image_url": {"url": image_internal}},
+        ),
+        "finish_reason": "",
+    }
+    assert list(_iter_internal_refs(message)) == [image_internal]
+
+
+def test_iter_internal_refs_caps_recursion_on_deeply_nested_payload() -> None:
+    """A pathologically deep payload terminates without ``RecursionError``.
+
+    The recursion limit is dwarfed by the nesting depth, so an uncapped walk
+    would blow the interpreter stack. With the cap in place the walk returns
+    cleanly; refs at the cap boundary are surfaced and deeper refs are dropped.
+    """
+    ref = "weave-trace-internal:///PID/object/deep:DIGEST"
+
+    # A ref sitting exactly at the cap is still found; one level deeper is not.
+    assert list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH))) == [
+        ref
+    ]
+    assert (
+        list(_iter_internal_refs(_nest_in_lists(ref, _MAX_REF_SEARCH_DEPTH + 1))) == []
+    )
+
+    # Far beyond sys.getrecursionlimit(): must not raise, must yield nothing.
+    pathological = _nest_in_lists(ref, sys.getrecursionlimit() * 2)
+    assert list(_iter_internal_refs(pathological)) == []

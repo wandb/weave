@@ -11543,7 +11543,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/openai/gpt-oss-120b": [
+  "openai/gpt-oss-120b": [
     {
       "provider": "coreweave",
       "input": 1.5e-07,
@@ -11559,7 +11559,7 @@
       "created_at": "2026-07-01 09:59:23"
     }
   ],
-  "coreweave/openai/gpt-oss-20b": [
+  "openai/gpt-oss-20b": [
     {
       "provider": "coreweave",
       "input": 5e-08,
@@ -11575,7 +11575,7 @@
       "created_at": "2026-07-01 09:59:23"
     }
   ],
-  "coreweave/Qwen/Qwen3-235B-A22B-Instruct-2507": [
+  "Qwen/Qwen3-235B-A22B-Instruct-2507": [
     {
       "provider": "coreweave",
       "input": 1e-07,
@@ -11583,7 +11583,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/Qwen/Qwen3-Coder-480B-A35B-Instruct": [
+  "Qwen/Qwen3-Coder-480B-A35B-Instruct": [
     {
       "provider": "coreweave",
       "input": 1e-06,
@@ -11591,7 +11591,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/Qwen/Qwen3-235B-A22B-Thinking-2507": [
+  "Qwen/Qwen3-235B-A22B-Thinking-2507": [
     {
       "provider": "coreweave",
       "input": 1e-07,
@@ -11599,7 +11599,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/moonshotai/Kimi-K2-Instruct": [
+  "moonshotai/Kimi-K2-Instruct": [
     {
       "provider": "coreweave",
       "input": 1.35e-06,
@@ -11607,7 +11607,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/meta-llama/Llama-3.1-8B-Instruct": [
+  "meta-llama/Llama-3.1-8B-Instruct": [
     {
       "provider": "coreweave",
       "input": 2.2e-07,
@@ -11615,7 +11615,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/deepseek-ai/DeepSeek-R1-0528": [
+  "deepseek-ai/DeepSeek-R1-0528": [
     {
       "provider": "coreweave",
       "input": 1.35e-06,
@@ -11623,7 +11623,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/deepseek-ai/DeepSeek-V3-0324": [
+  "deepseek-ai/DeepSeek-V3-0324": [
     {
       "provider": "coreweave",
       "input": 1.14e-06,
@@ -11631,7 +11631,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/meta-llama/Llama-3.3-70B-Instruct": [
+  "meta-llama/Llama-3.3-70B-Instruct": [
     {
       "provider": "coreweave",
       "input": 7.1e-07,
@@ -11639,7 +11639,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+  "meta-llama/Llama-4-Scout-17B-16E-Instruct": [
     {
       "provider": "coreweave",
       "input": 1.7e-07,
@@ -11647,7 +11647,7 @@
       "created_at": "2025-08-20 13:33:54"
     }
   ],
-  "coreweave/microsoft/Phi-4-mini-instruct": [
+  "microsoft/Phi-4-mini-instruct": [
     {
       "provider": "coreweave",
       "input": 8e-08,
@@ -11679,7 +11679,7 @@
       "created_at": "2025-08-21 14:19:20"
     }
   ],
-  "coreweave/deepseek-ai/DeepSeek-V3.1": [
+  "deepseek-ai/DeepSeek-V3.1": [
     {
       "provider": "coreweave",
       "input": 5.5e-07,
@@ -14601,7 +14601,7 @@
       "created_at": "2026-04-01 13:02:37"
     }
   ],
-  "coreweave/zai-org/GLM-4.5": [
+  "zai-org/GLM-4.5": [
     {
       "provider": "coreweave",
       "input": 5.5e-07,
@@ -14609,7 +14609,7 @@
       "created_at": "2025-09-29 12:08:30"
     }
   ],
-  "coreweave/Qwen/Qwen2.5-14B-Instruct": [
+  "Qwen/Qwen2.5-14B-Instruct": [
     {
       "provider": "coreweave",
       "input": 6e-08,
@@ -15369,7 +15369,7 @@
       "created_at": "2025-10-23 06:49:10"
     }
   ],
-  "coreweave/OpenPipe/Qwen3-14B-Instruct": [
+  "OpenPipe/Qwen3-14B-Instruct": [
     {
       "provider": "coreweave",
       "input": 5e-08,
@@ -16015,7 +16015,7 @@
       "created_at": "2025-11-14 13:09:35"
     }
   ],
-  "coreweave/moonshotai/Kimi-K2-Instruct-0905": [
+  "moonshotai/Kimi-K2-Instruct-0905": [
     {
       "provider": "coreweave",
       "input": 6e-07,
@@ -16023,7 +16023,7 @@
       "created_at": "2025-11-14 13:09:35"
     }
   ],
-  "coreweave/meta-llama/Llama-3.1-70B-Instruct": [
+  "meta-llama/Llama-3.1-70B-Instruct": [
     {
       "provider": "coreweave",
       "input": 8e-07,
@@ -21753,7 +21753,7 @@
       "created_at": "2026-01-28 10:01:14"
     }
   ],
-  "coreweave/Qwen/Qwen3-30B-A3B-Instruct-2507": [
+  "Qwen/Qwen3-30B-A3B-Instruct-2507": [
     {
       "provider": "coreweave",
       "input": 1e-07,
@@ -23449,7 +23449,7 @@
       "created_at": "2026-04-01 13:02:37"
     }
   ],
-  "coreweave/MiniMaxAI/MiniMax-M2.5": [
+  "MiniMaxAI/MiniMax-M2.5": [
     {
       "provider": "coreweave",
       "input": 3e-07,
@@ -23457,7 +23457,7 @@
       "created_at": "2026-02-24 16:41:24"
     }
   ],
-  "coreweave/zai-org/GLM-5-FP8": [
+  "zai-org/GLM-5-FP8": [
     {
       "provider": "coreweave",
       "input": 1e-06,
@@ -23465,7 +23465,7 @@
       "created_at": "2026-02-24 16:41:24"
     }
   ],
-  "coreweave/moonshotai/Kimi-K2.5": [
+  "moonshotai/Kimi-K2.5": [
     {
       "provider": "coreweave",
       "input": 5e-07,
@@ -24459,7 +24459,7 @@
       "created_at": "2026-03-18 14:49:41"
     }
   ],
-  "coreweave/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [
+  "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [
     {
       "provider": "coreweave",
       "input": 2e-07,
@@ -25333,7 +25333,7 @@
       "created_at": "2026-04-16 12:32:59"
     }
   ],
-  "coreweave/google/gemma-4-31B-it": [
+  "google/gemma-4-31B-it": [
     {
       "provider": "coreweave",
       "input": 3e-07,
@@ -25351,7 +25351,7 @@
       "created_at": "2026-07-01 09:59:23"
     }
   ],
-  "coreweave/zai-org/GLM-5.1": [
+  "zai-org/GLM-5.1": [
     {
       "provider": "coreweave",
       "input": 1.4e-06,
@@ -25361,7 +25361,7 @@
       "created_at": "2026-04-16 12:32:59"
     }
   ],
-  "coreweave/Qwen/Qwen3.5-35B-A3B": [
+  "Qwen/Qwen3.5-35B-A3B": [
     {
       "provider": "coreweave",
       "input": 2.5e-07,
@@ -25591,7 +25591,7 @@
       "created_at": "2026-04-30 13:13:24"
     }
   ],
-  "coreweave/ibm-granite/granite-4.1-8b": [
+  "ibm-granite/granite-4.1-8b": [
     {
       "provider": "coreweave",
       "input": 5e-08,
@@ -25601,7 +25601,7 @@
       "created_at": "2026-04-30 13:13:24"
     }
   ],
-  "coreweave/Qwen/Qwen3.5-27B": [
+  "Qwen/Qwen3.5-27B": [
     {
       "provider": "coreweave",
       "input": 3.9e-07,
@@ -25611,7 +25611,7 @@
       "created_at": "2026-04-30 13:13:24"
     }
   ],
-  "coreweave/moonshotai/Kimi-K2.6": [
+  "moonshotai/Kimi-K2.6": [
     {
       "provider": "coreweave",
       "input": 9.5e-07,
@@ -25771,7 +25771,7 @@
       "created_at": "2026-05-06 10:05:19"
     }
   ],
-  "coreweave/deepseek-ai/DeepSeek-V4-Flash": [
+  "deepseek-ai/DeepSeek-V4-Flash": [
     {
       "provider": "coreweave",
       "input": 1e-08,
@@ -25937,7 +25937,7 @@
       "created_at": "2026-07-01 09:59:23"
     }
   ],
-  "coreweave/deepseek-ai/DeepSeek-V4-Pro": [
+  "deepseek-ai/DeepSeek-V4-Pro": [
     {
       "provider": "coreweave",
       "input": 1.74e-06,
@@ -26017,7 +26017,7 @@
       "created_at": "2026-05-20 11:31:11"
     }
   ],
-  "coreweave/Qwen/Qwen3.6-27B": [
+  "Qwen/Qwen3.6-27B": [
     {
       "provider": "coreweave",
       "input": 6e-07,
@@ -26027,7 +26027,7 @@
       "created_at": "2026-05-29 11:23:33"
     }
   ],
-  "coreweave/Qwen/Qwen3.6-35B-A3B": [
+  "Qwen/Qwen3.6-35B-A3B": [
     {
       "provider": "coreweave",
       "input": 2.5e-07,
@@ -26237,7 +26237,7 @@
       "created_at": "2026-05-29 11:23:33"
     }
   ],
-  "coreweave/JetBrains/Mellum2-12B-A2.5B-Instruct": [
+  "JetBrains/Mellum2-12B-A2.5B-Instruct": [
     {
       "provider": "coreweave",
       "input": 5e-08,
@@ -26247,7 +26247,7 @@
       "created_at": "2026-06-10 16:22:38"
     }
   ],
-  "coreweave/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B": [
+  "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B": [
     {
       "provider": "coreweave",
       "input": 7.5e-07,
@@ -26645,7 +26645,7 @@
       "created_at": "2026-06-10 16:22:38"
     }
   ],
-  "coreweave/zai-org/GLM-5.2": [
+  "zai-org/GLM-5.2": [
     {
       "provider": "coreweave",
       "input": 1.39e-06,
@@ -26655,7 +26655,7 @@
       "created_at": "2026-07-01 09:59:23"
     }
   ],
-  "coreweave/moonshotai/Kimi-K2.7-Code": [
+  "moonshotai/Kimi-K2.7-Code": [
     {
       "provider": "coreweave",
       "input": 9.4e-07,
@@ -26683,6 +26683,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "global.anthropic.claude-sonnet-5": [
@@ -26693,6 +26701,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "us.anthropic.claude-sonnet-5": [
@@ -26703,6 +26719,14 @@
       "cache_read_input": 3.3e-07,
       "cache_creation_input": 4.125e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2.2e-06,
+      "output": 1.1e-05,
+      "cache_read_input": 2.2e-07,
+      "cache_creation_input": 2.75e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "eu.anthropic.claude-sonnet-5": [
@@ -26713,6 +26737,14 @@
       "cache_read_input": 3.3e-07,
       "cache_creation_input": 4.125e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2.2e-06,
+      "output": 1.1e-05,
+      "cache_read_input": 2.2e-07,
+      "cache_creation_input": 2.75e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "au.anthropic.claude-sonnet-5": [
@@ -26723,6 +26755,14 @@
       "cache_read_input": 3.3e-07,
       "cache_creation_input": 4.125e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2.2e-06,
+      "output": 1.1e-05,
+      "cache_read_input": 2.2e-07,
+      "cache_creation_input": 2.75e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "jp.anthropic.claude-sonnet-5": [
@@ -26733,6 +26773,14 @@
       "cache_read_input": 3.3e-07,
       "cache_creation_input": 4.125e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "bedrock_converse",
+      "input": 2.2e-06,
+      "output": 1.1e-05,
+      "cache_read_input": 2.2e-07,
+      "cache_creation_input": 2.75e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "azure_ai/claude-sonnet-5": [
@@ -26743,6 +26791,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "azure_ai/gpt-5.5": [
@@ -26803,6 +26859,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "anthropic",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "cloudflare/@cf/openai/gpt-oss-120b": [
@@ -27393,6 +27457,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "vertex_ai/gemini-3-pro-image": [
@@ -27763,6 +27835,14 @@
       "cache_read_input": 3e-07,
       "cache_creation_input": 3.75e-06,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 2e-06,
+      "output": 1e-05,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 2.5e-06,
+      "created_at": "2026-07-07 13:24:02"
     }
   ],
   "bedrock_mantle/google.gemma-4-31b": [
@@ -28012,6 +28092,560 @@
       "output": 7e-08,
       "cache_read_input": 0.0,
       "cache_creation_input": 0.0,
+      "created_at": "2026-07-01 09:59:23"
+    }
+  ],
+  "bedrock_mantle/xai.grok-4.3": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 1.25e-06,
+      "output": 2.5e-06,
+      "cache_read_input": 2e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-07 13:24:02"
+    }
+  ],
+  "tencent/deepseek-v4-pro": [
+    {
+      "provider": "tencent",
+      "input": 4.35e-07,
+      "output": 8.7e-07,
+      "cache_read_input": 3.625e-09,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-07 13:24:02"
+    }
+  ],
+  "tencent/deepseek-v4-flash": [
+    {
+      "provider": "tencent",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "cache_read_input": 2.8e-09,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-07 13:24:02"
+    }
+  ],
+  "azure/us/gpt-5.4": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.4": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.4-2026-03-05": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.4-2026-03-05": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.8e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.5": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.5": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/us/gpt-5.5-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "azure/eu/gpt-5.5-2026-04-23": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-sol": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-terra": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 2.5e-07,
+      "cache_creation_input": 3.125e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-5.6-luna": [
+    {
+      "provider": "openai",
+      "input": 1e-06,
+      "output": 6e-06,
+      "cache_read_input": 1e-07,
+      "cache_creation_input": 1.25e-06,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-realtime-2.1": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 2.4e-05,
+      "cache_read_input": 4e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "gpt-realtime-2.1-mini": [
+    {
+      "provider": "openai",
+      "input": 6e-07,
+      "output": 2.4e-06,
+      "cache_read_input": 6e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "xai/grok-4.5": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "xai/grok-4.5-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-09 13:23:56"
+    }
+  ],
+  "coreweave/openai/gpt-oss-120b": [
+    {
+      "provider": "coreweave",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-08-20 13:33:54"
+    },
+    {
+      "provider": "coreweave",
+      "input": 4e-08,
+      "output": 1.4e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-01 09:59:23"
+    }
+  ],
+  "coreweave/openai/gpt-oss-20b": [
+    {
+      "provider": "coreweave",
+      "input": 5e-08,
+      "output": 2e-07,
+      "created_at": "2025-08-20 13:33:54"
+    },
+    {
+      "provider": "coreweave",
+      "input": 3e-08,
+      "output": 1.3e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-01 09:59:23"
+    }
+  ],
+  "coreweave/Qwen/Qwen3-235B-A22B-Instruct-2507": [
+    {
+      "provider": "coreweave",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/Qwen/Qwen3-Coder-480B-A35B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 1e-06,
+      "output": 1.5e-06,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/Qwen/Qwen3-235B-A22B-Thinking-2507": [
+    {
+      "provider": "coreweave",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 1.35e-06,
+      "output": 4e-06,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/meta-llama/Llama-3.1-8B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 2.2e-07,
+      "output": 2.2e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-R1-0528": [
+    {
+      "provider": "coreweave",
+      "input": 1.35e-06,
+      "output": 5.4e-06,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "coreweave",
+      "input": 1.14e-06,
+      "output": 2.75e-06,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 7.1e-07,
+      "output": 7.1e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 1.7e-07,
+      "output": 6.6e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/microsoft/Phi-4-mini-instruct": [
+    {
+      "provider": "coreweave",
+      "input": 8e-08,
+      "output": 3.5e-07,
+      "created_at": "2025-08-20 13:33:54"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V3.1": [
+    {
+      "provider": "coreweave",
+      "input": 5.5e-07,
+      "output": 1.65e-06,
+      "created_at": "2025-08-21 14:19:20"
+    }
+  ],
+  "coreweave/zai-org/GLM-4.5": [
+    {
+      "provider": "coreweave",
+      "input": 5.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-09-29 12:08:30"
+    }
+  ],
+  "coreweave/Qwen/Qwen2.5-14B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-09-29 12:08:30"
+    }
+  ],
+  "coreweave/OpenPipe/Qwen3-14B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 5e-08,
+      "output": 2.2e-07,
+      "created_at": "2025-10-10 14:26:38"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2-Instruct-0905": [
+    {
+      "provider": "coreweave",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-11-14 13:09:35"
+    }
+  ],
+  "coreweave/meta-llama/Llama-3.1-70B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 8e-07,
+      "output": 8e-07,
+      "created_at": "2025-11-14 13:09:35"
+    }
+  ],
+  "coreweave/Qwen/Qwen3-30B-A3B-Instruct-2507": [
+    {
+      "provider": "coreweave",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2026-01-28 10:01:14"
+    }
+  ],
+  "coreweave/MiniMaxAI/MiniMax-M2.5": [
+    {
+      "provider": "coreweave",
+      "input": 3e-07,
+      "output": 1.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "coreweave/zai-org/GLM-5-FP8": [
+    {
+      "provider": "coreweave",
+      "input": 1e-06,
+      "output": 3.2e-06,
+      "created_at": "2026-02-24 16:41:24"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2.5": [
+    {
+      "provider": "coreweave",
+      "input": 5e-07,
+      "output": 2.85e-06,
+      "created_at": "2026-02-24 16:41:24"
+    },
+    {
+      "provider": "coreweave",
+      "input": 6e-07,
+      "output": 3e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8": [
+    {
+      "provider": "coreweave",
+      "input": 2e-07,
+      "output": 8e-07,
+      "created_at": "2026-03-18 14:49:41"
+    }
+  ],
+  "coreweave/google/gemma-4-31B-it": [
+    {
+      "provider": "coreweave",
+      "input": 3e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    },
+    {
+      "provider": "coreweave",
+      "input": 1.2e-07,
+      "output": 3.5e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-01 09:59:23"
+    }
+  ],
+  "coreweave/zai-org/GLM-5.1": [
+    {
+      "provider": "coreweave",
+      "input": 1.4e-06,
+      "output": 4.4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.5-35B-A3B": [
+    {
+      "provider": "coreweave",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-16 12:32:59"
+    }
+  ],
+  "coreweave/ibm-granite/granite-4.1-8b": [
+    {
+      "provider": "coreweave",
+      "input": 5e-08,
+      "output": 1e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.5-27B": [
+    {
+      "provider": "coreweave",
+      "input": 3.9e-07,
+      "output": 3.12e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2.6": [
+    {
+      "provider": "coreweave",
+      "input": 9.5e-07,
+      "output": 4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-04-30 13:13:24"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V4-Flash": [
+    {
+      "provider": "coreweave",
+      "input": 1e-08,
+      "output": 1e-08,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-06 10:05:19"
+    },
+    {
+      "provider": "coreweave",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V4-Pro": [
+    {
+      "provider": "coreweave",
+      "input": 1.74e-06,
+      "output": 3.48e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-19 10:56:57"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.6-27B": [
+    {
+      "provider": "coreweave",
+      "input": 6e-07,
+      "output": 3.6e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-29 11:23:33"
+    }
+  ],
+  "coreweave/Qwen/Qwen3.6-35B-A3B": [
+    {
+      "provider": "coreweave",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-05-29 11:23:33"
+    }
+  ],
+  "coreweave/JetBrains/Mellum2-12B-A2.5B-Instruct": [
+    {
+      "provider": "coreweave",
+      "input": 5e-08,
+      "output": 1e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-06-10 16:22:38"
+    }
+  ],
+  "coreweave/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B": [
+    {
+      "provider": "coreweave",
+      "input": 7.5e-07,
+      "output": 2.75e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-06-10 16:22:38"
+    }
+  ],
+  "coreweave/zai-org/GLM-5.2": [
+    {
+      "provider": "coreweave",
+      "input": 1.39e-06,
+      "output": 4.4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-01 09:59:23"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K2.7-Code": [
+    {
+      "provider": "coreweave",
+      "input": 9.4e-07,
+      "output": 4e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
     }
   ]

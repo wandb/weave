@@ -213,6 +213,9 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "span_agent_name": "",
         "span_agent_version": "",
         "span_status_code": "UNSET",
+        "span_conversation_id": "",
+        "span_trace_id": "",
+        "scorer_trace_id": "",
     }
 
 
@@ -400,6 +403,9 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "span_agent_name": "",
         "span_agent_version": "",
         "span_status_code": "UNSET",
+        "span_conversation_id": "",
+        "span_trace_id": "",
+        "scorer_trace_id": "",
     }
 
     # Runnable scorer feedback may also populate typed scorer columns while

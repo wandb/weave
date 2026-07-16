@@ -8,6 +8,7 @@ import threading
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
 from re import sub
@@ -82,8 +83,10 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
 )
 from weave.trace_server.base64_content_conversion import (
-    process_call_req_to_content,
-    process_complete_call_to_content,
+    PendingContentObjs,
+    process_call_content,
+    replace_base64_with_content_objects,
+    restore_raw_content_values,
 )
 from weave.trace_server.call_stats_helpers import (
     rows_to_bucket_dicts,
@@ -99,7 +102,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_started_at_select_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
@@ -194,6 +197,7 @@ from weave.trace_server.feedback import (
     format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
+    validate_feedback_agent_req_targets,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -210,7 +214,9 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.feedback_types import RUNNABLE_FEEDBACK_TYPE_PREFIX
+from weave.trace_server.interface.feedback_types import (
+    RUNNABLE_FEEDBACK_TYPE_PREFIX,
+)
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     _build_choices_array,
@@ -430,6 +436,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._call_batch
             or self._calls_complete_batch
             or self._file_batch
+            or self._content_obj_batch
             or self._bucket_uploads
         ):
             try:
@@ -440,6 +447,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 self._file_batch = []
                 self._call_batch = []
                 self._calls_complete_batch = []
+                self._content_obj_batch = []
                 self._bucket_uploads = BucketUploadBatch()
                 self._flush_immediately = True
 
@@ -499,6 +507,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @_calls_complete_batch.setter
     def _calls_complete_batch(self, value: list[list[Any]]) -> None:
         self._thread_local.calls_complete_batch = value
+
+    @property
+    def _content_obj_batch(self) -> list[tsi.ObjSchemaForInsert]:
+        if not hasattr(self._thread_local, "content_obj_batch"):
+            self._thread_local.content_obj_batch = []
+        return self._thread_local.content_obj_batch
+
+    @_content_obj_batch.setter
+    def _content_obj_batch(self, value: list[tsi.ObjSchemaForInsert]) -> None:
+        self._thread_local.content_obj_batch = value
 
     @classmethod
     def from_env(cls, use_async_insert: bool = True, **kwargs: Any) -> Self:
@@ -807,13 +825,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    calls.append(
-                        span.to_call(
-                            req.project_id,
-                            wb_user_id=req.wb_user_id,
-                            wb_run_id=wb_run_id,
-                        )
+                    # Mirror the non-OTel calls path: strip inline base64 /
+                    # base64 data-URIs into Content refs. Converting the span
+                    # attributes in place (before deriving the call) also
+                    # strips the lossless otel_dump the call carries.
+                    span.attributes = replace_base64_with_content_objects(
+                        span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
                     )
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=wb_run_id,
+                    )
+                    # Also convert the derived inputs/output: base64 nested in a
+                    # JSON-encoded message attribute only surfaces as a leaf
+                    # after to_call parses it.
+                    start_call.inputs = replace_base64_with_content_objects(
+                        start_call.inputs,
+                        req.project_id,
+                        self,
+                        wb_user_id=req.wb_user_id,
+                    )
+                    end_call.output = replace_base64_with_content_objects(
+                        end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
+                    )
+                    calls.append((start_call, end_call))
 
         set_current_span_dd_tags({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
@@ -872,23 +908,42 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._file_batch = []
             self._call_batch = []
             self._calls_complete_batch = []
+            self._content_obj_batch = []
             self._bucket_uploads = BucketUploadBatch()
             self._flush_immediately = True
 
     def _flush_all_batches_in_order(self) -> None:
-        """Flush all batches in order of dependency.
+        """Flush all batches, respecting cross-table write dependencies.
         1. Bucket uploads, fanned out in parallel. Resulting chunks join
            _file_batch before the file_chunks insert so URIs are persisted
            atomically with any inline-CH chunks accumulated alongside.
-        2. File chunks, if this fails, we raise so that we don't insert calls that
-           are missing file data. Forces retry.
+        2. File chunks and content objects, inserted concurrently. Both must be
+           durable before calls and neither reads the other. If either fails we
+           raise, so calls (below) never commit referencing unwritten data.
         3. Calls, if this fails, we raise so that clients can retry, and so we don't
            continue and push bad ids to the queue.
         4. Produce to kafka, if this fails, we don't raise because all of the data
            is already in the database, we don't want the client to retry.
            TODO: consider kafka retry logic.
         """
-        self._flush_file_batches()
+        self._flush_immediately = True
+
+        # Raises on fail
+        try:
+            self._file_batch.extend(
+                self._bucket_uploads.flush(self.file_storage_client)
+            )
+        except Exception:
+            logger.exception("Failed to flush bucket uploads")
+            raise
+
+        # File chunks || content objects. Snapshot the thread-local batches so
+        # each worker inserts an explicit list on its own pooled ch_client.
+        file_rows = self._file_batch
+        content_objs = self._content_obj_batch
+        self._file_batch = []
+        self._content_obj_batch = []
+        self._flush_referenced_data_in_parallel(file_rows, content_objs)
 
         # Raises on fail
         try:
@@ -903,6 +958,46 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self._flush_kafka_producer()
         except Exception:
             logger.exception("Failed to flush kafka producer")
+
+    @traced(name="clickhouse_trace_server_batched._flush_referenced_data_in_parallel")
+    def _flush_referenced_data_in_parallel(
+        self,
+        file_rows: list[FileChunkCreateCHInsertable],
+        content_objs: list[tsi.ObjSchemaForInsert],
+    ) -> None:
+        """Insert file chunks and content objects concurrently.
+
+        Both must commit before the calls that reference them, and neither reads
+        the other, so they run in parallel on separate ch_clients (ch_client is
+        thread-local, so each worker mints its own from the shared pool). Every
+        task is joined before returning; if either raises, the first error is
+        re-raised so the caller skips the calls insert and the client retries.
+        """
+        tasks: list[tuple[str, Callable[[], None]]] = []
+        if file_rows:
+            tasks.append(("files", lambda: self._insert_file_chunks(file_rows)))
+        if content_objs:
+            tasks.append(
+                ("content_objs", lambda: self._flush_content_objs_batch(content_objs))
+            )
+        if len(tasks) < 2:
+            for _, run in tasks:
+                run()
+            return
+
+        with ThreadPoolExecutor(
+            max_workers=len(tasks), thread_name_prefix="flush-insert"
+        ) as pool:
+            futures = {pool.submit(run): label for label, run in tasks}
+            errors: list[Exception] = []
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.exception("Failed to flush %s", futures[future])
+                    errors.append(e)
+        if errors:
+            raise errors[0]
 
     def _flush_file_batches(self) -> None:
         """Fan out staged bucket uploads in parallel, then insert their chunk rows.
@@ -927,7 +1022,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.exception("Failed to flush file chunks")
             raise
 
-    def _offload_call_content(self, req: _CallReqT) -> _CallReqT:
+    def _offload_call_content(
+        self, req: _CallReqT, pending_objs: PendingContentObjs | None = None
+    ) -> _CallReqT:
         """Replace inline base64 content with file refs, uploading in parallel.
 
         Each extracted attachment becomes a file_create; staging them and
@@ -935,12 +1032,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         one parallel batch. Files persist before this returns, so the caller's
         call insert/UPDATE can reference them. Deferral is a no-op when already
         inside call_batch(), which owns the flush.
+
+        When ``pending_objs`` is given, content objects are staged there for a
+        batched flush instead of written inline; the caller resolves and flushes
+        them (see call_start_batch). Without it, each object is written inline.
         """
         if not self._flush_immediately:
-            return process_call_req_to_content(req, self)
+            return process_call_content(req, self, pending_objs)
         self._flush_immediately = False
         try:
-            processed = process_call_req_to_content(req, self)
+            processed = process_call_content(req, self, pending_objs)
             self._flush_immediately = True
             self._flush_file_batches()
             return processed
@@ -951,26 +1052,49 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("call_start_batch")
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        """Insert a batch of start/end ops, batching their content objects.
+
+        Content objects embedded across the batch are staged into one
+        PendingContentObjs, deduped and collision-checked once per project, and
+        written in a single obj_create_batch (parallel with file chunks) before
+        the calls that reference them, instead of one inline obj_create per blob.
+        Mirrors calls_complete; standalone call_start/call_end keep inline writes.
+        """
+        set_current_span_dd_tags(
+            {"weave_trace_server.insert_call_count": len(req.batch)}
+        )
+        pending_objs = PendingContentObjs()
         with self.call_batch():
+            for item in req.batch:
+                self._offload_call_content(item.req, pending_objs)
+
+            raw_by_ref = self._resolve_pending_content_objs(pending_objs)
+
             res = []
             for item in req.batch:
+                if raw_by_ref:
+                    restore_raw_content_values(item.req, raw_by_ref)
                 if item.mode == "start":
-                    res.append(self.call_start(item.req))
+                    res.append(self._call_start_processed(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self._call_end_processed(item.req))
                 else:
                     raise ValueError("Invalid mode")
+        pending_objs.publish_refs()
         return tsi.CallCreateBatchRes(res=res)
 
     @tag_db_insert_path("call_start")
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         """Creates a new call."""
+        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
+        req = self._offload_call_content(req)
+        return self._call_start_processed(req)
+
+    def _call_start_processed(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        """Insert a start whose content was already offloaded (batch or inline)."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        set_current_span_dd_tags({"weave_trace_server.insert_call_count": 1})
-
-        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(
             req.start.project_id, self.ch_client
         )
@@ -1000,10 +1124,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         req: tsi.CallEndReq,
         publish: bool = True,
     ) -> tsi.CallEndRes:
+        req = self._offload_call_content(req)
+        return self._call_end_processed(req, publish)
+
+    def _call_end_processed(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+    ) -> tsi.CallEndRes:
+        """Insert an end whose content was already offloaded (batch or inline)."""
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        req = self._offload_call_content(req)
         retention_days = get_project_retention_days(req.end.project_id, self.ch_client)
         ch_call = end_call_for_insert_to_ch_insertable(req.end, retention_days)
 
@@ -1055,11 +1187,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             {"weave_trace_server.insert_call_count": len(req.batch)}
         )
 
+        pending_objs = PendingContentObjs()
         with self.call_batch():
-            for complete_call in req.batch:
-                processed_complete_call = process_complete_call_to_content(
-                    complete_call, self
-                )
+            processed_calls = [
+                process_call_content(complete_call, self, pending_objs)
+                for complete_call in req.batch
+            ]
+            # Resolve collisions now (read-only) so call payloads can restore
+            # the raw values of skipped objects; the surviving object rows are
+            # staged and written on with-exit, after their file bytes.
+            raw_by_ref = self._resolve_pending_content_objs(pending_objs)
+
+            for processed_complete_call in processed_calls:
+                if raw_by_ref:
+                    restore_raw_content_values(processed_complete_call, raw_by_ref)
 
                 # Determine write target based on project, this should be the same for all
                 # calls in the batch, subsequent calls just hit the in-memory cache. This
@@ -1088,7 +1229,74 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     processed_complete_call.ended_at,
                 )
 
+        # Only now is a cached ref guaranteed to resolve: objects, files,
+        # and calls have all committed.
+        pending_objs.publish_refs()
         return tsi.CallsUpsertCompleteRes()
+
+    def _resolve_pending_content_objs(
+        self, pending_objs: PendingContentObjs
+    ) -> dict[str, str]:
+        """Resolve content objects queued by calls_complete's base64 walk.
+
+        Read-only: dedupes by (project_id, object_id, digest) so identical
+        content embedded in multiple calls is written once, runs one WB-30574
+        collision check per project, and stages the survivors into
+        _content_obj_batch for the parallel flush. The actual obj_create_batch
+        write happens later in _flush_content_objs_batch, alongside file chunks.
+
+        A collision must not fail the calls batch: the colliding object is
+        skipped and reported in the returned {ref: raw_value} map so the
+        caller can restore the original inline values in the call payloads.
+        """
+        deduped: dict[tuple[str, str, str | None], tsi.ObjSchemaForInsert] = {}
+        for obj in pending_objs.objs:
+            deduped.setdefault(
+                (obj.project_id, obj.object_id, obj.expected_digest), obj
+            )
+
+        by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
+        for obj in deduped.values():
+            by_project.setdefault(obj.project_id, []).append(obj)
+
+        for project_id, project_objs in by_project.items():
+            checks: list[tuple[str, str, str | None]] = []
+            for obj in project_objs:
+                digest_result = compute_object_digest_result(
+                    obj.val, obj.builtin_object_class
+                )
+                kind = get_kind(digest_result.processed_val)
+                checks.append((obj.object_id, kind, digest_result.base_object_class))
+            collisions = self._find_obj_name_type_collisions(project_id, checks)
+            for collision in collisions:
+                logger.warning(
+                    "Skipping content object with name/type collision: %s", collision
+                )
+                pending_objs.mark_skipped(project_id, collision.object_id)
+
+            colliding_ids = {c.object_id for c in collisions}
+            self._content_obj_batch.extend(
+                o for o in project_objs if o.object_id not in colliding_ids
+            )
+
+        return pending_objs.restore_map()
+
+    def _flush_content_objs_batch(
+        self, content_objs: list[tsi.ObjSchemaForInsert]
+    ) -> None:
+        """Write content objects, grouped by project (obj_create_batch takes a
+        single project). Runs concurrently with the file-chunk insert; both land
+        before the calls that reference them.
+
+        Content refs pin the version digest (see base64_content_conversion.
+        _content_ref), so these objects are never resolved via the "latest"
+        alias; skipping that INSERT drops one CH round-trip per batch.
+        """
+        by_project: dict[str, list[tsi.ObjSchemaForInsert]] = {}
+        for obj in content_objs:
+            by_project.setdefault(obj.project_id, []).append(obj)
+        for project_objs in by_project.values():
+            self.obj_create_batch(project_objs, write_latest_alias=False)
 
     @tag_db_insert_path("call_start_v2")
     def call_start_v2(self, req: tsi.CallStartV2Req) -> tsi.CallStartV2Res:
@@ -1980,8 +2188,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             started_at_max_param = pb.add_param(
                 datetime_to_microseconds(started_at_window[1] + pad)
             )
-        delete_query = build_calls_complete_delete_query(
-            self._get_calls_complete_table_name(),
+        table_name = self._get_calls_complete_table_name()
+        # A single lightweight UPDATE writes one patch part that both hides the
+        # rows (deleted_at, applied on read) and marks them for physical
+        # reclamation by the table's native `TTL expire_at DELETE` (expire_at).
+        soft_delete_query = build_calls_complete_soft_delete_query(
+            table_name,
             project_id_param,
             call_ids_param,
             started_at_min_param=started_at_min_param,
@@ -1989,7 +2201,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             cluster_name=self.clickhouse_cluster_name,
         )
         self._command(
-            delete_query,
+            soft_delete_query,
             parameters=pb.get_params(),
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
@@ -2140,24 +2352,64 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         (WB-30574). Weave refs do not carry type, so allowing same-name
         different-type would make refs ambiguous.
         """
-        query, parameters = make_obj_name_type_collision_query(
-            project_id=project_id, object_id=object_id, kind=kind
+        collisions = self._find_obj_name_type_collisions(
+            project_id, [(object_id, kind, new_base_object_class)]
         )
-        result = self._query(query, parameters)
-        existing_classes = [row[0] for row in result.result_rows]
-        mismatched = [c for c in existing_classes if c != new_base_object_class]
-        if mismatched:
-            raise ObjectNameTypeCollision(
-                object_id=object_id,
-                kind=kind,
-                new_base_object_class=new_base_object_class,
-                existing_base_object_classes=mismatched,
+        if collisions:
+            raise collisions[0]
+
+    def _find_obj_name_type_collisions(
+        self,
+        project_id: str,
+        checks: list[tuple[str, str, str | None]],
+    ) -> list[ObjectNameTypeCollision]:
+        """WB-30574 collision check: one query per distinct kind, returning
+        one ObjectNameTypeCollision per object_id bound to more than one
+        base_object_class, by committed rows or by conflicting entries
+        within ``checks`` itself. Callers decide whether to raise.
+
+        ``checks`` is a list of (object_id, kind, new_base_object_class).
+        """
+        by_kind: dict[str, dict[str, set[str | None]]] = {}
+        for object_id, kind, new_base_object_class in checks:
+            by_kind.setdefault(kind, {}).setdefault(object_id, set()).add(
+                new_base_object_class
             )
+
+        collisions: list[ObjectNameTypeCollision] = []
+        for kind, object_id_to_classes in by_kind.items():
+            query, parameters = make_obj_name_type_collision_query(
+                project_id=project_id,
+                object_ids=sorted(object_id_to_classes),
+                kind=kind,
+            )
+            result = self._query(query, parameters)
+            existing_by_object_id: dict[str, set[str | None]] = {}
+            for object_id, base_object_class in result.result_rows:
+                existing_by_object_id.setdefault(object_id, set()).add(
+                    base_object_class
+                )
+
+            for object_id, new_classes in object_id_to_classes.items():
+                bound = existing_by_object_id.get(object_id, set()) | new_classes
+                if len(bound) > 1:
+                    new_class = sorted(new_classes, key=str)[0]
+                    collisions.append(
+                        ObjectNameTypeCollision(
+                            object_id=object_id,
+                            kind=kind,
+                            new_base_object_class=new_class,
+                            existing_base_object_classes=sorted(
+                                (c for c in bound if c != new_class), key=str
+                            ),
+                        )
+                    )
+        return collisions
 
     @traced(name="clickhouse_trace_server_batched.create_obj_batch")
     @tag_db_insert_path("obj_create_batch")
     def obj_create_batch(
-        self, batch: list[tsi.ObjSchemaForInsert]
+        self, batch: list[tsi.ObjSchemaForInsert], write_latest_alias: bool = True
     ) -> list[tsi.ObjCreateRes]:
         """This method is for the special case where all objects are known to use a placeholder.
         We lose any knowledge of what version the created object is in return for an enormous
@@ -2169,6 +2421,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         inserted first; if the subsequent batched alias INSERT fails, the
         new versions exist but their "latest" alias is missing — readers
         see the prior latest until the alias write succeeds on retry.
+
+        Unlike obj_create, no WB-30574 name/type collision guard runs here:
+        callers must know their object_ids are fresh or check beforehand
+        (see _resolve_pending_content_objs).
+
+        write_latest_alias=False skips the second "latest" alias INSERT. Only
+        safe for objects addressed exclusively by digest (never resolved via
+        the "latest" alias or listed in latest_only object queries), e.g.
+        content objects whose ref pins the version digest.
         """
         set_current_span_dd_tags(
             {"clickhouse_trace_server_batched.create_obj_batch.count": str(len(batch))}
@@ -2195,6 +2456,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             processed_val = digest_result.processed_val
             json_val = digest_result.json_val
             digest = digest_result.digest
+            validate_expected_digest(
+                expected=obj.expected_digest,
+                actual=digest,
+                label=f"obj {obj.object_id!r}",
+            )
             ch_obj = ObjCHInsertable(
                 project_id=obj.project_id,
                 object_id=obj.object_id,
@@ -2228,7 +2494,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Batch-write the "latest" alias for every row, matching obj_create.
-        if alias_rows:
+        if write_latest_alias and alias_rows:
             ch_alias_rows = [
                 list(
                     AliasCHInsertable(
@@ -2421,7 +2687,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     deleted_at=now,
                 )
 
-        return tsi.ObjDeleteRes(num_deleted=num_deleted)
+        return tsi.ObjDeleteRes(
+            num_deleted=num_deleted,
+            deleted_versions=[
+                tsi.DeletedObjVersion(
+                    digest=obj.digest,
+                    base_object_class=obj.base_object_class,
+                    leaf_object_class=obj.leaf_object_class,
+                )
+                for obj in delete_insertables
+            ],
+        )
 
     # --- Tags & Aliases ---
 
@@ -5696,7 +5972,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     filter=tsi.CallsFilter(parent_ids=batch),
                     columns=child_columns,
                     sort_by=[tsi.SortBy(field="started_at", direction="asc")],
-                    include_costs=req.include_costs,
                 )
                 page_calls.extend(self.calls_query_stream(child_req))
 
@@ -5707,6 +5982,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.include_raw_data_rows if req.include_rows else False,
             req.include_predict_and_score_children,
         )
+
+        # children above are fetched without costs; price only the predict calls
+        if req.include_costs:
+            eval_helpers.apply_predict_costs(
+                all_rows, req.project_id, self.calls_query_stream
+            )
 
         summary: tsi.EvalResultsSummaryRes | None = None
         if req.include_summary:
@@ -6440,6 +6721,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
+        validate_feedback_agent_req_targets(req)
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
@@ -6468,6 +6750,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
+            validate_feedback_agent_req_targets(feedback_req)
 
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
@@ -6526,7 +6809,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Validate the replacement payload before purging — if validation
         # rejects we want the old row preserved, not destroyed. This duplicates
         # the validation that feedback_create() runs internally (one extra
-        # ref-lookup network call on annotation/agent-monitor paths), which is
+        # refs_read on annotation paths), which is
         # acceptable to preserve the no-data-loss guarantee on replace.
         create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
         validate_feedback_create_req(create_req, self)
@@ -7062,7 +7345,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
         res, span_rows = AgentWriteHandler(
-            self.ch_client, self._async_insert_settings()
+            self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
         # Return early without emitting kafka events if online eval or agent scoring are disabled

@@ -47,6 +47,20 @@ class TestFieldResolution:
         sql, _ = _compile({"$eq": [{"$getField": "agent.name"}, {"$literal": "bot"}]})
         assert sql == "(s.agent_name = {genai_0:String})"
 
+    def test_eval_semconv_short_form(self) -> None:
+        sql, params = _compile(
+            {"$eq": [{"$getField": "eval.run_id"}, {"$literal": "eval-run-001"}]}
+        )
+        assert sql == "(s.eval_run_id = {genai_0:String})"
+        assert params == {"genai_0": "eval-run-001"}
+
+    def test_eval_trial_index_semconv(self) -> None:
+        sql, params = _compile(
+            {"$eq": [{"$getField": "weave.eval.trial_index"}, {"$literal": 2}]}
+        )
+        assert sql == "(s.eval_trial_index = {genai_0:Int64})"
+        assert params == {"genai_0": 2}
+
     def test_direct_column_name(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "trace_id"}, {"$literal": "t1"}]})
         assert sql == "(s.trace_id = {genai_0:String})"

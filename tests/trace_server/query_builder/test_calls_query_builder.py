@@ -15,7 +15,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     _invalid_field_message,
     _is_minimal_filter,
     _maybe_convert_datetime_operands,
-    build_calls_complete_delete_query,
+    build_calls_complete_soft_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
     build_calls_stats_query,
@@ -4189,53 +4189,9 @@ def test_query_with_summary_weave_status_filter_calls_complete() -> None:
     )
 
 
-def test_build_calls_complete_delete_query() -> None:
-    """Ensure the delete helper builds the expected query."""
-    query = build_calls_complete_delete_query(
-        table_name="calls_complete",
-        project_id_param="project_id",
-        call_ids_param="call_ids",
-    )
-
-    expected = sqlparse.format(
-        """
-        DELETE FROM calls_complete
-        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
-        """,
-        reindent=True,
-    )
-
-    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
-
-
-def test_build_calls_complete_delete_query_with_cluster() -> None:
-    """Ensure the delete helper builds the expected query with cluster name.
-
-    _format_table_name_with_cluster only adds ON CLUSTER; the caller is
-    responsible for passing the correct table name (e.g. calls_complete_local
-    in distributed mode via _get_calls_complete_table_name).
-    """
-    query = build_calls_complete_delete_query(
-        table_name="calls_complete",
-        project_id_param="project_id",
-        call_ids_param="call_ids",
-        cluster_name="my_cluster",
-    )
-
-    expected = sqlparse.format(
-        """
-        DELETE FROM calls_complete ON CLUSTER my_cluster
-        WHERE project_id = {project_id:String} AND id IN {call_ids:Array(String)}
-        """,
-        reindent=True,
-    )
-
-    assert query == expected, f"\nExpected:\n{expected}\n\nGot:\n{query}"
-
-
-def test_build_calls_complete_delete_query_with_started_at_window() -> None:
-    """started_at bounds bracket the partition/primary key so the delete prunes."""
-    query = build_calls_complete_delete_query(
+def test_build_calls_complete_soft_delete_query() -> None:
+    """Soft-delete marks deleted_at and expire_at in one lightweight UPDATE, pruned by the started_at window."""
+    query = build_calls_complete_soft_delete_query(
         table_name="calls_complete",
         project_id_param="project_id",
         call_ids_param="call_ids",
@@ -4246,7 +4202,8 @@ def test_build_calls_complete_delete_query_with_started_at_window() -> None:
 
     expected = sqlparse.format(
         """
-        DELETE FROM calls_complete ON CLUSTER my_cluster
+        UPDATE calls_complete ON CLUSTER my_cluster
+        SET deleted_at = now64(3), expire_at = now64(3)
         WHERE project_id = {project_id:String}
         AND started_at >= fromUnixTimestamp64Micro({started_at_min:Int64}, 'UTC')
         AND started_at <= fromUnixTimestamp64Micro({started_at_max:Int64}, 'UTC')

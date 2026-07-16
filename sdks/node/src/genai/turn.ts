@@ -36,7 +36,20 @@ export interface TurnInit extends SpanInitBase {
   agentName?: string;
   agentDescription?: string;
   agentVersion?: string;
+  /**
+   * Custom attributes set on this turn and passed to every child span.
+   * Normally seeded from the conversation via `startConversation({ attributes })`;
+   * set here for a rootless `startTurn({ attributes })` with no conversation.
+   */
+  attributes?: Attributes;
 }
+
+type Opts = {
+  conversationId: string;
+  messages: Message[];
+  span: Span;
+  context: Context;
+} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
 
 /**
  * An agent invocation. Typically wraps the work to respond to a single
@@ -81,14 +94,6 @@ export interface TurnInit extends SpanInitBase {
  *   turn.end();
  * }
  */
-
-type Opts = {
-  conversationId: string;
-  messages: Message[];
-  span: Span;
-  context: Context;
-} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
-
 export class Turn extends SpanBase {
   private _context: Context;
   private _conversationId: string;
@@ -99,6 +104,7 @@ export class Turn extends SpanBase {
   private _model: string;
   private _messages: Message[];
   private _systemInstructions: string[];
+  private _attributes: Attributes;
 
   public get agentName() {
     return this._agentName;
@@ -119,6 +125,7 @@ export class Turn extends SpanBase {
     this._messages = opts.messages;
     this._model = opts.model;
     this._systemInstructions = opts.systemInstructions;
+    this._attributes = opts.attributes;
   }
 
   static create(opts: TurnInit & {conversationId?: string} = {}): Turn {
@@ -129,13 +136,12 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(state.conversation?.attributes ?? {})};
+    const attributes: Attributes = {...(opts.attributes ?? {})};
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];
-    // Pass ROOT_CONTEXT explicitly so Turn is always a root span — never
-    // accidentally inherits a parent from some other OTel-instrumented
-    // library's active context.
+    // ROOT_CONTEXT keeps Turn a root span, never inheriting another OTel
+    // library's active span as a parent.
     const span = tracer.startSpan(
       'invoke_agent',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
@@ -152,6 +158,7 @@ export class Turn extends SpanBase {
       agentId: opts.agentId ?? '',
       agentDescription: opts.agentDescription ?? '',
       agentVersion: opts.agentVersion ?? '',
+      attributes: opts.attributes ?? {},
     });
     state.turn = turn;
     return turn;
@@ -163,6 +170,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 
@@ -172,6 +180,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 
@@ -181,6 +190,7 @@ export class Turn extends SpanBase {
       ...opts,
       parentContext: this._context,
       conversationId: this._conversationId,
+      attributes: this._attributes,
     });
   }
 

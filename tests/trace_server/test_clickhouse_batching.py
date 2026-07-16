@@ -92,10 +92,16 @@ def test_clickhouse_batching():
         # Use properly base64 encoded project_id (entity/project format)
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
-        # Simulate a legacy project by returning merged-only residence.
-        mock_query_result = MagicMock()
-        mock_query_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
-        mock_ch_client.query.return_value = mock_query_result
+        # Simulate a legacy project by returning merged-only residence; the
+        # WB-30574 collision query must see no rows (fresh object_ids), like
+        # a real DB, or every content obj_create would be rejected.
+        residence_result = MagicMock()
+        residence_result.result_rows = [[0, 1]]  # has_complete=0, has_merged=1
+        empty_result = MagicMock()
+        empty_result.result_rows = []
+        mock_ch_client.query.side_effect = lambda sql, *args, **kwargs: (
+            empty_result if "base_object_class" in sql else residence_result
+        )
 
         # Create a batch of call start requests
         batch_req = tsi.CallCreateBatchReq(
@@ -154,25 +160,15 @@ def test_clickhouse_batching():
         # Execute the batch
         trace_server.call_start_batch(batch_req)
 
-        # THE KEY ASSERTION:
-        # Verify that there are exactly 2 inserts:
-        # 1 for files and 1 for call_parts (order may vary)
-        insert_call_count = mock_ch_client.insert.call_count
-        assert insert_call_count == 2, (
-            f"Expected exactly 2 ClickHouse insert calls for 3 batched calls "
-            f"(and 3 base64 content objects, which are stored in files), "
-            f"but got {insert_call_count} insert calls"
-        )
-
-        # Check that both files and call_parts were inserted (order may vary)
-        insert_tables = [
-            mock_ch_client.insert.call_args_list[0][0][0],
-            mock_ch_client.insert.call_args_list[1][0][0],
-        ]
-        assert set(insert_tables) == {"files", "call_parts"}, (
-            f"Expected inserts to files and call_parts tables, "
-            f"but got inserts to: {insert_tables}"
-        )
+        # THE KEY ASSERTION: the whole request issues one insert per table.
+        # The 3 distinct content objects are staged and written in a single
+        # obj_create_batch (one object_versions insert, no "latest" alias since
+        # content refs pin the digest) alongside the batched files and
+        # call_parts inserts, instead of one obj_create round-trip per object.
+        insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
+        assert sorted(insert_tables) == sorted(
+            ["files", "call_parts", "object_versions"]
+        ), f"Unexpected inserts: {insert_tables}"
 
 
 def test_clickhouse_batching_deduplicates_identical_files():
@@ -188,9 +184,13 @@ def test_clickhouse_batching_deduplicates_identical_files():
         trace_server = ClickHouseTraceServer(host="test_host")
         project_id = base64.b64encode(b"test_entity/test_project").decode("utf-8")
 
-        mock_query_result = MagicMock()
-        mock_query_result.result_rows = [[0, 1]]
-        mock_ch_client.query.return_value = mock_query_result
+        residence_result = MagicMock()
+        residence_result.result_rows = [[0, 1]]
+        empty_result = MagicMock()
+        empty_result.result_rows = []
+        mock_ch_client.query.side_effect = lambda sql, *args, **kwargs: (
+            empty_result if "base_object_class" in sql else residence_result
+        )
 
         # 3 calls with the SAME content
         same_content = "IDENTICAL CONTENT"
@@ -199,8 +199,12 @@ def test_clickhouse_batching_deduplicates_identical_files():
         )
         trace_server.call_start_batch(batch_req)
 
+        # Dedup collapses the object too: one object_versions insert for the
+        # single unique content object, alongside the batched inserts.
         insert_tables = [call[0][0] for call in mock_ch_client.insert.call_args_list]
-        assert set(insert_tables) == {"files", "call_parts"}
+        assert sorted(insert_tables) == sorted(
+            ["files", "call_parts", "object_versions"]
+        ), f"Unexpected inserts: {insert_tables}"
 
         # The files insert should contain chunks for only 1 unique file
         # (content + metadata), not 3 copies.

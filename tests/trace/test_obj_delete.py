@@ -387,6 +387,54 @@ def test_delete_object_versions_api(client: WeaveClient):
     assert len(objs) == 0
 
 
+def test_delete_reports_deleted_versions(client: WeaveClient):
+    v0 = weave.publish({"i": 1}, name="obj_1")
+    v1 = weave.publish({"i": 2}, name="obj_1")
+
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="obj_1",
+            digests=[v0.digest],
+        )
+    )
+    assert res.num_deleted == 1
+    assert res.deleted_versions == [
+        tsi.DeletedObjVersion(
+            digest=v0.digest, base_object_class=None, leaf_object_class=None
+        )
+    ]
+
+    # Alias digests are resolved to content digests in the report.
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(
+            project_id=client.project_id,
+            object_id="obj_1",
+            digests=["latest"],
+        )
+    )
+    assert res.deleted_versions == [
+        tsi.DeletedObjVersion(
+            digest=v1.digest, base_object_class=None, leaf_object_class=None
+        )
+    ]
+
+
+def test_delete_all_reports_deleted_versions_with_classes(client: WeaveClient):
+    p0 = weave.publish(weave.StringPrompt("hello"), name="prompt_1")
+    p1 = weave.publish(weave.StringPrompt("world"), name="prompt_1")
+
+    res = client.server.obj_delete(
+        tsi.ObjDeleteReq(project_id=client.project_id, object_id="prompt_1")
+    )
+    assert res.num_deleted == 2
+    assert sorted(dv.digest for dv in res.deleted_versions) == sorted(
+        [p0.digest, p1.digest]
+    )
+    assert {dv.base_object_class for dv in res.deleted_versions} == {"Prompt"}
+    assert {dv.leaf_object_class for dv in res.deleted_versions} == {"StringPrompt"}
+
+
 def _datasets_query(client: WeaveClient, latest_only: bool) -> list[tsi.ObjSchema]:
     objs = client.server.objs_query(
         tsi.ObjQueryReq(

@@ -79,6 +79,16 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+### Trace Server API / Node SDK Schema
+
+When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
+
+1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
+2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
+3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
+
+If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
+
 ## Python Testing Guidelines
 
 ### Test Framework
@@ -289,10 +299,22 @@ pnpm exec tsx examples/claudeAgents.ts
 
 ### PR Requirements
 
-- Title format: Must start with one of:
-  - `chore(weave):` - For maintenance tasks
-  - `feat(weave):` - For new features
-  - `fix(weave):` - For bug fixes
+- Title format: `<type>(<scope>): <description>`, where `<type>` is one of
+  `chore`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `security`,
+  `test`. A scope is **required** (`requireScope: true`) and CI validates it
+  (`.github/workflows/pr.yaml`).
+- **Pick the scope by which SDK/area the change touches:**
+  - `weave_ts` — **required for ALL TypeScript / Node SDK changes** (anything
+    under `sdks/node/`). Any PR that modifies the TS SDK must be marked
+    `(weave_ts)`, e.g. `fix(weave_ts): ...`, `feat(weave_ts): ...`,
+    `chore(weave_ts): ...`.
+  - `weave` — the Python SDK and trace server (the default for `weave/…`
+    changes), e.g. `fix(weave): ...`, `feat(weave): ...`, `chore(weave): ...`.
+  - Other valid scopes (see `pr.yaml` for the authoritative list): `ui`, `app`,
+    `dev`, `deps`, `inference`.
+- If a single PR spans both the Python and TS SDKs, prefer splitting it; if that
+  isn't practical, scope it to the SDK that carries the primary change and call
+  out the other in the PR body.
 - Provide detailed PR summaries including:
   - Purpose of changes
   - Testing performed

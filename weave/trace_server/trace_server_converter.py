@@ -14,9 +14,15 @@ zero new objects are allocated.
 Pydantic models with nested dataclasses inside `Any` fields fall back to
 the legacy `model_dump` / `model_validate` round-trip, since Pydantic
 does not round-trip dataclasses safely through getattr / setattr.
+
+Refs can also be buried inside a JSON-serialized string leaf (e.g. an agent
+message's `content` parts array). Such leaves are decoded and re-walked so the
+embedded refs convert with the same semantics as top-level ones, bounded by
+`_MAX_REF_SEARCH_DEPTH` to cap JSON-in-JSON nesting.
 """
 
 import dataclasses
+import json
 import logging
 from collections.abc import Callable
 from typing import Any, NamedTuple, TypeVar, cast
@@ -24,7 +30,7 @@ from typing import Any, NamedTuple, TypeVar, cast
 from pydantic import BaseModel
 
 from weave.shared import refs_internal as ri
-from weave.trace_server.errors import InvalidExternalRef
+from weave.trace_server.errors import InvalidExternalRef, RequestTooLarge
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +40,84 @@ B = TypeVar("B")
 weave_prefix = ri.WEAVE_SCHEME + ":///"
 weave_internal_prefix = ri.WEAVE_INTERNAL_SCHEME + ":///"
 
+# Caps the JSON-in-JSON descent for refs embedded inside a JSON-serialized
+# string leaf: a decoded blob can hold another JSON-string leaf, so a
+# pathological payload could nest without bound. Realistic nesting is a few
+# levels; 8 leaves headroom below sys.getrecursionlimit(). Mirrors
+# ``chat_view._MAX_REF_SEARCH_DEPTH``.
+_MAX_REF_SEARCH_DEPTH = 8
+
+# Caps the copy-on-write walk over the payload's own container nesting
+# (dict / list / tuple / set / pydantic model). Without it a deeply-nested
+# body exhausts the Python stack and surfaces as an unhandled RecursionError
+# (HTTP 500); the guard converts that into a typed RequestTooLarge (HTTP 413).
+# The measured natural failure depth is ~330 for models on a shallow stack, so
+# 200 fires first with headroom for the request's own call stack, while staying
+# far above any realistic payload (real nesting is a handful of levels).
+_MAX_STRUCTURE_DEPTH = 200
+
 
 class InvalidInternalRef(ValueError):
     pass
+
+
+def _convert_embedded_json_refs(
+    s: str, mapper: Callable[[Any, int], Any], depth: int
+) -> str:
+    """Rewrite refs buried inside a JSON-serialized string ``s``.
+
+    Decode ``s`` as JSON and re-run ``mapper`` over the result so embedded refs
+    convert with the same semantics as top-level leaves. Returns ``s`` unchanged
+    when it does not parse as JSON or when nothing inside it changed (avoiding a
+    gratuitous re-dump); otherwise returns the re-serialized structure. Any
+    exception from ``mapper`` propagates, preserving whole-string raise
+    semantics.
+    """
+    try:
+        parsed = json.loads(s)
+    except (ValueError, TypeError):
+        return s
+    result = _map_values(parsed, mapper, depth)
+    if result is parsed:
+        return s
+    return json.dumps(result)
+
+
+def _make_ref_string_mapper(
+    convert_ref: Callable[[str, bool], str],
+) -> Callable[[B, int], B]:
+    """Build a copy-on-write mapper that rewrites weave refs in string leaves.
+
+    ``convert_ref`` handles a string that starts with a ref prefix (plus a bool
+    marking whether the leaf sits inside an embedded JSON blob), returning its
+    converted form (or raising for a disallowed ref). A string that instead
+    embeds a ref inside a JSON blob (e.g. a message ``content`` parts array) is
+    decoded and re-run through the same mapper so embedded refs convert like
+    top-level ones. The substring pre-check keeps ref-free strings off the
+    ``json.loads`` path, and ``_MAX_REF_SEARCH_DEPTH`` caps the JSON-in-JSON
+    descent.
+    """
+    search_depth = 0
+
+    def mapper(obj: B, structure_depth: int) -> B:
+        nonlocal search_depth
+        if not isinstance(obj, str):
+            return obj
+        if obj.startswith(weave_prefix) or obj.startswith(weave_internal_prefix):
+            return cast(B, convert_ref(obj, search_depth > 0))
+        if search_depth < _MAX_REF_SEARCH_DEPTH and (
+            weave_prefix in obj or weave_internal_prefix in obj
+        ):
+            search_depth += 1
+            try:
+                return cast(
+                    B, _convert_embedded_json_refs(obj, mapper, structure_depth)
+                )
+            finally:
+                search_depth -= 1
+        return obj
+
+    return mapper
 
 
 def replace_external_weave_ref(
@@ -94,41 +175,30 @@ def universal_ext_to_int_ref_converter(
     """
     ext_to_int_project_cache: dict[str, str] = {}
 
-    def replace_ref(ref_str: str) -> str:
-        return replace_external_weave_ref(
-            ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
-        )
+    def convert_ref(ref_str: str, _embedded: bool) -> str:
+        if ref_str.startswith(weave_prefix):
+            return replace_external_weave_ref(
+                ref_str, convert_ext_to_int_project_id, ext_to_int_project_cache
+            )
+        # Internal ref: accept only when the verify callback confirms the
+        # project_id, else a client could smuggle refs to arbitrary private
+        # projects.
+        rest = ref_str[len(weave_internal_prefix) :]
+        parts = rest.split("/", 2)
+        if len(parts) < 2:
+            raise InvalidExternalRef(
+                "Invalid internal ref format: missing project_id or kind."
+            )
+        if verify_internal_project_id is not None and verify_internal_project_id(
+            parts[0]
+        ):
+            return ref_str
+        raise InvalidExternalRef("Encountered unexpected internal ref format.")
 
-    def mapper(obj: B) -> B:
-        if isinstance(obj, str):
-            if obj.startswith(weave_prefix):
-                result = replace_ref(obj)
-                return cast(B, result)
-            elif obj.startswith(weave_internal_prefix):
-                # Internal refs are only accepted when the verify callback
-                # confirms the project_id is valid. Without this check, a
-                # malicious client could embed refs to arbitrary private
-                # projects.
-                rest = obj[len(weave_internal_prefix) :]
-                parts = rest.split("/", 2)
-                if len(parts) < 2:
-                    raise InvalidExternalRef(
-                        "Invalid internal ref format: missing project_id or kind."
-                    )
-                ref_project_id = parts[0]
-                if (
-                    verify_internal_project_id is not None
-                    and verify_internal_project_id(ref_project_id)
-                ):
-                    return obj
-                raise InvalidExternalRef("Encountered unexpected internal ref format.")
-        return obj
-
-    return _map_values(obj, mapper)
+    return _map_values(obj, _make_ref_string_mapper(convert_ref))
 
 
 C = TypeVar("C")
-D = TypeVar("D")
 
 
 def universal_int_to_ext_ref_converter(
@@ -141,13 +211,17 @@ def universal_int_to_ext_ref_converter(
     format of `weave-trace-internal:///project_id/...` and the external references are
     expected to be in the format of `weave:///entity/project/...`.
 
+    External refs embedded in JSON-string leaves always pass through (logged):
+    rows written before the converter descended into JSON strings legitimately
+    contain them.
+
     Args:
         obj: The object to convert.
         convert_int_to_ext_project_id: A function that takes an internal
             project ID and returns the external project ID.
-        tolerate_external_refs: When True, a ref already in external
-            (`weave:///`) form is logged and passed through instead of
-            raising. Used by agent reads, whose ingest path does not fully
+        tolerate_external_refs: When True, a top-level ref already in
+            external (`weave:///`) form is logged and passed through instead
+            of raising. Used by agent reads, whose ingest path does not fully
             convert refs and can therefore persist external refs.
 
     Returns:
@@ -156,36 +230,31 @@ def universal_int_to_ext_ref_converter(
     """
     int_to_ext_project_cache: dict[str, str | None] = {}
 
-    def replace_ref(ref_str: str) -> str:
-        if not ref_str.startswith(weave_internal_prefix):
-            raise ValueError(f"Invalid URI: {ref_str}")
-        rest = ref_str[len(weave_internal_prefix) :]
-        parts = rest.split("/", 1)
-        if len(parts) != 2:
-            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
-        project_id, tail = parts
-        if project_id not in int_to_ext_project_cache:
-            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
-                project_id
-            )
-        external_project_id = int_to_ext_project_cache[project_id]
-        if not external_project_id:
-            return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
-        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+    def convert_ref(ref_str: str, embedded: bool) -> str:
+        if ref_str.startswith(weave_internal_prefix):
+            rest = ref_str[len(weave_internal_prefix) :]
+            parts = rest.split("/", 1)
+            if len(parts) != 2:
+                raise InvalidInternalRef(f"Invalid URI: {ref_str}")
+            project_id, tail = parts
+            if project_id not in int_to_ext_project_cache:
+                int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                    project_id
+                )
+            external_project_id = int_to_ext_project_cache[project_id]
+            if not external_project_id:
+                return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+            return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+        # External ref stored where an internal one belongs. Embedded ones are
+        # expected legacy state (writes only started converting inside JSON
+        # strings mid-2026) and are already external-shaped, so they always
+        # pass through; top-level ones raise unless the caller opted in.
+        if not (embedded or tolerate_external_refs):
+            raise InvalidInternalRef("Encountered unexpected ref format.")
+        logger.warning("Returning stored external ref unchanged: %s", ref_str)
+        return ref_str
 
-    def mapper(obj: D) -> D:
-        if isinstance(obj, str):
-            if obj.startswith(weave_internal_prefix):
-                return cast(D, replace_ref(obj))
-            elif obj.startswith(weave_prefix):
-                # External ref stored where an internal one belongs. Agent reads
-                # tolerate it (already external-shaped); other paths raise loudly.
-                if not tolerate_external_refs:
-                    raise InvalidInternalRef("Encountered unexpected ref format.")
-                logger.error("Returning stored external ref unchanged: %s", obj)
-        return obj
-
-    return _map_values(obj, mapper)
+    return _map_values(obj, _make_ref_string_mapper(convert_ref))
 
 
 E = TypeVar("E")
@@ -208,39 +277,48 @@ class _MapResult(NamedTuple):
     fast_path_safe: bool
 
 
-def _map_values(obj: E, func: Callable[[E], E]) -> E:
-    """Apply `func` to every scalar in `obj`, reusing untouched subtrees."""
-    return cast(E, _walk(obj, cast(Callable[[Any], Any], func)).value)
+def _map_values(obj: E, func: Callable[[E, int], E], depth: int = 0) -> E:
+    """Apply `func` to every scalar in `obj`, reusing untouched subtrees.
+
+    `depth` seeds the structure-depth guard; re-entrant walks over a decoded
+    JSON-string leaf pass the leaf's own depth so the cap bounds total nesting.
+    """
+    return cast(E, _walk(obj, cast(Callable[[Any, int], Any], func), depth).value)
 
 
-def _walk(obj: Any, func: Callable[[Any], Any]) -> _MapResult:
+def _walk(obj: Any, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     """Recursive copy-on-write dispatcher; one container kind per arm."""
+    if depth > _MAX_STRUCTURE_DEPTH:
+        raise RequestTooLarge(
+            f"Request payload nesting exceeds the maximum supported depth of "
+            f"{_MAX_STRUCTURE_DEPTH}."
+        )
     if isinstance(obj, BaseModel):
-        return _walk_model(obj, func)
+        return _walk_model(obj, func, depth)
     if isinstance(obj, dict):
-        return _walk_mapping(obj, func)
+        return _walk_mapping(obj, func, depth)
     if isinstance(obj, list):
-        return _walk_sequence(obj, func, rebuild=list)
+        return _walk_sequence(obj, func, rebuild=list, depth=depth)
     if isinstance(obj, tuple):
-        return _walk_sequence(obj, func, rebuild=tuple)
+        return _walk_sequence(obj, func, rebuild=tuple, depth=depth)
     if isinstance(obj, set):
-        return _walk_set(obj, func)
+        return _walk_set(obj, func, depth)
 
     # Scalar leaf: ask the mapper for a replacement. Dataclasses are leaves
     # too, but trip the fast-path flag so any ancestor model knows to
     # round-trip via model_dump.
-    new_obj = func(obj)
+    new_obj = func(obj, depth)
     if new_obj is not obj:
         return _MapResult(new_obj, True, True)
     return _MapResult(obj, False, not dataclasses.is_dataclass(obj))
 
 
-def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_mapping(obj: dict, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     # Allocate a copy only on the first changed child, then write through it.
     clone: dict | None = None
     fast_path_safe = True
     for key, value in obj.items():
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         if result.changed:
             if clone is None:
                 clone = dict(obj)
@@ -253,15 +331,16 @@ def _walk_mapping(obj: dict, func: Callable[[Any], Any]) -> _MapResult:
 
 def _walk_sequence(
     obj: Any,
-    func: Callable[[Any], Any],
+    func: Callable[[Any, int], Any],
     rebuild: Callable[[list[Any]], Any],
+    depth: int,
 ) -> _MapResult:
     # Lists and tuples share an identical walk; only the final constructor
     # differs (`list` returns the buffer, `tuple` freezes it).
     clone: list[Any] | None = None
     fast_path_safe = True
     for index, value in enumerate(obj):
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         if result.changed:
             if clone is None:
                 clone = list(obj)
@@ -272,14 +351,14 @@ def _walk_sequence(
     return _MapResult(rebuild(clone), True, fast_path_safe)
 
 
-def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_set(obj: set, func: Callable[[Any, int], Any], depth: int) -> _MapResult:
     # Sets have no useful index to write through, so we collect into a list
     # and rebuild only when something changed.
     values: list[Any] = []
     changed = False
     fast_path_safe = True
     for value in obj:
-        result = _walk(value, func)
+        result = _walk(value, func, depth + 1)
         values.append(result.value)
         changed = changed or result.changed
         fast_path_safe = fast_path_safe and result.fast_path_safe
@@ -288,7 +367,9 @@ def _walk_set(obj: set, func: Callable[[Any], Any]) -> _MapResult:
     return _MapResult(set(values), True, fast_path_safe)
 
 
-def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
+def _walk_model(
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
+) -> _MapResult:
     """Walk a pydantic model with copy-on-write semantics.
 
     Three outcomes, in order:
@@ -300,17 +381,17 @@ def _walk_model(obj: BaseModel, func: Callable[[Any], Any]) -> _MapResult:
          shape the legacy round-trip would have produced.
       3. Something changed -> apply updates and revalidate.
     """
-    updates, fast_path_safe = _collect_model_updates(obj, func)
+    updates, fast_path_safe = _collect_model_updates(obj, func, depth)
 
     if not fast_path_safe:
-        return _MapResult(_model_via_roundtrip(obj, func), True, True)
+        return _MapResult(_model_via_roundtrip(obj, func, depth), True, True)
     if not updates:
         return _MapResult(obj.__class__.model_validate(obj), False, True)
     return _MapResult(_apply_model_updates(obj, updates), True, True)
 
 
 def _collect_model_updates(
-    obj: BaseModel, func: Callable[[Any], Any]
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
 ) -> tuple[dict[str, Any], bool]:
     """Walk every declared field + every extra; collect what changed.
 
@@ -326,13 +407,13 @@ def _collect_model_updates(
     for field_name, field_info in obj.__class__.model_fields.items():
         if field_info.exclude is True:
             continue
-        result = _walk(getattr(obj, field_name), func)
+        result = _walk(getattr(obj, field_name), func, depth + 1)
         if result.changed:
             updates[field_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
 
     for extra_name, extra_value in (obj.model_extra or {}).items():
-        result = _walk(extra_value, func)
+        result = _walk(extra_value, func, depth + 1)
         if result.changed:
             updates[extra_name] = result.value
         fast_path_safe = fast_path_safe and result.fast_path_safe
@@ -358,7 +439,9 @@ def _apply_model_updates(obj: BaseModel, updates: dict[str, Any]) -> BaseModel:
     return obj.__class__.model_validate(obj)
 
 
-def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseModel:
+def _model_via_roundtrip(
+    obj: BaseModel, func: Callable[[Any, int], Any], depth: int
+) -> BaseModel:
     """Fallback used when a model contains a nested dataclass.
 
     `by_alias=True` is required: query models have Mongo-style aliased
@@ -366,5 +449,5 @@ def _model_via_roundtrip(obj: BaseModel, func: Callable[[Any], Any]) -> BaseMode
     without it.
     """
     orig = obj.model_dump(by_alias=True)
-    walked = _walk(orig, func)
+    walked = _walk(orig, func, depth)
     return obj.model_validate(walked.value)

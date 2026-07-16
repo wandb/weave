@@ -61,6 +61,7 @@ except ImportError:
     _OTEL_AVAILABLE = False
 
 if TYPE_CHECKING:
+    from opentelemetry.context import Context as _OTelContext
     from opentelemetry.context import Token as _OTelToken
     from opentelemetry.trace import Span as _OTelSpan
     from opentelemetry.util.types import Attributes
@@ -142,6 +143,22 @@ class _SpanBase(BaseModel):
 
     _otel_span: _OTelSpan | None = PrivateAttr(default=None)
     _otel_token: _OTelToken | None = PrivateAttr(default=None)
+    # Explicit OTel parent context, set by a parent span's ``start_llm`` /
+    # ``start_tool`` / ``start_subagent`` factories (see ``_thread_otel_context``)
+    # on the children they create so those children nest under the parent's span
+    # regardless of what's on the ambient OTel context stack at ``__enter__`` time.
+    _parent_otel_context: _OTelContext | None = PrivateAttr(default=None)
+
+    def _thread_otel_context(self, child: _SpanBase) -> None:
+        """Nest ``child``'s span under this one by handing it an explicit OTel
+        parent context built from this span.
+
+        No-op until this span has started (``_otel_span`` is set in
+        ``_start_otel_span``); children created before then fall back to the
+        ambient OTel context, matching the bare ``LLM()`` / ``Tool()`` path.
+        """
+        if self._otel_span is not None:
+            child._parent_otel_context = otel_trace.set_span_in_context(self._otel_span)
 
     def _start_otel_span(
         self,
@@ -156,6 +173,10 @@ class _SpanBase(BaseModel):
         the SDK object was constructed (e.g. ``Turn.started_at``) so the
         OTel span timestamp matches the user-visible start, not the moment
         ``__enter__`` happened to run.
+
+        When ``_parent_otel_context`` is set (a child threaded from its parent
+        Turn/SubAgent), that context wins over ambient. ``new_trace`` is only
+        honored when no explicit parent was provided.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -163,7 +184,9 @@ class _SpanBase(BaseModel):
         kwargs: dict[str, Any] = {}
         if start_time_ns is not None:
             kwargs["start_time"] = start_time_ns
-        if new_trace:
+        if self._parent_otel_context is not None:
+            kwargs["context"] = self._parent_otel_context
+        elif new_trace:
             kwargs["context"] = Context()
         self._otel_span = tracer.start_span(name, **kwargs)
         self._otel_token = otel_context.attach(
@@ -701,7 +724,10 @@ class LLM(_SpanBase):
         )
 
         if self._token is not None:
-            _current_llm.reset(self._token)
+            try:
+                _current_llm.reset(self._token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
             self._token = None
 
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
@@ -746,7 +772,7 @@ class SubAgent(_SpanBase):
 
     _ended: bool = PrivateAttr(default=False)
 
-    def llm(
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -757,18 +783,63 @@ class SubAgent(_SpanBase):
 
         Sets the ``_current_llm`` contextvar so the LLM is visible via
         ``get_current_llm()`` regardless of whether a context manager is used.
+        Pins the LLM's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
         """
         llm = LLM(
             model=model or self.model,
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        self._thread_otel_context(llm)
         llm._token = _current_llm.set(llm)
         return llm
 
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
+        """Start a tool execution within this sub-agent.
+
+        Pins the Tool's OTel parent to this SubAgent's span when the SubAgent
+        has been entered.
+        """
+        tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        self._thread_otel_context(tool)
+        return tool
+
+    def start_subagent(self, *, name: str, model: str = "") -> SubAgent:
+        """Start a nested sub-agent under this one.
+
+        Pins the nested SubAgent's OTel parent to this SubAgent's span when
+        this SubAgent has been entered.
+        """
+        sub = SubAgent(name=name, model=model or self.model)
+        self._thread_otel_context(sub)
+        return sub
+
+    # Deprecated aliases — the factory methods were renamed to ``start_*`` to
+    # match the module-level ``start_*`` functions.
+    @deprecated("`llm` is deprecated; use `start_llm` instead.")
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias for :meth:`start_llm`."""
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    @deprecated("`tool` is deprecated; use `start_tool` instead.")
     def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
-        """Start a tool execution within this sub-agent."""
-        return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        """Deprecated alias for :meth:`start_tool`."""
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
 
     def record(
         self,
@@ -913,7 +984,11 @@ class Turn(_SpanBase):
         self.messages.append(Message(role="user", content=content))
         return self
 
-    def llm(
+    # Like ``SubAgent``, pin children to this turn's captured OTel context (via
+    # ``_thread_otel_context``) so a child built inside ``with turn:`` but
+    # entered after the turn exits still nests under it rather than becoming a
+    # detached root span. No-op until the turn is entered. See ``_SpanBase``.
+    def start_llm(
         self,
         *,
         model: str = "",
@@ -930,14 +1005,19 @@ class Turn(_SpanBase):
             provider_name=provider_name,
             system_instructions=system_instructions or [],
         )
+        self._thread_otel_context(llm)
         llm._token = _current_llm.set(llm)
         return llm
 
-    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+    def start_tool(
+        self, *, name: str, arguments: str = "", tool_call_id: str = ""
+    ) -> Tool:
         """Start a tool execution (execute_tool span, child of this turn)."""
-        return Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        tool = Tool(name=name, arguments=arguments, tool_call_id=tool_call_id)
+        self._thread_otel_context(tool)
+        return tool
 
-    def subagent(
+    def start_subagent(
         self,
         *,
         name: str,
@@ -945,10 +1025,49 @@ class Turn(_SpanBase):
         system_instructions: list[str] | None = None,
     ) -> SubAgent:
         """Start a sub-agent invocation (nested invoke_agent span, same trace)."""
-        return SubAgent(
+        sub = SubAgent(
             name=name,
             model=model or self.model,
             system_instructions=system_instructions or [],
+        )
+        self._thread_otel_context(sub)
+        return sub
+
+    # Deprecated aliases — the factory methods were renamed to ``start_*`` to
+    # match the module-level ``start_*`` functions.
+    @deprecated("`llm` is deprecated; use `start_llm` instead.")
+    def llm(
+        self,
+        *,
+        model: str = "",
+        provider_name: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> LLM:
+        """Deprecated alias for :meth:`start_llm`."""
+        return self.start_llm(
+            model=model,
+            provider_name=provider_name,
+            system_instructions=system_instructions,
+        )
+
+    @deprecated("`tool` is deprecated; use `start_tool` instead.")
+    def tool(self, *, name: str, arguments: str = "", tool_call_id: str = "") -> Tool:
+        """Deprecated alias for :meth:`start_tool`."""
+        return self.start_tool(
+            name=name, arguments=arguments, tool_call_id=tool_call_id
+        )
+
+    @deprecated("`subagent` is deprecated; use `start_subagent` instead.")
+    def subagent(
+        self,
+        *,
+        name: str,
+        model: str = "",
+        system_instructions: list[str] | None = None,
+    ) -> SubAgent:
+        """Deprecated alias for :meth:`start_subagent`."""
+        return self.start_subagent(
+            name=name, model=model, system_instructions=system_instructions
         )
 
     def record(
@@ -1045,7 +1164,10 @@ class Turn(_SpanBase):
         )
 
         if self._token is not None:
-            _current_turn.reset(self._token)
+            try:
+                _current_turn.reset(self._token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
             self._token = None
 
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
@@ -1161,7 +1283,10 @@ class Conversation(BaseModel):
         if self._current_turn is not None and not self._current_turn._ended:
             self._current_turn.end()
         if self._token is not None:
-            _current_conversation.reset(self._token)
+            try:
+                _current_conversation.reset(self._token)
+            except ValueError:
+                pass  # entered in a different context/thread; best-effort
             self._token = None
 
     def __enter__(self) -> Self:
@@ -1276,7 +1401,7 @@ def start_llm(
     """
     turn = get_current_turn()
     if turn is not None:
-        return turn.llm(
+        return turn.start_llm(
             model=model,
             provider_name=provider_name,
             system_instructions=system_instructions,

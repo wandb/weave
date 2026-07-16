@@ -7,18 +7,22 @@ tool calls, assistant responses, and context compaction events.
 
 This is a Weave product projection, not an OTel semantic-convention layer.
 Subagent spans remain inline in the same turn, inheriting the nearest enclosing
-agent label unless they provide their own. When SDKs mirror the final assistant
-text onto both an `invoke_agent` span and a descendant LLM span, the descendant
-message wins and the parent invoke output is suppressed.
+agent label unless they provide their own. When SDKs mirror assistant text onto
+both a model span and a descendant transcript span, the descendant message keeps
+its precise ordering while inheriting the model span's richer metadata. Mirrored
+`invoke_agent` output is likewise suppressed when a descendant already emitted.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
+from weave.shared.refs_internal import WEAVE_INTERNAL_SCHEME
 from weave.trace_server.agents.constants import (
     MAX_WALK_DEPTH,
     OP_EXECUTE_TOOL,
@@ -49,6 +53,14 @@ _NON_USER_PROMPT_ROLES = {
     "tool_call",
     "tool_result",
 }
+
+# Claude Code feeds asynchronous subagent completions back into the model as a
+# synthetic role=user XML message. It is execution context, not a human prompt,
+# and belongs with tool activity in the trajectory.
+_CLAUDE_TASK_NOTIFICATION_OPEN = "<task-notification>"
+_CLAUDE_TASK_NOTIFICATION_CLOSE = "</task-notification>"
+_CHAT_OPERATION = "chat"
+_ASSISTANT_TEXT_OPERATION = "assistant_text"
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +121,36 @@ def _span_sort_key(span: AgentSpanSchema) -> tuple[bool, float, bool, float, str
         span.ended_at is None,
         -_datetime_sort_seconds(span.ended_at),
         span.span_id,
+    )
+
+
+def _span_node_sort_key(
+    node: SpanNode,
+) -> tuple[bool, float, bool, float, str]:
+    """Order chat nodes by their precise transcript event when available.
+
+    Claude Code can give sibling ``chat`` spans the same coarse start time.
+    Their direct ``assistant_text`` children carry the actual emission times,
+    so use the earliest such child to place the whole model-response node among
+    its siblings. Other nodes retain the established span ordering policy.
+    """
+    event_time = node.span.started_at
+    if node.span.operation_name == _CHAT_OPERATION:
+        transcript_times = [
+            child.span.started_at
+            for child in node.children
+            if child.span.operation_name == _ASSISTANT_TEXT_OPERATION
+            and child.span.started_at is not None
+        ]
+        if transcript_times:
+            event_time = min(transcript_times)
+
+    return (
+        event_time is None,
+        _datetime_sort_seconds(event_time),
+        node.span.ended_at is None,
+        -_datetime_sort_seconds(node.span.ended_at),
+        node.span.span_id,
     )
 
 
@@ -215,7 +257,9 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
 
     Only when the walk surfaces no user message at all — e.g. an SDK that
     records the prompt on the enclosing `invoke_agent` span rather than the LLM
-    span — do we fall back to a single synthesized leading prompt.
+    span — do we fall back to a synthesized leading prompt. Claude Code task
+    notifications recorded only on that wrapper receive the equivalent fallback
+    as tool activity.
     """
     if not spans:
         return []
@@ -225,8 +269,14 @@ def build_chat_messages(spans: list[AgentSpanSchema]) -> list[AgentChatMessage]:
     traversal.walk_roots(tree)
 
     messages = traversal.messages
+    leading_context: list[AgentChatMessage] = []
     if not traversal.emitted_user and (user_message := _find_user_message(spans)):
-        messages.insert(0, user_message)
+        leading_context.append(user_message)
+    if not traversal.emitted_task_notification and (
+        task_notification := _find_task_notification(spans)
+    ):
+        leading_context.append(task_notification)
+    messages[:0] = leading_context
 
     # The walk emits an invoke_agent's `agent_start` before descending to the
     # chat span that carries that turn's user message, but the user speaks
@@ -257,6 +307,10 @@ class ChatTraversal:
     # True once any per-turn user message has been emitted during the walk;
     # gates the invoke_agent leading-prompt fallback in build_chat_messages.
     emitted_user: bool = False
+    # True once a Claude Code async task notification has been surfaced as
+    # tool activity. Like emitted_user, this prevents the invoke_agent input
+    # fallback from projecting the same context twice.
+    emitted_task_notification: bool = False
     # (text, media-digests) of the most recently emitted user message, so the
     # same message replayed by a following LLM span is not emitted twice.
     _last_user_sig: tuple[str, tuple[str, ...]] | None = None
@@ -356,8 +410,37 @@ class ChatTraversal:
         if not subtree_emitted_assistant:
             msg = _emit_assistant_message(span, subtree_agent, aggregate_node=node)
             if msg:
-                self.messages.append(msg)
-                subtree_emitted_assistant = True
+                assistant = msg.assistant_message
+                launch = (
+                    _claude_async_agent_launch(assistant.text) if assistant else None
+                )
+                if launch is not None and assistant is not None:
+                    description = launch.get("description")
+                    self.messages.append(
+                        AgentChatMessage(
+                            type="tool_call",
+                            span_id=span.span_id,
+                            agent_name=subtree_agent,
+                            agent_version=span.agent_version,
+                            status_code=span.status_code,
+                            started_at=span.started_at,
+                            tool_call=AgentChatToolCall(
+                                tool_name=f"Start {subtree_agent or 'subagent'}",
+                                tool_arguments=(
+                                    description
+                                    if isinstance(description, str)
+                                    else None
+                                ),
+                                tool_result=assistant.text,
+                                duration_ms=assistant.duration_ms,
+                                status=assistant.status,
+                                content_refs=assistant.content_refs,
+                            ),
+                        )
+                    )
+                else:
+                    self.messages.append(msg)
+                    subtree_emitted_assistant = True
 
         return subtree_emitted_assistant
 
@@ -401,7 +484,8 @@ class ChatTraversal:
         span = node.span
         agent_name = _agent_label(span, nearest_agent)
         self._emit_system_instructions(span, agent_name)
-        self._emit_user_turn(span)
+        self._emit_user_turn(span, agent_name)
+        child_message_start = len(self.messages)
         subtree_emitted_assistant = self._walk_children(
             node, nearest_agent=agent_name, depth=depth
         )
@@ -409,6 +493,12 @@ class ChatTraversal:
         msg = _emit_assistant_message(span, agent_name)
         if msg is None:
             return subtree_emitted_assistant
+        if _coalesce_mirrored_child_assistant(
+            node,
+            self.messages[child_message_start:],
+            msg,
+        ):
+            return True
         self.messages.append(msg)
         assistant = msg.assistant_message
         emitted_text = bool(assistant and assistant.text)
@@ -470,7 +560,7 @@ class ChatTraversal:
             )
         )
 
-    def _emit_user_turn(self, span: AgentSpanSchema) -> None:
+    def _emit_user_turn(self, span: AgentSpanSchema, agent_name: str | None) -> None:
         """Emit the user message(s) for the new turn this LLM span answers.
 
         The new user input is the trailing run of consecutive user-role
@@ -488,13 +578,38 @@ class ChatTraversal:
         """
         for message in _trailing_user_messages(span.input_messages):
             text = _display_text(message.content)
-            media = _directional_content_refs(span, _media_part_digests([message]))
+            media = _message_content_refs(span, [message])
             if not text and not media:
                 continue
             sig = (text, tuple(media))
             if sig == self._last_user_sig:
                 continue
             self._last_user_sig = sig
+            if _is_claude_task_notification(message):
+                # Claude's async subagent completion is encoded as role=user so
+                # the next model call consumes it, but it is not a new human
+                # turn. Preserve the event as foldable tool activity instead
+                # of rendering a misleading user bubble.
+                self._pending_agent_start = None
+                self.emitted_task_notification = True
+                self.messages.append(
+                    AgentChatMessage(
+                        type="tool_call",
+                        span_id=span.span_id,
+                        agent_name=agent_name,
+                        agent_version=span.agent_version,
+                        status_code=span.status_code,
+                        started_at=span.started_at,
+                        tool_call=AgentChatToolCall(
+                            tool_name="Task notification",
+                            tool_result=text,
+                            duration_ms=0,
+                            status=span.status_code,
+                            content_refs=media,
+                        ),
+                    )
+                )
+                continue
             self.emitted_user = True
             # A user message marks a new turn; an unfilled agent_start from an
             # earlier turn must not absorb this turn's instructions.
@@ -539,7 +654,7 @@ def build_span_tree(spans: list[AgentSpanSchema]) -> list[SpanNode]:
             roots.append(node)
 
     def _sort(nodes: list[SpanNode]) -> None:
-        nodes.sort(key=lambda n: _span_sort_key(n.span))
+        nodes.sort(key=_span_node_sort_key)
         for n in nodes:
             _sort(n.children)
 
@@ -589,15 +704,52 @@ def _display_text(content: str) -> str:
         return content
     texts: list[str] = []
     for p in parts:
-        if isinstance(p, dict) and isinstance(p.get("content"), str):
+        if isinstance(p, dict):
             # Reasoning is rendered separately via `reasoning_content`;
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
-            texts.append(p["content"])
+            # Support both the weave parts model (``content``) and the
+            # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
+            # images) carry neither and are skipped for display.
+            if isinstance(p.get("content"), str):
+                texts.append(p["content"])
+            elif isinstance(p.get("text"), str):
+                texts.append(p["text"])
         elif isinstance(p, str):
             texts.append(p)
     return "\n".join(texts)
+
+
+def _is_claude_task_notification(message: NormalizedMessage) -> bool:
+    """Whether a role=user message is Claude Code execution context.
+
+    Claude Code represents an asynchronous subagent completion as a synthetic
+    user message containing one complete ``<task-notification>`` XML element.
+    Match the full wrapper so ordinary prompts that merely discuss the tag are
+    not reclassified.
+    """
+    if message.role != _USER_ROLE:
+        return False
+    content = message.content.strip()
+    return content.startswith(_CLAUDE_TASK_NOTIFICATION_OPEN) and content.endswith(
+        _CLAUDE_TASK_NOTIFICATION_CLOSE
+    )
+
+
+def _claude_async_agent_launch(text: str) -> dict[str, Any] | None:
+    """Parse Claude Code's non-conversational async subagent launch result."""
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("isAsync") is not True or payload.get("status") != "async_launched":
+        return None
+    if not isinstance(payload.get("agentId"), str):
+        return None
+    return payload
 
 
 def _filter_message_texts(
@@ -626,13 +778,42 @@ def _extract_user_text(
 ) -> str:
     """Extract user text from normalized input_messages.
 
+    Role resolution is delegated to `_user_prompt_texts` so preview and
+    per-turn extraction stay consistent.
+    """
+    texts = _user_prompt_texts(messages)
+    if not texts:
+        return ""
+    return texts[-1] if last_only else "\n\n".join(texts)
+
+
+def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: opening user-prompt text from a span's `input_messages`.
+
+    The opening user prompt is the first user entry of the earliest
+    message-bearing span; that span's `input_messages` begins at the
+    conversation opening.
+    """
+    texts = _user_prompt_texts(messages)
+    return texts[0] if texts else ""
+
+
+def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
+    """Public: final assistant/output text from a span's `output_messages`."""
+    return _extract_non_user_output_text(messages)
+
+
+def _user_prompt_texts(messages: list[NormalizedMessage]) -> list[str]:
+    """Return candidate user-prompt texts using two-pass role resolution.
+
     First pass: entries tagged `role == "user"`. Fallback pass: entries
     that could plausibly be the user prompt: provider-specific or empty-role
     messages. We intentionally exclude assistant, system, and tool roles so
     those do not render as a user prompt.
     """
+    messages = [m for m in messages if not _is_claude_task_notification(m)]
     if not messages:
-        return ""
+        return []
     texts = _filter_message_texts(messages, include_roles={_USER_ROLE})
     if not texts:
         texts = _filter_message_texts(messages, exclude_roles=_NON_USER_PROMPT_ROLES)
@@ -641,24 +822,7 @@ def _extract_user_text(
                 "no role=user input messages; falling back to unknown/provider roles (roles=%r)",
                 [m.role for m in messages],
             )
-    if last_only and texts:
-        return texts[-1]
-    return "\n\n".join(texts)
-
-
-def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: opening user-prompt text from a span's `input_messages`.
-
-    Used to build the conversation table's "first message" preview directly
-    from the grouped spans query, applying the same role resolution as the
-    full chat view so previews match the opened conversation.
-    """
-    return _extract_user_text(messages, last_only=True)
-
-
-def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: final assistant/output text from a span's `output_messages`."""
-    return _extract_non_user_output_text(messages)
+    return texts
 
 
 def _extract_non_user_output_text(messages: list[NormalizedMessage]) -> str:
@@ -759,6 +923,87 @@ def _directional_content_refs(
     return [r for r in _content_refs(span) if _ref_digest(r) in part_digests]
 
 
+_INTERNAL_REF_PREFIX = f"{WEAVE_INTERNAL_SCHEME}:///"
+
+# Cap on how far ``_iter_internal_refs`` will descend. It walks nested
+# dicts/lists AND re-parses JSON-encoded strings (JSON-inside-JSON), so a deeply
+# nested or adversarial span payload could otherwise exceed Python's recursion
+# limit and raise ``RecursionError`` on the OTel ingest path, rejecting an
+# otherwise-valid span. Realistic message-part nesting is only a handful of
+# levels deep (message dict -> content JSON -> parts list -> part dict ->
+# image_url dict -> url string), so 8 leaves ample headroom while staying far
+# below ``sys.getrecursionlimit()`` (1000 by default).
+_MAX_REF_SEARCH_DEPTH = 8
+
+
+def _iter_internal_refs(value: Any, depth: int = 0) -> Iterator[str]:
+    """Yield every internal weave ref found anywhere in ``value``.
+
+    Recurses through dicts/lists and attempts ``json.loads`` on strings so refs
+    buried inside JSON-serialized blobs (e.g. a message ``content`` parts array)
+    are not missed, regardless of which field/part shape carries them. Only
+    internal-form refs are yielded: the int->ext adapter converts these and
+    rejects bare external refs, and external inline refs are already handled via
+    ``_directional_content_refs``.
+
+    ``depth`` bounds recursion at ``_MAX_REF_SEARCH_DEPTH``: once it is exceeded
+    we stop without yielding, trading unreachable deep refs for a guarantee that
+    a pathological payload cannot raise ``RecursionError``.
+    """
+    if depth > _MAX_REF_SEARCH_DEPTH:
+        return
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith(_INTERNAL_REF_PREFIX):
+            yield stripped
+        elif stripped[:1] in {"[", "{"}:
+            try:
+                parsed = json.loads(stripped)
+            except (ValueError, TypeError):
+                return
+            yield from _iter_internal_refs(parsed, depth + 1)
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from _iter_internal_refs(v, depth + 1)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_internal_refs(item, depth + 1)
+
+
+def _inline_media_refs(messages: list[NormalizedMessage]) -> list[str]:
+    """Internal weave refs embedded inline anywhere in ``messages``.
+
+    Server-side content conversion replaces an inline blob with a weave ref in
+    the message part itself (rather than via the span's ``content_refs``). Walk
+    each message recursively so those refs render, without special-casing any
+    part shape.
+    """
+    refs: list[str] = []
+    seen: set[str] = set()
+    for message in messages:
+        for ref in _iter_internal_refs(message.model_dump()):
+            if ref not in seen:
+                seen.add(ref)
+                refs.append(ref)
+    return refs
+
+
+def _message_content_refs(
+    span: AgentSpanSchema, messages: list[NormalizedMessage]
+) -> list[str]:
+    """Content refs for ``messages``: span.content_refs matched by media-part
+    digest (client-uploaded media) plus internal refs found inline in the
+    messages (server-converted content).
+    """
+    refs = list(_directional_content_refs(span, _media_part_digests(messages)))
+    seen = set(refs)
+    for ref in _inline_media_refs(messages):
+        if ref not in seen:
+            seen.add(ref)
+            refs.append(ref)
+    return refs
+
+
 def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]:
     """The user's side of a message list, selected by role.
 
@@ -770,7 +1015,11 @@ def _user_messages(messages: list[NormalizedMessage]) -> list[NormalizedMessage]
     assistant/system/tool context (explicit ``user`` plus provider-variant
     empty/unknown roles).
     """
-    return [m for m in messages if m.role not in _NON_USER_PROMPT_ROLES]
+    return [
+        m
+        for m in messages
+        if m.role not in _NON_USER_PROMPT_ROLES and not _is_claude_task_notification(m)
+    ]
 
 
 def _trailing_user_messages(
@@ -804,8 +1053,7 @@ def _input_content_refs(spans: list[AgentSpanSchema]) -> list[str]:
     refs: list[str] = []
     seen: set[str] = set()
     for span in spans:
-        in_digests = _media_part_digests(_user_messages(span.input_messages))
-        for ref in _directional_content_refs(span, in_digests):
+        for ref in _message_content_refs(span, _user_messages(span.input_messages)):
             if ref not in seen:
                 seen.add(ref)
                 refs.append(ref)
@@ -879,6 +1127,122 @@ def _find_user_message(spans: list[AgentSpanSchema]) -> AgentChatMessage | None:
     return None
 
 
+def _find_task_notification(
+    spans: list[AgentSpanSchema],
+) -> AgentChatMessage | None:
+    """Find Claude Code execution context recorded on an enclosing span.
+
+    Some Claude traces carry the task notification only on ``invoke_agent``
+    input rather than on a walked content span. This mirrors
+    ``_find_user_message``'s fallback, but projects the synthetic role=user
+    payload as tool activity.
+    """
+    prioritized = sorted(
+        spans,
+        key=lambda s: (s.operation_name != OP_INVOKE_AGENT, _span_sort_key(s)),
+    )
+    for span in prioritized:
+        for message in reversed(span.input_messages):
+            if not _is_claude_task_notification(message):
+                continue
+            text = _display_text(message.content)
+            media = _message_content_refs(span, [message])
+            return AgentChatMessage(
+                type="tool_call",
+                span_id=span.span_id,
+                agent_name=_own_agent_label(span),
+                agent_version=span.agent_version,
+                status_code=span.status_code,
+                started_at=span.started_at,
+                tool_call=AgentChatToolCall(
+                    tool_name="Task notification",
+                    tool_result=text,
+                    duration_ms=0,
+                    status=span.status_code,
+                    content_refs=media,
+                ),
+            )
+    return None
+
+
+def _coalesce_mirrored_child_assistant(
+    node: SpanNode,
+    child_messages: list[AgentChatMessage],
+    parent_message: AgentChatMessage,
+) -> bool:
+    """Fold a model span's mirrored text into its transcript child event.
+
+    Claude Code emits a model ``chat`` span plus direct ``assistant_text``
+    children. The model span carries tokens, cost, model, and reasoning while
+    each transcript child carries the precise event position; both contain the
+    same assistant text. When a direct child emitted an exact text match, keep
+    that child in the timeline and enrich it from the parent rather than
+    appending a duplicate parent bubble.
+
+    Exact text and direct parentage are both required. A distinct child reply
+    (for example, a nested agent response) remains separate from its parent's
+    final output.
+    """
+    parent = parent_message.assistant_message
+    if parent is None or not parent.text:
+        return False
+
+    direct_child_ids = {child.span.span_id for child in node.children}
+    for candidate_message in reversed(child_messages):
+        if (
+            candidate_message.type != "assistant_message"
+            or candidate_message.span_id not in direct_child_ids
+        ):
+            continue
+        candidate = candidate_message.assistant_message
+        if candidate is None or candidate.text != parent.text:
+            continue
+
+        candidate_message.agent_name = (
+            candidate_message.agent_name or parent_message.agent_name
+        )
+        candidate_message.agent_version = (
+            candidate_message.agent_version or parent_message.agent_version
+        )
+        candidate_message.status_code = (
+            candidate_message.status_code or parent_message.status_code
+        )
+
+        # Transcript spans intentionally carry little metadata. Preserve any
+        # values they do have, filling gaps from the enclosing model span.
+        candidate.model = candidate.model or parent.model
+        candidate.reasoning_content = (
+            candidate.reasoning_content or parent.reasoning_content
+        )
+        candidate.reasoning_tokens = (
+            candidate.reasoning_tokens or parent.reasoning_tokens
+        )
+        candidate.input_tokens = candidate.input_tokens or parent.input_tokens
+        candidate.output_tokens = candidate.output_tokens or parent.output_tokens
+        candidate.input_cost_usd = (
+            candidate.input_cost_usd
+            if candidate.input_cost_usd is not None
+            else parent.input_cost_usd
+        )
+        candidate.output_cost_usd = (
+            candidate.output_cost_usd
+            if candidate.output_cost_usd is not None
+            else parent.output_cost_usd
+        )
+        candidate.total_cost_usd = (
+            candidate.total_cost_usd
+            if candidate.total_cost_usd is not None
+            else parent.total_cost_usd
+        )
+        candidate.duration_ms = candidate.duration_ms or parent.duration_ms
+        candidate.status = candidate.status or parent.status
+        candidate.content_refs = list(
+            dict.fromkeys([*candidate.content_refs, *parent.content_refs])
+        )
+        return True
+    return False
+
+
 def _emit_assistant_message(
     span: AgentSpanSchema,
     agent_name: str | None,
@@ -938,8 +1302,6 @@ def _emit_assistant_message(
             total_cost_usd=totals.total_cost_usd,
             duration_ms=_compute_duration_ms(span.started_at, span.ended_at),
             status=span.status_code,
-            content_refs=_directional_content_refs(
-                span, _media_part_digests(span.output_messages)
-            ),
+            content_refs=_message_content_refs(span, span.output_messages),
         ),
     )
