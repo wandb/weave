@@ -7384,6 +7384,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
             req.targets,
             calls_read_table,
+            req.wb_user_id,
         )
         return tsi.ExportStartRes(job_id=job_id)
 

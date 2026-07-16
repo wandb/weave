@@ -18,6 +18,7 @@ from clickhouse_connect.driver.client import Client as CHClient
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import export_rate_limit
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.export_targets import EXPORT_TARGET_NAMES, build_export_query
 from weave.trace_server.file_storage import (
@@ -52,37 +53,51 @@ def start_export(
     project_id: str,
     target_names: list[str],
     calls_read_table: ReadTable,
+    wb_user_id: str | None,
 ) -> str:
     """Write the job manifest, then run its targets serially off-thread."""
-    targets = _resolve_targets(target_names, calls_read_table)
-    if file_storage_client is None:
-        raise ExportError(
-            503,
-            "EXPORT_STORAGE_UNAVAILABLE",
-            "export storage is not configured",
+    try:
+        slot = (
+            export_rate_limit.acquire_export_slot(wb_user_id)
+            if wb_user_id is not None
+            else None
         )
-    # Fail closed before a job or artifact exists, so a rejected request cannot
-    # leave an object the status API might later discover.
-    targets_with_counts: list[tuple[str, int]] = []
-    cap = wf_env.wf_export_max_rows()
-    for target in targets:
-        rows = precount_rows(ch_client, project_id, target)
-        if rows > cap:
+    except export_rate_limit.ExportRateLimitError as exc:
+        raise ExportError(exc.http_status, exc.code, str(exc)) from exc
+    try:
+        targets = _resolve_targets(target_names, calls_read_table)
+        if file_storage_client is None:
             raise ExportError(
-                409,
-                "TOO_LARGE",
-                f"target {target.name!r} has {rows} rows > cap {cap}",
+                503,
+                "EXPORT_STORAGE_UNAVAILABLE",
+                "export storage is not configured",
             )
-        targets_with_counts.append((target.name, rows))
-    job_id = str(uuid.uuid4())
-    if not JOB_ID_RE.match(job_id):
-        raise ExportError(500, "BAD_JOB_ID", f"job_id {job_id!r} fails validation")
-    _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
-    threading.Thread(
-        target=_run_export,
-        args=(mint_client, project_id, job_id, targets),
-        daemon=True,
-    ).start()
+        # Fail closed before a job or artifact exists, so a rejected request
+        # cannot leave an object the status API might later discover.
+        targets_with_counts: list[tuple[str, int]] = []
+        cap = wf_env.wf_export_max_rows()
+        for target in targets:
+            rows = precount_rows(ch_client, project_id, target)
+            if rows > cap:
+                raise ExportError(
+                    409,
+                    "TOO_LARGE",
+                    f"target {target.name!r} has {rows} rows > cap {cap}",
+                )
+            targets_with_counts.append((target.name, rows))
+        job_id = str(uuid.uuid4())
+        if not JOB_ID_RE.match(job_id):
+            raise ExportError(500, "BAD_JOB_ID", f"job_id {job_id!r} fails validation")
+        _write_manifest(file_storage_client, project_id, job_id, targets_with_counts)
+        threading.Thread(
+            target=_run_export,
+            args=(mint_client, project_id, job_id, targets, slot),
+            daemon=True,
+        ).start()
+    except Exception:
+        if slot is not None:
+            export_rate_limit.release_export_slot(slot)
+        raise
     return job_id
 
 
@@ -290,11 +305,16 @@ def _run_export(
     project_id: str,
     job_id: str,
     targets: list[ResolvedExportTarget],
+    slot: export_rate_limit.ExportSlot | None,
 ) -> None:
     """Run one job's targets serially to bound its ClickHouse concurrency."""
-    client = mint_client()
-    for target in targets:
-        _run_target_insert(client, project_id, job_id, target)
+    try:
+        client = mint_client()
+        for target in targets:
+            _run_target_insert(client, project_id, job_id, target)
+    finally:
+        if slot is not None:
+            export_rate_limit.release_export_slot(slot)
 
 
 def _run_target_insert(
