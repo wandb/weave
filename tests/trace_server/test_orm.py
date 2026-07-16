@@ -49,6 +49,36 @@ def test_parambuilder_clickhouse():
     }
 
 
+def test_add_param_dedups_by_type_not_just_value():
+    """Equal-but-differently-typed values must not share a param (WB-37505).
+
+    Python treats True == 1 == 1.0 as equal with equal hashes, so a value-only
+    dedup cache would hand a bool literal and an int the same param name. That
+    one param then renders under two ClickHouse types (e.g. Bool and UInt64),
+    and ClickHouse rejects "True cannot be parsed as UInt64". Keying on
+    (type, value) keeps them distinct while still deduping genuine repeats.
+    """
+    pb = ParamBuilder(prefix="pb")
+    assert pb.add_param(True) == "pb_0"
+    assert pb.add_param(1) == "pb_1"
+    assert pb.add_param(False) == "pb_2"
+    assert pb.add_param(0) == "pb_3"
+    assert pb.add_param(1.0) == "pb_4"
+
+    # Genuine repeats (same type and value) still dedup to the first param.
+    assert pb.add_param(True) == "pb_0"
+    assert pb.add_param(1) == "pb_1"
+
+    # Assert on type identity, not ==: True == 1 == 1.0 would hide the bug.
+    params = pb.get_params()
+    assert params["pb_0"] is True
+    assert params["pb_2"] is False
+    assert type(params["pb_1"]) is int
+    assert type(params["pb_3"]) is int
+    assert type(params["pb_4"]) is float
+    assert params == {"pb_0": True, "pb_1": 1, "pb_2": False, "pb_3": 0, "pb_4": 1.0}
+
+
 def test_combine_conditions():
     with pytest.raises(ValueError, match="Invalid operator"):
         combine_conditions([], "NOT")
