@@ -112,6 +112,14 @@ class _EncodingIdConverter(IdConverter):
                 filter=tsi.CallsFilter(wb_user_ids=["user-x"], wb_run_ids=["run-y"]),
             ),
         ),
+        (
+            "export_start",
+            lambda: tsi.ExportStartReq(project_id="ent/proj", targets=["calls"]),
+        ),
+        (
+            "export_status",
+            lambda: tsi.ExportStatusReq(project_id="ent/proj", job_id="j"),
+        ),
     ],
 )
 def test_adapter_does_not_mutate_req_when_inner_raises(
@@ -132,6 +140,39 @@ def test_adapter_does_not_mutate_req_when_inner_raises(
         getattr(adapter, method_name)(req)
 
     assert req.model_dump() == snapshot
+
+
+def test_export_adapter_converts_project_id_and_delegates() -> None:
+    """The export endpoints must convert the external entity/project id to the
+    internal (base64) form before delegating, leaving the caller's req intact.
+    Without an explicit adapter override, project_id would reach the internal
+    server unconverted (the __getattr__ fallthrough), a cross-tenant hazard.
+    """
+    idc = _EncodingIdConverter()
+    internal_project_id = idc.ext_to_int_project_id("ent/proj")
+
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.export_start.return_value = tsi.ExportStartRes(job_id="job-1")
+    inner.export_status.return_value = tsi.ExportStatusRes(
+        status="done",
+        manifest=[
+            tsi.ExportManifestEntry(target="calls", status="done", rows=3),
+        ],
+    )
+    adapter = ExternalTraceServer(inner, idc)
+
+    start_req = tsi.ExportStartReq(project_id="ent/proj", targets=["calls"])
+    start_res = adapter.export_start(start_req)
+    assert start_res.job_id == "job-1"
+    assert inner.export_start.call_args.args[0].project_id == internal_project_id
+    assert start_req.project_id == "ent/proj"
+
+    status_req = tsi.ExportStatusReq(project_id="ent/proj", job_id="job-1")
+    status_res = adapter.export_status(status_req)
+    assert status_res.status == "done"
+    assert status_res.manifest[0].rows == 3
+    assert inner.export_status.call_args.args[0].project_id == internal_project_id
+    assert status_req.project_id == "ent/proj"
 
 
 # --- genai_otel_export ext→int ref rewriting in OTel attribute values ---

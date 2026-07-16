@@ -686,6 +686,17 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.files_stats, req, req.project_id
         )
 
+    def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # Artifacts hold ref strings verbatim; no ext<->int ref conversion here.
+        return self._internal_trace_server.export_start(req)
+
+    def export_status(self, req: tsi.ExportStatusReq) -> tsi.ExportStatusRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.export_status(req)
+
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
