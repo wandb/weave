@@ -10,6 +10,9 @@ from moto import mock_aws
 
 import weave
 from weave.integrations.bedrock import patch_client
+from weave.integrations.bedrock.bedrock_sdk import (
+    extract_model_name_from_inference_profile_arn,
+)
 
 model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 inference_profile_id = "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0"
@@ -1049,3 +1052,27 @@ def test_bedrock_agent_invoke_agent(
     summary = call.summary
     assert summary is not None, "Summary should not be None"
     assert "usage" in summary
+
+
+def test_bedrock_inference_profile_resolved_using_arn_region() -> None:
+    # Resolving an inference profile to its model name calls the Bedrock control
+    # plane, which must run in the profile's own region -- encoded in the ARN, not
+    # read from an ambient env var (WB-29454). Otherwise resolution fails, the
+    # stored name matches no price row, and the call shows tokens but no cost.
+    profile_arn = "arn:aws:bedrock:eu-west-1:123456789012:application-inference-profile/abc123def456"
+    resolved_model = "anthropic.claude-sonnet-4-20250514-v1:0"
+
+    with patch(
+        "weave.integrations.bedrock.bedrock_sdk.boto3.client"
+    ) as mock_boto3_client:
+        mock_boto3_client.return_value.get_inference_profile.return_value = {
+            "models": [
+                {
+                    "modelArn": f"arn:aws:bedrock:eu-west-1::foundation-model/{resolved_model}"
+                }
+            ]
+        }
+        model_name = extract_model_name_from_inference_profile_arn(profile_arn)
+
+    mock_boto3_client.assert_called_once_with("bedrock", region_name="eu-west-1")
+    assert model_name == resolved_model

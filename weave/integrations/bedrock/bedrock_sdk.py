@@ -1,7 +1,6 @@
 import copy
 import io
 import json
-import os
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -120,9 +119,13 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
         The extracted model name (e.g. "amazon.nova-lite-v1:0")
     """
     try:
-        aws_region_name = os.environ.get("AWS_REGION_NAME")
         profile_id = profile_arn.rsplit("/", maxsplit=1)[-1]
-        bedrock_client = boto3.client("bedrock", region_name=aws_region_name)
+        # An inference profile is a regional resource and its ARN encodes the
+        # region (arn:aws:bedrock:<region>:...). Resolve it from that region so
+        # the call does not depend on the caller's ambient AWS region config
+        # (boto3 only reads AWS_DEFAULT_REGION, not AWS_REGION, by default).
+        region_name = profile_arn.split(":")[3]
+        bedrock_client = boto3.client("bedrock", region_name=region_name)
 
         response = bedrock_client.get_inference_profile(
             inferenceProfileIdentifier=profile_id
