@@ -156,7 +156,15 @@ USAGE_CACHE_READ_INPUT_TOKENS = Attribute(
     "weave.usage.cache_read.input_tokens",
     "int",
     "Tokens served from cache",
-    ["gen_ai.usage.cache_read.input_tokens"],
+    [
+        # Canonical Anthropic-style key; wins over the OpenAI-shaped forms below.
+        "gen_ai.usage.cache_read.input_tokens",
+        # OpenAI Chat Completions / Responses API usage shapes, as emitted by
+        # OpenAI-compatible and LiteLLM-bridged OTel exporters.
+        "gen_ai.usage.prompt_tokens_details.cached_tokens",
+        "gen_ai.usage.input_tokens_details.cached_tokens",
+        "prompt_tokens_details.cached_tokens",
+    ],
 )
 CONVERSATION_ID = Attribute(
     "weave.conversation.id",
