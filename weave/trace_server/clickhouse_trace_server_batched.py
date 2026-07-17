@@ -7376,6 +7376,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 req.project_id, self.ch_client
             )
         job_id = export.start_export(
+            self.ch_client,
             lambda: self._mint_client(
                 send_receive_timeout=export.EXPORT_MAX_EXECUTION_SECONDS
             ),

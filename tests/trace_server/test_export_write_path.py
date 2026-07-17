@@ -99,9 +99,12 @@ def test_start_export_runs_targets_serially_in_one_worker(
 
     export_client.command.side_effect = _command
     mint_client = MagicMock(return_value=export_client)
+    count_client = MagicMock()
+    count_client.query.return_value.result_rows = [(0,)]
     monkeypatch.setattr(export.threading, "Thread", _ImmediateThread)
 
     job_id = export.start_export(
+        count_client,
         mint_client,
         storage_client,
         "project",
@@ -184,6 +187,7 @@ def test_bad_target_and_job_id_validation(storage_client: S3StorageClient):
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
             MagicMock(),
+            MagicMock(),
             storage_client,
             "project",
             ["objects", "nope"],
@@ -202,6 +206,7 @@ def test_empty_and_duplicate_targets_are_rejected(
 ):
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
+            MagicMock(),
             MagicMock(),
             storage_client,
             "project",

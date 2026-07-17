@@ -15,6 +15,9 @@ DEFAULT_SCORING_WORKER_BATCH_TIMEOUT = 5
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS = 100
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS = 1000
 
+# Managed-bucket export defaults
+DEFAULT_EXPORT_MAX_ROWS = 5_000_000
+
 # Kafka Settings
 
 
@@ -570,6 +573,27 @@ def wf_file_storage_project_ramp_pct() -> int | None:
         )
 
     return pct
+
+
+# Export Settings
+
+
+def wf_export_max_rows() -> int:
+    """Per-target row cap for managed-bucket exports.
+
+    Raises:
+        ValueError: If the value is set but not a valid integer.
+    """
+    raw = os.environ.get("WF_EXPORT_MAX_ROWS")
+    if not raw:
+        return DEFAULT_EXPORT_MAX_ROWS
+
+    try:
+        return int(raw)
+    except ValueError as e:
+        raise ValueError(
+            f"WF_EXPORT_MAX_ROWS is not a valid integer: {raw}. Error: {e!s}"
+        ) from e
 
 
 # Inference Service Settings

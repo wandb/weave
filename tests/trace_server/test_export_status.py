@@ -181,7 +181,7 @@ def test_presign_on_done_downloads_exact_artifact(
         storage_client.base_uri.with_path(
             export.export_job_prefix(project_id, job_id) + "manifest.json"
         ),
-        export.build_manifest_json(job_id, ["objects"]),
+        export.build_manifest_json(job_id, [("objects", 5)]),
     )
     key = export.export_object_prefix(project_id, job_id, "objects") + "data.parquet"
     artifact = b"PAR1-status-artifact"
