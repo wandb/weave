@@ -1,14 +1,8 @@
-"""Write-path tests for the managed-bucket export engine.
+"""Tests for the detached ClickHouse-to-S3 export write path."""
 
-The job manifest is stored through the real file-storage implementation before
-the detached ClickHouse inserts begin. The local test ClickHouse intentionally
-has no production named collection, so the native inserts finish as errors in
-``system.query_log`` rather than writing production-like artifacts.
-"""
-
+import datetime
 import json
 import time
-import uuid
 from unittest.mock import MagicMock
 
 import boto3
@@ -24,15 +18,12 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.export_targets import (
     build_feedback_export_query,
+    build_objects_export_query,
 )
-from weave.trace_server.file_storage import S3StorageClient
+from weave.trace_server.file_storage import FileStorageWriteError, S3StorageClient
 from weave.trace_server.file_storage_credentials import AWSCredentials
 from weave.trace_server.file_storage_uris import S3FileStorageURI
 from weave.trace_server.project_version.types import ReadTable
-
-pytestmark = pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: export write path"
-)
 
 QUERY_LOG_POLL_SECONDS = 20
 BUCKET = "weave-export-write-path"
@@ -74,7 +65,7 @@ def test_build_export_insert_sql_exact_string():
     )
 
 
-def test_start_export_runs_targets_serially_in_one_worker(
+def test_start_export_persists_manifest_and_runs_targets_serially_in_one_worker(
     monkeypatch: pytest.MonkeyPatch,
     storage_client: S3StorageClient,
 ):
@@ -89,12 +80,12 @@ def test_start_export_runs_targets_serially_in_one_worker(
             target(*args)
 
     export_client = MagicMock()
-    command_query_ids: list[str] = []
+    commands: list[tuple[str, dict[str, str], dict[str, object]]] = []
 
-    def _command(_sql, *, parameters, settings):
+    def _command(sql, *, parameters, settings):
         assert parameters == {"project_id": "project"}
-        command_query_ids.append(settings["query_id"])
-        if len(command_query_ids) == 1:
+        commands.append((sql, parameters, settings))
+        if len(commands) == 1:
             raise RuntimeError("first target failed")
 
     export_client.command.side_effect = _command
@@ -112,7 +103,24 @@ def test_start_export_runs_targets_serially_in_one_worker(
     assert len(worker_starts) == 1
     assert worker_starts[0][2] is True
     assert mint_client.call_count == 1
-    assert command_query_ids == [f"{job_id}:objects", f"{job_id}:feedback"]
+    assert [command[2]["query_id"] for command in commands] == [
+        f"{job_id}:objects",
+        f"{job_id}:feedback",
+    ]
+    assert [command[0] for command in commands] == [
+        (
+            "INSERT INTO FUNCTION s3(weave_exports, "
+            f"filename = 'exports/project/{job_id}/objects/data.parquet', "
+            "format = 'Parquet') "
+            f"{build_objects_export_query()}"
+        ),
+        (
+            "INSERT INTO FUNCTION s3(weave_exports, "
+            f"filename = 'exports/project/{job_id}/feedback/data.parquet', "
+            "format = 'Parquet') "
+            f"{build_feedback_export_query()}"
+        ),
+    ]
     manifest = json.loads(
         storage_client.read(
             storage_client.base_uri.with_path(
@@ -120,14 +128,22 @@ def test_start_export_runs_targets_serially_in_one_worker(
             )
         )
     )
-    assert manifest["job_id"] == job_id
-    assert [target["target"] for target in manifest["targets"]] == [
-        "objects",
-        "feedback",
-    ]
+    created_at = datetime.datetime.fromisoformat(manifest.pop("created_at"))
+    assert created_at.tzinfo == datetime.timezone.utc
+    assert manifest == {
+        "job_id": job_id,
+        "format": "parquet",
+        "targets": [
+            {"target": "objects", "object": "objects/data.parquet"},
+            {"target": "feedback", "object": "feedback/data.parquet"},
+        ],
+    }
 
 
-def test_export_start_writes_manifest_without_creating_a_clickhouse_table(
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: export server entry point"
+)
+def test_export_start_persists_manifest(
     clickhouse_trace_server, storage_client: S3StorageClient
 ):
     clickhouse_trace_server._file_storage_client = storage_client
@@ -137,9 +153,6 @@ def test_export_start_writes_manifest_without_creating_a_clickhouse_table(
         tsi.ExportStartReq(project_id=project_id, targets=["objects", "feedback"])
     )
     assert export.JOB_ID_RE.match(res.job_id)
-    assert clickhouse_trace_server.ch_client.query(
-        "EXISTS TABLE export_jobs"
-    ).result_rows == [(0,)]
     manifest = json.loads(
         storage_client.read(
             storage_client.base_uri.with_path(
@@ -147,13 +160,21 @@ def test_export_start_writes_manifest_without_creating_a_clickhouse_table(
             )
         )
     )
-    assert manifest["job_id"] == res.job_id
-    assert [target["target"] for target in manifest["targets"]] == [
-        "objects",
-        "feedback",
-    ]
+    created_at = datetime.datetime.fromisoformat(manifest.pop("created_at"))
+    assert created_at.tzinfo == datetime.timezone.utc
+    assert manifest == {
+        "job_id": res.job_id,
+        "format": "parquet",
+        "targets": [
+            {"target": "objects", "object": "objects/data.parquet"},
+            {"target": "feedback", "object": "feedback/data.parquet"},
+        ],
+    }
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: query_log verification"
+)
 def test_export_start_query_id_lands_in_query_log(
     clickhouse_trace_server, storage_client: S3StorageClient
 ):
@@ -180,32 +201,59 @@ def test_export_start_query_id_lands_in_query_log(
     assert rows == [(qid,)]
 
 
-def test_bad_target_and_job_id_validation(storage_client: S3StorageClient):
-    with pytest.raises(export.ExportError) as exc_info:
-        export.start_export(
-            MagicMock(),
-            storage_client,
-            "project",
-            ["objects", "nope"],
-            ReadTable.CALLS_COMPLETE,
-        )
-    assert exc_info.value.http_status == 400
-    assert exc_info.value.code == "BAD_TARGET"
-    assert export.JOB_ID_RE.match("not-a-uuid") is None
-    assert export.JOB_ID_RE.match(str(uuid.uuid4()))
-    assert export.export_object_prefix("p", "j", "calls") == "exports/p/j/calls/"
-
-
-@pytest.mark.parametrize("targets", [[], ["objects", "objects"]])
-def test_empty_and_duplicate_targets_are_rejected(
-    storage_client: S3StorageClient, targets: list[str]
+def test_start_export_requires_durable_manifest(
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    mint_client = MagicMock()
     with pytest.raises(export.ExportError) as exc_info:
         export.start_export(
-            MagicMock(),
-            storage_client,
+            mint_client,
+            None,
             "project",
-            targets,
+            ["objects"],
             ReadTable.CALLS_COMPLETE,
         )
-    assert (exc_info.value.http_status, exc_info.value.code) == (400, "BAD_TARGET")
+    assert (exc_info.value.http_status, exc_info.value.code) == (
+        503,
+        "EXPORT_STORAGE_UNAVAILABLE",
+    )
+
+    failed_write = MagicMock(side_effect=FileStorageWriteError())
+    monkeypatch.setattr(export, "store_in_bucket", failed_write)
+    with pytest.raises(export.ExportError) as exc_info:
+        export.start_export(
+            mint_client,
+            MagicMock(),
+            "project",
+            ["objects"],
+            ReadTable.CALLS_COMPLETE,
+        )
+    assert (exc_info.value.http_status, exc_info.value.code) == (
+        503,
+        "EXPORT_STORAGE_UNAVAILABLE",
+    )
+    failed_write.assert_called_once()
+    assert mint_client.call_count == 0
+
+
+def test_start_export_rejects_invalid_targets_before_writing(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    store = MagicMock()
+    monkeypatch.setattr(export, "store_in_bucket", store)
+    for targets in ([], ["objects", "objects"], ["objects", "nope"]):
+        mint_client = MagicMock()
+        with pytest.raises(export.ExportError) as exc_info:
+            export.start_export(
+                mint_client,
+                MagicMock(),
+                "project",
+                targets,
+                ReadTable.CALLS_COMPLETE,
+            )
+        assert (exc_info.value.http_status, exc_info.value.code) == (
+            400,
+            "BAD_TARGET",
+        )
+        assert mint_client.call_count == 0
+    store.assert_not_called()
