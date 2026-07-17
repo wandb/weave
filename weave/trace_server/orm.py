@@ -217,7 +217,8 @@ class Select:
     _fields: list[str] | None
     # Fields that we have constructed internally, like cost query fields
     _raw_sql_fields: list[str] | None
-    _any_non_empty_collection_fields: tuple[str, ...]
+    _non_empty_collection_fields: tuple[str, ...]
+    _non_empty_collection_operator: Literal["AND", "OR"]
     _query: tsi.Query | None
     _order_by: list[SortBy] | None
     _limit: int | None
@@ -234,7 +235,8 @@ class Select:
         self._project_id = None
         self._fields = []
         self._raw_sql_fields = []
-        self._any_non_empty_collection_fields = ()
+        self._non_empty_collection_fields = ()
+        self._non_empty_collection_operator = "AND"
         self._query = None
         self._order_by = None
         self._limit = None
@@ -277,8 +279,16 @@ class Select:
         self._query = query
         return self
 
-    def where_any_collection_non_empty(self, fields: tuple[str, ...]) -> "Select":
-        """Require at least one trusted Array/Map column to be non-empty."""
+    def where_collection_non_empty(
+        self,
+        fields: tuple[str, ...],
+        *,
+        operator: Literal["AND", "OR"] = "AND",
+    ) -> "Select":
+        """Require trusted Array/Map columns to be non-empty.
+
+        ``operator`` controls how the per-column predicates are combined.
+        """
         collection_columns = set(
             self.table.array_string_cols
             + self.table.map_string_cols
@@ -289,7 +299,8 @@ class Select:
             raise ValueError(
                 f"Non-collection fields cannot use non-empty filtering: {sorted(invalid_fields)}"
             )
-        self._any_non_empty_collection_fields = fields
+        self._non_empty_collection_fields = fields
+        self._non_empty_collection_operator = operator
         return self
 
     def order_by(self, order_by: list[SortBy] | None) -> "Select":
@@ -390,14 +401,15 @@ class Select:
                 datetime_columns=self.datetime_columns,
             )
             conditions.extend(query_conds)
-        if self._any_non_empty_collection_fields:
+        if self._non_empty_collection_fields:
             conditions.append(
-                "("
-                + " OR ".join(
-                    f"notEmpty({field})"
-                    for field in self._any_non_empty_collection_fields
+                combine_conditions(
+                    [
+                        f"notEmpty({field})"
+                        for field in self._non_empty_collection_fields
+                    ],
+                    self._non_empty_collection_operator,
                 )
-                + ")"
             )
 
         joined = combine_conditions(conditions, "AND")
