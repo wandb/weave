@@ -2,7 +2,7 @@
 
 `start_export` writes the job's manifest object before starting one background
 worker. The worker runs each `INSERT INTO FUNCTION s3()` serially, while the
-manifest and `system.query_log` are the durable read path.
+manifest and replica-wide `system.query_log` are the durable read path.
 """
 
 import datetime
@@ -76,6 +76,7 @@ def get_export_status(
     file_storage_client: FileStorageClient | None,
     project_id: str,
     job_id: str,
+    query_log_cluster: str | None = None,
 ) -> tsi.ExportStatusRes:
     """Read the job manifest, then derive target status from ``query_log``."""
     if not JOB_ID_RE.match(job_id):
@@ -88,9 +89,16 @@ def get_export_status(
             "export storage is not configured",
         )
     targets = _read_manifest_targets(file_storage_client, project_id, job_id)
-    ch_client.command("SYSTEM FLUSH LOGS")
+    ch_client.command(_flush_query_log_sql(query_log_cluster))
     manifest = [
-        _manifest_entry(ch_client, file_storage_client, project_id, job_id, target)
+        _manifest_entry(
+            ch_client,
+            file_storage_client,
+            project_id,
+            job_id,
+            target,
+            query_log_cluster,
+        )
         for target in targets
     ]
     overall: tsi.ExportJobStatus
@@ -104,13 +112,11 @@ def get_export_status(
 
 
 def poll_query_status(
-    ch_client: CHClient, query_id: str
+    ch_client: CHClient, query_id: str, query_log_cluster: str | None = None
 ) -> tuple[tsi.ExportJobStatus, int, str | None]:
     """query_log oracle: map the latest event for query_id to (status, rows, error)."""
     rows = ch_client.query(
-        "SELECT type, written_rows, exception FROM system.query_log "
-        "WHERE query_id = {qid:String} AND event_date >= today() - 1 "
-        "ORDER BY event_time_microseconds DESC LIMIT 1",
+        _query_log_status_sql(query_log_cluster),
         parameters={"qid": query_id},
     ).result_rows
     if not rows:
@@ -223,8 +229,11 @@ def _manifest_entry(
     project_id: str,
     job_id: str,
     target: str,
+    query_log_cluster: str | None,
 ) -> tsi.ExportManifestEntry:
-    status, rows, error = poll_query_status(ch_client, f"{job_id}:{target}")
+    status, rows, error = poll_query_status(
+        ch_client, f"{job_id}:{target}", query_log_cluster
+    )
     objects: list[str] = []
     urls: list[str] = []
     expires_at: str | None = None
@@ -302,6 +311,26 @@ def _resolve_targets(
             ResolvedExportTarget(name, build_export_query(name, calls_read_table))
         )
     return targets
+
+
+def _flush_query_log_sql(query_log_cluster: str | None) -> str:
+    if query_log_cluster is None:
+        return "SYSTEM FLUSH LOGS query_log"
+    return f"SYSTEM FLUSH LOGS ON CLUSTER {query_log_cluster} query_log"
+
+
+def _query_log_status_sql(query_log_cluster: str | None) -> str:
+    source = "system.query_log"
+    if query_log_cluster is not None:
+        source = (
+            f"clusterAllReplicas('{query_log_cluster}', merge('system', '^query_log*'))"
+        )
+    return (
+        "SELECT type, written_rows, exception FROM "
+        f"{source} "
+        "WHERE query_id = {qid:String} AND event_date >= today() - 1 "
+        "ORDER BY event_time_microseconds DESC LIMIT 1"
+    )
 
 
 # CH server-config named collection holding the ch-writer S3 identity.
