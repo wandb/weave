@@ -112,6 +112,9 @@ USAGE_KEYS = {
     ],
     "cache_read_input_tokens": [
         ("gen_ai.usage.cache_read.input_tokens", try_parse_int),
+        ("gen_ai.usage.prompt_tokens_details.cached_tokens", try_parse_int),
+        ("gen_ai.usage.input_tokens_details.cached_tokens", try_parse_int),
+        ("prompt_tokens_details.cached_tokens", try_parse_int),
     ],
 }
 

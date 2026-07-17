@@ -13,6 +13,8 @@ import json
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
+
 from weave.trace_server.agents import semconv
 from weave.trace_server.opentelemetry.genai_extraction import (
     extract_genai_span,
@@ -427,6 +429,49 @@ def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
         project_id="p1",
     )
     assert result.reasoning_tokens == 99
+
+
+@pytest.mark.parametrize(
+    "details_key",
+    ["prompt_tokens_details", "input_tokens_details"],
+)
+def test_openai_shaped_cached_tokens_map_to_cache_read(details_key: str) -> None:
+    """Maps OpenAI-shaped cached tokens to cache reads."""
+    span = _make_span(
+        attrs={
+            "gen_ai": {
+                "usage": {
+                    "input_tokens": 1000,
+                    "output_tokens": 50,
+                    details_key: {"cached_tokens": 640},
+                }
+            }
+        }
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.input_tokens == 1000
+    assert result.output_tokens == 50
+    assert result.cache_creation_input_tokens == 0
+    assert result.cache_read_input_tokens == 640
+
+
+def test_anthropic_style_cache_read_wins_over_openai_shaped() -> None:
+    """When both the canonical Anthropic-style key and the OpenAI-shaped
+    fallback keys are present, the canonical value must win.
+    """
+    span = _make_span(
+        attrs={
+            "gen_ai": {
+                "usage": {
+                    "cache_read": {"input_tokens": 99},
+                    "prompt_tokens_details": {"cached_tokens": 10},
+                    "input_tokens_details": {"cached_tokens": 20},
+                }
+            }
+        }
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.cache_read_input_tokens == 99
 
 
 def test_extract_custom_attrs_skips_non_finite_floats() -> None:
