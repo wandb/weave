@@ -1055,10 +1055,13 @@ def test_bedrock_agent_invoke_agent(
 
 
 def test_bedrock_inference_profile_resolved_using_arn_region() -> None:
-    # Resolving an inference profile to its model name calls the Bedrock control
-    # plane, which must run in the profile's own region -- encoded in the ARN, not
-    # read from an ambient env var (WB-29454). Otherwise resolution fails, the
-    # stored name matches no price row, and the call shows tokens but no cost.
+    """Resolve an inference profile to its model name using the region in its ARN.
+
+    The Bedrock control-plane lookup must run in the profile's own region, which is
+    taken from the ARN and not an ambient env var (WB-29454); otherwise resolution
+    fails and the call shows tokens but no cost. boto3.client is patched directly
+    because moto does not implement get_inference_profile.
+    """
     profile_arn = "arn:aws:bedrock:eu-west-1:123456789012:application-inference-profile/abc123def456"
     resolved_model = "anthropic.claude-sonnet-4-20250514-v1:0"
 
