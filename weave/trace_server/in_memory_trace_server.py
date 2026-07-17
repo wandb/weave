@@ -6832,8 +6832,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
             eval_helpers.resolve_eval_inputs(all_calls, eval_root_ids, reader)
         if not req.filters and not req.sort_by:
-            return eval_helpers.eval_results_query(self, req, eval_root_ids, all_calls)
-        return self._eval_results_query_sorted_filtered(req, eval_root_ids, all_calls)
+            result = eval_helpers.eval_results_query(
+                self, req, eval_root_ids, all_calls
+            )
+        else:
+            result = self._eval_results_query_sorted_filtered(
+                req, eval_root_ids, all_calls
+            )
+        result.warnings.extend(
+            eval_helpers.hydrate_eval_agent_span_refs(self, req.project_id, result.rows)
+        )
+        return result
 
     @staticmethod
     def _eval_row_field_values(

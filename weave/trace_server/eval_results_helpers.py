@@ -19,7 +19,10 @@ from weave.shared.digest import str_digest
 from weave.trace_server import constants
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import types as agent_types
+from weave.trace_server.agents.constants import MAX_AGENT_QUERY_LIMIT
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.query import Query
 from weave.trace_server.tracing import traced
 
 _SUPPORTED_SORT_PREFIXES = (
@@ -28,8 +31,6 @@ _SUPPORTED_SORT_PREFIXES = (
     "output.",
 )
 _NUMERIC_SORT_PREFIXES = ("scores.",)
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -409,6 +410,166 @@ def _combine_genai_span_refs(
                 refs.append(ref)
                 seen.add(key)
     return refs or None
+
+
+def _span_order_key(span: agent_types.AgentSpanSchema) -> tuple[float, str]:
+    started_at = span.started_at
+    return (
+        started_at.timestamp() if started_at is not None else float("inf"),
+        span.span_id,
+    )
+
+
+def merge_eval_agent_span_refs(
+    rows: list[tsi.EvalResultsRow],
+    spans: Iterable[agent_types.AgentSpanSchema],
+) -> None:
+    """Merge one representative stamped span ref per trace into each trial.
+
+    Evaluation-linked OTel spans are stamped with both the evaluation run ID
+    and predict-and-score call ID. A prediction can produce an entire span tree,
+    but ``genai_span_ref`` is a trace link, so use the root of the stamped
+    subtree as the representative instead of returning every child span.
+    Explicit refs already recorded on calls win for their trace.
+    """
+    spans_by_trial_and_trace: dict[
+        tuple[str, str], dict[str, list[agent_types.AgentSpanSchema]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for span in spans:
+        if not span.eval_run_id or not span.eval_predict_and_score_call_id:
+            continue
+        spans_by_trial_and_trace[span.eval_run_id, span.eval_predict_and_score_call_id][
+            span.trace_id
+        ].append(span)
+
+    for row in rows:
+        for evaluation in row.evaluations:
+            for trial in evaluation.trials:
+                spans_by_trace = spans_by_trial_and_trace.get(
+                    (evaluation.evaluation_call_id, trial.predict_and_score_call_id)
+                )
+                if not spans_by_trace:
+                    continue
+
+                refs = list(trial.genai_span_ref or [])
+                linked_trace_ids = {ref.trace_id for ref in refs}
+                representatives: list[agent_types.AgentSpanSchema] = []
+                for trace_spans in spans_by_trace.values():
+                    span_ids = {span.span_id for span in trace_spans}
+                    roots = [
+                        span
+                        for span in trace_spans
+                        if span.parent_span_id not in span_ids
+                    ]
+                    representatives.append(
+                        min(roots or trace_spans, key=_span_order_key)
+                    )
+
+                for span in sorted(representatives, key=_span_order_key):
+                    if span.trace_id in linked_trace_ids:
+                        continue
+                    refs.append(
+                        tsi.GenAISpanRef(trace_id=span.trace_id, span_id=span.span_id)
+                    )
+                    linked_trace_ids.add(span.trace_id)
+                trial.genai_span_ref = refs or None
+
+
+def _query_eval_agent_spans(
+    server: tsi.TraceServerInterface,
+    project_id: str,
+    eval_call_ids: set[str],
+    predict_and_score_call_ids: list[str],
+) -> list[agent_types.AgentSpanSchema]:
+    linked_spans: list[agent_types.AgentSpanSchema] = []
+    for batch_start in range(
+        0,
+        len(predict_and_score_call_ids),
+        tsc.MAX_FILTER_LENGTH,
+    ):
+        call_id_batch = predict_and_score_call_ids[
+            batch_start : batch_start + tsc.MAX_FILTER_LENGTH
+        ]
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$and": [
+                        {
+                            "$in": [
+                                {"$getField": "eval_run_id"},
+                                [
+                                    {"$literal": eval_call_id}
+                                    for eval_call_id in sorted(eval_call_ids)
+                                ],
+                            ]
+                        },
+                        {
+                            "$in": [
+                                {"$getField": "eval_predict_and_score_call_id"},
+                                [{"$literal": call_id} for call_id in call_id_batch],
+                            ]
+                        },
+                    ]
+                }
+            }
+        )
+        offset = 0
+        while True:
+            result = server.agent_spans_query(
+                agent_types.AgentSpansQueryReq(
+                    project_id=project_id,
+                    query=query,
+                    limit=MAX_AGENT_QUERY_LIMIT,
+                    offset=offset,
+                )
+            )
+            linked_spans.extend(
+                span
+                for span in result.spans
+                if span.eval_run_id in eval_call_ids
+                and span.eval_predict_and_score_call_id in call_id_batch
+            )
+            offset += len(result.spans)
+            if not result.spans or offset >= result.total_count:
+                break
+    return linked_spans
+
+
+def hydrate_eval_agent_span_refs(
+    server: tsi.TraceServerInterface,
+    project_id: str,
+    rows: list[tsi.EvalResultsRow],
+) -> list[str]:
+    """Load stamped OTel spans for returned trials and merge them as trace refs.
+
+    This is deliberately best-effort. Eval results remain useful during rolling
+    deploys or if the agent span query fails; callers receive a non-fatal warning
+    rather than losing the evaluation response.
+    """
+    eval_call_ids: set[str] = set()
+    predict_and_score_call_ids: list[str] = []
+    for row in rows:
+        for evaluation in row.evaluations:
+            eval_call_ids.add(evaluation.evaluation_call_id)
+            predict_and_score_call_ids.extend(
+                trial.predict_and_score_call_id for trial in evaluation.trials
+            )
+    predict_and_score_call_ids = list(dict.fromkeys(predict_and_score_call_ids))
+    if not eval_call_ids or not predict_and_score_call_ids:
+        return []
+
+    try:
+        linked_spans = _query_eval_agent_spans(
+            server, project_id, eval_call_ids, predict_and_score_call_ids
+        )
+        merge_eval_agent_span_refs(rows, linked_spans)
+    except Exception:
+        logger.warning(
+            "Failed to load evaluation-linked agent spans",
+            exc_info=True,
+        )
+        return ["Failed to load evaluation-linked agent spans"]
+    return []
 
 
 def _build_trial(

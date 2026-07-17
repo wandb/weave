@@ -5896,7 +5896,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return tsi.EvalResultsQueryRes(
                 rows=[], total_rows=0, summary=empty_summary, warnings=[]
             )
-        return self._eval_results_via_cte(req, eval_root_ids)
+        result = self._eval_results_via_cte(req, eval_root_ids)
+        result.warnings.extend(
+            eval_helpers.hydrate_eval_agent_span_refs(self, req.project_id, result.rows)
+        )
+        return result
 
     def _eval_results_via_cte(
         self,

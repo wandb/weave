@@ -87,6 +87,12 @@ When trace-server request/response models or route schemas change, refresh the A
 2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
 3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
 
+Evaluation result rows merge agent span links from two sources: legacy
+`weave.genai_span_ref` call attributes and OTel spans whose promoted
+`eval_run_id` plus `eval_predict_and_score_call_id` columns identify the
+trial. Keep the promoted-column hydration best-effort so eval results remain
+available during rolling deploys.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines
