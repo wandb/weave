@@ -122,19 +122,6 @@ def _fetch_hf_model_json(model_name: str) -> dict[str, Any] | None:
         return None
 
 
-def _hf_likes_downloads_from_response(d: dict[str, Any]) -> dict[str, Any]:
-    """Extract likes and downloads from a Hub API model payload."""
-    return pick_keys(d, HF_KEYS_TO_KEEP)
-
-
-def _hf_license_from_response(d: dict[str, Any]) -> dict[str, Any]:
-    """Extract license from cardData if present."""
-    license_val = d.get("cardData", {}).get("license")
-    if license_val:
-        return {"license": license_val}
-    return {}
-
-
 def _hf_fields_from_response(d: dict[str, Any]) -> HfModelInfo:
     """Map a successful Hub API model JSON object to our stored fields.
 
@@ -144,8 +131,10 @@ def _hf_fields_from_response(d: dict[str, Any]) -> HfModelInfo:
     Returns:
         Dict with ``likesHuggingFace``, ``downloadsHuggingFace``, and optionally ``license``.
     """
-    out: dict[str, Any] = _hf_likes_downloads_from_response(d)
-    out.update(_hf_license_from_response(d))
+    out: dict[str, Any] = pick_keys(d, HF_KEYS_TO_KEEP)
+    license_val = d.get("cardData", {}).get("license")
+    if license_val:
+        out["license"] = license_val
     return cast(HfModelInfo, out)
 
 
@@ -191,12 +180,14 @@ def get_hf_info_from_lineage(lineage: list[str]) -> HfModelInfo:
     if d_earliest is None:
         merged.update({"likesHuggingFace": 0, "downloadsHuggingFace": 0})
     else:
-        merged.update(_hf_likes_downloads_from_response(d_earliest))
+        merged.update(pick_keys(d_earliest, HF_KEYS_TO_KEEP))
 
     if d_latest is None:
         merged["license"] = "unknown"
     else:
-        merged.update(_hf_license_from_response(d_latest))
+        license_val = d_latest.get("cardData", {}).get("license")
+        if license_val:
+            merged["license"] = license_val
 
     return cast(HfModelInfo, merged)
 
