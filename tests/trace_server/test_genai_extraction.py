@@ -436,12 +436,7 @@ def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
     ["prompt_tokens_details", "input_tokens_details"],
 )
 def test_openai_shaped_cached_tokens_map_to_cache_read(details_key: str) -> None:
-    """OpenAI-compatible / LiteLLM-bridged exporters nest cached tokens under
-    ``gen_ai.usage.prompt_tokens_details.cached_tokens`` (Chat Completions) or
-    ``gen_ai.usage.input_tokens_details.cached_tokens`` (Responses API) rather
-    than the Anthropic-style ``gen_ai.usage.cache_read.input_tokens``. Without
-    this mapping those tokens were silently dropped, overstating cost.
-    """
+    """Maps OpenAI-shaped cached tokens to cache reads."""
     span = _make_span(
         attrs={
             "gen_ai": {
