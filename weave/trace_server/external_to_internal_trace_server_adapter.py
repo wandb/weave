@@ -689,6 +689,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         # Artifacts hold ref strings verbatim; no ext<->int ref conversion here.
         return self._internal_trace_server.export_start(req)
 

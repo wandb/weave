@@ -7,6 +7,7 @@ paths. No job table or in-memory job registry participates in this flow.
 
 import time
 import uuid
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
@@ -160,6 +161,38 @@ def test_cross_tenant_unknown_and_traversal_guards(
             tsi.ExportStatusReq(project_id=project_a, job_id="../../etc/passwd")
         )
     assert (traversal.value.http_status, traversal.value.code) == (400, "BAD_JOB_ID")
+
+
+def test_status_rejects_corrupt_and_unsupported_manifests(
+    storage_client: S3StorageClient,
+):
+    project_id = b64(f"{TEST_ENTITY}/export-status-invalid-manifest")
+    corrupt_job_id = str(uuid.uuid4())
+    unsupported_job_id = str(uuid.uuid4())
+    storage_client.store(
+        storage_client.base_uri.with_path(
+            export.export_job_prefix(project_id, corrupt_job_id) + "manifest.json"
+        ),
+        b"not-json",
+    )
+    storage_client.store(
+        storage_client.base_uri.with_path(
+            export.export_job_prefix(project_id, unsupported_job_id) + "manifest.json"
+        ),
+        (
+            '{"job_id": "'
+            + unsupported_job_id
+            + '", "targets": [{"target": "not-a-target"}]}'
+        ).encode(),
+    )
+
+    for job_id in [corrupt_job_id, unsupported_job_id]:
+        with pytest.raises(export.ExportError) as exc_info:
+            export.get_export_status(MagicMock(), storage_client, project_id, job_id)
+        assert (exc_info.value.http_status, exc_info.value.code) == (
+            500,
+            "BAD_EXPORT_MANIFEST",
+        )
 
 
 def test_presign_on_done_downloads_exact_artifact(

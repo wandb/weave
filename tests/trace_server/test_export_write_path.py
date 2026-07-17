@@ -110,6 +110,7 @@ def test_start_export_runs_targets_serially_in_one_worker(
         "project",
         ["objects", "feedback"],
         ReadTable.CALLS_COMPLETE,
+        None,
     )
 
     assert len(worker_starts) == 1
@@ -192,6 +193,7 @@ def test_bad_target_and_job_id_validation(storage_client: S3StorageClient):
             "project",
             ["objects", "nope"],
             ReadTable.CALLS_COMPLETE,
+            None,
         )
     assert exc_info.value.http_status == 400
     assert exc_info.value.code == "BAD_TARGET"
@@ -212,5 +214,6 @@ def test_empty_and_duplicate_targets_are_rejected(
             "project",
             targets,
             ReadTable.CALLS_COMPLETE,
+            None,
         )
     assert (exc_info.value.http_status, exc_info.value.code) == (400, "BAD_TARGET")

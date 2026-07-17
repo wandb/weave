@@ -114,7 +114,9 @@ class _EncodingIdConverter(IdConverter):
         ),
         (
             "export_start",
-            lambda: tsi.ExportStartReq(project_id="ent/proj", targets=["calls"]),
+            lambda: tsi.ExportStartReq(
+                project_id="ent/proj", targets=["calls"], wb_user_id="u"
+            ),
         ),
         (
             "export_status",
@@ -161,11 +163,17 @@ def test_export_adapter_converts_project_id_and_delegates() -> None:
     )
     adapter = ExternalTraceServer(inner, idc)
 
-    start_req = tsi.ExportStartReq(project_id="ent/proj", targets=["calls"])
+    start_req = tsi.ExportStartReq(
+        project_id="ent/proj", targets=["calls"], wb_user_id="u"
+    )
     start_res = adapter.export_start(start_req)
     assert start_res.job_id == "job-1"
     assert inner.export_start.call_args.args[0].project_id == internal_project_id
+    assert inner.export_start.call_args.args[0].wb_user_id == idc.ext_to_int_user_id(
+        "u"
+    )
     assert start_req.project_id == "ent/proj"
+    assert start_req.wb_user_id == "u"
 
     status_req = tsi.ExportStatusReq(project_id="ent/proj", job_id="job-1")
     status_res = adapter.export_status(status_req)
