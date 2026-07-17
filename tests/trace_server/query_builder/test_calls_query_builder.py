@@ -20,6 +20,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_query,
     build_calls_stats_query,
     get_field_by_name,
+    process_query_to_conditions,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -73,6 +74,32 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
             expected_query,
             {"pb_0": SENTINEL_EPOCH, "pb_1": "project"},
         )
+
+
+def test_query_size_operand() -> None:
+    query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$gt": [
+                    {"$size": {"$getField": "op_name"}},
+                    {"$literal": 0},
+                ]
+            }
+        }
+    )
+    param_builder = ParamBuilder("test")
+
+    result = process_query_to_conditions(
+        query,
+        param_builder,
+        "calls_complete",
+        use_agg_fn=False,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+    assert result.conditions == ["(length(calls_complete.op_name) > {test_0:Int64})"]
+    assert [field.field for field in result.fields_used] == ["op_name"]
+    assert param_builder.get_params() == {"test_0": 0}
 
 
 def test_query_light_column() -> None:

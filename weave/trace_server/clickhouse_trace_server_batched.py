@@ -193,7 +193,6 @@ from weave.trace_server.errors import (
     handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
-    SCORER_OUTPUT_FIELDS,
     TABLE_FEEDBACK,
     format_feedback_to_res,
     format_feedback_to_row,
@@ -6773,10 +6772,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = query.project_id(req.project_id)
         query = query.fields(req.fields)
         query = query.where(req.query)
-        if req.scored_only:
-            query = query.where_collection_non_empty(
-                SCORER_OUTPUT_FIELDS, operator="OR"
-            )
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare()

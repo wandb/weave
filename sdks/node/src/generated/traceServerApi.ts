@@ -1502,6 +1502,7 @@ export interface AndOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2484,6 +2485,7 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2499,6 +2501,7 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2553,6 +2556,7 @@ export interface ConvertSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -3896,11 +3900,6 @@ export interface FeedbackQueryReq {
   limit?: number | null;
   /** Offset */
   offset?: number | null;
-  /**
-   * Scored Only
-   * Only return feedback with at least one scorer tag or rating.
-   */
-  scored_only?: boolean | null;
 }
 
 /** FeedbackQueryRes */
@@ -5282,6 +5281,7 @@ export interface OrOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -5815,6 +5815,34 @@ export interface ServerInfoRes {
   min_required_weave_python_version: string;
   /** Trace Server Version */
   trace_server_version: string;
+}
+
+/**
+ * SizeOperation
+ * Return the number of elements in a collection or characters in a string.
+ *
+ * Example:
+ *     ```
+ *     {"$size": {"$getField": "scorer_tags"}}
+ *     ```
+ */
+export interface SizeOperation {
+  /** $Size */
+  $size:
+    | LiteralOperation
+    | GetFieldOperator
+    | ConvertOperation
+    | SizeOperation
+    | AndOperation
+    | OrOperation
+    | NotOperation
+    | EqOperation
+    | GtOperation
+    | LtOperation
+    | GteOperation
+    | LteOperation
+    | InOperation
+    | ContainsOperation;
 }
 
 /** SortBy */

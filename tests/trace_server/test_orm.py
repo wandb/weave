@@ -146,7 +146,7 @@ def test_map_string_float_column_round_trip():
     }
 
 
-def test_select_where_collection_non_empty_with_or():
+def test_select_query_collection_size_with_or():
     table = Table(
         "feedback",
         [
@@ -156,50 +156,45 @@ def test_select_where_collection_non_empty_with_or():
         ],
     )
 
+    query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$or": [
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "tags"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "ratings"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
     prepared = (
         table.select()
         .project_id("entity/project")
-        .where_collection_non_empty(("tags", "ratings"), operator="OR")
-        .prepare()
+        .where(query)
+        .prepare(ParamBuilder("test"))
     )
 
     assert (
         prepared.sql
         == """SELECT id, tags, ratings
 FROM feedback
-WHERE ((project_id = {project_id:String}) AND (((notEmpty(tags)) OR (notEmpty(ratings)))))"""
+WHERE ((project_id = {project_id:String}) AND (((length(tags) > {test_1:Int64}) OR (length(ratings) > {test_2:Int64}))))"""
     )
-    assert prepared.parameters == {"project_id": "entity/project"}
+    assert prepared.parameters == {
+        "project_id": "entity/project",
+        "test_1": 0,
+        "test_2": 0,
+    }
     assert prepared.fields == ["id", "tags", "ratings"]
-
-
-def test_select_where_collection_non_empty_defaults_to_and():
-    table = Table(
-        "feedback",
-        [
-            Column("tags", "array_string"),
-            Column("ratings", "map_string_float"),
-        ],
-    )
-
-    prepared = table.select().where_collection_non_empty(("tags", "ratings")).prepare()
-
-    assert (
-        prepared.sql
-        == """SELECT tags, ratings
-FROM feedback
-WHERE ((notEmpty(tags)) AND (notEmpty(ratings)))"""
-    )
-
-
-def test_select_where_collection_non_empty_rejects_scalar_fields():
-    table = Table("feedback", [Column("id", "string")])
-
-    with pytest.raises(
-        ValueError,
-        match=r"Non-collection fields cannot use non-empty filtering: \['id'\]",
-    ):
-        table.select().where_collection_non_empty(("id",))
 
 
 def test_select_basic():

@@ -74,6 +74,9 @@
                 "$ref": "#/$defs/ConvertOperation"
               },
               {
+                "$ref": "#/$defs/SizeOperation"
+              },
+              {
                 "$ref": "#/$defs/AndOperation"
               },
               {
@@ -626,6 +629,9 @@
               "$ref": "#/$defs/ConvertOperation"
             },
             {
+              "$ref": "#/$defs/SizeOperation"
+            },
+            {
               "$ref": "#/$defs/AndOperation"
             },
             {
@@ -668,6 +674,9 @@
             },
             {
               "$ref": "#/$defs/ConvertOperation"
+            },
+            {
+              "$ref": "#/$defs/SizeOperation"
             },
             {
               "$ref": "#/$defs/AndOperation"
@@ -748,6 +757,9 @@
             },
             {
               "$ref": "#/$defs/ConvertOperation"
+            },
+            {
+              "$ref": "#/$defs/SizeOperation"
             },
             {
               "$ref": "#/$defs/AndOperation"
@@ -952,6 +964,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -993,6 +1008,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -1070,6 +1088,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -1111,6 +1132,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -1174,6 +1198,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -1215,6 +1242,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -1278,6 +1308,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -1320,6 +1353,9 @@
                   },
                   {
                     "$ref": "#/$defs/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/SizeOperation"
                   },
                   {
                     "$ref": "#/$defs/AndOperation"
@@ -1708,6 +1744,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -1749,6 +1788,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -1812,6 +1854,9 @@
                   "$ref": "#/$defs/ConvertOperation"
                 },
                 {
+                  "$ref": "#/$defs/SizeOperation"
+                },
+                {
                   "$ref": "#/$defs/AndOperation"
                 },
                 {
@@ -1853,6 +1898,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -1984,6 +2032,9 @@
                 },
                 {
                   "$ref": "#/$defs/ConvertOperation"
+                },
+                {
+                  "$ref": "#/$defs/SizeOperation"
                 },
                 {
                   "$ref": "#/$defs/AndOperation"
@@ -2168,6 +2219,9 @@
               },
               {
                 "$ref": "#/$defs/ConvertOperation"
+              },
+              {
+                "$ref": "#/$defs/SizeOperation"
               },
               {
                 "$ref": "#/$defs/AndOperation"
@@ -2626,6 +2680,63 @@
         }
       },
       "title": "SavedViewDefinition",
+      "type": "object"
+    },
+    "SizeOperation": {
+      "description": "Return the number of elements in a collection or characters in a string.\n\nExample:\n    ```\n    {\"$size\": {\"$getField\": \"scorer_tags\"}}\n    ```",
+      "properties": {
+        "$size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralOperation"
+            },
+            {
+              "$ref": "#/$defs/GetFieldOperator"
+            },
+            {
+              "$ref": "#/$defs/ConvertOperation"
+            },
+            {
+              "$ref": "#/$defs/SizeOperation"
+            },
+            {
+              "$ref": "#/$defs/AndOperation"
+            },
+            {
+              "$ref": "#/$defs/OrOperation"
+            },
+            {
+              "$ref": "#/$defs/NotOperation"
+            },
+            {
+              "$ref": "#/$defs/EqOperation"
+            },
+            {
+              "$ref": "#/$defs/GtOperation"
+            },
+            {
+              "$ref": "#/$defs/LtOperation"
+            },
+            {
+              "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/LteOperation"
+            },
+            {
+              "$ref": "#/$defs/InOperation"
+            },
+            {
+              "$ref": "#/$defs/ContainsOperation"
+            }
+          ],
+          "title": "$Size"
+        }
+      },
+      "required": [
+        "$size"
+      ],
+      "title": "SizeOperation",
       "type": "object"
     },
     "SortBy": {

@@ -1322,10 +1322,6 @@ class FeedbackQueryReq(BaseModelStrict):
     sort_by: list[SortBy] | None = None
     limit: int | None = Field(default=None, examples=[10])
     offset: int | None = Field(default=None, examples=[0])
-    scored_only: bool | None = Field(
-        default=None,
-        description="Only return feedback with at least one scorer tag or rating.",
-    )
 
 
 class FeedbackQueryRes(BaseModel):

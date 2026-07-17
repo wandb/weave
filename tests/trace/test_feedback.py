@@ -2330,7 +2330,7 @@ def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None
     )
 
 
-def test_feedback_query_scored_only(client: WeaveClient) -> None:
+def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
     project_id = client.project_id
 
     def create_feedback(
@@ -2365,7 +2365,26 @@ def test_feedback_query_scored_only(client: WeaveClient) -> None:
         tsi.FeedbackQueryReq(
             project_id=project_id,
             fields=["id"],
-            scored_only=True,
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_tags"}},
+                                    {"$literal": 0},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_ratings"}},
+                                    {"$literal": 0},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
         )
     )
 
