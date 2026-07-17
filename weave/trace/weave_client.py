@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import dataclasses
 import datetime
-import json
 import logging
 import os
 import re
@@ -40,6 +39,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
+from weave.trace.errors import format_http_error
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -584,16 +584,12 @@ class WeaveClient:
             )
         except HTTPError as e:
             if e.response is not None:
-                if e.response.content:
-                    try:
-                        reason = json.loads(e.response.content).get("reason")
-                        raise ValueError(reason) from None
-                    except json.JSONDecodeError:
-                        raise ValueError(e.response.content) from None
-                if e.response.status_code == 404:
-                    raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri}"
-                    ) from e
+                raise ValueError(
+                    format_http_error(
+                        e.response,
+                        f"Unable to read object for ref uri: {ref.uri}",
+                    )
+                ) from None
             raise
 
         # At this point, `ref.digest` is one of three things:
