@@ -81,6 +81,8 @@ def test_cost_apis(client):
         prompt_token_cost=500,
         completion_token_cost=1000,
         effective_date=datetime.datetime(1998, 10, 3),
+        cache_read_input_token_cost=250,
+        cache_creation_input_token_cost=750,
     )
 
     assert len(res.ids) == 1
@@ -94,6 +96,9 @@ def test_cost_apis(client):
     else:
         assert res[1].effective_date.year == 2021
         assert res[0].effective_date.year == 1998
+    added_cost = next(cost for cost in res if cost.effective_date.year == 1998)
+    assert added_cost.cache_read_input_token_cost == 250
+    assert added_cost.cache_creation_input_token_cost == 750
 
     # query with limit and offset
     res = client.query_costs(llm_ids=["my_model_to_delete3"], limit=1)

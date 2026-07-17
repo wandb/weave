@@ -1838,6 +1838,8 @@ class CostQueryOutput(BaseModel):
     llm_id: str | None = Field(default=None, examples=["gpt4"])
     prompt_token_cost: float | None = Field(default=None, examples=[1.0])
     completion_token_cost: float | None = Field(default=None, examples=[1.0])
+    cache_read_input_token_cost: float | None = Field(default=None, examples=[1.0])
+    cache_creation_input_token_cost: float | None = Field(default=None, examples=[1.0])
     prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     completion_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     effective_date: datetime.datetime | None = Field(
