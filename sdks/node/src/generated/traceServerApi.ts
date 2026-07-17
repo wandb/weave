@@ -246,8 +246,11 @@ export interface AgentConversationChatRes {
  * chat view; `text` is the trimmed, length-capped preview content.
  */
 export interface AgentConversationMessagePreview {
-  /** Role */
-  role: 'user_message' | 'assistant_message';
+  /**
+   * Role
+   * @default ""
+   */
+  role?: string;
   /**
    * Text
    * @default ""
@@ -527,8 +530,7 @@ export interface AgentSearchMatchedMessage {
     | 'system'
     | 'tool'
     | 'tool_call'
-    | 'tool_result'
-    | string;
+    | 'tool_result';
   /** Content Preview */
   content_preview: string;
   /** Content Digest */
@@ -910,20 +912,6 @@ export interface AgentSpanSchema {
   agent_description?: string | null;
   /** Agent Version */
   agent_version?: string | null;
-  /** Eval Run Id */
-  eval_run_id?: string | null;
-  /** Eval Predict And Score Call Id */
-  eval_predict_and_score_call_id?: string | null;
-  /** Eval Kind */
-  eval_kind?: string | null;
-  /** Eval Row Digest */
-  eval_row_digest?: string | null;
-  /** Eval Example Id */
-  eval_example_id?: string | null;
-  /** Eval Trial Index */
-  eval_trial_index?: number | null;
-  /** Eval Evaluation Name */
-  eval_evaluation_name?: string | null;
   /** Request Model */
   request_model?: string | null;
   /** Response Model */
@@ -1159,7 +1147,6 @@ export interface AgentSpanStatsReq {
     | null;
   /** Group Filters */
   group_filters?: AgentSpanGroupFilter[];
-  signal_filters?: AgentSignalFilter | null;
 }
 
 /**
@@ -1502,7 +1489,6 @@ export interface AndOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
-    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2485,7 +2471,6 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
-    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2501,7 +2486,6 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
-    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2556,7 +2540,6 @@ export interface ConvertSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
-    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2886,7 +2869,8 @@ export interface EndedCallSchemaForInsert {
   /** Exception */
   exception?: string | null;
   /** Output */
-  output?: null;
+  // TODO: This type is manually updated at the moment. https://github.com/wandb/weave/pull/6195/changes#r2850346035
+  output?: any;
   summary: SummaryInsertMap;
   /** Wb Run Step End */
   wb_run_step_end?: number | null;
@@ -3754,12 +3738,6 @@ export interface FeedbackCreateReq {
    */
   span_trace_id?: string;
   /**
-   * Scorer Trace Id
-   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
-   * @default ""
-   */
-  scorer_trace_id?: string;
-  /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
    */
@@ -3998,12 +3976,6 @@ export interface FeedbackReplaceReq {
    * @default ""
    */
   span_trace_id?: string;
-  /**
-   * Scorer Trace Id
-   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
-   * @default ""
-   */
-  scorer_trace_id?: string;
   /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
@@ -5281,7 +5253,6 @@ export interface OrOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
-    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -5815,34 +5786,6 @@ export interface ServerInfoRes {
   min_required_weave_python_version: string;
   /** Trace Server Version */
   trace_server_version: string;
-}
-
-/**
- * SizeOperation
- * Return the number of elements in a collection or characters in a string.
- *
- * Example:
- *     ```
- *     {"$size": {"$getField": "scorer_tags"}}
- *     ```
- */
-export interface SizeOperation {
-  /** $Size */
-  $size:
-    | LiteralOperation
-    | GetFieldOperator
-    | ConvertOperation
-    | SizeOperation
-    | AndOperation
-    | OrOperation
-    | NotOperation
-    | EqOperation
-    | GtOperation
-    | LtOperation
-    | GteOperation
-    | LteOperation
-    | InOperation
-    | ContainsOperation;
 }
 
 /** SortBy */

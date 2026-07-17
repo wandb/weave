@@ -89,14 +89,6 @@ When trace-server request/response models or route schemas change, refresh the A
 
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
-### Trace Server Query DSL
-
-Query operands are shared across feedback, calls, object refs, agent queries, and
-the in-memory backend. When adding an operand in
-`weave/trace_server/interface/query.py`, update every SQL/evaluation compiler,
-the optimization/object-ref traversal, and the hand-maintained frontend Query
-type. Regenerate the builtin-object, OpenAPI, Node SDK, and frontend Zod schemas.
-
 ## Python Testing Guidelines
 
 ### Test Framework

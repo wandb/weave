@@ -6479,11 +6479,8 @@
         "properties": {
           "role": {
             "type": "string",
-            "enum": [
-              "user_message",
-              "assistant_message"
-            ],
-            "title": "Role"
+            "title": "Role",
+            "default": ""
           },
           "text": {
             "type": "string",
@@ -6492,9 +6489,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "role"
-        ],
         "title": "AgentConversationMessagePreview",
         "description": "A truncated first/last message snippet for a grouped conversation row.\n\n`role` is the chat-timeline message type (e.g. \"user_message\",\n\"assistant_message\") so clients can style it consistently with the full\nchat view; `text` is the trimmed, length-capped preview content."
       },
@@ -7023,22 +7017,15 @@
             "title": "Trace Id"
           },
           "role": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "",
-                  "user",
-                  "assistant",
-                  "system",
-                  "tool",
-                  "tool_call",
-                  "tool_result"
-                ]
-              },
-              {
-                "type": "string"
-              }
+            "type": "string",
+            "enum": [
+              "",
+              "user",
+              "assistant",
+              "system",
+              "tool",
+              "tool_call",
+              "tool_result"
             ],
             "title": "Role"
           },
@@ -7943,83 +7930,6 @@
             ],
             "title": "Agent Version"
           },
-          "eval_run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Run Id"
-          },
-          "eval_predict_and_score_call_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Predict And Score Call Id"
-          },
-          "eval_kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Kind"
-          },
-          "eval_row_digest": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Row Digest"
-          },
-          "eval_example_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Example Id"
-          },
-          "eval_trial_index": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Trial Index"
-          },
-          "eval_evaluation_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Eval Evaluation Name"
-          },
           "request_model": {
             "anyOf": [
               {
@@ -8865,16 +8775,6 @@
             },
             "type": "array",
             "title": "Group Filters"
-          },
-          "signal_filters": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AgentSignalFilter"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object",
@@ -9618,9 +9518,6 @@
                 },
                 {
                   "$ref": "#/components/schemas/ConvertOperation"
-                },
-                {
-                  "$ref": "#/components/schemas/SizeOperation"
                 },
                 {
                   "$ref": "#/components/schemas/AndOperation"
@@ -12050,9 +11947,6 @@
                 "$ref": "#/components/schemas/ConvertOperation"
               },
               {
-                "$ref": "#/components/schemas/SizeOperation"
-              },
-              {
                 "$ref": "#/components/schemas/AndOperation"
               },
               {
@@ -12095,9 +11989,6 @@
               },
               {
                 "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/SizeOperation"
               },
               {
                 "$ref": "#/components/schemas/AndOperation"
@@ -12178,9 +12069,6 @@
               },
               {
                 "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/SizeOperation"
               },
               {
                 "$ref": "#/components/schemas/AndOperation"
@@ -13080,9 +12968,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -13124,9 +13009,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -14926,12 +14808,6 @@
             "description": "Turn the feedback belongs to (from spans.trace_id)",
             "default": ""
           },
-          "scorer_trace_id": {
-            "type": "string",
-            "title": "Scorer Trace Id",
-            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
-            "default": ""
-          },
           "wb_user_id": {
             "anyOf": [
               {
@@ -15521,12 +15397,6 @@
             "description": "Turn the feedback belongs to (from spans.trace_id)",
             "default": ""
           },
-          "scorer_trace_id": {
-            "type": "string",
-            "title": "Scorer Trace Id",
-            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
-            "default": ""
-          },
           "wb_user_id": {
             "anyOf": [
               {
@@ -15933,9 +15803,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -15977,9 +15844,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -16043,9 +15907,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16087,9 +15948,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -16262,9 +16120,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16307,9 +16162,6 @@
                     },
                     {
                       "$ref": "#/components/schemas/ConvertOperation"
-                    },
-                    {
-                      "$ref": "#/components/schemas/SizeOperation"
                     },
                     {
                       "$ref": "#/components/schemas/AndOperation"
@@ -16856,9 +16708,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16900,9 +16749,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -16966,9 +16812,6 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
-                    "$ref": "#/components/schemas/SizeOperation"
-                  },
-                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -17010,9 +16853,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -17543,9 +17383,6 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
-                  },
-                  {
-                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -18588,9 +18425,6 @@
                   "$ref": "#/components/schemas/ConvertOperation"
                 },
                 {
-                  "$ref": "#/components/schemas/SizeOperation"
-                },
-                {
                   "$ref": "#/components/schemas/AndOperation"
                 },
                 {
@@ -19532,63 +19366,6 @@
           "trace_server_version"
         ],
         "title": "ServerInfoRes"
-      },
-      "SizeOperation": {
-        "properties": {
-          "$size": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LiteralOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GetFieldOperator"
-              },
-              {
-                "$ref": "#/components/schemas/ConvertOperation"
-              },
-              {
-                "$ref": "#/components/schemas/SizeOperation"
-              },
-              {
-                "$ref": "#/components/schemas/AndOperation"
-              },
-              {
-                "$ref": "#/components/schemas/OrOperation"
-              },
-              {
-                "$ref": "#/components/schemas/NotOperation"
-              },
-              {
-                "$ref": "#/components/schemas/EqOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/LtOperation"
-              },
-              {
-                "$ref": "#/components/schemas/GteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/LteOperation"
-              },
-              {
-                "$ref": "#/components/schemas/InOperation"
-              },
-              {
-                "$ref": "#/components/schemas/ContainsOperation"
-              }
-            ],
-            "title": "$Size"
-          }
-        },
-        "type": "object",
-        "required": [
-          "$size"
-        ],
-        "title": "SizeOperation",
-        "description": "Return the number of elements in a collection or characters in a string.\n\nExample:\n    ```\n    {\"$size\": {\"$getField\": \"scorer_tags\"}}\n    ```"
       },
       "SortBy": {
         "properties": {
