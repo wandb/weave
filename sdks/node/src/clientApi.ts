@@ -80,7 +80,26 @@ export async function login(apiKey: string, host?: string) {
  *                   specify a W&B team (e.g., 'team/project'), your default entity is used.
  *                   To find or update your default entity, refer to User Settings at
  *                   https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team
- * @param settings - (Optional) Weave tracing settings
+ * @param settings - (Optional) Weave settings
+ *
+ *   - `printCallLink` (default `true`): prints links in terminal to the Weave
+ *     UI for ops. Overridden by env var `WEAVE_PRINT_CALL_LINK`.
+ *   - `attributes`: a map of attributes applied to every trace produced by
+ *     this client.
+ *   - `useOTelV2` (default `true`): routes OTel-capable integrations through
+ *     their OTel variant. Overridden by env var `WEAVE_USE_OTEL_V2`.
+ *   - `useCallsComplete` (default `true`): sends finished calls to the
+ *     `calls/complete` endpoint (start+end paired client-side) instead of the
+ *     legacy `call/upsert_batch` path. Overridden by env var
+ *     `WEAVE_USE_CALLS_COMPLETE`.
+ *   - `genai.spanProcessor`: how GenAI spans are exported. `'batch'` (default)
+ *     uses `BatchSpanProcessor` for production/long-lived processes;
+ *     `'simple'` uses `SimpleSpanProcessor` (one HTTP POST per span) for tests
+ *     and short-lived CLIs; a `SpanProcessor` instance uses a caller-owned
+ *     processor and bypasses the Weave OTLP exporter at
+ *     `/agents/otel/v1/traces`.
+ *   - `genai.batchOptions`: `BatchSpanProcessor` configuration. Ignored unless
+ *     `genai.spanProcessor === 'batch'`.
  * @returns A promise that resolves to the initialized Weave client.
  * @throws {Error} If the initialization fails
  */
