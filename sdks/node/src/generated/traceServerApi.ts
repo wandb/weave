@@ -2675,6 +2675,10 @@ export interface CostQueryOutput {
   prompt_token_cost?: number | null;
   /** Completion Token Cost */
   completion_token_cost?: number | null;
+  /** Cache Read Input Token Cost */
+  cache_read_input_token_cost?: number | null;
+  /** Cache Creation Input Token Cost */
+  cache_creation_input_token_cost?: number | null;
   /** Prompt Token Cost Unit */
   prompt_token_cost_unit?: string | null;
   /** Completion Token Cost Unit */
