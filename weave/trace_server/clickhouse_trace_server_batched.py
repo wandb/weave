@@ -7392,7 +7392,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.file_storage_client,
             req.project_id,
             req.job_id,
-            self.clickhouse_cluster_name,
+            wf_env.wf_clickhouse_query_log_cluster(),
         )
 
     # Private Methods

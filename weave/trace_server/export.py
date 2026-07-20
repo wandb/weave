@@ -115,9 +115,15 @@ def poll_query_status(
     ch_client: CHClient, query_id: str, query_log_cluster: str | None = None
 ) -> tuple[tsi.ExportJobStatus, int, str | None]:
     """query_log oracle: map the latest event for query_id to (status, rows, error)."""
+    settings = (
+        ch_settings.CLICKHOUSE_QUERY_LOG_FAN_OUT_SETTINGS
+        if query_log_cluster is not None
+        else None
+    )
     rows = ch_client.query(
         _query_log_status_sql(query_log_cluster),
         parameters={"qid": query_id},
+        settings=settings,
     ).result_rows
     if not rows:
         return "running", 0, None
