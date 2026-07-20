@@ -370,7 +370,6 @@ Operand = (
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()
 GetFieldOperator.model_rebuild()
-ConvertOperation.model_rebuild()
 SizeOperation.model_rebuild()
 AndOperation.model_rebuild()
 OrOperation.model_rebuild()

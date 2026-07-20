@@ -2387,12 +2387,45 @@ def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
             ),
         )
     )
+    scored_feedback_above_fractional_threshold = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["id"],
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_tags"}},
+                                    {"$literal": 0.5},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_ratings"}},
+                                    {"$literal": 0.5},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+        )
+    )
 
     assert sorted(all_feedback.result, key=lambda row: row["id"]) == sorted(
         [{"id": empty_id}, {"id": rated_id}, {"id": tagged_id}],
         key=lambda row: row["id"],
     )
     assert sorted(scored_feedback.result, key=lambda row: row["id"]) == sorted(
+        [{"id": rated_id}, {"id": tagged_id}],
+        key=lambda row: row["id"],
+    )
+    assert sorted(
+        scored_feedback_above_fractional_threshold.result,
+        key=lambda row: row["id"],
+    ) == sorted(
         [{"id": rated_id}, {"id": tagged_id}],
         key=lambda row: row["id"],
     )
