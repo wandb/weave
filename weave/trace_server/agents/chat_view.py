@@ -788,14 +788,60 @@ def _extract_user_text(
 
 
 def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: opening user-prompt text from a span's `input_messages`.
+    """Public: readable opening user-prompt text from `input_messages`.
 
     The opening user prompt is the first user entry of the earliest
     message-bearing span; that span's `input_messages` begins at the
     conversation opening.
     """
     texts = _user_prompt_texts(messages)
-    return texts[0] if texts else ""
+    return _json_aware_preview_text(texts[0]) if texts else ""
+
+
+def _json_aware_preview_text(text: str) -> str:
+    """Remove leading JSON and replace later values before preview truncation.
+
+    Conversation titles use prose, so JSON-only input produces no user preview.
+    Malformed leading JSON is left unchanged rather than partially stripped.
+    """
+    stripped = text.lstrip()
+    cursor = 0
+    parsed_json = False
+    decoder = json.JSONDecoder()
+    while cursor < len(stripped) and stripped[cursor] in "[{":
+        try:
+            _, cursor = decoder.raw_decode(stripped, cursor)
+        except json.JSONDecodeError:
+            return text
+        parsed_json = True
+        while cursor < len(stripped) and stripped[cursor].isspace():
+            cursor += 1
+        if cursor < len(stripped) and stripped[cursor] == ",":
+            return text
+
+    trailing = stripped[cursor:].strip() if parsed_json else text
+    return _replace_json_values(trailing)
+
+
+def _replace_json_values(text: str) -> str:
+    """Replace complete JSON objects/arrays in preview prose with `[JSON]`."""
+    parts: list[str] = []
+    cursor = 0
+    decoder = json.JSONDecoder()
+    while cursor < len(text):
+        if text[cursor] in "[{":
+            try:
+                value, end = decoder.raw_decode(text, cursor)
+            except json.JSONDecodeError:
+                pass
+            else:
+                if isinstance(value, (dict, list)):
+                    parts.append("[JSON]")
+                    cursor = end
+                    continue
+        parts.append(text[cursor])
+        cursor += 1
+    return "".join(parts).strip()
 
 
 def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
