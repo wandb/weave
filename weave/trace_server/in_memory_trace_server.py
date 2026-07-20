@@ -4148,6 +4148,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     ),
                     "prompt_token_cost": cost.prompt_token_cost,
                     "completion_token_cost": cost.completion_token_cost,
+                    "cache_read_input_token_cost": cost.cache_read_input_token_cost,
+                    "cache_creation_input_token_cost": cost.cache_creation_input_token_cost,
                     "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
                     "completion_token_cost_unit": cost.completion_token_cost_unit
                     or "USD",

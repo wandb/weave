@@ -12431,6 +12431,34 @@
               1.0
             ]
           },
+          "cache_read_input_token_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Input Token Cost",
+            "examples": [
+              1.0
+            ]
+          },
+          "cache_creation_input_token_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Creation Input Token Cost",
+            "examples": [
+              1.0
+            ]
+          },
           "prompt_token_cost_unit": {
             "anyOf": [
               {

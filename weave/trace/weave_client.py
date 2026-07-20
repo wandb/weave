@@ -2297,6 +2297,8 @@ class WeaveClient:
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
+        cache_read_input_token_cost: float = 0,
+        cache_creation_input_token_cost: float = 0,
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
@@ -2314,6 +2316,8 @@ class WeaveClient:
             provider_id: The provider of the LLM. Defaults to "default". eg "openai"
             prompt_token_cost_unit: The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
             completion_token_cost_unit: The unit of the cost for the completion tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time")
+            cache_read_input_token_cost: The cost per cache-read input token. Defaults to 0.
+            cache_creation_input_token_cost: The cost per cache-creation input token. Defaults to 0.
 
         Returns:
             A CostCreateRes object.
@@ -2325,6 +2329,8 @@ class WeaveClient:
         cost = CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
+            cache_read_input_token_cost=cache_read_input_token_cost,
+            cache_creation_input_token_cost=cache_creation_input_token_cost,
             effective_date=effective_date,
             prompt_token_cost_unit=prompt_token_cost_unit,
             completion_token_cost_unit=completion_token_cost_unit,
