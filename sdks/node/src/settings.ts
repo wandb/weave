@@ -1,5 +1,8 @@
 import type {BufferConfig, SpanProcessor} from '@opentelemetry/sdk-trace-base';
 
+/**
+ * @inline
+ */
 export type Settings = {
   /**
    * Prints links in terminal to Weave UI for ops.
