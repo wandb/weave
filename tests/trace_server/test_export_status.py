@@ -87,17 +87,12 @@ def test_poll_query_status_oracle_against_real_query_log(clickhouse_trace_server
 
 
 def test_query_log_oracle_sql_supports_standalone_and_replica_clusters():
-    assert export._flush_query_log_sql(None) == "SYSTEM FLUSH LOGS query_log"
     assert export._query_log_status_sql(None) == (
         "SELECT type, written_rows, exception FROM system.query_log "
         "WHERE query_id = {qid:String} AND event_date >= today() - 1 "
         "ORDER BY event_time_microseconds DESC LIMIT 1"
     )
 
-    assert (
-        export._flush_query_log_sql("default")
-        == "SYSTEM FLUSH LOGS ON CLUSTER default query_log"
-    )
     assert export._query_log_status_sql("default") == (
         "SELECT type, written_rows, exception FROM "
         "clusterAllReplicas('default', merge('system', '^query_log*')) "

@@ -89,7 +89,6 @@ def get_export_status(
             "export storage is not configured",
         )
     targets = _read_manifest_targets(file_storage_client, project_id, job_id)
-    ch_client.command(_flush_query_log_sql(query_log_cluster))
     manifest = [
         _manifest_entry(
             ch_client,
@@ -317,12 +316,6 @@ def _resolve_targets(
             ResolvedExportTarget(name, build_export_query(name, calls_read_table))
         )
     return targets
-
-
-def _flush_query_log_sql(query_log_cluster: str | None) -> str:
-    if query_log_cluster is None:
-        return "SYSTEM FLUSH LOGS query_log"
-    return f"SYSTEM FLUSH LOGS ON CLUSTER {query_log_cluster} query_log"
 
 
 def _query_log_status_sql(query_log_cluster: str | None) -> str:
