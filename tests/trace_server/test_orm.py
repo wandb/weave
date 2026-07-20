@@ -176,6 +176,57 @@ def test_map_string_float_column_round_trip():
     }
 
 
+def test_select_query_collection_size_with_or():
+    table = Table(
+        "feedback",
+        [
+            Column("id", "string"),
+            Column("tags", "array_string"),
+            Column("ratings", "map_string_float"),
+        ],
+    )
+
+    query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$or": [
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "tags"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "ratings"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    prepared = (
+        table.select()
+        .project_id("entity/project")
+        .where(query)
+        .prepare(ParamBuilder("test"))
+    )
+
+    assert (
+        prepared.sql
+        == """SELECT id, tags, ratings
+FROM feedback
+WHERE ((project_id = {project_id:String}) AND (((length(tags) > {test_1:Int64}) OR (length(ratings) > {test_2:Int64}))))"""
+    )
+    assert prepared.parameters == {
+        "project_id": "entity/project",
+        "test_1": 0,
+        "test_2": 0,
+    }
+    assert prepared.fields == ["id", "tags", "ratings"]
+
+
 def test_select_basic():
     table = Table(
         "users",

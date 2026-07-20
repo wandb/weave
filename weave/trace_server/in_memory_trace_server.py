@@ -476,6 +476,15 @@ def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
     return needle in haystack
 
 
+def _ch_size(value: Any) -> int | None:
+    """Mirror ClickHouse length() for query values supported by the DSL."""
+    if value is None:
+        return None
+    if isinstance(value, (str, bytes, list, tuple, dict)):
+        return len(value)
+    raise TypeError(f"Cannot apply $size to {type(value).__name__}")
+
+
 def _ch_sorted_by_terms(
     rows: list[Any],
     terms: Sequence[tuple[Any, str]],
@@ -1005,6 +1014,8 @@ class _QueryFilterEvaluator:
             if operand.convert_.to == "exists":
                 return inner is not None
             return _ch_cast_json_value(_ch_to_string(inner), operand.convert_.to)
+        if isinstance(operand, tsi_query.SizeOperation):
+            return _ch_size(self._operand_value(operand.size_))
         return self._evaluate(operand)
 
     def _binary(
@@ -1077,6 +1088,7 @@ class _QueryFilterEvaluator:
                 tsi_query.LiteralOperation,
                 tsi_query.GetFieldOperator,
                 tsi_query.ConvertOperation,
+                tsi_query.SizeOperation,
             ),
         ):
             return self._operand_value(operand)
@@ -2059,6 +2071,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     else _ch_to_string(inner(rec)),
                     convert_to,
                 )
+            elif isinstance(operand, tsi_query.SizeOperation):
+                inner = compile_operand(operand.size_)
+                return lambda rec: _ch_size(inner(rec))
             elif isinstance(
                 operand,
                 (
@@ -7279,6 +7294,8 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
             if convert_to == "exists":
                 return value is not None
             return _ch_cast_json_value(_ch_to_string(value), convert_to)
+        elif isinstance(operand, tsi_query.SizeOperation):
+            return _ch_size(process_operand(operand.size_))
         elif isinstance(
             operand,
             (

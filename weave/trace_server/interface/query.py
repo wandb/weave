@@ -130,6 +130,21 @@ class ConvertSpec(BaseModel):
     to: CastTo
 
 
+# https://www.mongodb.com/docs/manual/reference/operator/aggregation/size/
+class SizeOperation(BaseModel):
+    """Return the number of elements in a collection or characters in a string.
+
+    Example:
+        ```
+        {"$size": {"$getField": "scorer_tags"}}
+        ```
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    size_: "Operand" = Field(alias="$size")
+
+
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
     """Logical AND. All conditions must evaluate to true.
@@ -348,11 +363,14 @@ Operation = (
     | InOperation
     | ContainsOperation
 )
-Operand = LiteralOperation | GetFieldOperator | ConvertOperation | Operation
+Operand = (
+    LiteralOperation | GetFieldOperator | ConvertOperation | SizeOperation | Operation
+)
 
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()
 GetFieldOperator.model_rebuild()
+SizeOperation.model_rebuild()
 AndOperation.model_rebuild()
 OrOperation.model_rebuild()
 NotOperation.model_rebuild()

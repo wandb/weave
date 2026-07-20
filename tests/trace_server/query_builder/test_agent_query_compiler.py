@@ -167,6 +167,18 @@ class TestFieldResolution:
 
 
 class TestOperatorShapes:
+    def test_size_composes_with_comparison(self) -> None:
+        sql, params = _compile(
+            {
+                "$gt": [
+                    {"$size": {"$getField": "agent_name"}},
+                    {"$literal": 0},
+                ]
+            }
+        )
+        assert sql == "(length(s.agent_name) > {genai_0:Int64})"
+        assert params == {"genai_0": 0}
+
     def test_eq_with_null(self) -> None:
         sql, _ = _compile({"$eq": [{"$getField": "agent_name"}, {"$literal": None}]})
         assert sql == "(s.agent_name IS NULL)"

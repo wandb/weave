@@ -2328,3 +2328,104 @@ def test_feedback_query_returns_tz_aware_created_at(client: WeaveClient) -> None
     assert created_at.utcoffset() == datetime.timedelta(0), (
         "feedback created_at must be tz-aware UTC"
     )
+
+
+def test_feedback_query_by_collection_size(client: WeaveClient) -> None:
+    project_id = client.project_id
+
+    def create_feedback(
+        feedback_id: str,
+        *,
+        tags: list[str] | None = None,
+        ratings: dict[str, float] | None = None,
+    ) -> str:
+        result = client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{feedback_id}",
+                feedback_type="wandb.agent_monitor",
+                payload={},
+                runnable_ref=f"weave:///{project_id}/object/scorer:v1",
+                call_ref=f"weave:///{project_id}/call/judge-{feedback_id}",
+                trigger_ref=f"weave:///{project_id}/object/monitor:v1",
+                scorer_tags=tags or [],
+                scorer_ratings=ratings or {},
+            )
+        )
+        return result.id
+
+    empty_id = create_feedback("empty")
+    tagged_id = create_feedback("tagged", tags=["helpful"])
+    rated_id = create_feedback("rated", ratings={"_rating_": 0.8})
+
+    all_feedback = client.server.feedback_query(
+        tsi.FeedbackQueryReq(project_id=project_id, fields=["id"])
+    )
+    scored_feedback = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["id"],
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_tags"}},
+                                    {"$literal": 0},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_ratings"}},
+                                    {"$literal": 0},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    scored_feedback_above_fractional_threshold = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["id"],
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$or": [
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_tags"}},
+                                    {"$literal": 0.5},
+                                ]
+                            },
+                            {
+                                "$gt": [
+                                    {"$size": {"$getField": "scorer_ratings"}},
+                                    {"$literal": 0.5},
+                                ]
+                            },
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+
+    assert sorted(all_feedback.result, key=lambda row: row["id"]) == sorted(
+        [{"id": empty_id}, {"id": rated_id}, {"id": tagged_id}],
+        key=lambda row: row["id"],
+    )
+    assert sorted(scored_feedback.result, key=lambda row: row["id"]) == sorted(
+        [{"id": rated_id}, {"id": tagged_id}],
+        key=lambda row: row["id"],
+    )
+    assert sorted(
+        scored_feedback_above_fractional_threshold.result,
+        key=lambda row: row["id"],
+    ) == sorted(
+        [{"id": rated_id}, {"id": tagged_id}],
+        key=lambda row: row["id"],
+    )
