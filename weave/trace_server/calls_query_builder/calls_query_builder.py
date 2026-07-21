@@ -1134,7 +1134,9 @@ class CallsQuery(BaseModel):
             return None
 
         table_name = get_calls_table_name(self.read_table)
-        other_conditions = [c for c in self.query_conditions if c is not or_conditions[0]]
+        other_conditions = [
+            c for c in self.query_conditions if c is not or_conditions[0]
+        ]
         for condition in other_conditions:
             if (
                 condition.is_heavy(table_name)
@@ -1163,7 +1165,8 @@ class CallsQuery(BaseModel):
             self.hardcoded_filter and self.hardcoded_filter.filter.trace_ids
         )
         already_has_thread_ids = bool(
-            self.hardcoded_filter and self.hardcoded_filter.filter.thread_ids is not None
+            self.hardcoded_filter
+            and self.hardcoded_filter.filter.thread_ids is not None
         )
 
         arm_specs: list[_OrUnionArmSpec] = []
@@ -2087,9 +2090,7 @@ class CallsQuery(BaseModel):
         )
         other_conditions = [c for c in self.query_conditions if c is not or_condition]
 
-        already_ordered_by_id = any(
-            of.field.field == "id" for of in self.order_fields
-        )
+        already_ordered_by_id = any(of.field.field == "id" for of in self.order_fields)
         if already_ordered_by_id:
             total_order_fields = list(self.order_fields)
         else:
@@ -2102,7 +2103,9 @@ class CallsQuery(BaseModel):
 
         arm_sqls = []
         for arm in arms:
-            arm_query = CallsQuery(project_id=self.project_id, read_table=self.read_table)
+            arm_query = CallsQuery(
+                project_id=self.project_id, read_table=self.read_table
+            )
             arm_query.add_field("id")
             if page_started_at_bound:
                 arm_query.add_field("started_at")

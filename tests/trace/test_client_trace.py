@@ -4625,7 +4625,9 @@ def test_calls_query_or_union_trace_id_and_thread_id_lowering_functional(client)
     call_turn_match = _make_or_union_test_call(
         client, base_time=base_time, offset_seconds=2, turn_value=turn_target
     )
-    call_neither = _make_or_union_test_call(client, base_time=base_time, offset_seconds=3)
+    call_neither = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=3
+    )
 
     trace_query = {
         "$or": [
@@ -4657,7 +4659,10 @@ def test_calls_query_or_union_trace_id_and_thread_id_lowering_functional(client)
         client, base_time=base_time, offset_seconds=5, thread_id=thread_b
     )
     call_thread_other = _make_or_union_test_call(
-        client, base_time=base_time, offset_seconds=6, thread_id=f"thread_{generate_id()}"
+        client,
+        base_time=base_time,
+        offset_seconds=6,
+        thread_id=f"thread_{generate_id()}",
     )
 
     thread_query = {
