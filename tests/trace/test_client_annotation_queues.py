@@ -478,6 +478,117 @@ def test_annotation_queue_add_calls(client):
     assert add_res.duplicates == 0
 
 
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: calls_merged can contain end-only rows",
+)
+def test_annotation_queue_add_calls_retries_end_only_calls(client):
+    project_id = client.project_id
+    complete_call_id = generate_id()
+    end_only_call_id = generate_id()
+    complete_started_at = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0
+    )
+    complete_ended_at = complete_started_at + datetime.timedelta(seconds=1)
+    end_only_ended_at = complete_started_at + datetime.timedelta(seconds=3)
+
+    # One complete call and one end-only call reproduce the mixed production batch.
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=complete_call_id,
+                trace_id=complete_call_id,
+                started_at=complete_started_at,
+                op_name="complete_call",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=complete_call_id,
+                ended_at=complete_ended_at,
+                summary={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=end_only_call_id,
+                ended_at=end_only_ended_at,
+                summary={},
+            )
+        )
+    )
+
+    queue_id = create_annotation_queue(client, name="End-only calls test queue")
+    add_res = client.server.annotation_queue_add_calls(
+        tsi.AnnotationQueueAddCallsReq(
+            project_id=project_id,
+            queue_id=queue_id,
+            call_ids=[complete_call_id, end_only_call_id],
+            display_fields=["input", "output"],
+            wb_user_id="test_user",
+        )
+    )
+
+    # The valid call is added with its separately ingested end event intact.
+    assert add_res.added_count == 1
+    assert add_res.duplicates == 0
+    items_res = client.server.annotation_queue_items_query(
+        tsi.AnnotationQueueItemsQueryReq(
+            project_id=project_id,
+            queue_id=queue_id,
+        )
+    )
+    assert [item.call_id for item in items_res.items] == [complete_call_id]
+    assert items_res.items[0].call_ended_at is not None
+
+    # Once the missing start arrives, retrying adds the previously skipped call.
+    end_only_started_at = complete_started_at + datetime.timedelta(seconds=2)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=end_only_call_id,
+                trace_id=end_only_call_id,
+                started_at=end_only_started_at,
+                op_name="end_only_call",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    retry_res = client.server.annotation_queue_add_calls(
+        tsi.AnnotationQueueAddCallsReq(
+            project_id=project_id,
+            queue_id=queue_id,
+            call_ids=[end_only_call_id],
+            display_fields=["input", "output"],
+            wb_user_id="test_user",
+        )
+    )
+
+    assert retry_res.added_count == 1
+    assert retry_res.duplicates == 0
+    items_res = client.server.annotation_queue_items_query(
+        tsi.AnnotationQueueItemsQueryReq(
+            project_id=project_id,
+            queue_id=queue_id,
+        )
+    )
+    items_by_call_id = {item.call_id: item for item in items_res.items}
+    assert set(items_by_call_id) == {complete_call_id, end_only_call_id}
+    assert items_by_call_id[end_only_call_id].call_started_at is not None
+    assert items_by_call_id[end_only_call_id].call_ended_at is not None
+
+
 def test_annotation_queue_add_calls_duplicate_prevention(client):
     """Test that adding duplicate calls is handled correctly."""
     project_id = client.project_id
