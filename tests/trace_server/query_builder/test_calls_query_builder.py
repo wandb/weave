@@ -6241,6 +6241,106 @@ def test_or_union_guardrail_existing_call_ids_filter_unchanged() -> None:
     )
 
 
+def test_or_union_guardrail_heavy_order_field_unchanged() -> None:
+    """A qualifying $or with a heavy (summary) ORDER BY field disqualifies the rewrite; SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(_turn_id_or_condition())
+    cq.add_order("summary.weave.status", "asc")
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_7:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        ORDER BY CASE
+            WHEN any(calls_merged.exception) IS NOT NULL THEN {pb_3:String}
+            WHEN IFNULL(toInt64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.summary_dump, {pb_2:String}), calls_merged.summary_dump IS NOT NULL), 'null'), '')), 0) > 0 THEN {pb_6:String}
+            WHEN any(calls_merged.ended_at) IS NULL THEN {pb_4:String}
+            ELSE {pb_5:String}
+        END ASC
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": '$."status_counts"."error"',
+            "pb_3": "error",
+            "pb_4": "running",
+            "pb_5": "success",
+            "pb_6": "descendant_error",
+            "pb_7": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_existing_trace_ids_filter_unchanged() -> None:
+    """A trace_id branch never lowers onto an already-set hardcoded trace_ids filter; SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_ids": ["existing_trace"]})
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "trace_id"}, {"$literal": "trace_1"}]},
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.turn.root_turn_id"},
+                            {"$literal": "call_1"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filter_candidate_ids AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE ifNull(calls_merged.trace_id, '') = {pb_0:String}),
+        filtered_calls AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_1:String}
+            WHERE (calls_merged.id IN filter_candidate_ids)
+                AND (ifNull(calls_merged.trace_id, '') = {pb_0:String} OR calls_merged.trace_id IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING ((((any(calls_merged.trace_id) = {pb_2:String})
+                OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_4:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL))))))
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "existing_trace",
+            "pb_1": "project",
+            "pb_2": "trace_1",
+            "pb_3": '$."turn"."root_turn_id"',
+            "pb_4": "call_1",
+        },
+    )
+
+
 def test_or_union_guardrail_object_ref_expand_columns_unchanged() -> None:
     """An object-ref expand-columns condition alongside the $or disqualifies the whole rewrite."""
     cq = CallsQuery(project_id="project")

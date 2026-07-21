@@ -27,6 +27,7 @@ from tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    client_is_clickhouse,
     get_info_loglines,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
@@ -55,6 +56,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
+from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
@@ -4526,8 +4528,18 @@ def test_call_stream_query_heavy_query_batch(client):
         assert call.attributes["empty"] == ""
 
 
-def test_calls_query_or_union_rewrite_equivalence_and_pagination(client):
+@pytest.mark.parametrize(
+    "force_calls_merged", [False, True], ids=["calls_complete", "calls_merged"]
+)
+def test_calls_query_or_union_rewrite_equivalence_and_pagination(
+    client, force_calls_merged
+):
     """The $or -> UNION DISTINCT rewrite returns the same rows as a brute-force filter.
+
+    Runs on both calls_complete (default routing, also covers --trace-server=fake)
+    and calls_merged (FORCE_LEGACY routing, real ClickHouse only) so the
+    per-arm GROUP BY + UNION DISTINCT dedup path is exercised, not just the
+    single-row calls_complete path.
 
     Exercises id `$in` lowering (branch A) unioned with a heavy JSON `$eq`
     (branch B). One call matches both branches, two match branch B only, one
@@ -4535,6 +4547,12 @@ def test_calls_query_or_union_rewrite_equivalence_and_pagination(client):
     Also asserts paginated pages partition the full ordered result with no
     duplicates or misses.
     """
+    if force_calls_merged:
+        if not client_is_clickhouse(client):
+            pytest.skip("calls_merged routing requires a real ClickHouse backend")
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+        ch_server.table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+
     project_id = client.project_id
     turn_target = f"root_turn_{generate_id()}"
     base_time = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -4582,6 +4600,9 @@ def test_calls_query_or_union_rewrite_equivalence_and_pagination(client):
     assert set(full_ordered) == expected_ids
     assert call_neither not in full_ordered
     assert full_ordered == [call_a_only, call_both, call_b_only_1, call_b_only_2]
+    # call_both matches BOTH arms (id `$in` and heavy JSON `$eq`); UNION
+    # DISTINCT must still yield it exactly once, not once per matching arm.
+    assert full_ordered.count(call_both) == 1
 
     # Pagination: pages must partition the full ordered set with no dup/miss.
     page_size = 2
@@ -4769,6 +4790,83 @@ def test_calls_query_or_union_kill_switch_and_guardrails_functional(
         )
     )
     assert {c.id for c in res} == {call_match}
+
+
+def test_calls_query_or_union_calls_merged_started_at_tie_pagination_functional(
+    client, ch_server
+):
+    """A started_at tie spanning both UNION arms on calls_merged paginates cleanly.
+
+    Four calls share one `started_at` value: two match branch A (id `$in`),
+    two match branch B (heavy JSON `$eq`). With only the started_at tie to
+    resolve, ordering falls entirely on the id ASC tiebreak appended by the
+    rewrite. Forces calls_merged (real ClickHouse only, via `ch_server`) so
+    this exercises the per-arm GROUP BY + UNION DISTINCT path, not the
+    single-row calls_complete path. LIMIT (2) is smaller than the match count
+    (4), so pagination must partition the full ordered set with no
+    duplicates or misses.
+    """
+    ch_server.table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+
+    project_id = client.project_id
+    turn_target = f"root_turn_{generate_id()}"
+    tied_time = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    id_branch_ids = [
+        _make_or_union_test_call(client, base_time=tied_time, offset_seconds=0)
+        for _ in range(2)
+    ]
+    turn_branch_ids = [
+        _make_or_union_test_call(
+            client, base_time=tied_time, offset_seconds=0, turn_value=turn_target
+        )
+        for _ in range(2)
+    ]
+    call_neither = _make_or_union_test_call(
+        client, base_time=tied_time, offset_seconds=1
+    )
+
+    query = {
+        "$or": [
+            {"$in": [{"$getField": "id"}, [{"$literal": i} for i in id_branch_ids]]},
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    base_req = {
+        "project_id": project_id,
+        "query": {"$expr": query},
+        "sort_by": [{"field": "started_at", "direction": "asc"}],
+    }
+
+    expected_ids = set(id_branch_ids) | set(turn_branch_ids)
+    full_ordered = [
+        call.id
+        for call in client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(base_req)
+        )
+    ]
+    assert set(full_ordered) == expected_ids
+    assert call_neither not in full_ordered
+    # All four share started_at, so the id ASC tiebreak alone determines order.
+    assert full_ordered == sorted(expected_ids)
+
+    # Pagination: LIMIT (2) < match count (4) must still partition cleanly.
+    page_size = 2
+    paged_ids: list[str] = []
+    for offset in range(0, len(full_ordered), page_size):
+        page_req = {**base_req, "limit": page_size, "offset": offset}
+        paged_ids.extend(
+            call.id
+            for call in client.server.calls_query_stream(
+                tsi.CallsQueryReq.model_validate(page_req)
+            )
+        )
+    assert paged_ids == full_ordered
 
 
 @pytest.fixture
