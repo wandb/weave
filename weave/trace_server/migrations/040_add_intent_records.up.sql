@@ -1,6 +1,9 @@
 -- One row per distilled intent occurrence, including its embedding and complete
--- trace provenance. ReplacingMergeTree provides append-only logical updates;
--- callers must keep event_time stable across versions of the same occurrence.
+-- trace provenance. ReplacingMergeTree provides append-only logical updates
+-- keyed on (project_id, pipeline_version, created_at, id). created_at is the
+-- immutable occurrence time and sits in both the partition and dedup key, so
+-- every rewrite (retry, tombstone, re-embed) must carry it forward unchanged;
+-- a drifted created_at would land in another key/partition and never collapse.
 CREATE TABLE IF NOT EXISTS intent_records
 (
     -- Trusted tenancy and logical identity.
@@ -37,8 +40,8 @@ CREATE TABLE IF NOT EXISTS intent_records
     role LowCardinality(String) DEFAULT '',
     user_id String DEFAULT '',
 
-    -- Source time, insertion audit, retention, and cold metadata.
-    event_time DateTime64(6, 'UTC'),
+    -- Occurrence time, insertion audit, retention, and cold metadata.
+    created_at DateTime64(6, 'UTC'),
     inserted_at DateTime64(3, 'UTC') DEFAULT now64(3),
     inserted_by_user_id String,
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
@@ -51,14 +54,10 @@ CREATE TABLE IF NOT EXISTS intent_records
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_vector vector TYPE vector_similarity(
         'hnsw', 'cosineDistance', 1024, 'bf16', 64, 512
-    ) GRANULARITY 1,
-
-    CONSTRAINT embedding_dimensions_is_1024 CHECK embedding_dimensions = 1024,
-    CONSTRAINT vector_dimensions_is_1024 CHECK length(vector) = 1024
+    ) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(record_version)
-PARTITION BY toYYYYMM(event_time)
-PRIMARY KEY (project_id, event_time)
-ORDER BY (project_id, event_time, pipeline_version, id)
+PARTITION BY toYYYYMM(created_at)
+ORDER BY (project_id, pipeline_version, created_at, id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;

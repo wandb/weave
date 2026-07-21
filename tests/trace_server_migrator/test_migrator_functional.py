@@ -624,9 +624,9 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert table_metadata == [
         (
             "ReplacingMergeTree",
-            "toYYYYMM(event_time)",
-            "project_id, event_time, pipeline_version, id",
-            "project_id, event_time",
+            "toYYYYMM(created_at)",
+            "project_id, pipeline_version, created_at, id",
+            "project_id, pipeline_version, created_at, id",
             "expire_at",
         )
     ]
@@ -661,7 +661,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("intent_ordinal", "UInt16"),
         ("role", "LowCardinality(String)"),
         ("user_id", "String"),
-        ("event_time", "DateTime64(6, 'UTC')"),
+        ("created_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
         ("inserted_by_user_id", "String"),
         ("expire_at", "DateTime"),
@@ -693,7 +693,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         category, status, signature, normalized_signature, signature_id,
         embedding_model, vector, source, source_id, trace_id, span_id,
         parent_span_id, conversation_id, turn_id, intent_ordinal, role,
-        user_id, event_time, inserted_by_user_id, attributes
+        user_id, created_at, inserted_by_user_id, attributes
     """
     row_template = """
         SELECT
