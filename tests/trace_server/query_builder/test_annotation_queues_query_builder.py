@@ -37,7 +37,7 @@ def test_make_queue_add_calls_fetch_calls_query_skips_calls_without_start_time()
         "pb_1": ["call-1", "call-2"],
     }
 
-    # calls_merged needs aggregation after excluding incomplete call rows.
+    # calls_merged must filter after aggregation so a separate end row is preserved.
     merged_pb = ParamBuilder("pb")
     merged_query = make_queue_add_calls_fetch_calls_query(
         project_id="project",

@@ -548,7 +548,11 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
         )
     )
     assert [item.call_id for item in items_res.items] == [complete_call_id]
-    assert items_res.items[0].call_ended_at is not None
+    complete_item = items_res.items[0]
+    assert (
+        complete_item.call_ended_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=1)
+    )
 
     # Once the missing start arrives, retrying adds the previously skipped call.
     end_only_started_at = complete_started_at + datetime.timedelta(seconds=2)
@@ -585,8 +589,15 @@ def test_annotation_queue_add_calls_retries_end_only_calls(client):
     )
     items_by_call_id = {item.call_id: item for item in items_res.items}
     assert set(items_by_call_id) == {complete_call_id, end_only_call_id}
-    assert items_by_call_id[end_only_call_id].call_started_at is not None
-    assert items_by_call_id[end_only_call_id].call_ended_at is not None
+    end_only_item = items_by_call_id[end_only_call_id]
+    assert (
+        end_only_item.call_started_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=2)
+    )
+    assert (
+        end_only_item.call_ended_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=3)
+    )
 
 
 def test_annotation_queue_add_calls_duplicate_prevention(client):
