@@ -544,8 +544,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
-        """Lazily initialize the Kafka producer, only if online eval is enabled."""
-        if not wf_env.wf_enable_online_eval():
+        """Lazily initialize the Kafka producer when an agent consumer needs it."""
+        if not wf_env.wf_enable_agent_event_producer():
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
@@ -7353,8 +7353,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
-        # Return early without emitting kafka events if online eval or agent scoring are disabled
-        if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
+        if not wf_env.wf_enable_agent_event_producer():
             return res
 
         # Emit for each row that produces a valid event type

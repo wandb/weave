@@ -79,6 +79,18 @@ def wf_enable_agent_scoring() -> bool:
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
+def wf_enable_agent_insights() -> bool:
+    """Whether to emit agent span events for the Insights worker."""
+    return os.environ.get("WEAVE_ENABLE_AGENT_INSIGHTS", "false").lower() == "true"
+
+
+def wf_enable_agent_event_producer() -> bool:
+    """Whether to initialize Kafka and emit agent span events."""
+    return wf_enable_agent_insights() or (
+        wf_enable_online_eval() and wf_enable_agent_scoring()
+    )
+
+
 def wf_scoring_worker_batch_size() -> int:
     """The batch size for the scoring worker."""
     return int(
