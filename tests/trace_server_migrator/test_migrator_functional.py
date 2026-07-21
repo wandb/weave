@@ -598,6 +598,170 @@ def test_all_production_migrations_distributed(ch_client):
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
 
 
+def test_intent_records_schema_and_replacement_lifecycle(ch_client):
+    """Intent records retain pipeline history while replacing row versions."""
+    mgmt_db = _unique_name("db_mgmt_intents")
+    target_db = _unique_name("intents")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+    migrator.apply_migrations(target_db)
+
+    table_metadata = ch_client.query(
+        "SELECT engine, partition_key, sorting_key, primary_key, "
+        "extract(create_table_query, 'TTL (.+) SETTINGS') "
+        "FROM system.tables "
+        f"WHERE database = '{target_db}' AND name = 'intent_records'"
+    ).result_rows
+    assert table_metadata == [
+        (
+            "ReplacingMergeTree",
+            "toYYYYMM(event_time)",
+            "project_id, event_time, pipeline_version, id",
+            "project_id, event_time",
+            "expire_at",
+        )
+    ]
+
+    columns = ch_client.query(
+        "SELECT name, type FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "ORDER BY position"
+    ).result_rows
+    assert columns == [
+        ("project_id", "String"),
+        ("id", "String"),
+        ("pipeline_version", "UInt32"),
+        ("record_version", "UInt64"),
+        ("deleted", "Bool"),
+        ("space", "Enum8('intent' = 1, 'failure' = 2)"),
+        ("category", "LowCardinality(String)"),
+        ("status", "LowCardinality(String)"),
+        ("signature", "String"),
+        ("normalized_signature", "String"),
+        ("signature_id", "FixedString(16)"),
+        ("embedding_model", "LowCardinality(String)"),
+        ("embedding_dimensions", "UInt16"),
+        ("vector", "Array(Float32)"),
+        ("source", "LowCardinality(String)"),
+        ("source_id", "String"),
+        ("trace_id", "String"),
+        ("span_id", "String"),
+        ("parent_span_id", "String"),
+        ("conversation_id", "String"),
+        ("turn_id", "String"),
+        ("intent_ordinal", "UInt16"),
+        ("role", "LowCardinality(String)"),
+        ("user_id", "String"),
+        ("event_time", "DateTime64(6, 'UTC')"),
+        ("inserted_at", "DateTime64(3, 'UTC')"),
+        ("inserted_by_user_id", "String"),
+        ("expire_at", "DateTime"),
+        ("attributes", "Map(String, String)"),
+    ]
+
+    indexes = ch_client.query(
+        "SELECT name, expr, type_full, granularity "
+        "FROM system.data_skipping_indices "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "ORDER BY name"
+    ).result_rows
+    assert indexes == [
+        ("idx_conversation_id", "conversation_id", "bloom_filter(0.01)", 1),
+        ("idx_id", "id", "bloom_filter(0.01)", 1),
+        ("idx_signature_id", "signature_id", "bloom_filter(0.01)", 1),
+        ("idx_span_id", "span_id", "bloom_filter(0.01)", 1),
+        ("idx_trace_id", "trace_id", "bloom_filter(0.01)", 1),
+        (
+            "idx_vector",
+            "vector",
+            "vector_similarity('hnsw', 'cosineDistance', 1024, 'bf16', 64, 512)",
+            1,
+        ),
+    ]
+
+    insert_columns = """
+        project_id, id, pipeline_version, record_version, deleted, space,
+        category, status, signature, normalized_signature, signature_id,
+        embedding_model, vector, source, source_id, trace_id, span_id,
+        parent_span_id, conversation_id, turn_id, intent_ordinal, role,
+        user_id, event_time, inserted_by_user_id, attributes
+    """
+    row_template = """
+        SELECT
+            'project-1', 'intent-1', {pipeline_version}, {record_version}, false,
+            'intent', '{category}', 'active', 'Add Stripe checkout',
+            'add stripe checkout', unhex('00112233445566778899aabbccddeeff'),
+            'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
+            'weave', 'source-1', 'trace-1', 'span-1', 'parent-1',
+            'conversation-1', 'turn-1', 0, 'user', 'user-1',
+            toDateTime64('2026-06-20 14:32:00', 6, 'UTC'), 'wandb-user-1',
+            map('environment', 'test')
+    """
+    for pipeline_version, record_version, category in [
+        (1, 1, "action_request"),
+        (1, 2, "payments"),
+        (2, 1, "action_request"),
+    ]:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_records ({insert_columns}) "
+            + row_template.format(
+                pipeline_version=pipeline_version,
+                record_version=record_version,
+                category=category,
+            )
+        )
+
+    current_rows = ch_client.query(
+        "SELECT pipeline_version, record_version, category, deleted, "
+        "formatDateTime(expire_at, '%F %T'), length(vector), attributes "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' ORDER BY pipeline_version"
+    ).result_rows
+    assert current_rows == [
+        (1, 2, "payments", False, "2100-01-01 00:00:00", 1024, {"environment": "test"}),
+        (
+            2,
+            1,
+            "action_request",
+            False,
+            "2100-01-01 00:00:00",
+            1024,
+            {"environment": "test"},
+        ),
+    ]
+
+    ch_client.command(
+        f"INSERT INTO {target_db}.intent_records "
+        "SELECT * REPLACE(3 AS record_version, true AS deleted, now64(3) AS inserted_at) "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' AND pipeline_version = 1"
+    )
+    active_rows = ch_client.query(
+        "SELECT pipeline_version, id "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' AND deleted = false "
+        "ORDER BY pipeline_version"
+    ).result_rows
+    assert active_rows == [(2, "intent-1")]
+
+    active_partitions = ch_client.query(
+        "SELECT DISTINCT partition "
+        "FROM system.parts "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
+        "ORDER BY partition"
+    ).result_rows
+    assert active_partitions == [("202606",)]
+
+
 def test_all_production_down_migrations_replicated(ch_client):
     """All production down migrations apply cleanly in replicated mode."""
     mgmt_db = _unique_name("db_mgmt_down_repl")
