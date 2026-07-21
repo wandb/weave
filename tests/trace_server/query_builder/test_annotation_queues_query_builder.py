@@ -4,9 +4,11 @@ import sqlparse
 
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.query_builder.annotation_queues_query_builder import (
     make_annotator_progress_insert_query,
     make_annotator_progress_state_check_query,
+    make_queue_add_calls_fetch_calls_query,
     make_queue_item_existence_query,
     make_queue_items_query,
     make_queues_query,
@@ -24,6 +26,70 @@ def assert_sql(
     )
     assert expected_params == params, (
         f"\nExpected params: {expected_params}\n\nGot params: {params}"
+    )
+
+
+def test_make_queue_add_calls_fetch_calls_query_skips_calls_without_start_time() -> (
+    None
+):
+    expected_params = {
+        "pb_0": "project",
+        "pb_1": ["call-1", "call-2"],
+    }
+
+    # calls_merged needs aggregation after excluding incomplete call rows.
+    merged_pb = ParamBuilder("pb")
+    merged_query = make_queue_add_calls_fetch_calls_query(
+        project_id="project",
+        call_ids=["call-1", "call-2"],
+        pb=merged_pb,
+        read_table=ReadTable.CALLS_MERGED,
+    )
+    expected_merged_query = """
+        SELECT
+            id,
+            any(started_at) as started_at,
+            any(ended_at) as ended_at,
+            any(op_name) as op_name,
+            any(trace_id) as trace_id
+        FROM calls_merged
+        WHERE project_id = {pb_0: String}
+            AND id IN {pb_1: Array(String)}
+        GROUP BY (project_id, id)
+        HAVING started_at IS NOT NULL
+    """
+    assert_sql(
+        expected_merged_query,
+        expected_params,
+        merged_query,
+        merged_pb.get_params(),
+    )
+
+    # calls_complete stores one already-aggregated row per call.
+    complete_pb = ParamBuilder("pb")
+    complete_query = make_queue_add_calls_fetch_calls_query(
+        project_id="project",
+        call_ids=["call-1", "call-2"],
+        pb=complete_pb,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+    expected_complete_query = """
+        SELECT
+            id,
+            started_at,
+            ended_at,
+            op_name,
+            trace_id
+        FROM calls_complete
+        WHERE project_id = {pb_0: String}
+            AND id IN {pb_1: Array(String)}
+            AND started_at IS NOT NULL
+    """
+    assert_sql(
+        expected_complete_query,
+        expected_params,
+        complete_query,
+        complete_pb.get_params(),
     )
 
 
