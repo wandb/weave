@@ -1995,18 +1995,26 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 
 
 @pytest.mark.parametrize(
-    ("online_eval", "scoring", "should_emit"),
+    ("online_eval", "scoring", "insights", "should_emit"),
     [
-        (True, True, True),
-        (True, False, False),  # scoring off -> skip
-        (False, True, False),  # online eval off -> skip
+        (True, True, False, True),
+        (True, False, True, True),
+        (False, False, True, True),
+        (False, True, False, False),
+        (True, False, False, False),
     ],
-    ids=["both-on", "scoring-off", "online-eval-off"],
+    ids=[
+        "online-eval-and-scoring",
+        "online-eval-and-insights",
+        "insights-only",
+        "scoring-without-online-eval",
+        "all-consumers-off",
+    ],
 )
-def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_emit):
-    """OTel ingest emits turn-ended events only when online eval and agent scoring
-    are both enabled; otherwise the kafka emit is skipped.
-    """
+def test_genai_otel_export_emit_gate(
+    monkeypatch, online_eval, scoring, insights, should_emit
+):
+    """OTel ingest emits when either configured consumer can use the event."""
     mock_producer = MagicMock()
     monkeypatch.setattr(
         chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
@@ -2027,6 +2035,9 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_e
     )
     monkeypatch.setattr(
         "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
     )
 
     res = server.genai_otel_export(
