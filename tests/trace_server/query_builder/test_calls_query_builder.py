@@ -1071,7 +1071,11 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
 
 
 def test_calls_query_with_or_between_start_and_end_fields() -> None:
-    """Test that we create predicate filters when there's an OR between start and end fields."""
+    """Test that a top-level OR between two optimizable heavy fields splits into a UNION DISTINCT.
+
+    Each branch becomes its own pass-1 arm so its LIKE prefilter runs as a
+    top-level conjunct (see the $or -> UNION DISTINCT rewrite).
+    """
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
@@ -1099,30 +1103,47 @@ def test_calls_query_with_or_between_start_and_end_fields() -> None:
     assert_sql(
         cq,
         """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_3:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_1:String})))
+                ORDER BY calls_merged.id ASC
+                UNION DISTINCT
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_3:String}
+                WHERE ((calls_merged.output_dump LIKE {pb_6:String} OR calls_merged.output_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.output_dump, {pb_4:String}), calls_merged.output_dump IS NOT NULL), 'null'), '') = {pb_5:String})))
+                ORDER BY calls_merged.id ASC
+            )
+            ORDER BY id ASC
+        )
         SELECT
             calls_merged.id AS id,
             any(calls_merged.inputs_dump) AS inputs_dump,
             any(calls_merged.output_dump) AS output_dump
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_6:String}
-        WHERE (((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL)
-                OR (calls_merged.output_dump LIKE {pb_5:String} OR calls_merged.output_dump IS NULL)))
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE (calls_merged.id IN filtered_calls)
         GROUP BY (calls_merged.project_id, calls_merged.id)
-        HAVING ((
-            ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_1:String})
-            OR
-            (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.output_dump, {pb_2:String}), calls_merged.output_dump IS NOT NULL), 'null'), '') = {pb_3:String})))
-            AND ((any(calls_merged.deleted_at) IS NULL))
-            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {
             "pb_0": '$."param"."val"',
             "pb_1": "hello",
-            "pb_2": '$."result"',
-            "pb_3": "success",
-            "pb_4": '%"hello"%',
-            "pb_5": '%"success"%',
-            "pb_6": "project",
+            "pb_2": '%"hello"%',
+            "pb_3": "project",
+            "pb_4": '$."result"',
+            "pb_5": "success",
+            "pb_6": '%"success"%',
         },
     )
 
@@ -5429,5 +5450,864 @@ def test_query_with_annotation_filter_still_uses_anyif() -> None:
             "pb_1": '$."value"',
             "pb_2": "good",
             "pb_3": "project",
+        },
+    )
+
+
+######### $or -> UNION DISTINCT REWRITE ##########
+# A qualifying top-level `$or` (id/trace_id/thread_id `$eq`/`$in` lowered into a
+# hardcoded filter, or a heavy-JSON `$eq`/`$in`/`$contains` kept as the arm's sole
+# condition) forces the two-pass CTE and splits pass 1 into a UNION DISTINCT of
+# per-branch arms, so each branch's skip index applies as a top-level conjunct.
+
+
+def _turn_id_or_condition(id_value: str = "call_1") -> tsi_query.OrOperation:
+    """The prod shape: `id == X OR inputs.turn.root_turn_id == X`."""
+    return tsi_query.OrOperation.model_validate(
+        {
+            "$or": [
+                {"$eq": [{"$getField": "id"}, {"$literal": id_value}]},
+                {
+                    "$eq": [
+                        {"$getField": "inputs.turn.root_turn_id"},
+                        {"$literal": id_value},
+                    ]
+                },
+            ]
+        }
+    )
+
+
+def test_or_union_calls_complete_prod_shape() -> None:
+    """The prod query (id==X OR inputs.turn.root_turn_id==X) splits into a UNION DISTINCT on calls_complete.
+
+    The id branch lowers to `id IN {Array}` (idx_id_bloom); the heavy branch
+    keeps its LIKE prefilter as a top-level conjunct (idx_inputs_dump). Pass 2
+    bounds on the page's started_at range (page_started_at_bound).
+    """
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(_turn_id_or_condition())
+    cq.add_order("started_at", "desc")
+    cq.set_limit(40)
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id, started_at FROM (
+                SELECT calls_complete.id AS id, calls_complete.started_at AS started_at
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE (calls_complete.id IN {pb_1:Array(String)})
+                  AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+                ORDER BY calls_complete.started_at DESC, calls_complete.id ASC
+                LIMIT 40
+                UNION DISTINCT
+                SELECT calls_complete.id AS id, calls_complete.started_at AS started_at
+                FROM calls_complete
+                PREWHERE calls_complete.project_id = {pb_2:String}
+                WHERE (calls_complete.inputs_dump LIKE {pb_6:String})
+                  AND (((calls_complete.deleted_at = {pb_3:DateTime64(3)}))
+                    AND ((coalesce(nullIf(JSON_VALUE(calls_complete.inputs_dump, {pb_4:String}), 'null'), '') = {pb_5:String})))
+                ORDER BY calls_complete.started_at DESC, calls_complete.id ASC
+                LIMIT 40
+            )
+            ORDER BY started_at DESC, id ASC
+            LIMIT 40
+        )
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.inputs_dump AS inputs_dump
+        FROM calls_complete
+        PREWHERE calls_complete.project_id = {pb_2:String}
+        WHERE (calls_complete.id IN (SELECT id FROM filtered_calls))
+          AND (calls_complete.started_at >= (SELECT min(started_at) FROM filtered_calls))
+          AND (calls_complete.started_at <= (SELECT max(started_at) FROM filtered_calls))
+        ORDER BY calls_complete.started_at DESC
+        """,
+        {
+            "pb_0": SENTINEL_EPOCH,
+            "pb_1": ["call_1"],
+            "pb_2": "project",
+            "pb_3": SENTINEL_EPOCH,
+            "pb_4": '$."turn"."root_turn_id"',
+            "pb_5": "call_1",
+            "pb_6": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_calls_merged_shape() -> None:
+    """The same prod query splits into a UNION DISTINCT on calls_merged, each arm keeping GROUP BY/HAVING."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(_turn_id_or_condition())
+    cq.add_order("started_at", "desc")
+    cq.set_limit(40)
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id, any(calls_merged.started_at) AS started_at
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE (calls_merged.id IN {pb_0:Array(String)})
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+                ORDER BY any(calls_merged.started_at) DESC, calls_merged.id ASC
+                LIMIT 40
+                UNION DISTINCT
+                SELECT calls_merged.id AS id, any(calls_merged.started_at) AS started_at
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String})))
+                ORDER BY any(calls_merged.started_at) DESC, calls_merged.id ASC
+                LIMIT 40
+            )
+            ORDER BY started_at DESC, id ASC
+            LIMIT 40
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        ORDER BY any(calls_merged.started_at) DESC
+        """,
+        {
+            "pb_0": ["call_1"],
+            "pb_1": "project",
+            "pb_2": '$."turn"."root_turn_id"',
+            "pb_3": "call_1",
+            "pb_4": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_composes_with_light_conjunct() -> None:
+    """A light conjunct (op_name eq) alongside the $or rides along in every arm."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {"$eq": [{"$getField": "op_name"}, {"$literal": "my_op"}]},
+                    _turn_id_or_condition().model_dump(by_alias=True),
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_2:String}
+                WHERE (calls_merged.id IN {pb_1:Array(String)})
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.op_name) = {pb_0:String}))
+                    AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+                ORDER BY calls_merged.id ASC
+                UNION DISTINCT
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_2:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.op_name) = {pb_0:String}))
+                    AND ((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_4:String})))
+                ORDER BY calls_merged.id ASC
+            )
+            ORDER BY id ASC
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "my_op",
+            "pb_1": ["call_1"],
+            "pb_2": "project",
+            "pb_3": '$."turn"."root_turn_id"',
+            "pb_4": "call_1",
+            "pb_5": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_limit_offset_arithmetic() -> None:
+    """Each arm gets LIMIT limit+offset; the outer wrapper gets LIMIT limit OFFSET offset."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(_turn_id_or_condition())
+    cq.set_limit(10)
+    cq.set_offset(20)
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE (calls_merged.id IN {pb_0:Array(String)})
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+                ORDER BY calls_merged.id ASC
+                LIMIT 30
+                UNION DISTINCT
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String})))
+                ORDER BY calls_merged.id ASC
+                LIMIT 30
+            )
+            ORDER BY id ASC
+            LIMIT 10
+            OFFSET 20
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": ["call_1"],
+            "pb_1": "project",
+            "pb_2": '$."turn"."root_turn_id"',
+            "pb_3": "call_1",
+            "pb_4": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_trace_id_eq_lowering() -> None:
+    """A `trace_id == X` branch lowers into the arm's hardcoded trace_ids filter."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "trace_id"}, {"$literal": "trace_1"}]},
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.turn.root_turn_id"},
+                            {"$literal": "call_1"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE (ifNull(calls_merged.trace_id, '') = {pb_0:String} OR calls_merged.trace_id IS NULL)
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+                ORDER BY calls_merged.id ASC
+                UNION DISTINCT
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_1:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_4:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_2:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_3:String})))
+                ORDER BY calls_merged.id ASC
+            )
+            ORDER BY id ASC
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_1:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "trace_1",
+            "pb_1": "project",
+            "pb_2": '$."turn"."root_turn_id"',
+            "pb_3": "call_1",
+            "pb_4": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_thread_id_in_lowering() -> None:
+    """A `thread_id IN [...]` branch lowers into the arm's hardcoded thread_ids filter.
+
+    thread_ids double-renders (unchanged from today's non-union behavior): the
+    WHERE-level OR-IS-NULL pushdown AND the HAVING-level exact `IN` match.
+    """
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {
+                        "$in": [
+                            {"$getField": "thread_id"},
+                            [{"$literal": "thread_1"}, {"$literal": "thread_2"}],
+                        ]
+                    },
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.turn.root_turn_id"},
+                            {"$literal": "call_1"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT id FROM (
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_2:String}
+                WHERE (calls_merged.thread_id IN {pb_1:Array(String)} OR calls_merged.thread_id IS NULL)
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND (any(calls_merged.thread_id) IN {pb_0:Array(String)}))
+                ORDER BY calls_merged.id ASC
+                UNION DISTINCT
+                SELECT calls_merged.id AS id
+                FROM calls_merged
+                PREWHERE calls_merged.project_id = {pb_2:String}
+                WHERE ((calls_merged.inputs_dump LIKE {pb_5:String} OR calls_merged.inputs_dump IS NULL))
+                GROUP BY (calls_merged.project_id, calls_merged.id)
+                HAVING (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.op_name) IS NULL))))
+                    AND ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_4:String})))
+                ORDER BY calls_merged.id ASC
+            )
+            ORDER BY id ASC
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": ["thread_1", "thread_2"],
+            "pb_1": ["thread_1", "thread_2"],
+            "pb_2": "project",
+            "pb_3": '$."turn"."root_turn_id"',
+            "pb_4": "call_1",
+            "pb_5": '%"call_1"%',
+        },
+    )
+
+
+def test_or_union_kill_switch_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    """WEAVE_CALLS_OR_UNION_REWRITE=0 disables the rewrite; SQL matches today's (A OR B) shape."""
+    monkeypatch.setenv("WEAVE_CALLS_OR_UNION_REWRITE", "0")
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(_turn_id_or_condition())
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": "project",
+        },
+    )
+
+
+######### $or -> UNION DISTINCT GUARDRAILS (negative cases: today's SQL unchanged) ##########
+
+
+def test_or_union_guardrail_single_branch_unchanged() -> None:
+    """A single-element `$or` (len < 2) never qualifies; SQL is the plain single-pass OR."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.turn.root_turn_id"},
+                            {"$literal": "call_1"},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE (((calls_merged.inputs_dump LIKE {pb_2:String} OR calls_merged.inputs_dump IS NULL)))
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_0:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_1:String}))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": '$."turn"."root_turn_id"',
+            "pb_1": "call_1",
+            "pb_2": '%"call_1"%',
+            "pb_3": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_six_arms_unchanged() -> None:
+    """A 6-branch `$or` (> MAX_OR_UNION_ARMS) never qualifies; SQL is the plain single-pass OR."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    branches = [
+        {"$eq": [{"$getField": "id"}, {"$literal": f"call_{i}"}]} for i in range(3)
+    ]
+    branches += [
+        {
+            "$eq": [
+                {"$getField": "inputs.turn.root_turn_id"},
+                {"$literal": f"call_{i}"},
+            ]
+        }
+        for i in range(3)
+    ]
+    cq.add_condition(tsi_query.OrOperation.model_validate({"$or": branches}))
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (calls_merged.id = {pb_1:String})
+            OR (calls_merged.id = {pb_2:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_1:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_3:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_2:String})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_0",
+            "pb_1": "call_1",
+            "pb_2": "call_2",
+            "pb_3": '$."turn"."root_turn_id"',
+            "pb_4": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_gt_branch_unchanged() -> None:
+    """A `$gt` branch never classifies (only $eq/$in/$contains do); SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "id"}, {"$literal": "call_1"}]},
+                    {"$gt": [{"$getField": "inputs.turn.count"}, {"$literal": 5}]},
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (toInt64OrNull(coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '')) > {pb_2:Int64})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."count"',
+            "pb_2": 5,
+            "pb_3": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_nested_or_unchanged() -> None:
+    """A branch that is itself an `$or` never classifies; SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "id"}, {"$literal": "call_1"}]},
+                    {
+                        "$or": [
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.turn.root_turn_id"},
+                                    {"$literal": "call_1"},
+                                ]
+                            },
+                            {
+                                "$eq": [
+                                    {"$getField": "inputs.turn.root_turn_id"},
+                                    {"$literal": "call_2"},
+                                ]
+                            },
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR ((coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})
+                OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_2:String}))))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": "call_2",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_not_or_unchanged() -> None:
+    """`$not($or)` is a top-level NotOperation, not an OrOperation condition; SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.NotOperation.model_validate(
+            {"$not": [_turn_id_or_condition().model_dump(by_alias=True)]}
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_2:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((NOT (((calls_merged.id = {pb_0:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})))))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_feedback_branch_unchanged() -> None:
+    """A feedback-payload branch never classifies (not id/trace_id/thread_id/heavy JSON); SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "id"}, {"$literal": "call_1"}]},
+                    {
+                        "$eq": [
+                            {
+                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.score"
+                            },
+                            {"$literal": 5},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+        ) AS feedback ON (
+            feedback.weave_ref = concat('weave-trace-internal:///', {pb_4:String}, '/call/', calls_merged.id))
+        PREWHERE calls_merged.project_id = {pb_4:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (toInt64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump, feedback.feedback_type = {pb_1:String}), {pb_2:String}), 'null'), '')) = {pb_3:Int64})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": "wandb.runnable.my_op",
+            "pb_2": '$."output"."score"',
+            "pb_3": 5,
+            "pb_4": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_non_optimizable_heavy_branch_unchanged() -> None:
+    """An empty-string heavy-field literal never classifies (LIKE optimization rejects it); SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.add_condition(
+        tsi_query.OrOperation.model_validate(
+            {
+                "$or": [
+                    {"$eq": [{"$getField": "id"}, {"$literal": "call_1"}]},
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.turn.root_turn_id"},
+                            {"$literal": ""},
+                        ]
+                    },
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING ((((calls_merged.id = {pb_0:String})
+            OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_2:String})))
+            AND ((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": "",
+            "pb_3": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_existing_call_ids_filter_unchanged() -> None:
+    """An id branch never lowers onto an already-set hardcoded call_ids filter; SQL is unchanged."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.hardcoded_filter = HardCodedFilter(filter={"call_ids": ["existing_id"]})
+    cq.add_condition(_turn_id_or_condition())
+
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_3:String}
+            WHERE (calls_merged.id IN {pb_2:Array(String)})
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING ((((calls_merged.id = {pb_0:String})
+                OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_1:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_0:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "call_1",
+            "pb_1": '$."turn"."root_turn_id"',
+            "pb_2": ["existing_id"],
+            "pb_3": "project",
+        },
+    )
+
+
+def test_or_union_guardrail_object_ref_expand_columns_unchanged() -> None:
+    """An object-ref expand-columns condition alongside the $or disqualifies the whole rewrite."""
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.add_field("inputs")
+    cq.set_expand_columns(["inputs.model"])
+    cq.add_condition(
+        tsi_query.AndOperation.model_validate(
+            {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.model.id"},
+                            {
+                                "$literal": "weave-trace-internal:///project/object/Model:abc"
+                            },
+                        ]
+                    },
+                    _turn_id_or_condition().model_dump(by_alias=True),
+                ]
+            }
+        )
+    )
+
+    assert_sql(
+        cq,
+        """
+        WITH obj_filter_0 AS (
+            SELECT digest, concat('weave-trace-internal:///', project_id, '/object/', object_id, ':', digest) AS ref
+            FROM object_versions
+            WHERE project_id = {pb_0:String}
+              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+            GROUP BY project_id, object_id, digest
+            UNION ALL
+            SELECT digest, digest as ref
+            FROM table_rows
+            WHERE project_id = {pb_0:String}
+              AND JSON_VALUE(val_dump, {pb_1:String}) = {pb_2:String}
+            GROUP BY project_id, digest
+        ),
+        filtered_calls AS (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            PREWHERE calls_merged.project_id = {pb_0:String}
+            WHERE (length(calls_merged.input_refs) > 0 OR calls_merged.op_name IS NULL)
+            GROUP BY (calls_merged.project_id, calls_merged.id)
+            HAVING (((coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), '') GLOBAL IN (SELECT ref FROM obj_filter_0)
+                OR regexpExtract(coalesce(nullIf(JSON_VALUE(any(calls_merged.inputs_dump), {pb_3:String}), 'null'), ''), '/([^/]+)$', 1) GLOBAL IN (SELECT ref FROM obj_filter_0)))
+                AND (((calls_merged.id = {pb_4:String})
+                    OR (coalesce(nullIf(anyIf(JSON_VALUE(calls_merged.inputs_dump, {pb_5:String}), calls_merged.inputs_dump IS NOT NULL), 'null'), '') = {pb_4:String})))
+                AND ((any(calls_merged.deleted_at) IS NULL))
+                AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
+        )
+        SELECT
+            calls_merged.id AS id,
+            any(calls_merged.inputs_dump) AS inputs_dump
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {pb_0:String}
+        WHERE (calls_merged.id IN filtered_calls)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        """,
+        {
+            "pb_0": "project",
+            "pb_1": '$."id"',
+            "pb_2": "weave-trace-internal:///project/object/Model:abc",
+            "pb_3": '$."model"',
+            "pb_4": "call_1",
+            "pb_5": '$."turn"."root_turn_id"',
         },
     )
