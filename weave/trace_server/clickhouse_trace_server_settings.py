@@ -120,6 +120,12 @@ CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS: dict[str, int | str] = (
     }
 )
 
+# Fanning `system.query_log` reads across replicas (export status) must tolerate a
+# scaled-down or idle replica instead of failing the whole read.
+CLICKHOUSE_QUERY_LOG_FAN_OUT_SETTINGS: dict[str, int | str] = {
+    "skip_unavailable_shards": 1
+}
+
 # The new ClickHouse query analyzer (v24+) has a bug serializing SortingStep
 # for non-Full sorting modes on distributed tables, which causes error 48
 # ("Serialization of SortingStep is implemented only for Full sorting").
