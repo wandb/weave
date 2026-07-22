@@ -169,6 +169,47 @@ class TestGetCustomProviderInfo(unittest.TestCase):
         finally:
             _secret_fetcher_context.reset(token)
 
+    def test_provider_without_api_key_skips_secret_lookup(self):
+        """An empty API-key name allows headers or endpoint auth to be used."""
+        provider_without_api_key = self.provider_obj.model_copy(
+            update={
+                "val": {
+                    **self.provider_obj.val,
+                    "api_key_name": "",
+                    "extra_headers": {"Authorization": "Bearer header-token"},
+                }
+            }
+        )
+
+        def mock_obj_read(req):
+            if req.object_id == self.provider_id:
+                return tsi.ObjReadRes(obj=provider_without_api_key)
+            if req.object_id == self.model_name:
+                return tsi.ObjReadRes(obj=self.provider_model_obj)
+            raise NotFoundError(f"Unknown object_id: {req.object_id}")
+
+        self.mock_obj_read_func.side_effect = mock_obj_read
+        self.mock_secret_fetcher.fetch.side_effect = AssertionError(
+            "A runtime without an API key must not fetch a secret"
+        )
+
+        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
+        try:
+            provider_info = get_custom_provider_info(
+                project_id=self.project_id,
+                provider_name=self.provider_id,
+                model_name=self.model_name,
+                obj_read_func=self.mock_obj_read_func,
+            )
+
+            assert provider_info.api_key == ""
+            assert provider_info.extra_headers == {
+                "Authorization": "Bearer header-token"
+            }
+            self.mock_secret_fetcher.fetch.assert_not_called()
+        finally:
+            _secret_fetcher_context.reset(token)
+
     def test_missing_secret_fetcher(self):
         """Test error handling when secret fetcher is not configured.
 
