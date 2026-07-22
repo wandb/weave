@@ -51,6 +51,9 @@ from weave.trace_server import eval_results_helpers as eval_helpers
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.completion_spans import build_completion_span
 from weave.trace_server.agents.types import (
+    AgentSignalSchema,
+    AgentSignalsQueryReq,
+    AgentSignalsQueryRes,
     AgentSpanSchema,
     AgentSpansQueryReq,
     AgentSpansQueryRes,
@@ -4262,6 +4265,80 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             }
             results.append(AgentSpanSchema(**data))
         return AgentSpansQueryRes(spans=results, total_count=total)
+
+    def agent_signals_query(self, req: AgentSignalsQueryReq) -> AgentSignalsQueryRes:
+        """In-memory parity for filtered, server-paginated Signals rows."""
+
+        def ref_object_id(ref: str | None) -> str:
+            return (ref or "").rsplit("/", 1)[-1].split(":", 1)[0]
+
+        def matches(row: dict[str, Any]) -> bool:
+            if row["project_id"] != req.project_id:
+                return False
+            created_ms = int(_ensure_tz(row["created_at"]).timestamp() * 1000)
+            if created_ms < req.after_ms or created_ms >= req.before_ms:
+                return False
+            tags = row.get("scorer_tags") or []
+            ratings = row.get("scorer_ratings") or {}
+            if not tags and not ratings:
+                return False
+            if req.feedback_types and not any(
+                row["feedback_type"].startswith(value.rstrip("*"))
+                for value in req.feedback_types
+            ):
+                return False
+            if req.tags and not set(tags).intersection(req.tags):
+                return False
+            if (
+                req.monitor_ids
+                and ref_object_id(row.get("trigger_ref")) not in req.monitor_ids
+            ):
+                return False
+            if (
+                req.scorer_ids
+                and ref_object_id(row.get("runnable_ref")) not in req.scorer_ids
+            ):
+                return False
+            if (
+                req.span_agent_names
+                and row.get("span_agent_name", "") not in req.span_agent_names
+            ):
+                return False
+            span_type = row["weave_ref"].split("/")[-2]
+            if req.span_types and span_type not in req.span_types:
+                return False
+            rating = ratings.get("_rating_")
+            if req.rating_min is not None and (
+                rating is None or rating < req.rating_min
+            ):
+                return False
+            if req.rating_max is not None and (
+                rating is None or rating > req.rating_max
+            ):
+                return False
+            return True
+
+        with self.lock:
+            rows = [dict(row) for row in self._feedback if matches(row)]
+        rows.sort(key=lambda row: (row["created_at"], row["id"]), reverse=True)
+        if req.sort_by.field == "created_at" and req.sort_by.direction == "asc":
+            rows.reverse()
+        elif req.sort_by.field == "rating":
+            present = [
+                row for row in rows if "_rating_" in (row.get("scorer_ratings") or {})
+            ]
+            missing = [row for row in rows if row not in present]
+            present.sort(
+                key=lambda row: row["scorer_ratings"]["_rating_"],
+                reverse=req.sort_by.direction == "desc",
+            )
+            rows = present + missing
+        page = rows[req.offset : req.offset + req.limit]
+        signals = [
+            AgentSignalSchema.model_validate({**row, "total_cost_usd": None})
+            for row in page
+        ]
+        return AgentSignalsQueryRes(signals=signals, total_count=len(rows))
 
     def _prepare_completion_request(
         self, req: tsi.CompletionsCreateReq
