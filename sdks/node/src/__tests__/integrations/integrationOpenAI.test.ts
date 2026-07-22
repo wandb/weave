@@ -21,6 +21,7 @@ describe('OpenAI Integration', () => {
     }));
 
     mockOpenAI = {
+      baseURL: 'https://api.openai.com/v1/',
       chat: {
         completions: {create: mockOpenAIChat},
       },
@@ -73,6 +74,7 @@ describe('OpenAI Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.create');
+    expect(calls[0].display_name).toBeUndefined();
     // Integration-tracking metadata is stamped on every patched call.
     expect(calls[0].attributes?.integration?.name).toBe('openai');
     expect(calls[0].attributes?.integration?.meta?.package_name).toBe('openai');
@@ -98,6 +100,38 @@ describe('OpenAI Integration', () => {
     });
     // Ensure stream_options is not present in the logged call for non-streaming requests
     expect(calls[0].inputs).not.toHaveProperty('stream_options');
+  });
+
+  test('labels serverless inference calls by their requested model', async () => {
+    mockOpenAI.baseURL = 'https://api.inference.wandb.ai/v1/';
+    mockOpenAI.beta.chat.completions.parse = mockOpenAI.chat.completions.create;
+    patchedOpenAI = wrapOpenAI(mockOpenAI);
+    const messages = [{role: 'user', content: 'Hello!'}];
+
+    await patchedOpenAI.chat.completions.create({
+      model: 'google/gemma-4-31b-it',
+      messages,
+    });
+    await patchedOpenAI.chat.completions.create({messages});
+    await patchedOpenAI.beta.chat.completions.parse({
+      model: 'meta-llama/Llama-3.3-70B-Instruct',
+      messages,
+    });
+
+    await wait(300);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(3);
+    expect(calls[0].op_name).toContain('openai.chat.completions.create');
+    expect(calls[0].display_name).toBe(
+      'Serverless Inference: google/gemma-4-31b-it'
+    );
+    expect(calls[1].op_name).toContain('openai.chat.completions.create');
+    expect(calls[1].display_name).toBe('Serverless Inference');
+    expect(calls[2].op_name).toContain('openai.beta.chat.completions.parse');
+    expect(calls[2].display_name).toBe(
+      'Serverless Inference: meta-llama/Llama-3.3-70B-Instruct'
+    );
   });
 
   test('streaming chat completion basic', async () => {
