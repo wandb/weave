@@ -51,10 +51,7 @@ CREATE TABLE IF NOT EXISTS intent_records
     INDEX idx_signature_id signature_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_vector vector TYPE vector_similarity(
-        'hnsw', 'cosineDistance', 1024, 'bf16', 64, 512
-    ) GRANULARITY 1
+    INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(record_version)
 PARTITION BY toYYYYMM(created_at)
