@@ -1999,14 +1999,18 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
     [
         (True, True, False, True),
         (True, False, True, True),
-        (False, False, True, True),
+        (True, True, True, True),
+        (False, False, True, False),
+        (False, True, True, False),
         (False, True, False, False),
         (True, False, False, False),
     ],
     ids=[
         "online-eval-and-scoring",
         "online-eval-and-insights",
-        "insights-only",
+        "online-eval-with-both-consumers",
+        "insights-without-online-eval",
+        "both-consumers-without-online-eval",
         "scoring-without-online-eval",
         "all-consumers-off",
     ],
@@ -2014,7 +2018,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 def test_genai_otel_export_emit_gate(
     monkeypatch, online_eval, scoring, insights, should_emit
 ):
-    """OTel ingest emits when either configured consumer can use the event."""
+    """OTel ingest requires online eval and at least one event consumer."""
     mock_producer = MagicMock()
     monkeypatch.setattr(
         chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
