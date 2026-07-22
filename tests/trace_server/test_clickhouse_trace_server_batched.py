@@ -1389,9 +1389,15 @@ def server_with_mock_kafka():
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._kafka_producer = mock_producer
-        with patch(
-            "weave.trace_server.environment.wf_enable_online_eval",
-            return_value=True,
+        with (
+            patch(
+                "weave.trace_server.environment.wf_enable_online_eval",
+                return_value=True,
+            ),
+            patch(
+                "weave.trace_server.environment.wf_enable_agent_scoring",
+                return_value=True,
+            ),
         ):
             yield server, mock_producer
 
