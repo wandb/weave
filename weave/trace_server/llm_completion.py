@@ -608,17 +608,15 @@ def get_custom_provider_info(
 
     secret_name = provider_obj.api_key_name
 
-    # Get the API key
-    if not secret_name:
-        raise InvalidRequest(f"No secret name found for provider {provider_name}")
+    api_key = ""
+    if secret_name:
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
 
-    api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-
-    if not api_key:
-        raise MissingLLMApiKeyError(
-            f"No API key {secret_name} found for provider {provider_name}",
-            api_key_name=secret_name,
-        )
+        if not api_key:
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for provider {provider_name}",
+                api_key_name=secret_name,
+            )
 
     info = CustomProviderInfo(
         base_url=provider_obj.base_url,
