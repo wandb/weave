@@ -21,10 +21,10 @@ const CHAT_COMPLETIONS_CREATE_OP = 'openai.chat.completions.create';
 const CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
 
 function serverlessInferenceCallDisplayName(
-  baseURL: unknown,
+  baseURL: string | undefined,
   model: unknown
 ): string | undefined {
-  if (typeof baseURL !== 'string') {
+  if (baseURL == null) {
     return undefined;
   }
 
@@ -137,7 +137,7 @@ export const openAIStreamReducer = {
 export function wrapOpenAIChatCompletionsCreate(
   originalCreate: any,
   name: string,
-  baseURL?: unknown
+  baseURL?: string
 ) {
   const opRef = {
     __isOp: true as const,
