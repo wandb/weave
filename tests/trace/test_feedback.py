@@ -1174,11 +1174,6 @@ def test_feedback_query_total_count_precedes_pagination(client: WeaveClient) -> 
             )
         )
 
-    without_total = client.server.feedback_query(
-        tsi.FeedbackQueryReq(project_id=project_id, fields=["id"], limit=1)
-    )
-    assert without_total.total_count is None
-
     result = client.server.feedback_query(
         tsi.FeedbackQueryReq(
             project_id=project_id,
@@ -1196,7 +1191,6 @@ def test_feedback_query_total_count_precedes_pagination(client: WeaveClient) -> 
             sort_by=[SortBy(field="weave_ref", direction="asc")],
             limit=1,
             offset=1,
-            include_total=True,
         )
     )
 

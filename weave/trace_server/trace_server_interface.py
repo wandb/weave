@@ -1323,13 +1323,12 @@ class FeedbackQueryReq(BaseModelStrict):
     sort_by: list[SortBy] | None = None
     limit: int | None = Field(default=None, examples=[10])
     offset: int | None = Field(default=None, examples=[0])
-    include_total: bool = False
 
 
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
     result: list[dict[str, Any]]
-    total_count: int | None = Field(default=None, ge=0)
+    total_count: int = Field(ge=0)
 
 
 class FeedbackPurgeReq(BaseModelStrict):

@@ -3803,19 +3803,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         with self.lock:
             rows = list(self._feedback)
-        total_count = None
-        if req.include_total:
-            count_result = _orm_select(
-                TABLE_FEEDBACK,
-                rows,
-                project_id=req.project_id,
-                fields=["count(*)"],
-                query=req.query,
-                sort_by=None,
-                limit=None,
-                offset=None,
-            )
-            total_count = int(count_result[0]["count(*)"])
+        count_result = _orm_select(
+            TABLE_FEEDBACK,
+            rows,
+            project_id=req.project_id,
+            fields=["count(*)"],
+            query=req.query,
+            sort_by=None,
+            limit=None,
+            offset=None,
+        )
+        total_count = int(count_result[0]["count(*)"])
         result = _orm_select(
             TABLE_FEEDBACK,
             rows,

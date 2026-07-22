@@ -6773,15 +6773,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        total_count = None
-        if req.include_total:
-            count_query = TABLE_FEEDBACK.select()
-            count_query = count_query.project_id(req.project_id)
-            count_query = count_query.fields(["count(*)"])
-            count_query = count_query.where(req.query)
-            prepared_count = count_query.prepare()
-            count_result = self._query(prepared_count.sql, prepared_count.parameters)
-            total_count = int(count_result.result_rows[0][0])
+        count_query = TABLE_FEEDBACK.select()
+        count_query = count_query.project_id(req.project_id)
+        count_query = count_query.fields(["count(*)"])
+        count_query = count_query.where(req.query)
+        prepared_count = count_query.prepare()
+        count_result = self._query(prepared_count.sql, prepared_count.parameters)
+        total_count = int(count_result.result_rows[0][0])
 
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)
