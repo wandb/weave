@@ -337,15 +337,6 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _agent_event_producer_enabled() -> bool:
-    """Whether the online-eval event stream has an enabled consumer."""
-    return wf_env.wf_enable_online_eval() and (
-        wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_insights()
-    )
-
-
 logger.setLevel(logging.INFO)
 
 T = TypeVar("T")
@@ -554,7 +545,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @property
     def kafka_producer(self) -> KafkaProducer | None:
         """Lazily initialize the producer when an event consumer is enabled."""
-        if not _agent_event_producer_enabled():
+        if not wf_env.wf_enable_online_eval() or not (
+            wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_insights()
+        ):
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
@@ -7364,7 +7357,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # Online eval is the top-level gate; scoring and Insights are consumers
         # that can independently require the shared event stream beneath it.
-        if not _agent_event_producer_enabled():
+        if not wf_env.wf_enable_online_eval() or not (
+            wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_insights()
+        ):
             return res
 
         # Emit for each row that produces a valid event type
