@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import wraps
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -32,6 +32,7 @@ from weave.integrations.integration_metadata import (
 )
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+from weave.trace.call import Call
 from weave.trace.op import (
     _add_accumulator,
     _default_on_input_handler,
@@ -51,8 +52,35 @@ if TYPE_CHECKING:
 _openai_patcher: MultiPatcher | None = None
 
 OPENAI_INTEGRATION = library_integration("openai")
+SERVERLESS_INFERENCE_HOST = "api.inference.wandb.ai"
 
 logger = logging.getLogger(__name__)
+
+
+def serverless_inference_call_display_name(
+    default_display_name: str,
+) -> Callable[[Call], str]:
+    """Label OpenAI-compatible W&B Inference calls by their requested model."""
+
+    def display_name(call: Call) -> str:
+        self_input = call.inputs.get("self")
+        if not isinstance(self_input, Mapping):
+            return default_display_name
+        client = self_input.get("client")
+        if not isinstance(client, Mapping):
+            return default_display_name
+        base_url = client.get("base_url")
+        if (
+            isinstance(base_url, str)
+            and urlparse(base_url).hostname == SERVERLESS_INFERENCE_HOST
+        ):
+            model = call.inputs.get("model")
+            if isinstance(model, str) and model:
+                return f"Serverless Inference: {model}"
+            return "Serverless Inference"
+        return default_display_name
+
+    return display_name
 
 
 def _parse_api_response(value: LegacyAPIResponse | APIResponse) -> Any:
@@ -414,9 +442,14 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
     and the Responses API nests them under input_tokens_details. This extracts
     them to the top-level canonical field `cache_read_input_tokens`.
     """
-    ptd = usage.get("prompt_tokens_details")
-    if isinstance(ptd, dict) and ptd.get("cached_tokens") is not None:
-        usage.setdefault("cache_read_input_tokens", ptd["cached_tokens"])
+    prompt_tokens_details = usage.get("prompt_tokens_details")
+    if (
+        isinstance(prompt_tokens_details, dict)
+        and prompt_tokens_details.get("cached_tokens") is not None
+    ):
+        usage.setdefault(
+            "cache_read_input_tokens", prompt_tokens_details["cached_tokens"]
+        )
     itd = usage.get("input_tokens_details")
     if isinstance(itd, dict) and itd.get("cached_tokens") is not None:
         usage.setdefault("cache_read_input_tokens", itd["cached_tokens"])
@@ -793,28 +826,43 @@ def get_openai_patcher(
         return _openai_patcher
 
     base = with_integration_metadata(settings.op_settings, OPENAI_INTEGRATION)
+    completions_create_name = base.name or "openai.chat.completions.create"
+    completions_parse_name = base.name or "openai.chat.completions.parse"
+    completions_create_display_name = base.call_display_name
+    completions_parse_display_name = base.call_display_name
+    if base.name is None and base.call_display_name is None:
+        completions_create_display_name = serverless_inference_call_display_name(
+            completions_create_name
+        )
+        completions_parse_display_name = serverless_inference_call_display_name(
+            completions_parse_name
+        )
 
     completions_create_settings = base.model_copy(
         update={
-            "name": base.name or "openai.chat.completions.create",
+            "name": completions_create_name,
+            "call_display_name": completions_create_display_name,
             "kind": base.kind or "llm",
         }
     )
     async_completions_create_settings = base.model_copy(
         update={
-            "name": base.name or "openai.chat.completions.create",
+            "name": completions_create_name,
+            "call_display_name": completions_create_display_name,
             "kind": base.kind or "llm",
         }
     )
     completions_parse_settings = base.model_copy(
         update={
-            "name": base.name or "openai.chat.completions.parse",
+            "name": completions_parse_name,
+            "call_display_name": completions_parse_display_name,
             "kind": base.kind or "llm",
         }
     )
     async_completions_parse_settings = base.model_copy(
         update={
-            "name": base.name or "openai.chat.completions.parse",
+            "name": completions_parse_name,
+            "call_display_name": completions_parse_display_name,
             "kind": base.kind or "llm",
         }
     )
