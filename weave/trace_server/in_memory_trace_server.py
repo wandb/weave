@@ -3826,7 +3826,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     continue
                 keep.append(row)
             self._feedback = keep
-        return tsi.FeedbackPurgeRes()
+        return tsi.FeedbackPurgeRes(success=True)
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         # Validate the replacement payload before purging — if validation

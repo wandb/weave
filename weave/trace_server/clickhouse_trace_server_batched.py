@@ -6808,7 +6808,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters=prepared.parameters,
             settings=ch_settings.CLICKHOUSE_LIGHTWEIGHT_UPDATE_SETTINGS,
         )
-        return tsi.FeedbackPurgeRes()
+        return tsi.FeedbackPurgeRes(success=True)
 
     def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
         # Validate the replacement payload before purging — if validation

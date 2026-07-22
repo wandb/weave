@@ -58,6 +58,12 @@ class LLMUsageSchema(TypedDict, total=False):
     total_tokens: int | None
     cache_creation_input_tokens: int | None
     cache_read_input_tokens: int | None
+    # Deepseek R1 and other reasoning models. OpenAI-compat providers surface
+    # this as completion_tokens_details.reasoning_tokens or
+    # output_tokens_details.reasoning_tokens instead.
+    thinking_tokens: int | None
+    completion_tokens_details: dict[str, int | None] | None
+    output_tokens_details: dict[str, int | None] | None
 
 
 class LLMCostSchema(LLMUsageSchema, total=False):
@@ -67,6 +73,10 @@ class LLMCostSchema(LLMUsageSchema, total=False):
     completion_token_cost: float | None
     prompt_token_cost_unit: str | None
     completion_token_cost_unit: str | None
+    cache_read_input_tokens_total_cost: float | None
+    cache_creation_input_tokens_total_cost: float | None
+    cache_read_input_token_cost: float | None
+    cache_creation_input_token_cost: float | None
     effective_date: str | None
     provider_id: str | None
     pricing_level: str | None
@@ -150,7 +160,40 @@ class CallSchema(BaseModel):
     output: Any | None = None
 
     # Summary: a summary of the call
-    summary: SummaryMap | None = None
+    summary: SummaryMap | None = Field(
+        default=None,
+        json_schema_extra={
+            "properties": {
+                "usage": {
+                    "additionalProperties": {
+                        "$ref": "#/components/schemas/LLMUsageSchema"
+                    },
+                    "type": "object",
+                    "title": "Usage",
+                },
+                "status_counts": {
+                    "additionalProperties": {"type": "integer"},
+                    "propertyNames": {"$ref": "#/components/schemas/TraceStatus"},
+                    "type": "object",
+                    "title": "Status Counts",
+                },
+                "weave": {
+                    "properties": {
+                        "status": {"$ref": "#/components/schemas/TraceStatus"},
+                        "latency_ms": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+                        "trace_name": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                        "costs": {
+                            "additionalProperties": {
+                                "$ref": "#/components/schemas/LLMCostSchema"
+                            },
+                            "type": "object",
+                        },
+                    },
+                    "type": "object",
+                },
+            },
+        },
+    )
 
     # WB Metadata
     wb_user_id: str | None = None
@@ -1327,7 +1370,13 @@ class FeedbackQueryReq(BaseModelStrict):
 
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
-    result: list[dict[str, Any]]
+    # The json_schema_extra provides the full Feedback shape for the OpenAPI spec
+    # so generated SDKs produce typed results; the runtime type stays list[dict].
+    result: list[dict[str, Any]] = Field(
+        json_schema_extra={
+            "items": {"$ref": "#/components/schemas/Feedback"},
+        },
+    )
 
 
 class FeedbackPurgeReq(BaseModelStrict):
@@ -1336,7 +1385,7 @@ class FeedbackPurgeReq(BaseModelStrict):
 
 
 class FeedbackPurgeRes(BaseModel):
-    pass
+    success: bool
 
 
 class FeedbackReplaceReq(FeedbackCreateReq):
@@ -3934,10 +3983,50 @@ class CallStatsRes(BaseModel):
     usage_buckets: list[dict[str, Any]] = Field(
         default=[],
         description="Usage metrics by model. Each bucket contains 'timestamp', 'model', and aggregated metric values.",
+        json_schema_extra={
+            "items": {
+                "type": "object",
+                "title": "UsageBucket",
+                "properties": {
+                    "timestamp": {"type": "string", "format": "date-time"},
+                    "model": {"type": "string"},
+                    "count": {"type": "number"},
+                    "sum_input_tokens": {"type": "number"},
+                    "sum_output_tokens": {"type": "number"},
+                    "sum_total_tokens": {"type": "number"},
+                    "sum_input_cost": {"type": "number"},
+                    "sum_output_cost": {"type": "number"},
+                    "sum_total_cost": {"type": "number"},
+                    "avg_input_tokens": {"type": "number"},
+                    "avg_output_tokens": {"type": "number"},
+                    "avg_total_tokens": {"type": "number"},
+                    "avg_input_cost": {"type": "number"},
+                    "avg_output_cost": {"type": "number"},
+                    "avg_total_cost": {"type": "number"},
+                },
+                "additionalProperties": True,
+            },
+        },
     )
     call_buckets: list[dict[str, Any]] = Field(
         default=[],
         description="Call-level metrics. Each bucket contains 'timestamp' and aggregated metric values.",
+        json_schema_extra={
+            "items": {
+                "type": "object",
+                "title": "CallBucket",
+                "properties": {
+                    "timestamp": {"type": "string", "format": "date-time"},
+                    "count": {"type": "number"},
+                    "sum_latency_ms": {"type": "number"},
+                    "avg_latency_ms": {"type": "number"},
+                    "max_latency_ms": {"type": "number"},
+                    "sum_call_count": {"type": "number"},
+                    "sum_error_count": {"type": "number"},
+                },
+                "additionalProperties": True,
+            },
+        },
     )
 
 
