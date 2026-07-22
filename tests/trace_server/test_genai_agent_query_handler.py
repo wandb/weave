@@ -129,7 +129,9 @@ def test_group_distributions_are_hydrated_with_batched_queries() -> None:
         calls.append((sql, params))
         return results.pop(0)
 
-    handler = AgentQueryHandler(query, lambda req: FeedbackQueryRes(result=[]))
+    handler = AgentQueryHandler(
+        query, lambda req: FeedbackQueryRes(result=[], total_count=0)
+    )
 
     res = handler.spans_query(req)
 
@@ -224,7 +226,9 @@ def test_grouped_rows_hydrate_message_previews() -> None:
         calls.append(sql)
         return results.pop(0)
 
-    handler = AgentQueryHandler(query, lambda req: FeedbackQueryRes(result=[]))
+    handler = AgentQueryHandler(
+        query, lambda req: FeedbackQueryRes(result=[], total_count=0)
+    )
     res = handler.spans_query(req)
 
     # 3 queries: count, grouped list, bounded preview. The grouped list query

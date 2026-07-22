@@ -6773,6 +6773,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        count_query = TABLE_FEEDBACK.select()
+        count_query = count_query.project_id(req.project_id)
+        count_query = count_query.fields(["count(*)"])
+        count_query = count_query.where(req.query)
+        prepared_count = count_query.prepare()
+        count_result = self._query(prepared_count.sql, prepared_count.parameters)
+        total_count = int(count_result.result_rows[0][0])
+
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)
         query = query.fields(req.fields)
@@ -6788,7 +6796,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for row in result:
             if "created_at" in row and isinstance(row["created_at"], datetime.datetime):
                 row["created_at"] = ensure_datetimes_have_tz(row["created_at"])
-        return tsi.FeedbackQueryRes(result=result)
+        return tsi.FeedbackQueryRes(result=result, total_count=total_count)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         # TODO: Instead of passing conditions to DELETE FROM,
