@@ -79,6 +79,13 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+Persisted `AgentDashboard` objects intentionally use a closed, discriminated
+schema. Supported panel variants and their configuration fields must be added
+to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
+with an untyped dictionary. After changing the model, run
+`make synchronize-base-object-schemas` from the repository root so the Python
+schema and the dependent Core frontend types stay aligned.
+
 ### Trace Server API / Node SDK Schema
 
 When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
