@@ -1,34 +1,21 @@
--- One row per distilled intent occurrence, including its embedding and complete
--- trace provenance. ReplacingMergeTree provides append-only logical updates
--- keyed on (project_id, pipeline_version, created_at, id). created_at is the
--- immutable occurrence time and sits in both the partition and dedup key, so
--- every rewrite (retry, tombstone, re-embed) must carry it forward unchanged;
--- a drifted created_at would land in another key/partition and never collapse.
+-- One row per distilled intent occurrence, including its embedding and trace
+-- provenance. ReplacingMergeTree gives idempotent, append-only upserts keyed on
+-- (project_id, pipeline_version, id); the highest record_version wins, so a
+-- retry or re-embed of the same occurrence collapses instead of duplicating.
 CREATE TABLE IF NOT EXISTS intent_records
 (
-    -- Trusted tenancy and logical identity.
     project_id String,
-    id String,
-    pipeline_version UInt32,
-    record_version UInt64,
-    deleted Bool DEFAULT false,
+    id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
+    signature_id FixedString(16),            -- 128-bit hash of the canonicalized signature; groups every occurrence of the same intent
+    pipeline_version UInt32,                 -- recipe id; in ORDER BY so versions coexist during re-embed/backfill
+    record_version UInt64,                   -- ReplacingMergeTree version; highest for a key wins
 
-    -- Intent classification. Add new top-level spaces with
-    -- ALTER TABLE intent_records MODIFY COLUMN space ADD ENUM VALUES (...).
-    space Enum8('intent' = 1, 'failure' = 2),
-    category LowCardinality(String),
-    status LowCardinality(String),
-
-    -- Distilled signature and embedding.
+    category LowCardinality(String),         -- taxonomy label; mutable, deliberately excluded from identity
     signature String,
-    normalized_signature String,
-    -- Raw 128-bit digest of (space, normalized_signature), not hexadecimal.
-    signature_id FixedString(16),
     embedding_model LowCardinality(String),
     embedding_dimensions UInt16 DEFAULT 1024,
-    vector Array(Float32),
+    vector Array(Float32),                   -- searched by exact cosine distance; intentionally no ANN index
 
-    -- Source provenance.
     source LowCardinality(String),
     source_id String DEFAULT '',
     trace_id String DEFAULT '',
@@ -36,25 +23,21 @@ CREATE TABLE IF NOT EXISTS intent_records
     parent_span_id String DEFAULT '',
     conversation_id String DEFAULT '',
     turn_id String DEFAULT '',
-    intent_ordinal UInt16 DEFAULT 0,
-    role LowCardinality(String) DEFAULT '',
-    user_id String DEFAULT '',
+    intent_ordinal UInt16 DEFAULT 0,         -- position among the intents extracted from a single turn
+    user_id String DEFAULT '',               -- pseudonymous source subject, distinct from the writer
 
-    -- Occurrence time, insertion audit, retention, and cold metadata.
-    created_at DateTime64(6, 'UTC'),
+    intent_extracted_at DateTime64(6, 'UTC'),           -- partition key; set once at extraction, stable across retries
     inserted_at DateTime64(3, 'UTC') DEFAULT now64(3),
-    inserted_by_user_id String,
-    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
-    attributes Map(String, String),
+    expire_at DateTime DEFAULT '2100-01-01 00:00:00',   -- per-row retention override; default effectively never
+    attributes Map(String, String),          -- free-form, not indexed or searchable
 
-    INDEX idx_id id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_signature_id signature_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_span_id span_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(record_version)
-PARTITION BY toYYYYMM(created_at)
-ORDER BY (project_id, pipeline_version, created_at, id)
+PARTITION BY toYYYYMM(intent_extracted_at)
+ORDER BY (project_id, pipeline_version, id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
