@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import partial
 from unittest.mock import Mock
 
 import pytest
@@ -37,8 +38,8 @@ class NonCompletion:
 
 
 def test_serverless_inference_call_display_name():
-    display_name = serverless_inference_call_display_name(
-        "openai.chat.completions.create"
+    display_name = partial(
+        serverless_inference_call_display_name, "openai.chat.completions.create"
     )
 
     # W&B's OpenAI-compatible endpoint should show the actual provider and model.

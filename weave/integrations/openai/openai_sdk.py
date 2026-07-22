@@ -4,7 +4,7 @@ import importlib
 import logging
 import time
 from collections.abc import Callable, Mapping
-from functools import wraps
+from functools import partial, wraps
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -52,35 +52,31 @@ if TYPE_CHECKING:
 _openai_patcher: MultiPatcher | None = None
 
 OPENAI_INTEGRATION = library_integration("openai")
+OPENAI_HOST = "api.openai.com"
 SERVERLESS_INFERENCE_HOST = "api.inference.wandb.ai"
+SERVERLESS_INFERENCE_LABEL = "Serverless Inference"
+CHAT_COMPLETIONS_CREATE_OP = "openai.chat.completions.create"
+CHAT_COMPLETIONS_PARSE_OP = "openai.chat.completions.parse"
 
 logger = logging.getLogger(__name__)
 
 
 def serverless_inference_call_display_name(
-    default_display_name: str,
-) -> Callable[[Call], str]:
+    default_display_name: str, call: Call
+) -> str:
     """Label OpenAI-compatible W&B Inference calls by their requested model."""
-
-    def display_name(call: Call) -> str:
-        self_input = call.inputs.get("self")
-        if not isinstance(self_input, Mapping):
-            return default_display_name
-        client = self_input.get("client")
-        if not isinstance(client, Mapping):
-            return default_display_name
-        base_url = client.get("base_url")
-        if (
-            isinstance(base_url, str)
-            and urlparse(base_url).hostname == SERVERLESS_INFERENCE_HOST
-        ):
-            model = call.inputs.get("model")
-            if isinstance(model, str) and model:
-                return f"Serverless Inference: {model}"
-            return "Serverless Inference"
+    self_input = call.inputs.get("self")
+    client = self_input.get("client") if isinstance(self_input, Mapping) else None
+    base_url = client.get("base_url") if isinstance(client, Mapping) else None
+    if (
+        not isinstance(base_url, str)
+        or urlparse(base_url).hostname != SERVERLESS_INFERENCE_HOST
+    ):
         return default_display_name
-
-    return display_name
+    model = call.inputs.get("model")
+    if isinstance(model, str) and model:
+        return f"{SERVERLESS_INFERENCE_LABEL}: {model}"
+    return SERVERLESS_INFERENCE_LABEL
 
 
 def _parse_api_response(value: LegacyAPIResponse | APIResponse) -> Any:
@@ -450,9 +446,14 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
         usage.setdefault(
             "cache_read_input_tokens", prompt_tokens_details["cached_tokens"]
         )
-    itd = usage.get("input_tokens_details")
-    if isinstance(itd, dict) and itd.get("cached_tokens") is not None:
-        usage.setdefault("cache_read_input_tokens", itd["cached_tokens"])
+    input_tokens_details = usage.get("input_tokens_details")
+    if (
+        isinstance(input_tokens_details, dict)
+        and input_tokens_details.get("cached_tokens") is not None
+    ):
+        usage.setdefault(
+            "cache_read_input_tokens", input_tokens_details["cached_tokens"]
+        )
 
 
 def openai_on_finish(
@@ -480,7 +481,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
                     completion = self
                     base_url = str(completion._client._base_url)
                     # Only set stream_options if it targets the OpenAI endpoints
-                    if urlparse(base_url).hostname == "api.openai.com":
+                    if urlparse(base_url).hostname == OPENAI_HOST:
                         kwargs["stream_options"] = {"include_usage": True}
 
                 return fn(self, *args, **kwargs)
@@ -528,7 +529,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
                     completion = self
                     base_url = str(completion._client._base_url)
                     # Only set stream_options if it targets the OpenAI endpoints
-                    if urlparse(base_url).hostname == "api.openai.com":
+                    if urlparse(base_url).hostname == OPENAI_HOST:
                         kwargs["stream_options"] = {"include_usage": True}
 
                 return await fn(self, *args, **kwargs)
@@ -826,16 +827,17 @@ def get_openai_patcher(
         return _openai_patcher
 
     base = with_integration_metadata(settings.op_settings, OPENAI_INTEGRATION)
-    completions_create_name = base.name or "openai.chat.completions.create"
-    completions_parse_name = base.name or "openai.chat.completions.parse"
+    completions_create_name = base.name or CHAT_COMPLETIONS_CREATE_OP
+    completions_parse_name = base.name or CHAT_COMPLETIONS_PARSE_OP
+    # Only label by serverless model when the user hasn't set their own name/display.
     completions_create_display_name = base.call_display_name
     completions_parse_display_name = base.call_display_name
     if base.name is None and base.call_display_name is None:
-        completions_create_display_name = serverless_inference_call_display_name(
-            completions_create_name
+        completions_create_display_name = partial(
+            serverless_inference_call_display_name, completions_create_name
         )
-        completions_parse_display_name = serverless_inference_call_display_name(
-            completions_parse_name
+        completions_parse_display_name = partial(
+            serverless_inference_call_display_name, completions_parse_name
         )
 
     completions_create_settings = base.model_copy(
