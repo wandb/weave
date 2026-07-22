@@ -624,9 +624,9 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert table_metadata == [
         (
             "ReplacingMergeTree",
-            "toYYYYMM(created_at)",
-            "project_id, pipeline_version, created_at, id",
-            "project_id, pipeline_version, created_at, id",
+            "toYYYYMM(intent_extracted_at)",
+            "project_id, pipeline_version, id",
+            "project_id, pipeline_version, id",
             "expire_at",
         )
     ]
@@ -639,15 +639,11 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert columns == [
         ("project_id", "String"),
         ("id", "String"),
+        ("signature_id", "FixedString(16)"),
         ("pipeline_version", "UInt32"),
         ("record_version", "UInt64"),
-        ("deleted", "Bool"),
-        ("space", "Enum8('intent' = 1, 'failure' = 2)"),
         ("category", "LowCardinality(String)"),
-        ("status", "LowCardinality(String)"),
         ("signature", "String"),
-        ("normalized_signature", "String"),
-        ("signature_id", "FixedString(16)"),
         ("embedding_model", "LowCardinality(String)"),
         ("embedding_dimensions", "UInt16"),
         ("vector", "Array(Float32)"),
@@ -659,11 +655,9 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("conversation_id", "String"),
         ("turn_id", "String"),
         ("intent_ordinal", "UInt16"),
-        ("role", "LowCardinality(String)"),
         ("user_id", "String"),
-        ("created_at", "DateTime64(6, 'UTC')"),
+        ("intent_extracted_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
-        ("inserted_by_user_id", "String"),
         ("expire_at", "DateTime"),
         ("attributes", "Map(String, String)"),
     ]
@@ -676,28 +670,25 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ).result_rows
     assert indexes == [
         ("idx_conversation_id", "conversation_id", "bloom_filter(0.01)", 1),
-        ("idx_id", "id", "bloom_filter(0.01)", 1),
         ("idx_signature_id", "signature_id", "bloom_filter(0.01)", 1),
         ("idx_span_id", "span_id", "bloom_filter(0.01)", 1),
         ("idx_trace_id", "trace_id", "bloom_filter(0.01)", 1),
     ]
 
     insert_columns = """
-        project_id, id, pipeline_version, record_version, deleted, space,
-        category, status, signature, normalized_signature, signature_id,
-        embedding_model, vector, source, source_id, trace_id, span_id,
-        parent_span_id, conversation_id, turn_id, intent_ordinal, role,
-        user_id, created_at, inserted_by_user_id, attributes
+        project_id, id, signature_id, pipeline_version, record_version,
+        category, signature, embedding_model, vector, source, source_id,
+        trace_id, span_id, parent_span_id, conversation_id, turn_id,
+        intent_ordinal, user_id, intent_extracted_at, attributes
     """
     row_template = """
         SELECT
-            'project-1', 'intent-1', {pipeline_version}, {record_version}, false,
-            'intent', '{category}', 'active', 'Add Stripe checkout',
-            'add stripe checkout', unhex('00112233445566778899aabbccddeeff'),
+            'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
+            {pipeline_version}, {record_version}, '{category}', 'Add Stripe checkout',
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
             'weave', 'source-1', 'trace-1', 'span-1', 'parent-1',
-            'conversation-1', 'turn-1', 0, 'user', 'user-1',
-            toDateTime64('2026-06-20 14:32:00', 6, 'UTC'), 'wandb-user-1',
+            'conversation-1', 'turn-1', 0, 'user-1',
+            toDateTime64('2026-06-20 14:32:00', 6, 'UTC'),
             map('environment', 'test')
     """
     for pipeline_version, record_version, category in [
@@ -714,38 +705,18 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             )
         )
 
+    # Highest record_version wins within a pipeline_version, and each
+    # pipeline_version is retained as its own row.
     current_rows = ch_client.query(
-        "SELECT pipeline_version, record_version, category, deleted, "
+        "SELECT pipeline_version, record_version, category, "
         "formatDateTime(expire_at, '%F %T'), length(vector), attributes "
         f"FROM {target_db}.intent_records FINAL "
         "WHERE project_id = 'project-1' ORDER BY pipeline_version"
     ).result_rows
     assert current_rows == [
-        (1, 2, "payments", False, "2100-01-01 00:00:00", 1024, {"environment": "test"}),
-        (
-            2,
-            1,
-            "action_request",
-            False,
-            "2100-01-01 00:00:00",
-            1024,
-            {"environment": "test"},
-        ),
+        (1, 2, "payments", "2100-01-01 00:00:00", 1024, {"environment": "test"}),
+        (2, 1, "action_request", "2100-01-01 00:00:00", 1024, {"environment": "test"}),
     ]
-
-    ch_client.command(
-        f"INSERT INTO {target_db}.intent_records "
-        "SELECT * REPLACE(3 AS record_version, true AS deleted, now64(3) AS inserted_at) "
-        f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' AND pipeline_version = 1"
-    )
-    active_rows = ch_client.query(
-        "SELECT pipeline_version, id "
-        f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' AND deleted = false "
-        "ORDER BY pipeline_version"
-    ).result_rows
-    assert active_rows == [(2, "intent-1")]
 
     active_partitions = ch_client.query(
         "SELECT DISTINCT partition "
