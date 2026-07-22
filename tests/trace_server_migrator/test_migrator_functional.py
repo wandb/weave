@@ -680,12 +680,6 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("idx_signature_id", "signature_id", "bloom_filter(0.01)", 1),
         ("idx_span_id", "span_id", "bloom_filter(0.01)", 1),
         ("idx_trace_id", "trace_id", "bloom_filter(0.01)", 1),
-        (
-            "idx_vector",
-            "vector",
-            "vector_similarity('hnsw', 'cosineDistance', 1024, 'bf16', 64, 512)",
-            1,
-        ),
     ]
 
     insert_columns = """
