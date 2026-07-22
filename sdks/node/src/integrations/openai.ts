@@ -15,6 +15,33 @@ import {defaultSettings} from '../settings';
 
 // Integration provenance stamped onto every call this integration produces.
 const OPENAI_INTEGRATION = libraryIntegration('openai');
+const SERVERLESS_INFERENCE_HOST = 'api.inference.wandb.ai';
+const SERVERLESS_INFERENCE_LABEL = 'Serverless Inference';
+const CHAT_COMPLETIONS_CREATE_OP = 'openai.chat.completions.create';
+const CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
+
+function serverlessInferenceCallDisplayName(
+  baseURL: string | undefined,
+  model: unknown
+): string | undefined {
+  if (baseURL == null) {
+    return undefined;
+  }
+
+  let hostname: string;
+  try {
+    hostname = new URL(baseURL).hostname;
+  } catch {
+    return undefined;
+  }
+
+  if (hostname !== SERVERLESS_INFERENCE_HOST) {
+    return undefined;
+  }
+  return typeof model === 'string' && model.length > 0
+    ? `${SERVERLESS_INFERENCE_LABEL}: ${model}`
+    : SERVERLESS_INFERENCE_LABEL;
+}
 
 /**
  * Wraps a function to run with OpenAI Agents call stack if available.
@@ -109,7 +136,8 @@ export const openAIStreamReducer = {
 
 export function wrapOpenAIChatCompletionsCreate(
   originalCreate: any,
-  name: string
+  name: string,
+  baseURL?: string
 ) {
   const opRef = {
     __isOp: true as const,
@@ -154,6 +182,10 @@ export function wrapOpenAIChatCompletionsCreate(
         originalCreate,
         summarize,
         streamReducer: openAIStreamReducer,
+        displayName: serverlessInferenceCallDisplayName(
+          baseURL,
+          originalParams?.model
+        ),
       })
     );
   };
@@ -529,6 +561,7 @@ function traceOpenAICall(args: {
   summarize: (result: any) => any;
   streamReducer: any;
   thisArg?: any;
+  displayName?: string;
 }) {
   const {
     client,
@@ -539,6 +572,7 @@ function traceOpenAICall(args: {
     summarize,
     streamReducer,
     thisArg,
+    displayName,
   } = args;
 
   const apiPromise = originalCreate(...callArgs);
@@ -570,7 +604,7 @@ function traceOpenAICall(args: {
     currentCall,
     parentCall,
     startTime,
-    undefined,
+    displayName,
     {kind: 'llm', ...asAttributes(OPENAI_INTEGRATION)}
   );
 
@@ -690,6 +724,7 @@ function wrapStreamForTracing(args: {
 }
 
 interface OpenAIAPI {
+  baseURL?: string;
   chat: {
     completions: {
       create: any;
@@ -727,7 +762,8 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       if (p === 'create') {
         return wrapOpenAIChatCompletionsCreate(
           targetVal.bind(target),
-          'openai.chat.completions.create'
+          CHAT_COMPLETIONS_CREATE_OP,
+          openai.baseURL
         );
       }
       return targetVal;
@@ -763,7 +799,8 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
         if (p === 'parse') {
           return wrapOpenAIChatCompletionsCreate(
             targetVal.bind(target),
-            'openai.beta.chat.completions.parse'
+            CHAT_COMPLETIONS_PARSE_OP,
+            openai.baseURL
           );
         }
         return targetVal;
