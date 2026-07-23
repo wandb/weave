@@ -6,6 +6,7 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
 ## Python Import Rules
 
