@@ -749,6 +749,107 @@ def test_group_by_custom_attr_and_metric_custom_attr() -> None:
     assert result.columns == ["timestamp", "env", "avg_score", "count_score"]
 
 
+def test_grouped_time_stats_apply_conversation_membership_filters() -> None:
+    pb = ParamBuilder("genai")
+    req = _req(
+        group_by=[
+            AgentGroupByRef(
+                source="custom_attrs_string",
+                key="env",
+                alias="env",
+            )
+        ],
+        group_filters=[
+            AgentSpanGroupFilter(
+                group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+                measure=AgentSpanMeasureSpec(
+                    alias="matched",
+                    aggregation="count",
+                    filter=Query.model_validate(
+                        {
+                            "$expr": {
+                                "$eq": [
+                                    {"$getField": "status_code"},
+                                    {"$literal": "ERROR"},
+                                ]
+                            }
+                        }
+                    ),
+                ),
+                min=1,
+            )
+        ],
+    )
+
+    result = build_agent_span_stats_query(req, pb)
+
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 1, 2, tzinfo=datetime.timezone.utc)
+    src_sql, src_params = _attr_src(3, started_after=start, started_before=end)
+    expected_sql = """
+        WITH all_buckets AS
+          (SELECT toStartOfInterval(toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}) + toIntervalSecond(number * {genai_12:Int64}) AS bucket
+           FROM numbers(toUInt64(ceil((toUnixTimestamp(toDateTime({genai_10:Float64}, {genai_11:String})) - toUnixTimestamp(toStartOfInterval(toDateTime({genai_9:Float64}, {genai_11:String}), INTERVAL 3600 SECOND, {genai_11:String}))) / {genai_12:Float64})))
+           WHERE bucket < toDateTime({genai_10:Float64}, {genai_11:String}) ),
+             filtered_spans AS
+          (SELECT *
+           FROM {_ATTR_SRC} s
+           WHERE s.project_id = {genai_0:String}
+             AND s.started_at >= {genai_1:DateTime64(6)}
+             AND s.started_at < {genai_2:DateTime64(6)} ),
+             qualified_groups_0 AS
+          (SELECT s.conversation_id AS conversation_id
+           FROM filtered_spans s
+           GROUP BY conversation_id
+           HAVING countIf(((s.status_code = {genai_14:String}))) >= {genai_15:Float64}),
+             filtered_metric_spans AS
+          (SELECT s.*
+           FROM filtered_spans s
+           INNER JOIN qualified_groups_0 q ON s.conversation_id = q.conversation_id),
+             top_groups AS
+          (SELECT if(mapContains(s.custom_attrs_string, {genai_8:String}), s.custom_attrs_string[{genai_8:String}], NULL) AS env
+           FROM filtered_metric_spans s
+           GROUP BY env
+           ORDER BY count() DESC
+           LIMIT {genai_13:UInt64}),
+             aggregated_data AS
+          (SELECT bucket,
+                  env,
+                  sumOrNull(if(v_input_tokens, m_input_tokens, NULL)) AS sum_input_tokens
+           FROM
+             (SELECT toStartOfInterval(s.started_at, INTERVAL 3600 SECOND, {genai_11:String}) AS bucket,
+                     if(mapContains(s.custom_attrs_string, {genai_8:String}), s.custom_attrs_string[{genai_8:String}], NULL) AS env,
+                     toFloat64(s.input_tokens) AS m_input_tokens,
+                     toUInt8(1) AS v_input_tokens
+              FROM filtered_metric_spans s)
+           GROUP BY bucket,
+                    env)
+        SELECT all_buckets.bucket AS timestamp,
+               top_groups.env AS env,
+               COALESCE(aggregated_data.sum_input_tokens, 0) AS sum_input_tokens
+        FROM all_buckets
+        CROSS JOIN top_groups
+        LEFT JOIN aggregated_data ON all_buckets.bucket = aggregated_data.bucket
+        AND top_groups.env = aggregated_data.env
+        ORDER BY timestamp, env
+    """.replace("{_ATTR_SRC}", src_sql)
+    expected_params = {
+        "genai_0": "p1",
+        "genai_1": start,
+        "genai_2": end,
+        "genai_8": "env",
+        "genai_9": 1767225600,
+        "genai_10": 1767312000,
+        "genai_11": "UTC",
+        "genai_12": 3600,
+        "genai_13": 50,
+        "genai_14": "ERROR",
+        "genai_15": 1.0,
+        **src_params,
+    }
+    assert_sql(expected_sql, expected_params, result.sql, result.parameters)
+
+
 def test_time_stats_apply_group_filters() -> None:
     pb = ParamBuilder("genai")
     req = _req(

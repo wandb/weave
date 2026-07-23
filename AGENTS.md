@@ -86,6 +86,11 @@ with an untyped dictionary. After changing the model, run
 `make synchronize-base-object-schemas` from the repository root so the Python
 schema and the dependent Core frontend types stay aligned.
 
+Agent span stats `group_filters` are membership filters and may group by a
+different key than the result's `group_by`. For example, qualify conversations
+where any span matches an attribute, retain every span in those conversations,
+then display the resulting cost grouped by model.
+
 ### Trace Server API / Node SDK Schema
 
 When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
