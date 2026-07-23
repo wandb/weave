@@ -11,7 +11,6 @@ import {
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
@@ -255,15 +254,6 @@ export class ClaudeAgentOtelTracer {
     return this.turn;
   }
 
-  private childAttributes(): Attributes {
-    return {
-      [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
-      ...(this.conversationId
-        ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
-        : {}),
-    };
-  }
-
   private emitModelUsageSpans(result: SDKResultMessage): void {
     const perModel: Array<[string | undefined, ModelUsage | NonNullableUsage]> =
       result.modelUsage && Object.keys(result.modelUsage).length > 0
@@ -282,7 +272,6 @@ export class ClaudeAgentOtelTracer {
           providerName: PROVIDER_NAME,
         });
         llm.setAttributes({
-          ...this.childAttributes(),
           [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: normalized.totalTokens,
         });
         llm.record({
@@ -309,7 +298,6 @@ export class ClaudeAgentOtelTracer {
         model: model ?? '',
         providerName: PROVIDER_NAME,
       });
-      llm.setAttributes(this.childAttributes());
       llm.record({
         ...(parts.length > 0
           ? {outputMessages: [{role: 'assistant', parts}]}
@@ -332,7 +320,6 @@ export class ClaudeAgentOtelTracer {
         toolCallId: block.id,
         args: JSON.stringify(block.input ?? {}),
       });
-      tool.setAttributes(this.childAttributes());
       this.openTools.set(block.id, tool);
     }
   }

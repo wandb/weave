@@ -330,9 +330,6 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(chat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    // Child spans carry the agent name so per-agent usage rollups (which group
-    // by gen_ai.agent.name) attribute their tokens to the agent.
-    expect(chat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
       'tool_use',
     ]);
@@ -372,9 +369,6 @@ describe('Claude Agent SDK — OTel tracer', () => {
     // total_tokens = inclusive input (13) + output (5).
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(18);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe(
-      'claude_agent_sdk'
-    );
     expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
 
     const tool = findSpan(spans, 'execute_tool');
@@ -385,7 +379,6 @@ describe('Claude Agent SDK — OTel tracer', () => {
       '{"command":"ls"}'
     );
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('Sunny');
-    expect(tool.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
 
     // The whole tree shares one trace.
@@ -459,7 +452,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
   });
 
-  test('propagates an options.agent override to the root and child spans', () => {
+  test('uses an options.agent override on the root span', () => {
     const tracer = new ClaudeAgentOtelTracer({
       agent: 'researcher',
       prompt: 'p',
@@ -481,18 +474,8 @@ describe('Claude Agent SDK — OTel tracer', () => {
       })
     );
 
-    expect(
-      getExporter()
-        .getFinishedSpans()
-        .map(span => ({
-          agentName: span.attributes[ATTR_GEN_AI_AGENT_NAME],
-          name: span.name,
-        }))
-    ).toEqual([
-      {agentName: 'researcher', name: 'chat'},
-      {agentName: 'researcher', name: 'chat'},
-      {agentName: 'researcher', name: 'invoke_agent'},
-    ]);
+    const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('researcher');
   });
 
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {
