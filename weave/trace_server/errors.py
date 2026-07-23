@@ -131,6 +131,19 @@ class QueryTimeoutExceededError(Error):
     pass
 
 
+class QueryEstimatedTimeoutExceededError(Error):
+    """Raised when ClickHouse rejects a query up front (error code 160, TOO_SLOW)
+    because its *estimated* execution time exceeds the configured maximum.
+
+    Distinct from QueryTimeoutExceededError, which is a query that actually ran and
+    hit the execution-time limit mid-flight. Both are query-too-heavy guards, but the
+    distinction is kept so the pre-execution rejection can be identified separately
+    (e.g. in tracing/alerting).
+    """
+
+    pass
+
+
 class InsertTooLarge(Error):
     """Raised when a single insert is too large."""
 
@@ -354,6 +367,7 @@ class ErrorRegistry:
 
         # 504
         self.register(QueryTimeoutExceededError, 504)
+        self.register(QueryEstimatedTimeoutExceededError, 504)
 
         # Validation errors
         self.register(CHValidationError, 400)
@@ -424,7 +438,9 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     Raises:
         QueryMemoryLimitExceededError: When the query exceeds memory limits
         QueryNoCommonTypeError: When there's a type mismatch in the query
-        QueryTimeoutExceededError: When the query exceeds timeout limits
+        QueryTimeoutExceededError: When a running query exceeds its execution-time limit
+        QueryEstimatedTimeoutExceededError: When ClickHouse rejects a query up front
+            because its estimated execution time exceeds the limit
         Exception: Re-raises the original exception if no known pattern matches
     """
     error_str = str(e)
@@ -441,6 +457,20 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     if "TIMEOUT_EXCEEDED" in error_str:
         raise QueryTimeoutExceededError(
             "Query timeout exceeded. " + limit_scope_message
+        ) from e
+    if "TOO_SLOW" in error_str:
+        # ClickHouse rejects a query up front (error code 160, TOO_SLOW) when its
+        # *estimated* execution time exceeds max_estimated_execution_time -- the
+        # planner declines to run it rather than timing out mid-flight. This is the
+        # same class of "query is too heavy" guard as TIMEOUT_EXCEEDED, so surface it
+        # with actionable guidance instead of letting it fall through to a generic
+        # DatabaseError ("Temporary backend error", 502), which reads as an unexpected
+        # server fault and pages on-call. It gets its own error type (distinct from
+        # QueryTimeoutExceededError) so the pre-execution rejection is identifiable in
+        # tracing/alerting. See WB-33068.
+        raise QueryEstimatedTimeoutExceededError(
+            "Query aborted because its estimated execution time exceeds the maximum "
+            "allowed. " + limit_scope_message
         ) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
