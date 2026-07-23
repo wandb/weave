@@ -70,6 +70,24 @@ export function getUrls(hostOrUrl?: string) {
 export function getGlobalDomain() {
   return state.domain;
 }
-export function setGlobalDomain(domain: string) {
+export function setGlobalDomain(domain: string | null) {
   state.domain = domain;
+}
+
+/**
+ * Build a URL to a conversation in the Weave Agents view.
+ *
+ * Call `weave.init()` before this function to use the configured W&B domain.
+ * Without an initialized client, the URL defaults to wandb.ai.
+ *
+ * @param projectId W&B project identifier in `entity/project` format.
+ * @param conversationId Conversation identifier to link to.
+ * @returns The URL to the conversation in the Weave Agents view.
+ */
+export function agentConversationPath(
+  projectId: string,
+  conversationId: string
+): string {
+  const domain = getGlobalDomain() ?? defaultDomain;
+  return `https://${domain}/${projectId}/weave/agents/conversations/${encodeURIComponent(conversationId)}`;
 }
