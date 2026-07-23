@@ -29,7 +29,7 @@ import {
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../../genai/semconv';
-import {ClaudeAgentTracer} from '../../../integrations/claude-agent-sdk/tracer';
+import {ClaudeAgentTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
 import {
   findSpan,
   setupExporterPerTest,
@@ -224,7 +224,7 @@ function resultError(opts: {
   };
 }
 
-describe('Claude Agent SDK — Weave GenAI tracer', () => {
+describe('Claude Agent SDK — OTel tracer', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 

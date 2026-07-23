@@ -139,7 +139,7 @@ type ClaudeAgentTracerOptions = {
   agent?: string;
 };
 
-/** Maps a Claude Agent SDK query stream to Weave GenAI handles. */
+/** Emits Claude Agent SDK traces through Weave GenAI handles. */
 export class ClaudeAgentTracer {
   private readonly agentName: string;
   private readonly prompt: string | undefined;
