@@ -414,14 +414,15 @@ class AgentSpanStatsReq(BaseModel):
             raise ValueError(
                 "grouped numeric bucket stats do not support explicit metrics"
             )
-        if self.group_filters:
-            if self.group_by:
-                raise ValueError("group_filters do not support group_by")
-            if numeric_bucket is not None and not numeric_bucket.group_by:
-                raise ValueError(
-                    "group_filters are only supported for time stats or "
-                    "grouped numeric bucket stats"
-                )
+        if (
+            self.group_filters
+            and numeric_bucket is not None
+            and not numeric_bucket.group_by
+        ):
+            raise ValueError(
+                "group_filters are only supported for time stats or "
+                "grouped numeric bucket stats"
+            )
         return self
 
 

@@ -780,6 +780,8 @@ def _build_stats_query(
         resolved_groups=resolved_groups,
         group_limit_slot=group_limit_slot,
         parts=parts,
+        group_filters=group_filters,
+        pb=pb,
     )
 
 
@@ -1051,8 +1053,17 @@ def _build_grouped_stats_query(
     resolved_groups: list[tuple[str, str]],
     group_limit_slot: str,
     parts: _StatsQuerySQLParts,
+    group_filters: list[AgentSpanGroupFilter],
+    pb: ParamBuilder,
 ) -> str:
-    """Render one row per time bucket and selected top group."""
+    """Render one row per time bucket and selected top display group.
+
+    Membership group filters may use a different grouping (for example,
+    conversation_id) from the display group (for example, model). They first
+    qualify containers and retain all of their spans; top-N selection and
+    metric aggregation then run over that complete qualified span set.
+    """
+    group_filter_ctes, stats_source_cte = _group_filter_ctes(pb, group_filters)
     select_group_cols = ", ".join(
         f"{expr} AS {alias}" for expr, alias in resolved_groups
     )
@@ -1078,10 +1089,10 @@ def _build_grouped_stats_query(
         SELECT *
         FROM {source_filter.source} {_SPAN_ALIAS}
         {source_filter.clause}
-      ),
+      ){group_filter_ctes},
       {_CTE_TOP_GROUPS} AS (
         SELECT {select_group_cols}
-        FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
+        FROM {stats_source_cte} {_SPAN_ALIAS}
         GROUP BY {group_by_clause}
         ORDER BY count() DESC
         LIMIT {group_limit_slot}
@@ -1096,7 +1107,7 @@ def _build_grouped_stats_query(
             {parts.bucket_expr} AS {_BUCKET_COLUMN},
             {inner_group_select_sql},
             {parts.metric_select_sql}
-          FROM {_CTE_FILTERED_SPANS} {_SPAN_ALIAS}
+          FROM {stats_source_cte} {_SPAN_ALIAS}
         )
         GROUP BY {_BUCKET_COLUMN}, {group_by_clause}
       )
