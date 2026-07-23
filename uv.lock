@@ -234,21 +234,6 @@ wheels = [
 ]
 
 [[package]]
-name = "alembic"
-version = "1.17.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mako", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "sqlalchemy", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "tomli", marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython') or (python_full_version >= '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "typing-extensions", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/02/a6/74c8cadc2882977d80ad756a13857857dbcf9bd405bc80b662eb10651282/alembic-1.17.2.tar.gz", hash = "sha256:bbe9751705c5e0f14877f02d46c53d10885e377e3d90eda810a016f9baa19e8e", size = 1988064, upload-time = "2025-11-14T20:35:04.057Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/88/6237e97e3385b57b5f1528647addea5cc03d4d65d5979ab24327d41fb00d/alembic-1.17.2-py3-none-any.whl", hash = "sha256:f483dd1fe93f6c5d49217055e4d15b905b425b6af906746abb35b69c1996c4e6", size = 248554, upload-time = "2025-11-14T20:35:05.699Z" },
-]
-
-[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1896,37 +1881,31 @@ wheels = [
 
 [[package]]
 name = "dspy"
-version = "3.0.4"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "asyncer", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "backoff", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "cachetools", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "cloudpickle", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "gepa", version = "0.0.17", source = { registry = "https://pypi.org/simple" }, marker = "(platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "joblib", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "gepa", version = "0.0.27", source = { registry = "https://pypi.org/simple" }, marker = "(platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "json-repair", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "litellm", version = "1.80.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "magicattr", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version < '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version < '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "openai", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "optuna", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "orjson", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "pillow", version = "12.0.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.14' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version < '3.14' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version < '3.14' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "pillow", version = "12.2.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.14' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.14' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.14' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "pydantic", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "regex", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "requests", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "rich", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "tenacity", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "tqdm", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+    { name = "typeguard", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
     { name = "xxhash", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/18/0042d299cd5e85fdb381568f0cfcc7769122e8f70ea0a2d33e12fd63e705/dspy-3.0.4.tar.gz", hash = "sha256:cb4529df9a91353a16144d9d94ba6ff25f36fc5adfd921f127f4c49d0e309fb8", size = 236376, upload-time = "2025-11-10T17:43:37.619Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/44/6f/77a79122a16c60b7d5853c11943531bc60f32545369cd05cce4057403a1d/dspy-3.2.1.tar.gz", hash = "sha256:245d6531753cd3e844e7cc47835cfb283c8f57a36a977beabe5034457d9c7241", size = 278428, upload-time = "2026-05-05T19:35:07.471Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/94/52/56eed4828175f48f712a50a994293065afa7cc98cb112992a0b071179b6c/dspy-3.0.4-py3-none-any.whl", hash = "sha256:c0a88c7936f41f6f613ee6ca8cd92e63746ff2bd780e3896615ade7628eb6a6a", size = 285224, upload-time = "2025-11-10T17:43:36.263Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/a1/26ccff78d9e67b17e51fce8ac6d5f57d182ddb20915bf86daf09fc50191a/dspy-3.2.1-py3-none-any.whl", hash = "sha256:4f36c3c0f9d54cd66eeb2a7892df950119e4193deb1fbbc9d46c3438ee1f4df3", size = 331015, upload-time = "2026-05-05T19:35:05.816Z" },
 ]
 
 [[package]]
@@ -2331,7 +2310,7 @@ http = [
 
 [[package]]
 name = "gepa"
-version = "0.0.17"
+version = "0.0.27"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version == '3.12.*' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux'",
@@ -2359,9 +2338,9 @@ resolution-markers = [
     "python_full_version < '3.11' and platform_python_implementation == 'CPython' and sys_platform == 'darwin'",
     "python_full_version < '3.11' and platform_python_implementation == 'CPython' and sys_platform != 'darwin' and sys_platform != 'linux'",
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/61/f0/fe312ed4405ddc2ca97dc1ce8915c4dd707e413503e6832910ab088fceb6/gepa-0.0.17.tar.gz", hash = "sha256:641ed46f8127618341b66ee82a87fb46a21c5d2d427a5e0b91c850a7f7f64e7f", size = 99816, upload-time = "2025-09-25T22:13:45.476Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4e/99/6840f84498f2dcbfd27e8a15eeb4e637e84e9dbbd6331977b71f6ffad9c7/gepa-0.0.27.tar.gz", hash = "sha256:02ecb19e4aa6a1f5bb2994cd54b2057f25cd5e8cd662fee514303b2a8ba0a738", size = 155106, upload-time = "2026-01-28T00:33:51.72Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/88/dc/2bc81a01caa887ed58db3c725bebf1e98f37807a4d06c51ecaa85a7cabe0/gepa-0.0.17-py3-none-any.whl", hash = "sha256:0ea98f4179dbc8dd83bdf53494f302e663ee1da8300d086c4cc8ce4aefa4042c", size = 110464, upload-time = "2025-09-25T22:13:44.14Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/bd/f9e83519099a9fd5d090520ab0c51a6278e473b914a9b32d1e812662dd3b/gepa-0.0.27-py3-none-any.whl", hash = "sha256:592beb084fd638d525edae84ca75ad8e9e9c3758e5498b933c17153addf5dd2d", size = 146454, upload-time = "2026-01-28T00:33:50.262Z" },
 ]
 
 [[package]]
@@ -3824,11 +3803,11 @@ wheels = [
 
 [[package]]
 name = "json-repair"
-version = "0.54.1"
+version = "0.61.6"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/00/46/d3a4d9a3dad39bb4a2ad16b8adb9fe2e8611b20b71197fe33daa6768e85d/json_repair-0.54.1.tar.gz", hash = "sha256:d010bc31f1fc66e7c36dc33bff5f8902674498ae5cb8e801ad455a53b455ad1d", size = 38555, upload-time = "2025-11-19T14:55:24.265Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/27/b34afa132d79c2a73e944d91df2141d145163e863aa9cb6db99a3956cdee/json_repair-0.61.6.tar.gz", hash = "sha256:b10cf0c1570d9eac407520d1f164bc88316692f5bf83fbe35e69c9000c3ae5bc", size = 51428, upload-time = "2026-07-19T17:35:29.252Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/96/c9aad7ee949cc1bf15df91f347fbc2d3bd10b30b80c7df689ce6fe9332b5/json_repair-0.54.1-py3-none-any.whl", hash = "sha256:016160c5db5d5fe443164927bb58d2dfbba5f43ad85719fa9bc51c713a443ab1", size = 29311, upload-time = "2025-11-19T14:55:22.886Z" },
+    { url = "https://files.pythonhosted.org/packages/74/8a/c39e1500b09241eb56a41c42bf591f72308d5a33e8755fa6156b8d514b47/json_repair-0.61.6-py3-none-any.whl", hash = "sha256:00858025b19a1a6708f1b1311b76ca6e58e5628c3ba633583dcf2bd05a66333a", size = 49951, upload-time = "2026-07-19T17:35:27.875Z" },
 ]
 
 [[package]]
@@ -5175,26 +5154,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/da/137ddeea14c2cb86864838277b2607d09f8253f152156a07f84e11768a28/lz4-4.4.5-cp314-cp314-win32.whl", hash = "sha256:bd85d118316b53ed73956435bee1997bd06cc66dd2fa74073e3b1322bd520a67", size = 90139, upload-time = "2025-11-03T13:02:24.301Z" },
     { url = "https://files.pythonhosted.org/packages/18/2c/8332080fd293f8337779a440b3a143f85e374311705d243439a3349b81ad/lz4-4.4.5-cp314-cp314-win_amd64.whl", hash = "sha256:92159782a4502858a21e0079d77cdcaade23e8a5d252ddf46b0652604300d7be", size = 101497, upload-time = "2025-11-03T13:02:25.187Z" },
     { url = "https://files.pythonhosted.org/packages/ca/28/2635a8141c9a4f4bc23f5135a92bbcf48d928d8ca094088c962df1879d64/lz4-4.4.5-cp314-cp314-win_arm64.whl", hash = "sha256:d994b87abaa7a88ceb7a37c90f547b8284ff9da694e6afcfaa8568d739faf3f7", size = 93812, upload-time = "2025-11-03T13:02:26.133Z" },
-]
-
-[[package]]
-name = "magicattr"
-version = "0.1.6"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/7e/76b7e0c391bee7e9273725c29c8fe41c4df62a215ce58aa8e3518baee0bb/magicattr-0.1.6-py2.py3-none-any.whl", hash = "sha256:d96b18ee45b5ee83b09c17e15d3459a64de62d538808c2f71182777dd9dbbbdf", size = 4664, upload-time = "2022-01-25T16:56:47.074Z" },
-]
-
-[[package]]
-name = "mako"
-version = "1.3.10"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "markupsafe", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/38/bd5b78a920a64d708fe6bc8e0a2c075e1389d53bef8413725c63ba041535/mako-1.3.10.tar.gz", hash = "sha256:99579a6f39583fa7e5630a28c3c1f440e4e97a414b80372649c0ce338da2ea28", size = 392474, upload-time = "2025-04-10T12:44:31.16Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/87/fb/99f81ac72ae23375f22b7afdb7642aba97c00a713c217124420147681a2f/mako-1.3.10-py3-none-any.whl", hash = "sha256:baef24a52fc4fc514a0887ac600f9f1cff3d82c61d4d700a1fa84d597b88db59", size = 78509, upload-time = "2025-04-10T12:50:53.297Z" },
 ]
 
 [[package]]
@@ -6720,25 +6679,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ba/e6/40b59eda51ac47009fb47afcdf37c6938594a0bd7f3b9fadcbc6058248e3/opentelemetry_semantic_conventions_ai-0.4.13.tar.gz", hash = "sha256:94efa9fb4ffac18c45f54a3a338ffeb7eedb7e1bb4d147786e77202e159f0036", size = 5368, upload-time = "2025-08-22T10:14:17.387Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/35/b5/cf25da2218910f0d6cdf7f876a06bed118c4969eacaf60a887cbaef44f44/opentelemetry_semantic_conventions_ai-0.4.13-py3-none-any.whl", hash = "sha256:883a30a6bb5deaec0d646912b5f9f6dcbb9f6f72557b73d0f2560bf25d13e2d5", size = 6080, upload-time = "2025-08-22T10:14:16.477Z" },
-]
-
-[[package]]
-name = "optuna"
-version = "4.6.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "alembic", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "colorlog", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and platform_python_implementation == 'CPython' and extra == 'extra-5-weave-dspy') or (python_full_version < '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version < '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (extra != 'extra-5-weave-dspy' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "packaging", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "pyyaml", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "sqlalchemy", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-    { name = "tqdm", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/81/08f90f194eed78178064a9383432eca95611e2c5331e7b01e2418ce4b15a/optuna-4.6.0.tar.gz", hash = "sha256:89e38c2447c7f793a726617b8043f01e31f0bad54855040db17eb3b49404a369", size = 477444, upload-time = "2025-11-10T05:14:30.151Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/de/3d8455b08cb6312f8cc46aacdf16c71d4d881a1db4a4140fc5ef31108422/optuna-4.6.0-py3-none-any.whl", hash = "sha256:4c3a9facdef2b2dd7e3e2a8ae3697effa70fae4056fcf3425cfc6f5a40feb069", size = 404708, upload-time = "2025-11-10T05:14:28.6Z" },
 ]
 
 [[package]]
@@ -10323,6 +10263,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/d3/896b1439ab765c57a8d732f73c105ec41142c417a582600638385c2bee85/ty-0.0.2-py3-none-win32.whl", hash = "sha256:d773fdad5d2b30f26313204e6b191cdd2f41ab440a6c241fdb444f8c6593c288", size = 9204906, upload-time = "2025-12-16T20:13:25.099Z" },
     { url = "https://files.pythonhosted.org/packages/5d/0a/f30981e7d637f78e3d08e77d63b818752d23db1bc4b66f9e82e2cb3d34f8/ty-0.0.2-py3-none-win_amd64.whl", hash = "sha256:d1c9ac78a8aa60d0ce89acdccf56c3cc0fcb2de07f1ecf313754d83518e8e8c5", size = 10066640, upload-time = "2025-12-16T20:13:04.045Z" },
     { url = "https://files.pythonhosted.org/packages/5a/c4/97958503cf62bfb7908d2a77b03b91a20499a7ff405f5a098c4989589f34/ty-0.0.2-py3-none-win_arm64.whl", hash = "sha256:fbdef644ade0cd4420c4ec14b604b7894cefe77bfd8659686ac2f6aba9d1a306", size = 9572022, upload-time = "2025-12-16T20:13:39.189Z" },
+]
+
+[[package]]
+name = "typeguard"
+version = "4.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "platform_python_implementation == 'CPython' or (extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/34/53/f701077a29ddf65ed4556119961ef517d767c07f15f6cdf0717ad985426b/typeguard-4.4.3.tar.gz", hash = "sha256:be72b9c85f322c20459b29060c5c099cd733d5886c4ee14297795e62b0c0d59b", size = 75072, upload-time = "2025-06-04T21:47:07.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/18/662e2a14fcdbbc9e7842ad801a7f9292fcd6cf7df43af94e59ac9c0da9af/typeguard-4.4.3-py3-none-any.whl", hash = "sha256:7d8b4a3d280257fd1aa29023f22de64e29334bda0b172ff1040f05682223795e", size = 34855, upload-time = "2025-06-04T21:47:03.683Z" },
 ]
 
 [[package]]
