@@ -231,6 +231,7 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/wandb_interface/",
             "tests/conversation/",
+            "tests/integrations/test_autopatch.py",
         ],
     }
 

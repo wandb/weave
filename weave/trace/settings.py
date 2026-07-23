@@ -314,9 +314,9 @@ class UserSettings:
     import-hook patching. Explicit ``patch_*`` calls are unaffected — they
     always do exactly what their name says.
 
-    NOTE: plain ``openai`` has no OTel variant, so it is no longer patched on
-    implicit import-hook patching. Call ``weave.integrations.patch_openai()``
-    explicitly (or set this to False) to trace direct ``openai.*`` calls.
+    Plain ``openai`` remains patched. Supported OpenAI Agents model requests use
+    the Agents OTel span, while direct OpenAI requests keep their normal Weave
+    call.
 
     Can be overridden with the environment variable `WEAVE_USE_OTEL_V2`
     """
