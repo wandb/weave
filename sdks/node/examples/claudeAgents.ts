@@ -4,6 +4,8 @@
  * Demonstrates tracing the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`)
  * with Weave. The SDK's `query()` is automatically instrumented via module
  * loader hooks when you import Weave — no manual setup required.
+ * Internally, streamed Claude messages are mapped onto Weave's high-level
+ * `Turn` / `LLM` / `Tool` handles.
  *
  * This runs a single conversation as a sequence of follow-up turns. Each turn
  * is its own `query()` call (and its own `invoke_agent` root span), but the

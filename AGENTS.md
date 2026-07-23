@@ -325,6 +325,28 @@ pnpm exec tsx examples/claudeAgents.ts
   `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
   `invoke_agent` span as `gen_ai.output.messages`.
 
+### TypeScript GenAI span handles
+
+- The high-level GenAI API (`Conversation`, `Turn`, `LLM`, `Tool`,
+  `SubAgent`) emits through the same `/agents/otel/v1/traces` pipeline as
+  integrations that call `getWeaveTracer()` directly.
+- Callback- or generator-driven integrations may create
+  `Conversation`/`Turn`/`LLM` handles inside a short `runIsolated()` frame and
+  retain those handles across later callbacks. Parenting, conversation ID, and
+  conversation attributes travel through the handles; this avoids collisions
+  in the process-wide ambient GenAI state.
+- `Conversation.create`, `Turn.create`, and `LLM.create` currently guard and
+  write ambient state, so isolate their creation when concurrent long-lived
+  operations are driven by explicit handles. `Tool` and `SubAgent` creation do
+  not use ambient state.
+- The high-level emitters use canonical span names (`invoke_agent`, `chat`,
+  `execute_tool`); integration-specific fields not represented by typed
+  `record()` methods can be attached through `setAttributes()`.
+- The Claude Agent SDK integration is the reference async-generator pattern:
+  capture the query start time, lazily create a `Turn` once `session_id` is
+  known, create each `LLM` in a short `runIsolated()` frame, and retain `Tool`
+  handles until later `tool_result` messages close them.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -464,4 +486,7 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Add `output_messages` to Python `Turn.record()` for parity with
       TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
       `invoke_agent_attributes()` builder already supports agent output.
+- [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
+      OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
+      `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
 - [ ] ...
