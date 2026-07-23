@@ -278,39 +278,21 @@ describe('Claude Agent SDK — OTel tracer', () => {
       'chat',
       'invoke_agent',
     ]);
-    expect(
-      spans.map(span => ({
-        integrationName: span.attributes['integration.name'],
-        packageName: span.attributes['integration.meta.package_name'],
-        weaveIntegrationName: span.attributes[WEAVE_INTEGRATION_NAME],
-        weaveIntegrationVersion: span.attributes[WEAVE_INTEGRATION_VERSION],
-      }))
-    ).toEqual([
-      {
-        integrationName: 'claude_agent_sdk',
-        packageName: '@anthropic-ai/claude-agent-sdk',
-        weaveIntegrationName: 'claude_agent_sdk',
-        weaveIntegrationVersion: packageVersion,
-      },
-      {
-        integrationName: 'claude_agent_sdk',
-        packageName: '@anthropic-ai/claude-agent-sdk',
-        weaveIntegrationName: 'claude_agent_sdk',
-        weaveIntegrationVersion: packageVersion,
-      },
-      {
-        integrationName: 'claude_agent_sdk',
-        packageName: '@anthropic-ai/claude-agent-sdk',
-        weaveIntegrationName: 'claude_agent_sdk',
-        weaveIntegrationVersion: packageVersion,
-      },
-      {
-        integrationName: 'claude_agent_sdk',
-        packageName: '@anthropic-ai/claude-agent-sdk',
-        weaveIntegrationName: 'claude_agent_sdk',
-        weaveIntegrationVersion: packageVersion,
-      },
-    ]);
+    for (const span of spans) {
+      expect({
+        name: span.attributes[WEAVE_INTEGRATION_NAME],
+        version: span.attributes[WEAVE_INTEGRATION_VERSION],
+        legacyName: span.attributes['integration.name'],
+        legacyVersion: span.attributes['integration.version'],
+        legacyPackageName: span.attributes['integration.meta.package_name'],
+      }).toEqual({
+        name: 'claude_agent_sdk',
+        version: packageVersion,
+        legacyName: undefined,
+        legacyVersion: undefined,
+        legacyPackageName: undefined,
+      });
+    }
 
     const invoke = findSpan(spans, INVOKE);
     expect(invoke.kind).toBe(SpanKind.CLIENT);
