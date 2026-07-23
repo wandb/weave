@@ -1,19 +1,3 @@
-/**
- * Weave GenAI tracer for the Claude Agent SDK.
- *
- * Maps one `query()` message stream onto the high-level Weave TypeScript SDK:
- *
- *   invoke_agent                              (Turn, one trace per query)
- *   ├─ chat                                   (LLM, one per assistant message)
- *   ├─ execute_tool                           (Tool, tool_use → tool_result)
- *   └─ chat                                   (LLM, one usage span per model)
- *
- * The high-level handles emit through the shared Weave GenAI provider to
- * `/agents/otel/v1/traces`. Handles retain explicit parent contexts and
- * conversation metadata, so they remain valid across the async generator's
- * yields. Creation runs in short `runIsolated()` frames to contain the GenAI
- * SDK's ambient-state bookkeeping while multiple queries are in flight.
- */
 import type {Attributes} from '@opentelemetry/api';
 
 import {
@@ -46,22 +30,18 @@ import type {
 import {toWeaveUsage} from './messages';
 
 const AGENT_NAME = 'claude_agent_sdk';
-// The Claude Agent SDK runs Anthropic models exclusively.
 const PROVIDER_NAME = 'anthropic';
 
-// Total cost is provider-reported, not a GenAI-semconv field.
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
 const ATTR_NUM_TURNS = 'claude_agent_sdk.num_turns';
 
-// Turn attributes travel through the handle to every child span, including
-// when a later generator callback runs in a different isolation frame.
+// Turn attributes are inherited by child handles across isolation frames.
 const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
     packageName: '@anthropic-ai/claude-agent-sdk',
   })
 );
 
-/** Map an assistant message's content blocks to GenAI message parts. */
 function assistantParts(
   blocks: SDKAssistantMessage['message']['content']
 ): MessagePart[] {
@@ -89,13 +69,11 @@ function assistantParts(
   return parts;
 }
 
-/** The `tool_result` block carried on a user message, taken from the SDK type. */
 type ToolResultBlock = Extract<
   SDKUserMessage['message']['content'][number],
   {type: 'tool_result'}
 >;
 
-/** Stringify tool-result content (string or content-block array). */
 function toolResultText(content: ToolResultBlock['content']): string {
   if (!content) {
     return '';
@@ -115,17 +93,11 @@ type NormalizedUsage = {
   totalTokens: number;
 };
 
-/**
- * Normalize one model's usage for `LLM.record()`.
- *
- * Anthropic reports `input_tokens` disjoint from cache-read/cache-creation.
- * Weave's canonical input count is inclusive, with both cache counts as
- * subsets, so fold them into inputTokens before recording.
- */
 function normalizeUsage(
   rawUsage: ModelUsage | NonNullableUsage
 ): NormalizedUsage {
   const usage = toWeaveUsage(rawUsage);
+  // Anthropic excludes cache tokens from input tokens; Weave includes them.
   const inputTokens =
     usage.input_tokens +
     usage.cache_read_input_tokens +
@@ -143,11 +115,6 @@ function normalizeUsage(
   };
 }
 
-/**
- * The error message for a finished run, or undefined if it succeeded. A thrown
- * stream error wins; then a non-success terminal subtype surfaces its errors;
- * then a success result flagged `is_error` surfaces its text.
- */
 function runErrorMessage(
   error: unknown,
   result?: SDKResultMessage
@@ -168,15 +135,11 @@ function runErrorMessage(
 }
 
 type ClaudeAgentTracerOptions = {
-  /** The user prompt, when invoked as a string (recorded as input on the Turn). */
   prompt?: string;
-  /**
-   * The main-thread agent name (`options.agent`). Falls back to the integration
-   * name used by the Agents-tab per-agent usage rollup.
-   */
   agent?: string;
 };
 
+/** Maps a Claude Agent SDK query stream to Weave GenAI handles. */
 export class ClaudeAgentTracer {
   private readonly agentName: string;
   private readonly prompt: string | undefined;
@@ -221,7 +184,6 @@ export class ClaudeAgentTracer {
     this.captureConversationId(result?.session_id);
     const turn = this.ensureTurn();
 
-    // Sweep tool calls left open by an interrupted stream or missing result.
     for (const tool of this.openTools.values()) {
       tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
       tool.end({error: new Error('Agent ended with open tool span')});
@@ -259,10 +221,6 @@ export class ClaudeAgentTracer {
     }
   }
 
-  /**
-   * Capture the Claude session id. Real SDK messages all carry it, but the
-   * late-binding branch keeps result-only streams and partial test doubles safe.
-   */
   private captureConversationId(sessionId: string | undefined): void {
     if (this.conversationId != null || !sessionId) {
       return;
@@ -275,16 +233,12 @@ export class ClaudeAgentTracer {
     }
   }
 
-  /**
-   * Lazily create the root Turn once a message is consumed. The start time is
-   * captured in the constructor, so delaying creation until the session id is
-   * known does not shorten the recorded query duration.
-   */
   private ensureTurn(): Turn {
     if (this.turn) {
       return this.turn;
     }
 
+    // Defer creation until the session ID is known without losing query time.
     this.turn = runIsolated(() =>
       Turn.create({
         agentName: this.agentName,
@@ -304,7 +258,6 @@ export class ClaudeAgentTracer {
     return this.turn;
   }
 
-  /** Agent/conversation identity that is not first-class on child emitters. */
   private childAttributes(): Attributes {
     return {
       [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
@@ -314,10 +267,6 @@ export class ClaudeAgentTracer {
     };
   }
 
-  /**
-   * Emit one usage-only LLM span per model so the trace server can price and
-   * roll up each model independently. The root carries no token usage.
-   */
   private emitModelUsageSpans(result: SDKResultMessage): void {
     const perModel: Array<[string | undefined, ModelUsage | NonNullableUsage]> =
       result.modelUsage && Object.keys(result.modelUsage).length > 0
@@ -327,6 +276,7 @@ export class ClaudeAgentTracer {
           : [];
 
     const turn = this.ensureTurn();
+    // Keep usage per model so the server can price each model independently.
     for (const [model, rawUsage] of perModel) {
       const normalized = normalizeUsage(rawUsage);
       runIsolated(() => {
@@ -375,8 +325,7 @@ export class ClaudeAgentTracer {
       llm.end();
     });
 
-    // Tool spans are flat children of the Turn and remain open until the
-    // matching tool_result arrives on a later user message.
+    // Tool spans stay open until the matching tool_result arrives.
     for (const block of content) {
       if (block.type !== 'tool_use') {
         continue;

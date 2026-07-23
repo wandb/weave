@@ -319,8 +319,6 @@ describe('Claude Agent SDK — Weave GenAI tracer', () => {
       JSON.parse(invoke.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([{role: 'assistant', content: 'It is sunny.'}]);
 
-    // Two canonical `chat` spans target claude-x: the per-message content span
-    // and the per-model usage span. Distinguish them by what each carries.
     const chatSpans = spans.filter(
       s =>
         s.name === 'chat' &&
