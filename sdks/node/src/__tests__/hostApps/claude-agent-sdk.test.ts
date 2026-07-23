@@ -15,7 +15,7 @@ type CapturedSpan = {
 // `@anthropic-ai/claude-agent-sdk`'s `query()` and emits the integration's root
 // agent span through the real OTel pipeline. The detailed span-tree, usage, and
 // tool-call shape are asserted one layer down in the tracer unit test
-// (src/__tests__/integrations/claude-agent-sdk/otelTracer.test.ts), which drives
+// (src/__tests__/integrations/claude-agent-sdk/tracer.test.ts), which drives
 // the tracer directly against mocked SDK messages — cheaper and more exhaustive
 // than re-asserting shape inside a spawned host app.
 describe('hostApps — claude-agent-sdk', () => {
@@ -47,9 +47,7 @@ describe('hostApps — claude-agent-sdk', () => {
     // `--import=weave/instrument` patched query() and the tracer emitted its
     // root agent span through the real OTel pipeline. That's the entire
     // packaging / module-loading contract this layer protects.
-    const emittedAgentRoot = spans.some(
-      s => s.name === 'invoke_agent claude_agent_sdk'
-    );
+    const emittedAgentRoot = spans.some(s => s.name === 'invoke_agent');
     expect(emittedAgentRoot).toBe(true);
   }, 60_000);
 });

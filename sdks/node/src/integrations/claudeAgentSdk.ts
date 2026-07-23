@@ -8,8 +8,8 @@
  * hook callback only sees tool name/input/session_id — never the assistant
  * message content, model, token usage, or total_cost_usd. We therefore wrap the
  * SDK's exported `query()` and emit GenAI agent spans from the streamed messages
- * through the shared Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool`
- * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
+ * through the high-level Weave GenAI SDK — `invoke_agent`/`chat`/`execute_tool`
+ * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentTracer}.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
@@ -20,7 +20,7 @@
  */
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
+import {ClaudeAgentTracer} from './claude-agent-sdk/tracer';
 import state from '../state';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 
@@ -42,7 +42,7 @@ const GENERATOR_MEMBERS = new Set<PropertyKey>([
 ]);
 
 /**
- * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentOtelTracer}.
+ * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentTracer}.
  * The returned object preserves the full `Query` interface: iteration is traced,
  * and every other member (`interrupt`, `setModel`, `streamInput`, …) is
  * forwarded to the underlying query.
@@ -58,7 +58,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
     // gen_ai.agent.name follows the caller's main-thread agent when named.
     const agent = args?.options?.agent;
-    const tracer = new ClaudeAgentOtelTracer({prompt, agent});
+    const tracer = new ClaudeAgentTracer({prompt, agent});
 
     async function* traced(): AsyncGenerator<unknown, void> {
       let result: ClaudeAgentSdk.SDKResultMessage | undefined;
