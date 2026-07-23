@@ -11,7 +11,6 @@ import {
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
@@ -145,7 +144,6 @@ export class ClaudeAgentOtelTracer {
   private readonly openTools = new Map<string, Tool>();
 
   private turn: Turn | null = null;
-  private conversationId: string | null = null;
   private rootModel: string | null = null;
   private finished = false;
 
@@ -155,8 +153,7 @@ export class ClaudeAgentOtelTracer {
   }
 
   processMessage(msg: SDKMessage): void {
-    this.captureConversationId(msg.session_id);
-    this.ensureTurn();
+    this.ensureTurn(msg.session_id);
 
     switch (msg.type) {
       case 'assistant':
@@ -176,8 +173,7 @@ export class ClaudeAgentOtelTracer {
     }
     this.finished = true;
 
-    this.captureConversationId(result?.session_id);
-    const turn = this.ensureTurn();
+    const turn = this.ensureTurn(result?.session_id);
 
     for (const tool of this.openTools.values()) {
       tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
@@ -209,19 +205,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private captureConversationId(sessionId: string | undefined): void {
-    if (this.conversationId != null || !sessionId) {
-      return;
-    }
-    this.conversationId = sessionId;
-    if (this.turn) {
-      this.turn.setAttributes({
-        [ATTR_GEN_AI_CONVERSATION_ID]: sessionId,
-      });
-    }
-  }
-
-  private ensureTurn(): Turn {
+  private ensureTurn(conversationId = ''): Turn {
     if (this.turn) {
       return this.turn;
     }
@@ -230,7 +214,7 @@ export class ClaudeAgentOtelTracer {
     this.turn = runIsolated(() => {
       const conversation = Conversation.create({
         agentName: this.agentName,
-        conversationId: this.conversationId ?? '',
+        conversationId,
         attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
       });
       return conversation.startTurn({
