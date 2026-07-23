@@ -2056,9 +2056,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
         "all-consumers-off",
     ],
 )
-def test_genai_otel_export_emit_gate(
-    monkeypatch, online_eval, scoring, insights
-):
+def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights):
     """OTel ingest emits for scoring or Insights, independent of online eval."""
     mock_producer = MagicMock()
     monkeypatch.setattr(
