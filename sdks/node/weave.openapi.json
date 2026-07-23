@@ -5875,14 +5875,14 @@
         }
       }
     },
-    "/v2/{entity}/{project}/custom-runtimes/{runtime_name}": {
+    "/v2/{entity}/{project}/runtimes/{runtime_name}": {
       "put": {
         "tags": [
           "Custom Runtimes"
         ],
         "summary": "Custom Runtime Apply",
         "description": "Create or replace a custom runtime configuration.",
-        "operationId": "custom_runtime_apply_v2__entity___project__custom_runtimes__runtime_name__put",
+        "operationId": "custom_runtime_apply_v2__entity___project__runtimes__runtime_name__put",
         "parameters": [
           {
             "name": "entity",
