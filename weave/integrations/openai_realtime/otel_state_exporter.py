@@ -201,7 +201,7 @@ class OTelStateExporter(StateExporter):
             content: Content = Content.from_bytes(
                 pcm_to_wav(bytes(pcm_bytes)), mimetype=_AUDIO_MIME_TYPE
             )
-            ref = publish(content)
+            ref = publish(content, disable_logging=True)
             # ``ref.uri`` may be a str subclass that OTel attr validation rejects.
             return str(getattr(ref, "uri", ref))
         except Exception:
@@ -340,8 +340,7 @@ class OTelStateExporter(StateExporter):
             self._session_root_spans[group_key] = root
             if created_at:
                 self._session_last_activity[group_key] = created_at
-        # Log outside the lock; this runs once, when the root is first created.
-        self._log_conversation_link(conversation_id)
+            self._log_conversation_link(conversation_id)
         return root
 
     def _log_conversation_link(self, conversation_id: str) -> None:
