@@ -1513,7 +1513,7 @@ FEEDBACK_AGGREGATE_GROUP_BY_COLUMNS: frozenset[FeedbackAggregateGroupByColumn] =
 )
 
 # Span types, matched on the feedback's weave_ref path segment
-FeedbackSpanType: TypeAlias = Literal["agent_turn", "agent_conversation"]
+FeedbackSpanType: TypeAlias = Literal["agent_turn", "agent_span", "agent_conversation"]
 
 # Limit aggregate feedback request time range and time bucket count
 MAX_FEEDBACK_AGG_TIME_RANGE_DAYS = 31
@@ -1572,7 +1572,7 @@ class FeedbackAggregateReq(BaseModelStrict):
     )
     span_types: list[FeedbackSpanType] = Field(
         default_factory=list,
-        description="Filter by span type (turn vs conversation).",
+        description="Filter by span type (turn, message span, or conversation).",
     )
     group_by: list[FeedbackAggregateGroupByColumn] = Field(
         default_factory=list,

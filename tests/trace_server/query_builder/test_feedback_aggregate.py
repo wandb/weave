@@ -332,6 +332,9 @@ def test_feedback_aggregate_req_validation():
     """The request model validates the window, bucket count, and group_by allowlist."""
     # Happy path: a sane request constructs cleanly.
     assert _make_req().time_bucket_seconds == _BUCKET_SECONDS
+    assert _make_req(span_types=["agent_span"]).span_types == ["agent_span"]
+    with pytest.raises(ValidationError):
+        _make_req(span_types=["call"])
 
     # before_ms must be strictly after after_ms.
     with pytest.raises(ValidationError):
