@@ -32,6 +32,7 @@ from weave.trace_server.agents.types import (
     AgentGroupByRef,
     AgentSearchReq,
     AgentSignalFilter,
+    AgentSignalsQueryReq,
     AgentSortBy,
     AgentSpanGroupDistributionSpec,
     AgentSpanGroupFilter,
@@ -3263,6 +3264,53 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
 # ---------------------------------------------------------------------------
 # Tests: agent target IDs persisted on feedback create
 # ---------------------------------------------------------------------------
+
+
+def test_agent_signals_query_filters_counts_and_pages(ch_server):
+    project_id = _make_project_id("signals-page")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_ids: list[str] = []
+    for index, tags in enumerate((["unsafe"], ["safe"], ["unsafe"])):
+        trace_id = uuid.uuid4().hex
+        created = ch_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=ri.InternalAgentTurnRef(
+                    project_id=project_id, trace_id=trace_id
+                ).uri,
+                feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                payload={},
+                scorer_tags=tags,
+                span_agent_name=f"agent-{index}",
+                span_trace_id=trace_id,
+                wb_user_id=f"user-{index}",
+            )
+        )
+        created_ids.append(created.id)
+
+    request = AgentSignalsQueryReq(
+        project_id=project_id,
+        after_ms=int((now - datetime.timedelta(minutes=1)).timestamp() * 1000),
+        before_ms=int((now + datetime.timedelta(minutes=1)).timestamp() * 1000),
+        feedback_types=[AGENT_USER_FEEDBACK_TYPE],
+        tags=["unsafe"],
+        limit=1,
+    )
+    first = ch_server.agent_signals_query(request)
+    second = ch_server.agent_signals_query(request.model_copy(update={"offset": 1}))
+
+    assert first.total_count == 2
+    assert second.total_count == 2
+    assert len(first.signals) == 1
+    assert len(second.signals) == 1
+    assert {first.signals[0].id, second.signals[0].id} == {
+        created_ids[0],
+        created_ids[2],
+    }
+    assert first.signals[0].scorer_tags == ["unsafe"]
+    assert second.signals[0].scorer_tags == ["unsafe"]
+    assert first.signals[0].total_cost_usd is None
+    assert second.signals[0].total_cost_usd is None
 
 
 def test_feedback_create_derives_conversation_target_id_from_ref(ch_server):

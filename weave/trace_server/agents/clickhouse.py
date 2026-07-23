@@ -61,6 +61,9 @@ from weave.trace_server.agents.types import (
     AgentSearchMatchedMessage,
     AgentSearchReq,
     AgentSearchRes,
+    AgentSignalSchema,
+    AgentSignalsQueryReq,
+    AgentSignalsQueryRes,
     AgentSpanGroupDistributionBin,
     AgentSpanGroupDistributionItem,
     AgentSpanGroupDistributionValue,
@@ -82,7 +85,10 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
-from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
+from weave.trace_server.clickhouse.utilities import (
+    ensure_datetimes_have_tz,
+    insert_with_empty_query_retry,
+)
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import (
@@ -113,6 +119,10 @@ from weave.trace_server.query_builder.agent_query_builder import (
     safe_int,
     safe_str,
     span_group_distribution_key,
+)
+from weave.trace_server.query_builder.agent_signals_query_builder import (
+    make_agent_signals_count_query,
+    make_agent_signals_list_query,
 )
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
@@ -148,6 +158,7 @@ PaginatedReqT = TypeVar(
     AgentSpansQueryReq,
     AgentsQueryReq,
     AgentVersionsQueryReq,
+    AgentSignalsQueryReq,
     AgentConversationChatReq,
 )
 PARAM_NAMESPACE = "genai"
@@ -202,6 +213,17 @@ class AgentQueryHandler:
         if _is_conversation_grouping(req.group_by):
             self._hydrate_conversation_previews(req, groups, aliases[0])
         return AgentSpansQueryRes(groups=groups, total_count=total)
+
+    def signals_query(self, req: AgentSignalsQueryReq) -> AgentSignalsQueryRes:
+        """Query one filtered Signals page and its authoritative total."""
+        total, rows = self._run_paginated(
+            make_agent_signals_count_query, make_agent_signals_list_query, req
+        )
+        signals: list[AgentSignalSchema] = []
+        for row in rows:
+            row["created_at"] = ensure_datetimes_have_tz(row.get("created_at"))
+            signals.append(AgentSignalSchema.model_validate(row))
+        return AgentSignalsQueryRes(signals=signals, total_count=total)
 
     def _hydrate_conversation_previews(
         self,

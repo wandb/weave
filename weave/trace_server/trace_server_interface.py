@@ -3524,6 +3524,9 @@ class TraceServerInterface(Protocol):
     def agent_spans_query(
         self, req: agent_types.AgentSpansQueryReq
     ) -> agent_types.AgentSpansQueryRes: ...
+    def agent_signals_query(
+        self, req: agent_types.AgentSignalsQueryReq
+    ) -> agent_types.AgentSignalsQueryRes: ...
     def agent_spans_stats(
         self, req: agent_types.AgentSpanStatsReq
     ) -> agent_types.AgentSpanStatsRes: ...

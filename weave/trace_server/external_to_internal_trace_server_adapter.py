@@ -1480,6 +1480,23 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             span.project_id = original_project_id
         return res
 
+    def agent_signals_query(
+        self, req: tsi.agent_types.AgentSignalsQueryReq
+    ) -> tsi.agent_types.AgentSignalsQueryRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        res = self._ref_apply(
+            self._internal_trace_server.agent_signals_query,
+            req,
+            req.project_id,
+            tolerate_external_refs=True,
+        )
+        for signal in res.signals:
+            if signal.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            signal.project_id = original_project_id
+        return res
+
     def agent_spans_stats(
         self, req: tsi.agent_types.AgentSpanStatsReq
     ) -> tsi.agent_types.AgentSpanStatsRes:

@@ -641,6 +641,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def agent_signals_query(
+        self, req: agent_types.AgentSignalsQueryReq
+    ) -> agent_types.AgentSignalsQueryRes:
+        return self._generic_request(
+            "/agents/signals/query",
+            req,
+            agent_types.AgentSignalsQueryReq,
+            agent_types.AgentSignalsQueryRes,
+        )
+
+    @validate_call
     def agent_traces_chat(
         self, req: agent_types.AgentTraceChatReq
     ) -> agent_types.AgentTraceChatRes:

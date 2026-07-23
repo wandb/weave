@@ -8,7 +8,7 @@ endpoints (services/weave-trace) and the ClickHouse query handlers
 from __future__ import annotations
 
 import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, get_args
 
 from pydantic import (
     AwareDatetime,
@@ -789,6 +789,76 @@ class AgentSignalFilter(BaseModel):
 
     def is_empty(self) -> bool:
         return not self.tags and not self.ratings
+
+
+AgentSignalSpanType = Literal["agent_turn", "agent_conversation"]
+AgentSignalSortField = Literal["created_at", "rating", "total_cost_usd"]
+
+
+class AgentSignalsQueryReq(BaseModel):
+    """Request one filtered, globally sorted page of agent Signals feedback."""
+
+    project_id: str
+    after_ms: int = Field(ge=0)
+    before_ms: int = Field(ge=0)
+    feedback_types: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    rating_min: float | None = Field(default=None, ge=0.0, le=1.0)
+    rating_max: float | None = Field(default=None, ge=0.0, le=1.0)
+    monitor_ids: list[str] = Field(default_factory=list)
+    scorer_ids: list[str] = Field(default_factory=list)
+    span_agent_names: list[str] = Field(default_factory=list)
+    span_types: list[AgentSignalSpanType] = Field(default_factory=list)
+    sort_by: AgentSortBy = Field(
+        default_factory=lambda: AgentSortBy(field="created_at", direction="desc")
+    )
+    limit: int = Field(
+        default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
+    )
+    offset: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_signals_query_request(self) -> AgentSignalsQueryReq:
+        if self.before_ms <= self.after_ms:
+            raise ValueError("before_ms must be greater than after_ms")
+        if self.sort_by.field not in get_args(AgentSignalSortField):
+            raise ValueError(f"unsupported Signals sort field: {self.sort_by.field!r}")
+        if (
+            self.rating_min is not None
+            and self.rating_max is not None
+            and self.rating_max < self.rating_min
+        ):
+            raise ValueError("rating_max must be greater than or equal to rating_min")
+        return self
+
+
+class AgentSignalSchema(BaseModel):
+    """One agent Signals feedback row with its query-time scorer cost."""
+
+    id: str
+    project_id: str
+    weave_ref: str
+    wb_user_id: str
+    creator: str | None = None
+    created_at: datetime.datetime
+    feedback_type: str
+    runnable_ref: str | None = None
+    scorer_tags: list[str] = Field(default_factory=list)
+    scorer_tag_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_tag_confidences: dict[str, float] = Field(default_factory=dict)
+    scorer_ratings: dict[str, float] = Field(default_factory=dict)
+    scorer_rating_reasons: dict[str, str] = Field(default_factory=dict)
+    scorer_rating_confidences: dict[str, float] = Field(default_factory=dict)
+    span_agent_name: str = ""
+    span_conversation_id: str = ""
+    span_trace_id: str = ""
+    scorer_trace_id: str = ""
+    total_cost_usd: float | None = None
+
+
+class AgentSignalsQueryRes(BaseModel):
+    signals: list[AgentSignalSchema] = Field(default_factory=list)
+    total_count: int = 0
 
 
 class AgentSpansQueryReq(BaseModel):
