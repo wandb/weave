@@ -76,14 +76,6 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   attributes?: Record<string, any>;
 }
 
-type AsyncResult<F extends (...args: any[]) => any> = Promise<
-  Awaited<ReturnType<F>>
->;
-
-export interface OpWrapper<F extends (...args: any[]) => any> {
-  (this: any, ...params: Parameters<F>): AsyncResult<F>;
-}
-
 export interface CallMethod<F extends (...args: any[]) => any> {
   (
     this: any,

@@ -237,7 +237,7 @@ export function makeOpenAIImagesGenerateOp(originalGenerate: any) {
 
 import {type StreamReducer} from '../opType';
 
-export type Response = {
+type Response = {
   id: string;
   object: string;
   created_at: number;

@@ -95,7 +95,7 @@ const PI_CODING_AGENT_INTEGRATION_OTEL_ATTRS = asOtelAttributes(
 // ---------------------------------------------------------------------------
 
 /** Options for the pi coding agent OTEL extension. */
-export interface OtelExtensionOptions {
+interface OtelExtensionOptions {
   tracer?: Tracer;
   captureContent?: boolean;
 }
