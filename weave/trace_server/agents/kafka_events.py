@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
@@ -20,13 +21,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SCORE_AGENT_SPANS_TOPIC = "weave.score_agent_spans"
+EMBED_AGENT_SPANS_TOPIC = "weave.embed_agent_spans"
 
 _SENTINEL_EPOCH_NAIVE = SENTINEL_EPOCH_UTC.replace(tzinfo=None)
 
 
-class ScoreAgentSpansEvent(BaseModel):
-    """Trigger event for agent scoring."""
-
+class _AgentSpansEvent(BaseModel):
     event_type: AgentSpanOpName
     status_code: StatusCodeLiteral
     project_id: str
@@ -36,18 +36,9 @@ class ScoreAgentSpansEvent(BaseModel):
     parent_span_id: str | None
     conversation_id: str | None
 
-    def emit(self, producer: KafkaProducer | None) -> None:
-        """Produce this event to Kafka. Logs failures without raising."""
-        if producer is None:
-            return
-        try:
-            producer.produce_score_agent_spans(self)
-        except Exception:
-            logger.exception("Failed to emit ScoreAgentSpansEvent")
-
-    @staticmethod
-    def from_row(row: AgentSpanCHInsertable) -> ScoreAgentSpansEvent | None:
-        """Return a ScoreAgentSpansEvent from a finished span row if it matches any event_type (else None).
+    @classmethod
+    def from_row(cls, row: AgentSpanCHInsertable) -> Self | None:
+        """Return an event from a finished span row if it matches an event type.
 
         Currently only "turn_ended" is supported, but the interface is designed to support multiple types.
         """
@@ -57,7 +48,7 @@ class ScoreAgentSpansEvent(BaseModel):
             event_type = "weave.genai.turn_ended"
         # Ignore in-progress spans
         if event_type and row.ended_at > _SENTINEL_EPOCH_NAIVE:
-            return ScoreAgentSpansEvent(
+            return cls(
                 event_type=event_type,
                 status_code=row.status_code,
                 project_id=row.project_id,
@@ -69,3 +60,29 @@ class ScoreAgentSpansEvent(BaseModel):
                 operation_name=row.operation_name or None,
             )
         return None
+
+
+class ScoreAgentSpansEvent(_AgentSpansEvent):
+    """Trigger event for agent scoring."""
+
+    def emit(self, producer: KafkaProducer | None) -> None:
+        """Produce this event for agent scoring without raising."""
+        if producer is None:
+            return
+        try:
+            producer.produce_score_agent_spans(self)
+        except Exception:
+            logger.exception("Failed to emit ScoreAgentSpansEvent")
+
+
+class EmbedAgentSpansEvent(_AgentSpansEvent):
+    """Trigger event for Agent Insights embedding."""
+
+    def emit(self, producer: KafkaProducer | None) -> None:
+        """Produce this event for Agent Insights without raising."""
+        if producer is None:
+            return
+        try:
+            producer.produce_embed_agent_spans(self)
+        except Exception:
+            logger.exception("Failed to emit EmbedAgentSpansEvent")
