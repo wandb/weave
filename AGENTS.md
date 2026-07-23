@@ -294,6 +294,9 @@ The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
 and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
 `npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
 (`TypeError: Cannot read properties of null (reading 'matches')`).
+On the Codex macOS environment, select the installed Node 22 runtime before
+running pnpm (`nvm use 22.22.3`); the default Node 20 shell can resolve a global
+pnpm that requires `node:sqlite` and fails before executing a command.
 
 ```
 cd sdks/node
@@ -346,6 +349,14 @@ pnpm exec tsx examples/claudeAgents.ts
 - Response-model attributes belong to the child `chat` spans that performed
   inference; do not copy a first/primary child model onto a potentially
   multi-model `invoke_agent` span.
+- Keep the terminal agent result on the `invoke_agent` span as
+  `gen_ai.output.messages`, even when child `chat` spans carry model output.
+  TypeScript integrations record it through
+  `Turn.record({outputMessages: ...})`; `Turn.end()` serializes it. The root
+  value is the agent-level return and covers result-only streams, while
+  `agents/chat_view.py` suppresses it when a descendant already emitted
+  assistant text. Python's lower-level `invoke_agent_attributes()` accepts
+  `output_messages`, but Python `Turn.record()` does not yet expose it.
 - Conversation-scoped integrations use `weave.integration.name` and
   `weave.integration.version` as fixed identity inherited by every span; do
   not duplicate them under `integration.name`, `integration.version`, or

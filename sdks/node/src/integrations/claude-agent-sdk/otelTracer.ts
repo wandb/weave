@@ -1,9 +1,6 @@
-import type {Attributes} from '@opentelemetry/api';
-
 import {
   Conversation,
   runIsolated,
-  type Message,
   type MessagePart,
   type Tool,
   type Turn,
@@ -11,7 +8,6 @@ import {
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
   WEAVE_INTEGRATION_NAME,
@@ -184,14 +180,14 @@ export class ClaudeAgentOtelTracer {
     if (result) {
       this.emitModelUsageSpans(result, turn);
 
-      const resultAttributes: Attributes = {
+      turn.setAttributes({
         [ATTR_COST_USD]: result.total_cost_usd,
-      };
+      });
       if (result.subtype === 'success') {
-        const output: Message[] = [{role: 'assistant', content: result.result}];
-        resultAttributes[ATTR_GEN_AI_OUTPUT_MESSAGES] = JSON.stringify(output);
+        turn.record({
+          outputMessages: [{role: 'assistant', content: result.result}],
+        });
       }
-      turn.setAttributes(resultAttributes);
     }
 
     const errorMessage = runErrorMessage(error, result);
