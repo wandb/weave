@@ -3,6 +3,7 @@ import io
 import logging
 from collections.abc import Iterator
 from typing import Any, cast
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -1471,6 +1472,24 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             tsi.DatasetDeleteRes,
             method="DELETE",
             params=params,
+        )
+
+    @validate_call
+    def custom_runtime_apply(
+        self, req: tsi.CustomRuntimeApplyReq
+    ) -> tsi.CustomRuntimeApplyRes:
+        entity, project = from_project_id(req.project_id)
+        runtime_name = quote(req.runtime_name, safe="")
+        url = f"/v2/{entity}/{project}/custom-runtimes/{runtime_name}"
+        body = tsi.CustomRuntimeApplyBody.model_validate(
+            req.model_dump(exclude={"project_id", "runtime_name", "wb_user_id"})
+        )
+        return self._generic_request(
+            url,
+            body,
+            tsi.CustomRuntimeApplyBody,
+            tsi.CustomRuntimeApplyRes,
+            method="PUT",
         )
 
     @validate_call

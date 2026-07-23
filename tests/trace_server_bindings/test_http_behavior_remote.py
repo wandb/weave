@@ -80,6 +80,52 @@ def test_call_start_ok(mock_post, unbatched_server):
     mock_post.assert_called_once()
 
 
+@patch("weave.utils.http_requests.put")
+def test_custom_runtime_apply_sends_put_request(mock_put, unbatched_server):
+    expected = tsi.CustomRuntimeApplyRes(
+        name="support/agent?canary",
+        base_url="https://agent.example.com/v1",
+        api_key_secret=None,
+        headers={"X-Tenant-ID": "customer-1"},
+        runtime_ids=[
+            tsi.CustomRuntimeIDRes(
+                id="support-v12",
+                max_tokens=4096,
+                playground_id="custom::support/agent?canary::support-v12",
+            )
+        ],
+    )
+    mock_put.return_value = httpx.Response(
+        200,
+        json=expected.model_dump(),
+        request=httpx.Request("PUT", "http://example.com"),
+    )
+
+    result = unbatched_server.custom_runtime_apply(
+        tsi.CustomRuntimeApplyReq(
+            project_id="entity/project",
+            runtime_name="support/agent?canary",
+            base_url="https://agent.example.com/v1",
+            api_key_secret=None,
+            headers={"X-Tenant-ID": "customer-1"},
+            runtime_ids=[tsi.CustomRuntimeID(id="support-v12")],
+        )
+    )
+
+    assert result == expected
+    mock_put.assert_called_once()
+    call = mock_put.call_args
+    assert call.args[0] == (
+        "http://example.com/v2/entity/project/custom-runtimes/support%2Fagent%3Fcanary"
+    )
+    assert json.loads(call.kwargs["data"]) == {
+        "base_url": "https://agent.example.com/v1",
+        "api_key_secret": None,
+        "headers": {"X-Tenant-ID": "customer-1"},
+        "runtime_ids": [{"id": "support-v12", "max_tokens": 4096}],
+    }
+
+
 @patch("weave.utils.http_requests.post")
 def test_400_no_retry(mock_post, unbatched_server):
     """Test that 400 errors are not retried."""
