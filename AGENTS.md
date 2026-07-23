@@ -100,6 +100,9 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
+Feedback aggregate `span_types` filters support all agent feedback target refs:
+`agent_turn`, individual-message `agent_span`, and `agent_conversation`.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines
