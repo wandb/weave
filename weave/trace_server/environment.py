@@ -67,20 +67,17 @@ def wf_kafka_project_id_bucket_count() -> int:
 
 
 def wf_enable_online_eval() -> bool:
-    """Whether to enable online evaluation."""
+    """Enable the scoring worker and emit `weave.call_ended` events."""
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_enable_agent_scoring() -> bool:
-    """Whether to emit ScoreAgentSpansEvent triggers from the OTel ingest path.
-
-    In addition to `wf_enable_online_eval` so agent scoring can be toggled independently.
-    """
+    """Enable the agent scoring worker and emit `weave.score_agent_spans` events."""
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
 
 
 def wf_enable_agent_insights() -> bool:
-    """Whether to emit agent span events for the insights worker."""
+    """Enable the insights worker to emit `weave.embed_agent_spans` events."""
     return os.environ.get("WEAVE_ENABLE_AGENT_INSIGHTS", "false").lower() == "true"
 
 

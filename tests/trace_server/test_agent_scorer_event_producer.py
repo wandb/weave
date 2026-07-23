@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.agents.kafka_events import (
+    EMBED_AGENT_SPANS_TOPIC,
     SCORE_AGENT_SPANS_TOPIC,
     ScoreAgentSpansEvent,
 )
@@ -29,8 +30,9 @@ def _make_event(**overrides) -> ScoreAgentSpansEvent:
     return ScoreAgentSpansEvent(**base)
 
 
-def test_topic_constant_value() -> None:
+def test_topic_constant_values() -> None:
     assert SCORE_AGENT_SPANS_TOPIC == "weave.score_agent_spans"
+    assert EMBED_AGENT_SPANS_TOPIC == "weave.embed_agent_spans"
 
 
 def test_event_round_trip() -> None:
@@ -52,29 +54,43 @@ def _bind_real_methods(producer: MagicMock, *names: str) -> None:
         setattr(producer, name, getattr(KafkaProducer, name).__get__(producer))
 
 
+@pytest.mark.parametrize(
+    "method_name", ["produce_score_agent_spans", "produce_embed_agent_spans"]
+)
 @pytest.mark.disable_logging_error_check
-def test_producer_drops_when_buffer_full() -> None:
+def test_producer_drops_when_buffer_full(method_name: str) -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 2
     producer.__len__ = MagicMock(return_value=5)  # buffer full
-    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
+    _bind_real_methods(
+        producer, method_name, "_produce_agent_spans", "_check_buffer_pressure"
+    )
 
-    producer.produce_score_agent_spans(_make_event())
+    getattr(producer, method_name)(_make_event())
 
     producer.produce.assert_not_called()
 
 
-def test_producer_publishes_under_buffer_limit() -> None:
+@pytest.mark.parametrize(
+    ("method_name", "topic"),
+    [
+        ("produce_score_agent_spans", "weave.score_agent_spans"),
+        ("produce_embed_agent_spans", "weave.embed_agent_spans"),
+    ],
+)
+def test_producer_publishes_under_buffer_limit(method_name: str, topic: str) -> None:
     producer = MagicMock(spec=KafkaProducer)
     producer.max_buffer_size = 100
     producer.__len__ = MagicMock(return_value=0)
-    _bind_real_methods(producer, "produce_score_agent_spans", "_check_buffer_pressure")
+    _bind_real_methods(
+        producer, method_name, "_produce_agent_spans", "_check_buffer_pressure"
+    )
 
-    producer.produce_score_agent_spans(_make_event())
+    getattr(producer, method_name)(_make_event())
 
     producer.produce.assert_called_once()
     call_kwargs = producer.produce.call_args.kwargs
-    assert call_kwargs["topic"] == "weave.score_agent_spans"
+    assert call_kwargs["topic"] == topic
 
 
 @pytest.mark.disable_logging_error_check

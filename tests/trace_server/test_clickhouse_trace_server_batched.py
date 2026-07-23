@@ -1402,6 +1402,41 @@ def server_with_mock_kafka():
             yield server, mock_producer
 
 
+@pytest.mark.parametrize(
+    ("online_eval", "scoring", "insights", "should_enable"),
+    [
+        (True, False, False, True),
+        (False, True, False, True),
+        (False, False, True, True),
+        (True, True, True, True),
+        (False, False, False, False),
+    ],
+)
+def test_kafka_producer_feature_gate(
+    monkeypatch, online_eval, scoring, insights, should_enable
+):
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: online_eval
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
+    )
+
+    if should_enable:
+        assert server.kafka_producer is mock_producer
+    else:
+        assert server.kafka_producer is None
+
+
 def _make_call_end_req() -> tsi.CallEndReq:
     return tsi.CallEndReq(
         end=tsi.EndedCallSchemaForInsert(
@@ -2001,15 +2036,15 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 
 
 @pytest.mark.parametrize(
-    ("online_eval", "scoring", "insights", "should_emit"),
+    ("online_eval", "scoring", "insights"),
     [
-        (True, True, False, True),
-        (True, False, True, True),
-        (True, True, True, True),
-        (False, False, True, False),
-        (False, True, True, False),
-        (False, True, False, False),
-        (True, False, False, False),
+        (True, True, False),
+        (True, False, True),
+        (True, True, True),
+        (False, False, True),
+        (False, True, True),
+        (False, True, False),
+        (True, False, False),
     ],
     ids=[
         "online-eval-and-scoring",
@@ -2022,9 +2057,9 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
     ],
 )
 def test_genai_otel_export_emit_gate(
-    monkeypatch, online_eval, scoring, insights, should_emit
+    monkeypatch, online_eval, scoring, insights
 ):
-    """OTel ingest requires online eval and at least one event consumer."""
+    """OTel ingest emits for scoring or Insights, independent of online eval."""
     mock_producer = MagicMock()
     monkeypatch.setattr(
         chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
@@ -2055,11 +2090,17 @@ def test_genai_otel_export_emit_gate(
     )
 
     assert res.accepted_spans == 1
-    if should_emit:
+    if scoring:
         mock_producer.produce_score_agent_spans.assert_called_once()
-        mock_producer.flush.assert_called_once_with(0)
     else:
         mock_producer.produce_score_agent_spans.assert_not_called()
+    if insights:
+        mock_producer.produce_embed_agent_spans.assert_called_once()
+    else:
+        mock_producer.produce_embed_agent_spans.assert_not_called()
+    if scoring or insights:
+        mock_producer.flush.assert_called_once_with(0)
+    else:
         mock_producer.flush.assert_not_called()
 
 

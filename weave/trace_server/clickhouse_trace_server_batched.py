@@ -545,8 +545,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     @property
     def kafka_producer(self) -> KafkaProducer | None:
         """Lazily initialize the producer when an event consumer is enabled."""
-        if not wf_env.wf_enable_online_eval() or not (
-            wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_insights()
+        if not (
+            wf_env.wf_enable_online_eval()
+            or wf_env.wf_enable_agent_scoring()
+            or wf_env.wf_enable_agent_insights()
         ):
             return None
         if self._kafka_producer is not None:
@@ -7355,17 +7357,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
-        # Online eval is the top-level gate; scoring and Insights are consumers
-        # that can independently require the shared event stream beneath it.
-        if not wf_env.wf_enable_online_eval() or not (
-            wf_env.wf_enable_agent_scoring() or wf_env.wf_enable_agent_insights()
-        ):
+        scoring_enabled = wf_env.wf_enable_agent_scoring()
+        insights_enabled = wf_env.wf_enable_agent_insights()
+        if not (scoring_enabled or insights_enabled):
             return res
 
         # Emit for each row that produces a valid event type
         for row in span_rows:
             if event := ScoreAgentSpansEvent.from_row(row):
-                event.emit(self.kafka_producer)
+                event.emit(
+                    self.kafka_producer,
+                    for_scoring=scoring_enabled,
+                    for_insights=insights_enabled,
+                )
 
         # Flush kafka producer
         if span_rows and self.kafka_producer:

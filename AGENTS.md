@@ -93,6 +93,13 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
+Kafka event production uses independent feature gates. Online eval publishes
+call completions to `weave.call_ended`, agent scoring publishes agent spans to
+`weave.score_agent_spans`, and Agent Insights publishes the same agent-span
+payload to `weave.embed_agent_spans`. Completed root spans carry the event type
+`weave.genai.turn_ended`; when scoring and Insights are both enabled, publish
+the event to both agent-span topics.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines

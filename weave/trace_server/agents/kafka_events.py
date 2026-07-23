@@ -20,12 +20,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SCORE_AGENT_SPANS_TOPIC = "weave.score_agent_spans"
+EMBED_AGENT_SPANS_TOPIC = "weave.embed_agent_spans"
 
 _SENTINEL_EPOCH_NAIVE = SENTINEL_EPOCH_UTC.replace(tzinfo=None)
 
 
 class ScoreAgentSpansEvent(BaseModel):
-    """Trigger event for agent scoring."""
+    """Agent-span trigger shared by scoring and Insights."""
 
     event_type: AgentSpanOpName
     status_code: StatusCodeLiteral
@@ -36,14 +37,26 @@ class ScoreAgentSpansEvent(BaseModel):
     parent_span_id: str | None
     conversation_id: str | None
 
-    def emit(self, producer: KafkaProducer | None) -> None:
-        """Produce this event to Kafka. Logs failures without raising."""
+    def emit(
+        self,
+        producer: KafkaProducer | None,
+        *,
+        for_scoring: bool = True,
+        for_insights: bool = False,
+    ) -> None:
+        """Produce this event for each enabled consumer without raising."""
         if producer is None:
             return
-        try:
-            producer.produce_score_agent_spans(self)
-        except Exception:
-            logger.exception("Failed to emit ScoreAgentSpansEvent")
+        if for_scoring:
+            try:
+                producer.produce_score_agent_spans(self)
+            except Exception:
+                logger.exception("Failed to emit ScoreAgentSpansEvent for scoring")
+        if for_insights:
+            try:
+                producer.produce_embed_agent_spans(self)
+            except Exception:
+                logger.exception("Failed to emit agent spans event for Insights")
 
     @staticmethod
     def from_row(row: AgentSpanCHInsertable) -> ScoreAgentSpansEvent | None:
