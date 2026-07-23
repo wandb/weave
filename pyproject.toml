@@ -98,6 +98,7 @@ trace_server = [
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
+together = ["together>=1.3.0"]
 cohere = ["cohere>=5.13.5"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
 crewai = [
