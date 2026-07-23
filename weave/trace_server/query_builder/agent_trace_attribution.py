@@ -6,11 +6,16 @@ span, not on the child llm / tool spans it encloses. A span-exact read of those
 columns therefore shows blank identity on every child span and undercounts the
 turn's real work.
 
-This module attributes that identity at *read time* with a single rule:
+This module attributes that identity at *read time* with a three-step rule,
+checked in order:
 
-    if a span declares its own agent (`agent_name != ''`), use its own
-    identity (singleton / span-exact); otherwise inherit the identity of the
-    span's trace.
+    1. if a span declares its own agent (`agent_name != ''`), use its own
+       identity (singleton / span-exact);
+    2. otherwise, if the span's immediate parent declares its own agent, inherit
+       that parent's identity (the common case for a tool/llm span that is a
+       direct child of the `invoke_agent` span that issued it, including a
+       *sub*-agent's `invoke_agent` span);
+    3. otherwise inherit the trace's earliest-declared agent.
 
 It is expressed by wrapping the `spans` table in an *attributed-spans*
 subquery (see :func:`attributed_spans_source`). Callers swap their
@@ -20,20 +25,27 @@ aggregate) transparently sees the attributed value — what you filter on equals
 what you display.
 
 `agent_name` / `agent_version` / `agent_id` identify one agent, so they
-are inherited *together* as a single tuple taken from one span — the earliest
-span in the trace that declares an `agent_name` (`argMinIf` by
-`started_at`). Picking each column independently could synthesize a
-`(name, version)` pair that never co-occurred on any real span. Likewise, a
-span that declares its own `agent_name` keeps its *entire* own triple, so its
-version / id are never crossed with an inherited agent's. `conversation_id` is
-trace-scoped and inherited on its own.
+are inherited *together* as a single tuple taken from one span — either the
+span's immediate parent (step 2) or, failing that, the earliest span in the
+trace that declares an `agent_name` (`argMinIf` by `started_at`, step 3).
+Picking each column independently could synthesize a `(name, version)` pair
+that never co-occurred on any real span. Likewise, a span that declares its
+own `agent_name` keeps its *entire* own triple, so its version / id are never
+crossed with an inherited agent's. `conversation_id` is trace-scoped and
+inherited on its own (step 3 only; it has no per-parent step).
 
-This is a deliberately *flat* attribution: in a multi-agent trace an unset span
-inherits the trace's earliest-declared agent. A span that set its own identity
-always keeps it, so sub-agent spans are never wrongly attributed. The
-hierarchical "nearest enclosing agent" projection used by the chat view lives in
-`weave.trace_server.agents.chat_view` and is intentionally separate — queries
-that feed the chat view must NOT use this source or they would double-attribute.
+Step 2 is a *one-hop* parent lookup, not a full nearest-enclosing-agent walk:
+a span separated from its owning agent by an identity-less intermediate span
+still falls through to step 3's flat, trace-wide fallback. That is a known,
+documented limitation, not a bug — it trades exact hierarchical resolution
+(which would need an unbounded parent-chain walk ClickHouse cannot express
+without a recursive CTE) for a bounded, single-scan fix that resolves the
+common case: it never over-corrects, since step 2 only fires when the parent
+itself declares an identity, and step 3 is unchanged for every span step 2
+doesn't resolve. The full hierarchical "nearest enclosing agent" projection
+used by the chat view lives in `weave.trace_server.agents.chat_view` and is
+intentionally separate — queries that feed the chat view must NOT use this
+source or they would double-attribute.
 """
 
 from __future__ import annotations
@@ -161,7 +173,11 @@ def attributed_spans_source(
 
     The inner scan is bounded to `project_id` and the outer time window so it
     prunes by primary key; the fallback scan is bounded to the same window
-    widened by one trace-duration of slack so edge spans still resolve.
+    widened by one trace-duration of slack so edge spans still resolve. The
+    same fallback scan also builds a per-trace `span_id -> agent identity` map
+    (restricted to identity-declaring spans, so it stays small) used to resolve
+    a span's *immediate parent* identity in one map lookup, at no extra scan or
+    join cost.
     """
     pid_slot = pb.add(project_id, param_type="String")
 
@@ -186,14 +202,18 @@ def attributed_spans_source(
         base_before = pb.add(started_before, param_type="DateTime64(6)")
         base_conds.append(f"s0.started_at < {base_before}")
 
-    # The agent triple is inherited together from one span (the earliest in the
-    # trace that declares an agent_name); conversation_id is inherited on its
+    # The agent triple is inherited together from one span: the span's own
+    # immediate parent if it declares an identity, else the earliest
+    # identity-declaring span in the trace; conversation_id is inherited on its
     # own. Picking each agent column independently could mix two agents.
     agent_tuple = ", ".join(_AGENT_IDENTITY_COLUMNS)
+    agent_tuple_type = ", ".join("String" for _ in _AGENT_IDENTITY_COLUMNS)
     fallback_selects = (
         f"argMinIf(({agent_tuple}), started_at, {_AGENT_IDENTITY_MARKER} != '')\n"
         "            AS fb_agent_identity,\n"
-        "          anyIf(conversation_id, conversation_id != '') AS fb_conversation_id"
+        "          anyIf(conversation_id, conversation_id != '') AS fb_conversation_id,\n"
+        f"          CAST(groupArrayIf((span_id, ({agent_tuple})), {_AGENT_IDENTITY_MARKER} != ''),"
+        f" 'Map(String, Tuple({agent_tuple_type}))') AS fb_span_agents"
     )
     # Whether the span declares its own agent, computed from the raw column so
     # the coalesce gates below read it instead of the rewritten `agent_name`
@@ -201,17 +221,29 @@ def attributed_spans_source(
     # SELECT alias — gating on `agent_name` itself would see the *attributed*
     # value and leak one column of a different agent onto this span).
     own_marker = "has_own_agent_identity"
+    parent_marker = "has_parent_agent_identity"
     middle_refs = (
         f"(s0.{_AGENT_IDENTITY_MARKER} != '') AS {own_marker},"
-        " tf.fb_agent_identity, tf.fb_conversation_id"
+        " tf.fb_agent_identity, tf.fb_conversation_id,"
+        " tf.fb_span_agents[s0.parent_span_id] AS parent_agent_identity,"
+        f" (parent_agent_identity.1 != '') AS {parent_marker}"
     )
     except_cols = ", ".join(
-        [*IDENTITY_COLUMNS, own_marker, "fb_agent_identity", "fb_conversation_id"]
+        [
+            *IDENTITY_COLUMNS,
+            own_marker,
+            parent_marker,
+            "fb_agent_identity",
+            "fb_conversation_id",
+            "parent_agent_identity",
+        ]
     )
-    # A span that declares its own agent keeps its entire own triple; otherwise
-    # the whole triple is inherited — never a mix.
+    # A span keeps its entire own triple if set; else its immediate parent's
+    # entire triple if the parent declares one; else the trace-wide fallback.
+    # Never a mix of two agents' columns.
     agent_coalesced = ",\n    ".join(
-        f"if({own_marker}, {col}, fb_agent_identity.{idx}) AS {col}"
+        f"multiIf({own_marker}, {col}, {parent_marker}, parent_agent_identity.{idx},"
+        f" fb_agent_identity.{idx}) AS {col}"
         for idx, col in enumerate(_AGENT_IDENTITY_COLUMNS, start=1)
     )
     coalesced = (
