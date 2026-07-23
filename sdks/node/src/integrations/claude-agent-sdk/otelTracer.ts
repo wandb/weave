@@ -14,7 +14,6 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
-  ATTR_GEN_AI_RESPONSE_MODEL,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
   WEAVE_INTEGRATION_NAME,
   WEAVE_INTEGRATION_VERSION,
@@ -185,12 +184,6 @@ export class ClaudeAgentOtelTracer {
       tool.end({error: new Error('Agent ended with open tool span')});
     }
     this.openTools.clear();
-
-    if (this.rootModel) {
-      turn.setAttributes({
-        [ATTR_GEN_AI_RESPONSE_MODEL]: this.rootModel,
-      });
-    }
 
     if (result) {
       this.emitModelUsageSpans(result);

@@ -300,6 +300,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
+    expect(invoke.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBeUndefined();
     expect(invoke.parentSpanId).toBeUndefined();
     // The root carries no token usage of its own — per-model usage rides on
     // child `chat` spans (asserted below) so the trace server costs and rolls

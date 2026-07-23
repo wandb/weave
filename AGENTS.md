@@ -343,6 +343,9 @@ pnpm exec tsx examples/claudeAgents.ts
 - The high-level emitters use canonical span names (`invoke_agent`, `chat`,
   `execute_tool`); integration-specific fields not represented by typed
   `record()` methods can be attached through `setAttributes()`.
+- Response-model attributes belong to the child `chat` spans that performed
+  inference; do not copy a first/primary child model onto a potentially
+  multi-model `invoke_agent` span.
 - Conversation-scoped integrations use `weave.integration.name` and
   `weave.integration.version` as fixed identity inherited by every span; do
   not duplicate them under `integration.name`, `integration.version`, or
