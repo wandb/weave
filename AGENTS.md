@@ -352,9 +352,10 @@ pnpm exec tsx examples/claudeAgents.ts
   `integration.meta.package_name`.
 - The Claude Agent SDK integration is the reference async-generator pattern:
   capture the query start time, put integration attributes on a lazily created
-  `Conversation`, create its `Turn` once `session_id` is known, create each
-  `LLM` in a short `runIsolated()` frame, and retain `Tool` handles until later
-  `tool_result` messages close them.
+  `Conversation`, pass `session_id` into initial `Turn` creation rather than
+  patching its root attribute later, create each `LLM` in a short
+  `runIsolated()` frame, and retain `Tool` handles until later `tool_result`
+  messages close them.
 
 ## Code Review & PR Guidelines
 

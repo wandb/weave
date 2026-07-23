@@ -541,9 +541,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.status.message).toBe('boom');
   });
 
-  test('late-binds the conversation id from the result when no earlier message carried one', () => {
+  test('uses the result conversation id for a result-only stream', () => {
     // A result-only stream (no system/assistant turn) still groups into its
-    // session: finalize reads session_id off the result.
+    // session because finalize creates the Turn with the result's session_id.
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.finalize(resultSuccess({sessionId: 'sess-late', result: 'ok'}));
 
