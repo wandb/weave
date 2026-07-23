@@ -6273,6 +6273,81 @@ export interface ValidationError {
   type: string;
 }
 
+/** CustomRuntimeApplyBody */
+export interface CustomRuntimeApplyBody {
+  /**
+   * Base Url
+   * Public OpenAI-compatible endpoint base URL
+   */
+  base_url: string;
+  /**
+   * Api Key Secret
+   * Team secret name used as the endpoint API key; never the secret value
+   */
+  api_key_secret?: string | null;
+  /**
+   * Headers
+   * Literal headers forwarded to the endpoint
+   */
+  headers?: Record<string, string>;
+  /**
+   * Runtime Ids
+   * Complete desired list of IDs exposed by the endpoint
+   */
+  runtime_ids: CustomRuntimeID[];
+}
+
+/** CustomRuntimeApplyRes */
+export interface CustomRuntimeApplyRes {
+  /**
+   * Name
+   * Stable custom runtime name
+   */
+  name: string;
+  /** Base Url */
+  base_url: string;
+  /** Api Key Secret */
+  api_key_secret: string | null;
+  /** Headers */
+  headers: Record<string, string>;
+  /** Runtime Ids */
+  runtime_ids: CustomRuntimeIDRes[];
+}
+
+/** CustomRuntimeID */
+export interface CustomRuntimeID {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+}
+
+/** CustomRuntimeIDRes */
+export interface CustomRuntimeIDRes {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+  /** Playground Id */
+  playground_id: string;
+}
+
 export type QueryParamsType = Record<string | number, any>;
 export type ResponseFormat = keyof Omit<Body, 'body' | 'bodyUsed'>;
 
@@ -9132,6 +9207,30 @@ export class Api<
       this.request<EvalResultsQueryRes, HTTPValidationError>({
         path: `/v2/${entity}/${project}/eval_results/query`,
         method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * @description Create or replace a custom runtime configuration.
+     *
+     * @tags Custom Runtimes
+     * @name CustomRuntimeApplyV2EntityProjectCustomRuntimesRuntimeNamePut
+     * @summary Custom Runtime Apply
+     * @request PUT:/v2/{entity}/{project}/custom-runtimes/{runtime_name}
+     */
+    customRuntimeApplyV2EntityProjectCustomRuntimesRuntimeNamePut: (
+      entity: string,
+      project: string,
+      runtimeName: string,
+      data: CustomRuntimeApplyBody,
+      params: RequestParams = {}
+    ) =>
+      this.request<CustomRuntimeApplyRes, HTTPValidationError>({
+        path: `/v2/${entity}/${project}/custom-runtimes/${runtimeName}`,
+        method: 'PUT',
         body: data,
         type: ContentType.Json,
         format: 'json',

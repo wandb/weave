@@ -5874,6 +5874,79 @@
           }
         }
       }
+    },
+    "/v2/{entity}/{project}/custom-runtimes/{runtime_name}": {
+      "put": {
+        "tags": [
+          "Custom Runtimes"
+        ],
+        "summary": "Custom Runtime Apply",
+        "description": "Create or replace a custom runtime configuration.",
+        "operationId": "custom_runtime_apply_v2__entity___project__custom_runtimes__runtime_name__put",
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "runtime_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Stable name of the custom runtime to create or replace",
+              "title": "Runtime Name"
+            },
+            "description": "Stable name of the custom runtime to create or replace"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomRuntimeApplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRuntimeApplyRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20693,6 +20766,147 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "CustomRuntimeApplyBody": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "description": "Public OpenAI-compatible endpoint base URL"
+          },
+          "api_key_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Secret",
+            "description": "Team secret name used as the endpoint API key; never the secret value"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers",
+            "description": "Literal headers forwarded to the endpoint"
+          },
+          "runtime_ids": {
+            "items": {
+              "$ref": "#/components/schemas/CustomRuntimeID"
+            },
+            "type": "array",
+            "title": "Runtime Ids",
+            "description": "Complete desired list of IDs exposed by the endpoint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "base_url",
+          "runtime_ids"
+        ],
+        "title": "CustomRuntimeApplyBody"
+      },
+      "CustomRuntimeApplyRes": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Stable custom runtime name"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Secret"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "runtime_ids": {
+            "items": {
+              "$ref": "#/components/schemas/CustomRuntimeIDRes"
+            },
+            "type": "array",
+            "title": "Runtime Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "base_url",
+          "api_key_secret",
+          "headers",
+          "runtime_ids"
+        ],
+        "title": "CustomRuntimeApplyRes"
+      },
+      "CustomRuntimeID": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Value sent in the OpenAI-compatible request model field"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Tokens",
+            "description": "Maximum tokens supported by this runtime ID",
+            "default": 4096
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CustomRuntimeID"
+      },
+      "CustomRuntimeIDRes": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Value sent in the OpenAI-compatible request model field"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Tokens",
+            "description": "Maximum tokens supported by this runtime ID",
+            "default": 4096
+          },
+          "playground_id": {
+            "type": "string",
+            "title": "Playground Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "playground_id"
+        ],
+        "title": "CustomRuntimeIDRes"
       }
     },
     "securitySchemes": {

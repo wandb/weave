@@ -21,6 +21,10 @@ BLOCKED_HEADER_RE = re.compile(
 INVALID_BASE_URL_MSG = "base_url is not a valid provider URL"
 
 
+def sanitize_name_for_object_id(name: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
 def _validate_provider_base_url(url: str) -> str:
     """Validate that a provider base_url is a well-formed, publicly-routable HTTP(S) URL.
 

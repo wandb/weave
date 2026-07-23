@@ -1,7 +1,9 @@
 import datetime
+import json
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
@@ -166,6 +168,78 @@ class TestGetCustomProviderInfo(unittest.TestCase):
             # Verify the mock calls
             self.mock_obj_read_func.assert_called()
             self.mock_secret_fetcher.fetch.assert_called_with("TEST_API_KEY")
+        finally:
+            _secret_fetcher_context.reset(token)
+
+    def test_provider_without_api_key_skips_secret_lookup(self):
+        """An empty API-key name allows headers or endpoint auth to be used."""
+        provider_without_api_key = self.provider_obj.model_copy(
+            update={
+                "val": {
+                    **self.provider_obj.val,
+                    "api_key_name": "",
+                    "extra_headers": {"Authorization": "Bearer header-token"},
+                }
+            }
+        )
+
+        def mock_obj_read(req):
+            if req.object_id == self.provider_id:
+                return tsi.ObjReadRes(obj=provider_without_api_key)
+            if req.object_id == self.model_name:
+                return tsi.ObjReadRes(obj=self.provider_model_obj)
+            raise NotFoundError(f"Unknown object_id: {req.object_id}")
+
+        self.mock_obj_read_func.side_effect = mock_obj_read
+        self.mock_secret_fetcher.fetch.side_effect = AssertionError(
+            "A runtime without an API key must not fetch a secret"
+        )
+
+        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
+        try:
+            provider_info = get_custom_provider_info(
+                project_id=self.project_id,
+                provider_name=self.provider_id,
+                model_name=self.model_name,
+                obj_read_func=self.mock_obj_read_func,
+            )
+
+            assert provider_info.api_key is None
+            assert provider_info.extra_headers == {
+                "Authorization": "Bearer header-token"
+            }
+            self.mock_secret_fetcher.fetch.assert_not_called()
+        finally:
+            _secret_fetcher_context.reset(token)
+
+    def test_provider_with_missing_configured_api_key_raises(self):
+        """A configured secret must still resolve to an API key."""
+        self.mock_secret_fetcher.fetch.return_value = {"secrets": {}}
+
+        def mock_obj_read(req):
+            if req.object_id == self.provider_id:
+                return tsi.ObjReadRes(obj=self.provider_obj)
+            if req.object_id == self.model_name:
+                return tsi.ObjReadRes(obj=self.provider_model_obj)
+            raise NotFoundError(f"Unknown object_id: {req.object_id}")
+
+        self.mock_obj_read_func.side_effect = mock_obj_read
+
+        token = _secret_fetcher_context.set(self.mock_secret_fetcher)
+        try:
+            with pytest.raises(
+                MissingLLMApiKeyError,
+                match="No API key TEST_API_KEY found for provider test-provider",
+            ) as exc_info:
+                get_custom_provider_info(
+                    project_id=self.project_id,
+                    provider_name=self.provider_id,
+                    model_name=self.model_name,
+                    obj_read_func=self.mock_obj_read_func,
+                )
+
+            assert exc_info.value.api_key_name == "TEST_API_KEY"
+            self.mock_secret_fetcher.fetch.assert_called_once_with("TEST_API_KEY")
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -1432,13 +1506,13 @@ def test_completions_handles_error_response(
         assert span.status_message == "Rate limit exceeded"
 
 
-def test_litellm_error_response_preserves_status_code():
+def test_completion_error_response_preserves_status_code():
     """Error payload strips the `litellm.` prefix and preserves any status code."""
 
     class _StatusError(Exception):
         status_code = 429
 
-    with_status = llm_mod._litellm_error_response(
+    with_status = llm_mod._completion_error_response(
         _StatusError("litellm.RateLimitError: quota exceeded")
     )
     assert with_status.response == {
@@ -1446,7 +1520,7 @@ def test_litellm_error_response_preserves_status_code():
         llm_mod.ERROR_STATUS_CODE_KEY: 429,
     }
 
-    without_status = llm_mod._litellm_error_response(
+    without_status = llm_mod._completion_error_response(
         Exception("litellm.APIConnectionError: connection reset")
     )
     assert without_status.response == {"error": "APIConnectionError: connection reset"}
@@ -1839,6 +1913,409 @@ def test_build_litellm_kwargs_omits_unset_reasoning_effort():
         vertex_credentials=None,
     )
     assert "reasoning_effort" not in kwargs
+
+
+def _completion_inputs(
+    *,
+    model: str = "openai/test-model",
+    tools: list[dict] | None = None,
+) -> tsi.CompletionsCreateRequestInputs:
+    return tsi.CompletionsCreateRequestInputs(
+        model=model,
+        messages=[{"role": "user", "content": "hi"}],
+        tools=tools,
+    )
+
+
+def _mock_openai_response(request: httpx.Request) -> httpx.Response:
+    body = json.loads(request.content)
+    if body.get("stream"):
+        chunk = {
+            "id": "chatcmpl-test",
+            "object": "chat.completion.chunk",
+            "created": 0,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"role": "assistant", "content": "ok"},
+                    "finish_reason": None,
+                }
+            ],
+        }
+        return httpx.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            text=f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n",
+        )
+    message = {"role": "assistant", "content": "ok"}
+    finish_reason = "stop"
+    if body.get("tools"):
+        message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_test",
+                    "type": "function",
+                    "function": {
+                        "name": "lookup_order",
+                        "arguments": '{"order_id":"123"}',
+                    },
+                }
+            ],
+        }
+        finish_reason = "tool_calls"
+
+    return httpx.Response(
+        200,
+        json={
+            "id": "chatcmpl-test",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": message,
+                    "finish_reason": finish_reason,
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": 2,
+            },
+        },
+    )
+
+
+def _patch_openai_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[httpx.Request]:
+    captured_requests: list[httpx.Request] = []
+    sync_openai = llm_mod.OpenAI
+    async_openai = llm_mod.AsyncOpenAI
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        captured_requests.append(request)
+        return _mock_openai_response(request)
+
+    def mock_sync_openai(*args, **kwargs):
+        kwargs["http_client"] = httpx.Client(
+            transport=httpx.MockTransport(handle_request)
+        )
+        return sync_openai(*args, **kwargs)
+
+    def mock_async_openai(*args, **kwargs):
+        kwargs["http_client"] = httpx.AsyncClient(
+            transport=httpx.MockTransport(handle_request)
+        )
+        return async_openai(*args, **kwargs)
+
+    monkeypatch.setattr(llm_mod, "OpenAI", mock_sync_openai)
+    monkeypatch.setattr(llm_mod, "AsyncOpenAI", mock_async_openai)
+
+    def fail_litellm(*args, **kwargs):
+        raise AssertionError("keyless custom runtimes must bypass LiteLLM")
+
+    monkeypatch.setattr(llm_mod.litellm, "completion", fail_litellm)
+    monkeypatch.setattr(llm_mod.litellm, "acompletion", fail_litellm)
+    return captured_requests
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected_authorization", "expected_x_api_key"),
+    [
+        ({}, None, None),
+        ({"X-API-Key": "header-secret"}, None, "header-secret"),
+        (
+            {"Authorization": "Basic header-secret"},
+            "Basic header-secret",
+            None,
+        ),
+    ],
+)
+def test_keyless_custom_completion_preserves_configured_auth(
+    monkeypatch,
+    headers,
+    expected_authorization,
+    expected_x_api_key,
+):
+    captured_requests = _patch_openai_clients(monkeypatch)
+    result = llm_mod.lite_llm_completion(
+        api_key=None,
+        inputs=_completion_inputs(),
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+        extra_headers=headers,
+    )
+
+    assert "error" not in result.response, result.response
+    assert result.response["choices"][0]["message"]["content"] == "ok"
+    assert len(captured_requests) == 1
+    assert json.loads(captured_requests[0].content)["model"] == "test-model"
+    assert captured_requests[0].headers.get("Authorization") == expected_authorization
+    assert captured_requests[0].headers.get("X-API-Key") == expected_x_api_key
+
+
+def test_custom_completion_with_api_key_uses_litellm(monkeypatch):
+    expected = {"choices": [{"message": {"content": "litellm"}}]}
+    litellm_response = MagicMock()
+    litellm_response.model_dump.return_value = expected
+    litellm_completion = MagicMock(return_value=litellm_response)
+    monkeypatch.setattr(llm_mod.litellm, "completion", litellm_completion)
+    monkeypatch.setattr(
+        llm_mod,
+        "OpenAI",
+        MagicMock(side_effect=AssertionError("keyed providers must use LiteLLM")),
+    )
+
+    result = llm_mod.lite_llm_completion(
+        api_key="runtime-secret",
+        inputs=_completion_inputs(),
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+        extra_headers={"X-Tenant": "customer"},
+    )
+
+    assert result.response == expected
+    litellm_completion.assert_called_once()
+    call_args = litellm_completion.call_args.kwargs
+    assert call_args["api_key"] == "runtime-secret"
+    assert call_args["api_base"] == "https://runtime.example.com/v1"
+    assert call_args["extra_headers"] == {"X-Tenant": "customer"}
+
+
+def test_openai_client_kwargs_validate_and_normalize_configuration():
+    assert llm_mod._build_openai_client_kwargs(
+        "https://runtime.example.com/v1/",
+        {"X-Custom-Auth": "header-secret"},
+    ) == {
+        "api_key": "",
+        "base_url": "https://runtime.example.com/v1",
+        "default_headers": {"X-Custom-Auth": "header-secret"},
+    }
+
+    with pytest.raises(InvalidRequest, match="must provide base_url"):
+        llm_mod._build_openai_client_kwargs(None, None)
+
+
+@pytest.mark.asyncio
+async def test_custom_async_completion_with_api_key_uses_litellm(monkeypatch):
+    expected = {"choices": [{"message": {"content": "litellm"}}]}
+    litellm_response = MagicMock()
+    litellm_response.model_dump.return_value = expected
+    litellm_completion = AsyncMock(return_value=litellm_response)
+    monkeypatch.setattr(llm_mod.litellm, "acompletion", litellm_completion)
+    monkeypatch.setattr(
+        llm_mod,
+        "AsyncOpenAI",
+        MagicMock(side_effect=AssertionError("keyed providers must use LiteLLM")),
+    )
+
+    result = await llm_mod.lite_llm_acompletion(
+        api_key="runtime-secret",
+        inputs=_completion_inputs(),
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+    )
+
+    assert result.response == expected
+    litellm_completion.assert_awaited_once()
+
+
+def test_custom_streaming_completion_with_api_key_uses_litellm(monkeypatch):
+    expected = {"choices": [{"delta": {"content": "litellm"}}]}
+    chunk = MagicMock()
+    chunk.model_dump.return_value = expected
+    stream = MagicMock(spec=llm_mod.CustomStreamWrapper)
+    stream.__iter__.return_value = [chunk]
+    litellm_completion = MagicMock(return_value=stream)
+    monkeypatch.setattr(llm_mod.litellm, "completion", litellm_completion)
+    monkeypatch.setattr(
+        llm_mod,
+        "OpenAI",
+        MagicMock(side_effect=AssertionError("keyed providers must use LiteLLM")),
+    )
+
+    chunks = list(
+        llm_mod.lite_llm_completion_stream(
+            api_key="runtime-secret",
+            inputs=_completion_inputs(),
+            provider="custom",
+            base_url="https://runtime.example.com/v1",
+        )
+    )
+
+    assert chunks == [expected]
+    litellm_completion.assert_called_once()
+
+
+def test_custom_completion_removes_openai_routing_prefix(monkeypatch):
+    captured_requests = _patch_openai_clients(monkeypatch)
+
+    result = llm_mod.lite_llm_completion(
+        api_key=None,
+        inputs=_completion_inputs(model="openai/test-model"),
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+    )
+
+    assert "error" not in result.response, result.response
+    assert json.loads(captured_requests[0].content)["model"] == "test-model"
+
+
+def test_keyless_ollama_completion_stays_on_litellm(monkeypatch):
+    expected = {"choices": [{"message": {"content": "ollama"}}]}
+    litellm_response = MagicMock()
+    litellm_response.model_dump.return_value = expected
+    litellm_completion = MagicMock(return_value=litellm_response)
+    monkeypatch.setattr(llm_mod.litellm, "completion", litellm_completion)
+    monkeypatch.setattr(
+        llm_mod,
+        "OpenAI",
+        MagicMock(side_effect=AssertionError("Ollama must use LiteLLM")),
+    )
+
+    result = llm_mod.lite_llm_completion(
+        api_key=None,
+        inputs=_completion_inputs(model="ollama/llama3"),
+        provider="custom",
+        base_url="http://ollama.example.com:11434",
+    )
+
+    assert result.response == expected
+    litellm_completion.assert_called_once()
+    assert litellm_completion.call_args.kwargs["model"] == "ollama/llama3"
+    assert (
+        litellm_completion.call_args.kwargs["api_base"]
+        == "http://ollama.example.com:11434"
+    )
+
+
+def test_coreweave_requires_its_inference_api_key():
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="coreweave/test-model"),
+    )
+
+    with pytest.raises(MissingLLMApiKeyError):
+        chts._setup_completion_model_info(None, req, MagicMock())
+
+
+def test_coreweave_with_api_key_keeps_litellm_configuration():
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model="coreweave/test-model",
+            messages=[{"role": "user", "content": "hi"}],
+            extra_headers={"api_key": "wandb-key", "X-Tenant": "customer"},
+        ),
+    )
+
+    info = chts._setup_completion_model_info(None, req, MagicMock())
+
+    assert info.provider == "custom"
+    assert info.api_key == "wandb-key"
+    assert info.base_url == "https://api.inference.wandb.ai/v1"
+    assert info.extra_headers == {"X-Tenant": "customer"}
+    assert req.inputs.model == "openai/test-model"
+
+
+def test_keyless_ollama_streaming_completion_stays_on_litellm(monkeypatch):
+    expected = {"choices": [{"delta": {"content": "ollama"}}]}
+    chunk = MagicMock()
+    chunk.model_dump.return_value = expected
+    stream = MagicMock(spec=llm_mod.CustomStreamWrapper)
+    stream.__iter__.return_value = [chunk]
+    litellm_completion = MagicMock(return_value=stream)
+    monkeypatch.setattr(llm_mod.litellm, "completion", litellm_completion)
+    monkeypatch.setattr(
+        llm_mod,
+        "OpenAI",
+        MagicMock(side_effect=AssertionError("Ollama must use LiteLLM")),
+    )
+
+    chunks = list(
+        llm_mod.lite_llm_completion_stream(
+            api_key=None,
+            inputs=_completion_inputs(model="ollama/llama3"),
+            provider="custom",
+            base_url="http://ollama.example.com:11434",
+        )
+    )
+
+    assert chunks == [expected]
+    litellm_completion.assert_called_once()
+    assert litellm_completion.call_args.kwargs["model"] == "ollama/llama3"
+    assert (
+        litellm_completion.call_args.kwargs["api_base"]
+        == "http://ollama.example.com:11434"
+    )
+
+
+@pytest.mark.asyncio
+async def test_custom_async_completion_supports_header_auth_without_api_key(
+    monkeypatch,
+):
+    captured_requests = _patch_openai_clients(monkeypatch)
+    result = await llm_mod.lite_llm_acompletion(
+        api_key=None,
+        inputs=_completion_inputs(
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "lookup_order",
+                        "parameters": {"type": "object"},
+                    },
+                }
+            ]
+        ),
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+        extra_headers={"X-API-Key": "header-secret"},
+    )
+
+    assert "error" not in result.response, result.response
+    assert result.response["choices"][0]["message"]["tool_calls"] == [
+        {
+            "id": "call_test",
+            "function": {
+                "arguments": '{"order_id":"123"}',
+                "name": "lookup_order",
+            },
+            "type": "function",
+        }
+    ]
+    assert len(captured_requests) == 1
+    assert captured_requests[0].headers.get("Authorization") is None
+    assert captured_requests[0].headers["X-API-Key"] == "header-secret"
+
+
+def test_custom_streaming_completion_supports_header_auth_without_api_key(
+    monkeypatch,
+):
+    captured_requests = _patch_openai_clients(monkeypatch)
+    inputs = _completion_inputs()
+    inputs.stream = True
+
+    chunks = list(
+        llm_mod.lite_llm_completion_stream(
+            api_key=None,
+            inputs=inputs,
+            provider="custom",
+            base_url="https://runtime.example.com/v1",
+            extra_headers={"X-API-Key": "header-secret"},
+        )
+    )
+
+    assert "error" not in chunks[0], chunks[0]
+    assert chunks[0]["choices"][0]["delta"]["content"] == "ok"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].headers.get("Authorization") is None
+    assert captured_requests[0].headers["X-API-Key"] == "header-secret"
 
 
 if __name__ == "__main__":

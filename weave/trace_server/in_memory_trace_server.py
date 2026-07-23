@@ -77,6 +77,7 @@ from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     InvalidFieldError,
@@ -5593,6 +5594,16 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         )
         result = self.obj_delete(obj_delete_req)
         return tsi.DatasetDeleteRes(num_deleted=result.num_deleted)
+
+    def custom_runtime_apply(
+        self, req: tsi.CustomRuntimeApplyReq
+    ) -> tsi.CustomRuntimeApplyRes:
+        return apply_custom_runtime(
+            req,
+            self.obj_create,
+            self.objs_query,
+            self.obj_delete,
+        )
 
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         scorer_id = object_creation_utils.make_object_id(req.name, "Scorer")

@@ -412,6 +412,44 @@ def test_clickhouse_distributed_mode_properties():
         assert server._get_calls_complete_table_name() == "calls_complete"
 
 
+def test_keyless_custom_stream_preserves_none_api_key():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    req = tsi.CompletionsCreateReq(
+        project_id="test_project",
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model="custom::runtime::agent",
+            messages=[{"role": "user", "content": "Hello"}],
+        ),
+        track_llm_call=False,
+    )
+    model_info = chts.CompletionModelInfo(
+        model_name="runtime/agent",
+        api_key=None,
+        provider="custom",
+        base_url="https://runtime.example.com/v1",
+        extra_headers={"X-Auth": "header-token"},
+        return_type="openai",
+    )
+
+    with (
+        patch.object(
+            chts,
+            "resolve_and_apply_prompt",
+            return_value=(req.inputs.messages, req.inputs.messages),
+        ),
+        patch.object(chts, "_setup_completion_model_info", return_value=model_info),
+        patch.object(
+            chts,
+            "lite_llm_completion_stream",
+            return_value=iter([{"choices": []}]),
+        ) as completion_stream,
+    ):
+        list(server.completions_create_stream(req))
+
+    completion_stream.assert_called_once()
+    assert completion_stream.call_args.kwargs["api_key"] is None
+
+
 def test_completions_create_stream_custom_provider():
     """Test completions_create_stream for a custom provider (no call tracking)."""
     # Mock chunks to be returned by the stream

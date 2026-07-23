@@ -88,6 +88,13 @@ schema and the dependent Core frontend types stay aligned.
 
 ### Trace Server API / Node SDK Schema
 
+Custom Runtime registration is a desired-state facade over the existing
+`Provider` and `ProviderModel` built-in objects. Keep `ProviderModel.provider`
+as the Provider digest and preserve `custom::<provider>::<model>` selectors;
+those representations are consumed by inference and the current UI.
+Inference caches resolved custom-provider configuration per replica, so updates
+may remain stale for up to 60 seconds.
+
 When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
 
 1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
@@ -360,6 +367,12 @@ pnpm exec tsx examples/claudeAgents.ts
 - Use appropriate error types from `weave.errors`
 - Include meaningful error messages
 - Add error handling tests
+
+### LLM Completion Routing
+
+- Built-in and API-key-authenticated custom providers use LiteLLM.
+- Custom runtimes without an API key use the OpenAI client directly so configured
+  headers and unauthenticated endpoints do not receive a bearer header.
 
 ### Integration Testing
 
