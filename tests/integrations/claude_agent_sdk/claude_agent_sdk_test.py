@@ -100,6 +100,44 @@ async def test_simple_text_query(
     assert model_usage["output_tokens"] == 10
 
 
+@pytest.mark.asyncio
+async def test_cached_usage_is_normalized_in_call_and_summary(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    async for _ in query(
+        prompt="Use the cache",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("cache_usage_response")),
+    ):
+        pass
+
+    calls = list(client.get_calls())
+    root_calls = [
+        call for call in calls if op_name_from_call(call) == "claude_agent_sdk.query"
+    ]
+    assert len(root_calls) == 1
+    root_call = root_calls[0]
+    raw_usage = {
+        "input_tokens": 10,
+        "output_tokens": 75,
+        "cache_read_input_tokens": 19447,
+        "cache_creation_input_tokens": 1024,
+    }
+    expected_summary_usage = {
+        "input_tokens": 20481,
+        "output_tokens": 75,
+        "cache_read_input_tokens": 19447,
+        "cache_creation_input_tokens": 1024,
+    }
+    assert root_call.output["usage"] == raw_usage
+    assert root_call.summary["usage"] == {
+        "claude-sonnet-4-6": {
+            "requests": 1,
+            **expected_summary_usage,
+        }
+    }
+
+
 # =====================================================================
 # query() — tool use
 # =====================================================================
