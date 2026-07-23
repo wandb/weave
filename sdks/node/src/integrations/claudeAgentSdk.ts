@@ -20,7 +20,7 @@
  */
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {ClaudeAgentTracer} from './claude-agent-sdk/tracer';
+import {ClaudeAgentTracer} from './claude-agent-sdk/otelTracer';
 import state from '../state';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 
