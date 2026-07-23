@@ -343,6 +343,8 @@ pnpm exec tsx examples/claudeAgents.ts
 - The high-level emitters use canonical span names (`invoke_agent`, `chat`,
   `execute_tool`); integration-specific fields not represented by typed
   `record()` methods can be attached through `setAttributes()`.
+- Conversation-scoped integrations use `weave.integration.name` and
+  `weave.integration.version` as fixed identity inherited by every span.
 - The Claude Agent SDK integration is the reference async-generator pattern:
   capture the query start time, put integration attributes on a lazily created
   `Conversation`, create its `Turn` once `session_id` is known, create each
