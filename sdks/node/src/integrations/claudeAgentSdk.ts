@@ -9,7 +9,7 @@
  * message content, model, token usage, or total_cost_usd. We therefore wrap the
  * SDK's exported `query()` and emit GenAI agent spans from the streamed messages
  * through the high-level Weave GenAI SDK — `invoke_agent`/`chat`/`execute_tool`
- * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentTracer}.
+ * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
@@ -20,7 +20,7 @@
  */
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
-import {ClaudeAgentTracer} from './claude-agent-sdk/otelTracer';
+import {ClaudeAgentOtelTracer} from './claude-agent-sdk/otelTracer';
 import state from '../state';
 import type * as ClaudeAgentSdk from '@anthropic-ai/claude-agent-sdk';
 
@@ -42,7 +42,7 @@ const GENERATOR_MEMBERS = new Set<PropertyKey>([
 ]);
 
 /**
- * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentTracer}.
+ * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentOtelTracer}.
  * The returned object preserves the full `Query` interface: iteration is traced,
  * and every other member (`interrupt`, `setModel`, `streamInput`, …) is
  * forwarded to the underlying query.
@@ -58,7 +58,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
     // gen_ai.agent.name follows the caller's main-thread agent when named.
     const agent = args?.options?.agent;
-    const tracer = new ClaudeAgentTracer({prompt, agent});
+    const tracer = new ClaudeAgentOtelTracer({prompt, agent});
 
     async function* traced(): AsyncGenerator<unknown, void> {
       let result: ClaudeAgentSdk.SDKResultMessage | undefined;

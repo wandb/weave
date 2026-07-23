@@ -29,7 +29,7 @@ import {
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../../genai/semconv';
-import {ClaudeAgentTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
+import {ClaudeAgentOtelTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
 import {
   findSpan,
   setupExporterPerTest,
@@ -229,7 +229,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   const getExporter = setupExporterPerTest();
 
   test('emits invoke_agent + chat + execute_tool GenAI spans for one query', () => {
-    const tracer = new ClaudeAgentTracer({
+    const tracer = new ClaudeAgentOtelTracer({
       prompt: 'What is the weather in Tokyo?',
     });
     tracer.processMessage(
@@ -396,7 +396,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   });
 
   test('emits one usage chat span per model, preserving the per-model split', () => {
-    const tracer = new ClaudeAgentTracer({prompt: 'p'});
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.processMessage(
       assistantMessage({
         sessionId: 'sess-2',
@@ -461,7 +461,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   });
 
   test('propagates an options.agent override to the root and child spans', () => {
-    const tracer = new ClaudeAgentTracer({
+    const tracer = new ClaudeAgentOtelTracer({
       agent: 'researcher',
       prompt: 'p',
     });
@@ -497,7 +497,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   });
 
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {
-    const tracer = new ClaudeAgentTracer({prompt: 'p'});
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.processMessage(
       assistantMessage({
         sessionId: 's',
@@ -524,7 +524,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   });
 
   test('a stream error fails the root and sweeps open tool spans as aborted', () => {
-    const tracer = new ClaudeAgentTracer({prompt: 'p'});
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.processMessage(
       assistantMessage({
         sessionId: 's',
@@ -546,7 +546,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   });
 
   test('a non-success result subtype fails the root span', () => {
-    const tracer = new ClaudeAgentTracer({prompt: 'p'});
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.processMessage(
       assistantMessage({
         sessionId: 's',
@@ -566,7 +566,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
   test('late-binds the conversation id from the result when no earlier message carried one', () => {
     // A result-only stream (no system/assistant turn) still groups into its
     // session: finalize reads session_id off the result.
-    const tracer = new ClaudeAgentTracer({prompt: 'p'});
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.finalize(resultSuccess({sessionId: 'sess-late', result: 'ok'}));
 
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
@@ -578,7 +578,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     jest.useFakeTimers();
     jest.setSystemTime(startedAt);
     try {
-      const tracer = new ClaudeAgentTracer({prompt: 'p'});
+      const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
       jest.setSystemTime(new Date('2026-07-23T12:00:05.000Z'));
       tracer.finalize(resultSuccess({sessionId: 'sess-time', result: 'ok'}));
 
