@@ -59,7 +59,10 @@ from weave.trace_server import trace_server_interface as tsi
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
 from weave.trace_server.agents.completion_spans import build_completion_span
-from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.kafka_events import (
+    EmbedAgentSpansEvent,
+    ScoreAgentSpansEvent,
+)
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
@@ -7362,19 +7365,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not (scoring_enabled or insights_enabled):
             return res
 
-        # Emit for each row that produces a valid event type
+        producer = self.kafka_producer
         for row in span_rows:
-            if event := ScoreAgentSpansEvent.from_row(row):
-                event.emit(
-                    self.kafka_producer,
-                    for_scoring=scoring_enabled,
-                    for_insights=insights_enabled,
-                )
+            if scoring_enabled and (event := ScoreAgentSpansEvent.from_row(row)):
+                event.emit(producer)
+            if insights_enabled and (event := EmbedAgentSpansEvent.from_row(row)):
+                event.emit(producer)
 
         # Flush kafka producer
-        if span_rows and self.kafka_producer:
+        if span_rows and producer:
             try:
-                self.kafka_producer.flush(0)
+                producer.flush(0)
             except Exception:
                 logger.exception(
                     "Failed to flush Kafka producer during OTel span ingest"

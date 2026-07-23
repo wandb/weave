@@ -17,6 +17,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.kafka_events import (
     EMBED_AGENT_SPANS_TOPIC,
     SCORE_AGENT_SPANS_TOPIC,
+    EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
 )
 from weave.trace_server.datadog import set_root_span_dd_tags
@@ -162,7 +163,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         )
 
     @traced(name="kafka_producer.produce_embed_agent_spans")
-    def produce_embed_agent_spans(self, event: ScoreAgentSpansEvent) -> None:
+    def produce_embed_agent_spans(self, event: EmbedAgentSpansEvent) -> None:
         """Produce a weave.embed_agent_spans event to Kafka.
 
         Drops the message when the producer buffer is full (same policy as `produce_call_end`).
@@ -175,7 +176,7 @@ class KafkaProducer(ConfluentKafkaProducer):
 
     def _produce_agent_spans(
         self,
-        event: ScoreAgentSpansEvent,
+        event: ScoreAgentSpansEvent | EmbedAgentSpansEvent,
         *,
         topic: str,
         message_type: str,
