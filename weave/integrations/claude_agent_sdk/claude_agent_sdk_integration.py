@@ -14,6 +14,7 @@ from weave.integrations.claude_agent_sdk.display_utils import (
     tool_use_display_name,
     turn_display_name,
 )
+from weave.integrations.claude_agent_sdk.usage import total_input_tokens
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
@@ -210,11 +211,13 @@ def _finalize_stream(
             # Set summary directly so usage propagates even when tool
             # call children exist (children path skips output-based summary).
             if state["root_model"]:
+                summary_usage = dict(result_msg.usage)
+                summary_usage["input_tokens"] = total_input_tokens(summary_usage)
                 root_call.summary = {
                     "usage": {
                         state["root_model"]: {
                             "requests": 1,
-                            **result_msg.usage,
+                            **summary_usage,
                         }
                     }
                 }

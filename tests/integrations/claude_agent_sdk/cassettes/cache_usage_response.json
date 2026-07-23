@@ -1,0 +1,36 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-cache789"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The cached response."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    }
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 1200,
+    "duration_api_ms": 900,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-cache789",
+    "total_cost_usd": 0.003,
+    "usage": {
+      "input_tokens": 10,
+      "output_tokens": 75,
+      "cache_read_input_tokens": 19447,
+      "cache_creation_input_tokens": 1024
+    },
+    "result": "The cached response."
+  }
+]

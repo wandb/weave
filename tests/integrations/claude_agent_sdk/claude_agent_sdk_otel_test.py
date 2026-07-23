@@ -158,6 +158,27 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     assert chat_span.parent.span_id == agent_span.context.span_id
 
 
+@pytest.mark.asyncio
+async def test_cached_usage_is_normalized_in_otel_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    await run_query("cache_usage_response", "Use the cache")
+
+    chat_spans = get_spans_by_op(otel_spans.get_finished_spans(), "chat")
+    assert len(chat_spans) == 1
+    usage_attrs = {
+        key: value
+        for key, value in get_attrs(chat_spans[0]).items()
+        if key.startswith("gen_ai.usage.")
+    }
+    assert usage_attrs == {
+        "gen_ai.usage.input_tokens": 20481,
+        "gen_ai.usage.output_tokens": 75,
+        "gen_ai.usage.cache_read.input_tokens": 19447,
+        "gen_ai.usage.cache_creation.input_tokens": 1024,
+    }
+
+
 # --- query(): tool use ------------------------------------------------------
 
 
