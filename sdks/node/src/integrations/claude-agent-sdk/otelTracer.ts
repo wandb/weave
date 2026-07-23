@@ -134,13 +134,13 @@ function runErrorMessage(
   return undefined;
 }
 
-type ClaudeAgentTracerOptions = {
+type ClaudeAgentOtelTracerOptions = {
   prompt?: string;
   agent?: string;
 };
 
 /** Emits Claude Agent SDK traces through Weave GenAI handles. */
-export class ClaudeAgentTracer {
+export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
   private readonly prompt: string | undefined;
   private readonly startedAt = new Date();
@@ -154,7 +154,7 @@ export class ClaudeAgentTracer {
   private rootModel: string | null = null;
   private finished = false;
 
-  constructor(opts: ClaudeAgentTracerOptions = {}) {
+  constructor(opts: ClaudeAgentOtelTracerOptions = {}) {
     this.agentName = opts.agent || AGENT_NAME;
     this.prompt = opts.prompt;
   }
