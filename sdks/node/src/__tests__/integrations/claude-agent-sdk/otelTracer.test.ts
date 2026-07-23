@@ -311,7 +311,6 @@ describe('Claude Agent SDK — OTel tracer', () => {
     // it up per model. The SDK's authoritative total cost stays on the root.
     expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
     expect(invoke.attributes['claude_agent_sdk.usage.cost_usd']).toBe(0.01);
-    expect(invoke.attributes['claude_agent_sdk.num_turns']).toBe(1);
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'What is the weather in Tokyo?'}]);

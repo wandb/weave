@@ -34,7 +34,6 @@ const AGENT_NAME = 'claude_agent_sdk';
 const PROVIDER_NAME = 'anthropic';
 
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
-const ATTR_NUM_TURNS = 'claude_agent_sdk.num_turns';
 
 const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
@@ -198,7 +197,6 @@ export class ClaudeAgentOtelTracer {
 
       const resultAttributes: Attributes = {
         [ATTR_COST_USD]: result.total_cost_usd,
-        [ATTR_NUM_TURNS]: result.num_turns,
       };
       if (result.subtype === 'success') {
         const output: Message[] = [{role: 'assistant', content: result.result}];
