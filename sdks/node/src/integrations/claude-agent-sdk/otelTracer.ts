@@ -153,11 +153,11 @@ export class ClaudeAgentOtelTracer {
   }
 
   processMessage(msg: SDKMessage): void {
-    this.ensureTurn(msg.session_id);
+    const turn = this.ensureTurn(msg.session_id);
 
     switch (msg.type) {
       case 'assistant':
-        this.processAssistant(msg);
+        this.processAssistant(msg, turn);
         break;
       case 'user':
         this.processUser(msg);
@@ -182,7 +182,7 @@ export class ClaudeAgentOtelTracer {
     this.openTools.clear();
 
     if (result) {
-      this.emitModelUsageSpans(result);
+      this.emitModelUsageSpans(result, turn);
 
       const resultAttributes: Attributes = {
         [ATTR_COST_USD]: result.total_cost_usd,
@@ -205,7 +205,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private ensureTurn(conversationId = ''): Turn {
+  private ensureTurn(conversationId: string | undefined): Turn {
     if (this.turn) {
       return this.turn;
     }
@@ -214,7 +214,7 @@ export class ClaudeAgentOtelTracer {
     this.turn = runIsolated(() => {
       const conversation = Conversation.create({
         agentName: this.agentName,
-        conversationId,
+        conversationId: conversationId ?? '',
         attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
       });
       return conversation.startTurn({
@@ -232,7 +232,7 @@ export class ClaudeAgentOtelTracer {
     return this.turn;
   }
 
-  private emitModelUsageSpans(result: SDKResultMessage): void {
+  private emitModelUsageSpans(result: SDKResultMessage, turn: Turn): void {
     const perModel: Array<[string | undefined, ModelUsage | NonNullableUsage]> =
       result.modelUsage && Object.keys(result.modelUsage).length > 0
         ? Object.entries(result.modelUsage)
@@ -240,7 +240,6 @@ export class ClaudeAgentOtelTracer {
           ? [[this.rootModel ?? undefined, result.usage]]
           : [];
 
-    const turn = this.ensureTurn();
     // Keep usage per model so the server can price each model independently.
     for (const [model, rawUsage] of perModel) {
       const normalized = normalizeUsage(rawUsage);
@@ -261,7 +260,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private processAssistant(msg: SDKAssistantMessage): void {
+  private processAssistant(msg: SDKAssistantMessage, turn: Turn): void {
     const model = msg.message.model;
     if (this.rootModel == null && model) {
       this.rootModel = model;
@@ -269,7 +268,6 @@ export class ClaudeAgentOtelTracer {
 
     const content = msg.message.content;
     const parts = assistantParts(content);
-    const turn = this.ensureTurn();
 
     runIsolated(() => {
       const llm = turn.startLLM({
