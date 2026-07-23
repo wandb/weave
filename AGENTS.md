@@ -344,9 +344,10 @@ pnpm exec tsx examples/claudeAgents.ts
   `execute_tool`); integration-specific fields not represented by typed
   `record()` methods can be attached through `setAttributes()`.
 - The Claude Agent SDK integration is the reference async-generator pattern:
-  capture the query start time, lazily create a `Turn` once `session_id` is
-  known, create each `LLM` in a short `runIsolated()` frame, and retain `Tool`
-  handles until later `tool_result` messages close them.
+  capture the query start time, put integration attributes on a lazily created
+  `Conversation`, create its `Turn` once `session_id` is known, create each
+  `LLM` in a short `runIsolated()` frame, and retain `Tool` handles until later
+  `tool_result` messages close them.
 
 ## Code Review & PR Guidelines
 

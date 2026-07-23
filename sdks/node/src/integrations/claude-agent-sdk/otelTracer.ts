@@ -1,11 +1,12 @@
 import type {Attributes} from '@opentelemetry/api';
 
 import {
+  Conversation,
   runIsolated,
-  Turn,
   type Message,
   type MessagePart,
   type Tool,
+  type Turn,
   type Usage,
 } from '../../genai';
 import {
@@ -35,7 +36,6 @@ const PROVIDER_NAME = 'anthropic';
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
 const ATTR_NUM_TURNS = 'claude_agent_sdk.num_turns';
 
-// Turn attributes are inherited by child handles across isolation frames.
 const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
     packageName: '@anthropic-ai/claude-agent-sdk',
@@ -144,9 +144,6 @@ export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
   private readonly prompt: string | undefined;
   private readonly startedAt = new Date();
-  private readonly turnAttributes: Attributes = {
-    ...CLAUDE_AGENT_SDK_ATTRIBUTES,
-  };
   private readonly openTools = new Map<string, Tool>();
 
   private turn: Turn | null = null;
@@ -238,15 +235,17 @@ export class ClaudeAgentOtelTracer {
       return this.turn;
     }
 
-    // Defer creation until the session ID is known without losing query time.
-    this.turn = runIsolated(() =>
-      Turn.create({
+    // Defer conversation creation without losing the query start time.
+    this.turn = runIsolated(() => {
+      const conversation = Conversation.create({
         agentName: this.agentName,
-        conversationId: this.conversationId ?? undefined,
-        attributes: this.turnAttributes,
+        conversationId: this.conversationId ?? '',
+        attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
+      });
+      return conversation.startTurn({
         startTime: this.startedAt,
-      })
-    );
+      });
+    });
     this.turn.setAttributes({
       [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     });
