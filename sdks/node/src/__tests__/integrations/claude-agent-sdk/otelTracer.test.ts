@@ -28,8 +28,11 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
+  WEAVE_INTEGRATION_NAME,
+  WEAVE_INTEGRATION_VERSION,
 } from '../../../genai/semconv';
 import {ClaudeAgentOtelTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
+import {packageVersion} from '../../../utils/packageVersion';
 import {
   findSpan,
   setupExporterPerTest,
@@ -279,23 +282,33 @@ describe('Claude Agent SDK — OTel tracer', () => {
       spans.map(span => ({
         integrationName: span.attributes['integration.name'],
         packageName: span.attributes['integration.meta.package_name'],
+        weaveIntegrationName: span.attributes[WEAVE_INTEGRATION_NAME],
+        weaveIntegrationVersion: span.attributes[WEAVE_INTEGRATION_VERSION],
       }))
     ).toEqual([
       {
         integrationName: 'claude_agent_sdk',
         packageName: '@anthropic-ai/claude-agent-sdk',
+        weaveIntegrationName: 'claude_agent_sdk',
+        weaveIntegrationVersion: packageVersion,
       },
       {
         integrationName: 'claude_agent_sdk',
         packageName: '@anthropic-ai/claude-agent-sdk',
+        weaveIntegrationName: 'claude_agent_sdk',
+        weaveIntegrationVersion: packageVersion,
       },
       {
         integrationName: 'claude_agent_sdk',
         packageName: '@anthropic-ai/claude-agent-sdk',
+        weaveIntegrationName: 'claude_agent_sdk',
+        weaveIntegrationVersion: packageVersion,
       },
       {
         integrationName: 'claude_agent_sdk',
         packageName: '@anthropic-ai/claude-agent-sdk',
+        weaveIntegrationName: 'claude_agent_sdk',
+        weaveIntegrationVersion: packageVersion,
       },
     ]);
 
