@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
+from typing_extensions import Self
 
 from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
