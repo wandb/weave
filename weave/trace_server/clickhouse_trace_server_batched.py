@@ -1540,7 +1540,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     def _get_prices_for_models(
-        self, models: set[str], project_id: str
+        self, models: set[str], project_id: str, provider_id: str | None = None
     ) -> dict[str, dict[str, float]]:
         """Query llm_token_prices for the given models and return best prices.
 
@@ -1551,7 +1551,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return {}
 
         try:
-            sql, params = build_model_prices_query(project_id, list(models))
+            sql, params = build_model_prices_query(
+                project_id, list(models), provider_id
+            )
             settings = None
             if self.use_distributed_mode:
                 # Use patched settings for distributed bug (more info in ch_settings)
@@ -1589,6 +1591,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         usage_buckets: list[dict[str, Any]],
         project_id: str,
         requested_cost_metrics: set[str],
+        provider_id: str | None = None,
     ) -> None:
         """Compute cost metrics for usage buckets by multiplying tokens by prices.
 
@@ -1604,7 +1607,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         models = {b.get("model", "") for b in usage_buckets if b.get("model")}
 
         # Query prices for those models
-        prices = self._get_prices_for_models(models, project_id)
+        prices = self._get_prices_for_models(models, project_id, provider_id)
 
         # Compute costs for each bucket
         for bucket in usage_buckets:
@@ -1684,7 +1687,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Compute costs post-query if cost metrics were requested
         if requested_cost_metrics and usage_buckets:
             self._compute_costs_for_buckets(
-                usage_buckets, req.project_id, requested_cost_metrics
+                usage_buckets,
+                req.project_id,
+                requested_cost_metrics,
+                req.cost_provider_id,
             )
 
         # Process call metrics (not grouped by model)
