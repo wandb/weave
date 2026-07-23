@@ -317,6 +317,12 @@ pnpm exec tsx examples/claudeAgents.ts
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript GenAI Turn output
+
+- Record a terminal agent result with
+  `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
+  `invoke_agent` span as `gen_ai.output.messages`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -453,4 +459,7 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
+- [ ] Add `output_messages` to Python `Turn.record()` for parity with
+      TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
+      `invoke_agent_attributes()` builder already supports agent output.
 - [ ] ...

@@ -20,6 +20,7 @@ import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_REQUEST_MODEL,
   ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
@@ -103,6 +104,7 @@ export class Turn extends SpanBase {
   private _agentVersion: string;
   private _model: string;
   private _messages: Message[];
+  private _outputMessages: Message[] = [];
   private _systemInstructions: string[];
   private _attributes: Attributes;
 
@@ -210,6 +212,7 @@ export class Turn extends SpanBase {
    */
   record(opts: {
     messages?: Message[];
+    outputMessages?: Message[];
     model?: string;
     systemInstructions?: string[];
     agentId?: string;
@@ -221,6 +224,9 @@ export class Turn extends SpanBase {
 
     if (opts.messages !== undefined) {
       this._messages = opts.messages;
+    }
+    if (opts.outputMessages !== undefined) {
+      this._outputMessages = opts.outputMessages;
     }
     if (opts.model !== undefined) {
       this._model = opts.model;
@@ -279,6 +285,12 @@ export class Turn extends SpanBase {
       this.span.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
         JSON.stringify(this._messages)
+      );
+    }
+    if (this._outputMessages.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
+        JSON.stringify(this._outputMessages)
       );
     }
     if (this._systemInstructions.length > 0) {
