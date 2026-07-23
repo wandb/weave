@@ -1389,11 +1389,52 @@ def server_with_mock_kafka():
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._kafka_producer = mock_producer
-        with patch(
-            "weave.trace_server.environment.wf_enable_online_eval",
-            return_value=True,
+        with (
+            patch(
+                "weave.trace_server.environment.wf_enable_online_eval",
+                return_value=True,
+            ),
+            patch(
+                "weave.trace_server.environment.wf_enable_agent_scoring",
+                return_value=True,
+            ),
         ):
             yield server, mock_producer
+
+
+@pytest.mark.parametrize(
+    ("online_eval", "scoring", "insights", "should_enable"),
+    [
+        (True, False, False, True),
+        (False, True, False, True),
+        (False, False, True, True),
+        (True, True, True, True),
+        (False, False, False, False),
+    ],
+)
+def test_kafka_producer_feature_gate(
+    monkeypatch, online_eval, scoring, insights, should_enable
+):
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: online_eval
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
+    )
+
+    if should_enable:
+        assert server.kafka_producer is mock_producer
+    else:
+        assert server.kafka_producer is None
 
 
 def _make_call_end_req() -> tsi.CallEndReq:
@@ -1995,18 +2036,28 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
 
 
 @pytest.mark.parametrize(
-    ("online_eval", "scoring", "should_emit"),
+    ("online_eval", "scoring", "insights"),
     [
+        (True, True, False),
+        (True, False, True),
         (True, True, True),
-        (True, False, False),  # scoring off -> skip
-        (False, True, False),  # online eval off -> skip
+        (False, False, True),
+        (False, True, True),
+        (False, True, False),
+        (True, False, False),
     ],
-    ids=["both-on", "scoring-off", "online-eval-off"],
+    ids=[
+        "online-eval-and-scoring",
+        "online-eval-and-insights",
+        "online-eval-with-both-consumers",
+        "insights-without-online-eval",
+        "both-consumers-without-online-eval",
+        "scoring-without-online-eval",
+        "all-consumers-off",
+    ],
 )
-def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_emit):
-    """OTel ingest emits turn-ended events only when online eval and agent scoring
-    are both enabled; otherwise the kafka emit is skipped.
-    """
+def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights):
+    """OTel ingest emits for scoring or Insights, independent of online eval."""
     mock_producer = MagicMock()
     monkeypatch.setattr(
         chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
@@ -2028,17 +2079,26 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, should_e
     monkeypatch.setattr(
         "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
     )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
+    )
 
     res = server.genai_otel_export(
         GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
     )
 
     assert res.accepted_spans == 1
-    if should_emit:
+    if scoring:
         mock_producer.produce_score_agent_spans.assert_called_once()
-        mock_producer.flush.assert_called_once_with(0)
     else:
         mock_producer.produce_score_agent_spans.assert_not_called()
+    if insights:
+        mock_producer.produce_embed_agent_spans.assert_called_once()
+    else:
+        mock_producer.produce_embed_agent_spans.assert_not_called()
+    if scoring or insights:
+        mock_producer.flush.assert_called_once_with(0)
+    else:
         mock_producer.flush.assert_not_called()
 
 
