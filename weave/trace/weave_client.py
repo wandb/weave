@@ -146,6 +146,9 @@ from weave.trace_server.trace_server_interface import (
     CostPurgeReq,
     CostQueryOutput,
     CostQueryReq,
+    CustomRuntimeApplyReq,
+    CustomRuntimeApplyRes,
+    CustomRuntimeID,
     EndedCallSchemaForInsertWithStartedAt,
     FeedbackCreateReq,
     FileCreateReq,
@@ -538,6 +541,40 @@ class WeaveClient:
             pass
 
     ################ High Level Convenience Methods ################
+
+    @trace_sentry.global_trace_sentry.watch()
+    def apply_custom_runtime(
+        self,
+        *,
+        name: str,
+        base_url: str,
+        runtime_ids: Sequence[str | CustomRuntimeID],
+        api_key_secret: str | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> CustomRuntimeApplyRes:
+        """Create or replace a custom runtime's complete configuration.
+
+        Runtime IDs omitted from this call are removed. String IDs use the
+        default maximum token count; pass ``CustomRuntimeID`` to set it explicitly.
+        Inference may use a prior configuration for up to 60 seconds after an
+        update.
+        """
+        normalized_runtime_ids = [
+            CustomRuntimeID(id=runtime_id)
+            if isinstance(runtime_id, str)
+            else runtime_id
+            for runtime_id in runtime_ids
+        ]
+        return self.server.custom_runtime_apply(
+            CustomRuntimeApplyReq(
+                project_id=self.project_id,
+                runtime_name=name,
+                base_url=base_url,
+                api_key_secret=api_key_secret,
+                headers=headers or {},
+                runtime_ids=normalized_runtime_ids,
+            )
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     def save(self, val: Any, name: str, branch: str = "latest") -> Any:
