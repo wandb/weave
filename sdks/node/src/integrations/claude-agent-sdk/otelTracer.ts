@@ -20,7 +20,6 @@ import {
   WEAVE_INTEGRATION_VERSION,
 } from '../../genai/semconv';
 import {packageVersion} from '../../utils/packageVersion';
-import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 import type {
   ModelUsage,
   NonNullableUsage,
@@ -38,11 +37,6 @@ const PROVIDER_NAME = 'anthropic';
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
 
 const CLAUDE_AGENT_SDK_ATTRIBUTES = {
-  ...asOtelAttributes(
-    libraryIntegration(AGENT_NAME, {
-      packageName: '@anthropic-ai/claude-agent-sdk',
-    })
-  ),
   [WEAVE_INTEGRATION_NAME]: AGENT_NAME,
   [WEAVE_INTEGRATION_VERSION]: packageVersion,
 };
