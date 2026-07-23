@@ -28,25 +28,21 @@ def test_client_uses_default_httpx_transport():
     assert isinstance(http_requests._get_client()._transport, httpx.HTTPTransport)
 
 
-def test_request_hook_logs_when_enabled(monkeypatch):
-    monkeypatch.setenv("WEAVE_DEBUG_HTTP", "1")
+@pytest.mark.parametrize("debug_enabled", [True, False])
+def test_request_hook_logs_only_when_debug_enabled(monkeypatch, debug_enabled):
+    if debug_enabled:
+        monkeypatch.setenv("WEAVE_DEBUG_HTTP", "1")
     request = httpx.Request("GET", "https://api.wandb.ai/calls")
 
     with patch.object(http_requests, "pprint_request") as mock_pprint_request:
         http_requests._log_request(request)
 
-    mock_pprint_request.assert_called_once_with(request)
-    assert isinstance(request.extensions.get("weave_start_time"), float)
-
-
-def test_request_hook_noop_when_disabled():
-    request = httpx.Request("GET", "https://api.wandb.ai/calls")
-
-    with patch.object(http_requests, "pprint_request") as mock_pprint_request:
-        http_requests._log_request(request)
-
-    mock_pprint_request.assert_not_called()
-    assert "weave_start_time" not in request.extensions
+    if debug_enabled:
+        mock_pprint_request.assert_called_once_with(request)
+        assert isinstance(request.extensions.get("weave_start_time"), float)
+    else:
+        mock_pprint_request.assert_not_called()
+        assert "weave_start_time" not in request.extensions
 
 
 def test_response_hook_logs_when_enabled(monkeypatch):

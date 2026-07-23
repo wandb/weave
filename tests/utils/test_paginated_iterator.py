@@ -9,35 +9,26 @@ from weave.utils.paginated_iterator import PaginatedIterator
 pytestmark = pytest.mark.trace_server
 
 
-def _fetch_numbers(offset: int, limit: int) -> list[int]:
-    numbers = [0, 1, 2, 3, 4]
-    return numbers[offset : offset + limit]
-
-
-def test_paginated_iterator_implements_iterator_protocol() -> None:
+def test_paginated_iterator_protocol_and_restart() -> None:
+    # Implements the iterator protocol, yielding lazily across pages.
     paginated = PaginatedIterator(_fetch_numbers, page_size=2)
-
     assert isinstance(paginated, Iterator)
     assert next(paginated) == 0
     assert next(paginated) == 1
 
-
-def test_paginated_iterator_next_stops_at_end() -> None:
-    paginated = PaginatedIterator(_fetch_numbers, page_size=2, limit=3)
-
-    assert next(paginated) == 0
-    assert next(paginated) == 1
-    assert next(paginated) == 2
+    # `next` stops at the configured limit.
+    bounded = PaginatedIterator(_fetch_numbers, page_size=2, limit=3)
+    assert next(bounded) == 0
+    assert next(bounded) == 1
+    assert next(bounded) == 2
     with pytest.raises(StopIteration):
-        next(paginated)
+        next(bounded)
 
-
-def test_paginated_iterator_iter_remains_restartable() -> None:
-    paginated = PaginatedIterator(_fetch_numbers, page_size=2)
-
-    assert next(paginated) == 0
-    assert list(paginated) == [0, 1, 2, 3, 4]
-    assert list(paginated) == [0, 1, 2, 3, 4]
+    # `iter` is restartable even after a partial `next` consumption.
+    restartable = PaginatedIterator(_fetch_numbers, page_size=2)
+    assert next(restartable) == 0
+    assert list(restartable) == [0, 1, 2, 3, 4]
+    assert list(restartable) == [0, 1, 2, 3, 4]
 
 
 def test_paginated_iterator_limit_bounds_index_and_slice_consistently() -> None:
@@ -53,7 +44,7 @@ def test_paginated_iterator_limit_bounds_index_and_slice_consistently() -> None:
     assert list(paginated) == [0, 1, 2]
 
 
-def test_paginated_iterator_reuses_fetched_pages_within_instance() -> None:
+def test_paginated_iterator_per_instance_cache_reuses_and_releases() -> None:
     fetch_offsets: list[int] = []
 
     def fetch(offset: int, limit: int) -> list[int]:
@@ -71,20 +62,14 @@ def test_paginated_iterator_reuses_fetched_pages_within_instance() -> None:
     assert paginated[10] == 10
     assert fetch_offsets == [0, 10]
 
-
-def test_paginated_iterator_released_when_unreferenced() -> None:
-    # Regression: a method-level functools.lru_cache keys on `self` and lives
-    # for the process lifetime, pinning every iterator (and its fetched pages)
-    # in memory. The per-instance cache must let the iterator be garbage
-    # collected once the caller drops it.
-    def fetch(offset: int, limit: int) -> list[int]:
-        return list(range(100))[offset : offset + limit]
-
-    paginated = PaginatedIterator(fetch, page_size=10)
-    assert paginated[0] == 0  # populate the page cache
-
+    # The per-instance cache must not pin the iterator: dropping the only
+    # reference lets it (and its fetched pages) be garbage collected.
     ref = weakref.ref(paginated)
     del paginated
     gc.collect()
-
     assert ref() is None
+
+
+def _fetch_numbers(offset: int, limit: int) -> list[int]:
+    numbers = [0, 1, 2, 3, 4]
+    return numbers[offset : offset + limit]

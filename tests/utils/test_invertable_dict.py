@@ -5,71 +5,68 @@ from weave.utils.invertable_dict import InvertableDict
 pytestmark = pytest.mark.trace_server
 
 
-def test_invertable_dict_construction_and_access():
+def test_invertable_dict_access_and_inverse_roundtrip():
     mapping = InvertableDict({"jpg": "jpeg", "png": "png"})
 
-    # Default mapping -- looks and acts like a regular dict
+    # Forward mapping acts like a regular dict.
     assert len(mapping) == 2
     assert mapping["jpg"] == "jpeg"
     assert mapping["png"] == "png"
     assert sorted(iter(mapping)) == ["jpg", "png"]
 
-    # Inverse mapping -- looks and acts like a regular dict
+    # Inverse mapping acts like a regular dict.
     assert len(mapping.inv) == 2
     assert mapping.inv["jpeg"] == "jpg"
     assert mapping.inv["png"] == "png"
     assert sorted(iter(mapping.inv)) == ["jpeg", "png"]
 
-
-def test_invertable_dict_rejects_duplicate_values_on_init():
-    with pytest.raises(ValueError, match="Duplicate value found: jpeg"):
-        InvertableDict({"jpg": "jpeg", "jpe": "jpeg"})
-
-
-def test_invertable_dict_inverse_roundtrip():
-    mapping = InvertableDict({"a": 1, "b": 2})
-
-    assert mapping.inv[1] == "a"
-    assert mapping.inv[2] == "b"
-    assert mapping.inv.inv["a"] == 1
-    assert mapping.inv.inv["b"] == 2
+    # Double-inverse returns to the forward view.
+    nums = InvertableDict({"a": 1, "b": 2})
+    assert nums.inv[1] == "a"
+    assert nums.inv[2] == "b"
+    assert nums.inv.inv["a"] == 1
+    assert nums.inv.inv["b"] == 2
 
 
-def test_invertable_dict_mutation_updates_inverse_view():
-    mapping = InvertableDict({"a": 1})
-    inverse = mapping.inv
-
-    mapping["b"] = 2
-    mapping["a"] = 3
-
-    assert inverse[2] == "b"
-    assert inverse[3] == "a"
-    assert 1 not in inverse
-
-
-def test_invertable_dict_inverse_mutation_updates_forward_view():
-    mapping = InvertableDict({"a": 1})
-    inverse = mapping.inv
-
-    inverse[2] = "b"
-
-    assert mapping["b"] == 2
-    assert inverse[2] == "b"
-
-
-def test_invertable_dict_delete_updates_inverse_view():
+def test_invertable_dict_mutations_keep_views_in_sync():
     mapping = InvertableDict({"a": 1, "b": 2})
     inverse = mapping.inv
 
-    del mapping["a"]
-
-    assert "a" not in mapping
+    # Forward set adds and reassigns, dropping the stale inverse key.
+    mapping["c"] = 3
+    mapping["a"] = 4
+    assert inverse[3] == "c"
+    assert inverse[4] == "a"
     assert 1 not in inverse
-    assert inverse[2] == "b"
+
+    # Inverse set writes through to the forward view.
+    inverse[5] = "d"
+    assert mapping["d"] == 5
+    assert inverse[5] == "d"
+
+    # Forward delete removes both directions.
+    del mapping["b"]
+    assert "b" not in mapping
+    assert 2 not in inverse
 
 
-def test_invertable_dict_rejects_duplicate_values_on_set():
+def _init_duplicate() -> None:
+    InvertableDict({"jpg": "jpeg", "jpe": "jpeg"})
+
+
+def _set_duplicate() -> None:
     mapping = InvertableDict({"a": 1})
+    mapping["b"] = 1
 
-    with pytest.raises(ValueError, match="Duplicate value found: 1"):
-        mapping["b"] = 1
+
+@pytest.mark.parametrize(
+    ("build", "match"),
+    [
+        (_init_duplicate, "Duplicate value found: jpeg"),
+        (_set_duplicate, "Duplicate value found: 1"),
+    ],
+    ids=["on-init", "on-set"],
+)
+def test_invertable_dict_rejects_duplicate_values(build, match):
+    with pytest.raises(ValueError, match=match):
+        build()
