@@ -294,9 +294,6 @@ The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
 and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
 `npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
 (`TypeError: Cannot read properties of null (reading 'matches')`).
-On the Codex macOS environment, select the installed Node 22 runtime before
-running pnpm (`nvm use 22.22.3`); the default Node 20 shell can resolve a global
-pnpm that requires `node:sqlite` and fails before executing a command.
 
 ```
 cd sdks/node
