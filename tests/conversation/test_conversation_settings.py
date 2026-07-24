@@ -183,8 +183,10 @@ def _streaming_llm_reasoning_with_pii() -> None:
 
 def _streaming_turn_with_pii() -> None:
     with start_conversation(conversation_id="convo-pii-streaming-turn") as sess:
-        with sess.start_turn(user_message=_PII_EMAIL):
-            pass
+        with sess.start_turn(user_message=_PII_EMAIL) as turn:
+            turn.record(
+                output_messages=[Message(role="assistant", content=f"hi {_PII_EMAIL}")]
+            )
 
 
 def _batch_turn_messages_with_pii() -> None:
@@ -192,6 +194,7 @@ def _batch_turn_messages_with_pii() -> None:
         conversation_id="convo-pii-batch-turn-messages",
         agent_name="a",
         messages=[Message(role="user", content=_PII_EMAIL)],
+        output_messages=[Message(role="assistant", content=f"hi {_PII_EMAIL}")],
     )
 
 
@@ -244,13 +247,13 @@ def _batch_child_tool_with_pii() -> None:
         pytest.param(
             _streaming_turn_with_pii,
             "invoke_agent",
-            ("gen_ai.input.messages",),
+            ("gen_ai.input.messages", "gen_ai.output.messages"),
             id="streaming_turn",
         ),
         pytest.param(
             _batch_turn_messages_with_pii,
             "invoke_agent",
-            ("gen_ai.input.messages",),
+            ("gen_ai.input.messages", "gen_ai.output.messages"),
             id="batch_turn_messages",
         ),
         pytest.param(
@@ -314,8 +317,10 @@ def _content_off_turn() -> None:
     with start_conversation(
         conversation_id="convo-content-off-turn", include_content=False
     ) as sess:
-        with sess.start_turn(user_message=_PII_EMAIL):
-            pass
+        with sess.start_turn(user_message=_PII_EMAIL) as turn:
+            turn.record(
+                output_messages=[Message(role="assistant", content=f"hi {_PII_EMAIL}")]
+            )
 
 
 def _content_off_log_turn() -> None:
@@ -324,6 +329,7 @@ def _content_off_log_turn() -> None:
         agent_name="a",
         include_content=False,
         messages=[Message(role="user", content=_PII_EMAIL)],
+        output_messages=[Message(role="assistant", content=f"hi {_PII_EMAIL}")],
         spans=[Tool(name="lookup", arguments=f'{{"email":"{_PII_EMAIL}"}}')],
     )
 
