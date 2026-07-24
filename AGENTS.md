@@ -385,6 +385,21 @@ pnpm exec tsx examples/claudeAgents.ts
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Claude Agent SDK token accounting
+
+- Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
+  only. Weave usage requires an inclusive prompt total, with
+  `cache_read_input_tokens` and `cache_creation_input_tokens` represented as
+  subsets of `input_tokens`, because cost and cache-hit-rate rollups use that
+  convention.
+- Both Python tracing paths must normalize aggregate result usage through
+  `weave/integrations/claude_agent_sdk/usage.py`. Keep the SDK's yielded
+  `ResultMessage` and the calls-based root output unchanged; normalize the
+  calls-based usage summary and the OTel span attributes consumed by Weave
+  rollups.
+- Regression coverage must exercise both the calls-based and OTel integrations
+  with nonzero cache-read and cache-creation counts.
+
 ### Documentation
 
 - Update relevant docstrings for Python code
