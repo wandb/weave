@@ -149,7 +149,7 @@ export class ClaudeAgentOtelTracer {
   }
 
   processMessage(msg: SDKMessage): void {
-    const turn = this.ensureTurn(msg.session_id);
+    const turn = this.getOrCreateTurn(msg.session_id);
 
     switch (msg.type) {
       case 'assistant':
@@ -169,7 +169,7 @@ export class ClaudeAgentOtelTracer {
     }
     this.finished = true;
 
-    const turn = this.ensureTurn(result?.session_id);
+    const turn = this.getOrCreateTurn(result?.session_id);
 
     for (const tool of this.openTools.values()) {
       tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
@@ -201,7 +201,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private ensureTurn(conversationId: string | undefined): Turn {
+  private getOrCreateTurn(conversationId: string | undefined): Turn {
     if (this.turn) {
       return this.turn;
     }
