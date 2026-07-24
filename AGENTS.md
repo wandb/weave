@@ -354,10 +354,10 @@ pnpm exec tsx examples/claudeAgents.ts
   `agents/chat_view.py` suppresses it when a descendant already emitted
   assistant text. Python's lower-level `invoke_agent_attributes()` accepts
   `output_messages`, but Python `Turn.record()` does not yet expose it.
-- Conversation-scoped integrations use `weave.integration.name` and
-  `weave.integration.version` as fixed identity inherited by every span; do
-  not duplicate them under `integration.name`, `integration.version`, or
-  `integration.meta.package_name`.
+- Conversation-scoped integrations build fixed provenance with
+  `asOtelAttributes(libraryIntegration(...))` and inherit it on every span.
+  Keep identity and metadata under `weave.integration.*`; do not duplicate
+  legacy `integration.name`, `integration.version`, or `integration.meta.*`.
 - The Claude Agent SDK integration is the reference async-generator pattern:
   capture the query start time, put integration attributes on a lazily created
   `Conversation`, pass `session_id` into initial `Turn` creation rather than
