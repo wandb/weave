@@ -14,6 +14,7 @@
  *   }
  */
 import {
+  WEAVE_INTEGRATION_META_PREFIX,
   WEAVE_INTEGRATION_NAME,
   WEAVE_INTEGRATION_VERSION,
 } from '../genai/semconv';
@@ -105,7 +106,7 @@ export function asOtelAttributes(
       typeof value === 'string' ||
       typeof value === 'number' ||
       typeof value === 'boolean';
-    attributes[`${INTEGRATION_ATTRIBUTE_KEY}.meta.${key}`] = scalar
+    attributes[`${WEAVE_INTEGRATION_META_PREFIX}.${key}`] = scalar
       ? value
       : String(value);
   }

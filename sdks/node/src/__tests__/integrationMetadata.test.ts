@@ -55,9 +55,9 @@ describe('integration metadata builders', () => {
     expect(asOtelAttributes(m)).toEqual({
       'weave.integration.name': 'openai_agents',
       'weave.integration.version': '1',
-      'integration.meta.package_name': 'p',
-      'integration.meta.package_version': '2',
-      'integration.meta.options': '[object Object]',
+      'weave.integration.meta.package_name': 'p',
+      'weave.integration.meta.package_version': '2',
+      'weave.integration.meta.options': '[object Object]',
     });
   });
 });

@@ -133,7 +133,7 @@ describe('PiCodingAgentOtelAdapter', () => {
       expect(
         stamped.every(
           s =>
-            s.attributes['integration.meta.package_name'] ===
+            s.attributes['weave.integration.meta.package_name'] ===
             '@pi-dev/coding-agent'
         )
       ).toBe(true);
