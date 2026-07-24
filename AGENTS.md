@@ -319,6 +319,8 @@ pnpm exec tsx examples/claudeAgents.ts
 
 ### TypeScript GenAI Turn output
 
+- The existing `Turn.record({messages: [...]})` path records input messages;
+  Turn stores these separately from terminal `outputMessages`.
 - Record a terminal agent result with
   `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
   `invoke_agent` span as `gen_ai.output.messages`.

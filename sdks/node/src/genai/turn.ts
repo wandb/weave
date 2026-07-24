@@ -103,7 +103,7 @@ export class Turn extends SpanBase {
   private _agentDescription: string;
   private _agentVersion: string;
   private _model: string;
-  private _messages: Message[];
+  private _inputMessages: Message[];
   private _outputMessages: Message[] = [];
   private _systemInstructions: string[];
   private _attributes: Attributes;
@@ -124,7 +124,7 @@ export class Turn extends SpanBase {
     this._agentName = opts.agentName;
     this._agentDescription = opts.agentDescription;
     this._agentVersion = opts.agentVersion;
-    this._messages = opts.messages;
+    this._inputMessages = opts.messages;
     this._model = opts.model;
     this._systemInstructions = opts.systemInstructions;
     this._attributes = opts.attributes;
@@ -223,7 +223,7 @@ export class Turn extends SpanBase {
     if (this._warnIfEnded('record')) return this;
 
     if (opts.messages !== undefined) {
-      this._messages = opts.messages;
+      this._inputMessages = opts.messages;
     }
     if (opts.outputMessages !== undefined) {
       this._outputMessages = opts.outputMessages;
@@ -281,10 +281,10 @@ export class Turn extends SpanBase {
     if (this._agentVersion) {
       this.span.setAttribute(ATTR_GEN_AI_AGENT_VERSION, this._agentVersion);
     }
-    if (this._messages.length > 0) {
+    if (this._inputMessages.length > 0) {
       this.span.setAttribute(
         ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify(this._messages)
+        JSON.stringify(this._inputMessages)
       );
     }
     if (this._outputMessages.length > 0) {
