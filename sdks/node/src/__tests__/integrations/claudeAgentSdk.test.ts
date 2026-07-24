@@ -129,6 +129,159 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(spans.some(s => s.name === 'chat')).toBe(true);
   });
 
+  test('streaming input emits one root per user turn', async () => {
+    async function* prompts() {
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'first question'},
+        parent_tool_use_id: null,
+      };
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'second question'},
+        parent_tool_use_id: null,
+      };
+    }
+
+    const sdk = {
+      query: ({prompt}: {prompt: AsyncIterable<any>}) => {
+        async function* gen() {
+          let turn = 0;
+          for await (const _input of prompt) {
+            turn += 1;
+            yield {
+              type: 'assistant',
+              session_id: 'sess-multi',
+              message: {
+                model: `claude-${turn}`,
+                content: [{type: 'text', text: `response-${turn}`}],
+              },
+            };
+            yield {
+              type: 'result',
+              subtype: 'success',
+              session_id: 'sess-multi',
+              is_error: false,
+              result: `result-${turn}`,
+              total_cost_usd: turn / 100,
+              modelUsage: {
+                [`claude-${turn}`]: {
+                  inputTokens: turn,
+                  outputTokens: turn + 1,
+                  cacheReadInputTokens: 0,
+                  cacheCreationInputTokens: 0,
+                },
+              },
+            };
+          }
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    const query = sdk.query({prompt: prompts()});
+    await expect(query.next()).resolves.toMatchObject({
+      value: {type: 'assistant'},
+      done: false,
+    });
+    await expect(query.next()).resolves.toMatchObject({
+      value: {type: 'result', result: 'result-1'},
+      done: false,
+    });
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(span => span.name === INVOKE)
+    ).toHaveLength(1);
+
+    for await (const _message of query) {
+      void _message;
+    }
+
+    const roots = getExporter()
+      .getFinishedSpans()
+      .filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+    expect(
+      roots.map(root => ({
+        conversationId: root.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+        input: JSON.parse(
+          root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
+        ),
+        output: JSON.parse(
+          root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+        ),
+      }))
+    ).toEqual([
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'first question'}],
+        output: [{role: 'assistant', content: 'result-1'}],
+      },
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'second question'}],
+        output: [{role: 'assistant', content: 'result-2'}],
+      },
+    ]);
+  });
+
+  test('traces user messages sent through Query.streamInput()', async () => {
+    const streamInput = jest.fn(async (stream: AsyncIterable<any>) => {
+      for await (const _message of stream) {
+        void _message;
+      }
+    });
+    const sdk = fakeSdk(
+      [
+        {
+          type: 'assistant',
+          session_id: 'sess-stream-input',
+          message: {
+            model: 'claude-x',
+            content: [{type: 'text', text: 'response'}],
+          },
+        },
+        {
+          type: 'result',
+          subtype: 'success',
+          session_id: 'sess-stream-input',
+          is_error: false,
+          result: 'done',
+          modelUsage: {},
+        },
+      ],
+      {streamInput}
+    );
+    patchClaudeAgentSdk(sdk);
+
+    const emptyPrompt: AsyncIterable<any> = {
+      [Symbol.asyncIterator]: () => ({
+        next: async () => ({done: true, value: undefined}),
+      }),
+    };
+    async function* nextTurn() {
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'sent later'},
+        parent_tool_use_id: null,
+      };
+    }
+
+    const query = sdk.query({prompt: emptyPrompt});
+    await query.streamInput(nextTurn());
+    for await (const _message of query) {
+      void _message;
+    }
+
+    expect(streamInput).toHaveBeenCalledTimes(1);
+    const root = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    expect(
+      JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([{role: 'user', content: 'sent later'}]);
+  });
+
   test('forwards Query interface methods (e.g. interrupt) to the underlying query', async () => {
     const interrupt = jest.fn(async () => {});
     const sdk = fakeSdk(
