@@ -13,6 +13,10 @@
  *     }
  *   }
  */
+import {
+  WEAVE_INTEGRATION_NAME,
+  WEAVE_INTEGRATION_VERSION,
+} from '../genai/semconv';
 import {packageVersion as weavePackageVersion} from '../utils/packageVersion';
 
 /** Top-level attribute key under which integration provenance is stored. */
@@ -85,27 +89,15 @@ export function asAttributes(
 }
 
 /**
- * Render the metadata as flattened OpenTelemetry span attributes. OTel
- * attributes must be scalars, so the nested shape is flattened to dotted keys
- * (`integration.name`, `integration.version`, `integration.meta.<key>`). Used
- * by the agent OTel integrations that emit spans instead of Weave calls. The
- * trace server reconstructs the nested `integration` dict on ingest.
+ * Render the canonical Weave integration identity for OpenTelemetry spans.
+ * Integration-specific metadata remains available to call-based integrations
+ * through `asAttributes()` until it has a canonical OTel attribute namespace.
  */
 export function asOtelAttributes(
   metadata: IntegrationMetadata
 ): Record<string, string | number | boolean> {
-  const attributes: Record<string, string | number | boolean> = {
-    [`${INTEGRATION_ATTRIBUTE_KEY}.name`]: metadata.name,
-    [`${INTEGRATION_ATTRIBUTE_KEY}.version`]: metadata.version,
+  return {
+    [WEAVE_INTEGRATION_NAME]: metadata.name,
+    [WEAVE_INTEGRATION_VERSION]: metadata.version,
   };
-  for (const [key, value] of Object.entries(metadata.meta)) {
-    const scalar =
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean';
-    attributes[`${INTEGRATION_ATTRIBUTE_KEY}.meta.${key}`] = scalar
-      ? value
-      : String(value);
-  }
-  return attributes;
 }
