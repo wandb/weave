@@ -3,13 +3,20 @@ import {
   runIsolated,
   type Message,
   type MessagePart,
+  type SubAgent,
   type Tool,
   type Turn,
   type Usage,
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_PROVIDER_NAME,
+  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
+  ATTR_GEN_AI_TOOL_CALL_ID,
+  ATTR_GEN_AI_TOOL_CALL_RESULT,
+  ATTR_GEN_AI_TOOL_NAME,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
@@ -67,6 +74,11 @@ type ToolResultBlock = Extract<
   {type: 'tool_result'}
 >;
 
+type ToolUseBlock = Extract<
+  SDKAssistantMessage['message']['content'][number],
+  {type: 'tool_use'}
+>;
+
 function toolResultText(content: ToolResultBlock['content']): string {
   if (!content) {
     return '';
@@ -106,6 +118,23 @@ function userInputMessage(msg: SDKUserMessage): Message {
     return {role: 'user', content: parts[0].content};
   }
   return {role: 'user', parts};
+}
+
+function recordOf(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value != null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringField(
+  value: Record<string, unknown>,
+  key: string
+): string | undefined {
+  return typeof value[key] === 'string' ? value[key] : undefined;
+}
+
+function isSubagentTool(name: string): boolean {
+  return name === 'Agent' || name === 'Task';
 }
 
 type NormalizedUsage = {
@@ -164,10 +193,16 @@ type PendingTurn = {
   startedAt: Date;
 };
 
+type SpanParent = Pick<
+  Turn | SubAgent,
+  'startLLM' | 'startSubagent' | 'startTool'
+>;
+
 /** Emits Claude Agent SDK traces through Weave GenAI handles. */
 export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
   private readonly startedAt = new Date();
+  private readonly openSubagents = new Map<string, SubAgent>();
   private readonly openTools = new Map<string, Tool>();
   private readonly pendingTurns: PendingTurn[] = [];
 
@@ -258,6 +293,11 @@ export class ClaudeAgentOtelTracer {
       tool.end({error: new Error('Agent ended with open tool span')});
     }
     this.openTools.clear();
+    for (const subagent of [...this.openSubagents.values()].reverse()) {
+      subagent.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
+      subagent.end({error: new Error('Agent ended with open subagent span')});
+    }
+    this.openSubagents.clear();
 
     if (result) {
       this.emitModelUsageSpans(result, turn);
@@ -381,15 +421,16 @@ export class ClaudeAgentOtelTracer {
 
   private processAssistant(msg: SDKAssistantMessage, turn: Turn): void {
     const model = msg.message.model;
-    if (this.rootModel == null && model) {
+    if (msg.parent_tool_use_id == null && this.rootModel == null && model) {
       this.rootModel = model;
     }
 
+    const parent = this.spanParent(msg, turn);
     const content = msg.message.content;
     const parts = assistantParts(content);
 
     runIsolated(() => {
-      const llm = turn.startLLM({
+      const llm = parent.startLLM({
         model: model ?? '',
         providerName: PROVIDER_NAME,
       });
@@ -410,13 +451,75 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_use') {
         continue;
       }
-      const tool = turn.startTool({
+      if (isSubagentTool(block.name)) {
+        this.startSubagent(block, parent);
+        continue;
+      }
+      const tool = parent.startTool({
         name: block.name,
         toolCallId: block.id,
         args: JSON.stringify(block.input ?? {}),
       });
       this.openTools.set(block.id, tool);
     }
+  }
+
+  private spanParent(msg: SDKAssistantMessage, turn: Turn): SpanParent {
+    const parentToolUseId = msg.parent_tool_use_id;
+    if (parentToolUseId == null) {
+      return turn;
+    }
+
+    let subagent = this.openSubagents.get(parentToolUseId);
+    if (!subagent) {
+      subagent = turn.startSubagent({
+        name: msg.subagent_type ?? 'subagent',
+        model: msg.message.model,
+        agentDescription: msg.task_description,
+      });
+      subagent.setAttributes({
+        [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+        [ATTR_GEN_AI_TOOL_CALL_ID]: parentToolUseId,
+      });
+      this.openSubagents.set(parentToolUseId, subagent);
+    } else {
+      subagent.record({
+        ...(msg.subagent_type ? {name: msg.subagent_type} : {}),
+        ...(msg.message.model ? {model: msg.message.model} : {}),
+        ...(msg.task_description
+          ? {agentDescription: msg.task_description}
+          : {}),
+      });
+    }
+    return subagent;
+  }
+
+  private startSubagent(block: ToolUseBlock, parent: SpanParent): void {
+    const input = recordOf(block.input);
+    const name =
+      stringField(input, 'subagent_type') ??
+      stringField(input, 'name') ??
+      'subagent';
+    const prompt = stringField(input, 'prompt');
+    const subagent = parent.startSubagent({
+      name,
+      model: stringField(input, 'model'),
+      agentDescription: stringField(input, 'description'),
+    });
+    subagent.setAttributes({
+      [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
+      [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
+      [ATTR_GEN_AI_TOOL_NAME]: block.name,
+      [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(block.input ?? {}),
+      ...(prompt
+        ? {
+            [ATTR_GEN_AI_INPUT_MESSAGES]: JSON.stringify([
+              {role: 'user', content: prompt},
+            ]),
+          }
+        : {}),
+    });
+    this.openSubagents.set(block.id, subagent);
   }
 
   private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
@@ -427,12 +530,35 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_result') {
         continue;
       }
+      const resultText = toolResultText(block.content);
+      const subagent = this.openSubagents.get(block.tool_use_id);
+      if (subagent) {
+        this.openSubagents.delete(block.tool_use_id);
+        subagent.setAttributes({
+          [ATTR_GEN_AI_TOOL_CALL_RESULT]: resultText,
+          ...(resultText
+            ? {
+                [ATTR_GEN_AI_OUTPUT_MESSAGES]: JSON.stringify([
+                  {role: 'assistant', content: resultText},
+                ]),
+              }
+            : {}),
+        });
+        if (block.is_error) {
+          subagent.setAttributes({[ATTR_ERROR_TYPE]: 'subagent_error'});
+          subagent.end({
+            error: new Error(resultText || 'Subagent execution failed'),
+          });
+        } else {
+          subagent.end();
+        }
+        continue;
+      }
       const tool = this.openTools.get(block.tool_use_id);
       if (!tool) {
         continue;
       }
       this.openTools.delete(block.tool_use_id);
-      const resultText = toolResultText(block.content);
       tool.result = resultText;
       if (block.is_error) {
         tool.setAttributes({[ATTR_ERROR_TYPE]: 'tool_error'});

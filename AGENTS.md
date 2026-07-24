@@ -361,6 +361,8 @@ pnpm exec tsx examples/claudeAgents.ts
   `tool_result`.
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
+  and preserve the caller's `forwardSubagentText` option.
 
 ## Code Review & PR Guidelines
 

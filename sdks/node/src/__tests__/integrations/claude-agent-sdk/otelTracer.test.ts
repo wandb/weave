@@ -10,6 +10,7 @@ import type {
 
 import {
   ATTR_ERROR_TYPE,
+  ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -102,11 +103,16 @@ function assistantMessage(opts: {
   model: string;
   content: AssistantContent[];
   stopReason?: SDKAssistantMessage['message']['stop_reason'];
+  parentToolUseId?: string | null;
+  subagentType?: string;
+  taskDescription?: string;
 }): SDKAssistantMessage {
   return {
     type: 'assistant',
     session_id: opts.sessionId,
-    parent_tool_use_id: null,
+    parent_tool_use_id: opts.parentToolUseId ?? null,
+    subagent_type: opts.subagentType,
+    task_description: opts.taskDescription,
     uuid: randomUUID(),
     message: {
       id: 'msg-1',
@@ -135,6 +141,9 @@ function userToolResult(opts: {
   toolUseId: string;
   content: string;
   isError?: boolean;
+  parentToolUseId?: string | null;
+  subagentType?: string;
+  taskDescription?: string;
 }): SDKUserMessage {
   const block: ToolResultBlock = {
     type: 'tool_result',
@@ -145,7 +154,9 @@ function userToolResult(opts: {
   return {
     type: 'user',
     session_id: opts.sessionId,
-    parent_tool_use_id: null,
+    parent_tool_use_id: opts.parentToolUseId ?? null,
+    subagent_type: opts.subagentType,
+    task_description: opts.taskDescription,
     message: {role: 'user', content: [block]},
   };
 }
@@ -476,6 +487,247 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(contentChats.map(span => span.parentSpanId)).toEqual([
       roots[0].spanContext().spanId,
       roots[1].spanContext().spanId,
+    ]);
+  });
+
+  test('nests forwarded subagent text and tools under a SubAgent span', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'research the SDK'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-subagent',
+        model: 'claude-main',
+        stopReason: 'tool_use',
+        content: [
+          toolUseBlock('agent-1', 'Agent', {
+            description: 'Research the Agent SDK',
+            prompt: 'Find how subagent forwarding works.',
+            subagent_type: 'researcher',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-subagent',
+        parentToolUseId: 'agent-1',
+        subagentType: 'researcher',
+        taskDescription: 'Research the Agent SDK',
+        model: 'claude-subagent',
+        stopReason: 'tool_use',
+        content: [
+          thinkingBlock('I should inspect the source.'),
+          textBlock('I will read the relevant file.'),
+          toolUseBlock('read-1', 'Read', {file_path: 'sdk.d.ts'}),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-subagent',
+        parentToolUseId: 'agent-1',
+        subagentType: 'researcher',
+        toolUseId: 'read-1',
+        content: 'forwardSubagentText?: boolean',
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-subagent',
+        toolUseId: 'agent-1',
+        content: 'Set forwardSubagentText to include nested text.',
+      })
+    );
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-subagent',
+        model: 'claude-main',
+        content: [textBlock('The option forwards nested text.')],
+      })
+    );
+    tracer.finalize(
+      resultSuccess({
+        sessionId: 'sess-subagent',
+        result: 'The option forwards nested text.',
+      })
+    );
+
+    const spans = getExporter().getFinishedSpans();
+    const root = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
+    )!;
+    const subagent = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'researcher'
+    )!;
+    expect(subagent.parentSpanId).toBe(root.spanContext().spanId);
+    expect(subagent.attributes[ATTR_GEN_AI_AGENT_DESCRIPTION]).toBe(
+      'Research the Agent SDK'
+    );
+    expect(subagent.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe(
+      'claude-subagent'
+    );
+    expect(
+      JSON.parse(subagent.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([{role: 'user', content: 'Find how subagent forwarding works.'}]);
+    expect(
+      JSON.parse(subagent.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
+    ).toEqual([
+      {
+        role: 'assistant',
+        content: 'Set forwardSubagentText to include nested text.',
+      },
+    ]);
+
+    const nestedChat = spans.find(
+      span =>
+        span.name === 'chat' &&
+        span.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-subagent'
+    )!;
+    expect(nestedChat.parentSpanId).toBe(subagent.spanContext().spanId);
+    expect(
+      JSON.parse(nestedChat.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
+    ).toEqual([
+      {
+        role: 'assistant',
+        parts: [
+          {type: 'reasoning', content: 'I should inspect the source.'},
+          {type: 'text', content: 'I will read the relevant file.'},
+          {
+            type: 'tool_call',
+            toolCallId: 'read-1',
+            toolName: 'Read',
+            arguments: '{"file_path":"sdk.d.ts"}',
+          },
+        ],
+      },
+    ]);
+
+    const nestedTool = spans.find(
+      span =>
+        span.name === 'execute_tool' &&
+        span.attributes[ATTR_GEN_AI_TOOL_CALL_ID] === 'read-1'
+    )!;
+    expect(nestedTool.parentSpanId).toBe(subagent.spanContext().spanId);
+    expect(nestedTool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
+      'forwardSubagentText?: boolean'
+    );
+    expect(
+      spans.some(
+        span =>
+          span.name === 'execute_tool' &&
+          span.attributes[ATTR_GEN_AI_TOOL_CALL_ID] === 'agent-1'
+      )
+    ).toBe(false);
+  });
+
+  test('traces parallel subagents when only their tool blocks are forwarded', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate both checks'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-parallel',
+        model: 'claude-main',
+        stopReason: 'tool_use',
+        content: [
+          toolUseBlock('agent-a', 'Agent', {
+            description: 'Inspect types',
+            prompt: 'Read the SDK types.',
+            subagent_type: 'type-reader',
+          }),
+          toolUseBlock('agent-b', 'Agent', {
+            description: 'Inspect docs',
+            prompt: 'Search the SDK docs.',
+            subagent_type: 'doc-reader',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-parallel',
+        parentToolUseId: 'agent-b',
+        subagentType: 'doc-reader',
+        model: 'claude-docs',
+        stopReason: 'tool_use',
+        content: [toolUseBlock('grep-b', 'Grep', {pattern: 'forward'})],
+      })
+    );
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-parallel',
+        parentToolUseId: 'agent-a',
+        subagentType: 'type-reader',
+        model: 'claude-types',
+        stopReason: 'tool_use',
+        content: [toolUseBlock('read-a', 'Read', {file_path: 'sdk.d.ts'})],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-parallel',
+        parentToolUseId: 'agent-a',
+        toolUseId: 'read-a',
+        content: 'types',
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-parallel',
+        parentToolUseId: 'agent-b',
+        toolUseId: 'grep-b',
+        content: 'docs',
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-parallel',
+        toolUseId: 'agent-b',
+        content: 'docs complete',
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-parallel',
+        toolUseId: 'agent-a',
+        content: 'types complete',
+      })
+    );
+    tracer.finalize(
+      resultSuccess({sessionId: 'sess-parallel', result: 'done'})
+    );
+
+    const spans = getExporter().getFinishedSpans();
+    const root = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
+    )!;
+    const subagents = spans.filter(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] !== 'claude_agent_sdk'
+    );
+    expect(
+      subagents.map(span => ({
+        name: span.attributes[ATTR_GEN_AI_AGENT_NAME],
+        output: JSON.parse(
+          span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+        ),
+        parentSpanId: span.parentSpanId,
+      }))
+    ).toEqual([
+      {
+        name: 'doc-reader',
+        output: [{role: 'assistant', content: 'docs complete'}],
+        parentSpanId: root.spanContext().spanId,
+      },
+      {
+        name: 'type-reader',
+        output: [{role: 'assistant', content: 'types complete'}],
+        parentSpanId: root.spanContext().spanId,
+      },
     ]);
   });
 
