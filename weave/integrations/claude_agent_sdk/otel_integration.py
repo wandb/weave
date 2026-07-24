@@ -47,6 +47,7 @@ from weave.conversation.conversation_otel import (
     llm_attributes,
 )
 from weave.conversation.types import Message, Reasoning, ToolCallPart, Usage
+from weave.integrations.claude_agent_sdk.usage import total_input_tokens
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
@@ -109,7 +110,7 @@ def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
     """Build a Usage from a ResultMessage's aggregate usage dict."""
     raw = usage or {}
     return Usage(
-        input_tokens=int(raw.get("input_tokens", 0) or 0),
+        input_tokens=total_input_tokens(raw),
         output_tokens=int(raw.get("output_tokens", 0) or 0),
         cache_creation_input_tokens=int(raw.get("cache_creation_input_tokens", 0) or 0),
         cache_read_input_tokens=int(raw.get("cache_read_input_tokens", 0) or 0),
