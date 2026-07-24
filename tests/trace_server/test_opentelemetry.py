@@ -617,7 +617,6 @@ class TestPythonSpans:
 
         kv_is_turn_false = KeyValue()
         kv_is_turn_false.key = "wandb.is_turn"
-        # Assign explicitly so the proto3 oneof records field presence.
         kv_is_turn_false.value.bool_value = False
         pb_span_false.attributes.append(kv_is_turn_false)
 
@@ -1510,25 +1509,29 @@ class TestSemanticConventionParsing:
         )
         extracted = get_wandb_attributes(attributes)
         assert extracted["thread_id"] == test_conversation_id
-        # is_turn should be truthy (the conversation id itself)
-        assert extracted["is_turn"]
+        # Absent an explicit marker, is_turn falls back to the conversation id.
+        assert extracted["is_turn"] == test_conversation_id
 
         # An explicit Boolean wandb.is_turn overrides the conversation-id turn
         # fallback while the conversation id still populates thread_id.
         extracted_false = get_wandb_attributes(
-            {
-                "gen_ai.conversation.id": test_conversation_id,
-                "wandb.is_turn": False,
-            }
+            create_attributes(
+                {
+                    "gen_ai.conversation.id": test_conversation_id,
+                    "wandb.is_turn": False,
+                }
+            )
         )
         assert extracted_false["thread_id"] == test_conversation_id
         assert extracted_false["is_turn"] is False
 
         extracted_true = get_wandb_attributes(
-            {
-                "gen_ai.conversation.id": test_conversation_id,
-                "wandb.is_turn": True,
-            }
+            create_attributes(
+                {
+                    "gen_ai.conversation.id": test_conversation_id,
+                    "wandb.is_turn": True,
+                }
+            )
         )
         assert extracted_true["thread_id"] == test_conversation_id
         assert extracted_true["is_turn"] is True

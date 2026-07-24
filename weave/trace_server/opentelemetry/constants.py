@@ -176,7 +176,7 @@ WB_KEYS = {
     "wb_run_step": ["wandb.wb_run_step"],
     "wb_run_step_end": ["wandb.wb_run_step_end"],
     "is_turn": [
-        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv - legacy fallback: a non-empty id infers a turn unless wandb.is_turn overrides it
+        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv
         "gcp.vertex.agent.session_id",
         "wandb.is_turn",
     ],  # An explicit Boolean wandb.is_turn is authoritative; otherwise a non-empty conversation/session id infers a turn (see get_wandb_attributes)
