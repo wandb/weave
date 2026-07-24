@@ -167,6 +167,12 @@ Focus on these primary test shards:
 - `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
+The Claude Agent SDK shard combines ClickHouse-backed calls tests with
+no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
+without a marker filter so both tracing paths contribute coverage.
+Calls-based tests must include the integration's intentional text and thinking
+child calls in exact operation-set assertions.
+
 ### Running Tests
 
 **IMPORTANT**: Any test depending on the `client` fixture runs against ClickHouse, the only trace-server backend. Locally, the test fixtures auto-start a ClickHouse Docker container if one isn't already running, so Docker must be available. Pass `--clickhouse-process=true` to use a local `clickhouse-server` binary instead of Docker.
