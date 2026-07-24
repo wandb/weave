@@ -328,43 +328,16 @@ pnpm exec tsx examples/claudeAgents.ts
 
 ### TypeScript GenAI span handles
 
-- The high-level GenAI API (`Conversation`, `Turn`, `LLM`, `Tool`,
-  `SubAgent`) emits through the same `/agents/otel/v1/traces` pipeline as
-  integrations that call `getWeaveTracer()` directly.
-- Callback- or generator-driven integrations may create
-  `Conversation`/`Turn`/`LLM` handles inside a short `runIsolated()` frame and
-  retain those handles across later callbacks. Parenting, conversation ID, and
-  conversation attributes travel through the handles; this avoids collisions
-  in the process-wide ambient GenAI state.
-- `Conversation.create`, `Turn.create`, and `LLM.create` currently guard and
-  write ambient state, so isolate their creation when concurrent long-lived
-  operations are driven by explicit handles. `Tool` and `SubAgent` creation do
-  not use ambient state.
-- The high-level emitters use canonical span names (`invoke_agent`, `chat`,
-  `execute_tool`); integration-specific fields not represented by typed
-  `record()` methods can be attached through `setAttributes()`.
-- Response-model attributes belong to the child `chat` spans that performed
-  inference; do not copy a first/primary child model onto a potentially
-  multi-model `invoke_agent` span.
-- Keep the terminal agent result on the `invoke_agent` span as
-  `gen_ai.output.messages`, even when child `chat` spans carry model output.
-  TypeScript integrations record it through
-  `Turn.record({outputMessages: ...})`; `Turn.end()` serializes it. The root
-  value is the agent-level return and covers result-only streams, while
-  `agents/chat_view.py` suppresses it when a descendant already emitted
-  assistant text. Python's lower-level `invoke_agent_attributes()` accepts
-  `output_messages`, but Python `Turn.record()` does not yet expose it.
-- Conversation-scoped integrations build fixed provenance with
-  `asOtelAttributes(libraryIntegration(...))` and inherit it on every span.
-  Keep identity and metadata under `weave.integration.*`; do not duplicate
-  legacy `integration.name`, `integration.version`, or `integration.meta.*`.
-- The Claude Agent SDK integration is the reference async-generator pattern:
-  capture the query start time, put integration attributes on a lazily created
-  `Conversation`, pass `session_id` into initial `Turn` creation rather than
-  patching its root attribute later, pass that explicit `Turn` handle into
-  helpers that create child spans, create each `LLM` in a short `runIsolated()`
-  frame, and retain `Tool` handles until later `tool_result` messages close
-  them.
+- `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
+  `invoke_agent`, `chat`, and `execute_tool` spans through
+  `/agents/otel/v1/traces`.
+- For callback or generator integrations, create `Conversation`, `Turn`, and
+  `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
+  `Tool` and `SubAgent` do not use ambient state.
+- Keep response models on child `chat` spans; use `setAttributes()` for fields
+  without typed `record()` methods.
+- The Claude Agent SDK integration keeps each `Tool` open until its matching
+  `tool_result`.
 
 ## Code Review & PR Guidelines
 
