@@ -82,6 +82,26 @@ LifecycleStage = Literal[
 
 InferenceEnvironment = Literal["cw-prod", "cw-qa"]
 
+# How reasoning mode is exposed for this model (catalog JSON).
+ReasoningSupport = Literal[
+    "unsupported",
+    "default-off",
+    "adaptive",
+    "default-on",
+    "always-on",
+]
+
+# Reasoning effort levels a model can be configured with (catalog JSON).
+ReasoningEffort = Literal[
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+]
+
 
 class LLMModelDetails(TypedDict):
     # Field names are matching cross-language JSON, intentionally using camel case
@@ -105,6 +125,14 @@ class LLMModelDetails(TypedDict):
     featureToolCalling: bool
     featureLoRA: bool
     featureTrainableServerlessRL: bool
+    # If unset, reasoning is unsupported.
+    reasoningSupport: NotRequired[ReasoningSupport]
+    # Effort levels accepted by the model, in ascending order. Only present
+    # when reasoningSupport is set.
+    reasoningEfforts: NotRequired[list[ReasoningEffort]]
+    # The request body field name used to control reasoning/thinking mode for
+    # this model (e.g. "thinking_mode").
+    reasoningArgument: NotRequired[str]
     parameterCountTotal: int
     parameterCountActive: NotRequired[int]
     contextWindow: int
