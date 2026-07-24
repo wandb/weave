@@ -47,9 +47,7 @@ describe('hostApps — claude-agent-sdk', () => {
     // `--import=weave/instrument` patched query() and the tracer emitted its
     // root agent span through the real OTel pipeline. That's the entire
     // packaging / module-loading contract this layer protects.
-    const emittedAgentRoot = spans.some(
-      s => s.name === 'invoke_agent claude_agent_sdk'
-    );
+    const emittedAgentRoot = spans.some(s => s.name === 'invoke_agent');
     expect(emittedAgentRoot).toBe(true);
   }, 60_000);
 });

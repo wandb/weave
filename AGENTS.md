@@ -6,6 +6,7 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
 ## Python Import Rules
 
@@ -325,6 +326,19 @@ pnpm exec tsx examples/claudeAgents.ts
   `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
   `invoke_agent` span as `gen_ai.output.messages`.
 
+### TypeScript GenAI span handles
+
+- `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
+  `invoke_agent`, `chat`, and `execute_tool` spans through
+  `/agents/otel/v1/traces`.
+- For callback or generator integrations, create `Conversation`, `Turn`, and
+  `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
+  `Tool` and `SubAgent` do not use ambient state.
+- Keep response models on child `chat` spans; use `setAttributes()` for fields
+  without typed `record()` methods.
+- The Claude Agent SDK integration keeps each `Tool` open until its matching
+  `tool_result`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -464,4 +478,7 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Add `output_messages` to Python `Turn.record()` for parity with
       TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
       `invoke_agent_attributes()` builder already supports agent output.
+- [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
+      OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
+      `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
 - [ ] ...

@@ -8,7 +8,7 @@
  * hook callback only sees tool name/input/session_id — never the assistant
  * message content, model, token usage, or total_cost_usd. We therefore wrap the
  * SDK's exported `query()` and emit GenAI agent spans from the streamed messages
- * through the shared Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool`
+ * through the high-level Weave GenAI SDK — `invoke_agent`/`chat`/`execute_tool`
  * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
