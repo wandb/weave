@@ -28,6 +28,7 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
+  WEAVE_INTEGRATION_META_PREFIX,
   WEAVE_INTEGRATION_NAME,
   WEAVE_INTEGRATION_VERSION,
 } from '../../../genai/semconv';
@@ -282,12 +283,15 @@ describe('Claude Agent SDK — OTel tracer', () => {
       expect({
         name: span.attributes[WEAVE_INTEGRATION_NAME],
         version: span.attributes[WEAVE_INTEGRATION_VERSION],
+        packageName:
+          span.attributes[`${WEAVE_INTEGRATION_META_PREFIX}.package_name`],
         legacyName: span.attributes['integration.name'],
         legacyVersion: span.attributes['integration.version'],
         legacyPackageName: span.attributes['integration.meta.package_name'],
       }).toEqual({
         name: 'claude_agent_sdk',
         version: packageVersion,
+        packageName: '@anthropic-ai/claude-agent-sdk',
         legacyName: undefined,
         legacyVersion: undefined,
         legacyPackageName: undefined,
