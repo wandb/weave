@@ -1,7 +1,7 @@
 """Unit tests for langchain integration helpers.
 
 Tests the usage metadata extraction and processing functions that handle
-different provider formats (OpenAI, Google GenAI, Google Vertex AI).
+different provider formats (OpenAI, Google GenAI, Google Vertex AI, AWS Bedrock).
 """
 
 from unittest.mock import Mock
@@ -49,6 +49,44 @@ from weave.trace.call import Call
             {"input_tokens": 497, "output_tokens": 6, "total_tokens": 503},
             TokenUsage(prompt_tokens=497, completion_tokens=6, total_tokens=503),
         ),
+        # AWS Bedrock format exposed by LangChain's ChatBedrockConverse
+        (
+            {
+                "input_tokens": 195,
+                "output_tokens": 20,
+                "total_tokens": 120,
+                "input_token_details": {
+                    "cache_read": 80,
+                    "cache_creation": 15,
+                },
+            },
+            TokenUsage(
+                prompt_tokens=195,
+                completion_tokens=20,
+                total_tokens=120,
+                cache_read_input_tokens=80,
+                cache_creation_input_tokens=15,
+            ),
+        ),
+        # Explicit zero cache counts are meaningful and should be preserved
+        (
+            {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "total_tokens": 120,
+                "input_token_details": {
+                    "cache_read": 0,
+                    "cache_creation": 0,
+                },
+            },
+            TokenUsage(
+                prompt_tokens=100,
+                completion_tokens=20,
+                total_tokens=120,
+                cache_read_input_tokens=0,
+                cache_creation_input_tokens=0,
+            ),
+        ),
         # Empty metadata
         (
             {},
@@ -74,9 +112,7 @@ from weave.trace.call import Call
 def test_normalize_usage_metadata(usage_metadata, expected):
     """Test normalization of usage metadata from different provider formats."""
     result = _normalize_usage_metadata(usage_metadata)
-    assert result.prompt_tokens == expected.prompt_tokens
-    assert result.completion_tokens == expected.completion_tokens
-    assert result.total_tokens == expected.total_tokens
+    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -232,6 +268,48 @@ def test_find_full_model_name(output, partial_model, expected):
                     "prompt_tokens": 9,
                     "completion_tokens": 7,
                     "total_tokens": 16,
+                }
+            },
+        ),
+        # AWS Bedrock chat model format exposed by LangChain's ChatBedrockConverse
+        (
+            {
+                "extra": {
+                    "metadata": {
+                        "ls_provider": "bedrock_converse",
+                        "ls_model_name": "anthropic.claude-3-5-sonnet-20240620-v1:0",
+                        "ls_model_type": "chat",
+                    }
+                },
+                "outputs": {
+                    "generations": [
+                        [
+                            {
+                                "message": {
+                                    "kwargs": {
+                                        "usage_metadata": {
+                                            "input_tokens": 195,
+                                            "output_tokens": 20,
+                                            "total_tokens": 120,
+                                            "input_token_details": {
+                                                "cache_read": 80,
+                                                "cache_creation": 15,
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    ]
+                },
+            },
+            {
+                "anthropic.claude-3-5-sonnet-20240620-v1:0": {
+                    "prompt_tokens": 195,
+                    "completion_tokens": 20,
+                    "total_tokens": 120,
+                    "cache_read_input_tokens": 80,
+                    "cache_creation_input_tokens": 15,
                 }
             },
         ),
@@ -395,9 +473,7 @@ def test_extract_usage_data_success(output, expected_usage):
     call = Mock(spec=Call)
     call.summary = None
     _extract_usage_data(call, output)
-    assert call.summary is not None
-    assert "usage" in call.summary
-    assert call.summary["usage"] == expected_usage
+    assert call.summary == {"usage": expected_usage}
 
 
 @pytest.mark.parametrize(

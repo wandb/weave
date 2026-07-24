@@ -7,6 +7,7 @@ Supported providers:
 - OpenAI: "token_usage" with "prompt_tokens", "completion_tokens", "total_tokens"
 - Google GenAI: "usage_metadata" with "input_tokens", "output_tokens", "total_tokens"
 - Google Vertex AI: "usage_metadata" with "prompt_token_count", "candidates_token_count", "total_token_count"
+- AWS Bedrock: LangChain "usage_metadata" with cache tokens in "input_token_details"
 """
 
 from collections import defaultdict
@@ -22,16 +23,18 @@ class TokenUsage:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
+    cache_read_input_tokens: int | None = None
+    cache_creation_input_tokens: int | None = None
 
 
-def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
+def _normalize_usage_metadata(usage_metadata: dict[str, Any] | None) -> TokenUsage:
     """Normalize usage metadata from different provider formats to standard format.
 
     Args:
         usage_metadata: Raw usage metadata dictionary from provider
 
     Returns:
-        Tuple of (prompt_tokens, completion_tokens, total_tokens)
+        Normalized token usage.
 
     """
     if not usage_metadata:
@@ -41,6 +44,8 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
     # - OpenAI: prompt_tokens, completion_tokens, total_tokens
     # - Google GenAI: input_tokens, output_tokens, total_tokens
     # - Google Vertex AI: prompt_token_count, candidates_token_count, total_token_count
+    # - AWS Bedrock: input_tokens includes cached tokens, with cache token subsets
+    #   reported in input_token_details
 
     # Try different provider formats
     variations = {
@@ -59,11 +64,27 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
                 normalized_usage[key] = usage_metadata.get(value)
                 break
 
+    input_token_details = usage_metadata.get("input_token_details")
+    if not isinstance(input_token_details, dict):
+        input_token_details = {}
+    cache_read_input_tokens = (
+        input_token_details.get("cache_read") or 0
+        if "cache_read" in input_token_details
+        else None
+    )
+    cache_creation_input_tokens = (
+        input_token_details.get("cache_creation") or 0
+        if "cache_creation" in input_token_details
+        else None
+    )
+
     # Ensure all required fields have default values and handle None values
     return TokenUsage(
         prompt_tokens=normalized_usage.get("prompt_tokens") or 0,
         completion_tokens=normalized_usage.get("completion_tokens") or 0,
         total_tokens=normalized_usage.get("total_tokens") or 0,
+        cache_read_input_tokens=cache_read_input_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
     )
 
 
@@ -144,6 +165,14 @@ def _extract_usage_data(call: Call, output: Any) -> None:
                     token_usage.completion_tokens
                 )
                 usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
+                if token_usage.cache_read_input_tokens is not None:
+                    usage_dict[model_name]["cache_read_input_tokens"] += (
+                        token_usage.cache_read_input_tokens
+                    )
+                if token_usage.cache_creation_input_tokens is not None:
+                    usage_dict[model_name]["cache_creation_input_tokens"] += (
+                        token_usage.cache_creation_input_tokens
+                    )
 
     if usage_dict:
         if call.summary is None:
