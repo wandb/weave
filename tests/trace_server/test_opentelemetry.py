@@ -607,6 +607,26 @@ class TestPythonSpans:
         # is_turn is truthy via conversation.id, so turn_id should be set
         assert start_call.turn_id == py_span.span_id
 
+        # An explicit wandb.is_turn=false overrides the conversation-id turn
+        # inference: thread_id is retained but no turn_id is materialized.
+        pb_span_false = create_test_span()
+        kv_conv_false = KeyValue()
+        kv_conv_false.key = "gen_ai.conversation.id"
+        kv_conv_false.value.string_value = "conv-xyz"
+        pb_span_false.attributes.append(kv_conv_false)
+
+        kv_is_turn_false = KeyValue()
+        kv_is_turn_false.key = "wandb.is_turn"
+        # Assign explicitly so the proto3 oneof records field presence.
+        kv_is_turn_false.value.bool_value = False
+        pb_span_false.attributes.append(kv_is_turn_false)
+
+        py_span_false = PySpan.from_proto(pb_span_false)
+        start_call_false, _ = py_span_false.to_call("test_project")
+
+        assert start_call_false.thread_id == "conv-xyz"
+        assert start_call_false.turn_id is None
+
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
@@ -1061,7 +1081,7 @@ class TestSemanticConventionParsing:
             }
         )
         extracted_false = get_wandb_attributes(attributes_false)
-        assert "is_turn" not in extracted_false.keys()
+        assert extracted_false["is_turn"] is False
         assert extracted_false["thread_id"] == test_thread_id
 
         # Test with only thread_id
@@ -1492,6 +1512,26 @@ class TestSemanticConventionParsing:
         assert extracted["thread_id"] == test_conversation_id
         # is_turn should be truthy (the conversation id itself)
         assert extracted["is_turn"]
+
+        # An explicit Boolean wandb.is_turn overrides the conversation-id turn
+        # fallback while the conversation id still populates thread_id.
+        extracted_false = get_wandb_attributes(
+            {
+                "gen_ai.conversation.id": test_conversation_id,
+                "wandb.is_turn": False,
+            }
+        )
+        assert extracted_false["thread_id"] == test_conversation_id
+        assert extracted_false["is_turn"] is False
+
+        extracted_true = get_wandb_attributes(
+            {
+                "gen_ai.conversation.id": test_conversation_id,
+                "wandb.is_turn": True,
+            }
+        )
+        assert extracted_true["thread_id"] == test_conversation_id
+        assert extracted_true["is_turn"] is True
 
     def test_genai_semconv_conversation_id_priority_over_wandb(self):
         """Test that gen_ai.conversation.id takes priority over wandb.thread_id."""
