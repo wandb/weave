@@ -308,6 +308,15 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+### TypeScript integration metadata
+
+- `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
+  `asAttributes()` supplies nested provenance to Weave-call integrations, while
+  `asOtelAttributes()` supplies canonical `weave.integration.name` and
+  `weave.integration.version` identity to OTel integrations and preserves
+  flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
+  typed; non-scalar values are stringified.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
