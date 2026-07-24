@@ -366,7 +366,12 @@ pnpm exec tsx examples/claudeAgents.ts
   prompt and forwarded `Query.streamInput()` calls to capture inputs. Pass the
   explicit `Turn` handle into child emitters, create each `LLM` in a short
   `runIsolated()` frame, and retain `Tool` handles until later `tool_result`
-  messages close them.
+  messages close them. Treat `Agent`/legacy `Task` tool calls as subagents,
+  keyed by tool-call ID so parallel and nested subagent messages route through
+  the correct explicit `SubAgent` handle. The SDK forwards nested tool blocks
+  by default; `options.forwardSubagentText: true` additionally exposes nested
+  text and thinking for child `chat` spans. Instrumentation must respect that
+  caller option rather than enabling it and changing the visible SDK stream.
 
 ## Code Review & PR Guidelines
 
