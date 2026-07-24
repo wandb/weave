@@ -376,6 +376,20 @@ pnpm exec tsx examples/claudeAgents.ts
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### LangChain / Bedrock prompt-cache token accounting
+
+- LangChain's `ChatBedrockConverse` converts Bedrock usage to an inclusive
+  `usage_metadata.input_tokens` count and reports the cache subsets as
+  `input_token_details.cache_read` and
+  `input_token_details.cache_creation`. The LangChain integration must map
+  those subset fields to Weave's canonical `cache_read_input_tokens` and
+  `cache_creation_input_tokens` fields without adding them to `prompt_tokens`
+  again.
+- This differs from the direct boto3 Bedrock response: its `inputTokens` count
+  excludes `cacheReadInputTokens` and `cacheWriteInputTokens`, so the direct
+  Bedrock integration adds those two fields when constructing the inclusive
+  `prompt_tokens` total.
+
 ### Documentation
 
 - Update relevant docstrings for Python code
