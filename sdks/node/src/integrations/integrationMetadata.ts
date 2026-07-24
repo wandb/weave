@@ -89,15 +89,25 @@ export function asAttributes(
 }
 
 /**
- * Render the canonical Weave integration identity for OpenTelemetry spans.
- * Integration-specific metadata remains available to call-based integrations
- * through `asAttributes()` until it has a canonical OTel attribute namespace.
+ * Render canonical Weave integration identity plus flattened integration
+ * metadata for OpenTelemetry spans. OTel attributes must be scalars, so
+ * non-scalar metadata values are stringified.
  */
 export function asOtelAttributes(
   metadata: IntegrationMetadata
 ): Record<string, string | number | boolean> {
-  return {
+  const attributes: Record<string, string | number | boolean> = {
     [WEAVE_INTEGRATION_NAME]: metadata.name,
     [WEAVE_INTEGRATION_VERSION]: metadata.version,
   };
+  for (const [key, value] of Object.entries(metadata.meta)) {
+    const scalar =
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean';
+    attributes[`${INTEGRATION_ATTRIBUTE_KEY}.meta.${key}`] = scalar
+      ? value
+      : String(value);
+  }
+  return attributes;
 }

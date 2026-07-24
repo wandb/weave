@@ -130,6 +130,13 @@ describe('PiCodingAgentOtelAdapter', () => {
           s => s.attributes['weave.integration.version'] === packageVersion
         )
       ).toBe(true);
+      expect(
+        stamped.every(
+          s =>
+            s.attributes['integration.meta.package_name'] ===
+            '@pi-dev/coding-agent'
+        )
+      ).toBe(true);
     });
 
     it('emits one trace per prompt, linked by conversation id', () => {

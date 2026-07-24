@@ -313,8 +313,9 @@ pnpm exec tsx examples/claudeAgents.ts
 - `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
   `asAttributes()` supplies nested provenance to Weave-call integrations, while
   `asOtelAttributes()` supplies canonical `weave.integration.name` and
-  `weave.integration.version` identity to OTel integrations. Integration
-  `meta` remains call-only until it has a canonical OTel namespace.
+  `weave.integration.version` identity to OTel integrations and preserves
+  flattened `integration.meta.*` provenance. OTel scalar metadata stays typed;
+  non-scalar values are stringified.
 
 ## Code Review & PR Guidelines
 
