@@ -359,12 +359,14 @@ pnpm exec tsx examples/claudeAgents.ts
   Keep identity and metadata under `weave.integration.*`; do not duplicate
   legacy `integration.name`, `integration.version`, or `integration.meta.*`.
 - The Claude Agent SDK integration is the reference async-generator pattern:
-  capture the query start time, put integration attributes on a lazily created
-  `Conversation`, pass `session_id` into initial `Turn` creation rather than
-  patching its root attribute later, pass that explicit `Turn` handle into
-  helpers that create child spans, create each `LLM` in a short `runIsolated()`
-  frame, and retain `Tool` handles until later `tool_result` messages close
-  them.
+  put integration attributes on one lazily created `Conversation` per SDK
+  query/session, queue observed streaming inputs in FIFO order, and close the
+  active `Turn` on every SDK `result` so a multi-turn query emits one
+  `invoke_agent` root per user turn. Wrap both the initial `AsyncIterable`
+  prompt and forwarded `Query.streamInput()` calls to capture inputs. Pass the
+  explicit `Turn` handle into child emitters, create each `LLM` in a short
+  `runIsolated()` frame, and retain `Tool` handles until later `tool_result`
+  messages close them.
 
 ## Code Review & PR Guidelines
 

@@ -150,6 +150,18 @@ function userToolResult(opts: {
   };
 }
 
+function userPrompt(opts: {
+  content: string;
+  sessionId?: string;
+}): SDKUserMessage {
+  return {
+    type: 'user',
+    session_id: opts.sessionId,
+    parent_tool_use_id: null,
+    message: {role: 'user', content: opts.content},
+  };
+}
+
 // Build one model's usage; the tracer only reads the four token fields, so the
 // rest (cost, context window, …) default to 0.
 const modelUsage = (u: Partial<ModelUsage>): ModelUsage => ({
@@ -385,6 +397,86 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const traceId = invoke.spanContext().traceId;
     expect(chat.spanContext().traceId).toBe(traceId);
     expect(tool.spanContext().traceId).toBe(traceId);
+  });
+
+  test('emits one invoke_agent root per streaming-input turn', () => {
+    const tracer = new ClaudeAgentOtelTracer();
+
+    tracer.processInput(userPrompt({content: 'first question'}));
+    tracer.processInput(userPrompt({content: 'second question'}));
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-multi',
+        model: 'claude-first',
+        content: [textBlock('first response')],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({
+        sessionId: 'sess-multi',
+        result: 'first result',
+        modelUsage: {
+          'claude-first': modelUsage({inputTokens: 2, outputTokens: 3}),
+        },
+      })
+    );
+
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-multi',
+        model: 'claude-second',
+        content: [textBlock('second response')],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({
+        sessionId: 'sess-multi',
+        result: 'second result',
+        modelUsage: {
+          'claude-second': modelUsage({inputTokens: 5, outputTokens: 7}),
+        },
+      })
+    );
+    tracer.finalize();
+
+    const spans = getExporter().getFinishedSpans();
+    const roots = spans.filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+    expect(
+      roots.map(root => ({
+        conversationId: root.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+        input: JSON.parse(
+          root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
+        ),
+        output: JSON.parse(
+          root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+        ),
+      }))
+    ).toEqual([
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'first question'}],
+        output: [{role: 'assistant', content: 'first result'}],
+      },
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'second question'}],
+        output: [{role: 'assistant', content: 'second result'}],
+      },
+    ]);
+    expect(roots[0].spanContext().traceId).not.toBe(
+      roots[1].spanContext().traceId
+    );
+
+    const contentChats = spans.filter(
+      span =>
+        span.name === 'chat' &&
+        span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined
+    );
+    expect(contentChats.map(span => span.parentSpanId)).toEqual([
+      roots[0].spanContext().spanId,
+      roots[1].spanContext().spanId,
+    ]);
   });
 
   test('emits one usage chat span per model, preserving the per-model split', () => {
