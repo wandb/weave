@@ -44,6 +44,7 @@ class AutopatchSettings(BaseModel):
     For example: weave.integrations.patch_openai()
     """
 
+    ag2: IntegrationSettings | None = None
     openai: IntegrationSettings | None = None
     anthropic: IntegrationSettings | None = None
     mistral: IntegrationSettings | None = None
