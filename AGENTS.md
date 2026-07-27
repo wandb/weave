@@ -73,6 +73,14 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Azure file storage authentication
+
+The trace server preserves explicit Azure connection strings and account keys
+for backward compatibility. When neither is configured, it uses
+`DefaultAzureCredential`, including AKS workload identity. Read-only export
+links use an account-key SAS for explicit credentials and a user-delegation SAS
+for workload identity.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).

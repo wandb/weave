@@ -2,6 +2,8 @@ import base64
 import json
 from typing import TypedDict
 
+from azure.core.credentials import TokenCredential
+from azure.identity import DefaultAzureCredential
 from google.oauth2.credentials import Credentials as GCPCredentials
 from typing_extensions import NotRequired
 
@@ -31,6 +33,12 @@ class AzureAccountCredentials(TypedDict):
 
     access_key: str
     account_url: NotRequired[str | None]
+
+
+class AzureDefaultCredentials(TypedDict):
+    """Azure authentication using the default credential chain."""
+
+    default_credential: TokenCredential
 
 
 def get_aws_credentials() -> AWSCredentials:
@@ -90,25 +98,25 @@ def get_gcp_credentials() -> GCPCredentials | None:
         raise ValueError(f"Invalid GCP credentials JSON: {e}") from e
 
 
-def get_azure_credentials() -> AzureConnectionCredentials | AzureAccountCredentials:
+def get_azure_credentials() -> (
+    AzureConnectionCredentials | AzureAccountCredentials | AzureDefaultCredentials
+):
     """Retrieves Azure credentials from environment variables.
     Supports both connection string and account-based authentication.
 
-    Required env vars (one of):
+    Optional Weave-specific env vars:
         - WF_FILE_STORAGE_AZURE_CONNECTION_STRING
         - WF_FILE_STORAGE_AZURE_ACCESS_KEY
 
     Returns:
-        Either AzureConnectionCredentials or AzureAccountCredentials based on available env vars
-
-    Raises:
-        ValueError: If neither credential type is properly configured
+        Explicit credentials when configured; otherwise Azure's default credential
+        chain, which supports AKS workload identity.
     """
     connection_string = environment.wf_storage_bucket_azure_connection_string()
     if connection_string is not None:
         return AzureConnectionCredentials(connection_string=connection_string)
     access_key = environment.wf_storage_bucket_azure_access_key()
-    if access_key is None:
-        raise ValueError("Azure access key not set")
-    account_url = environment.wf_storage_bucket_azure_account_url()
-    return AzureAccountCredentials(access_key=access_key, account_url=account_url)
+    if access_key is not None:
+        account_url = environment.wf_storage_bucket_azure_account_url()
+        return AzureAccountCredentials(access_key=access_key, account_url=account_url)
+    return AzureDefaultCredentials(default_credential=DefaultAzureCredential())
