@@ -738,7 +738,7 @@ interface OpenAIAPI {
   images: {
     generate: any;
   };
-  // The shape moved twice: openai-node 4.0-4.15 had no `beta` at all, 4.16 added
+  // The shape moved twice: openai-node 4.0-4.14 had no `beta` at all, 4.15 added
   // `beta.chat.completions`, and v5 removed that again.
   beta?: any;
   responses?: {

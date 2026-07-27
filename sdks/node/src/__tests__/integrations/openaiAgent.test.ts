@@ -768,7 +768,6 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     await new Promise(resolve => setTimeout(resolve, 300));
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
-    // One call, not two: `create` is still suppressed here.
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.parse');
   });

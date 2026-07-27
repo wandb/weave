@@ -16,7 +16,7 @@ describe('wrapOpenAI against the installed openai package', () => {
     initWithCustomTraceServer(testProjectName, traceServer);
   });
 
-  test('still wraps every method it intercepts', () => {
+  test('still finds every method it intercepts', () => {
     const client = new OpenAI({apiKey: 'test-key'});
     // Capture from the same instance the wrapper gets, so this keeps working if
     // the SDK ever moves these off the resource prototypes.
@@ -74,9 +74,9 @@ describe('wrapOpenAI against the installed openai package', () => {
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // `parse` runs `create` internally. It reaches it through the SDK's own raw
-    // client reference, so only the outer call is traced — a second call here
-    // would mean the internal one found a wrapped `create`.
+    // `parse` runs `create` internally, so a wrapped `create` reachable from
+    // there — or a patch applied to the resource in place — would show up as a
+    // second call.
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.parse');

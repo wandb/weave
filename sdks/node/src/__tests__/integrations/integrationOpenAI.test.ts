@@ -178,9 +178,9 @@ describe('OpenAI Integration', () => {
   });
 
   test('early openai-node v4 clients without a parse method are wrapped safely', () => {
-    // 4.0 had no `beta` at all, which used to throw while wrapping. Later minors
-    // carried `beta.chat.completions` with `stream` / `runTools` before `parse`
-    // arrived, where only a read of `.parse` threw.
+    // 4.0-4.14 had no `beta` at all, which used to throw while wrapping. 4.15
+    // through 4.54 carried `beta.chat.completions` with `stream` / `runTools`
+    // before `parse` arrived, where only a read of `.parse` threw.
     const noBeta: any = {
       chat: {completions: {create: mockOpenAI.chat.completions.create}},
       images: mockOpenAI.images,
@@ -191,6 +191,7 @@ describe('OpenAI Integration', () => {
     };
 
     expect(() => wrapOpenAI(noBeta)).not.toThrow();
+    expect(wrapOpenAI(noBeta).chat.completions.parse).toBeUndefined();
     expect(
       wrapOpenAI(betaWithoutParse).beta.chat.completions.parse
     ).toBeUndefined();
