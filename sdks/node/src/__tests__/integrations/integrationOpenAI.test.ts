@@ -1,4 +1,4 @@
-import {InMemoryTraceServer, opObjectId} from '../helpers/inMemoryTraceServer';
+import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {wrapOpenAI} from '../../integrations/openai';
 import {initWithCustomTraceServer} from '../clientMock';
 import {
@@ -13,6 +13,7 @@ describe('OpenAI Integration', () => {
   let traceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
   let mockOpenAI: any;
+  let mockOpenAIParse: any;
   let patchedOpenAI: any;
 
   beforeEach(() => {
@@ -24,7 +25,7 @@ describe('OpenAI Integration', () => {
       functionCalls: [],
     }));
 
-    const mockOpenAIParse = makeMockOpenAIParse(messages => ({
+    mockOpenAIParse = makeMockOpenAIParse(messages => ({
       content: JSON.stringify({echo: messages[messages.length - 1].content}),
     }));
 
@@ -129,7 +130,7 @@ describe('OpenAI Integration', () => {
     );
     expect(calls[1].op_name).toContain('openai.chat.completions.create');
     expect(calls[1].display_name).toBe('Serverless Inference');
-    expect(opObjectId(calls[2])).toBe('openai.chat.completions.parse');
+    expect(calls[2].op_name).toContain('openai.chat.completions.parse');
     expect(calls[2].display_name).toBe(
       'Serverless Inference: meta-llama/Llama-3.3-70B-Instruct'
     );
@@ -153,7 +154,7 @@ describe('OpenAI Integration', () => {
 
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
-    expect(opObjectId(calls[0])).toBe('openai.chat.completions.parse');
+    expect(calls[0].op_name).toContain('openai.chat.completions.parse');
     expect(calls[0].inputs).toEqual({
       model: 'gpt-4o-2024-05-13',
       messages,
@@ -180,9 +181,7 @@ describe('OpenAI Integration', () => {
     const v4OpenAI: any = {
       baseURL: mockOpenAI.baseURL,
       chat: {completions: {create: mockOpenAI.chat.completions.create}},
-      beta: {
-        chat: {completions: {parse: mockOpenAI.chat.completions.parse}},
-      },
+      beta: {chat: {completions: {parse: mockOpenAIParse}}},
       images: mockOpenAI.images,
     };
     const patchedV4OpenAI = wrapOpenAI(v4OpenAI);
@@ -197,7 +196,26 @@ describe('OpenAI Integration', () => {
 
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
-    expect(opObjectId(calls[0])).toBe('openai.beta.chat.completions.parse');
+    expect(calls[0].op_name).toContain('openai.beta.chat.completions.parse');
+  });
+
+  test('early openai-node v4 clients without a parse method are wrapped safely', async () => {
+    // openai-node 4.0 had no `beta` at all, and `beta.chat.completions` carried
+    // `stream` / `runTools` for many minors before `parse` arrived. Reading
+    // `parse` on either shape must stay undefined rather than throw.
+    const noBeta: any = {
+      chat: {completions: {create: mockOpenAI.chat.completions.create}},
+      images: mockOpenAI.images,
+    };
+    const betaWithoutParse: any = {
+      ...noBeta,
+      beta: {chat: {completions: {stream: () => undefined}}},
+    };
+
+    expect(wrapOpenAI(noBeta).chat.completions.parse).toBeUndefined();
+    expect(
+      wrapOpenAI(betaWithoutParse).beta.chat.completions.parse
+    ).toBeUndefined();
   });
 
   test('streaming chat completion basic', async () => {

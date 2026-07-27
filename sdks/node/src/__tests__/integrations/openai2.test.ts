@@ -29,7 +29,13 @@ describe('OpenAI Integration', () => {
       images: {
         generate: jest.fn(),
       },
-      beta: {},
+      beta: {
+        chat: {
+          completions: {
+            parse: jest.fn(),
+          },
+        },
+      },
       responses: {
         create: jest.fn(),
       },
@@ -346,7 +352,13 @@ describe('OpenAI responses.create Integration', () => {
       images: {
         generate: jest.fn(),
       },
-      beta: {},
+      beta: {
+        chat: {
+          completions: {
+            parse: jest.fn(),
+          },
+        },
+      },
       responses: {
         create: jest.fn().mockImplementation((options: any) => {
           if (options.stream) {

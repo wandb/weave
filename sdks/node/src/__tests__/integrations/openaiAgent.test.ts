@@ -34,11 +34,7 @@ import {
   wrapOpenAIChatCompletionsCreate,
 } from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
-import {
-  InMemoryTraceServer,
-  opObjectId,
-  type Call,
-} from '../helpers/inMemoryTraceServer';
+import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import state from 'weave/state';
 import {packageVersion} from 'weave/utils/packageVersion';
 
@@ -739,9 +735,10 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
   });
 
   test('structured-output parse inside an agent context is still traced', async () => {
-    // The agents SDK only ever calls `create`, so its processor emits no span
-    // for a user's own `parse` call. Suppressing that call here as well would
-    // leave it unreported by both sides.
+    // The agents SDK never calls `parse`, so its processor emits no span for a
+    // user's own `parse` call. Suppressing that call here as well would leave it
+    // unreported by both sides. It lands as a root call rather than under the
+    // agent span, because the OTel processor publishes no weave call ids.
     const mockResponse = {
       id: 'resp-1',
       object: 'chat.completion',
@@ -772,7 +769,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     await new Promise(resolve => setTimeout(resolve, 300));
     const calls = await inMemoryTraceServer.getCalls(testProjectName);
-    expect(calls.map(opObjectId)).toEqual(['openai.chat.completions.parse']);
+    // One call, not two: `create` is still suppressed here.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].op_name).toContain('openai.chat.completions.parse');
   });
 
   async function emittedSpans(): Promise<ReadableSpan[]> {

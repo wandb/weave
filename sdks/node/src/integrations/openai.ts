@@ -155,9 +155,9 @@ export function wrapOpenAIChatCompletionsCreate(
   ) {
     const client = getGlobalClient();
     if (!client) return originalCreate(...args);
-    // The agents OTel processor reports the model calls the agents SDK makes,
-    // so tracing those here would double-report them. It only ever calls
-    // `create`, so methods it never calls opt in to staying traced.
+    // The agents OTel processor already reports the model calls the agents SDK
+    // makes, so tracing those here would double-report them. That SDK never
+    // calls `parse`, so the call sites wrapping it opt in to staying traced.
     if (!opts.traceInAgentContext && shouldSkipTracingInAgentContext()) {
       return originalCreate(...args);
     }
@@ -733,16 +733,15 @@ interface OpenAIAPI {
   chat: {
     completions: {
       create: any;
-      // Moved here from `beta.chat.completions` in openai-node v5.
-      parse?: any;
     };
   };
   images: {
     generate: any;
   };
-  // Shape varies by major version: openai-node v4 has `beta.chat.completions`,
-  // v5 removed it and left the other beta resources in place.
-  beta: any;
+  // Optional and untyped because the shape moved twice: openai-node 4.0 had no
+  // `beta` at all, later v4 added `beta.chat.completions`, and v5 removed it
+  // again. Narrowing it to any of those makes it a weak type the others fail.
+  beta?: any;
   responses?: {
     create: any;
   };
@@ -769,8 +768,9 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
           openai.baseURL
         );
       }
-      // `parse` only exists on this namespace since openai-node v5; on v4 it
-      // lived under `beta.chat` and reading it here yields undefined.
+      // `parse` moved onto this namespace in openai-node v5. The guard is load
+      // bearing: this trap binds eagerly, so on a v4 client — where the method
+      // is absent — `.bind` would throw on a bare property read.
       if (p === 'parse' && typeof targetVal === 'function') {
         return wrapOpenAIChatCompletionsCreate(
           targetVal.bind(target),
@@ -802,18 +802,21 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     },
   });
 
-  const hasBetaChatApis = openai.beta.chat != null;
+  const hasBetaChatApis = openai.beta?.chat != null;
   let betaProxy: any = null;
 
   if (hasBetaChatApis) {
     const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
       get(target, p, receiver) {
         const targetVal = Reflect.get(target, p, receiver);
-        if (p === 'parse') {
+        // Guarded for the same reason as the non-beta branch: `beta.chat`
+        // predates `parse`, so on those v4 minors the method is absent.
+        if (p === 'parse' && typeof targetVal === 'function') {
           return wrapOpenAIChatCompletionsCreate(
             targetVal.bind(target),
             BETA_CHAT_COMPLETIONS_PARSE_OP,
-            openai.baseURL
+            openai.baseURL,
+            {traceInAgentContext: true}
           );
         }
         return targetVal;
