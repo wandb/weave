@@ -16,7 +16,9 @@ from weave.trace_server.agents.chat_view import (
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
+    first_user_preview_text,
 )
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -120,6 +122,64 @@ def _context_compacted_payload(
 ) -> AgentChatContextCompacted:
     assert message.context_compacted is not None
     return message.context_compacted
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (
+            "Which settings caused the most crashes?",
+            "Which settings caused the most crashes?",
+        ),
+        (
+            json.dumps(
+                {
+                    "content": [{"type": "report", "title": "Crash report"}],
+                }
+            )
+            + "\nWhich settings caused the most crashes?",
+            "Which settings caused the most crashes?",
+        ),
+        (
+            '{"ordinary": 1}\nExplain this object',
+            "Explain this object",
+        ),
+        ("[1, 2]\nCompare these values", "Compare these values"),
+        (
+            '{"context": 1}\n{"metadata": 2}\nWhat failed?',
+            "What failed?",
+        ),
+        (
+            '{"context": 1}\nCompare {"run": "a"} with [1, 2]',
+            "Compare [JSON] with [JSON]",
+        ),
+        (
+            'Before {"first": 1} middle {"second": 2} after',
+            "Before [JSON] middle [JSON] after",
+        ),
+        ('Explain {"broken":', 'Explain {"broken":'),
+        ('{"question": "What failed?"}', ""),
+        (
+            '{"context": 1}\n{"error": "asdf"}',
+            "",
+        ),
+        ("Compare {foo} with {bar}", "Compare {foo} with {bar}"),
+        (
+            '{"complete": true}\n{"incomplete":\nWhat failed?',
+            '{"complete": true}\n{"incomplete":\nWhat failed?',
+        ),
+        (
+            '{"first": 1}, {"second": 2}\nWhat failed?',
+            '{"first": 1}, {"second": 2}\nWhat failed?',
+        ),
+    ],
+)
+def test_first_user_preview_text_handles_json_values(
+    content: str, expected: str
+) -> None:
+    messages = [NormalizedMessage(role="user", content=content)]
+
+    assert first_user_preview_text(messages) == expected
 
 
 def test_empty() -> None:

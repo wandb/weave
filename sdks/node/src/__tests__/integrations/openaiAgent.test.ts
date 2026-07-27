@@ -29,7 +29,10 @@ import {z} from 'zod';
 import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {initWithCustomTraceServer} from '../clientMock';
-import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
+import {
+  wrapOpenAI,
+  wrapOpenAIChatCompletionsCreate,
+} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
 import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
 import state from 'weave/state';
@@ -422,9 +425,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.agent.handoffs': ['h1'],
       'weave.openai_agents.agent.output_type': 'text',
       'weave.openai_agents.span_id': 'span-agent',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
 
     const executeToolSpan = spans.find(
@@ -438,9 +441,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
       'gen_ai.tool.call.result': 'sunny, 22C',
       'weave.openai_agents.span_id': 'span-function',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
 
     const resp = spans.find(s => s.name === 'chat gpt-4o-mini')!;
@@ -457,9 +460,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.usage.output_tokens': 7,
       'gen_ai.usage.cache_read.input_tokens': 4,
       'gen_ai.usage.reasoning.output_tokens': 3,
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(resp.attributes['gen_ai.input.messages']).toMatchInlineSnapshot(
       `"[{"role":"user","parts":[{"type":"text","content":"What is the weather in Tokyo?"}]}]"`
@@ -488,9 +491,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.request.seed': 42,
       'gen_ai.request.stop_sequences': ['STOP'],
       'gen_ai.request.choice.count': 3,
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(gen.attributes['gen_ai.input.messages']).toMatchInlineSnapshot(
       `"[{"role":"user","parts":[{"type":"text","content":"hi"}]}]"`
@@ -507,9 +510,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.handoff.from_agent': 'Triage',
       'weave.openai_agents.handoff.to_agent': 'Specialist',
       'weave.openai_agents.span_id': 'span-handoff',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(handoff.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -520,9 +523,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.guardrail.name': 'test-guardrail',
       'weave.openai_agents.guardrail.triggered': false,
       'weave.openai_agents.span_id': 'span-guardrail',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(guard.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -535,9 +538,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.transcription.input_format': 'pcm',
       'weave.openai_agents.transcription.output': 'hello world',
       'weave.openai_agents.span_id': 'span-transcription',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(transcription.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -550,9 +553,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.speech.output': 'base64audio',
       'weave.openai_agents.speech.output_format': 'pcm',
       'weave.openai_agents.span_id': 'span-speech',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(speech.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -562,9 +565,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.conversation.id': 'some-conversation-id',
       'weave.openai_agents.speech_group.input': 'narration script',
       'weave.openai_agents.span_id': 'span-speech-group',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(speechGroup.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -575,9 +578,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.mcp.server': 'http://localhost:9000',
       'weave.openai_agents.mcp.result': ['search', 'fetch'],
       'weave.openai_agents.span_id': 'span-mcp',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     expect(mcp.attributes['gen_ai.operation.name']).toBeUndefined();
 
@@ -589,9 +592,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'weave.openai_agents.custom.kind': 'cache_lookup',
       'weave.openai_agents.custom.hits': 3,
       'weave.openai_agents.span_id': 'span-custom',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     // Null values dropped — `miss: null` doesn't produce an attribute.
     expect(
@@ -666,9 +669,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       'gen_ai.conversation.id': 'some-conversation-id',
       'gen_ai.provider.name': 'openai',
       'weave.openai_agents.agent.tools': ['get_weather'],
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
 
     const executeToolSpan = spans.find(
@@ -684,9 +687,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
       // on the FunctionSpanData, which we lift straight to semconv.
       'gen_ai.tool.call.arguments': '{"city":"Tokyo"}',
       'gen_ai.tool.call.result': 'Tokyo: Sunny, 22°C',
-      'integration.meta.package_name': '@openai/agents',
-      'integration.name': 'openai_agents',
-      'integration.version': packageVersion,
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': packageVersion,
+      'weave.integration.meta.package_name': '@openai/agents',
     });
     // Span is a child of the agent span.
     expect(executeToolSpan.parentSpanId).toBe(agentSpan!.spanContext().spanId);
@@ -729,6 +732,43 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(
       calls.find(c => c.op_name === 'openai.chat.completions.create')
     ).toBeUndefined();
+  });
+
+  test('structured-output parse inside an agent context is still traced', async () => {
+    // The agents SDK never calls `parse`, so its processor emits no span for a
+    // user's own `parse` call. Suppressing that call here as well would leave it
+    // unreported by both sides.
+    const mockResponse = {
+      id: 'resp-1',
+      object: 'chat.completion',
+      model: 'gpt-4o-mini',
+      choices: [{index: 0, message: {role: 'assistant', content: '{}'}}],
+      usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
+    };
+    const params = {
+      model: 'gpt-4o-mini',
+      messages: [{role: 'user', content: 'hi'}],
+    };
+    const mockOpenAI: any = {
+      chat: {
+        completions: {
+          create: jest.fn(() => makeAPIPromiseShim(mockResponse)),
+          parse: jest.fn(() => makeAPIPromiseShim(mockResponse)),
+        },
+      },
+      images: {generate: jest.fn()},
+    };
+    const wrapped = wrapOpenAI(mockOpenAI);
+
+    await withTrace('Workflow', async () => {
+      await wrapped.chat.completions.create(params);
+      await wrapped.chat.completions.parse(params);
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].op_name).toContain('openai.chat.completions.parse');
   });
 
   async function emittedSpans(): Promise<ReadableSpan[]> {

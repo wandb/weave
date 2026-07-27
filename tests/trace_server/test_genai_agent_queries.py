@@ -18,6 +18,7 @@ from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.constants import CONVERSATION_PREVIEW_CHARS
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -1166,6 +1167,76 @@ def test_group_by_conversation_id_message_previews(ch_server):
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
     assert row.last_message.text == "final reply"
+
+
+def test_conversation_preview_strips_leading_json_before_truncation(ch_server):
+    project_id = _make_project_id("conv-preview-json")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv = f"conv-{uuid.uuid4().hex[:8]}"
+    question = "Which settings caused the most crashes?"
+    context_blob = json.dumps(
+        {
+            "url": "u",
+            "content": [
+                {
+                    "type": "workspace",
+                    "description": "x" * 16,
+                    "run_sets": [
+                        {
+                            "enabled": True,
+                            "filter": "a" * 20,
+                            "name": "first",
+                        },
+                        {
+                            "enabled": True,
+                            "filter": "b" * 100,
+                            "name": "second",
+                        },
+                    ],
+                }
+            ],
+        },
+        sort_keys=True,
+    )
+    assert len(context_blob) > CONVERSATION_PREVIEW_CHARS
+    # The production preview limit cuts the outer object after one
+    # complete nested run-set and its separator. Frontend cleanup then strips
+    # the nested JSON but misclassifies the remaining comma as user prose.
+    truncated = context_blob[:CONVERSATION_PREVIEW_CHARS]
+    assert '"name": "first"}, {' in truncated
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(truncated)
+
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                conversation_id=conv,
+                operation_name="chat",
+                started_at=now,
+                input_messages=[
+                    NormalizedMessage(
+                        role="user",
+                        content=f'{context_blob}\n{{"request_id": "abc"}}\n{question}',
+                    )
+                ],
+            )
+        ],
+    )
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+        )
+    )
+    by_conv = {group.group_keys["conversation_id"]: group for group in res.groups}
+    row = by_conv[conv]
+
+    assert row.first_message is not None
+    assert row.first_message.role == "user_message"
+    assert row.first_message.text == question
 
 
 def _create_feedback(

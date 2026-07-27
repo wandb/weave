@@ -411,6 +411,7 @@ def make_queue_add_calls_fetch_calls_query(
         WHERE project_id = {{{project_id_param}: String}}
             AND id IN {{{call_ids_param}: Array(String)}}
         GROUP BY (project_id, id)
+        HAVING started_at IS NOT NULL
         """
     else:
         # For calls_complete, columns are already aggregated
@@ -424,6 +425,7 @@ def make_queue_add_calls_fetch_calls_query(
         FROM {table_name}
         WHERE project_id = {{{project_id_param}: String}}
             AND id IN {{{call_ids_param}: Array(String)}}
+            AND started_at IS NOT NULL
         """
 
     return query

@@ -511,6 +511,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     logprobs: bool | None = None
     top_logprobs: int | None = None
     parallel_tool_calls: bool | None = None
+    reasoning_effort: str | None = None
     extra_headers: dict | None = None
     # soon to be deprecated params by OpenAI
     functions: list | None = None
@@ -1327,6 +1328,7 @@ class FeedbackQueryReq(BaseModelStrict):
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
     result: list[dict[str, Any]]
+    total_count: int = Field(ge=0)
 
 
 class FeedbackPurgeReq(BaseModelStrict):

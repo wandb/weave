@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import partial
 from unittest.mock import Mock
 
 import pytest
@@ -8,6 +9,7 @@ from weave.integrations.openai.openai_sdk import (
     create_wrapper_async,
     create_wrapper_sync,
     openai_on_input_handler,
+    serverless_inference_call_display_name,
 )
 from weave.trace.autopatch import OpSettings
 
@@ -33,6 +35,37 @@ class NonCompletion:
 
     def __init__(self):
         self.data = "not a completion"
+
+
+def test_serverless_inference_call_display_name():
+    display_name = partial(
+        serverless_inference_call_display_name, "openai.chat.completions.create"
+    )
+
+    # W&B's OpenAI-compatible endpoint should show the actual provider and model.
+    call = Mock(
+        inputs={
+            "self": {"client": {"base_url": "https://api.inference.wandb.ai/v1/"}},
+            "model": "google/gemma-4-31B-it",
+        }
+    )
+    assert display_name(call) == "Serverless Inference: google/gemma-4-31B-it"
+
+    # Missing model metadata still identifies Serverless Inference accurately.
+    call.inputs = {
+        "self": {"client": {"base_url": "https://api.inference.wandb.ai/v1"}}
+    }
+    assert display_name(call) == "Serverless Inference"
+
+    # OpenAI and other compatible endpoints retain the integration's op label.
+    call.inputs = {
+        "self": {"client": {"base_url": "https://api.openai.com/v1/"}},
+        "model": "gpt-5",
+    }
+    assert display_name(call) == "openai.chat.completions.create"
+
+    call.inputs = {}
+    assert display_name(call) == "openai.chat.completions.create"
 
 
 def test_openai_on_input_handler_with_completion_instance():

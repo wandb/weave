@@ -1162,6 +1162,42 @@ def test_agent_monitor_feedback_sort_by_map_column(client: WeaveClient) -> None:
     ]
 
 
+def test_feedback_query_total_count_precedes_pagination(client: WeaveClient) -> None:
+    project_id = client.project_id
+    for index, feedback_type in enumerate(["keep", "skip", "keep"]):
+        client.server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=f"weave:///{project_id}/call/{index}",
+                feedback_type=feedback_type,
+                payload={},
+            )
+        )
+
+    result = client.server.feedback_query(
+        tsi.FeedbackQueryReq(
+            project_id=project_id,
+            fields=["weave_ref"],
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "feedback_type"},
+                            {"$literal": "keep"},
+                        ]
+                    }
+                }
+            ),
+            sort_by=[SortBy(field="weave_ref", direction="asc")],
+            limit=1,
+            offset=1,
+        )
+    )
+
+    assert result.total_count == 2
+    assert result.result == [{"weave_ref": f"weave:///{project_id}/call/2"}]
+
+
 async def populate_feedback(client: WeaveClient) -> None:
     @weave.op
     def my_scorer(x: int, output: int) -> int:

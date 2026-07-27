@@ -58,6 +58,7 @@ def test_make_agent_feedback_query_req_unions_arbitrary_ref_kinds():
 
 def test_group_agent_feedback_by_target_separates_kinds_and_skips_non_agent_refs():
     feedback = tsi.FeedbackQueryRes(
+        total_count=4,
         result=[
             {
                 "id": "f1",
@@ -81,7 +82,7 @@ def test_group_agent_feedback_by_target_separates_kinds_and_skips_non_agent_refs
                 "id": "f5",
                 "weave_ref": ri.InternalCallRef(project_id="p", id="call-xyz").uri,
             },
-        ]
+        ],
     )
 
     groups = group_agent_feedback_by_target(feedback)

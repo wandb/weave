@@ -1804,5 +1804,42 @@ def test_get_custom_provider_info_requires_secret_fetcher_on_cache_hit(
         get_custom_provider_info(project_id, provider_id, model_object_id, obj_read)
 
 
+def test_build_litellm_kwargs_forwards_reasoning_effort():
+    """reasoning_effort passes through to litellm; drop_params drops it for unsupported models."""
+    inputs = tsi.CompletionsCreateRequestInputs(
+        model="my-model",
+        messages=[{"role": "user", "content": "hi"}],
+        reasoning_effort="low",
+    )
+    kwargs = llm_mod._build_litellm_kwargs(
+        api_key="sk-test",
+        inputs=inputs,
+        provider="custom",
+        base_url="https://example.com/v1",
+        extra_headers=None,
+        vertex_credentials=None,
+    )
+    assert kwargs["reasoning_effort"] == "low"
+    assert kwargs["model"] == "my-model"
+    assert kwargs["api_base"] == "https://example.com/v1"
+
+
+def test_build_litellm_kwargs_omits_unset_reasoning_effort():
+    """An unset reasoning_effort is excluded (exclude_none) rather than sent as null."""
+    inputs = tsi.CompletionsCreateRequestInputs(
+        model="my-model",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    kwargs = llm_mod._build_litellm_kwargs(
+        api_key="sk-test",
+        inputs=inputs,
+        provider="custom",
+        base_url="https://example.com/v1",
+        extra_headers=None,
+        vertex_credentials=None,
+    )
+    assert "reasoning_effort" not in kwargs
+
+
 if __name__ == "__main__":
     unittest.main()

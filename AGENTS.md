@@ -79,6 +79,13 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+Persisted `AgentDashboard` objects intentionally use a closed, discriminated
+schema. Supported panel variants and their configuration fields must be added
+to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
+with an untyped dictionary. After changing the model, run
+`make synchronize-base-object-schemas` from the repository root so the Python
+schema and the dependent Core frontend types stay aligned.
+
 ### Trace Server API / Node SDK Schema
 
 When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
@@ -301,6 +308,23 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+### TypeScript integration metadata
+
+- `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
+  `asAttributes()` supplies nested provenance to Weave-call integrations, while
+  `asOtelAttributes()` supplies canonical `weave.integration.name` and
+  `weave.integration.version` identity to OTel integrations and preserves
+  flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
+  typed; non-scalar values are stringified.
+
+### TypeScript GenAI Turn output
+
+- The existing `Turn.record({messages: [...]})` path records input messages;
+  Turn stores these separately from terminal `outputMessages`.
+- Record a terminal agent result with
+  `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
+  `invoke_agent` span as `gen_ai.output.messages`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -368,6 +392,21 @@ pnpm exec tsx examples/claudeAgents.ts
       patcher.undo_patch()
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
+
+### Claude Agent SDK token accounting
+
+- Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
+  only. Weave usage requires an inclusive prompt total, with
+  `cache_read_input_tokens` and `cache_creation_input_tokens` represented as
+  subsets of `input_tokens`, because cost and cache-hit-rate rollups use that
+  convention.
+- Both Python tracing paths must normalize aggregate result usage through
+  `weave/integrations/claude_agent_sdk/usage.py`. Keep the SDK's yielded
+  `ResultMessage` and the calls-based root output unchanged; normalize the
+  calls-based usage summary and the OTel span attributes consumed by Weave
+  rollups.
+- Regression coverage must exercise both the calls-based and OTel integrations
+  with nonzero cache-read and cache-creation counts.
 
 ### Documentation
 
@@ -437,4 +476,7 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
+- [ ] Add `output_messages` to Python `Turn.record()` for parity with
+      TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
+      `invoke_agent_attributes()` builder already supports agent output.
 - [ ] ...
