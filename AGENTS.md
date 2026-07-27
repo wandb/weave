@@ -457,6 +457,15 @@ pnpm exec tsx examples/claudeAgents.ts
   rollups.
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
+- The OTel-selected Claude Agent SDK path composes the Python GenAI
+  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
+  OTel spans or call the low-level GenAI attribute builders itself. Use
+  `set_attributes()` only for semantic fields the typed handles do not expose.
+  The legacy calls-based path remains separate.
+- Stream adapters can create child handles when work starts, then enter them
+  with a normal `with` when the completion message arrives. Preserve logical
+  timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
+  keeping contexts open with `ExitStack`.
 
 ### Credential-shaped fields in call inputs and attributes
 

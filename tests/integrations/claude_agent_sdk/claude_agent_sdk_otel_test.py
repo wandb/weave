@@ -26,6 +26,7 @@ from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
+from weave.trace.settings import override_settings
 
 
 @pytest.fixture
@@ -55,6 +56,16 @@ def patch_claude_agent_sdk_otel() -> Generator[None]:
     patcher.undo_patch()
 
 
+@pytest.fixture(autouse=True)
+def disable_capture_info() -> Generator[None]:
+    """Keep exact span payload assertions independent of host metadata."""
+    with override_settings(
+        capture_client_info=False,
+        capture_system_info=False,
+    ):
+        yield
+
+
 # --- helpers ----------------------------------------------------------------
 
 
@@ -65,7 +76,7 @@ def get_attrs(span: Any) -> dict[str, Any]:
 def check_integration_and_strip(attrs: dict[str, Any]) -> dict[str, Any]:
     """Assert + remove the flattened integration.* provenance keys.
 
-    The agent OTel processor stamps integration provenance on every span; pop it
+    Conversation attributes stamp integration provenance on every span; pop it
     here so the exact-shape assertions below stay focused on the GenAI semconv keys.
     """
     assert attrs["integration.name"] == "claude_agent_sdk"
@@ -116,6 +127,7 @@ async def run_query(cassette: str, prompt: str) -> None:
 async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     await run_query("simple_text_response", "What is 2+2?")
     spans = otel_spans.get_finished_spans()
+    assert {span.instrumentation_scope.name for span in spans} == {"weave.conversation"}
 
     agent_spans = get_spans_by_op(spans, "invoke_agent")
     chat_spans = get_spans_by_op(spans, "chat")
