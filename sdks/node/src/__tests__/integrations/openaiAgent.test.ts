@@ -758,7 +758,6 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
         },
       },
       images: {generate: jest.fn()},
-      beta: {},
     };
     const wrapped = wrapOpenAI(mockOpenAI);
 

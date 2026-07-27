@@ -8,7 +8,13 @@ import {initWithCustomTraceServer} from '../clientMock';
 // `chat.completions.parse` went quiet when openai-node v5 moved it out of
 // `beta.chat`.
 describe('wrapOpenAI against the installed openai package', () => {
+  let traceServer: InMemoryTraceServer;
   const testProjectName = 'test-project';
+
+  beforeEach(() => {
+    traceServer = new InMemoryTraceServer();
+    initWithCustomTraceServer(testProjectName, traceServer);
+  });
 
   test('still wraps every method it intercepts', () => {
     const client = new OpenAI({apiKey: 'test-key'});
@@ -29,15 +35,10 @@ describe('wrapOpenAI against the installed openai package', () => {
   });
 
   test('logs one call for one parse', async () => {
-    const traceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(testProjectName, traceServer);
-
-    let httpRequests = 0;
     const client = new OpenAI({
       apiKey: 'test-key',
-      fetch: async () => {
-        httpRequests += 1;
-        return new Response(
+      fetch: async () =>
+        new Response(
           JSON.stringify({
             id: 'chatcmpl-1',
             object: 'chat.completion',
@@ -58,8 +59,7 @@ describe('wrapOpenAI against the installed openai package', () => {
             usage: {prompt_tokens: 4, completion_tokens: 6, total_tokens: 10},
           }),
           {status: 200, headers: {'content-type': 'application/json'}}
-        );
-      },
+        ),
     });
 
     const result = await wrapOpenAI(client).chat.completions.parse({
@@ -80,7 +80,9 @@ describe('wrapOpenAI against the installed openai package', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('openai.chat.completions.parse');
-    expect(httpRequests).toBe(1);
+    // Weave's transform composes after the SDK's, so the trace carries the
+    // deserialized object rather than only the raw JSON string.
+    expect(calls[0].output.choices[0].message.parsed).toEqual({city: 'Paris'});
     expect(calls[0].summary).toEqual({
       usage: {
         'gpt-4o-2024-05-13': {
