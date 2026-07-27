@@ -737,8 +737,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
   test('structured-output parse inside an agent context is still traced', async () => {
     // The agents SDK never calls `parse`, so its processor emits no span for a
     // user's own `parse` call. Suppressing that call here as well would leave it
-    // unreported by both sides. It lands as a root call rather than under the
-    // agent span, because the OTel processor publishes no weave call ids.
+    // unreported by both sides.
     const mockResponse = {
       id: 'resp-1',
       object: 'chat.completion',
