@@ -6,24 +6,25 @@ CREATE TABLE IF NOT EXISTS intent_records
 (
     project_id String,
     id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
+    intent_ordinal UInt16 DEFAULT 0,         -- position among intents extracted from a single turn, folded into the id hash
     signature_id FixedString(16),            -- 128-bit hash of the canonicalized signature, groups every occurrence of the same intent
     pipeline_version UInt32,                 -- recipe id, in ORDER BY so versions coexist during re-embed/backfill
     record_version UInt64,                   -- ReplacingMergeTree version, highest for a key wins
 
-    category LowCardinality(String),         -- taxonomy label, mutable, deliberately excluded from identity
+    category String,                         -- mutable taxonomy label, excluded from identity, plain String because generated categories can be high-cardinality
     signature String,
     embedding_model LowCardinality(String),
     embedding_dimensions UInt16 DEFAULT 1024,
     vector Array(Float32),                   -- searched by exact cosine distance, intentionally no ANN index
 
     source LowCardinality(String),
+    insights_type LowCardinality(String) DEFAULT 'turn', -- grain of analyzed unit: 'turn' or 'conversation'
     source_id String DEFAULT '',
     trace_id String DEFAULT '',
     span_id String DEFAULT '',
     parent_span_id String DEFAULT '',
     conversation_id String DEFAULT '',
     turn_id String DEFAULT '',
-    intent_ordinal UInt16 DEFAULT 0,         -- position among the intents extracted from a single turn
     user_id String DEFAULT '',               -- pseudonymous source subject, distinct from the writer
 
     intent_extracted_at DateTime64(6, 'UTC'),           -- partition key, set once at extraction, stable across retries

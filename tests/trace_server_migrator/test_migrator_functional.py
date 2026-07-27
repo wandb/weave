@@ -645,22 +645,23 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert columns == [
         ("project_id", "String"),
         ("id", "String"),
+        ("intent_ordinal", "UInt16"),
         ("signature_id", "FixedString(16)"),
         ("pipeline_version", "UInt32"),
         ("record_version", "UInt64"),
-        ("category", "LowCardinality(String)"),
+        ("category", "String"),
         ("signature", "String"),
         ("embedding_model", "LowCardinality(String)"),
         ("embedding_dimensions", "UInt16"),
         ("vector", "Array(Float32)"),
         ("source", "LowCardinality(String)"),
+        ("insights_type", "LowCardinality(String)"),
         ("source_id", "String"),
         ("trace_id", "String"),
         ("span_id", "String"),
         ("parent_span_id", "String"),
         ("conversation_id", "String"),
         ("turn_id", "String"),
-        ("intent_ordinal", "UInt16"),
         ("user_id", "String"),
         ("intent_extracted_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
@@ -682,18 +683,18 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ]
 
     insert_columns = """
-        project_id, id, signature_id, pipeline_version, record_version,
-        category, signature, embedding_model, vector, source, source_id,
-        trace_id, span_id, parent_span_id, conversation_id, turn_id,
-        intent_ordinal, user_id, intent_extracted_at, attributes
+        project_id, id, intent_ordinal, signature_id, pipeline_version, record_version,
+        category, signature, embedding_model, vector, source, insights_type,
+        source_id, trace_id, span_id, parent_span_id, conversation_id,
+        turn_id, user_id, intent_extracted_at, attributes
     """
     row_template = """
         SELECT
-            'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
+            'project-1', 'intent-1', 0, unhex('00112233445566778899aabbccddeeff'),
             {pipeline_version}, {record_version}, '{category}', 'Add Stripe checkout',
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
-            'weave', 'source-1', 'trace-1', 'span-1', 'parent-1',
-            'conversation-1', 'turn-1', 0, 'user-1',
+            'weave', 'turn', 'source-1', 'trace-1', 'span-1', 'parent-1',
+            'conversation-1', 'turn-1', 'user-1',
             toDateTime64('2026-06-20 14:32:00', 6, 'UTC'),
             map('environment', 'test')
     """
@@ -714,14 +715,30 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     # Highest record_version wins within a pipeline_version, and each
     # pipeline_version is retained as its own row.
     current_rows = ch_client.query(
-        "SELECT pipeline_version, record_version, category, "
+        "SELECT pipeline_version, record_version, category, insights_type, "
         "formatDateTime(expire_at, '%F %T'), length(vector), attributes "
         f"FROM {target_db}.intent_records FINAL "
         "WHERE project_id = 'project-1' ORDER BY pipeline_version"
     ).result_rows
     assert current_rows == [
-        (1, 2, "payments", "2100-01-01 00:00:00", 1024, {"environment": "test"}),
-        (2, 1, "action_request", "2100-01-01 00:00:00", 1024, {"environment": "test"}),
+        (
+            1,
+            2,
+            "payments",
+            "turn",
+            "2100-01-01 00:00:00",
+            1024,
+            {"environment": "test"},
+        ),
+        (
+            2,
+            1,
+            "action_request",
+            "turn",
+            "2100-01-01 00:00:00",
+            1024,
+            {"environment": "test"},
+        ),
     ]
 
     active_partitions = ch_client.query(
