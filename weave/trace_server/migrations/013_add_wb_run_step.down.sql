@@ -22,7 +22,7 @@ GROUP BY
     call_parts.project_id,
     call_parts.id;
 
-ALTER TABLE calls_merged_stats DROP COLUMN wb_run_step;
+ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS wb_run_step;
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -48,5 +48,5 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
-ALTER TABLE calls_merged DROP COLUMN wb_run_step;
-ALTER TABLE call_parts DROP COLUMN wb_run_step;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS wb_run_step;
+ALTER TABLE call_parts DROP COLUMN IF EXISTS wb_run_step;

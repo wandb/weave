@@ -21,7 +21,10 @@
 // Upstream attribute keys (verbatim copies)
 // ---------------------------------------------------------------------------
 
+export const ATTR_GEN_AI_AGENT_DESCRIPTION = 'gen_ai.agent.description';
+export const ATTR_GEN_AI_AGENT_ID = 'gen_ai.agent.id';
 export const ATTR_GEN_AI_AGENT_NAME = 'gen_ai.agent.name';
+export const ATTR_GEN_AI_AGENT_VERSION = 'gen_ai.agent.version';
 export const ATTR_GEN_AI_CONVERSATION_ID = 'gen_ai.conversation.id';
 export const ATTR_GEN_AI_INPUT_MESSAGES = 'gen_ai.input.messages';
 export const ATTR_GEN_AI_OPERATION_NAME = 'gen_ai.operation.name';
@@ -48,6 +51,7 @@ export const ATTR_GEN_AI_SYSTEM_INSTRUCTIONS = 'gen_ai.system_instructions';
 export const ATTR_GEN_AI_TOOL_CALL_ARGUMENTS = 'gen_ai.tool.call.arguments';
 export const ATTR_GEN_AI_TOOL_CALL_ID = 'gen_ai.tool.call.id';
 export const ATTR_GEN_AI_TOOL_CALL_RESULT = 'gen_ai.tool.call.result';
+export const ATTR_GEN_AI_TOOL_DEFINITIONS = 'gen_ai.tool.definitions';
 export const ATTR_GEN_AI_TOOL_NAME = 'gen_ai.tool.name';
 export const ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS =
   'gen_ai.usage.cache_creation.input_tokens';
@@ -88,10 +92,15 @@ export const ATTR_GEN_AI_USAGE_TOTAL_TOKENS = 'gen_ai.usage.total_tokens';
  *  (e.g. on `gen_ai.system.message`). */
 export const ATTR_GEN_AI_EVENT_CONTENT = 'gen_ai.event.content';
 
+// Unlike gen_ai.agent.name, conversation-scoped integration identity is fixed and inherited by every span.
+export const WEAVE_INTEGRATION_META_PREFIX = 'weave.integration.meta';
+export const WEAVE_INTEGRATION_NAME = 'weave.integration.name';
+export const WEAVE_INTEGRATION_VERSION = 'weave.integration.version';
+
 // ---------------------------------------------------------------------------
 // Emitter identity (Weave-specific, not a semconv constant)
 // ---------------------------------------------------------------------------
 
 /** Instrumentation-library name passed to `getWeaveTracer` by every emitter
- *  in the GenAI session SDK. */
+ *  in the GenAI conversation SDK. */
 export const WEAVE_GENAI_TRACER_NAME = 'weave-genai';

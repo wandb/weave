@@ -1,0 +1,105 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 14:38:48 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.16.0
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Fri, 26 Jun 2026 14:38:49 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: d210b8acf6aea0203c169fb4047057cf
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/search
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","query":"","limit":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "711"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 14:38:48 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"results":[{"conversation_id":"bf0914f2-a124-4da7-927d-61e463a70cba","conversation_name":"","agent_name":"claude_agent_sdk","matched_messages":[{"span_id":"025fb68b7d6a1a1b","trace_id":"4a816ff61e80c6389ce60f9167e259cb","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Weave is an observability and tracing SDK for LLM
+      applications with Python and TypeScript/Node implementations that
+      automatically instruments AI integrations (OpenAI, Anthropic, etc.) and
+      stores trace data in a ClickHouse-backed trace
+      server.\"}]","content_digest":"e37f4a8d973198d2a9c83918a3ee2712","started_at":"2026-06-25T17:35:02.387000"}],"last_activity":"2026-06-25T17:35:02.387000"}],"total_conversations":1}'
+- request:
+    url: https://trace.wandb.ai/agents/search
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","query":"","limit":1,"offset":1}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "941"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 14:38:49 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: "{\"results\":[{\"conversation_id\":\"bf0914f2-a124-4da7-927d-61e463a70cba\
+      \",\"conversation_name\":\"\",\"agent_name\":\"claude_agent_sdk\",\"match\
+      ed_messages\":[{\"span_id\":\"35494d9c72f42040\",\"trace_id\":\"4a816ff61\
+      e80c6389ce60f9167e259cb\",\"role\":\"assistant\",\"content_preview\":\"[{\
+      \\\"type\\\": \\\"reasoning\\\", \\\"content\\\": \\\"The user is asking
+      me to summarize what I learned about the project in one sentence. Let me
+      think about what I've learned:\\\\n\\\\n1. This is the Weave repository -
+      a tracing/observability SDK for AI/LLM applications\\\\n2. It has both
+      Python and TypeScript/Node implementations\\\\n3. The Node SDK is in
+      `sdks/node` and uses pnpm for package management\\\\n4. The largest
+      TypeScript file is a generated API client (8,225 lines) for the trace
+      server\\\\n5. It supports automatic
+      int\",\"content_digest\":\"f050523d075a22a6c93dc28715ee4e91\",\"started_at\
+      \":\"2026-06-25T17:35:00.987000\"}],\"last_activity\":\"2026-06-25T17:35:\
+      00.987000\"}],\"total_conversations\":1}"

@@ -7,7 +7,7 @@
 -- Stores the per-project retention duration as an append-only audit trail.
 -- Use argMax(retention_days, updated_at) to read the latest setting.
 -- retention_days = 0 means "no TTL" (infinite retention).
-CREATE TABLE project_ttl_settings (
+CREATE TABLE IF NOT EXISTS project_ttl_settings (
     project_id      String,
     retention_days  Int32,
     updated_at      DateTime64(3) DEFAULT now64(3),
@@ -18,20 +18,30 @@ SETTINGS
     enable_block_number_column = 1,
     enable_block_offset_column = 1;
 
--- Step 1b: Rename ttl_at to expire_at on calls_complete
-ALTER TABLE calls_complete RENAME COLUMN ttl_at TO expire_at;
+-- Step 1b: Add expire_at to calls_complete (additive, not a rename).
+-- ttl_at is kept so a rollback to a pre-029 app can still write it. A RENAME
+-- would be irreversible mid-migration and, under prod write load on CH 25.10,
+-- spawns a mutation that can stall against concurrent lightweight updates.
+-- DateTime (not DateTime64(3) like the sibling tables) matches ttl_at's type so
+-- the TTL swap and the rollback path stay type-stable. No backfill from ttl_at is
+-- needed: TTL ships with this migration, so every existing row still holds the
+-- 2100 sentinel that ttl_at defaults to.
+ALTER TABLE calls_complete
+    ADD COLUMN IF NOT EXISTS expire_at DateTime DEFAULT '2100-01-01 00:00:00';
 
--- Step 1c: Re-apply TTL expression after column rename.
+-- Step 1c: Set the TTL to expire_at.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
-ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE;
+-- materialize_ttl_after_modify=0: set TTL metadata only. Every row has the
+-- 2100 sentinel so eager materialization rewrites every part to delete nothing.
+ALTER TABLE calls_complete MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 2: Add expire_at to call_parts
 ALTER TABLE call_parts
-    ADD COLUMN expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
+    ADD COLUMN IF NOT EXISTS expire_at DateTime64(3) DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 3: Add expire_at to calls_merged
 ALTER TABLE calls_merged
-    ADD COLUMN expire_at SimpleAggregateFunction(min, DateTime64(3))
+    ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
 
 -- Step 4: Update calls_merged_view to propagate expire_at from call_parts
@@ -67,14 +77,14 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Step 5: Enable TTL deletion on call_parts and calls_merged.
 -- toDateTime() wrapper required for CH < 25.6 compatibility (PR #80710).
-ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE;
-ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE call_parts MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
+ALTER TABLE calls_merged MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 6: Add expire_at column and TTL to calls_merged_stats
 ALTER TABLE calls_merged_stats
     ADD COLUMN IF NOT EXISTS expire_at SimpleAggregateFunction(min, DateTime64(3))
     DEFAULT toDateTime64('2100-01-01 00:00:00', 3);
-ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_merged_stats MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 7: Add expire_at column and TTL to calls_complete_stats
 ALTER TABLE calls_complete_stats
@@ -85,7 +95,7 @@ ALTER TABLE calls_complete_stats
 ALTER TABLE calls_complete_stats
     ADD COLUMN IF NOT EXISTS source SimpleAggregateFunction(any, Enum8('direct' = 1, 'dual' = 2, 'migration' = 3))
     DEFAULT 'direct';
-ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE;
+ALTER TABLE calls_complete_stats MODIFY TTL toDateTime(expire_at) DELETE SETTINGS materialize_ttl_after_modify = 0;
 
 -- Step 8: Update calls_merged_stats_view to propagate expire_at
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

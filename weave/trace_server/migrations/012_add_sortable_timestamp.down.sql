@@ -1,4 +1,4 @@
-ALTER TABLE calls_merged DROP INDEX idx_sortable_datetime;
+ALTER TABLE calls_merged DROP INDEX IF EXISTS idx_sortable_datetime;
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -23,4 +23,4 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     FROM call_parts
     GROUP BY project_id,
         id;
-ALTER TABLE calls_merged DROP COLUMN sortable_datetime;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS sortable_datetime;

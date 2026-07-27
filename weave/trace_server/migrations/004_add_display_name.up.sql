@@ -8,10 +8,10 @@
 */
 
 ALTER TABLE call_parts
-    ADD COLUMN display_name Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS display_name Nullable(String) DEFAULT NULL;
 
 ALTER TABLE calls_merged
-    ADD COLUMN display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
+    ADD COLUMN IF NOT EXISTS display_name AggregateFunction(argMax, Nullable(String), DateTime64(3));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,

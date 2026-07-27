@@ -54,7 +54,7 @@ describe('OpenAI Mock', () => {
       stream: true,
     })) as AsyncIterable<any>;
 
-    let chunks = [];
+    const chunks = [];
     for await (const chunk of stream) {
       chunks.push(chunk);
     }
@@ -101,7 +101,7 @@ describe('OpenAI Mock', () => {
       stream_options: {include_usage: true},
     })) as AsyncIterable<any>;
 
-    let chunks = [];
+    const chunks = [];
     for await (const chunk of stream) {
       chunks.push(chunk);
     }

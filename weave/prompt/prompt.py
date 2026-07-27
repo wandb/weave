@@ -87,6 +87,20 @@ class Prompt(Object):
 
 @register_object
 class StringPrompt(Prompt):
+    """A prompt template for plain text prompts.
+
+    Add variables in braces, then pass values for those variables to `format`
+    to produce the final prompt text.
+
+    Example:
+        prompt = StringPrompt("Hello {name}")
+        prompt.format(name="Ada")
+        'Hello Ada'
+
+    Raises:
+        KeyError: If you call `format` without a required template variable.
+    """
+
     content: str = ""
 
     def __init__(self, content: str):

@@ -21,7 +21,7 @@ function getBaseUrlFromConfig(): string | undefined {
         return config.default.wandb_base_url;
       }
     }
-  } catch (error) {
+  } catch (_error) {
     // Silently fail if we can't read the config file
     // This could happen in restricted environments like Deno
   }
@@ -33,7 +33,7 @@ function getApiKeyFromNetrc(host: string): string | undefined {
   try {
     const netrc = new Netrc();
     return netrc.entries.get(host)?.password;
-  } catch (error) {
+  } catch (_error) {
     // Silently fail if we can't read the netrc file
     // This could happen in restricted environments like Deno
     return undefined;

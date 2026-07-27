@@ -7,12 +7,19 @@ success-path test that exercises every extractor plus one error-status
 test since that's a separate code path (Status object vs attributes).
 """
 
+import base64
 import datetime
 import json
 from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
 
 from weave.trace_server.agents import semconv
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_span,
+    strip_inline_blobs_from_span,
+)
 from weave.trace_server.opentelemetry.python_spans import (
     Resource,
     Span,
@@ -20,6 +27,7 @@ from weave.trace_server.opentelemetry.python_spans import (
     Status,
     StatusCode,
 )
+from weave.trace_server.trace_server_interface import FileCreateRes, ObjCreateRes
 
 
 def _make_span(
@@ -60,6 +68,14 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.agent.name": "travel-bot",
             "gen_ai.agent.id": "agent-001",
             "gen_ai.agent.version": "1.2.3",
+            # Eval linkage
+            "weave.eval.run_id": "eval-run-001",
+            "weave.eval.predict_and_score_call_id": "pas-001",
+            "weave.eval.kind": "agent",
+            "weave.eval.row_digest": "row-digest-001",
+            "weave.eval.example_id": "example-001",
+            "weave.eval.trial_index": 2,
+            "weave.eval.evaluation_name": "travel-bot-eval",
             "gen_ai.conversation.id": "conv-abc",
             "weave.conversation.name": "My Chat",
             # Model + tokens
@@ -127,6 +143,13 @@ def test_extract_genai_span_comprehensive() -> None:
     # Other gen_ai.* fields pass through
     assert result.agent_id == "agent-001"
     assert result.agent_version == "1.2.3"
+    assert result.eval_run_id == "eval-run-001"
+    assert result.eval_predict_and_score_call_id == "pas-001"
+    assert result.eval_kind == "agent"
+    assert result.eval_row_digest == "row-digest-001"
+    assert result.eval_example_id == "example-001"
+    assert result.eval_trial_index == 2
+    assert result.eval_evaluation_name == "travel-bot-eval"
     assert result.conversation_id == "conv-abc"
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
@@ -175,10 +198,25 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["gen_ai.request.encoding_formats"] == '["float"]'
     assert result.custom_attrs_string["gen_ai.data_source.id"] == "ds-1"
     assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
+    assert "weave.eval.run_id" not in result.custom_attrs_string
+    assert "weave.eval.trial_index" not in result.custom_attrs_int
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""
     assert result.attributes_dump != ""
+
+
+def test_extract_genai_span_defaults_missing_eval_trial_index() -> None:
+    result = extract_genai_span(
+        _make_span(attrs={"weave.eval.run_id": "eval-run-001"}),
+        project_id="p1",
+    )
+
+    assert result.eval_run_id == "eval-run-001"
+    # -1 is the ClickHouse storage sentinel for "unset" (the column can't hold
+    # NULL ints). The read path (AgentSpanSchema) surfaces it to callers as None
+    # -- see test_genai_agent_queries.test_eval_trial_index_unset_reads_as_none.
+    assert result.eval_trial_index == -1
 
 
 def test_extract_genai_span_error_status() -> None:
@@ -393,6 +431,49 @@ def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
     assert result.reasoning_tokens == 99
 
 
+@pytest.mark.parametrize(
+    "details_key",
+    ["prompt_tokens_details", "input_tokens_details"],
+)
+def test_openai_shaped_cached_tokens_map_to_cache_read(details_key: str) -> None:
+    """Maps OpenAI-shaped cached tokens to cache reads."""
+    span = _make_span(
+        attrs={
+            "gen_ai": {
+                "usage": {
+                    "input_tokens": 1000,
+                    "output_tokens": 50,
+                    details_key: {"cached_tokens": 640},
+                }
+            }
+        }
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.input_tokens == 1000
+    assert result.output_tokens == 50
+    assert result.cache_creation_input_tokens == 0
+    assert result.cache_read_input_tokens == 640
+
+
+def test_anthropic_style_cache_read_wins_over_openai_shaped() -> None:
+    """When both the canonical Anthropic-style key and the OpenAI-shaped
+    fallback keys are present, the canonical value must win.
+    """
+    span = _make_span(
+        attrs={
+            "gen_ai": {
+                "usage": {
+                    "cache_read": {"input_tokens": 99},
+                    "prompt_tokens_details": {"cached_tokens": 10},
+                    "input_tokens_details": {"cached_tokens": 20},
+                }
+            }
+        }
+    )
+    result = extract_genai_span(span, project_id="p1")
+    assert result.cache_read_input_tokens == 99
+
+
 def test_extract_custom_attrs_skips_non_finite_floats() -> None:
     """NaN and +/-Inf must not reach custom_attrs_float — they break JSON
     serialization and have no aggregation semantics.
@@ -415,3 +496,180 @@ def test_extract_custom_attrs_skips_non_finite_floats() -> None:
         assert key not in result.custom_attrs_float
         assert key not in result.custom_attrs_string
         assert key not in result.custom_attrs_int
+
+
+def _mock_trace_server() -> MagicMock:
+    trace_server = MagicMock()
+    trace_server.file_create = MagicMock(
+        side_effect=lambda req: FileCreateRes(digest=f"digest_{req.name}")
+    )
+    # Auto-conversion publishes each converted blob as a weave object and embeds
+    # its ref, so obj_create must be stubbed with a deterministic digest.
+    trace_server.obj_create = MagicMock(return_value=ObjCreateRes(digest="obj_digest"))
+    return trace_server
+
+
+def test_strip_inline_blobs_then_extract_strips_base64() -> None:
+    """After ``strip_inline_blobs_from_span``, inline base64 in messages is a ref.
+
+    Mirrors the non-OTel calls path. The image field value becomes a compact
+    weave object ref inside the JSON-serialized NormalizedMessage content.
+    """
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": "describe this"},
+                        {"type": "image", "url": data_uri},
+                    ],
+                }
+            ]
+        )
+    }
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
+
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
+
+    content = json.loads(result.input_messages[0].content)
+    assert content[0] == {"type": "text", "content": "describe this"}
+    assert content[1]["url"].startswith("weave-trace-internal:///p1/object/")
+    assert content[1]["url"].endswith(":obj_digest")
+    assert b64 not in result.input_messages[0].content
+    assert trace_server.file_create.call_count == 2
+
+
+def test_extract_genai_span_leaves_base64_without_strip_step() -> None:
+    """Without the strip step, ``extract_genai_span`` leaves base64 inline."""
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [{"role": "user", "parts": [{"type": "image", "url": data_uri}]}]
+        )
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    assert data_uri in result.input_messages[0].content
+
+
+def test_extract_genai_span_preserves_multimodal_content_parts() -> None:
+    """OpenAI-style list ``content`` (text + image) is preserved as a JSON parts
+    array; non-text parts must not be dropped during normalization.
+    """
+    attrs = {
+        "gen_ai.input.messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://example.com/x.png"},
+                    },
+                ],
+            }
+        ]
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    parts = json.loads(result.input_messages[0].content)
+    assert parts == [
+        {"type": "text", "text": "What is in this image?"},
+        {"type": "image_url", "image_url": {"url": "https://example.com/x.png"}},
+    ]
+
+
+def test_extract_genai_span_normalizes_indexed_prompt_dict() -> None:
+    """Legacy ``gen_ai.prompt.{i}`` / ``gen_ai.completion.{i}`` unflatten to a
+    numeric-keyed dict; it must be converted to a message list (as the
+    non-agents path does) so input/output messages are populated.
+    """
+    attrs = {
+        "gen_ai": {
+            "prompt": {
+                "0": {"role": "user", "content": "hello"},
+                "1": {"role": "assistant", "content": "hi there"},
+            },
+            "completion": {"0": {"role": "assistant", "content": "done"}},
+        }
+    }
+
+    result = extract_genai_span(_make_span(attrs=attrs), project_id="p1")
+
+    assert [m.role for m in result.input_messages] == ["user", "assistant"]
+    assert result.input_messages[0].content == "hello"
+    assert result.input_messages[1].content == "hi there"
+    assert [m.role for m in result.output_messages] == ["assistant"]
+    assert result.output_messages[0].content == "done"
+
+
+def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
+    """Replicates AgentWriteHandler.insert_otel_spans: converting span.attributes
+    before extraction strips base64 from the lossless attributes_dump /
+    raw_span_dump columns (the OpenLLMetry ``gen_ai.prompt.{i}`` shape unflattens
+    to a numeric-keyed dict with a structured content array).
+    """
+    b64 = base64.b64encode(b"a" * 15000).decode("ascii")
+    attrs = {
+        "gen_ai": {
+            "prompt": {
+                "0": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What is in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{b64}"},
+                        },
+                    ],
+                }
+            }
+        }
+    }
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
+
+    # AgentWriteHandler strips inline blobs in place before extraction.
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
+
+    assert b64 not in result.attributes_dump
+    assert b64 not in result.raw_span_dump
+    # Base64 is replaced by a compact weave object ref, not an inline object.
+    assert "weave-trace-internal:///p1/object/" in result.attributes_dump
+    assert "CustomWeaveType" not in result.attributes_dump
+    assert trace_server.file_create.call_count == 2
+
+
+def test_strip_inline_blobs_attributes_obj_create_to_wb_user_id() -> None:
+    """The OTel agents path attributes converted Content objects to the caller.
+
+    ``strip_inline_blobs_from_span``'s ``wb_user_id`` must reach the
+    ``ObjSchemaForInsert`` used to publish each Content object via ``obj_create``.
+    Here the base64 is buried inside a JSON-encoded ``gen_ai.input.messages``
+    string, so the conversion happens on the message-payload pass
+    (``_strip_message_attr`` -> ``replace_base64_in_raw_messages``).
+    """
+    b64 = base64.b64encode(b"a" * 12000).decode("ascii")
+    data_uri = f"data:image/png;base64,{b64}"
+    attrs = {
+        "gen_ai.input.messages": json.dumps(
+            [{"role": "user", "parts": [{"type": "image", "url": data_uri}]}]
+        )
+    }
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs=attrs)
+
+    strip_inline_blobs_from_span(span, "p1", trace_server, wb_user_id="u-9")
+
+    assert trace_server.obj_create.call_count == 1
+    obj_create_req = trace_server.obj_create.call_args.args[0]
+    assert obj_create_req.obj.wb_user_id == "u-9"

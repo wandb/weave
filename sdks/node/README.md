@@ -24,34 +24,67 @@ Get your wandb API key from [here](https://wandb.ai/authorize).
 
 ## Quickstart
 
-Put this in a file called `predict.mjs`:
+Put this in a file called `main.mjs`:
 
-```javascript
-import {OpenAI} from 'openai';
-import {init, op, wrapOpenAI} from 'weave';
+```typescript
+import { randomUUID } from "node:crypto";
+import * as weave from "weave";
+import { Agent, Runner, tool, type AgentInputItem } from "@openai/agents";
+import { z } from "zod";
 
-const openai = wrapOpenAI(new OpenAI());
+const wikipediaSearch = tool({
+  name: "wikipedia_search",
+  description: "Search Wikipedia for a topic and return its title and intro paragraph.",
+  parameters: z.object({
+    query: z.string().describe("The topic to search for"),
+  }),
+  async execute({ query }) {
+    const url = new URL("https://en.wikipedia.org/w/api.php");
+    url.search = new URLSearchParams({
+      action: "query",
+      generator: "search",
+      gsrsearch: query,
+      gsrlimit: "1",
+      prop: "extracts",
+      exintro: "true",
+      explaintext: "true",
+      format: "json",
+    }).toString();
 
-async function extractDinos(input) {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'user',
-        content: `In JSON format extract a list of 'dinosaurs', with their 'name', their 'common_name', and whether its 'diet' is a herbivore or carnivore: ${input}`,
-      },
-    ],
-  });
-  return response.choices[0].message.content;
-}
-const extractDinosOp = op(extractDinos);
+    const response = await fetch(url, { headers: { "User-Agent": "weave-demo" } });
+    const data = await response.json();
+    const page = Object.values(data.query.pages)[0] as { title: string; extract: string };
+    return `${page.title}: ${page.extract}`;
+  },
+});
 
 async function main() {
-  await init('weave-quickstart');
-  const result = await extractDinosOp(
-    'I watched as a Tyrannosaurus rex (T. rex) chased after a Triceratops (Trike), both carnivore and herbivore locked in an ancient dance. Meanwhile, a gentle giant Brachiosaurus (Brachi) calmly munched on treetops, blissfully unaware of the chaos below.'
-  );
-  console.log(result);
+  await weave.init("<your-team>/<your-project-name>");
+
+  const agent = new Agent({
+    name: "Research assistant",
+    instructions:
+      "You are a research assistant. Use the wikipedia_search tool to look up " +
+      "topics when needed, and cite the article titles you used.",
+    tools: [wikipediaSearch],
+  });
+
+  const runner = new Runner({ groupId: randomUUID() });
+
+  const questions = [
+    "Who founded Anthropic?",
+    "What is Claude (the AI assistant)?",
+    "Summarize what we discussed in one sentence.",
+  ];
+
+  let history: AgentInputItem[] = [];
+  for (const question of questions) {
+    history.push({ role: "user", content: question });
+    console.log(`USER: ${question}`);
+    const result = await runner.run(agent, history);
+    console.log(`AGENT: ${result.finalOutput}\n`);
+    history = result.history;
+  }
 }
 
 main();
@@ -60,89 +93,44 @@ main();
 and then run
 
 ```
-node predict.mjs
+node --import=weave/instrument main.mjs
 ```
 
 ## Usage
 
 ### Initializing a Project
 
-Before you can start tracing operations, you need to initialize a project. This sets up the necessary environment for trace collection.
+Before you can start tracing your agent or application, you need to initialize a project.
 
-```javascript
+```typescript
 import {init} from 'weave';
 
 // Initialize your project with a unique project name
 init('my-awesome-ai-project');
 ```
 
-### Tracing Operations
+### Integrations
 
-You can trace specific operations using the `op` function. This function wraps your existing functions and tracks their execution.
+W&B Weave traces multi-turn agents built with popular SDKs and harnesses without hand-instrumenting each turn. Install a plugin for your agent harness, or call `weave.init()` in code that uses a supported agent SDK, and Weave autopatches the framework.
 
-```javascript
-import {op} from 'weave';
+Import the library, call `weave.init(...)`, and Weave picks it up. For ESM projects, launch with `node --import=weave/instrument`. See the [agent integration quickstart](https://docs.wandb.ai/weave/agent-integration-quickstart) for the full list of integrations.
 
-// Define a function you want to trace
-async function myFunction(arg1, arg2) {
-  // Your function logic
-  return arg1 + arg2;
-}
+#### Agent SDKs
 
-// Wrap the function with op to enable tracing
-const tracedFunction = op(myFunction, 'myFunction');
+- [OpenAI Agents SDK](https://docs.wandb.ai/weave/guides/integrations/openai_agents) (`@openai/agents`, `@openai/agents-realtime`)
+- [Google Agent Development Kit (ADK)](https://docs.wandb.ai/weave/guides/integrations/google_adk) (`@google/adk`)
+- [Claude Agent SDK](https://docs.wandb.ai/weave/guides/integrations/claude_agent_sdk) (`@anthropic-ai/claude-agent-sdk`)
 
-// Call the traced function
-tracedFunction(5, 10);
-```
+#### LLM providers
 
-If you have a class and a method, you can use decorators.
+- [OpenAI](https://docs.wandb.ai/weave/guides/integrations/openai) (`openai`)
+- [Anthropic](https://docs.wandb.ai/weave/guides/integrations/anthropic) (`@anthropic-ai/sdk`)
+- [Google Gen AI](https://docs.wandb.ai/weave/guides/integrations/google) (`@google/genai`)
 
-```javascript
-import * as weave from "weave";
-import { weaveImage, WeaveImage } from "weave";
+#### Custom agents and OpenTelemetry
 
-
-class TestClass {
-    @weave.op
-    async logImage(image: WeaveImage) {
-        console.log(image.imageType);
-    }
-}
-
-// const imageBuffer: Buffer = ...
-const image = weaveImage({data: imageBuffer});
-
-const testClassInstance = new TestClass();
-await testClassInstance.logImage(image);
-
-```
-
-### OpenAI Integration
-
-Weave provides an integration with OpenAI, allowing you to trace API calls made to OpenAI's services seamlessly.
-
-```javascript
-// Create a patched instance of OpenAI
-const openai = new OpenAI();
-
-// Use the OpenAI instance as usual
-openai.chat.completions.create({
-  model: 'text-davinci-003',
-  prompt: 'Translate the following English text to French: "Hello, world!"',
-  max_tokens: 60,
-});
-
-// Weave tracks images too!
-openai.images.generate({
-  prompt: 'A cute baby sea otter',
-  n: 3,
-  size: '256x256',
-  response_format: 'b64_json',
-});
-```
-
-For a complete setup guide for ESM projects, see the [TypeScript SDK: Third-Party Integration Guide](https://weave-docs.wandb.ai/guides/integrations/js).
+- [Quickstart: Manually instrument an agent](https://docs.wandb.ai/weave/agent-integration-quickstart#custom-agents-and-opentelemetry)
+- [Trace your agents](https://docs.wandb.ai/weave/guides/tracking/tracing)
 
 ### Evaluations
 

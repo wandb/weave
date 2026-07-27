@@ -1,10 +1,10 @@
 -- Add turn_id to raw call parts table
 ALTER TABLE call_parts
-    ADD COLUMN turn_id Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS turn_id Nullable(String) DEFAULT NULL;
 
 -- Add turn_id to aggregated calls table
 ALTER TABLE calls_merged
-    ADD COLUMN turn_id SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS turn_id SimpleAggregateFunction(any, Nullable(String));
 
 -- Update materialized view to include turn_id
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -36,7 +36,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Add turn_id to stats table
 ALTER TABLE calls_merged_stats
-    ADD COLUMN turn_id SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS turn_id SimpleAggregateFunction(any, Nullable(String));
 
 -- Update stats materialized view to include turn_id
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

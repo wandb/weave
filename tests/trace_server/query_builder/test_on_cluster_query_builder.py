@@ -13,7 +13,6 @@ import pytest
 from weave.trace_server import environment as wf_env
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.calls_query_builder.calls_query_builder import (
-    build_calls_complete_delete_query,
     build_calls_complete_update_end_query,
     build_calls_complete_update_query,
 )
@@ -64,14 +63,6 @@ def test_on_cluster_mutations_never_inject_local_suffix() -> None:
         cluster_name=CLUSTER,
     )
     assert f"calls_complete ON CLUSTER {CLUSTER}" in update_end
-
-    delete = build_calls_complete_delete_query(
-        table_name="calls_complete",
-        project_id_param="p",
-        call_ids_param="c",
-        cluster_name=CLUSTER,
-    )
-    assert f"calls_complete ON CLUSTER {CLUSTER}" in delete
 
     update = build_calls_complete_update_query(
         table_name="calls_complete",

@@ -4,7 +4,7 @@
     headers:
       authorization: masked
       content-type: application/json
-      user-agent: Weave JS Client 0.15.1
+      user-agent: Weave JS Client 0.16.0
     body: '{"query":"\nquery DefaultEntity {\n    viewer
       {\n        username\n        defaultEntity
       {\n            name\n        }\n    }\n}\n","variables":{}}'
@@ -32,6 +32,7 @@
       authorization: masked
       content-type: multipart/form-data; boundary=----formdata-undici-044877044187
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: "------formdata-undici-044877044187\r
 
       Content-Disposition: form-data; name=\"project_id\"\r
@@ -73,6 +74,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"method","val":{"_type":"CustomWeaveType","weave_type":{"type":"Op"},"files":{"obj.py":"5LPCsCuFWEk8TsCrQXF6eeF6hHLA8VzB2BeGgFbl5ng"},"load_op":"NO_LOAD_OP"}}}'
   response:
     status: 200
@@ -92,6 +94,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"obj":{"project_id":"drtangible-mocha/test-project","object_id":"ExampleObject","val":{"_type":"ExampleObject","_class_name":"ExampleObject","_bases":["Object","BaseModel"],"key":"test","value":1,"method":"weave:///drtangible-mocha/test-project/op/method:NLqQGA8CJAScye11A2W8syN2OOEFFuXgUUzPcNNPR2E"}}}'
   response:
     status: 200

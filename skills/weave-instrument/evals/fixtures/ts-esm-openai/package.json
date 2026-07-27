@@ -1,0 +1,12 @@
+{
+  "name": "esm-openai-script",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "openai": "^4.0.0"
+  }
+}

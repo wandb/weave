@@ -3,7 +3,6 @@ import socket
 import zlib
 from typing import Any
 
-import ddtrace
 from confluent_kafka import (
     Consumer as ConfluentKafkaConsumer,
 )
@@ -16,7 +15,9 @@ from confluent_kafka import (
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.kafka_events import (
+    EMBED_AGENT_SPANS_TOPIC,
     SCORE_AGENT_SPANS_TOPIC,
+    EmbedAgentSpansEvent,
     ScoreAgentSpansEvent,
 )
 from weave.trace_server.datadog import set_root_span_dd_tags
@@ -28,6 +29,7 @@ from weave.trace_server.environment import (
     kafka_producer_max_buffer_size,
     wf_kafka_project_id_bucket_count,
 )
+from weave.trace_server.tracing import traced
 
 CALL_ENDED_TOPIC = "weave.call_ended"
 SCORE_CALLS_TOPIC = "weave.score_calls"
@@ -148,14 +150,39 @@ class KafkaProducer(ConfluentKafkaProducer):
         if flush_immediately:
             self.flush(0)
 
-    @ddtrace.tracer.wrap(name="kafka_producer.produce_score_agent_spans")
+    @traced(name="kafka_producer.produce_score_agent_spans")
     def produce_score_agent_spans(self, event: ScoreAgentSpansEvent) -> None:
         """Produce a weave.score_agent_spans event to Kafka.
 
         Drops the message when the producer buffer is full (same policy as `produce_call_end`).
         """
-        if self._check_buffer_pressure(
+        self._produce_agent_spans(
+            event,
+            topic=SCORE_AGENT_SPANS_TOPIC,
             message_type="score_agent_spans",
+        )
+
+    @traced(name="kafka_producer.produce_embed_agent_spans")
+    def produce_embed_agent_spans(self, event: EmbedAgentSpansEvent) -> None:
+        """Produce a weave.embed_agent_spans event to Kafka.
+
+        Drops the message when the producer buffer is full (same policy as `produce_call_end`).
+        """
+        self._produce_agent_spans(
+            event,
+            topic=EMBED_AGENT_SPANS_TOPIC,
+            message_type="embed_agent_spans",
+        )
+
+    def _produce_agent_spans(
+        self,
+        event: ScoreAgentSpansEvent | EmbedAgentSpansEvent,
+        *,
+        topic: str,
+        message_type: str,
+    ) -> None:
+        if self._check_buffer_pressure(
+            message_type=message_type,
             logging_extra={
                 "event_type": event.event_type,
                 "status_code": event.status_code,
@@ -168,12 +195,12 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         # Partition by conversation_id if available, falling back to trace_id.
         # This ensures spans for the same conversation or turn always route to
-        # the same worker, which allows for more efficient caching/querying in
-        # the scoring worker. We intentionally do NOT partition on project_id:
+        # the same worker, which allows for more efficient caching/querying.
+        # We intentionally do NOT partition on project_id:
         # that would send all spans for a project to a single worker instance.
         publish_key = event.conversation_id or event.trace_id
         self.produce(
-            topic=SCORE_AGENT_SPANS_TOPIC,
+            topic=topic,
             value=event.model_dump_json(),
             key=publish_key,
         )

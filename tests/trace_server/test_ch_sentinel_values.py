@@ -194,16 +194,12 @@ def test_null_check_sql() -> None:
     # calls_complete: string sentinel field uses = sentinel param
     pb = ParamBuilder("pb")
     result = null_check_sql("parent_id", "t.parent_id", ReadTable.CALLS_COMPLETE, pb)
-    assert "=" in result
-    assert "IS NULL" not in result
-    assert "String" in result
+    assert result == "t.parent_id = {pb_0:String}"
 
     # calls_complete: datetime sentinel field uses = sentinel param
     pb = ParamBuilder("pb")
     result = null_check_sql("ended_at", "t.ended_at", ReadTable.CALLS_COMPLETE, pb)
-    assert "=" in result
-    assert "IS NULL" not in result
-    assert "DateTime64(6)" in result
+    assert result == "t.ended_at = {pb_0:DateTime64(6)}"
 
     # calls_merged: sentinel fields still use IS NULL (nullable columns)
     pb = ParamBuilder("pb")
@@ -215,9 +211,7 @@ def test_null_check_sql() -> None:
     result = null_check_sql(
         "wb_run_step", "t.wb_run_step", ReadTable.CALLS_COMPLETE, pb
     )
-    assert "=" in result
-    assert "IS NULL" not in result
-    assert "UInt64" in result
+    assert result == "t.wb_run_step = {pb_0:UInt64}"
 
     # calls_merged: int sentinel fields still use IS NULL (nullable columns)
     pb = ParamBuilder("pb")
@@ -227,17 +221,14 @@ def test_null_check_sql() -> None:
     # calls_merged: expire_at is non-null and uses its sentinel.
     pb = ParamBuilder("pb")
     result = null_check_sql("expire_at", "t.expire_at", ReadTable.CALLS_MERGED, pb)
-    assert "=" in result
-    assert "IS NULL" not in result
-    assert "DateTime64(3)" in result
+    assert result == "t.expire_at = {pb_0:DateTime64(3)}"
 
     # negate: calls_complete sentinel field uses != sentinel
     pb = ParamBuilder("pb")
     result = null_check_sql(
         "wb_run_id", "t.wb_run_id", ReadTable.CALLS_COMPLETE, pb, negate=True
     )
-    assert "!=" in result
-    assert "IS NOT NULL" not in result
+    assert result == "t.wb_run_id != {pb_0:String}"
 
     # negate: calls_merged uses IS NOT NULL
     pb = ParamBuilder("pb")

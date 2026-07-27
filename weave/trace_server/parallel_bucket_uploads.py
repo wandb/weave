@@ -32,10 +32,10 @@ Partial-failure semantics: if a worker raises something other than
 re-raises it and `flush()` logs a warning and re-raises. Peer workers
 still complete via the `ThreadPoolExecutor.__exit__` join, so their
 bucket objects may land without a corresponding `files` row. On retry,
-the same `(project_id, digest)` triggers
-`if_generation_match=0 -> PreconditionFailed`, which `store_in_bucket`
-wraps as `FileStorageWriteError`, which falls back to inline-CH chunks.
-End state is content-addressable and consistent.
+the repeat write is an idempotent no-op (served from the per-pod
+stored-key cache, or GCS `if_generation_match=0` swallows the duplicate)
+and the worker re-inserts the missing `files` row. End state is
+content-addressable and consistent.
 """
 
 from __future__ import annotations
@@ -43,8 +43,6 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-
-import ddtrace
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
@@ -57,6 +55,7 @@ from weave.trace_server.file_storage import (
     key_for_project_digest,
     store_in_bucket,
 )
+from weave.trace_server.tracing import traced
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,7 @@ class BucketUploadBatch:
     def __bool__(self) -> bool:
         return bool(self._pending)
 
-    @ddtrace.tracer.wrap(name="bucket_upload_batch.flush")
+    @traced(name="bucket_upload_batch.flush")
     def flush(
         self, client: FileStorageClient | None
     ) -> list[FileChunkCreateCHInsertable]:

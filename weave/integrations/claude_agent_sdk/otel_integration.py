@@ -11,7 +11,7 @@ span per tool call. The SDK reports token usage only on the final
 
 The Claude Agent SDK has no agent-name concept, so ``invoke_agent`` spans
 default to ``claude_agent_sdk``. Users relabel them for a block of work with the
-generic ``weave.session.agent_name_override(...)`` context manager; the name is
+generic ``weave.conversation.agent_name_override(...)`` context manager; the name is
 resolved per turn at span creation, so it is robust to (implicit) patch timing
 and correct under concurrent async queries.
 """
@@ -40,15 +40,16 @@ from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import StatusCode
 
-from weave.integrations.integration_metadata import library_integration
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.session.agent_context import resolve_agent_name
-from weave.session.session_otel import (
+from weave.conversation.agent_context import resolve_agent_name
+from weave.conversation.conversation_otel import (
     execute_tool_attributes,
     invoke_agent_attributes,
     llm_attributes,
 )
-from weave.session.types import Message, Reasoning, ToolCallPart, Usage
+from weave.conversation.types import Message, Reasoning, ToolCallPart, Usage
+from weave.integrations.claude_agent_sdk.usage import total_input_tokens
+from weave.integrations.integration_metadata import library_integration
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.settings import should_disable_weave
 
@@ -109,7 +110,7 @@ def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
     """Build a Usage from a ResultMessage's aggregate usage dict."""
     raw = usage or {}
     return Usage(
-        input_tokens=int(raw.get("input_tokens", 0) or 0),
+        input_tokens=total_input_tokens(raw),
         output_tokens=int(raw.get("output_tokens", 0) or 0),
         cache_creation_input_tokens=int(raw.get("cache_creation_input_tokens", 0) or 0),
         cache_read_input_tokens=int(raw.get("cache_read_input_tokens", 0) or 0),

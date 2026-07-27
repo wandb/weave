@@ -69,7 +69,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Filter shards if specified
         id: filter_shards
         run: |
@@ -111,11 +111,9 @@ jobs:
       - name: Enable debug logging
         if: steps.filter_shards.outputs.skip != 'true'
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
-      - name: Install Libmagic dependency package
-        run: sudo apt update && sudo apt install -y libmagic1
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         if: steps.filter_shards.outputs.skip != 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
       - name: Install dependencies
@@ -242,7 +240,7 @@ jobs:
 
       - name: Send Slack Notification on Failure
         if: steps.result.outputs.status == 'failure'
-        uses: slackapi/slack-github-action@v1.25.0
+        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         with:
           channel-id: "C09CE03J867"
           slack-message: |
@@ -256,7 +254,7 @@ jobs:
 
       - name: Send Slack Notification on Success
         if: steps.result.outputs.status == 'success'
-        uses: slackapi/slack-github-action@v1.25.0
+        uses: slackapi/slack-github-action@6c661ce58804a1a20f6dc5fbee7f0381b469e001 # v1.25.0
         with:
           channel-id: "C09CE03J867"
           slack-message: |

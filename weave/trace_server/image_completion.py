@@ -3,11 +3,11 @@ from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import store_content_object
+from weave.trace_server.content.content import Content
 from weave.trace_server.errors import (
     InvalidRequest,
 )
 from weave.trace_server.helpers.url_safety import is_publicly_routable_url
-from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 

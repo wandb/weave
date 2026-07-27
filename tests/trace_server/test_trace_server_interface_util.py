@@ -1,4 +1,5 @@
 import base64
+import json
 from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock
@@ -111,6 +112,14 @@ class _EncodingIdConverter(IdConverter):
                 filter=tsi.CallsFilter(wb_user_ids=["user-x"], wb_run_ids=["run-y"]),
             ),
         ),
+        (
+            "export_start",
+            lambda: tsi.ExportStartReq(project_id="ent/proj", targets=["calls"]),
+        ),
+        (
+            "export_status",
+            lambda: tsi.ExportStatusReq(project_id="ent/proj", job_id="j"),
+        ),
     ],
 )
 def test_adapter_does_not_mutate_req_when_inner_raises(
@@ -131,6 +140,39 @@ def test_adapter_does_not_mutate_req_when_inner_raises(
         getattr(adapter, method_name)(req)
 
     assert req.model_dump() == snapshot
+
+
+def test_export_adapter_converts_project_id_and_delegates() -> None:
+    """The export endpoints must convert the external entity/project id to the
+    internal (base64) form before delegating, leaving the caller's req intact.
+    Without an explicit adapter override, project_id would reach the internal
+    server unconverted (the __getattr__ fallthrough), a cross-tenant hazard.
+    """
+    idc = _EncodingIdConverter()
+    internal_project_id = idc.ext_to_int_project_id("ent/proj")
+
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.export_start.return_value = tsi.ExportStartRes(job_id="job-1")
+    inner.export_status.return_value = tsi.ExportStatusRes(
+        status="done",
+        manifest=[
+            tsi.ExportManifestEntry(target="calls", status="done", rows=3),
+        ],
+    )
+    adapter = ExternalTraceServer(inner, idc)
+
+    start_req = tsi.ExportStartReq(project_id="ent/proj", targets=["calls"])
+    start_res = adapter.export_start(start_req)
+    assert start_res.job_id == "job-1"
+    assert inner.export_start.call_args.args[0].project_id == internal_project_id
+    assert start_req.project_id == "ent/proj"
+
+    status_req = tsi.ExportStatusReq(project_id="ent/proj", job_id="job-1")
+    status_res = adapter.export_status(status_req)
+    assert status_res.status == "done"
+    assert status_res.manifest[0].rows == 3
+    assert inner.export_status.call_args.args[0].project_id == internal_project_id
+    assert status_req.project_id == "ent/proj"
 
 
 # --- genai_otel_export ext→int ref rewriting in OTel attribute values ---
@@ -179,9 +221,10 @@ def _make_otel_export_req_with_ref_attrs(
             kv = KeyValue(key=full_key)
             kv.value.CopyFrom(build_array_value(refs))
             span.attributes.append(kv)
-    # Non-ref attributes must survive unchanged.
+    # A string attribute that contains no ref substring must survive
+    # byte-for-byte (the cheap pre-check skips the conversion entirely).
     other = KeyValue(key="weave.raw_span_dump")
-    other.value.string_value = "weave:///should/not/be/rewritten"
+    other.value.string_value = "raw span dump with no refs"
     span.attributes.append(other)
 
     scope_spans = ScopeSpans()
@@ -279,18 +322,24 @@ def test_genai_otel_export_rewrites_nested_kvlist_ref_attrs() -> None:
 
 
 def test_genai_otel_export_leaves_non_ref_attrs_untouched() -> None:
-    """Refs embedded in non-ref attributes (here `weave.raw_span_dump`)
-    must survive byte-for-byte — only the three typed-array ref keys are
-    rewritten.
+    """A string attribute whose value contains no ref substring is left
+    byte-identical (the cheap pre-check short-circuits before any parse),
+    while the typed ref array alongside it is still rewritten.
     """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
     req = _make_otel_export_req_with_ref_attrs(
         {"weave.object_refs": ["weave:///ent/proj/object/a:v1"]}
     )
 
     forwarded = _capture_genai_otel_export_req(req)
+    # Non-ref string attribute is untouched.
     span = forwarded.processed_spans[0].resource_spans.scope_spans[0].spans[0]
     dump_kv = next(kv for kv in span.attributes if kv.key == "weave.raw_span_dump")
-    assert dump_kv.value.string_value == "weave:///should/not/be/rewritten"
+    assert dump_kv.value.string_value == "raw span dump with no refs"
+    # Typed ref array is still converted to internal form.
+    assert _ref_attr_values(forwarded, "weave.object_refs") == [
+        f"weave-trace-internal:///{internal_proj}/object/a:v1"
+    ]
 
 
 def test_genai_otel_export_skips_non_external_refs_in_array() -> None:
@@ -314,6 +363,114 @@ def test_genai_otel_export_skips_non_external_refs_in_array() -> None:
         "weave-trace-internal:///already-internal/object/b:v1",
         "not-a-ref-at-all",
     ]
+
+
+# --- genai_otel_export ext→int rewriting of refs in string attributes ---
+# Refs also reach the server buried in ordinary string attribute values —
+# most importantly the message-content JSON under `gen_ai.input.messages` /
+# `gen_ai.output.messages`. Those escape both `_ref_apply` (the protobuf is
+# opaque to its walker) and the typed-array path, so the adapter now runs
+# every string_value through the embedded-ref-aware converter.
+
+
+def _make_otel_export_req_with_string_attr(
+    attr_key: str,
+    attr_value: str,
+    *,
+    project_id: str = "ent/proj",
+) -> tsi.agent_types.GenAIOTelExportReq:
+    """Build a `GenAIOTelExportReq` with a single string-valued span attr."""
+    from opentelemetry.proto.common.v1.common_pb2 import KeyValue
+    from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+    from opentelemetry.proto.trace.v1.trace_pb2 import (
+        ResourceSpans,
+        ScopeSpans,
+        Span,
+    )
+
+    span = Span()
+    span.name = "test"
+    kv = KeyValue(key=attr_key)
+    kv.value.string_value = attr_value
+    span.attributes.append(kv)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(Resource())
+    resource_spans.scope_spans.append(scope_spans)
+
+    processed = tsi.ProcessedResourceSpans(
+        entity=project_id.split("/", maxsplit=1)[0],
+        project=project_id.split("/")[1],
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+    return tsi.agent_types.GenAIOTelExportReq(
+        processed_spans=[processed], project_id=project_id, wb_user_id=None
+    )
+
+
+def _string_attr_value(req: tsi.agent_types.GenAIOTelExportReq, attr_key: str) -> str:
+    """Pull the string_value of a flat string attribute from a request."""
+    span = req.processed_spans[0].resource_spans.scope_spans[0].spans[0]
+    for kv in span.attributes:
+        if kv.key == attr_key and kv.value.HasField("string_value"):
+            return kv.value.string_value
+    raise AssertionError(f"no string_value for {attr_key}")
+
+
+def test_genai_otel_export_rewrites_ref_embedded_in_message_json() -> None:
+    """An external ref buried inside a `gen_ai.input.messages` JSON string
+    is rewritten to internal form before the request reaches the inner
+    server; the surrounding JSON structure is preserved.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "ref": "weave:///ent/proj/object/ds:DIG"},
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+    req = _make_otel_export_req_with_string_attr(
+        "gen_ai.input.messages", json.dumps(messages)
+    )
+
+    forwarded = _capture_genai_otel_export_req(req)
+
+    forwarded_json = json.loads(_string_attr_value(forwarded, "gen_ai.input.messages"))
+    assert forwarded_json == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "ref": f"weave-trace-internal:///{internal_proj}/object/ds:DIG",
+                },
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+
+
+def test_genai_otel_export_rewrites_whole_ref_string_attr() -> None:
+    """A string attribute whose whole value is an external ref (not JSON) is
+    forwarded as the internal whole ref.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    req = _make_otel_export_req_with_string_attr(
+        "gen_ai.output.dataset_ref", "weave:///ent/proj/object/ds:DIG"
+    )
+
+    forwarded = _capture_genai_otel_export_req(req)
+
+    assert (
+        _string_attr_value(forwarded, "gen_ai.output.dataset_ref")
+        == f"weave-trace-internal:///{internal_proj}/object/ds:DIG"
+    )
 
 
 def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
@@ -370,3 +527,91 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     # One call for `req.project_id` translation + exactly one more for the
     # rewrite cache (not 6 — one per ref).
     assert converter.ext_to_int_calls == ["ent/proj", "ent/proj"]
+
+
+# --- otel_export (non-agents OTel calls path) mirrors the same span-attribute
+# ref rewriting: its raw protobuf ResourceSpans is equally opaque to the
+# `_ref_apply` walker, so embedded/whole external refs must be converted to
+# internal before reaching the inner server. ---
+
+
+def _otel_export_req_with_string_attr(
+    attr_key: str,
+    attr_value: str,
+    *,
+    project_id: str = "ent/proj",
+) -> tsi.OTelExportReq:
+    """Build a plain (non-agents) `OTelExportReq` with a single string span attr,
+    reusing the GenAI helper's span-building.
+    """
+    genai = _make_otel_export_req_with_string_attr(
+        attr_key, attr_value, project_id=project_id
+    )
+    return tsi.OTelExportReq(
+        processed_spans=genai.processed_spans, project_id=project_id, wb_user_id=None
+    )
+
+
+def _capture_otel_export_req(req: tsi.OTelExportReq) -> tsi.OTelExportReq:
+    """Run an `OTelExportReq` through the adapter and return the req the inner
+    trace server actually received (mirror of `_capture_genai_otel_export_req`).
+    """
+    inner = MagicMock(spec=tsi.FullTraceServerInterface)
+    inner.otel_export.return_value = tsi.OTelExportRes(partial_success=None)
+    adapter = ExternalTraceServer(inner, _EncodingIdConverter())
+    adapter.otel_export(req)
+    assert inner.otel_export.call_count == 1
+    return inner.otel_export.call_args.args[0]
+
+
+def test_otel_export_rewrites_ref_embedded_in_message_json() -> None:
+    """An external ref buried inside a `gen_ai.input.messages` JSON string is
+    rewritten to internal on the non-agents OTel calls path before the request
+    reaches the inner server; the surrounding JSON structure is preserved.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "ref": "weave:///ent/proj/object/ds:DIG"},
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+    req = _otel_export_req_with_string_attr(
+        "gen_ai.input.messages", json.dumps(messages)
+    )
+
+    forwarded = _capture_otel_export_req(req)
+
+    forwarded_json = json.loads(_string_attr_value(forwarded, "gen_ai.input.messages"))
+    assert forwarded_json == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "ref": f"weave-trace-internal:///{internal_proj}/object/ds:DIG",
+                },
+                {"type": "text", "text": "no ref here"},
+            ],
+        }
+    ]
+
+
+def test_otel_export_rewrites_whole_ref_string_attr() -> None:
+    """A whole-value external ref string attribute is forwarded as the internal
+    whole ref on the non-agents OTel calls path.
+    """
+    internal_proj = _EncodingIdConverter().ext_to_int_project_id("ent/proj")
+    req = _otel_export_req_with_string_attr(
+        "gen_ai.output.dataset_ref", "weave:///ent/proj/object/ds:DIG"
+    )
+
+    forwarded = _capture_otel_export_req(req)
+
+    assert (
+        _string_attr_value(forwarded, "gen_ai.output.dataset_ref")
+        == f"weave-trace-internal:///{internal_proj}/object/ds:DIG"
+    )

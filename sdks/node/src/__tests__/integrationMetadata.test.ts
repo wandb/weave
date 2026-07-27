@@ -42,17 +42,22 @@ describe('integration metadata builders', () => {
     expect(asAttributes(m).integration.meta.package_name).toBe('x');
   });
 
-  test('asOtelAttributes flattens to dotted keys', () => {
+  test('asOtelAttributes renders canonical identity and flattened metadata', () => {
     const m: IntegrationMetadata = {
       name: 'openai_agents',
       version: '1',
-      meta: {package_name: 'p', package_version: '2'},
+      meta: {
+        package_name: 'p',
+        package_version: '2',
+        options: {debug: true},
+      },
     };
     expect(asOtelAttributes(m)).toEqual({
-      'integration.name': 'openai_agents',
-      'integration.version': '1',
-      'integration.meta.package_name': 'p',
-      'integration.meta.package_version': '2',
+      'weave.integration.name': 'openai_agents',
+      'weave.integration.version': '1',
+      'weave.integration.meta.package_name': 'p',
+      'weave.integration.meta.package_version': '2',
+      'weave.integration.meta.options': '[object Object]',
     });
   });
 });
@@ -77,7 +82,7 @@ describe('op-level attributes', () => {
     await tracedOp();
 
     const calls = await traceServer.getCalls(projectId);
-    const call = calls.find(c => c.op_name?.includes('tracedOp'));
+    const call = calls.find(c => c.op_name.includes('tracedOp'));
     expect(call?.attributes?.integration?.name).toBe('demo');
     expect(call?.attributes?.integration?.version).toBe(packageVersion);
     expect(call?.attributes?.integration?.meta?.package_name).toBe('demo');
@@ -94,7 +99,7 @@ describe('op-level attributes', () => {
     await tracedOp();
 
     const calls = await traceServer.getCalls(projectId);
-    const call = calls.find(c => c.op_name?.includes('kindOp'));
+    const call = calls.find(c => c.op_name.includes('kindOp'));
     expect(call?.attributes?.kind).toBe('llm');
   });
 });

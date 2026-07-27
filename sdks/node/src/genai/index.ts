@@ -1,26 +1,40 @@
 /**
- * Weave GenAI session SDK — module entry point.
+ * Weave GenAI conversation SDK — module entry point.
  */
 
 export {
+  endConversation,
   endLLM,
-  endSession,
   endTurn,
+  startConversation,
   startLLM,
-  startSession,
   startSubagent,
   startTool,
   startTurn,
+
+  /* @deprecated */
+  endSession,
+  startSession,
 } from './api';
 export {
+  getCurrentConversation,
   getCurrentLLM,
-  getCurrentSession,
   getCurrentTurn,
   runIsolated,
+
+  /* @deprecated */
+  getCurrentSession,
 } from './context';
 export {flushOTel} from './flush';
 export {LLM, type LLMInit} from './llm';
-export {Session, type SessionInit} from './session';
+export {
+  Conversation,
+  type ConversationInit,
+
+  /* @deprecated */
+  Session,
+  type SessionInit,
+} from './conversation';
 export {SubAgent, type SubAgentInit} from './subagent';
 export {Tool, type ToolInit} from './tool';
 export {Turn, type TurnInit} from './turn';

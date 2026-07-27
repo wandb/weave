@@ -3,7 +3,6 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
 
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import llm_completion as llm_mod
@@ -1433,6 +1432,26 @@ def test_completions_handles_error_response(
         assert span.status_message == "Rate limit exceeded"
 
 
+def test_litellm_error_response_preserves_status_code():
+    """Error payload strips the `litellm.` prefix and preserves any status code."""
+
+    class _StatusError(Exception):
+        status_code = 429
+
+    with_status = llm_mod._litellm_error_response(
+        _StatusError("litellm.RateLimitError: quota exceeded")
+    )
+    assert with_status.response == {
+        "error": "RateLimitError: quota exceeded",
+        llm_mod.ERROR_STATUS_CODE_KEY: 429,
+    }
+
+    without_status = llm_mod._litellm_error_response(
+        Exception("litellm.APIConnectionError: connection reset")
+    )
+    assert without_status.response == {"error": "APIConnectionError: connection reset"}
+
+
 def test_completions_usage_captured_in_span(
     completions_mock_server, completions_secret_fetcher, completions_mock_response
 ):
@@ -1601,17 +1620,17 @@ def test_provider_base_url_validation():
     assert p.base_url == "http://my-ollama-server.example.com:11434"
 
     # Non-http schemes rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("ftp://bad.example.com")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("file:///etc/passwd")
 
     # Query strings, bare '?', and fragments rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("https://api.example.com/v1?foo=bar")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("https://api.example.com/v1#section")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://10.0.0.1/path?")
 
     # Blocked hostnames rejected
@@ -1621,28 +1640,28 @@ def test_provider_base_url_validation():
         "foo.metadata.google.internal",
         "169.254.169.254",
     ):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{hostname}/v1")
 
     # Non-globally-routable IPs rejected
     for addr in ("10.0.0.1", "172.16.0.1", "192.168.1.1", "127.0.0.1"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{addr}/v1")
 
     # Alternative IP encodings rejected
     for alt_ip in ("0xa9fea9fe", "2852039166", "0x7f000001", "0"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider(f"http://{alt_ip}/v1")
 
     # IPv6 non-global addresses rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://[::1]/v1")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         _make_provider("http://[::ffff:169.254.169.254]/v1")
 
     # Blocked extra_headers rejected
     for blocked in ("Metadata-Flavor", "METADATA-FLAVOR", "X-aws-ec2-metadata-token"):
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             _make_provider("https://api.example.com", extra_headers={blocked: "val"})
 
     # Allowed headers accepted
@@ -1654,9 +1673,9 @@ def test_provider_base_url_validation():
 
     # Validation also runs on assignment, not just init
     p = _make_provider("https://api.example.com")
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         p.base_url = "http://169.254.169.254/v1"
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         p.extra_headers = {"Metadata-Flavor": "Google"}
 
 
@@ -1812,6 +1831,43 @@ def test_setup_bedrock_nova_region_prefix(aws_region_name, expected_model):
         llm_mod._setup_provider_credentials_and_model(inputs, provider="bedrock")
 
     assert inputs.model == expected_model
+
+
+def test_build_litellm_kwargs_forwards_reasoning_effort():
+    """reasoning_effort passes through to litellm; drop_params drops it for unsupported models."""
+    inputs = tsi.CompletionsCreateRequestInputs(
+        model="my-model",
+        messages=[{"role": "user", "content": "hi"}],
+        reasoning_effort="low",
+    )
+    kwargs = llm_mod._build_litellm_kwargs(
+        api_key="sk-test",
+        inputs=inputs,
+        provider="custom",
+        base_url="https://example.com/v1",
+        extra_headers=None,
+        vertex_credentials=None,
+    )
+    assert kwargs["reasoning_effort"] == "low"
+    assert kwargs["model"] == "my-model"
+    assert kwargs["api_base"] == "https://example.com/v1"
+
+
+def test_build_litellm_kwargs_omits_unset_reasoning_effort():
+    """An unset reasoning_effort is excluded (exclude_none) rather than sent as null."""
+    inputs = tsi.CompletionsCreateRequestInputs(
+        model="my-model",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    kwargs = llm_mod._build_litellm_kwargs(
+        api_key="sk-test",
+        inputs=inputs,
+        provider="custom",
+        base_url="https://example.com/v1",
+        extra_headers=None,
+        vertex_credentials=None,
+    )
+    assert "reasoning_effort" not in kwargs
 
 
 if __name__ == "__main__":

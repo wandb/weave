@@ -33,11 +33,11 @@ from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from weave.conversation import agent_name_override
 from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
-from weave.session import agent_name_override
 from weave.trace.weave_client import WeaveClient
 
 
@@ -45,7 +45,7 @@ from weave.trace.weave_client import WeaveClient
 def otel_spans(monkeypatch: pytest.MonkeyPatch):
     """Install an in-memory OTel exporter and return it for assertions.
 
-    Mirrors the fixture in ``tests/session/test_session_otel.py`` — overrides
+    Mirrors the fixture in ``tests/conversation/test_conversation_otel.py`` — overrides
     the global tracer provider via ``monkeypatch.setattr`` so prior state is
     restored cleanly between tests.
     """

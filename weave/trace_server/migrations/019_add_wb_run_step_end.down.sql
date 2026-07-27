@@ -28,7 +28,7 @@ GROUP BY
 
 -- Remove wb_run_step_end from stats table
 ALTER TABLE calls_merged_stats
-    DROP COLUMN wb_run_step_end;
+    DROP COLUMN IF EXISTS wb_run_step_end;
 
 -- Rollback materialized view to remove wb_run_step_end
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -60,8 +60,8 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 
 -- Remove wb_run_step_end from aggregated calls table
 ALTER TABLE calls_merged
-    DROP COLUMN wb_run_step_end;
+    DROP COLUMN IF EXISTS wb_run_step_end;
 
 -- Remove wb_run_step_end from raw call parts table
 ALTER TABLE call_parts
-    DROP COLUMN wb_run_step_end;
+    DROP COLUMN IF EXISTS wb_run_step_end;

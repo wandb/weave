@@ -22,17 +22,17 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode
 
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
+from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
-from weave.session import agent_name_override
 
 
 @pytest.fixture
 def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporter]:
     """Install an in-memory OTel exporter as the global provider.
 
-    Mirrors the session-SDK / openai_agents_otel fixture: overrides the
+    Mirrors the conversation-SDK / openai_agents_otel fixture: overrides the
     private ``_TRACER_PROVIDER`` so prior state is restored cleanly and the
     "set once" warning is avoided.
     """
@@ -199,6 +199,30 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
         in get_part_types(get_messages(chat_span, "gen_ai.output.messages"))
     ]
     assert len(tool_call_chats) == 1
+
+
+# --- query(): prompt caching ------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_cached_usage_is_normalized_in_otel_span(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    await run_query("cache_usage_response", "Use the cache")
+
+    chat_spans = get_spans_by_op(otel_spans.get_finished_spans(), "chat")
+    assert len(chat_spans) == 1
+    usage_attrs = {
+        key: value
+        for key, value in get_attrs(chat_spans[0]).items()
+        if key.startswith("gen_ai.usage.")
+    }
+    assert usage_attrs == {
+        "gen_ai.usage.input_tokens": 20481,
+        "gen_ai.usage.output_tokens": 75,
+        "gen_ai.usage.cache_creation.input_tokens": 1024,
+        "gen_ai.usage.cache_read.input_tokens": 19447,
+    }
 
 
 # --- query(): multiple tools in one response --------------------------------

@@ -20,6 +20,9 @@ from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace.settings import replace_settings
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.project_version.project_version import (
+    reset_project_residence_cache as reset_residence_caches,
+)
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -86,19 +89,10 @@ def reset_serializer_load_refs():
 
 @pytest.fixture(autouse=True)
 def reset_project_residence_cache():
-    """Reset the project residence cache between tests.
-
-    The project residence cache stores the residence (merged/complete/both) of a project's data.
-    This needs to be cleared between tests to prevent state leakage, especially when tests
-    create projects with the same name but different data characteristics.
-    """
-    from weave.trace_server.project_version.project_version import (
-        _project_residence_cache,
-    )
-
-    _project_residence_cache.clear()
+    """Clear residence caches (populated LRU + empty TTL) between tests."""
+    reset_residence_caches()
     yield
-    _project_residence_cache.clear()
+    reset_residence_caches()
 
 
 @pytest.fixture(autouse=True)

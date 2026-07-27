@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import ttl_settings
 from weave.trace_server.ttl_settings import (
     REDIS_TTL_EXPIRY_SECS,
@@ -112,7 +113,9 @@ def test_get_project_retention_days_l1_cache(no_redis):
     assert second == 90
     assert ch_client.query.call_count == 1
     ch_client.query.assert_called_once_with(
-        EXPECTED_L3_QUERY, parameters={"project_id": "entity/project"}
+        EXPECTED_L3_QUERY,
+        parameters={"project_id": "entity/project"},
+        settings=ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
     )
 
     # Different project with no rows → 0 (no TTL configured)
@@ -144,7 +147,9 @@ def test_get_project_retention_days_redis_l2_cache(monkeypatch):
     assert result == 60
     assert ch_client.query.call_count == 1
     ch_client.query.assert_called_once_with(
-        EXPECTED_L3_QUERY, parameters={"project_id": "entity/other"}
+        EXPECTED_L3_QUERY,
+        parameters={"project_id": "entity/other"},
+        settings=ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS,
     )
     key = _ttl_cache_key("entity/other")
     assert redis_cold.get(key) == "60"

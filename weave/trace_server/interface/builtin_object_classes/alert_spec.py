@@ -19,6 +19,10 @@ class WeaveMetricThresholdSpec(BaseModel):
         default="THRESHOLD",
         description="Trigger condition type (e.g. 'THRESHOLD')",
     )
+    source_type: Literal["calls", "spans"] = Field(
+        default="calls",
+        description="Data source this alert evaluates: calls table or agent spans",
+    )
     comparison_operator: Literal["GREATER_THAN", "LESS_THAN", "EQUAL"] = Field(
         default="GREATER_THAN",
         description="Direction of the threshold comparison",
@@ -53,9 +57,15 @@ class WeaveMetricThresholdSpec(BaseModel):
         "Disambiguates scorers that share the same op class (e.g. multiple LLMAsAJudgeScorer instances). "
         "Filterable via inputs.self on scorer calls or input_refs on CallsFilter.",
     )
-    aggregation_function: Literal["mean", "median", "min", "max", "mode"] = Field(
+    aggregation_function: Literal[
+        "mean", "median", "min", "max", "mode", "percentage", "count"
+    ] = Field(
         default="mean",
         description="Aggregation function applied to metric values within the window before threshold comparison",
+    )
+    status_match_value: str | None = Field(
+        default=None,
+        description="For percentage/count aggregation: the status value to match (e.g. '2' for error)",
     )
 
 

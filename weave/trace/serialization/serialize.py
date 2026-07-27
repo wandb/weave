@@ -16,7 +16,11 @@ from weave.trace_server.trace_server_interface import (
     FileCreateReq,
     TraceServerInterface,
 )
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import (
+    REDACTED_VALUE,
+    should_redact,
+    strip_memory_addresses,
+)
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -292,6 +296,11 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
     if isinstance(rep, str) and len(rep) > limit:
         rep = rep[: limit - 3] + "..."
     return rep
+
+
+def stable_repr(obj: Any) -> str:
+    """`repr(obj)` with volatile memory addresses removed (see `strip_memory_addresses`)."""
+    return strip_memory_addresses(repr(obj))
 
 
 def is_primitive(obj: Any) -> bool:

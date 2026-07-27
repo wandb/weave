@@ -10,7 +10,10 @@ this module either fails to import or rejects an incoming request via
 Pydantic — drift is loud and immediate.
 
 Endpoints implemented (production-shaped):
-  * POST /call/upsert_batch     — record start/end events
+  * POST /call/upsert_batch     — record start/end events (legacy calls_merged)
+  * POST /v2/{entity}/{project}/calls/complete — record paired complete calls
+  * POST /v2/{entity}/{project}/call/start     — record an eager call start
+  * POST /v2/{entity}/{project}/call/end       — record an eager call end
   * POST /calls/stream_query    — return captured calls as NDJSON
 
 Stub endpoints (return empty success; flesh out as future tests need them):
@@ -95,6 +98,32 @@ def create_app() -> FastAPI:
                 # CallEndRes has no fields; an empty instance is the right return.
                 results.append(tsi.CallEndRes())
         return CallCreateBatchRes(res=results)
+
+    @app.post("/v2/{entity}/{project}/calls/complete")
+    def calls_complete(
+        entity: str, project: str, req: tsi.CallsUpsertCompleteReq
+    ) -> tsi.CallsUpsertCompleteRes:
+        for item in req.batch:
+            store.add_complete(item.model_dump(mode="json"))
+        return tsi.CallsUpsertCompleteRes()
+
+    @app.post("/v2/{entity}/{project}/call/start")
+    def call_start_v2(
+        entity: str, project: str, req: tsi.CallStartV2Req
+    ) -> tsi.CallStartV2Res:
+        payload = req.start.model_dump(mode="json")
+        store.add_start(payload)
+        return tsi.CallStartV2Res(
+            id=payload.get("id") or generate_id(),
+            trace_id=payload.get("trace_id") or generate_id(),
+        )
+
+    @app.post("/v2/{entity}/{project}/call/end")
+    def call_end_v2(
+        entity: str, project: str, req: tsi.CallEndV2Req
+    ) -> tsi.CallEndV2Res:
+        store.add_end(req.end.model_dump(mode="json"))
+        return tsi.CallEndV2Res()
 
     @app.post("/calls/stream_query")
     def stream_query(req: tsi.CallsQueryReq) -> StreamingResponse:

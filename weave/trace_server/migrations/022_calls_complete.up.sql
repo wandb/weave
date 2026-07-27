@@ -7,7 +7,7 @@
 -- ran the original version of this file. For fresh installs, 024's rename
 -- dance is harmless on empty tables.
 
-CREATE TABLE calls_complete (
+CREATE TABLE IF NOT EXISTS calls_complete (
     -- Primary fields
     id              String,
     project_id      String,
@@ -75,7 +75,7 @@ SETTINGS
     enable_block_offset_column=1;
 
 
-CREATE TABLE calls_complete_stats
+CREATE TABLE IF NOT EXISTS calls_complete_stats
 (
     project_id String,
     id String,
@@ -102,7 +102,7 @@ CREATE TABLE calls_complete_stats
 ) ENGINE = AggregatingMergeTree()
 ORDER BY (project_id, id);
 
-CREATE MATERIALIZED VIEW calls_complete_stats_view
+CREATE MATERIALIZED VIEW IF NOT EXISTS calls_complete_stats_view
 TO calls_complete_stats
 AS
 SELECT

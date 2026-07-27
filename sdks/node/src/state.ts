@@ -3,6 +3,7 @@ import type OpenAIAgents from '@openai/agents';
 import {type BasicTracerProvider} from '@opentelemetry/sdk-trace-base';
 import {globalSingleton} from './utils/globalSingleton';
 import {type GenAIState} from './genai/context';
+import {type WeaveAdkPlugin} from './integrations/googleAdk';
 import {type WeaveClient} from './weaveClient';
 import {type TracerProvider} from '@opentelemetry/api';
 
@@ -22,7 +23,13 @@ type State = {
   domain: string | null;
 
   genAi: {
-    provider: BasicTracerProvider | null;
+    /**
+     * The cached GenAI provider paired with the `projectId` it routes to. Held
+     * together because the provider's exporter is pinned to that project, so a
+     * `weave.init()` to a different project must rebuild it. `null` until the
+     * first tracer is pulled; reset on a project switch.
+     */
+    provider: {tracerProvider: BasicTracerProvider; projectId: string} | null;
 
     providerRegistered: boolean;
 
@@ -31,9 +38,9 @@ type State = {
      *
      * When the user calls `runIsolated(fn)`, this AsyncLocalStorage is `.run`-installed with
      * a fresh `GenAIState` container for that frame. Inside the frame,
-     * `_getGenaiState()` reads back that fresh container. When `runIsolated`
+     * `getGenaiState()` reads back that fresh container. When `runIsolated`
      * isn't on the call stack, `_genaiState.getStore()` returns `undefined`
-     * and `_getGenaiState()` falls back to `_defaultState`.
+     * and `getGenaiState()` falls back to `_defaultState`.
      *
      * The AsyncLocalStorage provides the isolation boundary for concurrent work — each
      * `runIsolated` frame has its own container object, so mutations inside
@@ -43,7 +50,7 @@ type State = {
 
     /**
      * Process-wide fallback container used when no `runIsolated()` frame is
-     * active. Lets users call `weave.startSession(...)` etc. directly without
+     * active. Lets users call `weave.startConversation(...)` etc. directly without
      * any wrapper — the casual, sequential single-flight path. Shared across
      * the whole process, so it is NOT safe for concurrent independent
      * sessions; those need `runIsolated()`.
@@ -76,6 +83,31 @@ type State = {
     openaiAgentsRealtime: {
       patched: boolean;
     };
+
+    claudeAgents: {
+      /**
+       * Exports objects whose `query` export has been wrapped, each mapped to
+       * the view to hand back (the mutated module, or our forwarding proxy when
+       * `query` is a getter-only/frozen export that can't be patched in place).
+       *
+       * A `WeakMap` keyed by the objects, rather than a marker stamped on them:
+       * the SDK ships `query` as a non-writable getter (under CJS↔ESM interop),
+       * so we can't mark that namespace, and `wrapClaudeAgentSdk()` plus the
+       * CJS/ESM hooks each present distinct exports views that must wrap exactly
+       * once. Living on the `globalSingleton` state makes it dual-package-safe.
+       */
+      patchedExports: WeakMap<object, object>;
+    };
+
+    googleAdk: {
+      /**
+       * The shared `WeaveAdkPlugin`, created lazily on first runner use. Held
+       * here (not in `googleAdk.ts` module scope) so CJS and ESM copies of the
+       * integration register one plugin instance across the module boundary —
+       * the same dual-package-hazard reasoning as the doc comment above.
+       */
+      plugin: WeaveAdkPlugin | null;
+    };
   };
 
   evalLink: {
@@ -92,7 +124,7 @@ function defaultState(): State {
       provider: null,
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
-      defaultState: {session: null, turn: null, llm: null},
+      defaultState: {conversation: null, turn: null, llm: null},
     },
 
     evalLink: {
@@ -111,6 +143,14 @@ function defaultState(): State {
 
       openaiAgentsRealtime: {
         patched: false,
+      },
+
+      claudeAgents: {
+        patchedExports: new WeakMap(),
+      },
+
+      googleAdk: {
+        plugin: null,
       },
     },
   };

@@ -42,15 +42,18 @@ There are two ways to authenticate with Azure Blob Storage:
 
 import logging
 import socket
+import threading
 from abc import abstractmethod
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import TypeVar, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError, ResourceExistsError
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobSasPermissions, BlobServiceClient, generate_blob_sas
 from botocore.config import Config
 from botocore.exceptions import ClientError
+from cachetools import LRUCache
 from google.api_core import exceptions as gcp_exceptions
 from google.auth import default as google_auth_default
 from google.auth.credentials import with_scopes_if_required
@@ -106,6 +109,17 @@ GCS_TCP_KEEPALIVE_COUNT = 5
 # uploads reuse warm keep-alive connections instead of churning new ones.
 GCS_POOL_MAXSIZE = 40
 
+# Keep-alive only probes IDLE sockets; an in-flight request whose peer goes silent
+# rides TCP retransmit backoff (~23s, under the read timeout). TCP_USER_TIMEOUT caps
+# unacked data so the socket errors fast and the retry decorator hits a fresh conn.
+GCS_TCP_USER_TIMEOUT_MS = 8000
+
+# Per-pod memo of content-addressed bucket keys already confirmed stored, so a
+# repeat write skips the redundant create that the provider rejects (GCS 412).
+STORED_KEY_CACHE_SIZE = 100_000
+_stored_key_cache: LRUCache[str, bool] = LRUCache(maxsize=STORED_KEY_CACHE_SIZE)
+_stored_key_cache_lock = threading.Lock()
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -136,6 +150,16 @@ class FileStorageClient:
         assert isinstance(base_uri, FileStorageURI)
         self.base_uri = base_uri
 
+    def _validate_presign_read_uri(self, uri: FileStorageURI) -> None:
+        """Ensure a presigned URL is only minted for an object below base_uri."""
+        if type(uri) is not type(self.base_uri):
+            raise ValueError(
+                f"Cannot presign {uri.to_uri_str()} with {self.base_uri.to_uri_str()}"
+            )
+        base_prefix = self.base_uri.to_uri_str().rstrip("/") + "/"
+        if not uri.to_uri_str().startswith(base_prefix):
+            raise ValueError(f"Cannot presign {uri.to_uri_str()} outside {base_prefix}")
+
     @abstractmethod
     def store(self, uri: FileStorageURI, data: bytes) -> None:
         """Store data at the specified URI location in cloud storage."""
@@ -146,17 +170,33 @@ class FileStorageClient:
         """Read data from the specified URI location in cloud storage."""
         pass
 
+    @abstractmethod
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        """Return a short-lived read-only URL for exactly one object.
+
+        Self-signed with this client's first-party credentials; grants a single
+        GET of `uri` for `ttl` seconds and nothing else (no write, no listing).
+        """
+        pass
+
 
 def store_in_bucket(
     client: FileStorageClient, path: str, data: bytes
 ) -> FileStorageURI:
-    """Store a file in a storage bucket."""
+    """Store a file in a storage bucket, deduping repeat content-addressed writes."""
+    target_file_storage_uri = client.base_uri.with_path(path)
+    uri_str = target_file_storage_uri.to_uri_str()
+    with _stored_key_cache_lock:
+        already_stored = uri_str in _stored_key_cache
+    if already_stored:
+        return target_file_storage_uri
     try:
-        target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
         raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
+    with _stored_key_cache_lock:
+        _stored_key_cache[uri_str] = True
     return target_file_storage_uri
 
 
@@ -174,6 +214,12 @@ def read_from_bucket(
 
 
 ### Everything below here is internal
+
+
+def reset_stored_key_cache() -> None:
+    """Clear the per-pod stored-key cache (used by tests)."""
+    with _stored_key_cache_lock:
+        _stored_key_cache.clear()
 
 
 def key_for_project_digest(project_id: str, digest: str) -> str:
@@ -302,6 +348,15 @@ class S3StorageClient(FileStorageClient):
         response = self.client.get_object(Bucket=uri.bucket, Key=uri.path)
         return response["Body"].read()
 
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        self._validate_presign_read_uri(uri)
+        s3_uri = cast(S3FileStorageURI, uri)
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": s3_uri.bucket, "Key": s3_uri.path},
+            ExpiresIn=ttl,
+        )
+
 
 class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
@@ -346,6 +401,18 @@ class GCSStorageClient(FileStorageClient):
         blob = bucket.blob(uri.path)
         return blob.download_as_bytes(
             timeout=(DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT), retry=None
+        )
+
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        self._validate_presign_read_uri(uri)
+        gcs_uri = cast(GCSFileStorageURI, uri)
+        blob = self.client.bucket(gcs_uri.bucket).blob(gcs_uri.path)
+        # V4 signing needs a signer key: a service-account key, or ADC creds with
+        # IAM signBlob (keyless node identity). Raises at call time if unavailable.
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=ttl),
+            method="GET",
         )
 
 
@@ -413,6 +480,23 @@ class AzureStorageClient(FileStorageClient):
         stream = blob_client.download_blob()
         return stream.readall()
 
+    def presign_read(self, uri: FileStorageURI, ttl: int) -> str:
+        self._validate_presign_read_uri(uri)
+        azure_uri = cast(AzureFileStorageURI, uri)
+        client = self._get_client(azure_uri.account)
+        blob_client = client.get_container_client(azure_uri.container).get_blob_client(
+            azure_uri.path
+        )
+        sas = generate_blob_sas(
+            account_name=client.account_name,
+            container_name=azure_uri.container,
+            blob_name=azure_uri.path,
+            account_key=client.credential.account_key,
+            permission=BlobSasPermissions(read=True),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=ttl),
+        )
+        return f"{blob_client.url}?{sas}"
+
 
 class _KeepAliveHTTPAdapter(HTTPAdapter):
     """requests adapter that enables TCP keep-alive on pooled connections."""
@@ -425,11 +509,13 @@ class _KeepAliveHTTPAdapter(HTTPAdapter):
         ]
         # TCP_KEEPIDLE (Linux) and TCP_KEEPALIVE (macOS/BSD) are the same idle knob;
         # only the platform's own constant exists, so getattr-guard each.
+        # TCP_USER_TIMEOUT (Linux, milliseconds) bounds in-flight unacked data.
         for opt_name, value in (
             ("TCP_KEEPIDLE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPALIVE", GCS_TCP_KEEPALIVE_IDLE),
             ("TCP_KEEPINTVL", GCS_TCP_KEEPALIVE_INTERVAL),
             ("TCP_KEEPCNT", GCS_TCP_KEEPALIVE_COUNT),
+            ("TCP_USER_TIMEOUT", GCS_TCP_USER_TIMEOUT_MS),
         ):
             opt: int | None = getattr(socket, opt_name, None)
             if opt is not None:

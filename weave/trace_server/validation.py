@@ -172,11 +172,11 @@ def validate_tag_name(name: str) -> None:
     Max length: 256 characters.
     """
     if not name:
-        raise ValueError("tag name must not be empty")
+        raise InvalidRequest("tag name must not be empty")
     if len(name) > MAX_TAG_LENGTH:
-        raise ValueError(f"tag name must be at most {MAX_TAG_LENGTH} characters")
+        raise InvalidRequest(f"tag name must be at most {MAX_TAG_LENGTH} characters")
     if not TAG_REGEX.match(name):
-        raise ValueError(
+        raise InvalidRequest(
             f"tag name {name!r} is invalid: only alphanumeric characters, "
             "hyphens, underscores, and single spaces between words are allowed"
         )
@@ -185,17 +185,19 @@ def validate_tag_name(name: str) -> None:
 def validate_alias_name(name: str) -> None:
     """Validate an alias name. Disallows '/' and ':', reserves 'latest' and version indices."""
     if not name:
-        raise ValueError("alias name must not be empty")
+        raise InvalidRequest("alias name must not be empty")
     if not name.strip():
-        raise ValueError("alias name must not be whitespace-only")
+        raise InvalidRequest("alias name must not be whitespace-only")
     if len(name) > MAX_ALIAS_LENGTH:
-        raise ValueError(f"alias name must be at most {MAX_ALIAS_LENGTH} characters")
+        raise InvalidRequest(
+            f"alias name must be at most {MAX_ALIAS_LENGTH} characters"
+        )
     for ch in name:
         if ch in _INVALID_ALIAS_CHARACTERS:
-            raise ValueError(f"alias name cannot contain character '{ch}'")
+            raise InvalidRequest(f"alias name cannot contain character '{ch}'")
     if _VERSION_LIKE_PATTERN.match(name):
-        raise ValueError(
+        raise InvalidRequest(
             f"alias name '{name}' is reserved (matches version pattern v<number>)"
         )
     if name in _RESERVED_ALIAS_NAMES:
-        raise ValueError(f"alias name '{name}' is reserved")
+        raise InvalidRequest(f"alias name '{name}' is reserved")

@@ -162,6 +162,7 @@ function parseResponseSpanItems(
 
     if (
       'role' in item &&
+      'content' in item &&
       (item.role === 'user' ||
         item.role === 'assistant' ||
         item.role === 'system')

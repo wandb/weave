@@ -11,6 +11,7 @@ from weave.trace_server.environment import (
     VALID_CALLS_SHARD_KEYS,
     kafka_producer_max_buffer_size,
     wf_clickhouse_calls_shard_key,
+    wf_clickhouse_query_log_cluster,
     wf_kafka_project_id_bucket_count,
     wf_scoring_worker_check_cancellation,
     wf_scoring_worker_debounced_scoring_max_call_history,
@@ -315,3 +316,25 @@ def test_wf_scoring_worker_remote_scorer_require_structured_result_schema(
     assert wf_scoring_worker_remote_scorer_require_structured_result_schema() is True
     monkeypatch.setenv(key, "0")
     assert wf_scoring_worker_remote_scorer_require_structured_result_schema() is True
+
+
+@pytest.mark.parametrize(
+    ("host", "replicated_cluster", "expected"),
+    [
+        # ClickHouse Cloud (public + private PSC hosts) fans out over `default`.
+        ("wsmkvdlncf.us-central1.p.gcp.clickhouse.cloud", None, "default"),
+        ("abc.us-central1.gcp.clickhouse.cloud", "weavecluster", "default"),
+        # Self-managed distributed uses its replicated cluster; single node stays local.
+        ("clickhouse.internal", "weavecluster", "weavecluster"),
+        ("localhost", None, None),
+    ],
+)
+def test_wf_clickhouse_query_log_cluster(
+    host, replicated_cluster, expected, monkeypatch
+):
+    monkeypatch.setenv("WF_CLICKHOUSE_HOST", host)
+    if replicated_cluster is None:
+        monkeypatch.delenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", raising=False)
+    else:
+        monkeypatch.setenv("WF_CLICKHOUSE_REPLICATED_CLUSTER", replicated_cluster)
+    assert wf_clickhouse_query_log_cluster() == expected

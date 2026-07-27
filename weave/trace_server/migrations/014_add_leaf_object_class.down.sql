@@ -16,7 +16,7 @@ GROUP BY
     object_versions.digest;
 
 ALTER TABLE object_versions
-    DROP COLUMN leaf_object_class;
+    DROP COLUMN IF EXISTS leaf_object_class;
 
 ALTER TABLE object_versions_stats
-    DROP COLUMN leaf_object_class;
+    DROP COLUMN IF EXISTS leaf_object_class;

@@ -88,7 +88,7 @@ def json_dump_field_as_sql(
     root_field_sanitized: str,
     extra_path: list[str] | None = None,
     cast: tsi_query.CastTo | None = None,
-    use_agg_fn: bool = True,
+    agg_fn: str | None = None,
 ) -> str:
     """Build SQL for JSON field access with optional type conversion.
 
@@ -98,7 +98,13 @@ def json_dump_field_as_sql(
         root_field_sanitized: The root field name (already sanitized)
         extra_path: Optional list of JSON path components
         cast: Optional type to cast the result to
-        use_agg_fn: Whether to use aggregate functions
+        agg_fn: When set, `root_field_sanitized` is the raw (un-aggregated)
+            column and the aggregate wraps the extracted scalar, not the dump:
+            `{agg_fn}If(JSON_VALUE(col, path), col IS NOT NULL)`. This keeps
+            GROUP BY state at one scalar per group instead of the whole JSON
+            dump, avoiding the memory blow-up of `{agg_fn}(dump)`-then-extract.
+            NULL-guarded so only rows carrying the dump contribute, matching
+            the aggregate-then-extract result.
 
     Returns:
         str: SQL expression for accessing the JSON field
@@ -109,14 +115,14 @@ def json_dump_field_as_sql(
         'toFloat64(JSON_VALUE(any(inputs_dump), {param_1:String}))'
     """
     if cast != "exists":
-        if cast is None and not use_agg_fn and not extra_path:
-            return f"{root_field_sanitized}"
-
         path_str = "'$'"
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
             path_str = param_slot(param_name, "String")
-        val = f"coalesce(nullIf(JSON_VALUE({root_field_sanitized}, {path_str}), 'null'), '')"
+        json_value = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        if agg_fn:
+            json_value = f"{agg_fn}If({json_value}, {root_field_sanitized} IS NOT NULL)"
+        val = f"coalesce(nullIf({json_value}, 'null'), '')"
         return clickhouse_cast_json_value(val, cast)
     else:
         # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".

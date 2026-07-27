@@ -31,6 +31,8 @@ class UnableToCreateProjectError(Exception): ...
 
 logger = logging.getLogger(__name__)
 
+PERMISSION_ERROR_CODE = "PERMISSION_ERROR"
+
 
 @contextmanager
 def wandb_logging_disabled() -> Iterator[None]:
@@ -83,6 +85,16 @@ def _is_retryable_project_exception(exception: BaseException) -> bool:
     )
 
 
+def _is_permission_denied(exception: Exception) -> bool:
+    """Return True if the exception is a GraphQL permission denial."""
+    if not isinstance(exception, TransportQueryError):
+        return False
+    for error in exception.errors or []:
+        if (error.get("extensions") or {}).get("code") == PERMISSION_ERROR_CODE:
+            return True
+    return False
+
+
 def _raise_project_access_error(
     entity_name: str, project_name: str, exception: Exception
 ) -> NoReturn:
@@ -90,10 +102,15 @@ def _raise_project_access_error(
     logger.error("Unable to access `%s/%s`.", entity_name, project_name)
     logger.error(str(exception))
 
-    if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):
-        # Suppress the stack trace for these exceptions to minimize noise for users
-        cls = exception.__class__
-        raise cls(str(exception)) from None
+    # Surface permission denials as a clear message, suppressing the raw gql
+    # traceback. gorilla returns PERMISSION_ERROR for forbidden and not-logged-in.
+    if _is_permission_denied(exception):
+        raise UnableToCreateProjectError(
+            f"You do not have permission to access or create project "
+            f"`{entity_name}/{project_name}`. Your API key may belong to a service "
+            f"account or user that is not a member of the `{entity_name}` team, or "
+            f"that lacks write access. Verify the key's team/entity scope."
+        ) from None
 
     raise exception
 

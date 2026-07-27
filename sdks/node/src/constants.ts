@@ -28,3 +28,13 @@ export const EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR =
   'weave.eval.predict_and_score_call_id';
 export const EVAL_PROJECT_ID_SPAN_ATTR = 'weave.eval.project_id';
 export const EVAL_EVALUATION_NAME_SPAN_ATTR = 'weave.eval.evaluation_name';
+
+/**
+ * Request header advertising the sampling-relevant capabilities this SDK build
+ * guarantees, so a future server-side ingest sampler can tell a sampling-safe
+ * client from an older one and leave unsupported traffic unsampled. Sent on
+ * every ingest request (it describes the client, not one trace); a
+ * comma-separated, forward-compatible token list.
+ */
+export const CLIENT_CAPABILITIES_HEADER = 'X-Weave-Client-Capabilities';
+export const CLIENT_CAPABILITIES = 'trace_id_on_end,eval_child_meta';

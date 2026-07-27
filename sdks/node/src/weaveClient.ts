@@ -2,17 +2,34 @@ import {AsyncLocalStorage} from 'async_hooks';
 import * as fs from 'fs';
 import {uuidv7} from 'uuidv7';
 
-import {MAX_OBJECT_NAME_LENGTH} from './constants';
-import {computeDigest} from './digest';
 import {
-  type CallSchema,
-  type CallsQueryReq,
-  type CallsFilter,
-  type EndedCallSchemaForInsert,
-  type Query,
-  type SortBy,
-  type StartedCallSchemaForInsert,
-  type Api as TraceServerApi,
+  EVAL_META_KEY,
+  EVALUATION_RUN_OP_NAME,
+  MAX_OBJECT_NAME_LENGTH,
+} from './constants';
+import {computeDigest} from './digest';
+import {ContentType} from './generated/traceServerApi';
+import type {
+  AgentChatMessage as AgentChatMessageSchema,
+  AgentSearchConversationResult,
+  AgentTraceChatRes,
+  AgentSchema,
+  AgentSpanSchema,
+  AgentVersionSchema,
+  CallSchema,
+  CallsQueryReq,
+  CallsFilter,
+  EndedCallSchemaForInsert,
+  Query,
+  SortBy,
+  StartedCallSchemaForInsert,
+  Api as TraceServerApi,
+  HttpResponse,
+  HTTPValidationError,
+  AgentGroupByRef,
+  AgentSpanStatsMetricSpec,
+  AgentSpanStatsColumn,
+  AgentCustomAttrSchemaItem,
 } from './generated/traceServerApi';
 import {
   type AudioType,
@@ -46,6 +63,8 @@ import type {Prompt} from './prompt';
 const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
 
+export type Response<T> = HttpResponse<T, HTTPValidationError>;
+
 /**
  * Serialized representation of a file blob stored in the Weave content store.
  * Returned by serializedFileBlob/serializedImage/serializedAudio.
@@ -62,7 +81,8 @@ interface SerializedFileBlob {
  */
 type BatchItem =
   | {mode: 'start'; data: {start: CallStartParams}}
-  | {mode: 'end'; data: {end: CallEndParams}};
+  | {mode: 'end'; data: {end: CallEndParams}}
+  | {mode: 'complete'; data: {complete: CompletedCallParams}};
 
 export type CallStackEntry = {
   callId: string;
@@ -83,6 +103,224 @@ export interface GetCallsOptions {
   columns?: string[];
   expandColumns?: string[];
 }
+
+export type Agent = AgentSchema;
+export type AgentConversationSearchResult = AgentSearchConversationResult;
+export type AgentMessage = AgentChatMessageSchema;
+export type AgentSpan = AgentSpanSchema;
+export type AgentTurn = AgentTraceChatRes;
+export type AgentVersion = AgentVersionSchema;
+
+/**
+ * Options for {@link WeaveClient.getAgents}.
+ */
+export interface GetAgentsOptions {
+  agentName?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgents}.
+ */
+export type GetAgentsResult = {
+  agents: Agent[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentVersions}.
+ */
+export interface GetAgentVersionsOptions {
+  agentName: string;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentVersions}.
+ */
+export type GetAgentVersionsResult = {
+  versions: AgentVersion[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpans}.
+ */
+export interface GetAgentSpansOptions {
+  agentName?: string;
+  /**
+   * Mongo-style filter on the spans.
+   */
+  query?: Query | null;
+  /**
+   * @min 0
+   * @max 10000
+   * @default 100
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  sortBy?: SortBy[];
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpans}.
+ */
+export type GetAgentSpansResult = {
+  spans: AgentSpan[];
+  total_count?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentSpanStats}.
+ */
+export interface GetAgentSpanStatsOptions {
+  start: string;
+  metrics: AgentSpanStatsMetricSpec[];
+  end?: string | null;
+  query?: Query | null;
+  groupBy?: AgentGroupByRef[];
+  granularity?: number | null;
+  /**
+   * @default "UTC"
+   */
+  timezone?: string;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentSpanStats}.
+ */
+export type GetAgentSpanStatsResult = {
+  start: string;
+  end: string;
+  granularity?: number | null;
+  timezone: string;
+  bucket_type?: 'time' | 'number';
+  columns?: AgentSpanStatsColumn[];
+  rows?: Record<string, string | number | boolean | null>[];
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentTurn}.
+ */
+export interface GetAgentTurnOptions {
+  traceId: string;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurn}.
+ */
+export type GetAgentTurnResult = AgentTurn;
+
+/**
+ * Options for {@link WeaveClient.getAgentTurns}.
+ */
+export interface GetAgentTurnsOptions {
+  conversationId: string;
+  /**
+   * @min 0
+   * @max 50
+   * @default 50
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+  includeFeedback?: boolean;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentTurns}.
+ */
+export type GetAgentTurnsResult = {
+  conversation_id: string;
+  turns?: AgentTurn[];
+  total_turns?: number;
+  has_more?: boolean;
+  limit?: number;
+  offset?: number;
+  feedback?: Record<string, any>[] | null;
+};
+
+/**
+ * Options for {@link WeaveClient.searchAgents}.
+ */
+export interface SearchAgentsOptions {
+  query: string;
+  agentName?: string | null;
+  conversationId?: string | null;
+  traceId?: string | null;
+  /**
+   * Limit
+   * @min 0
+   * @max 1000
+   * @default 20
+   */
+  limit?: number;
+  /**
+   * Offset
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.searchAgents}.
+ */
+export type SearchAgentsResult = {
+  results: AgentSearchConversationResult[];
+  total_conversations?: number;
+};
+
+/**
+ * Options for {@link WeaveClient.getAgentCustomAttributes}.
+ */
+export interface GetAgentCustomAttributesOptions {
+  query?: Query | null;
+  startedAfter?: string | null;
+  startedBefore?: string | null;
+  /**
+   * @min 1
+   * @max 2000
+   * @default 200
+   */
+  limit?: number;
+  /**
+   * @min 0
+   * @default 0
+   */
+  offset?: number;
+}
+
+/**
+ * Result shape returned by {@link WeaveClient.getAgentCustomAttributes}.
+ */
+export type GetAgentCustomAttributesResult = {
+  attributes?: AgentCustomAttrSchemaItem[];
+  limit?: number;
+  offset?: number;
+  has_more?: boolean;
+};
 
 /**
  * Distinguishes the object-based getCalls options form from the legacy
@@ -112,6 +350,27 @@ function maybeIsGetCallsOptions(
     }
   }
   return false;
+}
+
+/**
+ * Build the `getAgentSpans` filter from the `agentName` shortcut and the
+ * caller's `query`. Mirrors Python's `_agent_spans_query_filter`: when both
+ * are present they are AND-combined; otherwise whichever is set passes
+ * through.
+ */
+function agentSpansQueryFilter(
+  agentName: string | undefined,
+  query: Query | null | undefined
+): Query | undefined {
+  if (!agentName) return query ?? undefined;
+  const agentExpr = {
+    $eq: [{$getField: 'agent_name'}, {$literal: agentName}] as [
+      {$getField: string},
+      {$literal: string},
+    ],
+  };
+  if (!query) return {$expr: agentExpr} as unknown as Query;
+  return {$expr: {$and: [agentExpr, query.$expr]}} as unknown as Query;
 }
 
 function generateTraceId(): string {
@@ -170,14 +429,44 @@ export class CallStack {
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
-type CallEndParams = EndedCallSchemaForInsert;
+type CallEndParams = EndedCallSchemaForInsert & {display_name?: string | null};
+
+// Merged start + end payload for the `calls/complete` endpoint.
+type CompletedCallParams = StartedCallSchemaForInsert & {
+  id: string;
+  trace_id: string;
+  ended_at: string;
+  output?: EndedCallSchemaForInsert['output'];
+  summary: EndedCallSchemaForInsert['summary'];
+  exception?: string | null;
+  wb_run_step_end?: number | null;
+};
 
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
+
+// Whether the call is part of an evaluation: root by op-name substring (op_name
+// is a ref URI), children by the attribute marker.
+function isEvalCall(call: InternalCall): boolean {
+  const {attributes, op_name} = call.callSchema;
+  return (
+    attributes?.[EVAL_META_KEY] != null ||
+    (op_name?.includes(EVALUATION_RUN_OP_NAME) ?? false)
+  );
+}
+
 export class WeaveClient {
   private stackContext = new AsyncLocalStorage<CallStack>();
   private attributesContext = new AsyncLocalStorage<Record<string, any>>();
   private callQueue: BatchItem[] = [];
+  // calls_complete pairing state: starts/ends wait here for their counterpart.
+  private pendingStarts: Map<string, CallStartParams> = new Map();
+  private pendingEnds: Map<string, CallEndParams> = new Map();
+  private eagerCallIds: Set<string> = new Set();
+  private useCallsComplete: boolean;
+  // Set after exhausting retries: tracing gives up gracefully rather than
+  // killing the host process.
+  private tracingDisabled = false;
   private batchProcessTimeout: NodeJS.Timeout | null = null;
   private isBatchProcessing: boolean = false;
   private batchProcessingPromises: Set<Promise<void>> = new Set();
@@ -200,9 +489,325 @@ export class WeaveClient {
     this.traceServerApi = traceServerApi;
     this.projectId = projectId;
     this.settings = makeSettings(settings);
+    this.useCallsComplete = this.settings.useCallsComplete;
+  }
+
+  /**
+   * List agents with aggregated stats.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgents({limit: 20});
+   *
+   * for (const agent of resp.data.agents) {
+   *   console.log(agent.agent_name, agent.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgents(
+    options: GetAgentsOptions = {}
+  ): Promise<Response<GetAgentsResult>> {
+    const params = {
+      project_id: this.projectId,
+      sort_by: options.sortBy,
+      limit: options.limit,
+      offset: options.offset,
+    };
+
+    if (options.agentName) {
+      Object.assign(params, {
+        filters: {agent_name: options.agentName},
+      });
+    }
+
+    return this.traceServerApi.agents.genaiAgentsQueryAgentsQueryPost(params);
+  }
+
+  /**
+   * List versions for a given agent.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentVersions({agentName: 'my-agent', limit: 20});
+   *
+   * for (const version of resp.data.versions) {
+   *   console.log(version.agent_version, version.total_input_tokens);
+   * }
+   *
+   * console.log(`total count: ${resp.data.total_count}`)
+   * ```
+   */
+  public getAgentVersions(
+    options: GetAgentVersionsOptions
+  ): Promise<Response<GetAgentVersionsResult>> {
+    return this.traceServerApi.agents.genaiAgentVersionsQueryAgentsAgentVersionsQueryPost(
+      {
+        project_id: this.projectId,
+        agent_name: options.agentName,
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
+  }
+
+  /**
+   * Query agent spans, optionally filtered by agent name and/or a mongo-style
+   * query expression.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpans({agentName: 'my-agent', limit: 20});
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
+   * ```
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   *
+   * const resp = await client.getAgentSpans({
+   *   agentName: 'my-agent',
+   *   query: {
+   *     $expr: {$gt: [{$getField: 'input_tokens'}, {$literal: 1000}]},
+   *   },
+   * });
+   *
+   * for (const span of resp.data.spans) {
+   *   console.log(span.span_id, span.span_name, span.input_tokens);
+   * }
+   * ```
+   */
+  public async getAgentSpans(
+    options: GetAgentSpansOptions
+  ): Promise<Response<GetAgentSpansResult>> {
+    const resp =
+      await this.traceServerApi.agents.genaiSpansQueryAgentsSpansQueryPost({
+        project_id: this.projectId,
+        query: agentSpansQueryFilter(options.agentName, options.query),
+        sort_by: options.sortBy,
+        limit: options.limit,
+        offset: options.offset,
+      });
+
+    return {
+      ...resp,
+      data: {
+        ...resp.data,
+        spans: resp.data.spans ?? [],
+      },
+    };
+  }
+
+  /**
+   * Agregations over agent spans in the project, returned as rows + column
+   * metadata suitable for time-series / bucketed visualizations.
+   *
+   * `start` (required) and `end` define the time window. Each entry in
+   * `metrics` declares a field to extract and how to aggregate it (`sum`,
+   * `avg`, `count`, percentiles, etc.). Pass `granularity` (seconds) to
+   * bucket rows by time, or `groupBy` to break results out per agent /
+   * provider / model / etc. `query` filters the underlying spans before
+   * aggregation.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentSpanStats({
+   *   start: '2026-06-10T00:00:00Z',
+   *   end: '2026-06-23T00:00:00Z',
+   *   granularity: 86400, // one row per day
+   *   metrics: [
+   *     {
+   *       alias: 'total_input_tokens',
+   *       value_type: 'number',
+   *       aggregations: ['sum'],
+   *       value: {source: 'field', key: 'input_tokens'},
+   *     },
+   *   ],
+   *   groupBy: [{key: 'agent_name'}],
+   * });
+   *
+   * for (const row of resp.data.rows ?? []) {
+   *   console.log(row.started_at_bucket, row.agent_name, row.total_input_tokens);
+   * }
+   * ```
+   */
+  public async getAgentSpanStats(
+    options: GetAgentSpanStatsOptions
+  ): Promise<Response<GetAgentSpanStatsResult>> {
+    return this.traceServerApi.agents.genaiSpansStatsAgentsSpansStatsPost({
+      project_id: this.projectId,
+      start: options.start,
+      end: options.end,
+      metrics: options.metrics,
+      query: options.query,
+      group_by: options.groupBy,
+      granularity: options.granularity,
+      timezone: options.timezone,
+    });
+  }
+
+  /**
+   * Get data (including messages) for a single turn (by traceId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurn({
+   *   traceId: '01997b8a-2c89-7c4d-9d0e-2f7e5b9a1b2c',
+   *   includeFeedback: true,
+   * });
+   *
+   * console.log(resp.data.root_span_name, resp.data.total_duration_ms);
+   *
+   * for (const message of resp.data.messages ?? []) {
+   *   if (message.user_message) console.log('user:', message.user_message);
+   *   if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   * }
+   * ```
+   */
+  public getAgentTurn(
+    options: GetAgentTurnOptions
+  ): Promise<Response<GetAgentTurnResult>> {
+    return this.traceServerApi.agents.genaiTracesChatAgentsTracesChatPost({
+      project_id: this.projectId,
+      trace_id: options.traceId,
+      include_feedback: options.includeFeedback,
+    });
+  }
+
+  /**
+   * Get data (including messages) for many turns (by conversationId).
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentTurns({
+   *   conversationId: 'trace_c50312356de3487fa90e381c9399b5b4',
+   *   limit: 20,
+   *   includeFeedback: true,
+   * });
+   *
+   * for (const turn of resp.data.turns ?? []) {
+   *   console.log(turn.trace_id, turn.root_span_name);
+   *   for (const message of turn.messages ?? []) {
+   *     if (message.user_message) console.log('user:', message.user_message);
+   *     if (message.assistant_message) console.log('assistant:', message.assistant_message);
+   *   }
+   * }
+   *
+   * console.log(`total turns: ${resp.data.total_turns}, has more: ${resp.data.has_more}`);
+   * ```
+   */
+  public getAgentTurns(
+    options: GetAgentTurnsOptions
+  ): Promise<Response<GetAgentTurnsResult>> {
+    return this.traceServerApi.agents.genaiConversationChatAgentsConversationsChatPost(
+      {
+        project_id: this.projectId,
+        conversation_id: options.conversationId,
+        limit: options.limit,
+        offset: options.offset,
+        include_feedback: options.includeFeedback,
+      }
+    );
+  }
+
+  /**
+   * Full-text search across agent messages in the project. Returns hits
+   * grouped by conversation, with a preview of each matched message.
+   *
+   * `query` is the full-text search term. Pass an empty string to retrieve
+   * all messages matching the structured filters (`agentName`,
+   * `conversationId`, `traceId`) without text matching. Use `limit` /
+   * `offset` to page through results.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.searchAgents({
+   *   query: 'Liverpool',
+   *   agentName: 'Assistant',
+   *   limit: 20,
+   * });
+   *
+   * for (const conversation of resp.data.results ?? []) {
+   *   console.log(`${conversation.conversation_id} (${conversation.agent_name})`);
+   *   for (const match of conversation.matched_messages) {
+   *     console.log(`  [${match.role}] ${match.content_preview}`);
+   *   }
+   * }
+   *
+   * console.log(`total conversations: ${resp.data.total_conversations}`);
+   * ```
+   */
+  public searchAgents(
+    options: SearchAgentsOptions
+  ): Promise<Response<SearchAgentsResult>> {
+    return this.traceServerApi.agents.genaiSearchAgentsSearchPost({
+      project_id: this.projectId,
+      query: options.query,
+      agent_name: options.agentName,
+      conversation_id: options.conversationId,
+      trace_id: options.traceId,
+      limit: options.limit,
+      offset: options.offset,
+    });
+  }
+
+  /**
+   * Discover typed custom-attribute keys observed on agent spans in the
+   * project. Each result row is one `(source, key, value_type)` triple plus
+   * a count of how many spans carry it, which is what the spans
+   * query/group/stats APIs use to reference custom attrs.
+   *
+   * Filter the spans considered by passing `query` (a structured span
+   * filter), `startedAfter` / `startedBefore` (ISO-8601), or both. Use
+   * `limit` / `offset` to page through the discovered keys.
+   *
+   * @example
+   * ```ts
+   * const client = await weave.init('entity/project');
+   * const resp = await client.getAgentCustomAttributes({
+   *   query: {
+   *     $expr: {
+   *       $eq: [{$getField: 'agent_name'}, {$literal: 'my-agent'}],
+   *     },
+   *   },
+   *   startedAfter: '2026-06-15T00:00:00Z',
+   *   limit: 200,
+   * });
+   *
+   * for (const attr of resp.data.attributes ?? []) {
+   *   console.log(`${attr.source}.${attr.key} (${attr.value_type}): ${attr.span_count}`);
+   * }
+   * ```
+   */
+  public getAgentCustomAttributes(
+    options: GetAgentCustomAttributesOptions
+  ): Promise<Response<GetAgentCustomAttributesResult>> {
+    return this.traceServerApi.agents.genaiCustomAttrsSchemaAgentsSpansCustomAttrsSchemaPost(
+      {
+        project_id: this.projectId,
+        query: options.query,
+        started_after: options.startedAfter,
+        started_before: options.startedBefore,
+        limit: options.limit,
+        offset: options.offset,
+      }
+    );
   }
 
   private scheduleBatchProcessing() {
+    if (this.tracingDisabled) return;
     if (this.batchProcessTimeout || this.isBatchProcessing) return;
     const promise = new Promise<void>(resolve => {
       this.batchProcessTimeout = setTimeout(
@@ -217,20 +822,58 @@ export class WeaveClient {
   }
 
   public async waitForBatchProcessing() {
+    this.flushPendingCallsToQueue();
     while (this.batchProcessingPromises.size > 0) {
       await Promise.all(this.batchProcessingPromises);
+      this.flushPendingCallsToQueue();
+      if (this.callQueue.length > 0) {
+        this.scheduleBatchProcessing();
+      }
     }
   }
 
+  /** Deliver all buffered calls to the server. Await before `process.exit()`. */
+  public async flush(): Promise<void> {
+    await this.waitForBatchProcessing();
+  }
+
+  /** Calls buffered client-side but not yet delivered to the server. */
+  public pendingCallCount(): number {
+    return (
+      this.callQueue.length + this.pendingStarts.size + this.pendingEnds.size
+    );
+  }
+
+  // Unpaired starts/ends at flush time (interrupted calls) are sent via the v2
+  // single endpoints so nothing is dropped.
+  private flushPendingCallsToQueue() {
+    if (this.pendingStarts.size === 0 && this.pendingEnds.size === 0) {
+      return;
+    }
+    for (const start of this.pendingStarts.values()) {
+      this.callQueue.push({mode: 'start', data: {start}});
+    }
+    this.pendingStarts.clear();
+    for (const end of this.pendingEnds.values()) {
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
+    this.pendingEnds.clear();
+    this.scheduleBatchProcessing();
+  }
+
   private async processBatch() {
-    if (this.isBatchProcessing || this.callQueue.length === 0) {
+    if (
+      this.tracingDisabled ||
+      this.isBatchProcessing ||
+      this.callQueue.length === 0
+    ) {
       this.batchProcessTimeout = null;
       return;
     }
 
     this.isBatchProcessing = true;
 
-    let batchToProcess = [];
+    const batchToProcess = [];
     let currentBatchSize = 0;
 
     while (
@@ -267,40 +910,222 @@ export class WeaveClient {
 
     this.isBatchProcessing = true;
 
-    const batchReq = {
-      batch: batchToProcess.map(item => {
-        if (item.mode === 'start') {
-          return {mode: 'start' as const, req: item.data};
-        }
-        return {mode: 'end' as const, req: item.data};
-      }),
-    };
-
     try {
-      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
-        batchReq
-      );
+      const requeued = await this.sendBatch(batchToProcess);
+      if (requeued) {
+        // A per-item send requeued a retryable failure without throwing (eager
+        // starts/ends and per-item completes are isolated so one poison item
+        // can't drop its batch-mates); count it so a sustained outage still
+        // trips the breaker instead of requeuing forever.
+        this.registerSendFailure();
+      } else {
+        // A fully clean send clears the streak: errorCount is consecutive.
+        this.errorCount = 0;
+      }
     } catch (error) {
-      console.error('Error processing batch:', error);
-      this.errorCount++;
-      fs.appendFileSync(
-        WEAVE_ERRORS_LOG_FNAME,
-        `Error processing batch: ${error}\n`
-      );
+      // The project is pinned to calls_complete mode: switch paths and re-pair
+      // the failed legacy items instead of dropping them back as-is.
+      if (!this.useCallsComplete && isCallsCompleteModeError(error)) {
+        this.upgradeToCallsComplete(batchToProcess);
+      } else if (!isRetryableError(error)) {
+        // Non-retryable (4xx): drop these items so one rejected call can't
+        // wedge the queue and crash the process.
+        console.error('Dropping batch (non-retryable error):', error);
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Dropping ${batchToProcess.length} items (non-retryable): ${error}\n`
+        );
+      } else {
+        console.error('Error processing batch:', error);
+        fs.appendFileSync(
+          WEAVE_ERRORS_LOG_FNAME,
+          `Error processing batch: ${error}\n`
+        );
 
-      // Put failed items back at the front of the queue
-      this.callQueue.unshift(...batchToProcess);
-
-      // Exit if we have too many errors
-      if (this.errorCount > this.MAX_ERRORS) {
-        console.error(`Exceeded max errors: ${this.MAX_ERRORS}; exiting`);
-        process.exit(1);
+        // Put failed items back at the front of the queue.
+        // TODO: retry with exponential backoff (mirror the Python SDK's
+        // tenacity-based retry) instead of an immediate requeue at BATCH_INTERVAL.
+        this.callQueue.unshift(...batchToProcess);
+        this.registerSendFailure();
       }
     } finally {
       this.isBatchProcessing = false;
       this.batchProcessTimeout = null;
       if (this.callQueue.length > 0) {
         this.scheduleBatchProcessing();
+      }
+    }
+  }
+
+  // Count a consecutive send failure. An SDK must never kill or hang the host
+  // process, so after MAX_ERRORS in a row we give up gracefully: disable
+  // tracing and drop buffered calls (the server is unreachable) rather than
+  // requeuing forever.
+  private registerSendFailure() {
+    this.errorCount++;
+    if (this.errorCount > this.MAX_ERRORS) {
+      console.error(
+        `Weave: exceeded ${this.MAX_ERRORS} consecutive send errors; ` +
+          `disabling tracing for this process. Buffered calls may be lost.`
+      );
+      this.tracingDisabled = true;
+      this.callQueue = [];
+      this.pendingStarts.clear();
+      this.pendingEnds.clear();
+      this.eagerCallIds.clear();
+    }
+  }
+
+  // Routes a drained batch to the right endpoint(s): in calls_complete mode,
+  // paired completes go to `calls/complete` and any queued (eager) starts/ends
+  // go to the v2 single endpoints; otherwise the legacy upsert_batch path.
+  // Returns true if any item was requeued for retry (a retryable failure that
+  // did not throw), so the caller can advance the give-up counter.
+  private async sendBatch(batch: BatchItem[]): Promise<boolean> {
+    if (!this.useCallsComplete) {
+      const startEnds = batch.filter(
+        (i): i is Extract<BatchItem, {mode: 'start' | 'end'}> =>
+          i.mode === 'start' || i.mode === 'end'
+      );
+      const batchReq = {
+        batch: startEnds.map(item =>
+          item.mode === 'start'
+            ? {mode: 'start' as const, req: item.data}
+            : {mode: 'end' as const, req: item.data}
+        ),
+      };
+      await this.traceServerApi.call.callStartBatchCallUpsertBatchPost(
+        batchReq
+      );
+      return false;
+    }
+
+    let requeued = false;
+    const completes: CompletedCallParams[] = [];
+    for (const item of batch) {
+      if (item.mode === 'complete') {
+        completes.push(item.data.complete);
+      }
+    }
+    if (completes.length > 0) {
+      requeued = (await this.sendCompletes(completes)) || requeued;
+    }
+    // Eager start/end items are sent individually and isolated per item: a
+    // non-retryable failure drops just that item; a retryable one requeues it.
+    for (const item of batch) {
+      if (item.mode !== 'start' && item.mode !== 'end') {
+        continue;
+      }
+      try {
+        if (item.mode === 'start') {
+          await this.sendCallStartV2(item.data.start);
+        } else {
+          await this.sendCallEndV2(item.data.end);
+        }
+      } catch (error) {
+        requeued = this.requeueOrDrop(item, error) || requeued;
+      }
+    }
+    return requeued;
+  }
+
+  // Send paired completes as one request. A retryable failure propagates so the
+  // whole batch requeues; a non-retryable batch rejection means at least one
+  // call is bad, so retry each alone (mirrors the Python SDK's per-item
+  // fallback) and one poison call cannot drop its batch-mates.
+  private async sendCompletes(
+    completes: CompletedCallParams[]
+  ): Promise<boolean> {
+    try {
+      await this.sendCallsComplete(completes);
+      return false;
+    } catch (error) {
+      if (isRetryableError(error)) {
+        throw error;
+      }
+      if (completes.length === 1) {
+        return this.requeueOrDrop(
+          {mode: 'complete', data: {complete: completes[0]}},
+          error
+        );
+      }
+    }
+    let requeued = false;
+    for (const complete of completes) {
+      try {
+        await this.sendCallsComplete([complete]);
+      } catch (itemError) {
+        requeued =
+          this.requeueOrDrop({mode: 'complete', data: {complete}}, itemError) ||
+          requeued;
+      }
+    }
+    return requeued;
+  }
+
+  // Requeue a failed item on a retryable error (returns true); drop it (with a
+  // log) and return false otherwise.
+  private requeueOrDrop(item: BatchItem, error: unknown): boolean {
+    if (isRetryableError(error)) {
+      this.callQueue.unshift(item);
+      return true;
+    }
+    console.error(`Dropping ${item.mode} (non-retryable error):`, error);
+    fs.appendFileSync(
+      WEAVE_ERRORS_LOG_FNAME,
+      `Dropping ${item.mode} (non-retryable): ${error}\n`
+    );
+    return false;
+  }
+
+  private postV2(
+    pathSuffix: string,
+    body: {start: CallStartParams} | {end: Omit<CallEndParams, 'display_name'>}
+  ) {
+    return this.traceServerApi.request({
+      path: `/v2/${this.projectId}/${pathSuffix}`,
+      method: 'POST',
+      body,
+      type: ContentType.Json,
+      format: 'json',
+    });
+  }
+
+  private sendCallsComplete(batch: CompletedCallParams[]) {
+    const [entity, project] = this.projectId.split('/');
+    return this.traceServerApi.v2.callsCompleteV2EntityProjectCallsCompletePost(
+      entity,
+      project,
+      {batch}
+    );
+  }
+
+  private sendCallStartV2(start: CallStartParams) {
+    return this.postV2('call/start', {start});
+  }
+
+  private sendCallEndV2(end: CallEndParams) {
+    // The v2 end schema has no display_name (post-start renames go via
+    // updateCall, matching the Python client); strip it before sending.
+    const {display_name: _displayName, ...endReq} = end;
+    return this.postV2('call/end', {end: endReq});
+  }
+
+  // Re-pair the failed legacy batch through the calls_complete path.
+  private upgradeToCallsComplete(batch: BatchItem[]) {
+    if (!this.useCallsComplete) {
+      console.warn(
+        'Project requires calls_complete mode; upgrading the SDK to the calls_complete path.'
+      );
+      this.useCallsComplete = true;
+    }
+    for (const item of batch) {
+      if (item.mode === 'start') {
+        this.saveCallStart(item.data.start);
+      } else if (item.mode === 'end') {
+        this.saveCallEnd(item.data.end);
+      } else {
+        this.callQueue.push(item);
       }
     }
   }
@@ -465,7 +1290,7 @@ export class WeaveClient {
 
       const {content, description, name} = val;
 
-      let obj = new StringPrompt({
+      const obj = new StringPrompt({
         name,
         description,
         content,
@@ -481,7 +1306,7 @@ export class WeaveClient {
 
       const {description, messages, name} = val;
 
-      let obj = new MessagesPrompt({
+      const obj = new MessagesPrompt({
         name,
         description,
         messages,
@@ -498,7 +1323,7 @@ export class WeaveClient {
 
       const {description, rows, name} = val;
 
-      let obj = new Dataset({
+      const obj = new Dataset({
         name: name || dataObj.id,
         description,
         rows,
@@ -512,7 +1337,7 @@ export class WeaveClient {
       return obj;
     } else if (t == 'Table') {
       const {rows} = val;
-      let obj = new Table(rows);
+      const obj = new Table(rows);
       obj.__savedRef = ref;
 
       // Load table rows if they are a ref
@@ -522,7 +1347,7 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -538,7 +1363,7 @@ export class WeaveClient {
         // TODO: Implement getting img back as buffer
         return 'Coming soon!';
       } else if (typeName == 'wave.Wave_read') {
-        let loadedFiles: {[key: string]: Buffer} = {};
+        const loadedFiles: {[key: string]: Buffer} = {};
         for (const [name, digest] of Object.entries(val.files)) {
           try {
             const fileContent =
@@ -657,7 +1482,7 @@ export class WeaveClient {
     if (obj.__savedRef) {
       return Promise.resolve(obj.__savedRef);
     }
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [_key, value] of Object.entries(obj)) {
       this.saveWeaveValues(value);
     }
 
@@ -758,7 +1583,9 @@ export class WeaveClient {
     } else if (val instanceof Table) {
       this.saveTable(val);
     } else if (isWeaveImage(val)) {
+      // no-op
     } else if (isWeaveAudio(val)) {
+      // no-op
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
@@ -768,7 +1595,7 @@ export class WeaveClient {
       }
       visited.add(val);
 
-      for (const [key, value] of Object.entries(val)) {
+      for (const [_key, value] of Object.entries(val)) {
         this.saveWeaveValues(value, visited);
       }
     }
@@ -885,13 +1712,76 @@ export class WeaveClient {
     }
   }
 
-  public saveCallStart(callStart: CallStartParams) {
-    this.callQueue.push({mode: 'start', data: {start: callStart}});
-    this.scheduleBatchProcessing();
+  public saveCallStart(
+    callStart: CallStartParams,
+    opts: {eager?: boolean} = {}
+  ) {
+    if (this.tracingDisabled) return;
+    const callId = callStart.id;
+    if (!this.useCallsComplete || callId == null) {
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    // Eager: send the start now via the v2 single endpoint so long-running ops
+    // are visible before they finish; the end is routed the same way.
+    if (opts.eager) {
+      this.eagerCallIds.add(callId);
+      this.callQueue.push({mode: 'start', data: {start: callStart}});
+      const racedEnd = this.pendingEnds.get(callId);
+      if (racedEnd) {
+        this.pendingEnds.delete(callId);
+        this.callQueue.push({mode: 'end', data: {end: racedEnd}});
+      }
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingEnd = this.pendingEnds.get(callId);
+    if (pendingEnd) {
+      this.pendingEnds.delete(callId);
+      this.queueComplete(callStart, pendingEnd);
+    } else {
+      this.pendingStarts.set(callId, callStart);
+    }
   }
 
   public saveCallEnd(callEnd: CallEndParams) {
-    this.callQueue.push({mode: 'end', data: {end: callEnd}});
+    if (this.tracingDisabled) return;
+    const callId = callEnd.id;
+    if (!this.useCallsComplete) {
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    if (this.eagerCallIds.has(callId)) {
+      this.eagerCallIds.delete(callId);
+      this.callQueue.push({mode: 'end', data: {end: callEnd}});
+      this.scheduleBatchProcessing();
+      return;
+    }
+
+    const pendingStart = this.pendingStarts.get(callId);
+    if (pendingStart) {
+      this.pendingStarts.delete(callId);
+      this.queueComplete(pendingStart, callEnd);
+    } else {
+      this.pendingEnds.set(callId, callEnd);
+    }
+  }
+
+  // Pair a start with its end into one complete, or fall back to shipping them
+  // as separate start/end items when they cannot be merged.
+  private queueComplete(start: CallStartParams, end: CallEndParams) {
+    const complete = mergeToComplete(start, end);
+    if (complete) {
+      this.callQueue.push({mode: 'complete', data: {complete}});
+    } else {
+      this.callQueue.push({mode: 'start', data: {start}});
+      this.callQueue.push({mode: 'end', data: {end}});
+    }
     this.scheduleBatchProcessing();
   }
 
@@ -993,7 +1883,8 @@ export class WeaveClient {
     parentCall: CallStackEntry | undefined,
     startTime: Date,
     displayName?: string,
-    attributes?: Record<string, any>
+    attributes?: Record<string, any>,
+    eagerCallStart: boolean = false
   ) {
     // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
     // the in-memory call stack. Store the short op name for stack lookup
@@ -1040,7 +1931,7 @@ export class WeaveClient {
     };
     internalCall.updateWithCallSchemaData(startReq);
     internalCall.state = CallState.pending;
-    return this.saveCallStart(startReq);
+    return this.saveCallStart(startReq, {eager: eagerCallStart});
   }
 
   public async finishCall(
@@ -1073,6 +1964,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1110,6 +2002,7 @@ export class WeaveClient {
       project_id: this.projectId,
       id: currentCall.callId,
       trace_id: currentCall.traceId,
+      is_eval: isEvalCall(call),
       ...callSchemaExchangeData,
       // User might change the display name of the call after the call has started.
       // take this into account when logging the end call.
@@ -1182,6 +2075,54 @@ export class WeaveClient {
   }
 }
 
+// Server error_code returned on the legacy path when a project is pinned to
+// calls_complete mode.
+const CALLS_COMPLETE_MODE_REQUIRED = 'CALLS_COMPLETE_MODE_REQUIRED';
+
+// Returns null (rather than throwing) when the start lacks id/trace_id so the
+// caller can fall back to separate start/end items: tracing must never throw
+// into user code (mirrors the Python SDK, which swallows logging errors).
+function mergeToComplete(
+  start: CallStartParams,
+  end: CallEndParams
+): CompletedCallParams | null {
+  if (start.id == null || start.trace_id == null) {
+    return null;
+  }
+  // Spread both so any field added to the end payload flows through without
+  // editing this function; the start is authoritative for the identity/timing
+  // fields the two share.
+  return {
+    ...start,
+    ...end,
+    id: start.id,
+    trace_id: start.trace_id,
+    started_at: start.started_at,
+  };
+}
+
+function isCallsCompleteModeError(error: unknown): boolean {
+  if (error == null || typeof error !== 'object') {
+    return false;
+  }
+  const body = (error as {error?: unknown}).error;
+  if (body == null || typeof body !== 'object') {
+    return false;
+  }
+  return (
+    (body as {error_code?: unknown}).error_code === CALLS_COMPLETE_MODE_REQUIRED
+  );
+}
+
+// Network/unknown and 5xx/408/429 are retryable; other 4xx are permanent.
+function isRetryableError(error: unknown): boolean {
+  const status = (error as {status?: unknown} | null)?.status;
+  if (typeof status !== 'number') {
+    return true;
+  }
+  return status === 408 || status === 429 || status >= 500;
+}
+
 /**
  * Represents a summary object with string keys and any type of values.
  */
@@ -1228,7 +2169,7 @@ function processSummary(
   currentCall: CallStackEntry,
   parentCall: CallStackEntry | undefined
 ) {
-  let ownSummary = summarize && result != null ? summarize(result) : {};
+  const ownSummary = summarize && result != null ? summarize(result) : {};
 
   if (ownSummary.usage) {
     for (const model in ownSummary.usage) {

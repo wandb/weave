@@ -16,7 +16,7 @@ Key features:
 -- ============================================================================
 -- annotation_queues: Queue definitions and metadata
 -- ============================================================================
-CREATE TABLE annotation_queues (
+CREATE TABLE IF NOT EXISTS annotation_queues (
     /*
     `id`: String (UUID format), unique identifier for the queue. This is the primary reference.
     */
@@ -76,7 +76,7 @@ SETTINGS
 -- ============================================================================
 -- annotation_queue_items: Queue membership (which calls belong to each queue)
 -- ============================================================================
-CREATE TABLE annotation_queue_items (
+CREATE TABLE IF NOT EXISTS annotation_queue_items (
     /*
     `id`: String (UUID format), unique identifier for this queue item. This is the primary reference.
     */
@@ -165,12 +165,12 @@ ALTER TABLE feedback
     `queue_id`: The queue ID this feedback was created from.
     References annotation_queues.id. NULL when feedback is created outside of queues.
     */
-    ADD COLUMN queue_id Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS queue_id Nullable(String) DEFAULT NULL;
 
 -- ============================================================================
 -- annotator_queue_items_progress: Per-annotator workflow state tracking
 -- ============================================================================
-CREATE TABLE annotator_queue_items_progress (
+CREATE TABLE IF NOT EXISTS annotator_queue_items_progress (
     /*
     `id`: String (UUID format), unique identifier for this progress record. This is the primary reference.
     */

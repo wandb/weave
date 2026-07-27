@@ -10,7 +10,13 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -34,6 +40,7 @@ from weave.trace_server.agents.schema import (
     SpanKindLiteral,
     StatusCodeLiteral,
 )
+from weave.trace_server.interface.feedback_types import AgentSpanFeedbackType
 from weave.trace_server.interface.query import Query
 
 if TYPE_CHECKING:
@@ -69,6 +76,13 @@ AgentSpanStatsDerivedMetric = Literal[
     "total_tokens",
     "is_error",
     "is_invocation",
+    # Query-time costs (USD). Computed by joining the span's model against
+    # llm_token_prices; only resolvable when the query's span source is
+    # cost-augmented. Mirror of span_costs.COST_DERIVED_METRIC_NAMES — keep the
+    # two in sync. See weave/trace_server/agents/span_costs.py.
+    "total_cost_usd",
+    "input_cost_usd",
+    "output_cost_usd",
 ]
 AgentSpanValueSource = Literal[
     "field",
@@ -108,6 +122,9 @@ AGENT_SPAN_STATS_DERIVED_VALUE_TYPES: dict[
     "total_tokens": "number",
     "is_error": "boolean",
     "is_invocation": "boolean",
+    "total_cost_usd": "number",
+    "input_cost_usd": "number",
+    "output_cost_usd": "number",
 }
 _ALLOWED_AGGS_BY_TYPE: dict[AgentSpanStatsValueType, set[AgentSpanStatsAggregation]] = {
     "datetime": {"min", "max", "count", "count_distinct"},
@@ -348,6 +365,10 @@ class AgentSpanStatsReq(BaseModel):
     )
     bucket_by: AgentSpanStatsBucketSpec | None = None
     group_filters: list[AgentSpanGroupFilter] = Field(default_factory=list)
+    # Restrict stats to spans belonging to conversations that carry all of the
+    # requested signal tags/ratings. Signal timestamps are intentionally not
+    # constrained by the stats window; they annotate the conversation.
+    signal_filters: AgentSignalFilter | None = None
 
     @model_validator(mode="after")
     def validate_stats_request(self) -> AgentSpanStatsReq:
@@ -437,6 +458,13 @@ class AgentSpanSchema(BaseModel):
     agent_id: str | None = None
     agent_description: str | None = None
     agent_version: str | None = None
+    eval_run_id: str | None = None
+    eval_predict_and_score_call_id: str | None = None
+    eval_kind: str | None = None
+    eval_row_digest: str | None = None
+    eval_example_id: str | None = None
+    eval_trial_index: int | None = None
+    eval_evaluation_name: str | None = None
     request_model: str | None = None
     response_model: str | None = None
     response_id: str | None = None
@@ -445,6 +473,14 @@ class AgentSpanSchema(BaseModel):
     reasoning_tokens: int | None = None
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
+    # Query-time costs (USD), only populated when AgentSpansQueryReq.include_costs
+    # is set. None (not 0) when the span's model has no matching price, so the UI
+    # can distinguish "unpriced" from "free". See agents/span_costs.py.
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    cache_read_cost_usd: float | None = None
+    cache_creation_cost_usd: float | None = None
+    total_cost_usd: float | None = None
     reasoning_content: str | None = None
     conversation_id: str | None = None
     conversation_name: str | None = None
@@ -489,6 +525,18 @@ class AgentSpanSchema(BaseModel):
     # OTel JSON dump for the span is large, so it's omitted from list queries
     # by default.
     raw_span_dump: str | None = None
+
+    @field_validator("eval_trial_index", mode="before")
+    @classmethod
+    def _unset_trial_index_is_none(cls, v: Any) -> Any:
+        """Surface an unset trial index as None.
+
+        ClickHouse can't store NULL ints, so the spans table uses -1 as the
+        "unset" storage sentinel for eval_trial_index. That sentinel is an
+        internal detail: API callers should see None, and a real trial index is
+        always >= 0.
+        """
+        return None if v == -1 else v
 
 
 class AgentSortBy(BaseModel):
@@ -548,7 +596,7 @@ class AgentSpanGroupDistributionSpec(BaseModel):
         return self
 
     def custom_attr_source(self) -> AgentCustomAttrSource:
-        """Return ``value.source`` narrowed to ``AgentCustomAttrSource``.
+        """Return `value.source` narrowed to `AgentCustomAttrSource`.
 
         The model validator guarantees this at construction time; this helper
         re-checks each literal so callers avoid `cast()` at use sites.
@@ -606,8 +654,85 @@ class AgentConversationMessagePreview(BaseModel):
     chat view; `text` is the trimmed, length-capped preview content.
     """
 
-    role: str = ""
+    role: Literal["user_message", "assistant_message"]
     text: str = ""
+
+
+class AgentConversationSpan(BaseModel):
+    """One span in a conversation's trace.
+
+    Returned by `agent_conversation_spans`, which reads span scalar columns
+    only (no message bodies). Spans are ordered by `started_at`, which
+    approximates — but does not exactly match — the detail chat view's
+    parent/child tree-walk order. `operation_name` is the raw OTel value; the
+    client maps it to a display category.
+    """
+
+    operation_name: str
+    trace_id: str
+    span_id: str
+    status: StatusCodeLiteral
+    duration_ms: int
+
+
+class AgentConversationSpanRating(BaseModel):
+    """One numeric rating (a scorer score) applied to a turn or conversation."""
+
+    name: str
+    value: float
+    reason: str | None = None
+    confidence: float | None = None
+
+
+class AgentConversationSpanFeedback(BaseModel):
+    """Tags and ratings applied to a conversation's turn (or the conversation).
+
+    Positioned client-side by matching `trace_id` (turn) against the spans;
+    `trace_id` is None for conversation-level feedback.
+    """
+
+    trace_id: str | None = Field(
+        description="The turn this feedback is anchored to; None for conversation-level."
+    )
+    feedback_type: AgentSpanFeedbackType
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Arbitrary descriptive tags applied to this feedback.",
+        examples=[["👍", "needs-review"]],
+    )
+    ratings: list[AgentConversationSpanRating] = Field(
+        default_factory=list,
+        description="Numeric scorer ratings applied to this feedback.",
+    )
+
+
+class AgentConversationSpans(BaseModel):
+    """One conversation's span sequence and its feedback markers."""
+
+    conversation_id: str
+    spans: list[AgentConversationSpan] = Field(default_factory=list)
+    spans_feedback: list[AgentConversationSpanFeedback] = Field(default_factory=list)
+
+
+class AgentConversationSpansReq(BaseModel):
+    """Request the span sequences for an explicit set of conversations.
+
+    Reads span scalar columns only (no message bodies) for the given
+    `conversation_ids`. Powers the conversations-list spans minimap.
+    """
+
+    project_id: str
+    conversation_ids: list[str] = Field(
+        default_factory=list, max_length=MAX_AGENT_QUERY_LIMIT
+    )
+    started_after: AwareDatetime | None = None  # filter started_at >= start
+    started_before: AwareDatetime | None = None  # filter started_at < end
+
+
+class AgentConversationSpansRes(BaseModel):
+    """Span sequences + feedback markers, one entry per requested conversation."""
+
+    conversations: list[AgentConversationSpans] = Field(default_factory=list)
 
 
 class AgentSpanGroupRow(BaseModel):
@@ -628,6 +753,12 @@ class AgentSpanGroupRow(BaseModel):
     total_reasoning_tokens: int = 0
     total_duration_ms: int = 0
     error_count: int = 0
+    # Summed query-time costs (USD) across the group's spans. Only populated
+    # when AgentSpansQueryReq.include_costs is set; None when no span in the
+    # group had a matching model price. See agents/span_costs.py.
+    total_cost_usd: float | None = None
+    total_input_cost_usd: float | None = None
+    total_output_cost_usd: float | None = None
     agent_names: list[str] = Field(default_factory=list)
     agent_versions: list[str] = Field(default_factory=list)
     provider_names: list[str] = Field(default_factory=list)
@@ -644,6 +775,20 @@ class AgentSpanGroupRow(BaseModel):
     distributions: dict[str, AgentSpanGroupDistributionItem] = Field(
         default_factory=dict
     )
+
+
+class RatingCondition(BaseModel):
+    scorer_key: str
+    op: Literal["gte", "gt", "lte", "lt", "eq"]
+    value: float
+
+
+class AgentSignalFilter(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+    ratings: list[RatingCondition] = Field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        return not self.tags and not self.ratings
 
 
 class AgentSpansQueryReq(BaseModel):
@@ -670,6 +815,11 @@ class AgentSpansQueryReq(BaseModel):
     # etc.) in each row. Intended for single-trace detail fetches; do not set
     # for broad list queries.
     include_details: bool = False
+    # When true, compute per-span costs (USD) by joining each span's model
+    # against llm_token_prices. Adds input_cost_usd/output_cost_usd/.../total_cost_usd to
+    # ungrouped span rows, or summed total_cost_usd/total_input_cost_usd/
+    # total_output_cost_usd to grouped rows. See agents/span_costs.py.
+    include_costs: bool = False
     sort_by: list[AgentSortBy] | None = None
     limit: int = Field(
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
@@ -677,6 +827,7 @@ class AgentSpansQueryReq(BaseModel):
     offset: int = Field(default=0, ge=0)
     started_after: datetime.datetime | None = None  # filter started_at >= start
     started_before: datetime.datetime | None = None  # filter started_at < end
+    signal_filters: AgentSignalFilter | None = None
 
     @model_validator(mode="after")
     def validate_spans_query_request(self) -> AgentSpansQueryReq:
@@ -686,6 +837,14 @@ class AgentSpansQueryReq(BaseModel):
             raise ValueError(
                 "grouped measures, distributions, and filters require group_by"
             )
+        # `signal_filters` currently only apply when grouping by conversation_id.
+        # Later we may add support for filtering on ungrouped or turn-level data.
+        if (
+            self.signal_filters is not None
+            and not self.signal_filters.is_empty()
+            and not self.group_by
+        ):
+            raise ValueError("signal_filters require group_by")
         if self.group_distributions and len(self.group_by or []) != 1:
             raise ValueError("group_distributions currently support one group_by ref")
         if self.group_by and self.custom_attr_columns:
@@ -825,7 +984,9 @@ class AgentSearchMatchedMessage(BaseModel):
 
     span_id: str
     trace_id: str
-    role: SearchMessageRole
+    # Canonical roles are in SearchMessageRole; stored data may carry
+    # arbitrary client-supplied role strings, so accept both.
+    role: SearchMessageRole | str
     content_preview: str
     content_digest: str
     started_at: datetime.datetime
@@ -874,6 +1035,11 @@ class AgentChatAssistantMessage(BaseModel):
     reasoning_tokens: int | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    # Query-time costs (USD) for this message's span (or, for aggregated agent
+    # turns, summed across the subtree). None when the model has no price.
+    input_cost_usd: float | None = None
+    output_cost_usd: float | None = None
+    total_cost_usd: float | None = None
     duration_ms: int | None = None
     status: StatusCodeLiteral | None = None
     content_refs: list[str] = Field(default_factory=list)
@@ -988,6 +1154,9 @@ class AgentTraceChatRes(BaseModel):
             "This is not a sum of child span durations."
         ),
     )
+    # Summed query-time cost (USD) across all spans in the trace. Unlike
+    # duration, this IS a sum across spans. None when no span had a price.
+    total_cost_usd: float | None = None
     messages: list[AgentChatMessage] = Field(default_factory=list)
     feedback: list[dict[str, Any]] | None = None
 
@@ -1030,6 +1199,9 @@ class AgentConversationChatRes(BaseModel):
     has_more: bool = False
     limit: int = MAX_CONVERSATION_CHAT_TURNS
     offset: int = 0
+    # Summed query-time cost (USD) across the returned turns. None when no turn
+    # had a priced span.
+    total_cost_usd: float | None = None
     feedback: list[dict[str, Any]] | None = None
 
 
@@ -1046,6 +1218,11 @@ class AgentSchema(BaseModel):
     error_count: int
     first_seen: datetime.datetime | None
     last_seen: datetime.datetime | None
+    # Summed query-time cost (USD), populated only when the query sets
+    # include_costs. The agents/agent_versions materialized views don't store
+    # cost, so the handler fills this from a supplementary grouped spans query.
+    # None when costs weren't requested or no span had a price.
+    total_cost_usd: float | None = None
 
 
 class AgentsQueryFilters(BaseModel):
@@ -1064,6 +1241,9 @@ class AgentsQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
+    # When true, fill AgentSchema.total_cost_usd from a supplementary grouped spans
+    # cost query (the agents materialized view has no cost column).
+    include_costs: bool = False
 
 
 class AgentsQueryRes(BaseModel):
@@ -1094,6 +1274,9 @@ class AgentVersionsQueryReq(BaseModel):
         default=DEFAULT_AGENT_QUERY_LIMIT, ge=0, le=MAX_AGENT_QUERY_LIMIT
     )
     offset: int = Field(default=0, ge=0)
+    # When true, fill AgentVersionSchema.total_cost_usd from a supplementary grouped
+    # spans cost query (the agent_versions materialized view has no cost column).
+    include_costs: bool = False
 
 
 class AgentVersionsQueryRes(BaseModel):

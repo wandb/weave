@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,13 @@ AGENT_MONITOR_FEEDBACK_TYPE = "wandb.agent_monitor"
 # stored in scorer_tags. Covers any human tag, e.g. an emoji reaction or a
 # manual label like "low-quality".
 AGENT_USER_FEEDBACK_TYPE = "wandb.agent_user_feedback"
+
+# The agent feedback types that carry tags/ratings: human-applied
+# (agent_user_feedback) and scorer-applied (agent_monitor).
+AgentSpanFeedbackType = Literal["wandb.agent_user_feedback", "wandb.agent_monitor"]
+AGENT_SPAN_FEEDBACK_TYPES: frozenset[str] = frozenset(
+    {AGENT_USER_FEEDBACK_TYPE, AGENT_MONITOR_FEEDBACK_TYPE}
+)
 
 # Feedback types where multiple entries can exist per call per type.
 # When filtering on these, we use groupArrayIf (collect all values) + has()

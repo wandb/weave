@@ -12,7 +12,6 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from typing import Any
 
-import ddtrace
 from pydantic import ValidationError
 
 from weave.shared import refs_internal as ri
@@ -20,7 +19,11 @@ from weave.shared.digest import str_digest
 from weave.trace_server import constants
 from weave.trace_server import trace_server_common as tsc
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import types as agent_types
+from weave.trace_server.agents.constants import MAX_AGENT_QUERY_LIMIT
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.interface.query import Query
+from weave.trace_server.tracing import traced
 
 _SUPPORTED_SORT_PREFIXES = (
     "scores.",
@@ -28,8 +31,6 @@ _SUPPORTED_SORT_PREFIXES = (
     "output.",
 )
 _NUMERIC_SORT_PREFIXES = ("scores.",)
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -238,6 +239,93 @@ def extract_total_tokens(
     return total_tokens if found_any else None
 
 
+# The four components of a call's spent cost, summed to the canonical total_cost
+# (see the total_cost definition in trace_server_interface.py). Populated in
+# summary.weave.costs when calls are read with include_costs=True.
+_COST_COMPONENT_KEYS = (
+    "prompt_tokens_total_cost",
+    "completion_tokens_total_cost",
+    "cache_read_input_tokens_total_cost",
+    "cache_creation_input_tokens_total_cost",
+)
+
+
+def extract_total_cost(
+    summary: "dict[str, Any] | tsi.SummaryMap | None",
+) -> float | None:
+    """Return the total cost from summary.weave.costs if present.
+
+    Sums the four spent-cost components across all models. Returns None when no
+    cost data is present (e.g. the model is not in the cost table) so callers
+    can tell "no cost reported" apart from a real $0.
+    """
+    if not isinstance(summary, dict):
+        return None
+    weave_summary = summary.get("weave")
+    if not isinstance(weave_summary, dict):
+        return None
+    costs = weave_summary.get("costs")
+    if not isinstance(costs, dict):
+        return None
+    total_cost = 0.0
+    found_any = False
+    for model_cost in costs.values():
+        if not isinstance(model_cost, dict):
+            continue
+        for key in _COST_COMPONENT_KEYS:
+            value = model_cost.get(key)
+            if isinstance(value, (int, float)):
+                total_cost += float(value)
+                found_any = True
+    return total_cost if found_any else None
+
+
+@traced(name="eval_results_helpers.apply_predict_costs")
+def apply_predict_costs(
+    rows: list[tsi.EvalResultsRow],
+    project_id: str,
+    fetch_calls: Callable[[tsi.CallsQueryReq], Iterable[tsi.CallSchema]],
+) -> None:
+    """Fill each trial's total_cost from its predict call in-place.
+
+    Trial children are fetched without cost enrichment (pricing every scorer
+    child just to read the predict cost is wasted work), so trials start with
+    total_cost=None. This re-reads only the predict calls by id with
+    include_costs=True and copies their cost onto the trials. Must run before
+    compute_summary_from_rows, which sums trial.total_cost.
+    """
+    predict_call_ids = sorted(
+        {
+            trial.predict_call_id
+            for row in rows
+            for evaluation in row.evaluations
+            for trial in evaluation.trials
+            if trial.predict_call_id is not None
+        }
+    )
+    if not predict_call_ids:
+        return
+    cost_by_call_id: dict[str, float] = {}
+    for i in range(0, len(predict_call_ids), tsc.MAX_FILTER_LENGTH):
+        batch = predict_call_ids[i : i + tsc.MAX_FILTER_LENGTH]
+        cost_req = tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(call_ids=batch),
+            columns=["id"],
+            sort_by=[],
+            include_costs=True,
+        )
+        for call in fetch_calls(cost_req):
+            cost = extract_total_cost(call.summary)
+            if cost is not None:
+                cost_by_call_id[call.id] = cost
+    for row in rows:
+        for evaluation in row.evaluations:
+            for trial in evaluation.trials:
+                if trial.predict_call_id is not None:
+                    trial.total_cost = cost_by_call_id.get(trial.predict_call_id)
+
+
 def best_effort_scorer_call_ids(
     scores: dict[str, Any], child_calls: list[tsi.CallSchema]
 ) -> dict[str, str]:
@@ -324,6 +412,166 @@ def _combine_genai_span_refs(
     return refs or None
 
 
+def _span_order_key(span: agent_types.AgentSpanSchema) -> tuple[float, str]:
+    started_at = span.started_at
+    return (
+        started_at.timestamp() if started_at is not None else float("inf"),
+        span.span_id,
+    )
+
+
+def merge_eval_agent_span_refs(
+    rows: list[tsi.EvalResultsRow],
+    spans: Iterable[agent_types.AgentSpanSchema],
+) -> None:
+    """Merge one representative stamped span ref per trace into each trial.
+
+    Evaluation-linked OTel spans are stamped with both the evaluation run ID
+    and predict-and-score call ID. A prediction can produce an entire span tree,
+    but ``genai_span_ref`` is a trace link, so use the root of the stamped
+    subtree as the representative instead of returning every child span.
+    Explicit refs already recorded on calls win for their trace.
+    """
+    spans_by_trial_and_trace: dict[
+        tuple[str, str], dict[str, list[agent_types.AgentSpanSchema]]
+    ] = defaultdict(lambda: defaultdict(list))
+    for span in spans:
+        if not span.eval_run_id or not span.eval_predict_and_score_call_id:
+            continue
+        spans_by_trial_and_trace[span.eval_run_id, span.eval_predict_and_score_call_id][
+            span.trace_id
+        ].append(span)
+
+    for row in rows:
+        for evaluation in row.evaluations:
+            for trial in evaluation.trials:
+                spans_by_trace = spans_by_trial_and_trace.get(
+                    (evaluation.evaluation_call_id, trial.predict_and_score_call_id)
+                )
+                if not spans_by_trace:
+                    continue
+
+                refs = list(trial.genai_span_ref or [])
+                linked_trace_ids = {ref.trace_id for ref in refs}
+                representatives: list[agent_types.AgentSpanSchema] = []
+                for trace_spans in spans_by_trace.values():
+                    span_ids = {span.span_id for span in trace_spans}
+                    roots = [
+                        span
+                        for span in trace_spans
+                        if span.parent_span_id not in span_ids
+                    ]
+                    representatives.append(
+                        min(roots or trace_spans, key=_span_order_key)
+                    )
+
+                for span in sorted(representatives, key=_span_order_key):
+                    if span.trace_id in linked_trace_ids:
+                        continue
+                    refs.append(
+                        tsi.GenAISpanRef(trace_id=span.trace_id, span_id=span.span_id)
+                    )
+                    linked_trace_ids.add(span.trace_id)
+                trial.genai_span_ref = refs or None
+
+
+def _query_eval_agent_spans(
+    server: tsi.TraceServerInterface,
+    project_id: str,
+    eval_call_ids: set[str],
+    predict_and_score_call_ids: list[str],
+) -> list[agent_types.AgentSpanSchema]:
+    linked_spans: list[agent_types.AgentSpanSchema] = []
+    for batch_start in range(
+        0,
+        len(predict_and_score_call_ids),
+        tsc.MAX_FILTER_LENGTH,
+    ):
+        call_id_batch = predict_and_score_call_ids[
+            batch_start : batch_start + tsc.MAX_FILTER_LENGTH
+        ]
+        query = Query.model_validate(
+            {
+                "$expr": {
+                    "$and": [
+                        {
+                            "$in": [
+                                {"$getField": "eval_run_id"},
+                                [
+                                    {"$literal": eval_call_id}
+                                    for eval_call_id in sorted(eval_call_ids)
+                                ],
+                            ]
+                        },
+                        {
+                            "$in": [
+                                {"$getField": "eval_predict_and_score_call_id"},
+                                [{"$literal": call_id} for call_id in call_id_batch],
+                            ]
+                        },
+                    ]
+                }
+            }
+        )
+        offset = 0
+        while True:
+            result = server.agent_spans_query(
+                agent_types.AgentSpansQueryReq(
+                    project_id=project_id,
+                    query=query,
+                    limit=MAX_AGENT_QUERY_LIMIT,
+                    offset=offset,
+                )
+            )
+            linked_spans.extend(
+                span
+                for span in result.spans
+                if span.eval_run_id in eval_call_ids
+                and span.eval_predict_and_score_call_id in call_id_batch
+            )
+            offset += len(result.spans)
+            if not result.spans or offset >= result.total_count:
+                break
+    return linked_spans
+
+
+def hydrate_eval_agent_span_refs(
+    server: tsi.TraceServerInterface,
+    project_id: str,
+    rows: list[tsi.EvalResultsRow],
+) -> list[str]:
+    """Load stamped OTel spans for returned trials and merge them as trace refs.
+
+    This is deliberately best-effort. Eval results remain useful during rolling
+    deploys or if the agent span query fails; callers receive a non-fatal warning
+    rather than losing the evaluation response.
+    """
+    eval_call_ids: set[str] = set()
+    predict_and_score_call_ids: list[str] = []
+    for row in rows:
+        for evaluation in row.evaluations:
+            eval_call_ids.add(evaluation.evaluation_call_id)
+            predict_and_score_call_ids.extend(
+                trial.predict_and_score_call_id for trial in evaluation.trials
+            )
+    predict_and_score_call_ids = list(dict.fromkeys(predict_and_score_call_ids))
+    if not eval_call_ids or not predict_and_score_call_ids:
+        return []
+
+    try:
+        linked_spans = _query_eval_agent_spans(
+            server, project_id, eval_call_ids, predict_and_score_call_ids
+        )
+        merge_eval_agent_span_refs(rows, linked_spans)
+    except Exception:
+        logger.warning(
+            "Failed to load evaluation-linked agent spans",
+            exc_info=True,
+        )
+        return ["Failed to load evaluation-linked agent spans"]
+    return []
+
+
 def _build_trial(
     predict_and_score_call: tsi.CallSchema,
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -361,12 +609,17 @@ def _build_trial(
         total_tokens=extract_total_tokens(
             predict_call.summary if predict_call else predict_and_score_call.summary
         ),
+        # Cost is filled afterwards by apply_predict_costs: children arrive
+        # without cost enrichment, and only the predict calls get priced —
+        # never the predict_and_score rollup, which would include the
+        # LLM-as-a-judge scorer.
+        total_cost=None,
         scorer_call_ids=best_effort_scorer_call_ids(scores, trial_children),
         genai_span_ref=_combine_genai_span_refs(predict_call, predict_and_score_call),
     )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows_from_calls")
+@traced(name="eval_results_helpers.build_eval_rows_from_calls")
 def build_eval_rows_from_calls(
     predict_and_score_calls: list[tsi.CallSchema],
     child_by_parent: dict[str, list[tsi.CallSchema]],
@@ -432,7 +685,7 @@ def finalize_rows(
     return apply_row_selection(rows, eval_root_ids, require_intersection, offset, limit)
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.build_eval_rows")
+@traced(name="eval_results_helpers.build_eval_rows")
 def build_eval_rows(
     page_calls: list[tsi.CallSchema],
     eval_root_ids: list[str],
@@ -541,7 +794,7 @@ def resolve_eval_row_refs(
     return []
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_grouped_rows")
+@traced(name="eval_results_helpers.eval_results_grouped_rows")
 def eval_results_grouped_rows(
     req: tsi.EvalResultsQueryReq,
     eval_root_ids: list[str],
@@ -575,7 +828,7 @@ def eval_results_grouped_rows(
     )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.fetch_eval_root_metadata")
+@traced(name="eval_results_helpers.fetch_eval_root_metadata")
 def fetch_eval_root_metadata(
     server: tsi.TraceServerInterface,
     project_id: str,
@@ -617,7 +870,7 @@ def validate_eval_results_request(req: tsi.EvalResultsQueryReq) -> None:
                 )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.eval_results_query")
+@traced(name="eval_results_helpers.eval_results_query")
 def eval_results_query(
     server: tsi.TraceServerInterface,
     req: tsi.EvalResultsQueryReq,
@@ -640,6 +893,9 @@ def eval_results_query(
         offset=0,
     )
     all_rows, _ = eval_results_grouped_rows(all_rows_req, eval_root_ids, all_calls)
+
+    if req.include_costs:
+        apply_predict_costs(all_rows, req.project_id, server.calls_query_stream)
 
     rows: list[tsi.EvalResultsRow] = []
     total_rows = 0
@@ -743,7 +999,7 @@ def _process_scorer_output(
             )
 
 
-@ddtrace.tracer.wrap(name="eval_results_helpers.compute_summary_from_rows")
+@traced(name="eval_results_helpers.compute_summary_from_rows")
 def compute_summary_from_rows(
     rows: list[tsi.EvalResultsRow],
     eval_call_metadata: dict[str, dict[str, Any]] | None = None,
@@ -784,6 +1040,14 @@ def compute_summary_from_rows(
 
             for trial in eval_entry.trials:
                 eval_summary_map[eval_call_id].trial_count += 1
+                if trial.total_tokens is not None:
+                    eval_summary_map[eval_call_id].predict_total_tokens = (
+                        eval_summary_map[eval_call_id].predict_total_tokens or 0
+                    ) + trial.total_tokens
+                if trial.total_cost is not None:
+                    eval_summary_map[eval_call_id].predict_total_cost = (
+                        eval_summary_map[eval_call_id].predict_total_cost or 0.0
+                    ) + trial.total_cost
                 for scorer_key, scorer_val in trial.scores.items():
                     _process_scorer_output(
                         scorer_val,

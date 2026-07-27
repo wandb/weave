@@ -12,7 +12,7 @@ The main entry point is `extract_genai_span()` which takes a parsed OTel
 import json
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
@@ -24,12 +24,24 @@ from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
 )
-from weave.trace_server.opentelemetry.helpers import get_attribute, to_json_serializable
+from weave.trace_server.base64_content_conversion import (
+    replace_base64_in_raw_messages,
+    replace_base64_with_content_objects,
+)
+from weave.trace_server.opentelemetry.helpers import (
+    _set_value_in_nested_dict,
+    get_attribute,
+    to_json_serializable,
+    try_convert_numeric_keys_to_list,
+)
 from weave.trace_server.opentelemetry.python_spans import Span
 from weave.trace_server.query_builder.agent_query_builder import (
     safe_float,
     safe_int,
 )
+
+if TYPE_CHECKING:
+    from weave.trace_server.trace_server_interface import TraceServerInterface
 
 # Known operation name prefixes for span-name inference.
 _KNOWN_OP_PREFIXES = (
@@ -69,6 +81,17 @@ def _get(attrs: dict[str, Any], *keys: str) -> Any:
 def _get_str(attrs: dict[str, Any], *keys: str) -> str:
     """Return the first non-empty attribute value as a string."""
     return str(_get(attrs, *keys) or "")
+
+
+def _get_int(attrs: dict[str, Any], *keys: str, default: int = 0) -> int:
+    """Return the first attribute value as an int, or default if absent/invalid."""
+    val = _get(attrs, *keys)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
 
 
 def _json_str(val: Any) -> str:
@@ -231,20 +254,6 @@ def extract_tool_call_result(
 # ---------------------------------------------------------------------------
 
 
-def _text_from_parts(parts: list[Any]) -> str:
-    """Concatenate text from a list of message parts."""
-    texts: list[str] = []
-    for p in parts:
-        if isinstance(p, str):
-            texts.append(p)
-        elif isinstance(p, dict):
-            if "content" in p and isinstance(p["content"], str):
-                texts.append(p["content"])
-            elif "text" in p and isinstance(p["text"], str):
-                texts.append(p["text"])
-    return "\n".join(texts)
-
-
 def _normalize_single_message(
     msg: dict[str, Any], *, default_role: str = ""
 ) -> NormalizedMessage:
@@ -264,7 +273,11 @@ def _normalize_single_message(
     elif isinstance(msg.get("content"), str):
         content = msg["content"]
     elif isinstance(msg.get("content"), list):
-        content = _text_from_parts(msg["content"])
+        # Multimodal content (e.g. OpenAI-style ``[{text}, {image_url}]``) is
+        # preserved as a JSON parts array so the full payload — including
+        # non-text parts such as converted images — survives. Flattening to
+        # text here silently dropped image/blob parts.
+        content = _json_str(msg["content"])
 
     return NormalizedMessage(
         role=role,
@@ -331,33 +344,40 @@ def _normalize_system_instructions(raw: Any) -> list[str]:
 
 
 def _extract_raw_input(attrs: dict[str, Any]) -> Any:
-    """Return raw input messages from attrs."""
-    return _get(
-        attrs,
-        *semconv.INPUT_MESSAGES.lookup_keys,
-        "weave.prompt",
-        "gen_ai.prompt",
+    """Return raw input messages from attrs.
+
+    Legacy indexed conventions (``gen_ai.prompt.{i}.*``) unflatten to a
+    numeric-keyed dict (``{"0": {...}}``); ``try_convert_numeric_keys_to_list``
+    turns that back into a message list, matching how the non-agents path
+    normalizes inputs in ``parse_weave_values``.
+    """
+    return try_convert_numeric_keys_to_list(
+        _get(
+            attrs,
+            *semconv.INPUT_MESSAGES.lookup_keys,
+            "weave.prompt",
+            "gen_ai.prompt",
+        )
     )
 
 
 def _extract_raw_output(attrs: dict[str, Any], events: list[dict[str, Any]]) -> Any:
-    """Return raw output messages from attrs, legacy completion attrs, or events."""
+    """Return raw output messages from attrs, legacy completion attrs, or events.
+
+    Numeric-keyed dicts from indexed conventions (``gen_ai.completion.{i}.*``)
+    are converted back to a message list, as in the non-agents path.
+    """
     val = _get(attrs, *semconv.OUTPUT_MESSAGES.lookup_keys)
-    if val is not None:
-        return val
-
-    val = _get(attrs, *semconv.COMPLETION.lookup_keys)
-    if val is not None:
-        return val
-
-    for event in events:
-        if event.get("name") == "gen_ai.content.completion":
-            event_attrs = event.get("attributes", {})
-            val = get_attribute(event_attrs, "gen_ai.completion")
-            if val is not None:
-                return val
-
-    return None
+    if val is None:
+        val = _get(attrs, *semconv.COMPLETION.lookup_keys)
+    if val is None:
+        for event in events:
+            if event.get("name") == "gen_ai.content.completion":
+                event_attrs = event.get("attributes", {})
+                val = get_attribute(event_attrs, "gen_ai.completion")
+                if val is not None:
+                    break
+    return try_convert_numeric_keys_to_list(val)
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +466,95 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 
 
 # ---------------------------------------------------------------------------
+# Inline blob stripping
+# ---------------------------------------------------------------------------
+
+
+def _strip_message_attr(
+    attrs: dict[str, Any],
+    lookup_keys: tuple[str, ...],
+    project_id: str,
+    trace_server: "TraceServerInterface",
+    wb_user_id: str | None = None,
+) -> None:
+    """Strip base64 from the first present message-payload attribute key.
+
+    Only the first present lookup key is considered (matching how extraction
+    resolves aliases via ``_get``). If that value is a ``str`` it is a
+    JSON-encoded message payload that the generic leaf walker cannot descend
+    into, so parse-and-strip it and write the (now structured) result back at
+    the same key. If it is already a dict/list the generic pass has handled it,
+    so nothing is done.
+    """
+    for key in lookup_keys:
+        value = get_attribute(attrs, key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            stripped = replace_base64_in_raw_messages(
+                value, project_id, trace_server, wb_user_id
+            )
+            # Mirror ``get_attribute``'s flat-vs-nested resolution: write back to
+            # the flat dotted key if present, otherwise into the nested tree.
+            if key in attrs:
+                attrs[key] = stripped
+            else:
+                _set_value_in_nested_dict(attrs, key, stripped)
+        return
+
+
+def strip_inline_blobs_from_span(
+    span: Span,
+    project_id: str,
+    trace_server: "TraceServerInterface",
+    wb_user_id: str | None = None,
+) -> None:
+    """Strip inline base64 / base64 data-URIs from a span into stored Content refs.
+
+    Mutates ``span.attributes`` in place. This is the single explicit
+    inline-blob-stripping step for the OTel *agents* ingest path and is run
+    *before* the pure ``extract_genai_span`` transform.
+
+    Two passes are required because base64 lands in two different output
+    columns with two different shapes:
+
+    1. Generic pass — ``replace_base64_with_content_objects`` walks the whole
+       attribute tree and replaces any leaf string that is itself a data-URI /
+       base64 blob. This cleans the lossless dumps (``attributes_dump`` /
+       ``raw_span_dump``) and the typed custom-attribute maps, and it catches
+       structured message payloads (dict/list) where the blob is already a
+       leaf.
+
+    2. Message-payload pass — the ``gen_ai.{input,output}.messages`` payload
+       frequently arrives as a *JSON-encoded string*. The generic walker in
+       pass 1 cannot descend into a JSON-string leaf, so base64 buried inside
+       it survives pass 1. For each of the input / output message attributes we
+       take the first present lookup key and, when its value is such a string,
+       parse-strip-and-write-back via ``replace_base64_in_raw_messages`` — which
+       cleans the ``input_messages`` / ``output_messages`` columns (and, as a
+       side benefit, the dumps for the JSON-string case too, since the attribute
+       is now a stripped structure).
+    """
+    span.attributes = replace_base64_with_content_objects(
+        span.attributes, project_id, trace_server, wb_user_id
+    )
+    _strip_message_attr(
+        span.attributes,
+        semconv.INPUT_MESSAGES.lookup_keys,
+        project_id,
+        trace_server,
+        wb_user_id,
+    )
+    _strip_message_attr(
+        span.attributes,
+        semconv.OUTPUT_MESSAGES.lookup_keys,
+        project_id,
+        trace_server,
+        wb_user_id,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -461,6 +570,10 @@ def extract_genai_span(
     """Extract GenAI semantic convention fields from a parsed OTel span.
 
     Returns an `AgentSpanCHInsertable` ready for ClickHouse insert.
+
+    This is a pure transform: it reads ``span`` and produces the insertable
+    with no file storage or other side effects. Inline base64 stripping is a
+    separate, explicit step (`strip_inline_blobs_from_span`) run before this.
     """
     attrs = span.attributes
     events_dicts = [e.as_dict() for e in span.events]
@@ -472,6 +585,7 @@ def extract_genai_span(
     status_code = span.status.code.name
 
     raw_output = _extract_raw_output(attrs, events_dicts)
+    raw_input = _extract_raw_input(attrs)
     output_msgs = _normalize_raw_messages(raw_output, default_role="assistant")
     reasoning_content = extract_reasoning_content(raw_output)
 
@@ -494,6 +608,17 @@ def extract_genai_span(
         agent_id=_get_str(attrs, *semconv.AGENT_ID.lookup_keys),
         agent_description=_get_str(attrs, *semconv.AGENT_DESCRIPTION.lookup_keys),
         agent_version=_get_str(attrs, *semconv.AGENT_VERSION.lookup_keys),
+        eval_run_id=_get_str(attrs, *semconv.EVAL_RUN_ID.lookup_keys),
+        eval_predict_and_score_call_id=_get_str(
+            attrs, *semconv.EVAL_PREDICT_AND_SCORE_CALL_ID.lookup_keys
+        ),
+        eval_kind=_get_str(attrs, *semconv.EVAL_KIND.lookup_keys),
+        eval_row_digest=_get_str(attrs, *semconv.EVAL_ROW_DIGEST.lookup_keys),
+        eval_example_id=_get_str(attrs, *semconv.EVAL_EXAMPLE_ID.lookup_keys),
+        eval_trial_index=_get_int(
+            attrs, *semconv.EVAL_TRIAL_INDEX.lookup_keys, default=-1
+        ),
+        eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),
@@ -537,9 +662,7 @@ def extract_genai_span(
             _get(attrs, *semconv.REQUEST_CHOICE_COUNT.lookup_keys)
         ),
         output_type=_get_str(attrs, *semconv.OUTPUT_TYPE.lookup_keys),
-        input_messages=_normalize_raw_messages(
-            _extract_raw_input(attrs), default_role="user"
-        ),
+        input_messages=_normalize_raw_messages(raw_input, default_role="user"),
         output_messages=output_msgs,
         system_instructions=_normalize_system_instructions(
             _get(attrs, *semconv.SYSTEM_INSTRUCTIONS.lookup_keys)

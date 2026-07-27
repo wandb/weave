@@ -1,5 +1,5 @@
 import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
-import {Session} from '../../genai/session';
+import {Conversation} from '../../genai/conversation';
 
 import {
   findSpan,
@@ -11,18 +11,18 @@ describe('end-to-end chain', () => {
   setupGenAITestEnvironment();
   const getExporter = setupExporterPerTest();
 
-  it('session → turn → llm → tool wires the full parent-child trace', () => {
-    const session = Session.create({
+  it('conversation → turn → llm → tool wires the full parent-child trace', () => {
+    const conversation = Conversation.create({
       agentName: 'weather-bot',
-      sessionId: 'conv-e2e',
+      conversationId: 'conv-e2e',
     });
-    const turn = session.startTurn();
+    const turn = conversation.startTurn();
     const llm = turn.startLLM({model: 'gpt-4o'});
     const tool = llm.startTool({name: 'get_weather'});
     tool.end();
     llm.end();
     turn.end();
-    session.end();
+    conversation.end();
 
     const spans = getExporter().getFinishedSpans();
     expect(spans).toHaveLength(3);

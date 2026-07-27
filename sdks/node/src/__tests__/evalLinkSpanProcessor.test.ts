@@ -183,7 +183,7 @@ describe('EvalLinkSpanProcessor', () => {
 
     const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCall = calls.find(c =>
-      c.op_name?.includes('Evaluation.predictAndScore')
+      c.op_name.includes('Evaluation.predictAndScore')
     );
 
     expect(predictAndScoreCall?.summary?.weave?.genai_span_ref).toEqual([

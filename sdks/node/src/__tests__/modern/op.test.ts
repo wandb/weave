@@ -164,7 +164,7 @@ describe('op modern decorators', () => {
       }
     }
 
-    const instance = new TestClass();
+    const _instance = new TestClass();
     const descriptor = Object.getOwnPropertyDescriptor(
       TestClass.prototype,
       'method'

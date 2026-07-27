@@ -15,6 +15,8 @@ class ComparisonViewDefinition(BaseModel):
     Args:
         evaluation_call_ids (list[str]): List of evaluation call IDs being compared.
         selected_metrics (list[str] | None): List of metrics that are visible in plots.
+        column_visibility (dict[str, bool] | None): Results-table column visibility
+            keyed by column field. Absent/empty means the default columns.
 
     Examples:
         >>> definition = ComparisonViewDefinition(
@@ -25,6 +27,7 @@ class ComparisonViewDefinition(BaseModel):
 
     evaluation_call_ids: list[str]
     selected_metrics: list[str] | None = None
+    column_visibility: dict[str, bool] | None = None
 
 
 class ComparisonView(base_object_def.BaseObject):

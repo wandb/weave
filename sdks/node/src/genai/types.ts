@@ -1,5 +1,5 @@
 /**
- * Public data types for the Weave GenAI session SDK.
+ * Public data types for the Weave GenAI conversation SDK.
  */
 
 export type Role =

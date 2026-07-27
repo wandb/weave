@@ -4,7 +4,6 @@ import datetime
 
 import pytest
 
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
 from weave.trace.call import Call
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -204,7 +203,6 @@ def _create_finished_calls(client, count: int) -> list[Call]:
     return calls
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_sdk_lifecycle(client):
     scorer_refs = ["weave:///entity/project/scorer/sdk_test:abc123"]
 

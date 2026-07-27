@@ -11,6 +11,7 @@ from typing import Any, Literal, TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
@@ -43,16 +44,21 @@ class ParamBuilder:
         param_builder_count += 1
         self._params: dict[str, Any] = {}
         self._prefix = (prefix or f"pb_{param_builder_count}") + "_"
-        self._param_to_name: dict[Any, str] = {}
+        self._param_to_name: dict[tuple[type, Any], str] = {}
 
     def add_param(self, param_value: Any) -> str:
         param_name = self._prefix + str(len(self._params))
 
         # Only attempt caching for hashable values
         if isinstance(param_value, Hashable):
-            if param_value in self._param_to_name:
-                return self._param_to_name[param_value]
-            self._param_to_name[param_value] = param_name
+            # Dedup on (type, value), not value alone: True == 1 == 1.0 in
+            # Python (with equal hashes), so a value-only key could bind a bool
+            # and an int to one param rendered as both Bool and UInt64 (a parse
+            # error in ClickHouse).
+            cache_key = (type(param_value), param_value)
+            if cache_key in self._param_to_name:
+                return self._param_to_name[cache_key]
+            self._param_to_name[cache_key] = param_name
 
         # For non-hashable values, just generate a new param without caching
         self._params[param_name] = param_value
@@ -184,6 +190,7 @@ class Table:
 
 
 Action = Literal["SELECT", "DELETE"]
+JoinType: TypeAlias = Literal["INNER", "LEFT", "RIGHT", "FULL", "CROSS"]
 
 
 @dataclass(slots=True)
@@ -197,7 +204,8 @@ class PreparedSelect:
 class Join:
     table: Table
     query: tsi.Query
-    join_type: str | None
+    join_type: JoinType | None
+    global_: bool = False
 
 
 class Select:
@@ -237,9 +245,13 @@ class Select:
         self._group_by = None
 
     def join(
-        self, table: Table, query: tsi.Query, join_type: str | None = None
+        self,
+        table: Table,
+        query: tsi.Query,
+        join_type: JoinType | None = None,
+        global_: bool = False,
     ) -> "Select":
-        self.joins.append(Join(table, query, join_type))
+        self.joins.append(Join(table, query, join_type, global_))
         for col in table.cols:
             self.all_columns.append(col.dbname())
         self.datetime_columns.extend(table.datetime_cols)
@@ -344,7 +356,9 @@ class Select:
                 datetime_columns=self.datetime_columns,
             )
             joined = combine_conditions(query_conds, "AND")
-            sql += f"\n{j.join_type + ' ' if j.join_type else ''}JOIN {j.table.name} ON {joined}"
+            global_prefix = "GLOBAL " if j.global_ else ""
+            join_kind = f"{j.join_type} " if j.join_type else ""
+            sql += f"\n{global_prefix}{join_kind}JOIN {j.table.name} ON {joined}"
 
         conditions = []
         if self._project_id:
@@ -364,7 +378,6 @@ class Select:
                 datetime_columns=self.datetime_columns,
             )
             conditions.extend(query_conds)
-
         joined = combine_conditions(conditions, "AND")
         if joined:
             sql += f"\nWHERE {joined}"
@@ -678,6 +691,7 @@ def quote_json_path(path: str) -> str:
 
 
 def quote_json_path_parts(parts: list[str]) -> str:
+    assert_parsable_json_path(parts)
     parts_final = []
     for part in parts:
         try:
@@ -686,6 +700,23 @@ def quote_json_path_parts(parts: list[str]) -> str:
         except ValueError:
             parts_final.append('."' + part + '"')
     return "$" + "".join(parts_final)
+
+
+def assert_parsable_json_path(parts: list[str]) -> None:
+    """Reject path segments ClickHouse's JSON_VALUE grammar cannot parse.
+
+    A negative array index compiles to e.g. `[-1]`, which raises BAD_ARGUMENTS
+    in ClickHouse; surface it as a client-facing InvalidFieldError instead.
+    """
+    for part in parts:
+        try:
+            index = int(part)
+        except ValueError:
+            continue
+        if index < 0:
+            raise InvalidFieldError(
+                f"Negative array index {part!r} is not supported in JSON field paths"
+            )
 
 
 def _transform_external_field_to_internal_field(
@@ -982,6 +1013,9 @@ def _process_query_to_conditions(
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
+        elif isinstance(operand, tsi_query.SizeOperation):
+            value = process_operand(operand.size_)
+            return f"length({value})"
         elif isinstance(
             operand,
             (

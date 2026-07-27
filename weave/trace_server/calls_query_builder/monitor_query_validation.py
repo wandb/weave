@@ -1,19 +1,20 @@
-"""Server-side validation for saved Monitor object queries.
+"""Server-side validation for saved Monitor object queries at obj_create time.
 
-A Monitor carries a `query` over call fields that the scoring worker runs every
-cycle. We reject queries referencing disallowed fields or that are structurally
-invalid at obj_create time, so a bad monitor fails loudly on save instead of
-silently erroring per scoring cycle.
+Regular monitors validate against the `calls_merged` schema; agent monitors
+(op_names include an agent-span op) against the agent-spans schema, so logical
+fields like `operation_name` aren't wrongly rejected (the agent-signal 422).
 """
 
 from pydantic import ValidationError
 
+from weave.trace_server.agents.constants import AGENT_SPAN_OP_NAMES
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     process_query_to_conditions,
 )
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.orm import ParamBuilder
+from weave.trace_server.query_builder.agent_query_compiler import compile_agent_query
 
 
 def validate_monitor_query_fields(
@@ -27,7 +28,10 @@ def validate_monitor_query_fields(
     query = _monitor_query(val)
     if query is None:
         return
-    _validate_calls_query(query)
+    if _is_agent_monitor(val):
+        _validate_agent_spans_query(query)
+    else:
+        _validate_calls_query(query)
 
 
 def _validate_calls_query(query: tsi_query.Query) -> None:
@@ -40,6 +44,18 @@ def _validate_calls_query(query: tsi_query.Query) -> None:
     """
     try:
         process_query_to_conditions(query, ParamBuilder(), "calls_merged")
+    except (ValueError, TypeError) as e:
+        raise InvalidRequest(f"Invalid query: {e}") from e
+
+
+def _validate_agent_spans_query(query: tsi_query.Query) -> None:
+    """Like `_validate_calls_query`, but compiles against the agent-spans schema.
+
+    Accepts logical agent-span fields (`operation_name`, ...) while still failing
+    loudly on unknown ones; `compile_agent_query` raises a ValueError remapped here.
+    """
+    try:
+        compile_agent_query(query, ParamBuilder())
     except (ValueError, TypeError) as e:
         raise InvalidRequest(f"Invalid query: {e}") from e
 
@@ -57,6 +73,20 @@ def _is_monitor_object(
         base_object_class in MONITOR_OBJECT_CLASSES
         or leaf_object_class in MONITOR_OBJECT_CLASSES
     )
+
+
+def _is_agent_monitor(val: object) -> bool:
+    """Whether a Monitor targets agent spans, by its serialized `op_names`.
+
+    Agent-span op literals are stored verbatim (not normalized to `weave:///`
+    refs), so a plain membership check against `AGENT_SPAN_OP_NAMES` suffices.
+    """
+    if not isinstance(val, dict):
+        return False
+    op_names = val.get("op_names")
+    if not isinstance(op_names, list):
+        return False
+    return any(op in AGENT_SPAN_OP_NAMES for op in op_names)
 
 
 def _monitor_query(val: object) -> tsi_query.Query | None:

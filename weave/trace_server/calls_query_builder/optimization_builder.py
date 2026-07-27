@@ -96,6 +96,8 @@ class QueryOptimizationProcessor(ABC):
             return self.process_get_field(operand)
         elif isinstance(operand, tsi_query.ConvertOperation):
             return self.process_convert(operand)
+        elif isinstance(operand, tsi_query.SizeOperation):
+            return self.process_size(operand)
         return apply_processor(self, operand)
 
     def process_literal(self, operand: tsi_query.LiteralOperation) -> str | None:
@@ -112,6 +114,13 @@ class QueryOptimizationProcessor(ABC):
         if field is None:
             return None
         return clickhouse_cast(field, operand.convert_.to)
+
+    def process_size(self, operand: tsi_query.SizeOperation) -> str | None:
+        """Process a size operand when its input can be optimized."""
+        value = self.process_operand(operand.size_)
+        if value is None:
+            return None
+        return f"length({value})"
 
     def process_and(self, operation: tsi_query.AndOperation) -> str | None:
         """Process AND operations into optimized SQL."""

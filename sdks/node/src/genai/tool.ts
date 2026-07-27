@@ -1,4 +1,4 @@
-import {type Span, SpanKind} from '@opentelemetry/api';
+import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
@@ -56,7 +56,8 @@ export class Tool extends SpanBase {
 
   static create(opts: ToolInit & ChildSpanContext): Tool {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Record<string, string> = {
+    const attributes: Attributes = {
+      ...(opts.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: opts.name,
     };

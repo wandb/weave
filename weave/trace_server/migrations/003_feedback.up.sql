@@ -1,4 +1,4 @@
-CREATE TABLE feedback (
+CREATE TABLE IF NOT EXISTS feedback (
     /*
     `id`: The unique identifier for the feedback. This is a UUID.
     */

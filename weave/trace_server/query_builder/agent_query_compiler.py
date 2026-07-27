@@ -106,6 +106,12 @@ def compile_agent_query(
 
     Callers AND the returned condition with their other filter clauses.
     The condition may contain internal `AND` / `OR` / `NOT`.
+
+    Fields compile with span-exact semantics against `table_alias`. Trace-level
+    attribution of the agent / conversation identity columns is handled by the
+    caller's choice of FROM source (see `agent_trace_attribution`), not here, so
+    a filter like ``agent_name = 'X'`` transparently matches the attributed
+    value when the query reads from the attributed-spans source.
     """
     _validate_sql_identifier("table_alias", table_alias)
     return _compile_operation(query.expr_, pb, table_alias)
@@ -212,6 +218,10 @@ def _compile_operand(
             operand.convert_.input, pb, alias, sibling_hint=cast_hint
         )
         return clickhouse_cast(inner_sql, operand.convert_.to)
+
+    if isinstance(operand, tsi_query.SizeOperation):
+        inner_sql = _compile_operand(operand.size_, pb, alias)
+        return f"length({inner_sql})"
 
     if isinstance(
         operand,

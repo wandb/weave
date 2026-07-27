@@ -8,6 +8,7 @@ We should never be breaking the user's program with an error.
 from __future__ import annotations
 
 import gc
+import time
 import weakref
 from collections import Counter
 from unittest.mock import MagicMock
@@ -119,6 +120,11 @@ def test_resilience_to_obj_create_failure_does_not_pin_payload(
         pass
     client_with_throwing_server.future_executor.flush()
 
+    # flush() can return before the future's failure done-callback clears the
+    # ref, so wait for the eventual release rather than racing it.
+    deadline = time.monotonic() + 5.0
+    while obj.ref is not None and time.monotonic() < deadline:
+        time.sleep(0.005)
     assert obj.ref is None
 
     del obj

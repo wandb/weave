@@ -42,6 +42,15 @@ class CallStore:
             existing.update(payload)
             self._calls[project_id][call_id] = existing
 
+    def add_complete(self, payload: dict[str, Any]) -> None:
+        """Record a completed call (start + end fields together)."""
+        project_id = payload.get("project_id", "<unknown>")
+        call_id = payload.get("id", "<unknown>")
+        with self._lock:
+            existing = self._calls[project_id].get(call_id, {})
+            existing.update(payload)
+            self._calls[project_id][call_id] = existing
+
     def get_calls(self, project_id: str) -> list[dict[str, Any]]:
         """Return all captured calls for a project, in insertion order."""
         with self._lock:

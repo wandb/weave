@@ -53,7 +53,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "custom",
     "flow",
     "trace",
-    "trace_calls_complete_only",
+    "trace_calls_merged_only",
     "trace_no_server",
     "trace_server",
     "trace_server_bindings",
@@ -116,7 +116,7 @@ SHARDS_WITHOUT_EXTRAS = {
         "verifiers_test",
         "autogen_tests",
         "trace",
-        "trace_calls_complete_only",
+        "trace_calls_merged_only",
         "trace_no_server",
         "stainless",
     ],
@@ -147,9 +147,17 @@ def tests(session: nox.Session, shard: str):
     session.run(*sync_args)
 
     if shard == "openai_agents":
-        # Keep the public extra broad for runtime compatibility, but exercise the
-        # newer SDK span classes in CI.
-        session.run("uv", "pip", "install", "--upgrade", "openai-agents>=0.14.7")
+        # Exercise the newer SDK span classes in CI. Cap openai below 2.45.0:
+        # it made InputTokensDetails.cache_write_tokens required, but openai-agents
+        # still constructs InputTokensDetails without it.
+        session.run(
+            "uv",
+            "pip",
+            "install",
+            "--upgrade",
+            "openai-agents>=0.14.7",
+            "openai<2.45.0",
+        )
 
     if shard == "google_adk":
         # Installed here (not via an extra) so it stays out of the shared
@@ -207,14 +215,14 @@ def tests(session: nox.Session, shard: str):
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
-        "trace_calls_complete_only": [
+        "trace_calls_merged_only": [
             "tests/trace/",
             "tests/compat/",
             "tests/utils/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
         "trace_no_server": [
             "tests/trace/",
@@ -222,7 +230,7 @@ def tests(session: nox.Session, shard: str):
             "tests/utils/",
             "tests/compat/",
             "tests/wandb_interface/",
-            "tests/session/",
+            "tests/conversation/",
         ],
     }
 
@@ -234,7 +242,7 @@ def tests(session: nox.Session, shard: str):
 
     # Each worker gets its own isolated database namespace
     # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard in {"trace", "trace_calls_complete_only"}:
+    if shard in {"trace", "trace_calls_merged_only"}:
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
@@ -252,14 +260,14 @@ def tests(session: nox.Session, shard: str):
         "--cov-branch",
     ]
 
-    if shard in {"trace", "trace_calls_complete_only"}:
+    if shard in {"trace", "trace_calls_merged_only"}:
         pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    if shard == "trace_calls_complete_only":
-        env["WEAVE_USE_CALLS_COMPLETE"] = "true"
+    if shard == "trace_calls_merged_only":
+        env["WEAVE_USE_CALLS_COMPLETE"] = "false"
 
     # Set trace-server flag for stainless shard
     if shard == "stainless":

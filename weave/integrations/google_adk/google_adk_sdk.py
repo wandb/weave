@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping
 from functools import wraps
+from typing import cast
 
 from google.adk.agents.base_agent import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
@@ -65,15 +66,18 @@ from weave.trace.autopatch import IntegrationSettings
 # their signatures as ``TypeAlias`` / ``Protocol``, so we declare local
 # aliases here to type the wrappers below. Each ADK function returns
 # ``None`` — the wrappers capture the return value but never change it.
-# ``_TraceToolCall`` is the open ``Callable[..., None]`` because ADK adds
-# trailing optional params to ``trace_tool_call`` across releases
-# (``error_type`` landed in 2.2.0); the wrapper forwards them verbatim.
+# ``_TraceToolCall`` and ``_TraceInferenceResult`` are the open
+# ``Callable[..., None]`` because ADK reshapes both across releases: it adds
+# trailing optional params to ``trace_tool_call`` (``error_type`` landed in
+# 2.2.0), and it prepended a leading ``invocation_context`` argument to
+# ``trace_inference_result`` in 2.3.0. Both wrappers forward the arguments
+# verbatim.
 _TraceAgentInvocation = Callable[[Span, BaseAgent, InvocationContext], None]
 _TraceToolCall = Callable[..., None]
 _SetCommonGenerateContentAttributes = Callable[
     [Span, LlmRequest, Mapping[str, AttributeValue]], None
 ]
-_TraceInferenceResult = Callable[[Span | GenerateContentSpan, LlmResponse], None]
+_TraceInferenceResult = Callable[..., None]
 
 # Integration provenance, flattened once for OTel span attributes (scalars only).
 # ADK creates the spans; these wrappers enrich them, so we stamp the same
@@ -214,11 +218,24 @@ def _wrap_set_common_generate_content_attributes(
 def _wrap_trace_inference_result(
     original: _TraceInferenceResult,
 ) -> _TraceInferenceResult:
-    """Enrich the modern ``use_inference_span`` response-time entry point."""
+    """Enrich the modern ``use_inference_span`` response-time entry point.
+
+    ADK prepended a leading ``invocation_context`` argument to
+    ``trace_inference_result`` in 2.3.0: ``(span, llm_response)`` became
+    ``(invocation_context, span, llm_response)``. We forward ``*args``
+    verbatim to the same-version original, then pull the span and response
+    off the tail two positions (their relative order is stable across both
+    shapes), so the wrapper works against ADK >=1.36 without a signature
+    mismatch.
+    """
 
     @wraps(original)
-    def wrapper(span: Span | GenerateContentSpan, llm_response: LlmResponse) -> None:
-        original(span, llm_response)
+    def wrapper(*args: object) -> None:
+        original(*args)
+        # ADK keeps ``span`` and ``llm_response`` as the last two positional
+        # args in both shapes; only ``invocation_context`` was prepended.
+        span = cast("Span | GenerateContentSpan", args[-2])
+        llm_response = cast(LlmResponse, args[-1])
         # ADK's own ``trace_inference_result`` bails on partial chunks
         # (``if llm_response.partial: return``) — mirror that contract so
         # the streaming path doesn't stomp the span N times with

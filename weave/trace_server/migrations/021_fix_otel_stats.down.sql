@@ -1,5 +1,5 @@
-ALTER TABLE calls_merged_stats DROP COLUMN otel_dump_size_bytes;
-ALTER TABLE calls_merged_stats ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
+ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS otel_dump_size_bytes;
+ALTER TABLE calls_merged_stats ADD COLUMN IF NOT EXISTS otel_dump SimpleAggregateFunction(any, Nullable(String));
 
 ALTER TABLE calls_merged_stats_view MODIFY QUERY
 SELECT

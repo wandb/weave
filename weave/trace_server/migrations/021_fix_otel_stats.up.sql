@@ -1,9 +1,9 @@
 -- Drop errantly added DUMP from stats table
-ALTER TABLE calls_merged_stats DROP COLUMN otel_dump;
+ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS otel_dump;
  
 -- Add otel_dump_size_bytes (NOT DUMP) to stats table
 ALTER TABLE calls_merged_stats
-    ADD COLUMN otel_dump_size_bytes SimpleAggregateFunction(any, Nullable(UInt64));
+    ADD COLUMN IF NOT EXISTS otel_dump_size_bytes SimpleAggregateFunction(any, Nullable(UInt64));
 
 -- Update stats materialized view with the bytes field
 ALTER TABLE calls_merged_stats_view MODIFY QUERY

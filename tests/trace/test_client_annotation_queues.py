@@ -13,7 +13,7 @@ import pytest
 
 import weave
 from tests.trace.server_utils import TEST_ENTITY, find_server_layer
-from tests.trace.util import FAKE_NOT_IMPLEMENTED, NOT_CLICKHOUSE_BACKEND
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
@@ -143,7 +143,6 @@ def create_queue_with_calls(
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_create_and_read(client):
     """Test creating and reading an annotation queue."""
     # Create a queue
@@ -177,7 +176,6 @@ def test_annotation_queue_create_and_read(client):
     assert read_res.queue.deleted_at is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_multiple_scorer_refs(client):
     """Test creating a queue with multiple scorer refs."""
     req = tsi.AnnotationQueueCreateReq(
@@ -212,7 +210,6 @@ def test_annotation_queue_multiple_scorer_refs(client):
     assert "weave:///entity/project/scorer/safety:ghi789" in read_res.queue.scorer_refs
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_update_all_fields(client):
     """Test updating all fields of an annotation queue."""
     # Create a queue
@@ -262,7 +259,6 @@ def test_annotation_queue_update_all_fields(client):
     assert len(read_res.queue.scorer_refs) == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_update_partial(client):
     """Test updating only some fields (partial update)."""
     # Create a queue
@@ -295,7 +291,6 @@ def test_annotation_queue_update_partial(client):
     ]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_update_nonexistent(client):
     """Test updating a non-existent queue raises NotFoundError."""
     # Try to update a non-existent queue
@@ -310,7 +305,6 @@ def test_annotation_queue_update_nonexistent(client):
         client.server.annotation_queue_update(update_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_update_no_fields(client):
     """Test updating with no fields provided returns existing queue."""
     # Create a queue
@@ -344,7 +338,6 @@ def test_annotation_queue_update_no_fields(client):
     ]
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queues_query_stream_all(client):
     """Test querying all annotation queues for a project."""
     # Create multiple queues
@@ -373,7 +366,6 @@ def test_annotation_queues_query_stream_all(client):
         assert queues[i].created_at >= queues[i + 1].created_at
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queues_query_stream_with_name_filter(client):
     """Test querying queues with name filter."""
     # Create queues with different names
@@ -408,7 +400,6 @@ def test_annotation_queues_query_stream_with_name_filter(client):
     assert not any(q.name == "Quality Check Queue" for q in queues)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queues_query_stream_with_pagination(client):
     """Test querying queues with limit and offset."""
     # Create 5 queues
@@ -445,7 +436,6 @@ def test_annotation_queues_query_stream_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_add_calls(client):
     """Test adding calls to an annotation queue."""
 
@@ -488,7 +478,128 @@ def test_annotation_queue_add_calls(client):
     assert add_res.duplicates == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="ClickHouse-only: calls_merged can contain end-only rows",
+)
+def test_annotation_queue_add_calls_retries_end_only_calls(client):
+    project_id = client.project_id
+    complete_call_id = generate_id()
+    end_only_call_id = generate_id()
+    complete_started_at = datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0
+    )
+    complete_ended_at = complete_started_at + datetime.timedelta(seconds=1)
+    end_only_ended_at = complete_started_at + datetime.timedelta(seconds=3)
+
+    # One complete call and one end-only call reproduce the mixed production batch.
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=complete_call_id,
+                trace_id=complete_call_id,
+                started_at=complete_started_at,
+                op_name="complete_call",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=complete_call_id,
+                ended_at=complete_ended_at,
+                summary={},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=end_only_call_id,
+                ended_at=end_only_ended_at,
+                summary={},
+            )
+        )
+    )
+
+    queue_id = create_annotation_queue(client, name="End-only calls test queue")
+    add_res = client.server.annotation_queue_add_calls(
+        tsi.AnnotationQueueAddCallsReq(
+            project_id=project_id,
+            queue_id=queue_id,
+            call_ids=[complete_call_id, end_only_call_id],
+            display_fields=["input", "output"],
+            wb_user_id="test_user",
+        )
+    )
+
+    # The valid call is added with its separately ingested end event intact.
+    assert add_res.added_count == 1
+    assert add_res.duplicates == 0
+    items_res = client.server.annotation_queue_items_query(
+        tsi.AnnotationQueueItemsQueryReq(
+            project_id=project_id,
+            queue_id=queue_id,
+        )
+    )
+    assert [item.call_id for item in items_res.items] == [complete_call_id]
+    complete_item = items_res.items[0]
+    assert (
+        complete_item.call_ended_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=1)
+    )
+
+    # Once the missing start arrives, retrying adds the previously skipped call.
+    end_only_started_at = complete_started_at + datetime.timedelta(seconds=2)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=end_only_call_id,
+                trace_id=end_only_call_id,
+                started_at=end_only_started_at,
+                op_name="end_only_call",
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+    retry_res = client.server.annotation_queue_add_calls(
+        tsi.AnnotationQueueAddCallsReq(
+            project_id=project_id,
+            queue_id=queue_id,
+            call_ids=[end_only_call_id],
+            display_fields=["input", "output"],
+            wb_user_id="test_user",
+        )
+    )
+
+    assert retry_res.added_count == 1
+    assert retry_res.duplicates == 0
+    items_res = client.server.annotation_queue_items_query(
+        tsi.AnnotationQueueItemsQueryReq(
+            project_id=project_id,
+            queue_id=queue_id,
+        )
+    )
+    items_by_call_id = {item.call_id: item for item in items_res.items}
+    assert set(items_by_call_id) == {complete_call_id, end_only_call_id}
+    end_only_item = items_by_call_id[end_only_call_id]
+    assert (
+        end_only_item.call_started_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=2)
+    )
+    assert (
+        end_only_item.call_ended_at
+        == complete_item.call_started_at + datetime.timedelta(seconds=3)
+    )
+
+
 def test_annotation_queue_add_calls_duplicate_prevention(client):
     """Test that adding duplicate calls is handled correctly."""
     project_id = client.project_id
@@ -538,7 +649,6 @@ def test_annotation_queue_add_calls_duplicate_prevention(client):
     assert add_res2.duplicates == 1
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_add_calls_batch(client):
     """Test adding multiple calls in batch."""
 
@@ -578,7 +688,6 @@ def test_annotation_queue_add_calls_batch(client):
     assert add_res.duplicates == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_add_calls_partial_duplicates(client):
     """Test adding calls where some are duplicates and some are new."""
 
@@ -801,7 +910,6 @@ def test_annotation_queues_stats(client):
     assert stats_map[queue_ids[2]].completed_items == 4
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queues_stats_empty_queues(client):
     """Test getting stats for queues with no items."""
     # Create two empty queues
@@ -830,7 +938,6 @@ def test_annotation_queues_stats_empty_queues(client):
         assert stat.completed_items == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queues_stats_no_queue_ids(client):
     """Test getting stats with empty queue_ids list."""
     # Request stats with no queue IDs
@@ -844,7 +951,6 @@ def test_annotation_queues_stats_no_queue_ids(client):
     assert len(stats_res.stats) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_basic(client):
     """Test basic querying of annotation queue items."""
     # Create queue with 5 calls
@@ -872,7 +978,6 @@ def test_annotation_queue_items_query_basic(client):
         assert item.deleted_at is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_with_pagination(client):
     """Test querying queue items with limit and offset."""
     # Create queue with 10 calls
@@ -906,7 +1011,6 @@ def test_annotation_queue_items_query_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_with_sorting(client):
     """Test querying queue items with different sort orders."""
     # Create queue with 3 calls
@@ -943,7 +1047,6 @@ def test_annotation_queue_items_query_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_empty_queue(client):
     """Test querying items from an empty queue."""
     # Create an empty queue
@@ -960,7 +1063,6 @@ def test_annotation_queue_items_query_empty_queue(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     """Test querying with multiple sort fields."""
     # Create queue with 5 calls
@@ -983,7 +1085,6 @@ def test_annotation_queue_items_query_with_multiple_sort_fields(client):
     assert len(query_res.items) == 5
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_by_call_id(client):
     """Test filtering queue items by call_id."""
     # Create queue with 5 calls
@@ -1007,7 +1108,6 @@ def test_annotation_queue_items_query_filter_by_call_id(client):
     assert query_res.items[0].call_id == target_call_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_by_call_op_name(client):
     """Test filtering queue items by call_op_name."""
     # Create two different sets of calls with different op names
@@ -1042,7 +1142,6 @@ def test_annotation_queue_items_query_filter_by_call_op_name(client):
         assert item.call_op_name == target_op_name
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_by_call_trace_id(client):
     """Test filtering queue items by call_trace_id."""
     # Create queue with 5 calls
@@ -1074,7 +1173,6 @@ def test_annotation_queue_items_query_filter_by_call_trace_id(client):
         assert item.call_trace_id == target_trace_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_by_added_by(client):
     """Test filtering queue items by added_by."""
     # Create queue with 5 calls added by test_user
@@ -1107,7 +1205,6 @@ def test_annotation_queue_items_query_filter_by_added_by(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_by_annotation_states(client):
     """Test filtering queue items by annotation_states.
 
@@ -1145,7 +1242,6 @@ def test_annotation_queue_items_query_filter_by_annotation_states(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_combined(client):
     """Test filtering queue items with multiple filters combined."""
     # Create queue with 5 calls
@@ -1196,7 +1292,6 @@ def test_annotation_queue_items_query_filter_combined(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_empty_results(client):
     """Test filtering queue items that returns no results."""
     # Create queue with 5 calls
@@ -1227,7 +1322,6 @@ def test_annotation_queue_items_query_filter_empty_results(client):
     assert len(query_res.items) == 0
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_with_pagination(client):
     """Test filtering with pagination."""
     # Create queue with 10 calls
@@ -1265,7 +1359,6 @@ def test_annotation_queue_items_query_filter_with_pagination(client):
     assert page1_ids.isdisjoint(page2_ids)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_filter_with_sorting(client):
     """Test filtering with sorting."""
     # Create queue with 5 calls
@@ -1292,7 +1385,6 @@ def test_annotation_queue_items_query_filter_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_with_position_basic(client):
     """Test querying queue items with position tracking enabled."""
     # Create queue with 5 calls
@@ -1321,7 +1413,6 @@ def test_annotation_queue_items_query_with_position_basic(client):
     assert positions == {1, 2, 3, 4, 5}
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_without_position(client):
     """Test that position_in_queue is None when include_position=False."""
     # Create queue with 3 calls
@@ -1342,7 +1433,6 @@ def test_annotation_queue_items_query_without_position(client):
         assert item.position_in_queue is None
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_position_with_sorting(client):
     """Test that position respects custom sort order."""
     # Create queue with 5 calls
@@ -1371,7 +1461,6 @@ def test_annotation_queue_items_query_position_with_sorting(client):
         )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_items_query_position_with_filter_unstarted(client):
     """Test position calculation with annotation_states filter.
 
@@ -1405,7 +1494,6 @@ def test_annotation_queue_items_query_position_with_filter_unstarted(client):
 # ============================================================================
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_completed(client):
     """Test updating queue item state to 'completed'."""
     # Create queue with 1 call
@@ -1456,7 +1544,6 @@ def test_annotator_queue_items_progress_update_completed(client):
     assert query_res.items[0].annotator_user_id == expected_annotator_id
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_skipped(client):
     """Test updating queue item state to 'skipped'."""
     # Create queue with 1 call
@@ -1488,7 +1575,6 @@ def test_annotator_queue_items_progress_update_skipped(client):
     assert update_res.item.annotation_state == "skipped"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_invalid_state(client):
     """Test that updating to invalid state raises error."""
     # Create queue with 1 call
@@ -1518,7 +1604,6 @@ def test_annotator_queue_items_progress_update_invalid_state(client):
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_nonexistent_item(client):
     """Test that updating nonexistent item raises error."""
     # Create an empty queue
@@ -1538,7 +1623,6 @@ def test_annotator_queue_items_progress_update_nonexistent_item(client):
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_no_user_id(client):
     """Test that updating without user_id raises error."""
     # Create queue with 1 call
@@ -1568,7 +1652,6 @@ def test_annotator_queue_items_progress_update_no_user_id(client):
         client.server.annotator_queue_items_progress_update(update_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_transition_from_in_progress(client):
     """Test valid state transition from in_progress to completed."""
     # Create queue with 1 call
@@ -1618,7 +1701,6 @@ def test_annotator_queue_items_progress_update_transition_from_in_progress(clien
     assert update_res.item.annotation_state == "completed"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_invalid_transition_from_completed(
     client,
 ):
@@ -1660,7 +1742,6 @@ def test_annotator_queue_items_progress_update_invalid_transition_from_completed
         client.server.annotator_queue_items_progress_update(update_req2)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 @pytest.mark.parametrize("state", ["completed", "skipped"])
 def test_annotator_queue_items_progress_update_idempotent(client, state):
     """Test that setting the same state twice is idempotent (no error, no-op).
@@ -1708,7 +1789,6 @@ def test_annotator_queue_items_progress_update_idempotent(client, state):
     assert update_res2.item.annotation_state == state
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_stats_integration(client):
     """Test that progress updates correctly affect queue stats."""
     # Create queue with 5 calls
@@ -1766,7 +1846,6 @@ def test_annotator_queue_items_progress_update_stats_integration(client):
     assert stats_res.stats[0].completed_items == 3
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_in_progress_new(client):
     """Test updating queue item state to 'in_progress' for a new record."""
     # Create queue with 1 call
@@ -1811,7 +1890,6 @@ def test_annotator_queue_items_progress_update_in_progress_new(client):
     assert query_res.items[0].annotation_state == "in_progress"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_in_progress_existing(client):
     """Test that in_progress -> in_progress is idempotent (no-op, succeeds)."""
     # Create queue with 1 call
@@ -1853,7 +1931,6 @@ def test_annotator_queue_items_progress_update_in_progress_existing(client):
     assert update_res2.item.annotation_state == "in_progress"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_in_progress_from_completed(client):
     """Test that completed -> in_progress fails (can't restart a finished item)."""
     # Create queue with 1 call
@@ -1896,7 +1973,6 @@ def test_annotator_queue_items_progress_update_in_progress_from_completed(client
         client.server.annotator_queue_items_progress_update(update_req2)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_in_progress_to_completed(client):
     """Test transitioning from 'in_progress' to 'completed'."""
     # Create queue with 1 call
@@ -1947,7 +2023,6 @@ def test_annotator_queue_items_progress_in_progress_to_completed(client):
     assert query_res.items[0].annotation_state == "completed"
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_in_progress_workflow(client):
     """Test the full workflow: mark in_progress, then complete."""
     # Create queue with 3 calls
@@ -2052,7 +2127,6 @@ def test_annotator_queue_items_progress_in_progress_workflow(client):
     assert stats_res.stats[0].completed_items == 2
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotator_queue_items_progress_update_returns_correct_item(client):
     """Test that progress update returns the specific item that was updated."""
     # Create queue with 3 items - we need multiple items to expose the bug
@@ -2226,7 +2300,6 @@ def test_annotation_queue_add_calls_with_calls_complete_table(trace_server):
     )
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_read_nonexistent(client):
     """Test that reading a non-existent annotation queue raises NotFoundError.
 
@@ -2252,7 +2325,6 @@ def test_annotation_queue_read_nonexistent(client):
 # ============================================================================
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_delete_basic(client):
     """Test complete deletion lifecycle: delete, verify response, verify cannot read/delete again."""
     # Create a queue
@@ -2312,7 +2384,6 @@ def test_annotation_queue_delete_basic(client):
         client.server.annotation_queue_delete(delete_req)
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_delete_not_in_query(client):
     """Test that deleted queues don't appear in query results."""
     # Create two queues
@@ -2346,7 +2417,6 @@ def test_annotation_queue_delete_not_in_query(client):
     assert queue2_id in queue_ids
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
 def test_annotation_queue_delete_nonexistent(client):
     """Test that deleting a non-existent queue raises NotFoundError."""
     nonexistent_queue_id = "00000000-0000-0000-0000-000000000000"

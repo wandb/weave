@@ -79,6 +79,29 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+Persisted `AgentDashboard` objects intentionally use a closed, discriminated
+schema. Supported panel variants and their configuration fields must be added
+to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
+with an untyped dictionary. After changing the model, run
+`make synchronize-base-object-schemas` from the repository root so the Python
+schema and the dependent Core frontend types stay aligned.
+
+### Trace Server API / Node SDK Schema
+
+When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
+
+1. From this repo, run `make -C ../../weave-trace export-api-schema` to regenerate the sibling trace service's `openapi.json` from the FastAPI app.
+2. Copy that schema into the tracked Node SDK schema: `cp ../../weave-trace/openapi.json sdks/node/weave.openapi.json`.
+3. Regenerate the TypeScript client from `sdks/node`: `pnpm run generate-api`.
+
+Evaluation result rows merge agent span links from two sources: legacy
+`weave.genai_span_ref` call attributes and OTel spans whose promoted
+`eval_run_id` plus `eval_predict_and_score_call_id` columns identify the
+trial. Keep the promoted-column hydration best-effort so eval results remain
+available during rolling deploys.
+
+If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
+
 ## Python Testing Guidelines
 
 ### Test Framework
@@ -93,6 +116,32 @@ Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks
   `client.project_id`) or the `trace_server` fixture, which run against a real
   ClickHouse backend. Build inputs with the real APIs
   (`obj_create`, `table_create`, etc.). Mock only external services we don't own.
+
+### Assert on the complete payload (no substring / membership checks)
+
+Assert on the **full value**, not that a fragment appears somewhere inside a
+stringified payload. Substring (`in`) and membership checks pass on accidental
+matches and let the rest of the payload drift undetected, so prefer them only
+when membership in a collection is genuinely the contract under test.
+
+❌ **Never do this:**
+
+```python
+assert "short memo" in msg                 # substring of a serialized blob
+assert "error" in str(response)
+assert "note" in feedback.payload          # key-presence instead of value
+```
+
+✅ **Always do this:**
+
+```python
+assert feedback.payload == {"note": "short memo", "emoji": "👍"}  # whole object
+assert feedback.payload["note"] == "short memo"                   # exact field
+```
+
+If you only care about one field, pin that field with `==`; if you care about
+the shape, compare the whole dict/object. The same rule applies to SQL: assert
+the complete query string, never `assert "WHERE x" in sql`.
 
 ### VCR + ClickHouse isolation (integration tests)
 
@@ -240,20 +289,54 @@ nox --no-install -e "tests-3.12(shard='langchain')" -- tests/integrations/langch
 
 ## Typescript Testing Guidelines
 
+The Node SDK (`sdks/node`) is a **pnpm** project — it ships a `pnpm-lock.yaml`
+and pins `"packageManager": "pnpm@10.8.1"` in `package.json`. Do **not** run
+`npm i`: npm's resolver crashes trying to dedupe pnpm's symlink `node_modules`
+(`TypeError: Cannot read properties of null (reading 'matches')`).
+
 ```
 cd sdks/node
-npm i
-npm run test
+pnpm install
+pnpm test
 ```
+
+To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
+(`import 'weave'` self-resolves via the package `exports` to `dist/index.mjs`);
+`pnpm install` builds it via the `prepare` script. Then:
+
+```
+pnpm exec tsx examples/claudeAgents.ts
+```
+
+### TypeScript integration metadata
+
+- `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
+  `asAttributes()` supplies nested provenance to Weave-call integrations, while
+  `asOtelAttributes()` supplies canonical `weave.integration.name` and
+  `weave.integration.version` identity to OTel integrations and preserves
+  flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
+  typed; non-scalar values are stringified.
 
 ## Code Review & PR Guidelines
 
 ### PR Requirements
 
-- Title format: Must start with one of:
-  - `chore(weave):` - For maintenance tasks
-  - `feat(weave):` - For new features
-  - `fix(weave):` - For bug fixes
+- Title format: `<type>(<scope>): <description>`, where `<type>` is one of
+  `chore`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `security`,
+  `test`. A scope is **required** (`requireScope: true`) and CI validates it
+  (`.github/workflows/pr.yaml`).
+- **Pick the scope by which SDK/area the change touches:**
+  - `weave_ts` — **required for ALL TypeScript / Node SDK changes** (anything
+    under `sdks/node/`). Any PR that modifies the TS SDK must be marked
+    `(weave_ts)`, e.g. `fix(weave_ts): ...`, `feat(weave_ts): ...`,
+    `chore(weave_ts): ...`.
+  - `weave` — the Python SDK and trace server (the default for `weave/…`
+    changes), e.g. `fix(weave): ...`, `feat(weave): ...`, `chore(weave): ...`.
+  - Other valid scopes (see `pr.yaml` for the authoritative list): `ui`, `app`,
+    `dev`, `deps`, `inference`.
+- If a single PR spans both the Python and TS SDKs, prefer splitting it; if that
+  isn't practical, scope it to the SDK that carries the primary change and call
+  out the other in the PR body.
 - Provide detailed PR summaries including:
   - Purpose of changes
   - Testing performed
@@ -301,6 +384,21 @@ npm run test
       patcher.undo_patch()
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
+
+### Claude Agent SDK token accounting
+
+- Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
+  only. Weave usage requires an inclusive prompt total, with
+  `cache_read_input_tokens` and `cache_creation_input_tokens` represented as
+  subsets of `input_tokens`, because cost and cache-hit-rate rollups use that
+  convention.
+- Both Python tracing paths must normalize aggregate result usage through
+  `weave/integrations/claude_agent_sdk/usage.py`. Keep the SDK's yielded
+  `ResultMessage` and the calls-based root output unchanged; normalize the
+  calls-based usage summary and the OTel span attributes consumed by Weave
+  rollups.
+- Regression coverage must exercise both the calls-based and OTel integrations
+  with nonzero cache-read and cache-creation counts.
 
 ### Documentation
 

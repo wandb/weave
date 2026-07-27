@@ -27,6 +27,8 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.http_utils import (
+    CLIENT_CAPABILITIES,
+    CLIENT_CAPABILITIES_HEADER,
     ERROR_CODE_CALLS_COMPLETE_MODE_REQUIRED,
     TRACE_ID_HEADER,
 )
@@ -550,6 +552,27 @@ def test_call_end_single_without_trace_id_omits_header(mock_post, unbatched_serv
 
 
 @patch("weave.utils.http_requests.post")
+def test_call_end_single_carries_is_eval_in_body(mock_post, unbatched_server):
+    """The SDK-computed is_eval flag is serialized into the /call/end body."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://test.com")
+    )
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id="test",
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"result": "ok"},
+        is_eval=True,
+    )
+    unbatched_server.call_end(tsi.CallEndReq(end=end))
+
+    body = json.loads(mock_post.call_args.kwargs["data"].decode("utf-8"))
+    assert body["end"]["is_eval"] is True
+
+
+@patch("weave.utils.http_requests.post")
 def test_call_start_v2_sends_trace_id_header(mock_post, unbatched_server):
     """v2 single /call/start attaches the X-Weave-Trace-Id header."""
     mock_post.return_value = httpx.Response(
@@ -632,6 +655,66 @@ def test_legacy_upsert_batch_end_carries_trace_id_in_body(mock_post):
         ]
         assert end_items, "expected an end item in the posted batch"
         assert end_items[0]["req"]["end"]["trace_id"] == "trace-batch"
+    finally:
+        if server.call_processor:
+            server.call_processor.stop_accepting_new_work_and_flush_queue()
+        if server.feedback_processor:
+            server.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+
+# =============================================================================
+# X-Weave-Client-Capabilities on every ingest request
+#
+# Unlike the per-trace X-Weave-Trace-Id header, the capability header describes
+# the client build itself, so it rides every request -- single calls AND
+# batches -- letting a future server-side ingest sampler recognize a
+# sampling-safe client even on the batch path, which cannot carry a per-trace
+# trace_id header.
+# =============================================================================
+
+
+@patch("weave.utils.http_requests.post")
+def test_single_call_sends_client_capabilities_header(mock_post, unbatched_server):
+    """Every single-call request advertises the client's capabilities."""
+    call_id = generate_id()
+    mock_post.return_value = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
+    )
+
+    unbatched_server.call_start(tsi.CallStartReq(start=generate_start(call_id)))
+
+    assert (
+        _request_headers(mock_post.call_args)[CLIENT_CAPABILITIES_HEADER]
+        == CLIENT_CAPABILITIES
+    )
+
+
+@patch("weave.utils.http_requests.post")
+def test_batch_upsert_sends_client_capabilities_header(mock_post):
+    """The batch path carries the capability header too (it describes the
+    client, not a trace), unlike the per-trace X-Weave-Trace-Id header.
+    """
+    server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    mock_post.return_value = httpx.Response(
+        200, json={}, request=httpx.Request("POST", "http://example.com")
+    )
+
+    call_id = "call-id"
+    start = StartBatchItem(
+        req=tsi.CallStartReq(start=generate_start(call_id, "entity/project"))
+    )
+
+    try:
+        server._flush_calls([start])
+
+        assert mock_post.call_args_list
+        for call in mock_post.call_args_list:
+            assert (
+                _request_headers(call)[CLIENT_CAPABILITIES_HEADER]
+                == CLIENT_CAPABILITIES
+            )
     finally:
         if server.call_processor:
             server.call_processor.stop_accepting_new_work_and_flush_queue()

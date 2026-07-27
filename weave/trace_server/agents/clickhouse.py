@@ -14,7 +14,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
+from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
+    add_optional_cost,
     build_trace_chat,
     first_user_preview_text,
     last_assistant_preview_text,
@@ -23,6 +25,11 @@ from weave.trace_server.agents.constants import (
     CONVERSATION_PREVIEW_CHARS,
     MAX_INGEST_ERRORS_REPORTED,
     NO_CONVERSATION_LABEL,
+)
+from weave.trace_server.agents.conversation_spans import (
+    is_supported_feedback,
+    parse_conversation_spans,
+    span_feedback_marker,
 )
 from weave.trace_server.agents.helpers import (
     genai_span_to_row,
@@ -40,6 +47,11 @@ from weave.trace_server.agents.types import (
     AgentConversationChatReq,
     AgentConversationChatRes,
     AgentConversationMessagePreview,
+    AgentConversationSpan,
+    AgentConversationSpanFeedback,
+    AgentConversationSpans,
+    AgentConversationSpansReq,
+    AgentConversationSpansRes,
     AgentCustomAttrSchemaItem,
     AgentCustomAttrsSchemaReq,
     AgentCustomAttrsSchemaRes,
@@ -71,8 +83,12 @@ from weave.trace_server.agents.types import (
     group_by_ref_alias,
 )
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
-from weave.trace_server.datadog import record_db_insert
-from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
+from weave.trace_server.interface.query import Query
+from weave.trace_server.opentelemetry.genai_extraction import (
+    extract_genai_span,
+    strip_inline_blobs_from_span,
+)
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder
@@ -84,6 +100,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
     make_conversation_chat_spans_query,
     make_conversation_chat_turns_count_query,
     make_conversation_previews_query,
+    make_conversation_spans_query,
     make_custom_attrs_schema_query,
     make_message_search_query,
     make_span_group_categorical_distributions_query,
@@ -108,7 +125,9 @@ from weave.trace_server.trace_server_common import (
 from weave.trace_server.trace_server_interface import (
     FeedbackQueryReq,
     FeedbackQueryRes,
+    TraceServerInterface,
 )
+from weave.trace_server.tracing import traced
 
 if TYPE_CHECKING:
     from clickhouse_connect.driver.client import Client as CHClient
@@ -148,7 +167,7 @@ class AgentQueryHandler:
     Takes a `query_fn` (typically the server's `_query` method) so queries
     participate in the same logging / ddtrace / error-handling wrapper as the
     rest of the trace server. Also takes a `feedback_query_fn` (the server's
-    `feedback_query` method), invoked only when ``include_feedback=True`` to
+    `feedback_query` method), invoked only when `include_feedback=True` to
     fold agent-target feedback into the chat response.
     """
 
@@ -227,6 +246,115 @@ class AgentQueryHandler:
             preview = previews_by_conv.get(cid) if isinstance(cid, str) else None
             if preview is not None:
                 g.first_message, g.last_message = preview
+
+    def conversation_spans(
+        self, req: AgentConversationSpansReq
+    ) -> AgentConversationSpansRes:
+        """Return per-conversation span sequences + feedback markers.
+
+        Runs one bounded query scoped to the requested conversation_ids that
+        reads only scalar columns (no message bodies), then a single batched
+        feedback query for those conversations and their turns. Best-effort:
+        failures yield empty sequences so the spans minimap never hard-fails.
+        """
+        if not req.conversation_ids:
+            return AgentConversationSpansRes()
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_conversation_spans_query(
+            pb,
+            req.project_id,
+            req.conversation_ids,
+            started_after=req.started_after,
+            started_before=req.started_before,
+        )
+        try:
+            rows = _rows_as_dicts(self._query(sql, pb.get_params()))
+        except Exception:
+            logger.exception(
+                "failed to query conversation spans (project=%s, conversations=%d)",
+                req.project_id,
+                len(req.conversation_ids),
+            )
+            rows = []
+
+        spans_by_conv: dict[str, list[AgentConversationSpan]] = {}
+        # Map each turn (trace_id) back to its conversation so turn-level
+        # feedback can be bucketed without a second lookup.
+        trace_to_conv: dict[str, str] = {}
+        for row in rows:
+            cid = safe_str(row.get("conversation_id"))
+            if not cid:
+                continue
+            spans = parse_conversation_spans(row.get("spans"))
+            spans_by_conv[cid] = spans
+            for span in spans:
+                if span.trace_id:
+                    trace_to_conv.setdefault(span.trace_id, cid)
+
+        feedback_by_conv = self._fetch_conversation_spans_feedback(
+            req.project_id, req.conversation_ids, trace_to_conv
+        )
+
+        return AgentConversationSpansRes(
+            conversations=[
+                AgentConversationSpans(
+                    conversation_id=cid,
+                    spans=spans_by_conv.get(cid, []),
+                    spans_feedback=feedback_by_conv.get(cid, []),
+                )
+                for cid in req.conversation_ids
+            ]
+        )
+
+    def _fetch_conversation_spans_feedback(
+        self,
+        project_id: str,
+        conversation_ids: list[str],
+        trace_to_conv: dict[str, str],
+    ) -> dict[str, list[AgentConversationSpanFeedback]]:
+        """Batch-fetch conversation- and turn-level feedback for one list page.
+
+        One feedback query covering every conversation + turn target on the
+        page; results are bucketed per conversation and shaped into positioned
+        markers (turn markers carry their trace_id; conversation-level markers
+        carry none). Step-level (span) feedback is intentionally not fetched —
+        markers are anchored to turns for the list view. Best-effort.
+        """
+        by_conv: dict[str, list[AgentConversationSpanFeedback]] = {
+            cid: [] for cid in conversation_ids
+        }
+        try:
+            grouped = self._fetch_agent_feedback(
+                project_id=project_id,
+                conversation_ids=list(conversation_ids),
+                trace_ids=list(trace_to_conv),
+            )
+        except Exception:
+            logger.exception(
+                "failed to fetch conversation spans feedback "
+                "(project=%s, conversations=%d, turns=%d)",
+                project_id,
+                len(conversation_ids),
+                len(trace_to_conv),
+            )
+            return by_conv
+
+        for cid, items in grouped.by_conversation_id.items():
+            if cid in by_conv:
+                by_conv[cid].extend(
+                    span_feedback_marker(raw, trace_id=None)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
+                )
+        for tid, items in grouped.by_trace_id.items():
+            conv_id = trace_to_conv.get(tid)
+            if conv_id is not None and conv_id in by_conv:
+                by_conv[conv_id].extend(
+                    span_feedback_marker(raw, trace_id=tid)
+                    for raw in items
+                    if is_supported_feedback(safe_str(raw.get("feedback_type")))
+                )
+        return by_conv
 
     def spans_stats(self, req: AgentSpanStatsReq) -> AgentSpanStatsRes:
         """Return chart-ready aggregations over spans."""
@@ -393,6 +521,12 @@ class AgentQueryHandler:
             )
             for r in rows
         ]
+        if req.include_costs and agents:
+            cost_map = self._grouped_cost_map(
+                req.project_id, "agent_name", [a.agent_name for a in agents]
+            )
+            for agent in agents:
+                agent.total_cost_usd = cost_map.get(agent.agent_name)
         return AgentsQueryRes(agents=agents, total_count=total)
 
     def agent_versions_query(self, req: AgentVersionsQueryReq) -> AgentVersionsQueryRes:
@@ -409,7 +543,62 @@ class AgentQueryHandler:
             )
             for r in rows
         ]
+        if req.include_costs and versions:
+            cost_map = self._grouped_cost_map(
+                req.project_id,
+                "agent_version",
+                [v.agent_version for v in versions],
+                extra_exprs=[
+                    {
+                        "$eq": [
+                            {"$getField": "agent_name"},
+                            {"$literal": req.agent_name},
+                        ]
+                    }
+                ],
+            )
+            for version in versions:
+                version.total_cost_usd = cost_map.get(version.agent_version)
         return AgentVersionsQueryRes(versions=versions, total_count=total)
+
+    def _grouped_cost_map(
+        self,
+        project_id: str,
+        field: str,
+        values: list[str],
+        *,
+        extra_exprs: list[dict[str, Any]] | None = None,
+    ) -> dict[str, float]:
+        """Map each `field` value to its summed span cost (USD).
+
+        The agents / agent_versions materialized views don't store cost, so this
+        runs a supplementary cost-augmented grouped spans query scoped to the
+        `values` on the current page and returns {value: total_cost_usd} for the
+        priced ones. All-time (no time filter), matching the AMT aggregates.
+        """
+        names = [v for v in values if v]
+        if not names:
+            return {}
+        conditions: list[dict[str, Any]] = [
+            {"$in": [{"$getField": field}, [{"$literal": v} for v in names]]}
+        ]
+        if extra_exprs:
+            conditions.extend(extra_exprs)
+        expr = conditions[0] if len(conditions) == 1 else {"$and": conditions}
+        cost_req = AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate({"$expr": expr}),
+            group_by=[AgentGroupByRef(source="column", key=field)],
+            include_costs=True,
+            limit=len(names),
+        )
+        res = self.spans_query(cost_req)
+        out: dict[str, float] = {}
+        for group in res.groups:
+            key = group.group_keys.get(field)
+            if isinstance(key, str) and group.total_cost_usd is not None:
+                out[key] = group.total_cost_usd
+        return out
 
     # ------------------------------------------------------------------
     # Message search
@@ -526,6 +715,12 @@ class AgentQueryHandler:
             if trace_spans
         ]
 
+        conversation_cost: float | None = None
+        for turn in turns:
+            conversation_cost = add_optional_cost(
+                conversation_cost, turn.total_cost_usd
+            )
+
         res = AgentConversationChatRes(
             conversation_id=req.conversation_id,
             turns=turns,
@@ -533,6 +728,7 @@ class AgentQueryHandler:
             has_more=req.offset + len(turns) < total_turns,
             limit=req.limit,
             offset=req.offset,
+            total_cost_usd=conversation_cost,
         )
 
         if req.include_feedback:
@@ -615,10 +811,13 @@ class AgentWriteHandler:
     """Write-side operations for agent data.
 
     Takes a `ch_client` for `insert` calls, which have no query wrapper.
+    Optionally takes a `trace_server` used for file storage when stripping
+    inline base64 out of GenAI message payloads into Content refs.
     """
 
     _ch_client: CHClient
     _insert_settings: dict[str, Any] | None = None
+    _trace_server: TraceServerInterface | None = None
 
     # ------------------------------------------------------------------
     # OTel ingest
@@ -631,6 +830,14 @@ class AgentWriteHandler:
 
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
+
+        When ingest sampling is enabled (rate < 1.0), spans are parsed first
+        and whole traces are kept or dropped *before* the expensive
+        blob-strip/extraction steps run, so dropped traces never write
+        Content files. Dropped spans are neither stored nor returned (they
+        never reach the scoring Kafka emit) but still count as accepted —
+        the client sees an ordinary success. See agents/ingest_sampling.py
+        (WB-36877).
         """
         span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
@@ -639,59 +846,105 @@ class AgentWriteHandler:
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
 
-        for processed_span in req.processed_spans:
-            resource = Resource.from_proto(processed_span.resource_spans.resource)
+        # Both branches below account every parse/extraction failure through
+        # these two helpers, so the bookkeeping cannot drift between them.
+        def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
+            nonlocal rejected
+            try:
+                return Span.from_proto(protobuf_span, resource)
+            except AttributePathConflictError as e:
+                _record_ingest_failure(
+                    failure_counts,
+                    failure_examples,
+                    type(e).__name__,
+                )
+                rejected += 1
+                errors.append(str(e))
+                return None
 
-            for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                for protobuf_span in protobuf_scope_spans.spans:
-                    try:
-                        span = Span.from_proto(protobuf_span, resource)
-                    except AttributePathConflictError as e:
-                        _record_ingest_failure(
-                            failure_counts,
-                            failure_examples,
-                            type(e).__name__,
-                        )
-                        rejected += 1
-                        errors.append(str(e))
-                        continue
+        def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
+            nonlocal accepted, rejected
+            # Strip inline base64/data-URIs into weave refs before the
+            # pure extraction transform runs.
+            if self._trace_server is not None:
+                strip_inline_blobs_from_span(
+                    span,
+                    req.project_id,
+                    self._trace_server,
+                    wb_user_id=req.wb_user_id,
+                )
+            try:
+                genai_row = extract_genai_span(
+                    span,
+                    project_id=req.project_id,
+                    wb_user_id=req.wb_user_id or "",
+                    wb_run_id=run_id or "",
+                )
+            except Exception as e:
+                error_type = type(e).__name__
+                _record_ingest_failure(
+                    failure_counts,
+                    failure_examples,
+                    error_type,
+                    span_id=span.span_id,
+                )
+                rejected += 1
+                # Don't leak raw `str(e)` to the client — it can
+                # contain server-side state. Exception type is
+                # safe and enough for a caller to triage.
+                errors.append(
+                    f"Extraction failed for span {span.span_id}: {error_type}"
+                )
+                return None
+            accepted += 1
+            return genai_row
 
-                    try:
-                        genai_row = extract_genai_span(
-                            span,
-                            project_id=req.project_id,
-                            wb_user_id=req.wb_user_id or "",
-                            wb_run_id=processed_span.run_id or "",
-                        )
-                    except Exception as e:
-                        error_type = type(e).__name__
-                        _record_ingest_failure(
-                            failure_counts,
-                            failure_examples,
-                            error_type,
-                            span_id=span.span_id,
-                        )
-                        rejected += 1
-                        # Don't leak raw `str(e)` to the client — it can
-                        # contain server-side state. Exception type is
-                        # safe and enough for a caller to triage.
-                        errors.append(
-                            f"Extraction failed for span {span.span_id}: {error_type}"
-                        )
-                        continue
+        sampling = ingest_sampling.request_config()
+        if not sampling.enabled:
+            # Sampler off (the default): the unmodified single-pass path.
+            for processed_span in req.processed_spans:
+                resource = Resource.from_proto(processed_span.resource_spans.resource)
+                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                    for protobuf_span in protobuf_scope_spans.spans:
+                        span = parse_span(protobuf_span, resource)
+                        if span is None:
+                            continue
+                        row = extract_row(span, processed_span.run_id)
+                        if row is not None:
+                            span_rows.append(row)
+        else:
+            # Pass 1 (cheap): parse everything, then decide keep/drop per
+            # trace before any blob-strip/extraction work happens.
+            parsed: list[tuple[Span, str | None]] = []
+            byte_sizes: list[int] = []
+            for processed_span in req.processed_spans:
+                resource = Resource.from_proto(processed_span.resource_spans.resource)
+                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
+                    for protobuf_span in protobuf_scope_spans.spans:
+                        span = parse_span(protobuf_span, resource)
+                        if span is None:
+                            continue
+                        parsed.append((span, processed_span.run_id))
+                        byte_sizes.append(protobuf_span.ByteSize())
 
-                    span_rows.append(genai_row)
+            decisions = ingest_sampling.decide_spans(
+                sampling, [span for span, _ in parsed], byte_sizes
+            )
+
+            # Pass 2 (expensive): blob-strip + extraction for kept spans only.
+            for (span, run_id), decision in zip(parsed, decisions, strict=True):
+                if decision.drop:
                     accepted += 1
+                    continue
+                row = extract_row(span, run_id)
+                if row is None:
+                    continue
+                if decision.sampled_rate is not None:
+                    ingest_sampling.stamp_sample_rate(row, decision.sampled_rate)
+                span_rows.append(row)
 
         if span_rows:
-            insert_with_empty_query_retry(
-                self._ch_client,
-                "spans",
-                data=[genai_span_to_row(s) for s in span_rows],
-                column_names=ALL_SPAN_INSERT_COLUMNS,
-                settings=self._insert_settings,
-            )
-            record_db_insert(table="spans", count=len(span_rows))
+            self.insert_spans(span_rows)
 
         if failure_counts:
             logger.warning(
@@ -714,18 +967,35 @@ class AgentWriteHandler:
     def insert_span(self, span: AgentSpanCHInsertable) -> None:
         """Insert a single pre-built span into the spans table.
 
-        Unlike ``insert_otel_spans`` this skips OTel protobuf parsing and
+        Unlike `insert_otel_spans` this skips OTel protobuf parsing and
         GenAI extraction — the caller is responsible for constructing a
-        fully populated ``AgentSpanCHInsertable``.
+        fully populated `AgentSpanCHInsertable`.
         """
+        self.insert_spans([span])
+
+    @traced(name="agents.clickhouse.insert_spans")
+    def insert_spans(self, span_rows: list[AgentSpanCHInsertable]) -> None:
+        """Bulk-insert pre-built span rows in one round-trip; traced for APM.
+
+        Shared by `insert_span`, OTel ingest, and the scoring worker's batch
+        span-write path. Empty input is a no-op.
+        """
+        if not span_rows:
+            return
+        set_root_span_dd_tags(
+            {
+                "weave_trace_server.insert.table": "spans",
+                "weave_trace_server.insert.row_count": len(span_rows),
+            }
+        )
         insert_with_empty_query_retry(
             self._ch_client,
             "spans",
-            data=[genai_span_to_row(span)],
+            data=[genai_span_to_row(s) for s in span_rows],
             column_names=ALL_SPAN_INSERT_COLUMNS,
             settings=self._insert_settings,
         )
-        record_db_insert(table="spans", count=1)
+        record_db_insert(table="spans", count=len(span_rows))
 
 
 # ---------------------------------------------------------------------------
@@ -792,6 +1062,21 @@ def _first_cell_int(result: QueryResult) -> int:
     return safe_int(result.result_rows[0][0]) if result.result_rows else 0
 
 
+def _optional_float(val: Any) -> float | None:
+    """Coerce to float, preserving None.
+
+    Unlike `safe_float` (which maps None -> 0.0), this keeps a missing/NULL
+    cost as None so the response distinguishes "unpriced" from "$0". Used for
+    cost columns that are only present when `include_costs` was requested.
+    """
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _agent_aggregate_fields(row: ClickHouseRow) -> dict[str, Any]:
     """Hydrate the aggregate fields shared by agent and version rows."""
     return {
@@ -851,6 +1136,11 @@ def _hydrate_group_row(
         total_reasoning_tokens=safe_int(row.get("total_reasoning_tokens")),
         total_duration_ms=safe_int(row.get("total_duration_ms")),
         error_count=safe_int(row.get("error_count")),
+        # Cost aggregates are present only when include_costs was set; absent
+        # keys stay None (default on AgentSpanGroupRow).
+        total_cost_usd=_optional_float(row.get("total_cost_usd")),
+        total_input_cost_usd=_optional_float(row.get("total_input_cost_usd")),
+        total_output_cost_usd=_optional_float(row.get("total_output_cost_usd")),
         agent_names=unpack_string_array(row.get("agent_names")),
         agent_versions=unpack_string_array(row.get("agent_versions")),
         provider_names=unpack_string_array(row.get("provider_names")),

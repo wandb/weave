@@ -8,6 +8,7 @@ import sqlparse
 from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
@@ -23,6 +24,26 @@ from weave.trace_server.clickhouse_trace_server_migrator import (
 DEFAULT_MIGRATION_DIR = os.path.abspath(
     os.path.join(os.path.dirname(trace_server_migrator.__file__), "migrations")
 )
+
+
+def _count_result(n: int) -> Mock:
+    """Mock a `SELECT count()` query result with a single row/column of `n`."""
+    res = Mock()
+    res.result_rows = [(n,)]
+    return res
+
+
+def _stub_divergence_precheck(sql: str) -> Mock | None:
+    """Stub the divergence pre-check queries in `_apply_migrations_locked`.
+
+    A row in the migrations table (count 1) makes the guard a no-op, so tests
+    that mock the inner migration methods reach the path they exercise.
+    """
+    if "system.tables" in sql:
+        return _count_result(0)
+    if "count()" in sql and ".migrations" in sql:
+        return _count_result(1)
+    return None
 
 
 def _make_ch_client(database_engine: str = "Atomic") -> Mock:
@@ -41,6 +62,9 @@ def _make_ch_client(database_engine: str = "Atomic") -> Mock:
     def _query_side_effect(sql, *args, **kwargs):
         if "system.databases" in sql:
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -61,6 +85,9 @@ def _make_ch_client_with_database_engines(database_engines: dict[str, str]) -> M
             else:
                 engine_result.result_rows = []
             return engine_result
+        precheck = _stub_divergence_precheck(sql)
+        if precheck is not None:
+            return precheck
         return Mock()
 
     ch_client.query.side_effect = _query_side_effect
@@ -205,8 +232,14 @@ def test_apply_migrations_with_target_version(
     assert migrator.ch_client.command.call_count == 2
     migrator.ch_client.command.assert_has_calls(
         [
-            call("CREATE TABLE test1 (id Int32)", settings=None),
-            call("CREATE TABLE test2 (id Int32)", settings=None),
+            call(
+                "CREATE TABLE test1 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
+            call(
+                "CREATE TABLE test2 (id Int32)",
+                settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+            ),
         ]
     )
 
@@ -263,21 +296,34 @@ def test_apply_migrations_discovers_existing_target_database_engine(
 
         executed_sql = [call.args[0] for call in ch_client.command.call_args_list]
         create_sql = executed_sql[0]
-        assert "CREATE TABLE" in create_sql
-        assert "object_version_first_seen" in create_sql
-        assert "ENGINE = ReplicatedAggregatingMergeTree()" in create_sql
-        assert ("ON CLUSTER test_cluster" in create_sql) is expect_on_cluster
+        table_name = (
+            "object_version_first_seen_local"
+            if use_distributed
+            else "object_version_first_seen"
+        )
+        on_cluster = " ON CLUSTER test_cluster" if expect_on_cluster else ""
+        assert create_sql == (
+            f"CREATE TABLE IF NOT EXISTS {table_name}{on_cluster} (\n"
+            "            project_id String,\n"
+            "            object_id String,\n"
+            "            digest String,\n"
+            "            first_created_at SimpleAggregateFunction(min, DateTime64(3))\n"
+            "        ) ENGINE = ReplicatedAggregatingMergeTree()\n"
+            "        ORDER BY (project_id, object_id, digest)"
+        )
         assert migrator._replicated_db_engine_cache[target_db] is (
             target_engine == "Replicated"
         )
 
         if use_distributed:
             distributed_sql = executed_sql[1]
-            assert "CREATE TABLE IF NOT EXISTS object_version_first_seen" in (
-                distributed_sql
+            assert distributed_sql == (
+                "\n"
+                "        CREATE TABLE IF NOT EXISTS object_version_first_seen\n"
+                "        AS object_version_first_seen_local\n"
+                "        ENGINE = Distributed(test_cluster, currentDatabase(), object_version_first_seen_local, rand())\n"
+                "    "
             )
-            assert "ENGINE = Distributed" in distributed_sql
-            assert ("ON CLUSTER test_cluster" in distributed_sql) is expect_on_cluster
 
     # Existing legacy Replicated DBs reject ON CLUSTER during upgrades.
     run_upgrade_case(
@@ -311,21 +357,80 @@ def test_migration_dir_must_be_absolute():
         )
 
 
-def test_apply_migrations_raises_on_partially_applied(mock_migration_lock):
+def test_apply_migrations_recovers_partially_applied(mock_migration_lock):
+    # partial == curr+1 is recoverable: re-run the interrupted (idempotent)
+    # migration, then continue with the rest instead of dead-ending.
     ch_client = _make_ch_client()
     migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
         ch_client, post_migration_hook=None
     )
+    migrator._migration_row_exists = Mock(return_value=True)
     migrator._get_migration_status = Mock(
+        side_effect=[
+            {"curr_version": 1, "partially_applied_version": 2},
+            {"curr_version": 2, "partially_applied_version": None},
+        ]
+    )
+    migrator._get_migrations = Mock(
         return_value={
-            "curr_version": 1,
-            "partially_applied_version": 2,
+            2: {"up": "2.up.sql", "down": "2.down.sql"},
+            3: {"up": "3.up.sql", "down": "3.down.sql"},
+        }
+    )
+    migrator._determine_migrations_to_apply = Mock(return_value=[(3, "3.up.sql")])
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    migrator.apply_migrations("test_db")
+
+    migrator._apply_migration.assert_any_call("test_db", 2, "2.up.sql")
+    migrator._apply_migration.assert_any_call("test_db", 3, "3.up.sql")
+
+
+def test_apply_migrations_raises_on_unrecoverable_partial(mock_migration_lock):
+    # A partial version that isn't the expected next migration (curr+1) is not
+    # safe to auto-recover; require manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 1, "partially_applied_version": 5}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 6)
         }
     )
     migrator._has_migrations_to_apply = Mock(return_value=True)
 
-    with pytest.raises(MigrationError, match="partially applied migration version 2"):
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
         migrator.apply_migrations("test_db")
+
+
+def test_apply_migrations_raises_on_non_recoverable_one_shot(mock_migration_lock):
+    # A one-shot migration (006 seed, 024 swap) is partial==curr+1 but must NOT be
+    # re-run; recovery refuses it and requires manual repair.
+    ch_client = _make_ch_client()
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None
+    )
+    migrator._migration_row_exists = Mock(return_value=True)
+    migrator._get_migration_status = Mock(
+        return_value={"curr_version": 5, "partially_applied_version": 6}
+    )
+    migrator._get_migrations = Mock(
+        return_value={
+            i: {"up": f"{i}.up.sql", "down": f"{i}.down.sql"} for i in range(1, 7)
+        }
+    )
+    migrator._apply_migration = Mock()
+    migrator._has_migrations_to_apply = Mock(return_value=True)
+
+    with pytest.raises(MigrationError, match="cannot be auto-recovered"):
+        migrator.apply_migrations("test_db")
+    migrator._apply_migration.assert_not_called()
 
 
 def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock):
@@ -464,7 +569,8 @@ def test_execute_migration_command(migrator):
         migrator.ch_client.database == "original_db"
     )  # Should restore original database
     migrator.ch_client.command.assert_called_once_with(
-        "CREATE TABLE test (id Int32)", settings=None
+        "CREATE TABLE test (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
     )
 
 
@@ -472,7 +578,9 @@ def test_migration_non_replicated(migrator):
     # Test that non-replicated mode doesn't transform the SQL
     orig = "CREATE TABLE test (id String, project_id String) ENGINE = MergeTree ORDER BY (project_id, id);"
     migrator._execute_migration_command("test_db", orig)
-    migrator.ch_client.command.assert_called_once_with(orig, settings=None)
+    migrator.ch_client.command.assert_called_once_with(
+        orig, settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS
+    )
 
 
 def test_update_migration_status(migrator):
@@ -486,14 +594,14 @@ def test_update_migration_status(migrator):
     migrator._update_migration_status("test_db", 2, is_start=True)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE partially_applied_version = 2 WHERE db_name = 'test_db'",
-        settings={"mutations_sync": 2},
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
     # Test end of migration
     migrator._update_migration_status("test_db", 2, is_start=False)
     migrator.ch_client.command.assert_called_with(
         "ALTER TABLE db_management.migrations UPDATE curr_version = 2, partially_applied_version = NULL WHERE db_name = 'test_db'",
-        settings={"mutations_sync": 2},
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
     )
 
 
@@ -679,7 +787,18 @@ def test_replicated_engine_discovery_wait_and_timeout(mock_sleep):
     # ON CLUSTER on CH 25.8+, so the shape of this statement is fully pinned
     # by test_replicated_management_table_follows_database_engine.
     create_table_sql = ch_client.command.call_args_list[1][0][0]
-    assert "ENGINE = ReplicatedMergeTree()" in create_table_sql
+    assert create_table_sql == (
+        "\n"
+        "            CREATE TABLE IF NOT EXISTS db_management.migrations\n"
+        "            (\n"
+        "    db_name String,\n"
+        "    curr_version UInt64,\n"
+        "    partially_applied_version UInt64 NULL,\n"
+        ")\n"
+        "            ENGINE = ReplicatedMergeTree()\n"
+        "            ORDER BY (db_name)\n"
+        "        "
+    )
 
     # Times out: engine never becomes visible, error includes the SQL context
     timeout_client = Mock()
@@ -919,15 +1038,15 @@ def test_format_distributed_sql():
     # CREATE TABLE should create both local and distributed
     sql = "CREATE TABLE test ON CLUSTER test_cluster (id Int32) ENGINE = MergeTree"
     result = distributed_migrator._format_distributed_sql(sql)
-    assert "test_local" in result.local_command
-    assert result.distributed_command is not None
-    assert (
-        "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster"
-        in result.distributed_command
+    assert result.local_command == (
+        "CREATE TABLE test_local ON CLUSTER test_cluster (id Int32) ENGINE = MergeTree"
     )
-    assert (
-        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in result.distributed_command
+    assert result.distributed_command == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n"
+        "        AS test_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())\n"
+        "    "
     )
 
 
@@ -940,18 +1059,18 @@ def test_execute_migration_command_with_distributed(distributed_migrator):
     assert distributed_migrator.ch_client.database == "original_db"
 
     first_call = distributed_migrator.ch_client.command.call_args_list[0][0][0]
-    assert "CREATE TABLE test_local ON CLUSTER test_cluster" in first_call
-    assert (
-        "ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
-        in first_call
+    assert first_call == (
+        "CREATE TABLE test_local ON CLUSTER test_cluster (id Int32) "
+        "ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/test_db/test_local', '{replica}')"
     )
 
     second_call = distributed_migrator.ch_client.command.call_args_list[1][0][0]
-    assert "CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster" in second_call
-    assert "AS test_local" in second_call
-    assert (
-        "ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())"
-        in second_call
+    assert second_call == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS test ON CLUSTER test_cluster\n"
+        "        AS test_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), test_local, rand())\n"
+        "    "
     )
 
 
@@ -1395,10 +1514,13 @@ def test_rename_table_distributed(distributed_migrator):
 
     # 3. Create new distributed table
     create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
-    assert "calls_complete_old" in create_sql
-    assert "ON CLUSTER test_cluster" in create_sql
-    assert "Distributed" in create_sql
-    assert "calls_complete_old_local" in create_sql
+    assert create_sql == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS calls_complete_old ON CLUSTER test_cluster\n"
+        "        AS calls_complete_old_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_old_local, rand())\n"
+        "    "
+    )
 
 
 def test_rename_table_distributed_picks_up_shard_key(distributed_migrator):
@@ -1411,8 +1533,13 @@ def test_rename_table_distributed_picks_up_shard_key(distributed_migrator):
 
     # The new distributed table should use sipHash64(trace_id) for calls_complete
     create_sql = distributed_migrator.ch_client.command.call_args_list[2][0][0]
-    assert "sipHash64(trace_id)" in create_sql
-    assert "calls_complete_local" in create_sql
+    assert create_sql == (
+        "\n"
+        "        CREATE TABLE IF NOT EXISTS calls_complete ON CLUSTER test_cluster\n"
+        "        AS calls_complete_local\n"
+        "        ENGINE = Distributed(test_cluster, currentDatabase(), calls_complete_local, sipHash64(trace_id))\n"
+        "    "
+    )
 
 
 def test_rename_table_replicated(replicated_migrator):
@@ -1776,10 +1903,6 @@ def test_split_migration_sql() -> None:
         "ALTER TABLE runs\n        ADD COLUMN note String DEFAULT 'it''s; ok'",
         "CREATE INDEX idx_runs_config ON runs (config) TYPE minmax",
     ]
-    for s in statements:
-        assert not s.endswith(";")
-        assert "--" not in s
-        assert "/*" not in s
 
 
 def test_shipped_migrations_do_not_embed_on_cluster() -> None:
@@ -1847,3 +1970,31 @@ def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
             f"  old ({len(old_norm)}): {old_norm}\n"
             f"  new ({len(new_norm)}): {new_norm}"
         )
+
+
+def test_run_ddl_with_retry_passes_migration_ddl_settings(migrator):
+    migrator._run_ddl_with_retry("CREATE TABLE t (id Int32)")
+    migrator.ch_client.command.assert_called_once_with(
+        "CREATE TABLE t (id Int32)",
+        settings=ch_settings.MIGRATION_DDL_QUERY_SETTINGS,
+    )
+
+
+def test_run_ddl_with_retry_merges_caller_settings(migrator):
+    migrator._run_ddl_with_retry("SELECT 1", settings={"mutations_sync": 2})
+    migrator.ch_client.command.assert_called_once_with(
+        "SELECT 1",
+        settings={**ch_settings.MIGRATION_DDL_QUERY_SETTINGS, "mutations_sync": 2},
+    )
+
+
+def test_migration_timeout_ladder_invariants():
+    # The client read timeout must outlast both the ON CLUSTER DDL wait and the
+    # server's replicated-DDL wait (database_replicated_initial_query_timeout_sec,
+    # default 300s) so the client always gets a response rather than the read
+    # timeout that stranded the migration mid-DDL in the incident.
+    client = ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+    ddl_task = ch_settings.MIGRATION_DDL_QUERY_SETTINGS["distributed_ddl_task_timeout"]
+    server_replicated_ddl_default = 300
+    assert client > ddl_task
+    assert client > server_replicated_ddl_default

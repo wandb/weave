@@ -29,7 +29,7 @@ GROUP BY
 
 -- Remove otel_dump from stats table
 ALTER TABLE calls_merged_stats
-    DROP COLUMN otel_dump;
+    DROP COLUMN IF EXISTS otel_dump;
 
 -- Rollback materialized view to remove otel_dump
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -61,8 +61,8 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         id;
 
 -- Remove otel_dump from aggregated calls table
-ALTER TABLE calls_merged DROP COLUMN otel_dump;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS otel_dump;
 
 -- Remove otel_dump from raw call parts table
 ALTER TABLE call_parts
-    DROP COLUMN otel_dump;
+    DROP COLUMN IF EXISTS otel_dump;

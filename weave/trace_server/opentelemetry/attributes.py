@@ -24,12 +24,22 @@ class SpanEvent(dict):
     dropped_attributes_count: int
 
 
+def _has_value(value: Any, allow_numeric_zero: bool) -> bool:
+    return bool(value) or (
+        allow_numeric_zero
+        and isinstance(value, int)
+        and not isinstance(value, bool)
+        and value == 0
+    )
+
+
 def parse_weave_values(
     attributes: dict[str, Any],
     key_mapping: list[str]
     | dict[str, list[str]]
     | list[tuple[str, Callable[..., Any]]]
     | dict[str, list[tuple[str, Callable[..., Any]]]],
+    allow_numeric_zero: bool = False,
 ) -> dict[str, Any]:
     result = {}
     # If list use the attribute as the key - Prevents synthetic attributes under input and output
@@ -42,7 +52,7 @@ def parse_weave_values(
             else:
                 attribute_key = attribute_key_or_tuple
             value = get_attribute(attributes, attribute_key)
-            if value:
+            if _has_value(value, allow_numeric_zero):
                 # Handler should never raise - Always use a try in handler and default to passed in value
                 if handler:
                     value = handler(value)
@@ -62,7 +72,7 @@ def parse_weave_values(
                 attribute_key = attribute_key_or_tuple
 
             value = get_attribute(attributes, attribute_key)
-            if value:
+            if _has_value(value, allow_numeric_zero):
                 if handler:
                     # Handler should never raise - Always use a try in handler and default to passed in value
                     value = handler(value)
@@ -81,7 +91,7 @@ def get_weave_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_weave_usage(attributes: dict[str, Any]) -> dict[str, Any]:
-    usage = parse_weave_values(attributes, USAGE_KEYS)
+    usage = parse_weave_values(attributes, USAGE_KEYS, allow_numeric_zero=True)
     if (
         "prompt_tokens" in usage
         and "completion_tokens" in usage

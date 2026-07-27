@@ -45,7 +45,7 @@ export type OpDecorator<T extends (...args: any[]) => any> = ((
 ) => T | void) &
   ((
     // Legacy signature
-    target: Object,
+    target: object,
     propertyKey: string | symbol,
     descriptor: TypedPropertyDescriptor<T>
   ) => TypedPropertyDescriptor<T> | void);

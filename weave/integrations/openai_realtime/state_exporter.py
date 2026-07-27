@@ -635,45 +635,9 @@ class StateExporter(BaseModel):
         if session:
             inputs.update(session)
 
-        from weave.trace.context.weave_client_context import require_weave_client
-
-        client = require_weave_client()
-
-        session_call: Call | None = None
-        if self.session_span:
-            session_call = self.session_span.get_root_call()
-
         response = msg.get("response", {})
         conv_id = response.get("conversation_id")
         response_id = response.get("id")
-
-        if conv_id and self.conversation_responses.get(conv_id) is not None:
-            if response_id:
-                self.conversation_responses[conv_id].append(response_id)
-
-        elif conv_id and response_id:
-            self.conversation_responses[conv_id] = [response_id]
-
-        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
-            response_parent = conv_call
-
-        elif conv_id:
-            conv_call = client.create_call(
-                op="realtime.conversation",
-                inputs={"id": conv_id},
-                parent=session_call,
-                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-            )
-            self.conversation_calls[conv_id] = conv_call
-            response_parent = conv_call
-
-        elif session_call:
-            response_parent = session_call
-
-        else:
-            logger.warning("Could not find session for response - %s", response_id)
-            # Will not happen in GA but potentially possible in Beta
-            response_parent = None
 
         # Pop all pre-recorded timestamps for this response
         created_at = (
@@ -702,31 +666,6 @@ class StateExporter(BaseModel):
                 if not isinstance(inputs.get("metadata"), dict):
                     inputs["metadata"] = {}
                 inputs["metadata"]["metrics"] = input_metrics_array
-
-        # Latency = TTFT: started_at=response.created, ended_at=first content
-        # Use user-set thread_id if present, otherwise fall back to conv_id
-        user_thread_id = get_thread_id()
-        if user_thread_id is not None and user_thread_id != "":
-            thread_id = user_thread_id
-        else:
-            thread_id = conv_id
-        if thread_id is not None and conv_id != "":
-            with set_thread_id(thread_id):
-                call = client.create_call(
-                    "realtime.response",
-                    inputs=inputs,
-                    parent=response_parent,
-                    started_at=created_at,
-                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-                )
-        else:
-            call = client.create_call(
-                "realtime.response",
-                inputs=inputs,
-                parent=response_parent,
-                started_at=created_at,
-                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
-            )
 
         output_dict = dict(response)
         output_list = response.get("output", [])
@@ -784,6 +723,101 @@ class StateExporter(BaseModel):
 
         if summary_usage:
             summary["usage"] = summary_usage
+
+        self._emit_response(
+            response=response,
+            conv_id=conv_id,
+            response_id=response_id,
+            inputs=inputs,
+            output_dict=output_dict,
+            summary=summary,
+            created_at=created_at,
+            done_at=done_at,
+            first_content_at=first_content_at,
+        )
+
+    def _emit_response(
+        self,
+        *,
+        response: dict,
+        conv_id: str | None,
+        response_id: str | None,
+        inputs: dict[str, Any],
+        output_dict: dict[str, Any],
+        summary: dict[str, Any],
+        created_at: datetime.datetime | None,
+        done_at: datetime.datetime | None,
+        first_content_at: datetime.datetime | None,
+    ) -> None:
+        """Export the compiled state for one finished response.
+
+        The single seam between the delta-accumulation machinery and the export
+        destination. The default creates the legacy ``realtime.response`` Weave
+        call under its conversation/session call; subclasses override it to
+        export the same ``inputs`` / ``output_dict`` / ``summary`` elsewhere
+        (e.g. as OTel GenAI spans) without re-deriving state.
+        """
+        from weave.trace.context.weave_client_context import require_weave_client
+
+        client = require_weave_client()
+
+        session_call: Call | None = None
+        if self.session_span:
+            session_call = self.session_span.get_root_call()
+
+        if conv_id and self.conversation_responses.get(conv_id) is not None:
+            if response_id:
+                self.conversation_responses[conv_id].append(response_id)
+
+        elif conv_id and response_id:
+            self.conversation_responses[conv_id] = [response_id]
+
+        if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
+            response_parent = conv_call
+
+        elif conv_id:
+            conv_call = client.create_call(
+                op="realtime.conversation",
+                inputs={"id": conv_id},
+                parent=session_call,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+            )
+            self.conversation_calls[conv_id] = conv_call
+            response_parent = conv_call
+
+        elif session_call:
+            response_parent = session_call
+
+        else:
+            logger.warning("Could not find session for response - %s", response_id)
+            # Will not happen in GA but potentially possible in Beta
+            response_parent = None
+
+        # Latency = TTFT: started_at=response.created, ended_at=first content
+        # Use user-set thread_id if present, otherwise fall back to conv_id
+        user_thread_id = get_thread_id()
+        thread_id: str | None
+        if user_thread_id is not None and user_thread_id != "":
+            thread_id = user_thread_id
+        else:
+            thread_id = conv_id
+        if thread_id is not None and conv_id != "":
+            with set_thread_id(thread_id):
+                call = client.create_call(
+                    "realtime.response",
+                    inputs=inputs,
+                    parent=response_parent,
+                    started_at=created_at,
+                    attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+                )
+        else:
+            call = client.create_call(
+                "realtime.response",
+                inputs=inputs,
+                parent=response_parent,
+                started_at=created_at,
+                attributes=OPENAI_REALTIME_INTEGRATION.as_attributes(),
+            )
 
         if summary:
             call.summary = summary
@@ -865,11 +899,7 @@ class StateExporter(BaseModel):
                     pass
 
             def _cb() -> None:
-                try:
-                    self._advance_fifo()
-                finally:
-                    # If more remain and head not ready, a new timer will be scheduled
-                    pass
+                self._advance_fifo()
 
             self.fifo_timer = threading.Timer(FIFO_TIMER_INTERVAL_SECONDS, _cb)
             self.fifo_timer.start()

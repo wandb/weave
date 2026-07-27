@@ -33,13 +33,18 @@ def bedrock_on_finish_converse(
             "completion_tokens": output_usage["outputTokens"],
             "total_tokens": output_usage["totalTokens"],
         }
-        # Bedrock Converse API returns cache tokens when prompt caching is used
-        cache_read = output_usage.get("cacheReadInputTokenCount")
+        # Bedrock Converse API returns cache tokens when prompt caching is used.
+        # Bedrock's inputTokens excludes cached tokens, while Weave's cost math
+        # treats prompt_tokens as the gross total and subtracts the cache counts
+        # from it, so add them in (litellm maps Bedrock usage the same way).
+        cache_read = output_usage.get("cacheReadInputTokens")
         if cache_read is not None:
             tokens_metrics["cache_read_input_tokens"] = cache_read
-        cache_write = output_usage.get("cacheWriteInputTokenCount")
+            tokens_metrics["prompt_tokens"] += cache_read
+        cache_write = output_usage.get("cacheWriteInputTokens")
         if cache_write is not None:
             tokens_metrics["cache_creation_input_tokens"] = cache_write
+            tokens_metrics["prompt_tokens"] += cache_write
         usage[model_name].update(tokens_metrics)
     if call.summary is not None:
         call.summary.update(summary_update)
@@ -414,9 +419,18 @@ def bedrock_stream_accumulator(
     if "metadata" in value:
         metadata = value["metadata"]
         if "usage" in metadata:
-            acc["usage"]["inputTokens"] = metadata["usage"].get("inputTokens", 0)
-            acc["usage"]["outputTokens"] = metadata["usage"].get("outputTokens", 0)
-            acc["usage"]["totalTokens"] = metadata["usage"].get("totalTokens", 0)
+            usage = metadata["usage"]
+            acc["usage"]["inputTokens"] = usage.get("inputTokens", 0)
+            acc["usage"]["outputTokens"] = usage.get("outputTokens", 0)
+            acc["usage"]["totalTokens"] = usage.get("totalTokens", 0)
+            # Preserve Bedrock's cache token keys so bedrock_on_finish_converse
+            # captures them; caching may be off, so a count of 0 is meaningful.
+            cache_read = usage.get("cacheReadInputTokens")
+            if cache_read is not None:
+                acc["usage"]["cacheReadInputTokens"] = cache_read
+            cache_write = usage.get("cacheWriteInputTokens")
+            if cache_write is not None:
+                acc["usage"]["cacheWriteInputTokens"] = cache_write
         if "metrics" in metadata:
             acc["latency_ms"] = metadata["metrics"].get("latencyMs", 0)
 

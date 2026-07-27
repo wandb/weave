@@ -1,5 +1,6 @@
 # always use lowercase keys for the redact keys
 import dataclasses
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -113,3 +114,11 @@ def redact_dataclass_fields(obj: Any, recursive_fn: Callable[[Any], Any]) -> Any
 
 
 # Note: No backward-compatibility alias is exposed; use add/remove/get helpers.
+
+
+_MEMORY_ADDRESS_RE = re.compile(r" at 0x[0-9a-fA-F]+")
+
+
+def strip_memory_addresses(s: str) -> str:
+    """Remove volatile ` at 0x...` memory addresses so serialized object digests stay stable across processes."""
+    return _MEMORY_ADDRESS_RE.sub("", s)

@@ -191,7 +191,7 @@ class WeaveMediaConnection:
 
             def _target() -> None:
                 try:
-                    self.conversation_manager.state.on_exit()
+                    self.conversation_manager.state_exporter.on_exit()
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
@@ -284,7 +284,7 @@ class WeaveAsyncWebsocketConnection:
 
             def _target() -> None:
                 try:
-                    self.conversation_manager.state.on_exit()
+                    self.conversation_manager.state_exporter.on_exit()
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
@@ -383,7 +383,7 @@ class WeaveAiohttpWebsocketConnection:
 
             def _target() -> None:
                 try:
-                    self.conversation_manager.state.on_exit()
+                    self.conversation_manager.state_exporter.on_exit()
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 

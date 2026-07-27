@@ -5,6 +5,16 @@ import {type Op, type OpOptions, type OpRef, type CallMethod} from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 
+// Internal registry of ops whose call start should be sent eagerly (immediately
+// via the v2 single endpoints) instead of paired into a calls_complete write.
+// Reserved for SDK integrations with long-running spans that must be visible
+// before they finish (evaluations, streaming tracers). Not a public op option.
+const eagerOps = new WeakSet<object>();
+
+export function markOpEager(opFn: Op<any>): void {
+  eagerOps.add(opFn);
+}
+
 export interface MethodDecoratorContext {
   kind: 'method';
   name: string | symbol;
@@ -38,7 +48,7 @@ function isModernDecorator(
  */
 function isLegacyDecorator(
   args: any[]
-): args is [Object, string | symbol, TypedPropertyDescriptor<any>] {
+): args is [object, string | symbol, TypedPropertyDescriptor<any>] {
   return (
     args.length === 3 &&
     (typeof args[0] === 'object' || typeof args[0] === 'function') &&
@@ -86,7 +96,7 @@ function deriveOpName<T extends (...args: any[]) => any>(
   context?: MethodDecoratorContext
 ): string {
   const fnName = options?.originalFunction?.name || fn.name || 'anonymous';
-  let calculatedName = 'anonymous';
+  let calculatedName: string;
 
   if (options?.name) {
     calculatedName = options.name;
@@ -168,11 +178,12 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       parentCall,
       startTime,
       displayName,
-      Object.keys(attributes).length > 0 ? attributes : undefined
+      Object.keys(attributes).length > 0 ? attributes : undefined,
+      eagerOps.has(opWrapper)
     );
 
     try {
-      let result = await client.runWithCallStack(newStack, async () => {
+      const result = await client.runWithCallStack(newStack, async () => {
         return await fn.apply(thisArg, params);
       });
 
@@ -294,7 +305,7 @@ function handleModernDecorator<T extends (...args: any[]) => any>(
 }
 
 function handleLegacyDecorator<T extends (...args: any[]) => any>(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<T>,
   factoryOptions?: Partial<OpOptions<T>>
@@ -305,7 +316,7 @@ function handleLegacyDecorator<T extends (...args: any[]) => any>(
   }
 
   // Derive default legacy name
-  let className = 'anonymous';
+  let className: string;
   if (target.constructor === Function) {
     // Static method
     className = (target as Function).name || 'anonymous';
@@ -343,7 +354,7 @@ function handleDecoratorFactory<T extends (...args: any[]) => any>(
     // Legacy Factory Usage
     if (isLegacyDecorator(decoratorArgs)) {
       const [target, propertyKey, descriptor] = decoratorArgs as [
-        Object,
+        object,
         string | symbol,
         TypedPropertyDescriptor<(...args: any[]) => any>,
       ];
@@ -389,7 +400,7 @@ export function op<T extends (...args: any[]) => any>(
 ): Op<T>;
 // Legacy decorator usage (experimentalDecorators in tsconfig.json): @weave.op
 export function op(
-  target: Object,
+  target: object,
   propertyKey: string | symbol,
   descriptor: TypedPropertyDescriptor<any>
 ): TypedPropertyDescriptor<any>;

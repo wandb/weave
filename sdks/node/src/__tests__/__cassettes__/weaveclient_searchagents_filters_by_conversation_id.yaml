@@ -1,0 +1,71 @@
+- request:
+    url: https://trace.wandb.ai/health
+    method: GET
+    headers:
+      authorization: masked
+      user-agent: W&B Weave JS Client unknown
+    body: ""
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "15"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 14:38:47 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"status":"ok"}'
+- request:
+    url: https://api.wandb.ai/graphql
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: Weave JS Client 0.16.0
+    body: '{"query":"\nquery DefaultEntity {\n    viewer
+      {\n        username\n        defaultEntity
+      {\n            name\n        }\n    }\n}\n","variables":{}}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-encoding: br
+      content-length: "69"
+      content-type: application/json; charset=utf-8
+      date: Fri, 26 Jun 2026 14:38:47 GMT
+      ratelimit-limit: "1000"
+      ratelimit-remaining: "1000"
+      vary: Origin
+      via: 1.1 google
+      x-content-type-options: nosniff
+      x-ratelimit-limit: "1000"
+      x-ratelimit-remaining: "1000"
+      x-wandb-trace-id: 33da2f2c7abb4da576da83a58e64374d
+    body: '{"data":{"viewer":{"username":"drtangible","defaultEntity":{"name":"drtangible-mocha"}}}}'
+- request:
+    url: https://trace.wandb.ai/agents/search
+    method: POST
+    headers:
+      authorization: masked
+      content-type: application/json
+      user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
+    body: '{"project_id":"drtangible-mocha/example","query":"","conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","limit":2}'
+  response:
+    status: 200
+    statusText: OK
+    headers:
+      alt-svc: h3=":443"; ma=2592000
+      content-length: "866"
+      content-type: application/json
+      date: Fri, 26 Jun 2026 14:38:47 GMT
+      server: uvicorn
+      via: 1.1 google
+    body: '{"results":[{"conversation_id":"trace_c50312356de3487fa90e381c9399b5b4","conversation_name":"","agent_name":"","matched_messages":[{"span_id":"53fc733e2f6b3417","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","role":"user","content_preview":"[{\"type\":
+      \"text\", \"content\": \"When was the last time Liverpool won the
+      EPL?\"}]","content_digest":"32cce4db16007e3f5c876c1a4b91e930","started_at":"2026-06-16T22:10:34.631000"},{"span_id":"53fc733e2f6b3417","trace_id":"86cc8e5a64b3bb1fbbf80cb377155950","role":"assistant","content_preview":"[{\"type\":
+      \"text\", \"content\": \"Liverpool last won the English Premier League in
+      the **2019\\u201320 season**, clinching the title on **25 June
+      2020**.\"}]","content_digest":"95fbc841becb3025395d9f997712ad53","started_at":"2026-06-16T22:10:34.631000"}],"last_activity":"2026-06-16T22:10:34.631000"}],"total_conversations":1}'

@@ -165,7 +165,7 @@ function createMockAnthropic() {
 
   MockMessages.prototype.stream = jest
     .fn()
-    .mockImplementation((options: any) => {
+    .mockImplementation((_options: any) => {
       return new MockAnthropicStream(mockStreamChunks);
     });
 
@@ -196,7 +196,7 @@ describe('Anthropic Integration', () => {
   const testProjectName = 'test-project';
   let mockAnthropic: any;
   let MockMessages: any;
-  let MockBatches: any;
+  let _MockBatches: any;
   let patchedAnthropic: any;
 
   beforeEach(() => {
@@ -206,7 +206,7 @@ describe('Anthropic Integration', () => {
     const mockData = createMockAnthropic();
     mockAnthropic = mockData.mockAnthropic;
     MockMessages = mockData.MockMessages;
-    MockBatches = mockData.MockBatches;
+    _MockBatches = mockData.MockBatches;
 
     // Apply patching
     patchedAnthropic = commonPatchAnthropic(mockAnthropic);

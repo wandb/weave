@@ -7,6 +7,7 @@ from collections.abc import Callable
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, TypedDict
 
+from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.trace import urls
 from weave.trace.context import weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -18,7 +19,7 @@ from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.constants import EVALUATION_RUN_OP_NAME, MAX_DISPLAY_NAME_LENGTH
 from weave.trace_server.interface.query import Query
 from weave.trace_server.trace_server_interface import (
     CallSchema,
@@ -296,6 +297,19 @@ class Call:
             storage_size_bytes=self.storage_size_bytes,
             total_storage_size_bytes=self.total_storage_size_bytes,
         )
+
+
+def is_eval_call(call: Call) -> bool:
+    """Whether the call is part of an evaluation.
+
+    Root matched by op name (a ref URI, hence substring), children by attribute.
+    op_name can raise if the op never saved, so fall back to attrs only.
+    """
+    try:
+        op_name = call.op_name
+    except Exception:
+        op_name = ""
+    return EVAL_META_KEY in (call.attributes or {}) or EVALUATION_RUN_OP_NAME in op_name
 
 
 class NoOpCall(Call):

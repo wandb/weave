@@ -17,6 +17,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import GenAIOTelExportReq, GenAIOTelExportRes
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
@@ -1093,6 +1094,36 @@ def test_insert_retries_empty_query_error():
         assert mock_ch_client.insert.call_count == 2  # Retried once
 
 
+def test_insert_deduplication_token_gated_on_replicated():
+    """Replicated/distributed inserts carry a unique dedup-opt-out token; non-replicated is untouched."""
+
+    def capture_settings(replicated: bool) -> list[dict]:
+        mock_client = MagicMock()
+        with (
+            patch(
+                "weave.trace_server.environment.wf_clickhouse_replicated",
+                return_value=replicated,
+            ),
+            patch.object(
+                chts.ClickHouseTraceServer, "_mint_client", return_value=mock_client
+            ),
+        ):
+            server = chts.ClickHouseTraceServer(host="h")
+            server._insert("t", data=[[1]], column_names=["a"])
+            server._insert("t", data=[[1]], column_names=["a"])
+        return [
+            c.kwargs.get("settings") or {} for c in mock_client.insert.call_args_list
+        ]
+
+    tokens = [s.get("insert_deduplication_token") for s in capture_settings(True)]
+    assert all(tokens), "replicated inserts must carry a dedup token"
+    assert tokens[0] != tokens[1], "each insert must get a unique token"
+
+    assert all(
+        "insert_deduplication_token" not in s for s in capture_settings(False)
+    ), "non-replicated inserts must be unchanged (SharedMergeTree/CH Cloud)"
+
+
 def test_insert_with_empty_query_retry_contract():
     """The shared direct-insert helper retries empty query, exhausts, and passes through."""
     summary = MagicMock()
@@ -1358,11 +1389,52 @@ def server_with_mock_kafka():
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._kafka_producer = mock_producer
-        with patch(
-            "weave.trace_server.environment.wf_enable_online_eval",
-            return_value=True,
+        with (
+            patch(
+                "weave.trace_server.environment.wf_enable_online_eval",
+                return_value=True,
+            ),
+            patch(
+                "weave.trace_server.environment.wf_enable_agent_scoring",
+                return_value=True,
+            ),
         ):
             yield server, mock_producer
+
+
+@pytest.mark.parametrize(
+    ("online_eval", "scoring", "insights", "should_enable"),
+    [
+        (True, False, False, True),
+        (False, True, False, True),
+        (False, False, True, True),
+        (True, True, True, True),
+        (False, False, False, False),
+    ],
+)
+def test_kafka_producer_feature_gate(
+    monkeypatch, online_eval, scoring, insights, should_enable
+):
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: online_eval
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
+    )
+
+    if should_enable:
+        assert server.kafka_producer is mock_producer
+    else:
+        assert server.kafka_producer is None
 
 
 def _make_call_end_req() -> tsi.CallEndReq:
@@ -1946,3 +2018,117 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
         f"pointed at a tombstoned version: {exc_info.value!r}.  Expected a "
         f"NotFoundError-family error mentioning 'not found' or 'deleted'."
     )
+
+
+def _turn_ended_span_row() -> AgentSpanCHInsertable:
+    """A finished root span; ScoreAgentSpansEvent.from_row yields a turn_ended event."""
+    return AgentSpanCHInsertable(
+        project_id="p",
+        trace_id="tr",
+        span_id="root",
+        parent_span_id="",
+        span_name="root",
+        started_at=dt.datetime(2024, 1, 1, 11, 0, 0),
+        ended_at=dt.datetime(2024, 1, 1, 12, 0, 0),
+        agent_name="a",
+        operation_name="invoke_agent",
+    )
+
+
+@pytest.mark.parametrize(
+    ("online_eval", "scoring", "insights"),
+    [
+        (True, True, False),
+        (True, False, True),
+        (True, True, True),
+        (False, False, True),
+        (False, True, True),
+        (False, True, False),
+        (True, False, False),
+    ],
+    ids=[
+        "online-eval-and-scoring",
+        "online-eval-and-insights",
+        "online-eval-with-both-consumers",
+        "insights-without-online-eval",
+        "both-consumers-without-online-eval",
+        "scoring-without-online-eval",
+        "all-consumers-off",
+    ],
+)
+def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights):
+    """OTel ingest emits for scoring or Insights, independent of online eval."""
+    mock_producer = MagicMock()
+    monkeypatch.setattr(
+        chts.ClickHouseTraceServer, "_mint_client", lambda self: MagicMock()
+    )
+    server = chts.ClickHouseTraceServer(host="test_host")
+    server._kafka_producer = mock_producer
+
+    monkeypatch.setattr(
+        AgentWriteHandler,
+        "insert_otel_spans",
+        lambda self, req: (
+            GenAIOTelExportRes(accepted_spans=1),
+            [_turn_ended_span_row()],
+        ),
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_online_eval", lambda: online_eval
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_scoring", lambda: scoring
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.environment.wf_enable_agent_insights", lambda: insights
+    )
+
+    res = server.genai_otel_export(
+        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
+    )
+
+    assert res.accepted_spans == 1
+    if scoring:
+        mock_producer.produce_score_agent_spans.assert_called_once()
+    else:
+        mock_producer.produce_score_agent_spans.assert_not_called()
+    if insights:
+        mock_producer.produce_embed_agent_spans.assert_called_once()
+    else:
+        mock_producer.produce_embed_agent_spans.assert_not_called()
+    if scoring or insights:
+        mock_producer.flush.assert_called_once_with(0)
+    else:
+        mock_producer.flush.assert_not_called()
+
+
+def test_mint_client_forwards_send_receive_timeout():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client(
+            send_receive_timeout=ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+        kwargs = mock_get_client.call_args.kwargs
+        assert (
+            kwargs["send_receive_timeout"]
+            == ch_settings.MIGRATION_CLIENT_SEND_RECEIVE_TIMEOUT_SEC
+        )
+
+
+def test_mint_client_omits_send_receive_timeout_by_default():
+    server = chts.ClickHouseTraceServer(host="test_host")
+    with (
+        patch.object(chts.ClickHouseTraceServer, "_ensure_database"),
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client"
+        ) as mock_get_client,
+    ):
+        mock_get_client.return_value = MagicMock()
+        server._mint_client()
+        assert "send_receive_timeout" not in mock_get_client.call_args.kwargs

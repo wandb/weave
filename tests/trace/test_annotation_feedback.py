@@ -4,7 +4,11 @@ from pydantic import BaseModel, Field
 import weave
 from weave import AnnotationSpec
 from weave.trace_server.clickhouse_trace_server_batched import InvalidRequest
-from weave.trace_server.trace_server_interface import FeedbackCreateReq, ObjQueryReq
+from weave.trace_server.trace_server_interface import (
+    FeedbackCreateReq,
+    ObjDeleteReq,
+    ObjQueryReq,
+)
 
 
 def test_human_feedback_basic(client):
@@ -84,6 +88,39 @@ def test_human_feedback_basic(client):
                     "feedback_type": "wandb.annotation." + ref1.name,
                     "annotation_ref": ref1.uri,
                     "payload": {"value": 42},
+                }
+            )
+        )
+
+
+def test_feedback_create_on_deleted_annotation_spec(client):
+    """A feedback ref pointing at a deleted annotation spec resolves to None;
+    the request is rejected as not-found, not a 500 (TypeError on model_validate(None)).
+    """
+    spec = AnnotationSpec(
+        name="Deleted Spec",
+        field_schema={"type": "number", "minimum": 0, "maximum": 1},
+    )
+    ref = weave.publish(spec, "deleted spec")
+    assert ref
+
+    client.server.obj_delete(
+        ObjDeleteReq(
+            project_id=client.project_id,
+            object_id=ref.name,
+            digests=[ref.digest],
+        )
+    )
+
+    with pytest.raises(InvalidRequest, match="not found"):
+        client.server.feedback_create(
+            FeedbackCreateReq.model_validate(
+                {
+                    "project_id": client.project_id,
+                    "weave_ref": "weave:///entity/project/call/name:digest",
+                    "feedback_type": "wandb.annotation." + ref.name,
+                    "annotation_ref": ref.uri,
+                    "payload": {"value": 0},
                 }
             )
         )

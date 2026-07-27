@@ -1,13 +1,16 @@
 import time
 
 import pytest
-from pydantic import ValidationError
 
 import weave
 from weave.trace.refs import ObjectRef
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError, ObjectDeletedError
+from weave.trace_server.errors import (
+    InvalidRequest,
+    NotFoundError,
+    ObjectDeletedError,
+)
 from weave.trace_server.trace_server_common import digest_is_content_hash
 
 
@@ -47,42 +50,42 @@ def _create_obj_in_project(server, project_id: str, name: str, val: dict | None 
 def test_tag_validation():
     """All tag format rules: regex, length, whitespace, deduplication, version-like names."""
     # Empty tag rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj", object_id="obj", digest="abc123", tags=[""]
         )
 
     # Too long (>256 chars) rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj", object_id="obj", digest="abc123", tags=["a" * 257]
         )
 
     # Whitespace-only rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj", object_id="obj", digest="abc123", tags=["   "]
         )
 
     # Special characters rejected
     for bad_tag in ["special!chars", "my.tag", "hello@world", "a+b"]:
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             tsi.ObjAddTagsReq(
                 project_id="test/proj", object_id="obj", digest="abc123", tags=[bad_tag]
             )
 
     # Leading/trailing spaces rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj", object_id="obj", digest="abc123", tags=[" leading"]
         )
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj", object_id="obj", digest="abc123", tags=["trailing "]
         )
 
     # Consecutive spaces rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjAddTagsReq(
             project_id="test/proj",
             object_id="obj",
@@ -125,7 +128,7 @@ def test_alias_validation():
     """All alias format rules: reserved names, invalid chars, length, whitespace."""
     # Reserved names rejected: 'latest', version-like
     for reserved in ["latest", "v0", "v123"]:
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             tsi.ObjSetAliasesReq(
                 project_id="test/proj",
                 object_id="obj",
@@ -135,7 +138,7 @@ def test_alias_validation():
 
     # Invalid characters: '/' and ':' rejected
     for bad in ["path/slash", "has:colon"]:
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             tsi.ObjSetAliasesReq(
                 project_id="test/proj",
                 object_id="obj",
@@ -145,7 +148,7 @@ def test_alias_validation():
 
     # Whitespace-only rejected (spaces, tabs)
     for ws in ["   ", "\t"]:
-        with pytest.raises(ValidationError):
+        with pytest.raises(InvalidRequest):
             tsi.ObjSetAliasesReq(
                 project_id="test/proj",
                 object_id="obj",
@@ -154,13 +157,13 @@ def test_alias_validation():
             )
 
     # Empty string rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjSetAliasesReq(
             project_id="test/proj", object_id="obj", digest="abc123", aliases=[""]
         )
 
     # Too long (>128 chars) rejected
-    with pytest.raises(ValidationError):
+    with pytest.raises(InvalidRequest):
         tsi.ObjSetAliasesReq(
             project_id="test/proj",
             object_id="obj",

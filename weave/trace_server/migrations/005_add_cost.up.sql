@@ -1,4 +1,4 @@
-CREATE TABLE llm_token_prices (
+CREATE TABLE IF NOT EXISTS llm_token_prices (
      /*
     `id`: The unique identifier for the call. This is typically a UUID.
     */

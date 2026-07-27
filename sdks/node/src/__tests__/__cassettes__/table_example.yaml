@@ -4,7 +4,7 @@
     headers:
       authorization: masked
       content-type: application/json
-      user-agent: Weave JS Client 0.15.1
+      user-agent: Weave JS Client 0.16.0
     body: '{"query":"\nquery DefaultEntity {\n    viewer
       {\n        username\n        defaultEntity
       {\n            name\n        }\n    }\n}\n","variables":{}}'
@@ -32,6 +32,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"table":{"project_id":"drtangible-mocha/test-project","rows":[{"a":1,"b":2},{"a":3,"b":4},{"a":5,"b":6}]}}'
   response:
     status: 200
@@ -51,6 +52,7 @@
       authorization: masked
       content-type: application/json
       user-agent: W&B Weave JS Client unknown
+      x-weave-client-capabilities: trace_id_on_end,eval_child_meta
     body: '{"project_id":"drtangible-mocha/test-project","digest":"d2e5de0d792d9f5636b67ab5c8baf8a7749b4703e89c625303b32405e0b17e77"}'
   response:
     status: 200

@@ -1,0 +1,79 @@
+"""Public namespace for the Weave Conversation SDK.
+
+Imports everything user code needs to construct conversations, turns, llm
+spans, tool spans, and structured messages. Concrete message parts
+(``TextPart``, ``ToolCallPart``, etc.) and the ``MessagePart`` union
+live here rather than at the top-level ``weave`` namespace, mirroring
+the ``langchain_core.messages`` pattern: callers building structured
+messages do ``from weave.conversation import TextPart, ToolCallPart``.
+"""
+
+from weave.conversation.agent_context import agent_name_override
+from weave.conversation.conversation import (
+    LLM,
+    BlobPart,
+    Conversation,
+    FilePart,
+    LogResult,
+    MediaAttachment,
+    Message,
+    MessagePart,
+    Reasoning,
+    ReasoningPart,
+    SubAgent,
+    TextPart,
+    Tool,
+    ToolCallPart,
+    ToolCallResponsePart,
+    Turn,
+    UriPart,
+    Usage,
+    end_conversation,
+    end_llm,
+    end_turn,
+    get_current_conversation,
+    get_current_llm,
+    get_current_turn,
+    log_conversation,
+    log_turn,
+    start_conversation,
+    start_llm,
+    start_subagent,
+    start_tool,
+    start_turn,
+)
+
+__all__ = [
+    "LLM",
+    "BlobPart",
+    "Conversation",
+    "FilePart",
+    "LogResult",
+    "MediaAttachment",
+    "Message",
+    "MessagePart",
+    "Reasoning",
+    "ReasoningPart",
+    "SubAgent",
+    "TextPart",
+    "Tool",
+    "ToolCallPart",
+    "ToolCallResponsePart",
+    "Turn",
+    "UriPart",
+    "Usage",
+    "agent_name_override",
+    "end_conversation",
+    "end_llm",
+    "end_turn",
+    "get_current_conversation",
+    "get_current_llm",
+    "get_current_turn",
+    "log_conversation",
+    "log_turn",
+    "start_conversation",
+    "start_llm",
+    "start_subagent",
+    "start_tool",
+    "start_turn",
+]

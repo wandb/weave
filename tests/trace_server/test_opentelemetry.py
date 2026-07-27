@@ -1469,6 +1469,17 @@ class TestSemanticConventionParsing:
         assert usage.get("cache_read_input_tokens") == 20
         assert usage.get("total_tokens") == 150
 
+        # An explicit canonical zero beats an OpenAI-shaped fallback.
+        usage = get_weave_usage(
+            create_attributes(
+                {
+                    "gen_ai.usage.cache_read.input_tokens": 0,
+                    "gen_ai.usage.prompt_tokens_details.cached_tokens": 640,
+                }
+            )
+        )
+        assert usage.get("cache_read_input_tokens") == 0
+
     def test_genai_semconv_conversation_id_as_thread_and_turn(self):
         """Test that gen_ai.conversation.id maps to both thread_id and is_turn."""
         test_conversation_id = "conv-abc-123"

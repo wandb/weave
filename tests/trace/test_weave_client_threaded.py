@@ -7,7 +7,7 @@ import pytest
 from flask import Flask
 
 import weave
-from tests.trace.util import FAKE_NOT_IMPLEMENTED
+from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 
 
 @pytest.fixture
@@ -34,7 +34,11 @@ def flask_server(weave_active):
     return url
 
 
-@pytest.mark.skipif(FAKE_NOT_IMPLEMENTED, reason="fake: not implemented yet")
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND,
+    reason="requires a served HTTP backend; the in-process fake client is not "
+    "reachable from werkzeug request threads",
+)
 def test_flask_server(flask_server):
     url = flask_server
     with httpx.Client() as client:

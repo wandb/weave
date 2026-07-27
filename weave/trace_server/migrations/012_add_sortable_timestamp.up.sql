@@ -1,6 +1,6 @@
 -- Create non-nullable Datetime field in the call_merged table
 ALTER TABLE calls_merged 
-    ADD COLUMN sortable_datetime Datetime(6) DEFAULT coalesce(started_at, ended_at, NOW());
+    ADD COLUMN IF NOT EXISTS sortable_datetime Datetime(6) DEFAULT coalesce(started_at, ended_at, NOW());
 
 -- Add the column to the materialized view 
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -30,6 +30,6 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 ALTER TABLE calls_merged MATERIALIZE COLUMN sortable_datetime SETTINGS mutations_sync = 1;
 
 -- Add minmax index  on the new column
-ALTER TABLE calls_merged ADD INDEX idx_sortable_datetime (sortable_datetime) TYPE minmax GRANULARITY 1 SETTINGS alter_sync = 1;
+ALTER TABLE calls_merged ADD INDEX IF NOT EXISTS idx_sortable_datetime (sortable_datetime) TYPE minmax GRANULARITY 1 SETTINGS alter_sync = 1;
 -- Materialize the index, actually generating index marks for all the granules
 ALTER TABLE calls_merged MATERIALIZE INDEX idx_sortable_datetime SETTINGS mutations_sync = 1;

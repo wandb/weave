@@ -12,10 +12,26 @@ from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
-from weave.trace.refs import ObjectRef, Ref
+from weave.trace.refs import (
+    AgentConversationRef,
+    AgentSpanRef,
+    AgentTurnRef,
+    AnyRef,
+    ObjectRef,
+    Ref,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 from weave.utils.project_id import to_project_id
+
+# Mirrors weave.trace_server.interface.feedback_types; the client/server import
+# boundary forbids importing it here.
+AGENT_USER_FEEDBACK_TYPE = "wandb.agent_user_feedback"
+NOTE_FEEDBACK_TYPE = "wandb.note.1"
+REACTION_FEEDBACK_TYPE = "wandb.reaction.1"
+
+# Reason the Agent UI records for human reactions; keep in sync with Reactions.tsx.
+AGENT_REACTION_REASON = "Set by user"
 
 
 class Feedbacks(AbstractRichContainer[tsi.Feedback]):
@@ -48,7 +64,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
 
         type_ = feedback.feedback_type
         display_type = type_
-        if type_ == "wandb.reaction.1":
+        if type_ == REACTION_FEEDBACK_TYPE:
             display_type = "reaction"
             if util.is_notebook():
                 # TODO: Emojis mess up table alignment in Jupyter 😢
@@ -56,7 +72,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
                 content = feedback.payload["alias"]
             else:
                 content = feedback.payload["emoji"]
-        elif type_ == "wandb.note.1":
+        elif type_ == NOTE_FEEDBACK_TYPE:
             display_type = "note"
             content = feedback.payload["note"]
         else:
@@ -169,12 +185,10 @@ class RefFeedbackQuery(FeedbackQuery):
     """Object for interacting with feedback associated with a particular ref."""
 
     weave_ref: str
+    _parsed_ref: AnyRef
 
     def __init__(self, ref: str) -> None:
         parsed_ref = Ref.parse_uri(ref)
-        # All ref types have entity and project attributes
-        if not hasattr(parsed_ref, "entity") or not hasattr(parsed_ref, "project"):
-            raise ValueError(f"Invalid ref type: {type(parsed_ref)}")
         query = {
             "$expr": {
                 "$eq": [
@@ -184,11 +198,17 @@ class RefFeedbackQuery(FeedbackQuery):
             }
         }
         super().__init__(
-            entity=parsed_ref.entity,  # type: ignore
-            project=parsed_ref.project,  # type: ignore
+            entity=parsed_ref.entity,
+            project=parsed_ref.project,
             query=Query(**query),
         )
         self.weave_ref = ref
+        self._parsed_ref = parsed_ref
+
+    def _create(self, freq: tsi.FeedbackCreateReq) -> str:
+        response = self.client.server.feedback_create(freq)
+        self.feedbacks = None  # Clear cache
+        return response.id
 
     def _add(
         self,
@@ -212,9 +232,22 @@ class RefFeedbackQuery(FeedbackQuery):
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
                 ) from None
             freq.annotation_ref = annotation_ref
-        response = self.client.server.feedback_create(freq)
-        self.feedbacks = None  # Clear cache
-        return response.id
+        return self._create(freq)
+
+    def _add_agent_reaction(self, emoji: str, creator: str | None) -> str:
+        return self._create(
+            tsi.FeedbackCreateReq(
+                project_id=to_project_id(self.entity, self.project),
+                weave_ref=self.weave_ref,
+                feedback_type=AGENT_USER_FEEDBACK_TYPE,
+                scorer_tags=[emoji],
+                scorer_tag_reasons={emoji: AGENT_REACTION_REASON},
+                scorer_tag_confidences={emoji: 1.0},
+                # Mirror the tag so wandb.reaction.1 consumers can read it too.
+                payload={"emoji": emoji, "scorer_tags": [emoji]},
+                creator=creator,
+            )
+        )
 
     def add(
         self,
@@ -236,8 +269,13 @@ class RefFeedbackQuery(FeedbackQuery):
         return self._add(feedback_type, feedback, creator, annotation_ref)
 
     def add_reaction(self, emoji: str, creator: str | None = None) -> str:
+        """Add an emoji reaction, written as the type the target's UI renders."""
+        if isinstance(
+            self._parsed_ref, (AgentSpanRef, AgentTurnRef, AgentConversationRef)
+        ):
+            return self._add_agent_reaction(emoji, creator)
         return self._add(
-            "wandb.reaction.1",
+            REACTION_FEEDBACK_TYPE,
             {
                 "emoji": emoji,
             },
@@ -246,7 +284,7 @@ class RefFeedbackQuery(FeedbackQuery):
 
     def add_note(self, note: str, creator: str | None = None) -> str:
         return self._add(
-            "wandb.note.1",
+            NOTE_FEEDBACK_TYPE,
             {
                 "note": note,
             },

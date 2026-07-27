@@ -64,6 +64,18 @@ MOCK_CONVERSE_RESPONSE = {
     "metrics": {"latencyMs": 838},
 }
 
+# Converse (non-streaming) response reporting prompt-cache token counts.
+MOCK_CONVERSE_RESPONSE_CACHE = {
+    **MOCK_CONVERSE_RESPONSE,
+    "usage": {
+        "inputTokens": 100,
+        "outputTokens": 20,
+        "totalTokens": 120,
+        "cacheReadInputTokens": 80,
+        "cacheWriteInputTokens": 15,
+    },
+}
+
 MOCK_STREAM_EVENTS = [
     {"messageStart": {"role": "assistant"}},
     {"contentBlockDelta": {"delta": {"text": "To"}, "contentBlockIndex": 0}},
@@ -98,6 +110,53 @@ MOCK_STREAM_EVENTS = [
         "metadata": {
             "usage": {"inputTokens": 55, "outputTokens": 30, "totalTokens": 85},
             "metrics": {"latencyMs": 926},
+        }
+    },
+]
+
+# Converse stream whose metadata reports prompt-cache token counts. Bedrock
+# names these cacheReadInputTokens / cacheWriteInputTokens.
+MOCK_STREAM_EVENTS_CACHE = [
+    {"messageStart": {"role": "assistant"}},
+    {
+        "contentBlockDelta": {
+            "delta": {"text": "Cached answer."},
+            "contentBlockIndex": 0,
+        }
+    },
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {"messageStop": {"stopReason": "end_turn"}},
+    {
+        "metadata": {
+            "usage": {
+                "inputTokens": 100,
+                "outputTokens": 20,
+                "totalTokens": 120,
+                "cacheReadInputTokens": 80,
+                "cacheWriteInputTokens": 15,
+            },
+            "metrics": {"latencyMs": 500},
+        }
+    },
+]
+
+# Converse stream whose metadata reports a cache read of 0 tokens. A count of 0
+# is meaningful (caching was possible but nothing hit) and must be preserved.
+MOCK_STREAM_EVENTS_CACHE_ZERO = [
+    {"messageStart": {"role": "assistant"}},
+    {"contentBlockDelta": {"delta": {"text": "No cache hit."}, "contentBlockIndex": 0}},
+    {"contentBlockStop": {"contentBlockIndex": 0}},
+    {"messageStop": {"stopReason": "end_turn"}},
+    {
+        "metadata": {
+            "usage": {
+                "inputTokens": 100,
+                "outputTokens": 20,
+                "totalTokens": 120,
+                "cacheReadInputTokens": 0,
+                "cacheWriteInputTokens": 0,
+            },
+            "metrics": {"latencyMs": 500},
         }
     },
 ]
@@ -355,6 +414,17 @@ def converse_stream_make_api_call(events: list[dict]) -> Callable:
                     yield from events
 
             return {"stream": MockStream()}
+        return orig(self, operation_name, api_params)
+
+    return mock
+
+
+def converse_make_api_call(response: dict) -> Callable:
+    """Build a _make_api_call that returns the given response for Converse."""
+
+    def mock(self, operation_name: str, api_params: dict) -> dict:
+        if operation_name == "Converse":
+            return response
         return orig(self, operation_name, api_params)
 
     return mock
@@ -625,6 +695,135 @@ def test_bedrock_converse_stream_text_and_tools(
     assert output["usage"]["inputTokens"] == model_usage["prompt_tokens"] == 70
     assert output["usage"]["outputTokens"] == model_usage["completion_tokens"] == 40
     assert output["usage"]["totalTokens"] == model_usage["total_tokens"] == 110
+
+
+@mock_aws
+def test_bedrock_converse_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Non-streaming converse records prompt-cache token counts."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_make_api_call(MOCK_CONVERSE_RESPONSE_CACHE),
+    ):
+        bedrock_client.converse(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 30},
+        )
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    model_usage = calls[0].summary["usage"][model_id]
+    # prompt_tokens is gross: inputTokens (100) excludes cached tokens, so the
+    # cache read (80) and cache write (15) counts are added in.
+    assert model_usage["prompt_tokens"] == 195
+    assert model_usage["completion_tokens"] == 20
+    assert model_usage["total_tokens"] == 120
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@mock_aws
+def test_bedrock_converse_stream_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Streaming converse records prompt-cache token counts from the metadata event."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_stream_make_api_call(MOCK_STREAM_EVENTS_CACHE),
+    ):
+        response = bedrock_client.converse_stream(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 30},
+        )
+        consumed = list(response.get("stream"))
+        assert consumed == MOCK_STREAM_EVENTS_CACHE
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    model_usage = calls[0].summary["usage"][model_id]
+    # Same gross prompt_tokens math as the non-streaming cache test above.
+    assert model_usage["prompt_tokens"] == 195
+    assert model_usage["completion_tokens"] == 20
+    assert model_usage["total_tokens"] == 120
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+
+
+@mock_aws
+def test_bedrock_converse_stream_cache_tokens_zero(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """A cache read of 0 is a meaningful count and must be recorded, not dropped."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=converse_stream_make_api_call(MOCK_STREAM_EVENTS_CACHE_ZERO),
+    ):
+        response = bedrock_client.converse_stream(
+            modelId=model_id,
+            system=[{"text": system_message}],
+            messages=messages,
+            inferenceConfig={"maxTokens": 30},
+        )
+        list(response.get("stream"))
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    model_usage = calls[0].summary["usage"][model_id]
+    assert model_usage["cache_read_input_tokens"] == 0
+    assert model_usage["cache_creation_input_tokens"] == 0
+    # Zero cache counts add nothing: prompt_tokens stays at inputTokens.
+    assert model_usage["prompt_tokens"] == 100
+
+
+def test_bedrock_mock_usage_keys_match_service_model() -> None:
+    """Pin the mocks' usage keys to the botocore service model.
+
+    The cache-token capture shipped broken twice because the code and the
+    test mocks agreed on a field name (cacheReadInputTokenCount) that real
+    Bedrock never sends. Mocked responses bypass botocore's parser, so a
+    made-up key sails through every other test; this check fails instead.
+    """
+    token_usage_shape = (
+        botocore.session.get_session()
+        .get_service_model("bedrock-runtime")
+        .shape_for("TokenUsage")
+    )
+    real_keys = set(token_usage_shape.members)
+    stream_usages = [
+        event["metadata"]["usage"]
+        for events in (
+            MOCK_STREAM_EVENTS,
+            MOCK_STREAM_EVENTS_CACHE,
+            MOCK_STREAM_EVENTS_CACHE_ZERO,
+            MOCK_STREAM_EVENTS_TOOL_USE,
+            MOCK_STREAM_EVENTS_TEXT_AND_TOOLS,
+        )
+        for event in events
+        if "metadata" in event
+    ]
+    for usage in [
+        MOCK_CONVERSE_RESPONSE["usage"],
+        MOCK_CONVERSE_RESPONSE_CACHE["usage"],
+        *stream_usages,
+    ]:
+        unknown_keys = set(usage) - real_keys
+        assert not unknown_keys, (
+            f"mock usage keys Bedrock never sends: {sorted(unknown_keys)}"
+        )
 
 
 @mock_aws

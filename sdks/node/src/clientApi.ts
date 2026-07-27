@@ -1,5 +1,10 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
+import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
 import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
+import {
+  getWeaveTracerProviderProjectId,
+  shutdownWeaveTracerProvider,
+} from './genai/provider';
 import {makeSettings, type Settings} from './settings';
 import {defaultHost, getUrls, setGlobalDomain} from './urls';
 import {ConcurrencyLimiter} from './utils/concurrencyLimit';
@@ -43,7 +48,7 @@ export async function login(apiKey: string, host?: string) {
   });
   try {
     await testTraceServerApi.health.readRootHealthGet({});
-  } catch (error) {
+  } catch (_error) {
     throw new Error(
       'Unable to verify connection to the weave trace server with given API Key'
     );
@@ -57,7 +62,7 @@ export async function login(apiKey: string, host?: string) {
       netrc.save();
       console.log(`Successfully logged in. Credentials saved for ${host}`);
     }
-  } catch (error) {
+  } catch (_error) {
     // Log warning but don't fail - the API key can still be used from environment
     console.warn(
       'Could not save credentials to netrc file. You may need to set WANDB_API_KEY environment variable for future sessions.'
@@ -121,6 +126,7 @@ export async function init(
       baseApiParams: {
         headers: {
           'User-Agent': `W&B Weave JS Client ${process.env.VERSION || 'unknown'}`,
+          [CLIENT_CAPABILITIES_HEADER]: CLIENT_CAPABILITIES,
           Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
         },
       },
@@ -132,15 +138,57 @@ export async function init(
       projectId,
       settings: resolvedSettings,
     });
+    // A GenAI provider is pinned to the project it was built for (its OTLP
+    // exporter carries that project_id), so if a previous init() built one for
+    // a different project, drop it here — the next span rebuilds one that
+    // routes to this project.
+    const priorProviderProjectId = getWeaveTracerProviderProjectId();
+    if (
+      priorProviderProjectId !== null &&
+      priorProviderProjectId !== projectId
+    ) {
+      shutdownWeaveTracerProvider();
+    }
     setGlobalClient(client);
     setGlobalDomain(domain);
     registerEvalLinkSpanProcessor(getGlobalClient);
-    console.log(`Initializing project: ${projectId}`);
+    registerExitFlush();
+    console.log(`View Weave data at https://${domain}/${projectId}/weave`);
     return client;
   } catch (error) {
     console.error('Error during initialization:', error);
     throw error;
   }
+}
+
+/** Deliver all buffered calls to the server. Await before `process.exit()`. */
+export async function flush(): Promise<void> {
+  await getGlobalClient()?.flush();
+}
+
+let exitFlushRegistered = false;
+
+// Buffered calls are sent asynchronously, so an exit before they drain loses
+// them. Auto-flush on a normal exit; `process.exit()` skips `beforeExit` and
+// can't flush from the sync `exit` event, so warn loudly instead of dropping
+// silently. Registered once per process.
+function registerExitFlush(): void {
+  if (exitFlushRegistered) {
+    return;
+  }
+  exitFlushRegistered = true;
+  process.once('beforeExit', () => {
+    void getGlobalClient()?.flush();
+  });
+  process.on('exit', () => {
+    const pending = getGlobalClient()?.pendingCallCount() ?? 0;
+    if (pending > 0) {
+      console.warn(
+        `Weave: ${pending} traced call(s) were not delivered before exit. ` +
+          'Call `await weave.flush()` before process.exit() to avoid losing trace data.'
+      );
+    }
+  });
 }
 
 export function requireCurrentCallStackEntry(): CallStackEntry {

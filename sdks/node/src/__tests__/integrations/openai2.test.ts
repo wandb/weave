@@ -5,7 +5,6 @@ import {
   wrapOpenAI,
 } from '../../integrations/openai';
 import {isWeaveImage} from '../../media';
-import {type WandbServerApi} from '../../wandb/wandbServerApi';
 import {WeaveClient} from '../../weaveClient';
 import {makeAPIPromiseShim} from '../openaiMock';
 
@@ -17,8 +16,7 @@ describe('OpenAI Integration', () => {
   let mockOpenAI: any;
   let wrappedOpenAI: any;
   let mockTraceServerApi: jest.Mocked<TraceServerApi<any>>;
-  let mockWandbServerApi: jest.Mocked<WandbServerApi>;
-  let weaveClient: WeaveClient;
+  let _weaveClient: WeaveClient;
 
   beforeEach(() => {
     // Setup mock OpenAI client
@@ -54,8 +52,7 @@ describe('OpenAI Integration', () => {
         callStartBatchCallUpsertBatchPost: jest.fn(),
       },
     } as any;
-    mockWandbServerApi = {} as any;
-    weaveClient = new WeaveClient({
+    _weaveClient = new WeaveClient({
       traceServerApi: mockTraceServerApi,
       projectId: 'test-project',
     });
@@ -187,7 +184,7 @@ describe('OpenAI Integration', () => {
 
   describe('wrapOpenAI', () => {
     it('should wrap transparently', async () => {
-      const mockCreate = jest.fn(async params => ({
+      const mockCreate = jest.fn(async _params => ({
         id: 'test-id',
         choices: [{message: {content: 'Hello'}}],
       }));

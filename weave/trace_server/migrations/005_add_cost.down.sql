@@ -1,1 +1,1 @@
-DROP TABLE llm_token_prices;
+DROP TABLE IF EXISTS llm_token_prices;

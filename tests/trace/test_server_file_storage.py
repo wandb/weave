@@ -6,7 +6,10 @@ specific setup requirements.
 """
 
 import base64
+import datetime
 import os
+import socket
+import uuid
 from unittest import mock
 
 import boto3
@@ -21,7 +24,20 @@ from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from weave.shared.digest import compute_file_digest
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import clickhouse_trace_server_settings, file_storage
-from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
+from weave.trace_server.trace_server_interface import (
+    CallEndReq,
+    CallEndV2Req,
+    CallStartReq,
+    CallStartRes,
+    CallStartV2Req,
+    CallStartV2Res,
+    EndedCallSchemaForInsert,
+    EndedCallSchemaForInsertWithStartedAt,
+    FileContentReadReq,
+    FileCreateReq,
+    StartedCallSchemaForInsert,
+)
+from weave.trace_server_bindings.client_interface import TraceServerClientInterface
 
 # Test Data Constants
 TEST_CONTENT = b"Hello, world!"
@@ -290,6 +306,60 @@ def test_keepalive_gcs_client_scopes_credentials_for_session():
     prescoped = _ScopedFakeCredentials(scopes=["existing-scope"])
     passthrough = file_storage._build_keepalive_gcs_client(prescoped)
     assert passthrough._http.credentials.scopes == ["existing-scope"]
+
+
+def test_keepalive_adapter_sets_tcp_user_timeout():
+    """In-flight stalls need TCP_USER_TIMEOUT; keep-alive only covers idle sockets."""
+    adapter = file_storage._KeepAliveHTTPAdapter(
+        pool_maxsize=file_storage.GCS_POOL_MAXSIZE
+    )
+    socket_options = adapter.poolmanager.connection_pool_kw["socket_options"]
+
+    assert (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1) in socket_options
+    # Linux-only knob (skipped on macOS/BSD where the constant is absent).
+    if hasattr(socket, "TCP_USER_TIMEOUT"):
+        assert (
+            socket.IPPROTO_TCP,
+            socket.TCP_USER_TIMEOUT,
+            file_storage.GCS_TCP_USER_TIMEOUT_MS,
+        ) in socket_options
+
+
+class _CountingStorageClient(file_storage.FileStorageClient):
+    """Records store() calls so a test can assert the dedup cache skips repeats."""
+
+    def __init__(self, base_uri: file_storage.FileStorageURI):
+        super().__init__(base_uri)
+        self.store_calls = 0
+
+    def store(self, uri: file_storage.FileStorageURI, data: bytes) -> None:
+        self.store_calls += 1
+
+    def read(self, uri: file_storage.FileStorageURI) -> bytes:
+        raise NotImplementedError
+
+
+def test_store_in_bucket_dedups_repeat_keys():
+    """A repeat content-addressed write is served from the per-pod cache, not the backend."""
+    file_storage.reset_stored_key_cache()
+    base = file_storage.FileStorageURI.parse_uri_str("gs://dedup-test-bucket")
+    client = _CountingStorageClient(base)
+
+    path = file_storage.key_for_project_digest("proj", "digestA")
+    uri1 = file_storage.store_in_bucket(client, path, b"data")
+    uri2 = file_storage.store_in_bucket(client, path, b"data")
+    assert uri1.to_uri_str() == uri2.to_uri_str()
+    assert client.store_calls == 1  # second call served from cache
+
+    file_storage.store_in_bucket(
+        client, file_storage.key_for_project_digest("proj", "digestB"), b"x"
+    )
+    assert client.store_calls == 2  # a distinct key still reaches the backend
+
+    # reset re-arms the backend write for an already-seen key.
+    file_storage.reset_stored_key_cache()
+    file_storage.store_in_bucket(client, path, b"data")
+    assert client.store_calls == 3
 
 
 class TestAzureStorage:
@@ -686,3 +756,165 @@ def test_call_batch_falls_back_to_clickhouse_on_per_file_bucket_failure(
         FileContentReadReq(project_id=client.project_id, digest=fail_digest)
     )
     assert fallback_read.content == fail_payload
+
+
+def _data_uri(mimetype: str, size: int) -> str:
+    """Build a distinct data URI whose decoded body exceeds AUTO_CONVERSION_MIN_SIZE."""
+    raw = (mimetype + "_" + "x" * size).encode()
+    return f"data:{mimetype};base64," + base64.b64encode(raw).decode()
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_start_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
+):
+    """Eager call/start (v1 and v2) with many inline data-URI inputs fans the
+    auto-extracted attachment uploads across the bucket pool instead of one
+    serial PUT each. The barrier of 2 makes the parallel floor deterministic;
+    the pre-fix serial path only ever had one upload in flight.
+    """
+    gcs.state.expected_concurrency = 2
+    # Distinct mimetype+size keeps every content and metadata digest unique, so
+    # dedup can't collapse the upload set below the barrier width.
+    inputs = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    res = _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=str(uuid.uuid4()),
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=datetime.datetime.now(datetime.timezone.utc),
+            attributes={},
+            inputs=inputs,
+        ),
+    )
+
+    assert res.id
+    assert res.trace_id
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+@pytest.mark.usefixtures("gcp_storage_env", "mock_gcp_credentials")
+@pytest.mark.disable_logging_error_check
+@pytest.mark.skipif(
+    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: bucket file storage machinery"
+)
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_call_end_offloads_attachments_to_bucket_in_parallel(
+    client: WeaveClient, gcs, version: str
+):
+    """Eager call/end (v1 and v2) fans its output-attachment uploads across the
+    bucket pool too (and, for calls_complete projects, finishes them before the
+    end UPDATE references them). Barrier of 2 pins the parallel floor; the
+    pre-fix serial path peaked at 1.
+    """
+    call_id = str(uuid.uuid4())
+    started_at = datetime.datetime.now(datetime.timezone.utc)
+    _start_call(
+        client.server,
+        version,
+        StartedCallSchemaForInsert(
+            project_id=client.project_id,
+            id=call_id,
+            trace_id=str(uuid.uuid4()),
+            op_name="test_op",
+            started_at=started_at,
+            attributes={},
+            inputs={},
+        ),
+    )
+
+    # Set the barrier only now so it gates the end's uploads, not the empty start.
+    gcs.state.expected_concurrency = 2
+    output = {
+        "png": _data_uri("image/png", 20_000),
+        "jpeg": _data_uri("image/jpeg", 30_000),
+        "bin": _data_uri("application/octet-stream", 40_000),
+    }
+    _end_call(
+        client.server,
+        version,
+        project_id=client.project_id,
+        call_id=call_id,
+        started_at=started_at,
+        ended_at=started_at + datetime.timedelta(seconds=1),
+        output=output,
+    )
+
+    assert gcs.state.concurrent_peak >= 2, (
+        f"expected parallel attachment uploads, peak={gcs.state.concurrent_peak}"
+    )
+    project_b64 = base64.b64encode(client.project_id.encode()).decode()
+    expected_prefix = f"weave/projects/{project_b64}/files/"
+    assert gcs.state.blob_data
+    assert all(k.startswith(expected_prefix) for k in gcs.state.blob_data)
+
+
+def _start_call(
+    server: TraceServerClientInterface,
+    version: str,
+    start: StartedCallSchemaForInsert,
+) -> CallStartRes | CallStartV2Res:
+    """Dispatch a single eager call/start to the v1 or v2 write path."""
+    if version == "v1":
+        return server.call_start(CallStartReq(start=start))
+    if version == "v2":
+        return server.call_start_v2(CallStartV2Req(start=start))
+    raise ValueError(f"unknown call version: {version}")
+
+
+def _end_call(
+    server: TraceServerClientInterface,
+    version: str,
+    *,
+    project_id: str,
+    call_id: str,
+    started_at: datetime.datetime,
+    ended_at: datetime.datetime,
+    output: dict[str, str],
+) -> None:
+    """Dispatch a single eager call/end to the v1 or v2 write path."""
+    if version == "v1":
+        server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    elif version == "v2":
+        server.call_end_v2(
+            CallEndV2Req(
+                end=EndedCallSchemaForInsertWithStartedAt(
+                    project_id=project_id,
+                    id=call_id,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    output=output,
+                    summary={},
+                )
+            )
+        )
+    else:
+        raise ValueError(f"unknown call version: {version}")

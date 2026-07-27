@@ -10,7 +10,7 @@ extraction logic that applies those conventions lives in
 """
 
 import datetime
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
@@ -25,6 +25,13 @@ SpanKindLiteral = Literal[
     "CONSUMER",
 ]
 StatusCodeLiteral = Literal["UNSET", "OK", "ERROR"]
+
+# Operation names of agent spans the server emits scoring events for. This is a
+# server/wire concept (the span op-name the server produces and matches on), so
+# the trace server owns it here. `weave.flow.monitor` keeps an independent copy
+# of the same literal for the client-side `Monitor.op_names` field; the two are
+# deliberately not shared, to keep the trace server free of client imports.
+AgentSpanOpName: TypeAlias = Literal["weave.genai.turn_ended"]
 # Empty string means the provider did not specify an output modality; it
 # mirrors the ClickHouse string-column default for newly inserted spans.
 OutputTypeLiteral = Literal["", "text", "json", "image", "speech"]
@@ -93,6 +100,15 @@ class AgentSpanCHInsertable(BaseModel):
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
+
+    # [Weave] eval linkage — weave.eval.*
+    eval_run_id: str = ""
+    eval_predict_and_score_call_id: str = ""
+    eval_kind: str = ""
+    eval_row_digest: str = ""
+    eval_example_id: str = ""
+    eval_trial_index: int = -1
+    eval_evaluation_name: str = ""
 
     # [OTel GenAI] model info — gen_ai.request.model, gen_ai.response.*
     request_model: str = ""

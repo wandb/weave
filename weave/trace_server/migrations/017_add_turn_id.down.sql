@@ -26,7 +26,7 @@ GROUP BY
     call_parts.id;
 
 -- Remove turn_id from stats table
-ALTER TABLE calls_merged_stats DROP COLUMN turn_id;
+ALTER TABLE calls_merged_stats DROP COLUMN IF EXISTS turn_id;
 
 -- Revert materialized view to exclude turn_id
 ALTER TABLE calls_merged_view MODIFY QUERY
@@ -56,7 +56,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         id;
 
 -- Remove turn_id from aggregated calls table
-ALTER TABLE calls_merged DROP COLUMN turn_id;
+ALTER TABLE calls_merged DROP COLUMN IF EXISTS turn_id;
 
 -- Remove turn_id from raw call parts table
-ALTER TABLE call_parts DROP COLUMN turn_id; 
+ALTER TABLE call_parts DROP COLUMN IF EXISTS turn_id; 

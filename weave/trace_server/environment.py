@@ -67,16 +67,18 @@ def wf_kafka_project_id_bucket_count() -> int:
 
 
 def wf_enable_online_eval() -> bool:
-    """Whether to enable online evaluation."""
+    """Enable the scoring worker and emit `weave.call_ended` events."""
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_enable_agent_scoring() -> bool:
-    """Whether to emit ScoreAgentSpansEvent triggers from the OTel ingest path.
-
-    In addition to `wf_enable_online_eval` so agent scoring can be toggled independently.
-    """
+    """Enable the agent scoring worker and emit `weave.score_agent_spans` events."""
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
+
+
+def wf_enable_agent_insights() -> bool:
+    """Enable the insights worker to emit `weave.embed_agent_spans` events."""
+    return os.environ.get("WEAVE_ENABLE_AGENT_INSIGHTS", "false").lower() == "true"
 
 
 def wf_scoring_worker_batch_size() -> int:
@@ -254,7 +256,47 @@ def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
     )
 
 
+# Ingest sampling -- shared knobs for both data models. The same env vars are
+# read by the calls-model sampler in the trace-server service; these accessors
+# are model-agnostic.
+
+
+def wf_ingest_sample_rate() -> float:
+    """Fraction of non-eval traces to keep at ingest (0.0-1.0).
+
+    Governs BOTH data models: the calls-model sampler reads the same variable.
+    Defaults to 1.0 (sampling off); an unparsable or out-of-range value falls
+    back to 1.0, so a bad config can never start dropping data.
+
+    The value comes from the process environment and is not mutated in-process,
+    so changing the rate means redeploying / restarting the service with the new
+    value -- it is not a live knob. A redeploy briefly runs old and new
+    instances at different rates, and a trace whose spans hit both can be stored
+    partially; do rate changes in a low-traffic window to minimize that.
+    """
+    try:
+        rate = float(os.environ.get("WEAVE_INGEST_SAMPLE_RATE", "1.0"))
+    except ValueError:
+        return 1.0
+    if not 0.0 <= rate <= 1.0:
+        return 1.0
+    return rate
+
+
+def wf_ingest_sample_dry_run() -> bool:
+    """When true, the sampler records what it would drop but drops nothing.
+
+    Shadow mode. The same variable also gates the calls-model sampler's dry-run.
+    """
+    return os.environ.get("WEAVE_INGEST_SAMPLE_DRY_RUN", "false").lower() == "true"
+
+
 # Clickhouse Settings
+
+# ClickHouse Cloud services share the built-in `default` cluster and resolve to a
+# `*.clickhouse.cloud` host; query_log fan-out uses it without any extra config.
+CLICKHOUSE_CLOUD_HOST_SUFFIX = ".clickhouse.cloud"
+CLICKHOUSE_CLOUD_CLUSTER = "default"
 
 
 def wf_clickhouse_host() -> str:
@@ -305,6 +347,18 @@ def wf_clickhouse_use_distributed_tables() -> bool:
     )
 
 
+def wf_clickhouse_query_log_cluster() -> str | None:
+    """Cluster to fan out `system.query_log` reads across replicas, or None for local-only.
+
+    ClickHouse Cloud is multi-replica with a built-in `default` cluster and no
+    `WF_CLICKHOUSE_REPLICATED_CLUSTER` set, so detect it by host and default to
+    `default`; self-managed distributed falls back to its replicated cluster.
+    """
+    if wf_clickhouse_host().endswith(CLICKHOUSE_CLOUD_HOST_SUFFIX):
+        return CLICKHOUSE_CLOUD_CLUSTER
+    return wf_clickhouse_replicated_cluster()
+
+
 VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})
 
 
@@ -347,6 +401,20 @@ def wf_clickhouse_max_execution_time() -> int | None:
     except ValueError:
         logger.exception(
             "WF_CLICKHOUSE_MAX_EXECUTION_TIME value '%s' is not valid", time
+        )
+        return None
+
+
+def wf_clickhouse_max_estimated_execution_time() -> int | None:
+    """The estimated-time (TOO_SLOW) projection guard for the clickhouse server."""
+    time = os.environ.get("WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME")
+    if time is None:
+        return None
+    try:
+        return int(time)
+    except ValueError:
+        logger.exception(
+            "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
 

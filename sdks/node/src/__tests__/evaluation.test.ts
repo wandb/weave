@@ -198,13 +198,13 @@ describe('Evaluation - declarative eval metadata', () => {
 
     const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+      c.op_name.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );
-    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const modelCalls = calls.filter(c => c.op_name.includes('mockPrediction'));
     const scorerCalls = calls.filter(
       c =>
-        c.op_name?.includes('lengthScorer') ||
-        c.op_name?.includes('inclusionScorer')
+        c.op_name.includes('lengthScorer') ||
+        c.op_name.includes('inclusionScorer')
     );
 
     // nTrials (2) * dataset rows (5), and scorers also * scorer count (2).
@@ -217,13 +217,13 @@ describe('Evaluation - declarative eval metadata', () => {
       ...modelCalls,
       ...scorerCalls,
     ]) {
-      expect(call.attributes?._weave_eval_meta).toEqual({declarative: true});
+      expect(call.attributes._weave_eval_meta).toEqual({declarative: true});
     }
 
     // Exactly one root evaluate call; recognized by op_name, so it is
     // intentionally not tagged (its attributes are read before the wrapper runs).
     const rootCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_OP_NAME)
+      c.op_name.includes(EVALUATION_RUN_OP_NAME)
     );
     expect(rootCalls).toHaveLength(1);
     expect(rootCalls[0].attributes?._weave_eval_meta).toBeUndefined();
@@ -240,13 +240,13 @@ describe('Evaluation - declarative eval metadata', () => {
 
     const calls = await traceServer.getCalls(projectId);
     const predictAndScoreCalls = calls.filter(c =>
-      c.op_name?.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+      c.op_name.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
     );
-    const modelCalls = calls.filter(c => c.op_name?.includes('mockPrediction'));
+    const modelCalls = calls.filter(c => c.op_name.includes('mockPrediction'));
     const scorerCalls = calls.filter(
       c =>
-        c.op_name?.includes('lengthScorer') ||
-        c.op_name?.includes('inclusionScorer')
+        c.op_name.includes('lengthScorer') ||
+        c.op_name.includes('inclusionScorer')
     );
 
     // dataset rows (5), and scorers also * scorer count (2).
@@ -260,10 +260,33 @@ describe('Evaluation - declarative eval metadata', () => {
       ...modelCalls,
       ...scorerCalls,
     ]) {
-      expect(call.attributes?._weave_eval_meta).toEqual({
+      expect(call.attributes._weave_eval_meta).toEqual({
         foo: true,
         declarative: true,
       });
+    }
+  });
+
+  // is_eval rides each eval call-end (root matched by op_name, children by
+  // attrs) for a server-side sampler.
+  test('stamps is_eval on every eval call-end', async () => {
+    const evaluation = createMockEvaluation(false);
+    const model = createMockModel(false);
+
+    await evaluation.evaluate({model, nTrials: 2, maxConcurrency: 2});
+
+    const calls = await traceServer.getCalls(projectId);
+    // Root: matched by op_name (it carries no _weave_eval_meta) -> true.
+    const rootCall = calls.find(c =>
+      c.op_name.includes(EVALUATION_RUN_OP_NAME)
+    );
+    expect(rootCall).toBeDefined();
+    expect(rootCall!.is_eval).toBe(true);
+
+    // Every eval call is marked (children via attributes).
+    expect(calls.length).toBeGreaterThan(1);
+    for (const call of calls) {
+      expect(call.is_eval).toBe(true);
     }
   });
 });

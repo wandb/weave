@@ -81,6 +81,8 @@ def test_cost_apis(client):
         prompt_token_cost=500,
         completion_token_cost=1000,
         effective_date=datetime.datetime(1998, 10, 3),
+        cache_read_input_token_cost=250,
+        cache_creation_input_token_cost=750,
     )
 
     assert len(res.ids) == 1
@@ -94,6 +96,9 @@ def test_cost_apis(client):
     else:
         assert res[1].effective_date.year == 2021
         assert res[0].effective_date.year == 1998
+    added_cost = next(cost for cost in res if cost.effective_date.year == 1998)
+    assert added_cost.cache_read_input_token_cost == 250
+    assert added_cost.cache_creation_input_token_cost == 750
 
     # query with limit and offset
     res = client.query_costs(llm_ids=["my_model_to_delete3"], limit=1)
@@ -293,3 +298,63 @@ def test_costs_streamed_with_all_fields(client):
     assert cost_entry["effective_date"] is not None
     assert cost_entry["prompt_token_cost_unit"] == "USD"
     assert cost_entry["completion_token_cost_unit"] == "USD"
+
+
+def test_calls_query_bool_filter_with_costs_does_not_collide(client):
+    """Regression for WB-37505: a boolean filter literal plus include_costs=True
+    must not 400 the whole calls query.
+
+    The boolean literal is bound as a Bool param; the cost query binds rank = 1
+    as UInt64. On the shared ParamBuilder these used to dedup to one param
+    (True == 1 in Python with equal hashes), so the UInt64 slot resolved to True
+    and ClickHouse rejected the request with "cannot be parsed as UInt64". This
+    exercises the reported path end-to-end against ClickHouse.
+    """
+    project_id = client.project_id
+
+    call_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.timezone.utc)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=str(uuid.uuid4()),
+                started_at=now,
+                op_name=f"weave:///{project_id}/op/test_op:v1",
+                attributes={},
+                inputs={"enabled": True},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=now + datetime.timedelta(seconds=1),
+                summary={},
+            )
+        )
+    )
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "inputs.enabled"},
+                                {"$literal": True},
+                            ]
+                        }
+                    }
+                ),
+                include_costs=True,
+            )
+        )
+    )
+    assert len(calls) == 1
+    assert calls[0].id == call_id

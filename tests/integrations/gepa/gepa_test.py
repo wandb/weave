@@ -9,8 +9,12 @@ from gepa.core.adapter import EvaluationBatch
 
 import weave
 from weave.integrations.gepa import gepa_sdk
-from weave.integrations.gepa.gepa_callback import WeaveGEPACallback
-from weave.integrations.gepa.gepa_sdk import get_gepa_patcher
+from weave.integrations.gepa.gepa_callback import WeaveGEPACallback, _safe
+from weave.integrations.gepa.gepa_sdk import (
+    _optimize_postprocess_inputs,
+    _optimize_postprocess_output,
+    get_gepa_patcher,
+)
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
@@ -34,6 +38,31 @@ def patch_gepa() -> Generator[None, None, None]:
     finally:
         patcher.undo_patch()
         gepa_sdk._gepa_patcher = None
+
+
+def test_gepa_logging_helpers_strip_memory_addresses() -> None:
+    # GEPA logs candidate/optimize metadata as versioned objects, so repr() fallbacks
+    # for unserializable values must not embed `at 0x...` addresses (object churn).
+    obj = object()
+    assert " at 0x" in repr(obj)
+
+    assert _safe({"adapter": obj, "nested": [obj]}) == {
+        "adapter": "<object object>",
+        "nested": ["<object object>"],
+    }
+    assert _optimize_postprocess_inputs(
+        {"adapter": obj, "callbacks": [obj], "seed": 7}
+    ) == {"adapter": "<object object>", "callbacks": ["<object object>"], "seed": 7}
+
+    class _Result:
+        best_idx = 2
+        best_candidate = obj
+
+    assert _optimize_postprocess_output(_Result()) == {
+        "__class__": "_Result",
+        "best_candidate": "<object object>",
+        "best_idx": 2,
+    }
 
 
 class _StubAdapter:

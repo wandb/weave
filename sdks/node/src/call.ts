@@ -71,7 +71,7 @@ function buildProxyHandlers(
 
       return undefined;
     },
-    set(target: Partial<CallSchema>, prop: string, value: any) {
+    set(_target: Partial<CallSchema>, _prop: string, _value: any) {
       // Disallow setting properties on the call schema
       return false;
     },

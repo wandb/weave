@@ -10,7 +10,7 @@ const createFreshMockClient = () => ({
     parentCall: null,
     newStack: [],
   })),
-  createCall: jest.fn((...args: any[]) => {
+  createCall: jest.fn((..._args: any[]) => {
     // We still need a way to capture this if tests rely on it.
     // Maybe pass a shared object or use a different mechanism?
     // For now, let's remove the direct capture here.

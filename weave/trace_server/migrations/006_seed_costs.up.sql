@@ -1,5 +1,8 @@
-INSERT INTO llm_token_prices 
-    (id, pricing_level, pricing_level_id, provider_id, llm_id, effective_date, prompt_token_cost, prompt_token_cost_unit, completion_token_cost, completion_token_cost_unit, created_by, created_at) 
+-- One-shot seed. Not idempotent: llm_token_prices is a plain MergeTree with no
+-- dedup key, so re-running duplicates every row. The migrator applies each
+-- migration exactly once, so this seed runs a single time per database.
+INSERT INTO llm_token_prices
+    (id, pricing_level, pricing_level_id, provider_id, llm_id, effective_date, prompt_token_cost, prompt_token_cost_unit, completion_token_cost, completion_token_cost_unit, created_by, created_at)
 VALUES 
     (generateUUIDv4(), 'default', 'default', 'openai', 'gpt-4', now(), 3e-05, 'USD', 6e-05, 'USD', 'system', now()), 
     (generateUUIDv4(), 'default', 'default', 'openai', 'gpt-4o', now(), 5e-06, 'USD', 1.5e-05, 'USD', 'system', now()), 

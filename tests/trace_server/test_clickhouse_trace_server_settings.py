@@ -6,6 +6,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 
 ENV_KEYS = [
     "WF_CLICKHOUSE_MAX_EXECUTION_TIME",
+    "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME",
     "WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION",
 ]
 
@@ -51,6 +52,13 @@ def test_query_settings_apply_prediction_guards(monkeypatch, reload_settings):
         settings["timeout_before_checking_execution_speed"]
         == settings_module.DEFAULT_TIMEOUT_BEFORE_CHECKING_EXECUTION_SPEED
     )
+
+    # A dedicated override decouples the projection guard from the hard cap.
+    monkeypatch.setenv("WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME", "5")
+    settings_module = reload_settings()
+    settings = settings_module.CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+    assert settings["max_execution_time"] == 30
+    assert settings["max_estimated_execution_time"] == 5
 
     # Operators can disable the estimated-time guard entirely.
     monkeypatch.setenv("WF_CLICKHOUSE_DISABLE_QUERY_FAILURE_PREDICTION", "true")
