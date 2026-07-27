@@ -8351,7 +8351,7 @@ def _setup_completion_model_info(
     elif is_explicit_custom:
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
-        name_part = model_name.replace("custom::", "")
+        name_part = model_name.removeprefix("custom::")
 
         if "::" in name_part:
             # Format: custom::<provider>::<model>
