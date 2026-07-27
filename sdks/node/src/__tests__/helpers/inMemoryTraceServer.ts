@@ -16,6 +16,14 @@ export interface Call {
   [key: string]: any; // Index signature to allow dynamic property access
 }
 
+// A logged call's `op_name` is a `weave:///<project>/op/<objectId>:<digest>`
+// URI. Only the digest is unstable, so tests compare the object id exactly
+// instead of substring-matching the URI — a substring cannot tell
+// `openai.chat.completions.parse` from `openai.beta.chat.completions.parse`.
+export function opObjectId(call: Call): string {
+  return new URL(call.op_name).pathname.split('/').pop()!.split(':')[0];
+}
+
 interface QueryParams {
   project_id: string;
   limit?: number;

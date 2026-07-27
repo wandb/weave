@@ -29,9 +29,16 @@ import {z} from 'zod';
 import * as weave from '../..';
 import {clearWeaveTracerProvider} from '../../genai/provider';
 import {initWithCustomTraceServer} from '../clientMock';
-import {wrapOpenAIChatCompletionsCreate} from '../../integrations/openai';
+import {
+  wrapOpenAI,
+  wrapOpenAIChatCompletionsCreate,
+} from '../../integrations/openai';
 import {makeAPIPromiseShim} from '../openaiMock';
-import {InMemoryTraceServer, type Call} from '../helpers/inMemoryTraceServer';
+import {
+  InMemoryTraceServer,
+  opObjectId,
+  type Call,
+} from '../helpers/inMemoryTraceServer';
 import state from 'weave/state';
 import {packageVersion} from 'weave/utils/packageVersion';
 
@@ -729,6 +736,43 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     expect(
       calls.find(c => c.op_name === 'openai.chat.completions.create')
     ).toBeUndefined();
+  });
+
+  test('structured-output parse inside an agent context is still traced', async () => {
+    // The agents SDK only ever calls `create`, so its processor emits no span
+    // for a user's own `parse` call. Suppressing that call here as well would
+    // leave it unreported by both sides.
+    const mockResponse = {
+      id: 'resp-1',
+      object: 'chat.completion',
+      model: 'gpt-4o-mini',
+      choices: [{index: 0, message: {role: 'assistant', content: '{}'}}],
+      usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
+    };
+    const params = {
+      model: 'gpt-4o-mini',
+      messages: [{role: 'user', content: 'hi'}],
+    };
+    const mockOpenAI: any = {
+      chat: {
+        completions: {
+          create: jest.fn(() => makeAPIPromiseShim(mockResponse)),
+          parse: jest.fn(() => makeAPIPromiseShim(mockResponse)),
+        },
+      },
+      images: {generate: jest.fn()},
+      beta: {},
+    };
+    const wrapped = wrapOpenAI(mockOpenAI);
+
+    await withTrace('Workflow', async () => {
+      await wrapped.chat.completions.create(params);
+      await wrapped.chat.completions.parse(params);
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
+    expect(calls.map(opObjectId)).toEqual(['openai.chat.completions.parse']);
   });
 
   async function emittedSpans(): Promise<ReadableSpan[]> {

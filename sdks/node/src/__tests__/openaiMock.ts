@@ -140,6 +140,25 @@ export function makeMockOpenAIChat(responseFn: ResponseFn) {
   };
 }
 
+// Stands in for `chat.completions.parse`. The real method runs `create` and
+// then transforms the completion through the APIPromise chain, attaching the
+// deserialized message content to each choice as `parsed`.
+export function makeMockOpenAIParse(responseFn: ResponseFn) {
+  const create = makeMockOpenAIChat(responseFn);
+  return function openaiChatCompletionsParse(params: any) {
+    return create(params)._thenUnwrap((completion: any) => ({
+      ...completion,
+      choices: completion.choices.map((choice: any) => ({
+        ...choice,
+        message: {
+          ...choice.message,
+          parsed: JSON.parse(choice.message.content),
+        },
+      })),
+    }));
+  };
+}
+
 function* generateChunks(
   content: string,
   functionCalls: FunctionCall[],

@@ -18,7 +18,8 @@ const OPENAI_INTEGRATION = libraryIntegration('openai');
 const SERVERLESS_INFERENCE_HOST = 'api.inference.wandb.ai';
 const SERVERLESS_INFERENCE_LABEL = 'Serverless Inference';
 const CHAT_COMPLETIONS_CREATE_OP = 'openai.chat.completions.create';
-const CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
+const CHAT_COMPLETIONS_PARSE_OP = 'openai.chat.completions.parse';
+const BETA_CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
 
 function serverlessInferenceCallDisplayName(
   baseURL: string | undefined,
@@ -137,7 +138,8 @@ export const openAIStreamReducer = {
 export function wrapOpenAIChatCompletionsCreate(
   originalCreate: any,
   name: string,
-  baseURL?: string
+  baseURL?: string,
+  opts: {traceInAgentContext?: boolean} = {}
 ) {
   const opRef = {
     __isOp: true as const,
@@ -153,7 +155,10 @@ export function wrapOpenAIChatCompletionsCreate(
   ) {
     const client = getGlobalClient();
     if (!client) return originalCreate(...args);
-    if (shouldSkipTracingInAgentContext()) {
+    // The agents OTel processor reports the model calls the agents SDK makes,
+    // so tracing those here would double-report them. It only ever calls
+    // `create`, so methods it never calls opt in to staying traced.
+    if (!opts.traceInAgentContext && shouldSkipTracingInAgentContext()) {
       return originalCreate(...args);
     }
 
@@ -728,18 +733,16 @@ interface OpenAIAPI {
   chat: {
     completions: {
       create: any;
+      // Moved here from `beta.chat.completions` in openai-node v5.
+      parse?: any;
     };
   };
   images: {
     generate: any;
   };
-  beta: {
-    chat: {
-      completions: {
-        parse: any;
-      };
-    };
-  };
+  // Shape varies by major version: openai-node v4 has `beta.chat.completions`,
+  // v5 removed it and left the other beta resources in place.
+  beta: any;
   responses?: {
     create: any;
   };
@@ -764,6 +767,16 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
           targetVal.bind(target),
           CHAT_COMPLETIONS_CREATE_OP,
           openai.baseURL
+        );
+      }
+      // `parse` only exists on this namespace since openai-node v5; on v4 it
+      // lived under `beta.chat` and reading it here yields undefined.
+      if (p === 'parse' && typeof targetVal === 'function') {
+        return wrapOpenAIChatCompletionsCreate(
+          targetVal.bind(target),
+          CHAT_COMPLETIONS_PARSE_OP,
+          openai.baseURL,
+          {traceInAgentContext: true}
         );
       }
       return targetVal;
@@ -799,7 +812,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
         if (p === 'parse') {
           return wrapOpenAIChatCompletionsCreate(
             targetVal.bind(target),
-            CHAT_COMPLETIONS_PARSE_OP,
+            BETA_CHAT_COMPLETIONS_PARSE_OP,
             openai.baseURL
           );
         }

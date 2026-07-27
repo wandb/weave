@@ -1,7 +1,11 @@
-import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
+import {InMemoryTraceServer, opObjectId} from '../helpers/inMemoryTraceServer';
 import {wrapOpenAI} from '../../integrations/openai';
 import {initWithCustomTraceServer} from '../clientMock';
-import {makeAPIPromiseShim, makeMockOpenAIChat} from '../openaiMock';
+import {
+  makeAPIPromiseShim,
+  makeMockOpenAIChat,
+  makeMockOpenAIParse,
+} from '../openaiMock';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -20,20 +24,18 @@ describe('OpenAI Integration', () => {
       functionCalls: [],
     }));
 
+    const mockOpenAIParse = makeMockOpenAIParse(messages => ({
+      content: JSON.stringify({echo: messages[messages.length - 1].content}),
+    }));
+
+    // Shaped like an openai-node v5+ client: `parse` sits on the normal chat
+    // namespace and the `beta` namespace no longer carries a `chat`.
     mockOpenAI = {
       baseURL: 'https://api.openai.com/v1/',
       chat: {
-        completions: {create: mockOpenAIChat},
+        completions: {create: mockOpenAIChat, parse: mockOpenAIParse},
       },
-      beta: {
-        chat: {
-          completions: {
-            parse: () => {
-              throw new Error('not implemented');
-            },
-          },
-        },
-      },
+      beta: {},
       images: {
         generate: () => {
           throw new Error('not implemented');
@@ -104,7 +106,6 @@ describe('OpenAI Integration', () => {
 
   test('labels serverless inference calls by their requested model', async () => {
     mockOpenAI.baseURL = 'https://api.inference.wandb.ai/v1/';
-    mockOpenAI.beta.chat.completions.parse = mockOpenAI.chat.completions.create;
     patchedOpenAI = wrapOpenAI(mockOpenAI);
     const messages = [{role: 'user', content: 'Hello!'}];
 
@@ -113,7 +114,7 @@ describe('OpenAI Integration', () => {
       messages,
     });
     await patchedOpenAI.chat.completions.create({messages});
-    await patchedOpenAI.beta.chat.completions.parse({
+    await patchedOpenAI.chat.completions.parse({
       model: 'meta-llama/Llama-3.3-70B-Instruct',
       messages,
     });
@@ -128,10 +129,75 @@ describe('OpenAI Integration', () => {
     );
     expect(calls[1].op_name).toContain('openai.chat.completions.create');
     expect(calls[1].display_name).toBe('Serverless Inference');
-    expect(calls[2].op_name).toContain('openai.beta.chat.completions.parse');
+    expect(opObjectId(calls[2])).toBe('openai.chat.completions.parse');
     expect(calls[2].display_name).toBe(
       'Serverless Inference: meta-llama/Llama-3.3-70B-Instruct'
     );
+  });
+
+  test('structured-output parse on the non-beta chat namespace is traced', async () => {
+    const messages = [{role: 'user', content: 'Hello!'}];
+    const responseFormat = {
+      type: 'json_schema',
+      json_schema: {name: 'echo', schema: {type: 'object'}},
+    };
+
+    const result = await patchedOpenAI.chat.completions.parse({
+      model: 'gpt-4o-2024-05-13',
+      messages,
+      response_format: responseFormat,
+    });
+    expect(result.choices[0].message.parsed).toEqual({echo: 'Hello!'});
+
+    await wait(300);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(opObjectId(calls[0])).toBe('openai.chat.completions.parse');
+    expect(calls[0].inputs).toEqual({
+      model: 'gpt-4o-2024-05-13',
+      messages,
+      response_format: responseFormat,
+    });
+    // Weave's transform composes after the SDK's, so the trace records the
+    // parsed object and not just the raw JSON string.
+    expect(calls[0].output.choices[0].message.parsed).toEqual({echo: 'Hello!'});
+    expect(calls[0].summary).toEqual({
+      usage: {
+        'gpt-4o-2024-05-13': {
+          requests: 1,
+          prompt_tokens: 1,
+          completion_tokens: 1,
+          total_tokens: 2,
+        },
+      },
+    });
+  });
+
+  test('parse under beta.chat is traced on an openai-node v4 client', async () => {
+    // v4 has no `parse` on the normal chat namespace, so reading it there must
+    // stay undefined rather than throw, and the beta op name is unchanged.
+    const v4OpenAI: any = {
+      baseURL: mockOpenAI.baseURL,
+      chat: {completions: {create: mockOpenAI.chat.completions.create}},
+      beta: {
+        chat: {completions: {parse: mockOpenAI.chat.completions.parse}},
+      },
+      images: mockOpenAI.images,
+    };
+    const patchedV4OpenAI = wrapOpenAI(v4OpenAI);
+    expect(patchedV4OpenAI.chat.completions.parse).toBeUndefined();
+
+    await patchedV4OpenAI.beta.chat.completions.parse({
+      model: 'gpt-4o-2024-05-13',
+      messages: [{role: 'user', content: 'Hello!'}],
+    });
+
+    await wait(300);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(opObjectId(calls[0])).toBe('openai.beta.chat.completions.parse');
   });
 
   test('streaming chat completion basic', async () => {
