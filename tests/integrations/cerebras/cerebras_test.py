@@ -7,7 +7,7 @@ from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 import weave
 from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
 
-model = "llama3.1-8b"  # Cerebras model
+model = "gpt-oss-120b"  # Cerebras model
 
 
 @pytest.fixture(autouse=True)
