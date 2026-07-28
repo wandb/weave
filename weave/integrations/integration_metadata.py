@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 # Top-level attribute key under which integration provenance is stored.
 INTEGRATION_ATTRIBUTE_KEY = "integration"
 
+# Restated locally because import-linter forbids integrations from importing
+# trace-server semconv constants; a cross-SDK parity test guards drift.
+WEAVE_INTEGRATION_NAME = "weave.integration.name"
+WEAVE_INTEGRATION_VERSION = "weave.integration.version"
+WEAVE_INTEGRATION_META_PREFIX = "weave.integration.meta"
+
 # OpenTelemetry span attributes must be scalars (or scalar sequences); values
 # outside this set are stringified when flattened onto a span.
 # See opentelemetry.util.types.AttributeValue.
@@ -93,17 +99,16 @@ class IntegrationMetadata:
         """Render the metadata as flattened OpenTelemetry span attributes.
 
         OTel span attributes must be scalars, so the nested shape from
-        :meth:`as_attributes` is flattened to dotted keys (``integration.name``,
-        ``integration.version``, ``integration.meta.<key>``). The trace server
-        reconstructs the nested dict from these keys on ingest. Used by the
-        agent OTel processors that emit spans instead of calling ``create_call``.
+        :meth:`as_attributes` is emitted as dotted ``weave.integration.*`` keys
+        for OTel consumers. The trace server does not rebuild these into a nested
+        ``attributes["integration"]`` dict on ingest.
         """
         attributes: dict[str, Any] = {
-            f"{INTEGRATION_ATTRIBUTE_KEY}.name": self.name,
-            f"{INTEGRATION_ATTRIBUTE_KEY}.version": self.version,
+            WEAVE_INTEGRATION_NAME: self.name,
+            WEAVE_INTEGRATION_VERSION: self.version,
         }
         for key, value in self.meta.items():
-            attributes[f"{INTEGRATION_ATTRIBUTE_KEY}.meta.{key}"] = (
+            attributes[f"{WEAVE_INTEGRATION_META_PREFIX}.{key}"] = (
                 value if isinstance(value, _OTEL_SCALAR_TYPES) else str(value)
             )
         return attributes

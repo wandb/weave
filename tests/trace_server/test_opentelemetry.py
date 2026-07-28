@@ -643,6 +643,22 @@ class TestPythonSpans:
 
         assert span.name == "test_span"
         assert span.kind == SpanKind.INTERNAL
+        assert span.scope_name == "test_instrumentation"
+        assert span.scope_version == "1.0.0"
+        assert span.as_dict()["scope"] == {
+            "name": "test_instrumentation",
+            "version": "1.0.0",
+        }
+
+        # An omitted instrumentation scope is represented by an empty proto.
+        empty_scope_spans = ScopeSpans(spans=[create_test_span()])
+        empty_resource_spans = ResourceSpans(scope_spans=[empty_scope_spans])
+        empty_traces_data = PyTracesData.from_proto(
+            TracesData(resource_spans=[empty_resource_spans])
+        )
+        empty_span = empty_traces_data.resource_spans[0].scope_spans[0].spans[0]
+        assert empty_span.scope_name == ""
+        assert empty_span.scope_version == ""
 
 
 class TestAttributes:

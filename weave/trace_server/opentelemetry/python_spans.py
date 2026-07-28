@@ -202,6 +202,10 @@ class Span:
     start_time_unix_nano: int
     end_time_unix_nano: int
     attributes: dict[str, Any] = field(default_factory=dict)
+    # Carried down from the enclosing ScopeSpans so each persisted span retains
+    # its instrumentation-library identity.
+    scope_name: str = ""
+    scope_version: str = ""
     kind: SpanKind = SpanKind.UNSPECIFIED
     parent_id: str | None = None
     trace_state: str = ""
@@ -236,7 +240,12 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
+    def from_proto(
+        cls,
+        proto_span: PbSpan,
+        resource: Resource | None = None,
+        scope: InstrumentationScope | None = None,
+    ) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if (
@@ -263,6 +272,8 @@ class Span:
             dropped_links_count=proto_span.dropped_links_count,
             status=Status.from_proto(proto_span.status),
             resource=resource,
+            scope_name=scope.name if scope is not None else "",
+            scope_version=scope.version if scope is not None else "",
         )
 
     # The full OTEL Span as it is received
@@ -284,6 +295,10 @@ class Span:
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
+                "scope": {
+                    "name": self.scope_name,
+                    "version": self.scope_version,
+                },
             }
         )
 
@@ -456,7 +471,10 @@ class ScopeSpans:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
-            spans=[Span.from_proto(s, resource) for s in proto_scope_spans.spans],
+            spans=[
+                Span.from_proto(s, resource, scope=proto_scope_spans.scope)
+                for s in proto_scope_spans.spans
+            ],
             schema_url=proto_scope_spans.schema_url,
         )
 

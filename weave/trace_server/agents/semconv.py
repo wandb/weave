@@ -30,16 +30,16 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
-    column. The first entry is the canonical upstream name; later entries
-    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
-    for an example with multiple aliases.
+    ``gen_ai_aliases`` lists wire keys recognized as equivalent to this column.
+    The first is the canonical upstream name; later entries are parallel forms
+    also accepted on ingest. Most are ``gen_ai.*``, but not all: ``ERROR_TYPE``
+    recognizes the OTel core key ``error.type``.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    # OTel gen_ai.* equivalent(s), if any
+    # Equivalent wire key(s) recognized on ingest, if any
     gen_ai_aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
