@@ -19,6 +19,50 @@ class _FakeQueryResult:
     result_rows: list[tuple[Any, ...]]
 
 
+def test_paginated_query_skips_only_zero_limit_pages() -> None:
+    # A count-only request executes one query and preserves the total.
+    zero_limit_calls: list[tuple[str, dict[str, Any]]] = []
+
+    def zero_limit_query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+        zero_limit_calls.append((sql, params))
+        return _FakeQueryResult(column_names=[], result_rows=[(3,)])
+
+    handler = AgentQueryHandler(
+        zero_limit_query, lambda req: FeedbackQueryRes(result=[])
+    )
+    count_only = handler.spans_query(AgentSpansQueryReq(project_id="p1", limit=0))
+
+    assert count_only.total_count == 3
+    assert count_only.spans == []
+    assert zero_limit_calls == [
+        (
+            "SELECT count() FROM spans s WHERE s.project_id = {genai_0:String}",
+            {"genai_0": "p1"},
+        )
+    ]
+
+    # A positive limit retains the existing count-plus-list behavior.
+    paginated_results = [
+        _FakeQueryResult(column_names=[], result_rows=[(0,)]),
+        _FakeQueryResult(column_names=[], result_rows=[]),
+    ]
+    paginated_calls: list[tuple[str, dict[str, Any]]] = []
+
+    def paginated_query(sql: str, params: dict[str, Any]) -> _FakeQueryResult:
+        paginated_calls.append((sql, params))
+        return paginated_results.pop(0)
+
+    handler = AgentQueryHandler(
+        paginated_query, lambda req: FeedbackQueryRes(result=[])
+    )
+    page = handler.spans_query(AgentSpansQueryReq(project_id="p1", limit=1))
+
+    assert page.total_count == 0
+    assert page.spans == []
+    assert len(paginated_calls) == 2
+    assert not paginated_results
+
+
 def test_group_distributions_are_hydrated_with_batched_queries() -> None:
     req = AgentSpansQueryReq(
         project_id="p1",
