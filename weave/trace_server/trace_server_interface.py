@@ -1194,6 +1194,11 @@ class RefsReadBatchRes(BaseModel):
 
 
 class FeedbackCreateReq(BaseModelStrict):
+    # Newer SDKs may send fields that an older trace server does not yet know.
+    # Ignore those fields so feedback ingestion remains available during a
+    # rolling client/server upgrade; known fields remain fully validated.
+    model_config = ConfigDict(extra="ignore")
+
     id: str | None = Field(
         default=None,
         description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
