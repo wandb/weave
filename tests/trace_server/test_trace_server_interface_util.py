@@ -20,26 +20,28 @@ REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
 
 
-def test_feedback_create_requests_ignore_unknown_fields() -> None:
-    """Older servers accept feedback emitted by newer SDKs."""
-    feedback = {
-        "project_id": "entity/project",
-        "weave_ref": "weave:///entity/project/call/call-id",
-        "feedback_type": "custom",
-        "payload": {"score": 1},
-        "future_sdk_field": "ignored",
-    }
+def test_base_model_strict_ignores_and_warns_on_unknown_fields(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        request = tsi.FeedbackCreateReq.model_validate(
+            {
+                "project_id": "entity/project",
+                "weave_ref": "weave:///entity/project/call/call-id",
+                "feedback_type": "custom",
+                "payload": {"score": 1},
+                "future_sdk_field": "ignored",
+            }
+        )
 
-    req = tsi.FeedbackCreateReq.model_validate(feedback)
-    batch_req = tsi.FeedbackCreateBatchReq.model_validate({"batch": [feedback]})
-
-    assert req.model_extra is None
-    assert req.model_dump()["payload"] == {"score": 1}
-    assert batch_req.model_dump()["batch"] == [req.model_dump()]
+    assert request.model_extra is None
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating FeedbackCreateReq: future_sdk_field"
+    ]
 
 
 def test_request_models_and_query_components_ignore_unknown_fields() -> None:
-    """Older servers accept additive fields from newer SDKs throughout requests."""
+    """Every shared API request model inherits the compatibility behavior."""
     call_read = tsi.CallReadReq.model_validate(
         {"project_id": "entity/project", "id": "call-id", "future_field": True}
     )
@@ -68,7 +70,6 @@ def test_request_models_and_query_components_ignore_unknown_fields() -> None:
 
 
 def test_custom_runtime_configuration_ignores_unknown_fields() -> None:
-    """Custom runtime configuration follows the trace-server compatibility default."""
     runtime = tsi.CustomRuntimeApplyBody.model_validate(
         {
             "base_url": "https://runtime.example.com",

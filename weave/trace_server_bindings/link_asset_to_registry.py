@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from weave.trace.env import weave_trace_server_url
+from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server_bindings.http_utils import handle_response_error
 from weave.utils import http_requests
 from weave.wandb_interface.context import get_wandb_api_context
@@ -10,13 +11,13 @@ from weave.wandb_interface.context import get_wandb_api_context
 LINK_TO_REGISTRY_PATH = "/link_to_registry"
 
 
-class LinkAssetToRegistryTarget(BaseModel):
+class LinkAssetToRegistryTarget(BaseModelStrict):
     portfolio_name: str
     entity_name: str
     project_name: str
 
 
-class LinkAssetToRegistryReq(BaseModel):
+class LinkAssetToRegistryReq(BaseModelStrict):
     ref: str
     target: LinkAssetToRegistryTarget
     aliases: list[str] = Field(default_factory=list)

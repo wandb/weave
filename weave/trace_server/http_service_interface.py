@@ -6,15 +6,16 @@ included in the URL path, whereas the full request models in trace_server_interf
 include all parameters for internal use.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from weave.trace_server.common_interface import (
     AnnotationQueueItemsFilter,
+    BaseModelStrict,
     SortBy,
 )
 
 
-class AnnotationQueueAddCallsBody(BaseModel):
+class AnnotationQueueAddCallsBody(BaseModelStrict):
     """Request body for adding calls to an annotation queue (queue_id comes from path)."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -25,7 +26,7 @@ class AnnotationQueueAddCallsBody(BaseModel):
     )
 
 
-class AnnotationQueueUpdateBody(BaseModel):
+class AnnotationQueueUpdateBody(BaseModelStrict):
     """Request body for updating an annotation queue (queue_id comes from path).
 
     All fields except project_id are optional - only provided fields will be updated.
@@ -45,7 +46,7 @@ class AnnotationQueueUpdateBody(BaseModel):
     )
 
 
-class AnnotationQueueItemsQueryBody(BaseModel):
+class AnnotationQueueItemsQueryBody(BaseModelStrict):
     """Request body for querying items in an annotation queue (queue_id comes from path)."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -65,7 +66,7 @@ class AnnotationQueueItemsQueryBody(BaseModel):
     )
 
 
-class AnnotationQueueItemProgressUpdateBody(BaseModel):
+class AnnotationQueueItemProgressUpdateBody(BaseModelStrict):
     """Request body for updating annotation progress (queue_id and item_id come from path).
 
     Note: wb_user_id is not included in the body - it's set server-side from the authenticated session.
@@ -78,14 +79,14 @@ class AnnotationQueueItemProgressUpdateBody(BaseModel):
     )
 
 
-class ObjTagsBody(BaseModel):
+class ObjTagsBody(BaseModelStrict):
     """Request body for adding/removing tags (object_id and digest come from path)."""
 
     project_id: str = Field(examples=["entity/project"])
     tags: list[str] = Field(examples=[["production", "reviewed"]])
 
 
-class ObjSetAliasesBody(BaseModel):
+class ObjSetAliasesBody(BaseModelStrict):
     """Request body for setting aliases (object_id comes from path)."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -93,7 +94,7 @@ class ObjSetAliasesBody(BaseModel):
     aliases: list[str] = Field(examples=[["staging", "v1-candidate"]])
 
 
-class ObjRemoveAliasesBody(BaseModel):
+class ObjRemoveAliasesBody(BaseModelStrict):
     """Request body for removing aliases (object_id comes from path)."""
 
     project_id: str = Field(examples=["entity/project"])

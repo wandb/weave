@@ -88,6 +88,12 @@ schema and the dependent Core frontend types stay aligned.
 
 ### Trace Server API / Node SDK Schema
 
+`BaseModelStrict` is the shared trace-server API compatibility model. Despite
+its legacy name, it uses `extra="ignore"` and logs unexpected field names at
+WARNING level; use it for API request and response models so SDK/server rolling
+upgrades remain compatible. Do not log unexpected values because request data
+can be sensitive.
+
 Custom Runtime registration is a desired-state facade over the existing
 `Provider` and `ProviderModel` built-in objects. Keep `ProviderModel.provider`
 as the Provider digest and preserve `custom::<provider>::<model>` selectors;
