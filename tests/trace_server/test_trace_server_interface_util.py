@@ -5,7 +5,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import ValidationError
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
 from weave.trace_server import http_service_interface as hsi
@@ -68,16 +67,17 @@ def test_request_models_and_query_components_ignore_unknown_fields() -> None:
     assert metric_spec.model_extra is None
 
 
-def test_custom_runtime_configuration_rejects_unknown_fields() -> None:
-    """Partial runtime configuration is worse than rejecting an invalid request."""
-    with pytest.raises(ValidationError):
-        tsi.CustomRuntimeApplyBody.model_validate(
-            {
-                "base_url": "https://runtime.example.com",
-                "runtime_ids": [{"id": "model"}],
-                "future_configuration": True,
-            }
-        )
+def test_custom_runtime_configuration_ignores_unknown_fields() -> None:
+    """Custom runtime configuration follows the trace-server compatibility default."""
+    runtime = tsi.CustomRuntimeApplyBody.model_validate(
+        {
+            "base_url": "https://runtime.example.com",
+            "runtime_ids": [{"id": "model"}],
+            "future_configuration": True,
+        }
+    )
+
+    assert runtime.model_extra is None
 
 
 def test_extract_refs_from_values_deduplicates():

@@ -26,7 +26,6 @@ from weave.trace_server.agents import types as agent_types
 from weave.trace_server.common_interface import (
     WB_USER_ID_DESCRIPTION,
     AnnotationState,
-    BaseModelStrict,
     SortBy,
 )
 from weave.trace_server.constants import (
@@ -2703,7 +2702,7 @@ class DatasetDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of dataset versions deleted")
 
 
-class CustomRuntimeID(BaseModelStrict):
+class CustomRuntimeID(BaseModel):
     id: str = Field(
         description="Value sent in the OpenAI-compatible request model field"
     )
@@ -2714,7 +2713,7 @@ class CustomRuntimeID(BaseModelStrict):
     )
 
 
-class CustomRuntimeApplyBody(BaseModelStrict):
+class CustomRuntimeApplyBody(BaseModel):
     base_url: str = Field(description="Public OpenAI-compatible endpoint base URL")
     api_key_secret: str | None = Field(
         default=None,

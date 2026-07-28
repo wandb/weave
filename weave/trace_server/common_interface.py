@@ -6,17 +6,11 @@ trace_server_interface.py and http_service_interface.py to avoid circular depend
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
 )
-
-
-class BaseModelStrict(BaseModel):
-    """Base model with strict validation that forbids extra fields."""
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class SortBy(BaseModel):
