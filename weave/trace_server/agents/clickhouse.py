@@ -13,6 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
+
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
@@ -860,7 +862,9 @@ class AgentWriteHandler:
 
         # Both branches below account every parse/extraction failure through
         # these two helpers, so the bookkeeping cannot drift between them.
-        def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
+        def parse_span(
+            protobuf_span: Any, resource: Resource, scope: InstrumentationScope
+        ) -> Span | None:
             nonlocal rejected
             try:
                 span = Span.from_proto(protobuf_span, resource)

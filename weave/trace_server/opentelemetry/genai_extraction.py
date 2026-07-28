@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from weave.trace_server import source_attribution
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     CUSTOM_ATTR_TRUNCATION_MARKER,
@@ -623,6 +624,13 @@ def extract_genai_span(
     reasoning_content = extract_reasoning_content(raw_output)
 
     custom_attrs = _extract_custom_attrs(attrs)
+
+    source = source_attribution.resolve_for_otel_span(
+        attributes=attrs,
+        scope_name=span.scope_name,
+        scope_version=span.scope_version,
+        resource_attributes=span.resource.attributes if span.resource else None,
+    )
 
     return AgentSpanCHInsertable(
         project_id=project_id,

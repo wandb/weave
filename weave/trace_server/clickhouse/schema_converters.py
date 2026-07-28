@@ -29,6 +29,7 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.ids import generate_id
+from weave.trace_server.source_attribution import resolve_for_call
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 from weave.trace_server.ttl_settings import compute_expire_at
 
@@ -92,6 +93,9 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": sv["wb_user_id"],
+        "source_name": sv["source_name"],
+        "source_version": sv["source_version"],
+        "source_sdk": sv["source_sdk"],
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
@@ -147,6 +151,10 @@ def start_call_for_insert_to_ch_insertable(
 
     otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
+    source = resolve_for_call(
+        attributes=start_call.attributes, otel_dump=start_call.otel_dump
+    )
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -164,6 +172,9 @@ def start_call_for_insert_to_ch_insertable(
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
+        source_name=source.name,
+        source_version=source.version,
+        source_sdk=source.sdk,
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -202,6 +213,9 @@ def start_call_insertable_to_complete_start(
         wb_run_id=ch_start.wb_run_id,
         wb_run_step=ch_start.wb_run_step,
         wb_run_step_end=None,
+        source_name=ch_start.source_name,
+        source_version=ch_start.source_version,
+        source_sdk=ch_start.source_sdk,
         expire_at=ch_start.expire_at,
     )
 
@@ -258,6 +272,10 @@ def start_end_calls_to_ch_complete_insertable(
 
     otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
+    source = resolve_for_call(
+        attributes=start_call.attributes, otel_dump=start_call.otel_dump
+    )
+
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -281,6 +299,9 @@ def start_end_calls_to_ch_complete_insertable(
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
+        source_name=source.name,
+        source_version=source.version,
+        source_sdk=source.sdk,
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -317,6 +338,10 @@ def complete_call_to_ch_insertable(
 
     otel_dump_str = _redacted_otel_dump(complete_call.otel_dump)
 
+    source = resolve_for_call(
+        attributes=complete_call.attributes, otel_dump=complete_call.otel_dump
+    )
+
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -340,6 +365,9 @@ def complete_call_to_ch_insertable(
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
+        source_name=source.name,
+        source_version=source.version,
+        source_sdk=source.sdk,
         expire_at=compute_expire_at(retention_days, complete_call.started_at),
     )
 

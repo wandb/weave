@@ -30,16 +30,18 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
-    column. The first entry is the canonical upstream name; later entries
-    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
-    for an example with multiple aliases.
+    ``gen_ai_aliases`` lists the wire key(s) recognised as equivalent to this
+    column. The first entry is the canonical upstream name; later entries are
+    parallel forms also accepted on ingest. See ``USAGE_REASONING_TOKENS`` for an
+    example with multiple aliases. Most are ``gen_ai.*``, hence the field name,
+    but any recognised key belongs here — ``ERROR_TYPE`` uses OTel core's
+    ``error.type`` and ``SOURCE_NAME`` uses Weave's ``integration.name``.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    # OTel gen_ai.* equivalent(s), if any
+    # Wire key equivalent(s), if any -- usually gen_ai.*
     gen_ai_aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -363,6 +365,25 @@ PARENT_CALL_TRACE_ID = Attribute(
     "string",
     "Weave trace ID of the @weave.op call that was running when this span started",
 )
+# Python emits `integration.*` while Node emits `weave.integration.*`; both
+# aliases stay out of custom attrs and are pinned to their producers by tests.
+SOURCE_NAME = Attribute(
+    "weave.source.name",
+    "string",
+    "Instrumentation that produced this row: openai, langchain, codex, ...",
+    ["integration.name", "weave.integration.name"],
+)
+SOURCE_VERSION = Attribute(
+    "weave.source.version",
+    "string",
+    "Version of the instrumentation that produced this row",
+    ["integration.version", "weave.integration.version"],
+)
+INGEST_SOURCE = Attribute(
+    "weave.ingest_source",
+    "string",
+    "Ingest surface the row arrived on: weave or otlp. Server-derived, never read off the wire",
+)
 
 _DEFS: list[Attribute] = [
     # Keep this registry in sync with Attribute constants. The unit tests
@@ -425,6 +446,9 @@ _DEFS: list[Attribute] = [
     EVAL_EVALUATION_NAME,
     PARENT_CALL_ID,
     PARENT_CALL_TRACE_ID,
+    SOURCE_NAME,
+    SOURCE_VERSION,
+    INGEST_SOURCE,
 ]
 
 
@@ -506,6 +530,9 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
     PARENT_CALL_ID.key: "parent_call_id",
     PARENT_CALL_TRACE_ID.key: "parent_call_trace_id",
+    SOURCE_NAME.key: "source_name",
+    SOURCE_VERSION.key: "source_version",
+    INGEST_SOURCE.key: "ingest_source",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",
