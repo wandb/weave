@@ -1,6 +1,7 @@
 import * as vm from 'vm';
 import {Dataset, op} from 'weave';
 import type {Op} from 'weave';
+import {requireGlobalClient} from '../clientApi';
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
@@ -86,6 +87,18 @@ describe('serializing objects the SDK does not own', () => {
       tools: ['<OuterHandle>'],
     });
     expect(JSON.stringify(calls[0])).not.toContain(SENTINEL);
+  });
+
+  test('an array argument object keeps being spread', async () => {
+    const call = op(async (_params: string[]) => 'ok', {
+      name: 'call',
+      parameterNames: 'useParam0Object',
+    });
+
+    await call(['a', 'b']);
+
+    const calls = await traceServer.getCalls(projectId);
+    expect(calls[0].inputs).toEqual({0: 'a', 1: 'b'});
   });
 
   test('a class instance passed as the whole argument object is recorded as a type marker', async () => {
@@ -195,6 +208,23 @@ describe('serializing objects the SDK does not own', () => {
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
     expect(calls[0].inputs).toEqual({arg0: payload});
+  });
+
+  test('publishing a class instance still records its fields', async () => {
+    class Config {
+      region = 'us-east';
+      retries = 3;
+    }
+
+    await requireGlobalClient().publish(new Config(), 'published-config');
+
+    const read = await traceServer.obj.objReadObjReadPost({
+      project_id: projectId,
+      object_id: 'published-config',
+    });
+    // Only call inputs stop at class instances; publishing one is an explicit
+    // request to store it.
+    expect(read.data.obj.val).toEqual({region: 'us-east', retries: 3});
   });
 
   test('a class instance returned from an op is still recorded in full', async () => {
