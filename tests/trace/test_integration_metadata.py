@@ -84,9 +84,6 @@ def test_otel_attribute_constants_match_node(
     node_semconv = (
         Path(__file__).resolve().parents[2] / "sdks/node/src/genai/semconv.ts"
     )
-    if not node_semconv.exists():
-        pytest.skip("Node SDK source is not included in this checkout")
-
     match = re.search(
         rf"export const {constant_name} = ['\"]([^'\"]+)['\"];",
         node_semconv.read_text(encoding="utf-8"),
