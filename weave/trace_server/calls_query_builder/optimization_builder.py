@@ -539,7 +539,7 @@ def _create_like_optimized_eq_condition(
     if not isinstance(literal_operand.literal_, (str, int, float, bool)):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
         get_field_by_name,
     )
 
@@ -590,7 +590,7 @@ def _create_like_optimized_contains_condition(
     ) or not isinstance(operation.contains_.substr.literal_, str):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
         get_field_by_name,
     )
 
@@ -639,7 +639,7 @@ def _create_like_optimized_in_condition(
     ):
         return None
 
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
         get_field_by_name,
     )
 

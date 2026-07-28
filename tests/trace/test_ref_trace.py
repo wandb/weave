@@ -63,7 +63,7 @@ def test_repr_is_unchanged_dataclass_form():
 
 def test_str_round_trips_through_parse_uri():
     original = ObjectRef(entity="e", project="p", name="obj", _digest="dig", _extra=())
-    from weave.trace.refs import Ref
+    from weave.trace.refs import Ref  # noqa: PLC0415
 
     parsed = Ref.parse_uri(str(original))
     assert parsed == original
@@ -73,7 +73,7 @@ def test_leaderboard_column_accepts_str_of_ref():
     # LeaderboardColumn.evaluation_object_ref is typed as RefStr (= str), so
     # pydantic accepts any string. str(ref) now produces a URI, so a column
     # built from str(ref) matches calls keyed by ref.uri() downstream.
-    from weave.trace_server.interface.builtin_object_classes.leaderboard import (
+    from weave.trace_server.interface.builtin_object_classes.leaderboard import (  # noqa: PLC0415
         LeaderboardColumn,
     )
 

@@ -173,7 +173,7 @@ def test_import_hook_patches_on_import(setup_env, monkeypatch):
         {"openai": mock_patch_func},
     ):
         _inject_fake_module(monkeypatch, "openai")
-        from weave.integrations.patch import _patch_if_needed
+        from weave.integrations.patch import _patch_if_needed  # noqa: PLC0415
 
         _patch_if_needed("openai")
         mock_patch_func.assert_called_once()

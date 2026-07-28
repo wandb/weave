@@ -493,9 +493,9 @@ class TestPatchInteraction:
         patcher factory must not be reached, no matter how
         ``patch_google_genai`` is invoked.
         """
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock  # noqa: PLC0415
 
-        from weave.integrations import patch as patch_module
+        from weave.integrations import patch as patch_module  # noqa: PLC0415
 
         patch_module.reset_patched_integrations()
         try:

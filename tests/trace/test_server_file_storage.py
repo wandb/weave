@@ -573,8 +573,6 @@ def test_file_storage_retry_limit(client: WeaveClient):
         nonlocal attempt_count
         attempt_count += 1
         # Simulate a 429 rate limit error
-        from google.api_core import exceptions
-
         raise exceptions.TooManyRequests("Rate limit exceeded")
 
     with mock.patch.dict(

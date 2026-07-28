@@ -25,7 +25,7 @@ def patch_notdiamond() -> Generator[None, None, None]:
 def test_notdiamond_quickstart(
     client: WeaveClient,
 ) -> None:
-    from notdiamond import NotDiamond
+    from notdiamond import NotDiamond  # noqa: PLC0415
 
     api_key = os.environ.get("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     nd_client = NotDiamond(api_key=api_key)

@@ -51,8 +51,8 @@ def patch_instructor() -> Generator[None, None, None]:
 def test_instructor_openai(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import OpenAI
+    import instructor  # noqa: PLC0415
+    from openai import OpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(OpenAI(api_key=api_key))
@@ -96,8 +96,8 @@ def test_instructor_openai(
 def test_instructor_openai_with_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import OpenAI
+    import instructor  # noqa: PLC0415
+    from openai import OpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(OpenAI(api_key=api_key))
@@ -134,8 +134,8 @@ def test_instructor_openai_with_completion(
 async def test_instructor_openai_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import AsyncOpenAI
+    import instructor  # noqa: PLC0415
+    from openai import AsyncOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(AsyncOpenAI(api_key=api_key))
@@ -177,8 +177,8 @@ async def test_instructor_openai_async(
 def test_instructor_iterable(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import OpenAI
+    import instructor  # noqa: PLC0415
+    from openai import OpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(
@@ -233,8 +233,8 @@ def test_instructor_iterable(
 def test_instructor_iterable_sync_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import OpenAI
+    import instructor  # noqa: PLC0415
+    from openai import OpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(
@@ -281,8 +281,8 @@ def test_instructor_iterable_sync_stream(
 async def test_instructor_iterable_async_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import AsyncOpenAI
+    import instructor  # noqa: PLC0415
+    from openai import AsyncOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(
@@ -334,8 +334,8 @@ async def test_instructor_iterable_async_stream(
 def test_instructor_partial_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import OpenAI
+    import instructor  # noqa: PLC0415
+    from openai import OpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(OpenAI(api_key=api_key))
@@ -403,8 +403,8 @@ list of speakers.
 async def test_instructor_partial_stream_async(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import instructor
-    from openai import AsyncOpenAI
+    import instructor  # noqa: PLC0415
+    from openai import AsyncOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     lm_client = instructor.from_openai(AsyncOpenAI(api_key=api_key))

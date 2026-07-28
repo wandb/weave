@@ -10,7 +10,7 @@ from weave.integrations.integration_utilities import op_name_from_ref
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_chat_completion(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     huggingface_client = InferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -51,7 +51,7 @@ def test_huggingface_chat_completion(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_chat_completion_stream(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     huggingface_client = InferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -94,7 +94,7 @@ def test_huggingface_chat_completion_stream(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_chat_completion_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     huggingface_client = AsyncInferenceClient(
         api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -129,7 +129,7 @@ async def test_huggingface_chat_completion_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_document_question_answering(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     image_url = "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
     InferenceClient(
@@ -159,7 +159,7 @@ def test_huggingface_document_question_answering(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_document_question_answering_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     image_url = "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
     await AsyncInferenceClient(
@@ -188,7 +188,7 @@ async def test_huggingface_document_question_answering_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_fill_mask(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -211,7 +211,7 @@ def test_huggingface_fill_mask(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_fill_mask_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -236,7 +236,7 @@ async def test_huggingface_fill_mask_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_question_answering(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -263,7 +263,7 @@ def test_huggingface_question_answering(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_question_answering_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -290,7 +290,7 @@ async def test_huggingface_question_answering_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_table_question_answering(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     query = "How many stars does the transformers repository have?"
     table = {
@@ -320,7 +320,7 @@ def test_huggingface_table_question_answering(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_table_question_answering_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     query = "How many stars does the transformers repository have?"
     table = {
@@ -349,7 +349,7 @@ async def test_huggingface_table_question_answering_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_text_classification(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -375,7 +375,7 @@ def test_huggingface_text_classification(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_text_classification_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -400,7 +400,7 @@ async def test_huggingface_text_classification_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_token_classification(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -428,7 +428,7 @@ def test_huggingface_token_classification(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_token_classification_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -455,7 +455,7 @@ async def test_huggingface_token_classification_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_translation(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -481,7 +481,7 @@ def test_huggingface_translation(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_translation_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -508,7 +508,7 @@ async def test_huggingface_translation_async(client):
     filter_headers=["authorization", "x-api-key"],
 )
 def test_huggingface_text_to_image(client):
-    from huggingface_hub import InferenceClient
+    from huggingface_hub import InferenceClient  # noqa: PLC0415
 
     InferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -537,7 +537,7 @@ def test_huggingface_text_to_image(client):
 )
 @pytest.mark.asyncio
 async def test_huggingface_text_to_image_async(client):
-    from huggingface_hub import AsyncInferenceClient
+    from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
 
     await AsyncInferenceClient(
         api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")

@@ -41,7 +41,7 @@ def _registered_processors() -> list[Any] | None:
     no-op uninstall rather than guess at the processor list.
     """
     try:
-        from agents.tracing import get_trace_provider
+        from agents.tracing import get_trace_provider  # noqa: PLC0415
 
         provider = get_trace_provider()
         multi = provider._multi_processor
@@ -63,7 +63,7 @@ def _remove_processor(processor: Any) -> bool:
     if current is None:
         return False
     try:
-        from agents.tracing import set_trace_processors
+        from agents.tracing import set_trace_processors  # noqa: PLC0415
     except Exception:
         return False
 
@@ -99,7 +99,7 @@ class OpenAIAgentsPatcher(Patcher):
             return True
 
         try:
-            from agents.tracing import add_trace_processor
+            from agents.tracing import add_trace_processor  # noqa: PLC0415
 
             self.processor = WeaveTracingProcessor()
             add_trace_processor(self.processor)
@@ -167,7 +167,7 @@ class OpenAIAgentsOtelPatcher(Patcher):
             return True
 
         try:
-            from agents.tracing import add_trace_processor
+            from agents.tracing import add_trace_processor  # noqa: PLC0415
 
             self.processor = WeaveOtelTracingProcessor()
             add_trace_processor(self.processor)

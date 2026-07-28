@@ -226,7 +226,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     _model_max_length: int = PrivateAttr(default=8192)
 
     def load_pipeline(self) -> None:
-        from transformers import pipeline
+        from transformers import pipeline  # noqa: PLC0415
 
         self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]

@@ -21,7 +21,7 @@ TCP_CONNECTION_POOL_LIMIT = 50
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        from gql.transport.httpx import HTTPXTransport
+        from gql.transport.httpx import HTTPXTransport  # noqa: PLC0415
 
         auth = None
         api_key = get_wandb_api_context()
@@ -216,15 +216,15 @@ class Api:
 
 class ApiAsync:
     def __init__(self) -> None:
-        import aiohttp
+        import aiohttp  # noqa: PLC0415
 
         self.connector = aiohttp.TCPConnector(
             limit=TCP_CONNECTION_POOL_LIMIT, ssl=env.ssl_verify()
         )
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        import aiohttp
-        from gql.transport.aiohttp import AIOHTTPTransport
+        import aiohttp  # noqa: PLC0415
+        from gql.transport.aiohttp import AIOHTTPTransport  # noqa: PLC0415
 
         auth = None
         api_key = get_wandb_api_context()

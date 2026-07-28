@@ -353,7 +353,7 @@ async def test_image_generation_async(client):
 
 def test_thoughts_token_count_included_in_usage():
     """Test that thoughts_token_count is included in usage data when available."""
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     # Create a mock call with model name in inputs
     call = Mock(spec=Call)
@@ -386,7 +386,7 @@ def test_thoughts_token_count_included_in_usage():
 
 def test_thoughts_token_count_not_included_when_missing():
     """Test that thoughts_tokens is not included when thoughts_token_count is not available."""
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     # Create a mock call with model name in inputs
     call = Mock(spec=Call)
@@ -422,7 +422,7 @@ def test_thoughts_token_count_not_included_when_missing():
 
 def test_on_finish_includes_cached_content_token_count():
     """Test that cached_content_token_count is mapped to cache_read_input_tokens."""
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     call = Mock(spec=Call)
     call.inputs = {"model": "gemini-2.0-flash"}
@@ -447,7 +447,7 @@ def test_on_finish_includes_cached_content_token_count():
 
 def test_on_finish_excludes_cached_content_when_missing():
     """Test that cache_read_input_tokens is omitted when cached_content_token_count is absent."""
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     call = Mock(spec=Call)
     call.inputs = {"model": "gemini-2.0-flash"}
@@ -472,9 +472,9 @@ def test_on_finish_excludes_cached_content_when_missing():
 
 def test_on_finish_with_inline_data_output():
     """Test that on_finish handles responses with inline_data (images) correctly."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     call = Mock(spec=Call)
     call.inputs = {"model": "gemini-2.0-flash"}
@@ -504,9 +504,9 @@ def test_on_finish_with_inline_data_output():
 
 def test_postprocess_output_suppresses_non_text_warning():
     """Test that postprocess_output suppresses the non-text parts warning."""
-    import logging
+    import logging  # noqa: PLC0415
 
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
     # Build a response with inline_data (image) that triggers the warning
     image_part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/png")
@@ -523,7 +523,7 @@ def test_postprocess_output_suppresses_non_text_warning():
     )
 
     # Reset the SDK's internal warning flag so it would warn again
-    import google.genai.types as genai_types
+    import google.genai.types as genai_types  # noqa: PLC0415
 
     genai_types._response_text_non_text_warning_logged = False
 
@@ -543,11 +543,11 @@ def test_postprocess_output_suppresses_non_text_warning():
 
 def test_wrapper_sync_sets_postprocess_output():
     """Test that the sync wrapper sets postprocess_output on the op."""
-    from weave.integrations.google_genai.gemini_utils import (
+    from weave.integrations.google_genai.gemini_utils import (  # noqa: PLC0415
         google_genai_gemini_postprocess_output,
         google_genai_gemini_wrapper_sync,
     )
-    from weave.trace.autopatch import OpSettings
+    from weave.trace.autopatch import OpSettings  # noqa: PLC0415
 
     settings = OpSettings()
     wrapper = google_genai_gemini_wrapper_sync(settings)
@@ -561,11 +561,11 @@ def test_wrapper_sync_sets_postprocess_output():
 
 def test_wrapper_async_sets_postprocess_output():
     """Test that the async wrapper sets postprocess_output on the op."""
-    from weave.integrations.google_genai.gemini_utils import (
+    from weave.integrations.google_genai.gemini_utils import (  # noqa: PLC0415
         google_genai_gemini_postprocess_output,
         google_genai_gemini_wrapper_async,
     )
-    from weave.trace.autopatch import OpSettings
+    from weave.trace.autopatch import OpSettings  # noqa: PLC0415
 
     settings = OpSettings()
     wrapper = google_genai_gemini_wrapper_async(settings)
@@ -790,7 +790,7 @@ def test_accumulator_preserves_non_text_parts():
 
 def test_traverse_and_replace_blobs_converts_blob_dict_to_content():
     """Dict with 'data' bytes and 'mime_type' is converted to a Content object."""
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     blob_dict = {"data": b"fake_image_bytes", "mime_type": "image/jpeg"}
     result = _traverse_and_replace_blobs(blob_dict)
@@ -801,9 +801,9 @@ def test_traverse_and_replace_blobs_converts_blob_dict_to_content():
 
 def test_traverse_and_replace_blobs_converts_part_with_inline_data():
     """types.Part.from_bytes (Pydantic BaseModel) has inline_data converted to Content."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
     result = _traverse_and_replace_blobs(part)
@@ -815,9 +815,9 @@ def test_traverse_and_replace_blobs_converts_part_with_inline_data():
 
 def test_traverse_and_replace_blobs_traverses_list_of_parts():
     """List of Parts with blobs are recursively traversed; text parts unchanged."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     parts = [
         types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg"),
@@ -833,9 +833,9 @@ def test_traverse_and_replace_blobs_traverses_list_of_parts():
 
 def test_traverse_and_replace_blobs_traverses_tuple():
     """Tuples with blobs are traversed and returned as tuples."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     part = types.Part.from_bytes(data=b"fake_image_bytes", mime_type="image/jpeg")
     result = _traverse_and_replace_blobs((part,))
@@ -881,7 +881,7 @@ def test_traverse_and_replace_blobs_leaves_primitives_unchanged():
 
 def test_traverse_and_replace_blobs_traverses_nested_dict():
     """Blobs nested inside dicts are replaced recursively."""
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     nested = {
         "outer": {"inner": {"data": b"fake_image_bytes", "mime_type": "image/png"}}
@@ -897,9 +897,9 @@ def test_traverse_and_replace_blobs_traverses_nested_dict():
 
 def test_postprocess_inputs_converts_image_bytes_to_content():
     """Image bytes in 'contents' inputs are converted to Content for Weave UI display."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     mock_self = Mock()
     mock_self._model = "gemini-2.0-flash"
@@ -942,9 +942,9 @@ def test_postprocess_inputs_leaves_text_only_contents_unchanged():
 )
 def test_content_generation_with_image_bytes(client):
     """Image bytes passed to generate_content are stored as Content in the Weave trace."""
-    from google.genai import types
+    from google.genai import types  # noqa: PLC0415
 
-    from weave import Content
+    from weave import Content  # noqa: PLC0415
 
     google_client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_KEY", "DUMMY_API_KEY"))
     image_bytes = b"\xff\xd8\xff\xe0"  # minimal JPEG header bytes

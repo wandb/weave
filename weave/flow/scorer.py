@@ -21,7 +21,7 @@ from weave.trace.weave_client import sanitize_object_name
 
 def _import_numpy() -> Any | None:
     try:
-        import numpy
+        import numpy  # noqa: PLC0415
     except ImportError:
         return None
     return numpy

@@ -386,10 +386,10 @@ class ErrorRegistry:
 
         # ClickHouse errors
         # It's unfortunate we have to defer imports here because the client also imports from this file.
-        from clickhouse_connect.driver.exceptions import (
+        from clickhouse_connect.driver.exceptions import (  # noqa: PLC0415
             DatabaseError as CHDatabaseError,
         )
-        from clickhouse_connect.driver.exceptions import (
+        from clickhouse_connect.driver.exceptions import (  # noqa: PLC0415
             OperationalError as CHOperationalError,
         )
 

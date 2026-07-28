@@ -44,7 +44,7 @@ def patch_crewai() -> Generator[None, None, None]:
 
 
 def get_crew():
-    from crewai import Agent, Crew, Process, Task
+    from crewai import Agent, Crew, Process, Task  # noqa: PLC0415
 
     researcher = Agent(
         role="Market Research Specialist",
@@ -69,8 +69,8 @@ def get_crew():
 
 
 def get_flow_with_router_or():
-    from crewai.flow.flow import Flow, listen, or_, router, start
-    from pydantic import BaseModel
+    from crewai.flow.flow import Flow, listen, or_, router, start  # noqa: PLC0415
+    from pydantic import BaseModel  # noqa: PLC0415
 
     # Define structured state
     class SupportTicketState(BaseModel):
@@ -95,7 +95,7 @@ def get_flow_with_router_or():
 
         @listen(receive_ticket)
         def categorize_ticket(self, _):
-            import random
+            import random  # noqa: PLC0415
 
             self.state.category = random.choice(["Billing", "Account access"])
             return self.state.category

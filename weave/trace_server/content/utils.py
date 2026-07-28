@@ -47,7 +47,7 @@ def _get_mimetypes_module() -> ModuleType:
     """
     global _mimetypes_module  # noqa: PLW0603
     if _mimetypes_module is None:
-        import mimetypes as _m
+        import mimetypes as _m  # noqa: PLC0415
 
         _m.add_type("text/markdown", ".md")
         _m.add_type("audio/wav", ".wav")
@@ -66,13 +66,13 @@ def _get_resolver() -> Any:
     if _resolver is not _UNSET:
         return _resolver
 
-    from weave.trace_server.content import python_magic_resolver
+    from weave.trace_server.content import python_magic_resolver  # noqa: PLC0415
 
     if python_magic_resolver.is_available():
         _resolver = python_magic_resolver
         return _resolver
 
-    from weave.trace_server.content import polyfile_magic_resolver
+    from weave.trace_server.content import polyfile_magic_resolver  # noqa: PLC0415
 
     if polyfile_magic_resolver.is_available():
         _resolver = polyfile_magic_resolver

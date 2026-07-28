@@ -40,7 +40,7 @@ class BedrockGuardrailScorer(weave.Scorer):
     def model_post_init(self, context: Any, /) -> None:
         """Initialize the Bedrock runtime client."""
         try:
-            import boto3
+            import boto3  # noqa: PLC0415
 
             self._bedrock_runtime = boto3.client(
                 "bedrock-runtime", **self.bedrock_runtime_kwargs

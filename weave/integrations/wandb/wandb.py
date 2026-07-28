@@ -12,7 +12,7 @@ def wandb_init_hook() -> None:
 
     # If wandb isn't installed at all, there's nothing to auto-link; stay silent.
     try:
-        import wandb  # noqa: F401
+        import wandb  # noqa: F401, PLC0415
     except (ImportError, ModuleNotFoundError):
         return
 
@@ -20,7 +20,7 @@ def wandb_init_hook() -> None:
     # on a version that predates wandb<>weave auto-linking.  Log an actionable
     # warning so they know how to re-enable the feature.
     try:
-        from wandb.integration.weave import active_run_path
+        from wandb.integration.weave import active_run_path  # noqa: PLC0415
     except (ImportError, ModuleNotFoundError):
         logger.warning(
             "wandb is installed but `wandb.integration.weave` is missing. "

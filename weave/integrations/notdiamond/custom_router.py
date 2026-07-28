@@ -247,7 +247,7 @@ def _placeholder_model_name() -> str:
 
 def _in_notebook() -> bool:
     try:
-        from IPython import get_ipython
+        from IPython import get_ipython  # noqa: PLC0415
 
         if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
             return False

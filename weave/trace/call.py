@@ -247,7 +247,7 @@ class Call:
         result, score_call = prediction.apply_scorer(my_scorer)
         ```
         """
-        from weave.flow.scorer import Scorer, apply_scorer_async
+        from weave.flow.scorer import Scorer, apply_scorer_async  # noqa: PLC0415
 
         model_inputs = {k: v for k, v in self.inputs.items() if k != "self"}
         example = {**model_inputs, **(additional_scorer_kwargs or {})}

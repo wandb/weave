@@ -8,8 +8,8 @@ from weave.integrations.integration_utilities import op_name_from_ref
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_content_generation(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
@@ -40,8 +40,8 @@ def test_content_generation(client):
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_content_generation_stream(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
@@ -68,8 +68,8 @@ def test_content_generation_stream(client):
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 async def test_content_generation_async(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
@@ -96,8 +96,8 @@ async def test_content_generation_async(client):
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 async def test_content_generation_async_stream(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
@@ -131,8 +131,8 @@ async def test_content_generation_async_stream(client):
 )
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 def test_chat_session(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")
@@ -160,8 +160,8 @@ def test_chat_session(client):
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 async def test_chat_session_async(client):
-    import vertexai
-    from vertexai.generative_models import GenerativeModel
+    import vertexai  # noqa: PLC0415
+    from vertexai.generative_models import GenerativeModel  # noqa: PLC0415
 
     vertexai.init(project="wandb-growth", location="us-central1")
     model = GenerativeModel("gemini-1.5-flash")

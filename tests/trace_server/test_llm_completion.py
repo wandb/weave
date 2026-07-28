@@ -724,7 +724,9 @@ class TestPromptResolution(unittest.TestCase):
 
     def test_resolve_prompt_messages(self):
         """Test resolving prompt messages from a MessagesPrompt object."""
-        from weave.trace_server.llm_completion import resolve_prompt_messages
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_prompt_messages,
+        )
 
         # Create a mock MessagesPrompt object
         mock_prompt_obj = tsi.ObjSchema(
@@ -769,8 +771,10 @@ class TestPromptResolution(unittest.TestCase):
 
     def test_resolve_prompt_messages_invalid_prompt(self):
         """Test error handling when prompt object is not a Prompt or MessagesPrompt."""
-        from weave.trace_server.errors import InvalidRequest
-        from weave.trace_server.llm_completion import resolve_prompt_messages
+        from weave.trace_server.errors import InvalidRequest  # noqa: PLC0415
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_prompt_messages,
+        )
 
         # Create a mock object that is NOT a MessagesPrompt
         mock_not_prompt = tsi.ObjSchema(
@@ -1029,7 +1033,7 @@ class TestStreamingWithPrompts(unittest.TestCase):
         """Test error handling when prompt resolution fails during streaming."""
         with patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read:
             # Mock obj_read to raise an error
-            from weave.trace_server.errors import NotFoundError
+            from weave.trace_server.errors import NotFoundError  # noqa: PLC0415
 
             mock_obj_read.side_effect = NotFoundError("Prompt not found")
 
@@ -1073,7 +1077,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_with_all_params(self):
         """Test with prompt, messages, and template vars all provided."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         # Mock prompt object
         mock_prompt_obj = tsi.ObjSchema(
@@ -1131,7 +1137,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_only_prompt_no_template_vars(self):
         """Test with only prompt, no user messages or template vars."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         mock_prompt_obj = tsi.ObjSchema(
             project_id=self.project_id,
@@ -1175,7 +1183,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_only_messages_and_template_vars(self):
         """Test with only user messages and template vars, no prompt."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")
@@ -1208,7 +1218,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_only_messages_no_template_vars(self):
         """Test with only user messages, no prompt or template vars."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")
@@ -1232,7 +1244,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_empty_inputs(self):
         """Test with all inputs empty/None."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")
@@ -1251,7 +1265,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_prompt_not_found(self):
         """Test error handling when prompt reference cannot be found."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             # Raise NotFoundError directly (simulating obj_read behavior when object doesn't exist)
@@ -1274,7 +1290,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_invalid_prompt_type(self):
         """Test error handling when prompt reference is not a Prompt object."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         # Mock an object that's not a MessagesPrompt
         mock_obj = tsi.ObjSchema(
@@ -1311,7 +1329,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_template_vars_with_empty_messages(self):
         """Test that template vars are skipped when there are no messages."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")
@@ -1333,7 +1353,9 @@ class TestResolveAndApplyPrompt(unittest.TestCase):
 
     def test_resolve_and_apply_prompt_skips_assistant_messages(self):
         """Test that template variable substitution is skipped for assistant messages."""
-        from weave.trace_server.llm_completion import resolve_and_apply_prompt
+        from weave.trace_server.llm_completion import (  # noqa: PLC0415
+            resolve_and_apply_prompt,
+        )
 
         def mock_obj_read(req):
             raise NotImplementedError("Should not be called")

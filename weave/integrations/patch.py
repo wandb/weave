@@ -297,7 +297,7 @@ def patch_fastmcp(settings: IntegrationSettings | None = None) -> None:
         if "mcp" in _PATCHED_INTEGRATIONS:
             return
 
-    from weave.integrations.fastmcp import (
+    from weave.integrations.fastmcp import (  # noqa: PLC0415
         get_fastmcp_client_patcher,
         get_fastmcp_server_patcher,
     )
@@ -447,7 +447,9 @@ def patch_langchain() -> None:
         if "langchain" in _PATCHED_INTEGRATIONS:
             return
 
-    from weave.integrations.langchain.langchain import langchain_patcher
+    from weave.integrations.langchain.langchain import (  # noqa: PLC0415
+        langchain_patcher,
+    )
 
     with _PATCH_LOCK:
         if "langchain" in _PATCHED_INTEGRATIONS:
@@ -464,7 +466,9 @@ def patch_llamaindex() -> None:
         if "llama_index" in _PATCHED_INTEGRATIONS:
             return
 
-    from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+    from weave.integrations.llamaindex.llamaindex import (  # noqa: PLC0415
+        llamaindex_patcher,
+    )
 
     with _PATCH_LOCK:
         if "llama_index" in _PATCHED_INTEGRATIONS:
@@ -654,7 +658,9 @@ def implicit_patch() -> None:
     This respects the implicitly_patch_integrations setting - if disabled, no automatic
     patching will occur.
     """
-    from weave.trace.settings import should_implicitly_patch_integrations
+    from weave.trace.settings import (  # noqa: PLC0415
+        should_implicitly_patch_integrations,
+    )
 
     # Check if implicit patching is enabled
     if not should_implicitly_patch_integrations():
@@ -684,7 +690,9 @@ def register_import_hook() -> None:
     This respects the implicitly_patch_integrations setting - if disabled, the import hook
     will not be registered.
     """
-    from weave.trace.settings import should_implicitly_patch_integrations
+    from weave.trace.settings import (  # noqa: PLC0415
+        should_implicitly_patch_integrations,
+    )
 
     # Check if implicit patching is enabled
     if not should_implicitly_patch_integrations():

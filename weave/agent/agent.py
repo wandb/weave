@@ -31,9 +31,9 @@ class Agent(Object):
         Returns:
             The new state of the environment.
         """
-        import openai
-        from openai._types import NotGiven
-        from openai.types.chat import ChatCompletionMessageParam
+        import openai  # noqa: PLC0415
+        from openai._types import NotGiven  # noqa: PLC0415
+        from openai.types.chat import ChatCompletionMessageParam  # noqa: PLC0415
 
         LogEvents.step_start("agent", "green")
 

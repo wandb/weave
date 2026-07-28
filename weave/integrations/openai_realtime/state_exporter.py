@@ -354,7 +354,9 @@ class StateExporter(BaseModel):
 
         conv_id = response.get("conversation_id")
         if conv_id and conv_id not in self.conversation_calls:
-            from weave.trace.context.weave_client_context import require_weave_client
+            from weave.trace.context.weave_client_context import (  # noqa: PLC0415
+                require_weave_client,
+            )
 
             session_call = (
                 self.session_span.get_root_call() if self.session_span else None
@@ -757,7 +759,9 @@ class StateExporter(BaseModel):
         export the same ``inputs`` / ``output_dict`` / ``summary`` elsewhere
         (e.g. as OTel GenAI spans) without re-deriving state.
         """
-        from weave.trace.context.weave_client_context import require_weave_client
+        from weave.trace.context.weave_client_context import (  # noqa: PLC0415
+            require_weave_client,
+        )
 
         client = require_weave_client()
 

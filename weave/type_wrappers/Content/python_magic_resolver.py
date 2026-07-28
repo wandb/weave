@@ -31,7 +31,7 @@ def _check_availability() -> tuple[bool, bool]:
     if _magic_available is not None:
         return _magic_available, _magic_has_extension
     try:
-        import magic
+        import magic  # noqa: PLC0415
 
         magic.Magic(mime=True)
         _magic_available = True
@@ -63,7 +63,7 @@ def _get_magic_instances() -> tuple[Any, Any]:
     if not available:
         return None, None
 
-    import magic
+    import magic  # noqa: PLC0415
 
     _thread_local.mime = magic.Magic(mime=True)
     _thread_local.ext = magic.Magic(extension=True) if has_extension else None  # type: ignore[call-overload]

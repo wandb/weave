@@ -381,7 +381,7 @@ class TestMakeSpansListQuery:
         )
 
     def test_include_details_projects_detail_columns(self) -> None:
-        from weave.trace_server.query_builder.agent_query_builder import (
+        from weave.trace_server.query_builder.agent_query_builder import (  # noqa: PLC0415
             SPANS_DETAILS_COLS,
         )
 

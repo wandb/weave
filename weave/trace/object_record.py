@@ -41,7 +41,7 @@ class ObjectRecord:  # noqa: PLW1641
 
     def unwrap(self) -> dict[str, Any]:
         # Nasty import to avoid circular import
-        from weave.trace.vals import unwrap
+        from weave.trace.vals import unwrap  # noqa: PLC0415
 
         unwrapped_one_level = {
             k: v

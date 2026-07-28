@@ -28,7 +28,7 @@ class RichViewer:
         force_terminal: bool | None = None,
         **kwargs: Any,
     ):
-        from rich.console import Console as RichConsole
+        from rich.console import Console as RichConsole  # noqa: PLC0415
 
         self._file = file
         self._emoji = emoji
@@ -109,7 +109,7 @@ class RichTable:
         header_style: str | None = None,
         **kwargs: Any,
     ):
-        from rich.table import Table as RichTableBase
+        from rich.table import Table as RichTableBase  # noqa: PLC0415
 
         self._table = RichTableBase(
             title=title, show_header=show_header, header_style=header_style, **kwargs
@@ -151,7 +151,7 @@ class RichTable:
             return capture.get().strip()
         else:
             # Fallback to basic string representation
-            from rich.console import Console as RichConsole
+            from rich.console import Console as RichConsole  # noqa: PLC0415
 
             temp_console = RichConsole()
             with temp_console.capture() as capture:
@@ -163,7 +163,7 @@ class RichProgress:
     """Rich progress bar implementation."""
 
     def __init__(self, console: Any, **kwargs: Any):
-        from rich.progress import (
+        from rich.progress import (  # noqa: PLC0415
             BarColumn,
             Progress,
             SpinnerColumn,
@@ -231,7 +231,7 @@ class RichSyntax:
         theme: str = "ansi_dark",
         line_numbers: bool = False,
     ):
-        from rich.syntax import Syntax
+        from rich.syntax import Syntax  # noqa: PLC0415
 
         self._syntax = Syntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
@@ -245,7 +245,7 @@ class RichSyntax:
                 console._viewer._console.print(self._syntax)
             return capture.get().strip()
         else:
-            from rich.console import Console as RichConsole
+            from rich.console import Console as RichConsole  # noqa: PLC0415
 
             temp_console = RichConsole()
             with temp_console.capture() as capture:
@@ -257,7 +257,7 @@ class RichText:
     """Rich text implementation."""
 
     def __init__(self, text: str = "", style: str | Style | None = None):
-        from rich.text import Text as RichTextBase
+        from rich.text import Text as RichTextBase  # noqa: PLC0415
 
         if isinstance(style, Style):
             style = style.to_rich_style()
@@ -277,6 +277,6 @@ def register() -> None:
     This function is called by the display module after initialization
     to avoid circular import issues.
     """
-    from weave.trace.display import display
+    from weave.trace.display import display  # noqa: PLC0415
 
     display.register_viewer("rich", RichViewer)

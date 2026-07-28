@@ -283,9 +283,8 @@ ignore = [
   # Initial TRY rollout: defer high-volume rules for a dedicated cleanup pass.
   "TRY003", # https://docs.astral.sh/ruff/rules/raise-vanilla-args/
   "TRY301", # https://docs.astral.sh/ruff/rules/raise-within-try/
-  # Existing code intentionally uses many lazy imports and private symbols;
-  # keep these disabled until we do a dedicated cleanup.
-  "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
+  # Existing code intentionally uses many private symbols; keep this disabled
+  # until we do a dedicated cleanup.
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/

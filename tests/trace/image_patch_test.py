@@ -10,7 +10,7 @@ def test_patching_import_order():
     assert pil_image_thread_safety._patched
     pil_image_thread_safety.undo_threadsafe_patch_to_pil_image()
     assert not pil_image_thread_safety._patched
-    import PIL
+    import PIL  # noqa: PLC0415
 
     image = PIL.Image.new("RGB", (10, 10))
     # On Windows, we need delete=False to allow PIL to open the file

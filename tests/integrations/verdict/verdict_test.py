@@ -24,9 +24,9 @@ def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
 def test_simple_verdict_pipeline(client: WeaveClient) -> None:
     """Test that a simple Verdict pipeline is traced to Weave."""
     try:
-        from verdict import Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
+        from verdict import Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -81,10 +81,10 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
 def test_verdict_layer_tracing(client: WeaveClient) -> None:
     """Test that Verdict layers with multiple units are properly traced."""
     try:
-        from verdict import Layer, Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
-        from verdict.transform import MeanPoolUnit
+        from verdict import Layer, Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
+        from verdict.transform import MeanPoolUnit  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -129,9 +129,9 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
 def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
     """Test that custom Verdict units are properly traced."""
     try:
-        from verdict import Pipeline, Unit
-        from verdict.prompt import Prompt
-        from verdict.schema import Schema
+        from verdict import Pipeline, Unit  # noqa: PLC0415
+        from verdict.prompt import Prompt  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -178,9 +178,9 @@ def test_verdict_custom_unit_tracing(client: WeaveClient) -> None:
 def test_verdict_block_tracing(client: WeaveClient) -> None:
     """Test that Verdict blocks are properly traced."""
     try:
-        from verdict import Block, Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
+        from verdict import Block, Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -226,10 +226,10 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
 def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
     """Test that Verdict dataset execution is properly traced."""
     try:
-        from datasets import Dataset
-        from verdict import Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.dataset import DatasetWrapper
+        from datasets import Dataset  # noqa: PLC0415
+        from verdict import Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.dataset import DatasetWrapper  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict or datasets not available")
 
@@ -273,9 +273,9 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
 def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
     """Test different layer configurations are properly traced."""
     try:
-        from verdict import Layer, Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
+        from verdict import Layer, Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -319,10 +319,10 @@ def test_verdict_layer_configurations_tracing(client: WeaveClient) -> None:
 def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
     """Test complex nested pipeline structures are properly traced."""
     try:
-        from verdict import Block, Layer, Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
-        from verdict.transform import MeanPoolUnit
+        from verdict import Block, Layer, Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
+        from verdict.transform import MeanPoolUnit  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -370,9 +370,9 @@ def test_verdict_complex_pipeline_tracing(client: WeaveClient) -> None:
 def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
     """Test that errors in Verdict units are properly traced."""
     try:
-        from verdict import Pipeline, Unit
-        from verdict.prompt import Prompt
-        from verdict.schema import Schema
+        from verdict import Pipeline, Unit  # noqa: PLC0415
+        from verdict.prompt import Prompt  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 
@@ -422,9 +422,9 @@ def test_verdict_error_handling_tracing(client: WeaveClient) -> None:
 def test_verdict_tracer_inheritance(client: WeaveClient) -> None:
     """Test that tracer context is properly inherited through pipeline execution."""
     try:
-        from verdict import Pipeline
-        from verdict.common.judge import JudgeUnit
-        from verdict.schema import Schema
+        from verdict import Pipeline  # noqa: PLC0415
+        from verdict.common.judge import JudgeUnit  # noqa: PLC0415
+        from verdict.schema import Schema  # noqa: PLC0415
     except ImportError:
         pytest.skip("verdict not available")
 

@@ -180,7 +180,7 @@ def test_oauth_token_endpoint_url_non_string_input_rejected() -> None:
 
 
 def test_oauth_token_endpoint_url_urlparse_exception_path() -> None:
-    from weave.scorers import remote_scorer as remote_scorer_module
+    from weave.scorers import remote_scorer as remote_scorer_module  # noqa: PLC0415
 
     def boom(_: str) -> None:
         raise RuntimeError("urlparse blew up")

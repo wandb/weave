@@ -70,9 +70,9 @@ def reset_serializer_load_refs():
 
     This fixture clears those refs before each test to ensure proper test isolation.
     """
-    from weave.trace.op_protocol import Op
-    from weave.trace.ref_util import remove_ref
-    from weave.trace.serialization.serializer import SERIALIZERS
+    from weave.trace.op_protocol import Op  # noqa: PLC0415
+    from weave.trace.ref_util import remove_ref  # noqa: PLC0415
+    from weave.trace.serialization.serializer import SERIALIZERS  # noqa: PLC0415
 
     # Before test: clear refs from serializer load functions
     for serializer in SERIALIZERS:

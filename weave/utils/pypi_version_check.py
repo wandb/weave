@@ -69,9 +69,13 @@ def _parse_version(version: str) -> packaging.version.Version:
     is not installed, it falls back to the `pkg_resources` library.
     """
     try:
-        from packaging.version import parse as parse_version  # type: ignore
+        from packaging.version import (  # noqa: PLC0415
+            parse as parse_version,  # type: ignore
+        )
     except ImportError:
-        from pkg_resources import parse_version  # type: ignore[assignment]
+        from pkg_resources import (  # noqa: PLC0415
+            parse_version,  # type: ignore[assignment]
+        )
 
     return parse_version(version)
 

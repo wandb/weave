@@ -95,7 +95,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         # Imported lazily: `import jsonschema` eagerly loads every installed
         # format-checker lib (rfc3987_syntax builds a Lark grammar, ~0.45s),
         # so keeping it out of module scope avoids paying that on `import weave`.
-        import jsonschema
+        import jsonschema  # noqa: PLC0415
 
         # Validate the schema
         try:
@@ -117,7 +117,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         """
         # Lazy import: see note in validate_field_schema (avoids ~0.45s of
         # jsonschema format-checker imports at `import weave` time).
-        import jsonschema
+        import jsonschema  # noqa: PLC0415
 
         try:
             jsonschema.validate(payload, self.field_schema)

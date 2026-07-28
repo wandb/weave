@@ -432,7 +432,7 @@ def print_importtime_section(modules: list[ModuleImport]) -> None:
 def generate_pyinstrument(out_dir: Path) -> Path | None:
     """Profile import + offline init with pyinstrument; write HTML + text."""
     try:
-        import pyinstrument  # noqa: F401
+        import pyinstrument  # noqa: F401, PLC0415
     except ImportError:
         print("  [skip] pyinstrument not installed (uv pip install pyinstrument)")
         return None

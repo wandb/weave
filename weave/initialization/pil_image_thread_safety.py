@@ -62,7 +62,7 @@ def _apply_threadsafe_patch() -> None:
         ImportError: If PIL is not installed
         Exception: For any other unexpected errors during patching
     """
-    from PIL.ImageFile import ImageFile
+    from PIL.ImageFile import ImageFile  # noqa: PLC0415
 
     global _original_methods  # noqa: PLW0602
 
@@ -138,7 +138,7 @@ def _undo_threadsafe_patch() -> None:
         ImportError: If PIL is not installed
         Exception: For any other unexpected errors during unpatching
     """
-    from PIL.ImageFile import ImageFile
+    from PIL.ImageFile import ImageFile  # noqa: PLC0415
 
     global _original_methods  # noqa: PLW0603
 

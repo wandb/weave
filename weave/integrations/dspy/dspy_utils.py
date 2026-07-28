@@ -52,7 +52,7 @@ def get_symbol_patcher(
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    from dspy import Adapter, Evaluate, Predict
+    from dspy import Adapter, Evaluate, Predict  # noqa: PLC0415
 
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
@@ -101,9 +101,9 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def dspy_postprocess_outputs(
     outputs: Any | Example,
 ) -> list[Any] | dict[str, Any] | Any:
-    import numpy as np
-    from dspy import Example, Module
-    from litellm import ModelResponse
+    import numpy as np  # noqa: PLC0415
+    from dspy import Example, Module  # noqa: PLC0415
+    from litellm import ModelResponse  # noqa: PLC0415
 
     if isinstance(outputs, Module):
         outputs = outputs.dump_state()

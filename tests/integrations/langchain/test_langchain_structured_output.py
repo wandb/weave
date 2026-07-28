@@ -175,7 +175,7 @@ def test_run_to_dict_with_pydantic_v2_run_and_model_class_in_extra() -> None:
         TypeError('The `encoder` argument is no longer supported;
                    use field serializers instead.')
     """
-    from weave.integrations.langchain.langchain import _run_to_dict
+    from weave.integrations.langchain.langchain import _run_to_dict  # noqa: PLC0415
 
     now = datetime.datetime.now(datetime.timezone.utc)
     run = PydanticV2Run(

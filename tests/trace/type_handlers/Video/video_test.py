@@ -401,7 +401,9 @@ def test_videos_in_load_of_dataset(weave_active):
 
 
 def test_video_format_from_filename():
-    from weave.type_handlers.Video.video import get_format_from_filename
+    from weave.type_handlers.Video.video import (  # noqa: PLC0415
+        get_format_from_filename,
+    )
 
     assert get_format_from_filename("test.mp4") == VideoFormat.MP4
     assert get_format_from_filename("test.webm") == VideoFormat.WEBM

@@ -554,7 +554,7 @@ class EasyPrompt(UserList, Prompt):
     @op
     def run(self) -> Any:
         # TODO: Nicer result type
-        import litellm
+        import litellm  # noqa: PLC0415
 
         result = litellm.completion(
             messages=list(self),

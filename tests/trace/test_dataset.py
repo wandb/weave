@@ -240,9 +240,11 @@ def test_add_rows_to_unsaved_dataset(weave_active):
 
 def test_hf_conversion(weave_active):
     try:
-        from datasets import Dataset as HFDataset
-        from datasets import DatasetDict as HFDatasetDict
-        from datasets.features import Value  # Import Value for feature checking
+        from datasets import Dataset as HFDataset  # noqa: PLC0415
+        from datasets import DatasetDict as HFDatasetDict  # noqa: PLC0415
+        from datasets.features import (  # noqa: PLC0415
+            Value,  # Import Value for feature checking
+        )
     except ImportError:
         pytest.skip("requires huggingface datasets library")
 

@@ -450,7 +450,9 @@ def _get_code_deps(
                     if (client := get_weave_client()) is None:
                         raise ValueError("Weave client not found")
 
-                    from weave.trace.serialization.serialize import to_json
+                    from weave.trace.serialization.serialize import (  # noqa: PLC0415
+                        to_json,  # noqa: PLC0415
+                    )
 
                     # Redact sensitive values
                     if should_redact(var_name):
@@ -539,7 +541,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         code = []
 
     if settings.should_redact_pii():
-        from weave.utils.pii_redaction import redact_pii_string
+        from weave.utils.pii_redaction import redact_pii_string  # noqa: PLC0415
 
         op_function_code = redact_pii_string(op_function_code)
 

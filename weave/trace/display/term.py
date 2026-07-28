@@ -25,7 +25,7 @@ class WeaveFormatter(logging.Formatter):
 
 def in_colab() -> bool:
     try:
-        import google.colab  # noqa: F401
+        import google.colab  # noqa: F401, PLC0415
 
         return True  # noqa: TRY300
     except ImportError:

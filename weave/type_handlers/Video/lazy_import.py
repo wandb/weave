@@ -26,7 +26,7 @@ class MoviePyImportHook(MetaPathFinder):
             sys.meta_path.remove(self)
 
         # Trigger the video type registration
-        from weave.type_handlers.Video import video
+        from weave.type_handlers.Video import video  # noqa: PLC0415
 
         video._ensure_registered()
 

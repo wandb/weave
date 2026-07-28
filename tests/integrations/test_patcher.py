@@ -6,7 +6,7 @@ from weave.integrations.patcher import SymbolPatcher
 
 
 def test_symbol_patcher():
-    from tests.test_patcher_module.example_class import ExampleClass
+    from tests.test_patcher_module.example_class import ExampleClass  # noqa: PLC0415
 
     patcher = SymbolPatcher(
         lambda: importlib.import_module("tests.test_patcher_module.example_class"),
@@ -61,7 +61,7 @@ def test_symbol_patcher_invalid_attr_method():
 
 @pytest.mark.disable_logging_error_check
 def test_symbol_patcher_invalid_patching(log_collector):
-    from tests.test_patcher_module.example_class import ExampleClass
+    from tests.test_patcher_module.example_class import ExampleClass  # noqa: PLC0415
 
     patcher = SymbolPatcher(
         lambda: importlib.import_module("tests.test_patcher_module.example_class"),

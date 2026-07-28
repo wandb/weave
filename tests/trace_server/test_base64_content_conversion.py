@@ -639,7 +639,7 @@ class TestThresholdAndStructuralIdentity:
         ``CallStartReq`` machinery in ``process_call_content`` just
         rebinds the field, which is fine.
         """
-        from datetime import datetime, timezone
+        from datetime import datetime, timezone  # noqa: PLC0415
 
         trace_server = MagicMock()
         inputs_before = {"text": "no binary content here"}

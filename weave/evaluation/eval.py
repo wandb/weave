@@ -221,7 +221,7 @@ class Evaluation(Object):
         # please feel free to remove this as we have tests that validate the
         # end-user experience.
         if orig_scorers := field_values.get("scorers"):
-            from weave import scorers as weave_scorers
+            from weave import scorers as weave_scorers  # noqa: PLC0415
 
             assert weave_scorers
             scorers = []

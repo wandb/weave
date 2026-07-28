@@ -571,7 +571,7 @@ def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
 
 ### Responses API
 def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
-    from openai.types.responses import (
+    from openai.types.responses import (  # noqa: PLC0415
         Response,
         ResponseAudioDeltaEvent,
         ResponseAudioDoneEvent,
@@ -609,7 +609,9 @@ def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> R
     # ResponseOutputTextAnnotationAddedEvent was introduced in openai 1.80.0
     is_new_sdk = False
     try:
-        from openai.types.responses import ResponseOutputTextAnnotationAddedEvent
+        from openai.types.responses import (  # noqa: PLC0415
+            ResponseOutputTextAnnotationAddedEvent,
+        )
 
         is_new_sdk = True
     except ImportError:

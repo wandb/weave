@@ -310,7 +310,9 @@ def test_extract_custom_attrs_caps_total_entries() -> None:
     excess silently dropped so a single misbehaving client can't blow up the
     insert.
     """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTRS_PER_SPAN
+    from weave.trace_server.agents.constants import (  # noqa: PLC0415
+        MAX_CUSTOM_ATTRS_PER_SPAN,
+    )
 
     attrs = {
         f"lorem.key_{i:05d}": f"val_{i}" for i in range(MAX_CUSTOM_ATTRS_PER_SPAN + 500)
@@ -339,7 +341,9 @@ def test_extract_custom_attrs_truncates_large_string_values() -> None:
     """String values larger than MAX_CUSTOM_ATTR_VALUE_CHARS are truncated
     with a marker suffix so downstream tools can tell truncation happened.
     """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
+    from weave.trace_server.agents.constants import (  # noqa: PLC0415
+        MAX_CUSTOM_ATTR_VALUE_CHARS,
+    )
 
     huge = "x" * (MAX_CUSTOM_ATTR_VALUE_CHARS + 50_000)
     result = extract_genai_span(
@@ -358,7 +362,9 @@ def test_extract_custom_attrs_truncates_large_json_values() -> None:
     truncated the same way. Dicts get flattened by `_flatten_attrs` so
     they never hit the JSON-encoding branch.
     """
-    from weave.trace_server.agents.constants import MAX_CUSTOM_ATTR_VALUE_CHARS
+    from weave.trace_server.agents.constants import (  # noqa: PLC0415
+        MAX_CUSTOM_ATTR_VALUE_CHARS,
+    )
 
     huge_list = ["x" * 100] * 5000  # JSON encoding ~500KB
     result = extract_genai_span(

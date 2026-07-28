@@ -41,7 +41,7 @@ def solo_versioned_op(a: int) -> float:
 
 
 def test_solo_op_versioning(client):
-    from tests.trace import op_versioning_solo
+    from tests.trace import op_versioning_solo  # noqa: PLC0415
 
     ref = weave.publish(op_versioning_solo.solo_versioned_op)
 
@@ -64,7 +64,7 @@ def versioned_op(self, a: int) -> float:
 
 
 def test_object_op_versioning(client):
-    from tests.trace import op_versioning_obj
+    from tests.trace import op_versioning_obj  # noqa: PLC0415
 
     obj = op_versioning_obj.MyTestObjWithOp(val=5)
     # Call it to publish
@@ -88,7 +88,7 @@ def versioned_op_importfrom(a: int) -> float:
 
 
 def test_op_versioning_importfrom(client):
-    from tests.trace import op_versioning_importfrom
+    from tests.trace import op_versioning_importfrom  # noqa: PLC0415
 
     ref = weave.publish(op_versioning_importfrom.versioned_op_importfrom)
     saved_code = get_saved_code(client, ref)
@@ -567,7 +567,7 @@ def func(data: dict) -> str:
 
 
 def test_op_import_as(client):
-    import json as js
+    import json as js  # noqa: PLC0415
 
     @weave.op
     def func(data: dict) -> str:
@@ -594,7 +594,7 @@ def func(data: dict) -> str:
 
 
 def test_op_import_from_as(client):
-    from json import dumps as ds
+    from json import dumps as ds  # noqa: PLC0415
 
     @weave.op
     def func(data: dict) -> str:

@@ -70,7 +70,7 @@ def fake_publish(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     the list of published Content objects (for assertions) and hands back a
     deterministic ``weave://`` ref per call.
     """
-    from weave.integrations.openai_realtime import otel_state_exporter
+    from weave.integrations.openai_realtime import otel_state_exporter  # noqa: PLC0415
 
     published: list[Any] = []
 
@@ -429,7 +429,7 @@ def test_multiple_responses_share_session_root(
 def test_failed_response_sets_error_status(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
-    from opentelemetry.trace import StatusCode
+    from opentelemetry.trace import StatusCode  # noqa: PLC0415
 
     exp = OTelStateExporter()
     exp.handle_session_updated({"type": "session.updated", "session": make_session()})
@@ -452,9 +452,14 @@ def _readable_to_ts_spans(readable_spans: list[Any]) -> list[Any]:
     This is the exact transformation the ingest endpoint performs, so the
     resulting Spans feed ``extract_genai_span`` precisely as production does.
     """
-    from opentelemetry.exporter.otlp.proto.common.trace_encoder import encode_spans
+    from opentelemetry.exporter.otlp.proto.common.trace_encoder import (  # noqa: PLC0415
+        encode_spans,
+    )
 
-    from weave.trace_server.opentelemetry.python_spans import Resource, Span
+    from weave.trace_server.opentelemetry.python_spans import (  # noqa: PLC0415
+        Resource,
+        Span,
+    )
 
     req = encode_spans(readable_spans)
     out: list[Any] = []
@@ -469,7 +474,9 @@ def _readable_to_ts_spans(readable_spans: list[Any]) -> list[Any]:
 def test_spans_populate_clickhouse_schema_via_extraction(
     otel_spans: InMemorySpanExporter, fake_publish: list[Any]
 ) -> None:
-    from weave.trace_server.opentelemetry.genai_extraction import extract_genai_span
+    from weave.trace_server.opentelemetry.genai_extraction import (  # noqa: PLC0415
+        extract_genai_span,
+    )
 
     exp = OTelStateExporter()
     exp.handle_session_updated({"type": "session.updated", "session": make_session()})

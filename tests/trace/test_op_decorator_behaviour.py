@@ -502,7 +502,7 @@ def test_op_annotation_parse_failure_at_decoration_falls_back_at_runtime():
     # When `parse_from_signature` raises while decorating, the op caches
     # the `PARSE_DEFERRED` sentinel and the runtime handler retries parsing
     # both inputs and the return annotation against the live signature.
-    from weave.trace.op import PARSE_DEFERRED
+    from weave.trace.op import PARSE_DEFERRED  # noqa: PLC0415
 
     def failing_parse(*args: Any, **kwargs: Any) -> Any:
         raise ValueError("simulated parse failure")

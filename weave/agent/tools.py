@@ -71,7 +71,7 @@ def generate_json_schema(func: Callable) -> dict:
 
 
 def chat_call_tool_params(tools: list[Callable]) -> list["ChatCompletionToolParam"]:
-    from openai.types.chat import ChatCompletionToolParam
+    from openai.types.chat import ChatCompletionToolParam  # noqa: PLC0415
 
     chat_tools = [generate_json_schema(tool) for tool in tools]
     return [ChatCompletionToolParam(**tool) for tool in chat_tools]
