@@ -119,6 +119,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.source_attribution import resolve_for_call
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
@@ -184,6 +185,9 @@ _CALLS_PLAIN_COLUMNS = frozenset(
         "wb_run_id",
         "wb_run_step",
         "wb_run_step_end",
+        "source_name",
+        "source_version",
+        "source_sdk",
         "deleted_at",
         "expire_at",
         "input_refs",
@@ -894,6 +898,23 @@ def _interpolated_quantile(durations: list[float], level: float) -> float | None
     return durations[f] + (k - f) * (durations[c] - durations[f])
 
 
+def _source_fields(
+    attributes: dict[str, Any] | None, otel_dump: dict[str, Any] | None
+) -> dict[str, str | None]:
+    """Resolve the `source_*` columns for a `_CallRec`, as ClickHouse does on insert.
+
+    Unresolved rungs become None, not '', to match what the ClickHouse read path
+    returns: `ch_sentinel_values.from_ch_value` maps calls_complete's '' sentinel
+    back to None, and calls_merged stores NULL outright.
+    """
+    source = resolve_for_call(attributes=attributes, otel_dump=otel_dump)
+    return {
+        "source_name": empty_str_to_none(source.name),
+        "source_version": empty_str_to_none(source.version),
+        "source_sdk": empty_str_to_none(source.sdk),
+    }
+
+
 @dataclass(slots=True)
 class _CallRec:
     project_id: str
@@ -924,6 +945,9 @@ class _CallRec:
     output_refs: list[str] = field(default_factory=list)
     summary: Any = None
     wb_run_step_end: int | None = None
+    source_name: str | None = None
+    source_version: str | None = None
+    source_sdk: str | None = None
     deleted_at: datetime.datetime | None = None
     storage_size_bytes: int | None = None
 
@@ -1254,6 +1278,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     inputs_len=len(inputs_json),
                     output_len=len(output_json),
                     summary_len=len(summary_json),
+                    **_source_fields(call.attributes, call.otel_dump),
                 )
                 self._calls[rec.project_id, rec.id] = rec
         return tsi.CallsUpsertCompleteRes()
@@ -1316,6 +1341,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
+                for source_field, source_value in _source_fields(
+                    req.start.attributes, req.start.otel_dump
+                ).items():
+                    setattr(existing, source_field, source_value)
                 existing.otel_dump = copy.deepcopy(req.start.otel_dump)
                 existing.otel_dump_len = (
                     len(json.dumps(req.start.otel_dump))
@@ -1353,6 +1382,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
                     inputs_len=len(inputs_json),
+                    **_source_fields(req.start.attributes, req.start.otel_dump),
                 )
                 self._calls[rec.project_id, rec.id] = rec
 
@@ -4594,7 +4624,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
-                        span = Span.from_proto(proto_span, resource)
+                        span = Span.from_proto(
+                            proto_span, resource, proto_scope_spans.scope
+                        )
                     except AttributePathConflictError as e:
                         rejected_spans += 1
                         try:

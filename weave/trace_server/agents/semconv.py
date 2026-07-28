@@ -30,16 +30,18 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
-    column. The first entry is the canonical upstream name; later entries
-    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
-    for an example with multiple aliases.
+    ``gen_ai_aliases`` lists the wire key(s) recognised as equivalent to this
+    column. The first entry is the canonical upstream name; later entries are
+    parallel forms also accepted on ingest. See ``USAGE_REASONING_TOKENS`` for an
+    example with multiple aliases. Most are ``gen_ai.*``, hence the field name,
+    but any recognised key belongs here — ``ERROR_TYPE`` uses OTel core's
+    ``error.type`` and ``SOURCE_NAME`` uses Weave's ``integration.name``.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    # OTel gen_ai.* equivalent(s), if any
+    # Wire key equivalent(s), if any -- usually gen_ai.*
     gen_ai_aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -353,6 +355,32 @@ EVAL_EVALUATION_NAME = Attribute(
     "string",
     "Evaluation display name associated with this span",
 )
+# Source attribution. Registering the `integration.*` aliases both drives
+# extraction and keeps them out of `custom_attrs_string`. The resolution ladder
+# that fills these columns lives in `trace_server/source_attribution.py`;
+# `integration.meta.*` stays in the custom-attr maps.
+#
+# The `integration` prefix is `INTEGRATION_ATTRIBUTE_KEY` in
+# `weave/integrations/integration_metadata.py`, restated rather than imported
+# because the trace server may not import the client SDK (see the import-linter
+# contract in pyproject.toml). `test_source_attribution.py` pins the two together.
+SOURCE_NAME = Attribute(
+    "weave.source.name",
+    "string",
+    "Instrumentation that produced this row: openai, langchain, codex, ...",
+    ["integration.name"],
+)
+SOURCE_VERSION = Attribute(
+    "weave.source.version",
+    "string",
+    "Version of the instrumentation that produced this row",
+    ["integration.version"],
+)
+SOURCE_SDK = Attribute(
+    "weave.source.sdk",
+    "string",
+    "Ingest surface the row arrived on: weave or otlp. Server-derived, never read off the wire",
+)
 
 _DEFS: list[Attribute] = [
     # Keep this registry in sync with Attribute constants. The unit tests
@@ -413,6 +441,9 @@ _DEFS: list[Attribute] = [
     EVAL_EXAMPLE_ID,
     EVAL_TRIAL_INDEX,
     EVAL_EVALUATION_NAME,
+    SOURCE_NAME,
+    SOURCE_VERSION,
+    SOURCE_SDK,
 ]
 
 
@@ -492,6 +523,9 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     EVAL_ROW_DIGEST.key: "eval_row_digest",
     EVAL_EXAMPLE_ID.key: "eval_example_id",
     EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
+    SOURCE_NAME.key: "source_name",
+    SOURCE_VERSION.key: "source_version",
+    SOURCE_SDK.key: "source_sdk",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",

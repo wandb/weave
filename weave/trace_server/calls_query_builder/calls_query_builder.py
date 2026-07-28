@@ -2018,6 +2018,11 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
+    # Source attribution (migration 040). Only the call-start part carries these,
+    # so `any` picks it up on calls_merged exactly as it does for op_name.
+    "source_name": CallsMergedAggField(field="source_name", agg_fn="any"),
+    "source_version": CallsMergedAggField(field="source_version", agg_fn="any"),
+    "source_sdk": CallsMergedAggField(field="source_sdk", agg_fn="any"),
     # calls_merged.expire_at is SimpleAggregateFunction(min, DateTime64(3))
     # (migration 029); use the matching agg_fn so reads agree with storage.
     "expire_at": CallsMergedAggField(field="expire_at", agg_fn="min"),

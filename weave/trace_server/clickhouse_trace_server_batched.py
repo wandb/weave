@@ -817,7 +817,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
-                        span = Span.from_proto(proto_span, resource)
+                        span = Span.from_proto(
+                            proto_span, resource, proto_scope_spans.scope
+                        )
                     except AttributePathConflictError as e:
                         # Record and skip malformed spans so we can partially accept the batch
                         rejected_spans += 1

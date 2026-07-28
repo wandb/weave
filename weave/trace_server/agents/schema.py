@@ -110,6 +110,12 @@ class AgentSpanCHInsertable(BaseModel):
     eval_trial_index: int = -1
     eval_evaluation_name: str = ""
 
+    # [Weave] source attribution — weave.source.* / integration.*, resolved by
+    # the ladder in `trace_server/source_attribution.py`.
+    source_name: str = ""
+    source_version: str = ""
+    source_sdk: str = ""
+
     # [OTel GenAI] model info — gen_ai.request.model, gen_ai.response.*
     request_model: str = ""
     response_model: str = ""

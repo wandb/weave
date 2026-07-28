@@ -13,6 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
+
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
@@ -848,10 +850,12 @@ class AgentWriteHandler:
 
         # Both branches below account every parse/extraction failure through
         # these two helpers, so the bookkeeping cannot drift between them.
-        def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
+        def parse_span(
+            protobuf_span: Any, resource: Resource, scope: InstrumentationScope
+        ) -> Span | None:
             nonlocal rejected
             try:
-                return Span.from_proto(protobuf_span, resource)
+                return Span.from_proto(protobuf_span, resource, scope)
             except AttributePathConflictError as e:
                 _record_ingest_failure(
                     failure_counts,
@@ -906,7 +910,9 @@ class AgentWriteHandler:
                 resource = Resource.from_proto(processed_span.resource_spans.resource)
                 for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
                     for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
+                        span = parse_span(
+                            protobuf_span, resource, protobuf_scope_spans.scope
+                        )
                         if span is None:
                             continue
                         row = extract_row(span, processed_span.run_id)
@@ -921,7 +927,9 @@ class AgentWriteHandler:
                 resource = Resource.from_proto(processed_span.resource_spans.resource)
                 for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
                     for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
+                        span = parse_span(
+                            protobuf_span, resource, protobuf_scope_spans.scope
+                        )
                         if span is None:
                             continue
                         parsed.append((span, processed_span.run_id))

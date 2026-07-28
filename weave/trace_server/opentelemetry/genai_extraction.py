@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from weave.trace_server import source_attribution
 from weave.trace_server.agents import semconv
 from weave.trace_server.agents.constants import (
     CUSTOM_ATTR_TRUNCATION_MARKER,
@@ -591,6 +592,13 @@ def extract_genai_span(
 
     custom_attrs = _extract_custom_attrs(attrs)
 
+    source = source_attribution.resolve_for_otel_span(
+        attributes=attrs,
+        scope_name=span.scope_name,
+        scope_version=span.scope_version,
+        resource_attributes=span.resource.attributes if span.resource else None,
+    )
+
     return AgentSpanCHInsertable(
         project_id=project_id,
         trace_id=span.trace_id,
@@ -619,6 +627,9 @@ def extract_genai_span(
             attrs, *semconv.EVAL_TRIAL_INDEX.lookup_keys, default=-1
         ),
         eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
+        source_name=source.name,
+        source_version=source.version,
+        source_sdk=source.sdk,
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),

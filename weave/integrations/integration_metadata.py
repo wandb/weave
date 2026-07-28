@@ -94,9 +94,14 @@ class IntegrationMetadata:
 
         OTel span attributes must be scalars, so the nested shape from
         :meth:`as_attributes` is flattened to dotted keys (``integration.name``,
-        ``integration.version``, ``integration.meta.<key>``). The trace server
-        reconstructs the nested dict from these keys on ingest. Used by the
-        agent OTel processors that emit spans instead of calling ``create_call``.
+        ``integration.version``, ``integration.meta.<key>``). Used by the agent
+        OTel processors that emit spans instead of calling ``create_call``.
+
+        The trace server does *not* rebuild ``attributes["integration"]`` from
+        these keys. It reads ``integration.name`` / ``integration.version``
+        directly into the ``source_name`` / ``source_version`` columns (see
+        ``trace_server/source_attribution.py``); ``integration.meta.*`` survives
+        only in the span's custom-attribute map and raw dump.
         """
         attributes: dict[str, Any] = {
             f"{INTEGRATION_ATTRIBUTE_KEY}.name": self.name,
