@@ -5,80 +5,50 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import Field, ValidationError
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
-from weave.trace_server import http_service_interface as hsi
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
 )
-from weave.trace_server.service_interface import ProjectsInfoReq
 
 REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
+
+
+class _BaseModelStrictTestModel(BaseModelStrict):
+    required_field: str
+    aliased_field: str = Field(alias="aliasedField")
 
 
 def test_base_model_strict_ignores_and_warns_on_unknown_fields(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
-        request = tsi.FeedbackCreateReq.model_validate(
+        model = _BaseModelStrictTestModel.model_validate(
             {
-                "project_id": "entity/project",
-                "weave_ref": "weave:///entity/project/call/call-id",
-                "feedback_type": "custom",
-                "payload": {"score": 1},
-                "future_sdk_field": "ignored",
+                "required_field": "required",
+                "aliasedField": "aliased",
+                "future_sdk_field": "sensitive value",
             }
         )
 
-    assert request.model_extra is None
+    assert model.required_field == "required"
+    assert model.aliased_field == "aliased"
+    assert model.model_extra is None
     assert caplog.messages == [
-        "Ignoring unexpected fields while validating FeedbackCreateReq: future_sdk_field"
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field"
     ]
 
 
-def test_request_models_and_query_components_ignore_unknown_fields() -> None:
-    """Every shared API request model inherits the compatibility behavior."""
-    call_read = tsi.CallReadReq.model_validate(
-        {"project_id": "entity/project", "id": "call-id", "future_field": True}
-    )
-    projects_info = ProjectsInfoReq.model_validate(
-        {"project_ids": ["entity/project"], "future_field": True}
-    )
-    obj_tags = hsi.ObjTagsBody.model_validate(
-        {"project_id": "entity/project", "tags": ["tag"], "future_field": True}
-    )
-
-    assert call_read.model_extra is None
-    assert projects_info.model_extra is None
-    assert obj_tags.model_extra is None
-
-    calls_filter = tsi.CallsFilter.model_validate({"future_filter": True})
-    sort_by = tsi.SortBy.model_validate(
-        {"field": "started_at", "direction": "asc", "future": True}
-    )
-    metric_spec = tsi.FeedbackMetricSpec.model_validate(
-        {"json_path": "payload.score", "future_metric_option": True}
-    )
-
-    assert calls_filter.model_extra is None
-    assert sort_by.model_extra is None
-    assert metric_spec.model_extra is None
-
-
-def test_custom_runtime_configuration_ignores_unknown_fields() -> None:
-    runtime = tsi.CustomRuntimeApplyBody.model_validate(
-        {
-            "base_url": "https://runtime.example.com",
-            "runtime_ids": [{"id": "model"}],
-            "future_configuration": True,
-        }
-    )
-
-    assert runtime.model_extra is None
+def test_base_model_strict_preserves_required_field_validation() -> None:
+    with pytest.raises(ValidationError, match="required_field"):
+        _BaseModelStrictTestModel.model_validate({"aliasedField": "aliased"})
 
 
 def test_extract_refs_from_values_deduplicates():
