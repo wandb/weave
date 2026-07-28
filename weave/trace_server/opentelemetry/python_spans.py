@@ -192,6 +192,21 @@ class Resource:
 
 
 @dataclass
+class Scope:
+    """Identifies the instrumentation library that emitted a span."""
+
+    name: str = ""
+    version: str = ""
+
+    @classmethod
+    def from_proto(cls, proto_scope: InstrumentationScope) -> Self:
+        return cls(name=proto_scope.name, version=proto_scope.version)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "version": self.version}
+
+
+@dataclass
 class Span:
     """Represents a span in a trace."""
 
@@ -202,10 +217,7 @@ class Span:
     start_time_unix_nano: int
     end_time_unix_nano: int
     attributes: dict[str, Any] = field(default_factory=dict)
-    # Carried down from the enclosing ScopeSpans so each persisted span retains
-    # its instrumentation-library identity.
-    scope_name: str = ""
-    scope_version: str = ""
+    scope: Scope | None = None
     kind: SpanKind = SpanKind.UNSPECIFIED
     parent_id: str | None = None
     trace_state: str = ""
@@ -272,8 +284,7 @@ class Span:
             dropped_links_count=proto_span.dropped_links_count,
             status=Status.from_proto(proto_span.status),
             resource=resource,
-            scope_name=scope.name if scope is not None else "",
-            scope_version=scope.version if scope is not None else "",
+            scope=Scope.from_proto(scope) if scope is not None else None,
         )
 
     # The full OTEL Span as it is received
@@ -295,10 +306,7 @@ class Span:
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
-                "scope": {
-                    "name": self.scope_name,
-                    "version": self.scope_version,
-                },
+                "scope": self.scope.as_dict() if self.scope else None,
             }
         )
 
@@ -469,10 +477,11 @@ class ScopeSpans:
         cls, proto_scope_spans: PbScopeSpans, resource: Resource | None = None
     ) -> Self:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
+        scope = proto_scope_or_none(proto_scope_spans)
         return cls(
             scope=proto_scope_spans.scope,
             spans=[
-                Span.from_proto(s, resource, scope=proto_scope_spans.scope)
+                Span.from_proto(s, resource, scope=scope)
                 for s in proto_scope_spans.spans
             ],
             schema_url=proto_scope_spans.schema_url,
@@ -521,3 +530,22 @@ class TracesData:
                 ResourceSpans.from_proto(rs) for rs in proto_traces_data.resource_spans
             ]
         )
+
+
+def proto_scope_or_none(
+    proto_scope_spans: PbScopeSpans,
+) -> InstrumentationScope | None:
+    """Return the instrumentation scope, or None when the sender omitted it."""
+    if not proto_scope_spans.HasField("scope"):
+        return None
+    return proto_scope_spans.scope
+
+
+def iter_proto_spans(
+    proto_resource_spans: PbResourceSpans,
+) -> Iterator[tuple[PbSpan, InstrumentationScope | None]]:
+    """Yield each proto span in a ResourceSpans paired with its enclosing scope."""
+    for proto_scope_spans in proto_resource_spans.scope_spans:
+        scope = proto_scope_or_none(proto_scope_spans)
+        for proto_span in proto_scope_spans.spans:
+            yield proto_span, scope

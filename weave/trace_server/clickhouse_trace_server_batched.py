@@ -249,7 +249,11 @@ from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
-from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.python_spans import (
+    Resource,
+    Span,
+    iter_proto_spans,
+)
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.parallel_bucket_uploads import (
     BucketUploadBatch,
@@ -814,53 +818,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
+            for proto_span, scope in iter_proto_spans(proto_resource_spans):
+                try:
+                    span = Span.from_proto(proto_span, resource, scope=scope)
+                except AttributePathConflictError as e:
+                    # Record and skip malformed spans so we can partially accept the batch
+                    rejected_spans += 1
+                    # Use data available on the proto span for context
                     try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        # Record and skip malformed spans so we can partially accept the batch
-                        rejected_spans += 1
-                        # Use data available on the proto span for context
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
+                        trace_id = proto_span.trace_id.hex()
+                        span_id = proto_span.span_id.hex()
+                        name = getattr(proto_span, "name", "")
+                    except Exception:
+                        trace_id = ""
+                        span_id = ""
+                        name = ""
+                    span_ident = (
+                        f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                    )
+                    error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                    continue
 
-                    # Mirror the non-OTel calls path: strip inline base64 /
-                    # base64 data-URIs into Content refs. Converting the span
-                    # attributes in place (before deriving the call) also
-                    # strips the lossless otel_dump the call carries.
-                    span.attributes = replace_base64_with_content_objects(
-                        span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
-                    )
-                    start_call, end_call = span.to_call(
-                        req.project_id,
-                        wb_user_id=req.wb_user_id,
-                        wb_run_id=wb_run_id,
-                    )
-                    # Also convert the derived inputs/output: base64 nested in a
-                    # JSON-encoded message attribute only surfaces as a leaf
-                    # after to_call parses it.
-                    start_call.inputs = replace_base64_with_content_objects(
-                        start_call.inputs,
-                        req.project_id,
-                        self,
-                        wb_user_id=req.wb_user_id,
-                    )
-                    end_call.output = replace_base64_with_content_objects(
-                        end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
-                    )
-                    calls.append((start_call, end_call))
+                # Mirror the non-OTel calls path: strip inline base64 /
+                # base64 data-URIs into Content refs. Converting the span
+                # attributes in place (before deriving the call) also
+                # strips the lossless otel_dump the call carries.
+                span.attributes = replace_base64_with_content_objects(
+                    span.attributes, req.project_id, self, wb_user_id=req.wb_user_id
+                )
+                start_call, end_call = span.to_call(
+                    req.project_id,
+                    wb_user_id=req.wb_user_id,
+                    wb_run_id=wb_run_id,
+                )
+                # Also convert the derived inputs/output: base64 nested in a
+                # JSON-encoded message attribute only surfaces as a leaf
+                # after to_call parses it.
+                start_call.inputs = replace_base64_with_content_objects(
+                    start_call.inputs,
+                    req.project_id,
+                    self,
+                    wb_user_id=req.wb_user_id,
+                )
+                end_call.output = replace_base64_with_content_objects(
+                    end_call.output, req.project_id, self, wb_user_id=req.wb_user_id
+                )
+                calls.append((start_call, end_call))
 
         set_current_span_dd_tags({"call_count": len(calls)})
         return calls, rejected_spans, error_messages
