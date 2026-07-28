@@ -19,7 +19,7 @@ class BaseModelStrict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class SortBy(BaseModelStrict):
+class SortBy(BaseModel):
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.

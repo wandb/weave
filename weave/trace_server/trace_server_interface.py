@@ -599,7 +599,7 @@ class ImageGenerationCreateRes(BaseModel):
     weave_call_id: str | None = None
 
 
-class CallsFilter(BaseModelStrict):
+class CallsFilter(BaseModel):
     op_names: list[str] | None = None
     input_refs: list[str] | None = None
     output_refs: list[str] | None = None
@@ -751,7 +751,7 @@ class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
-class ObjectVersionFilter(BaseModelStrict):
+class ObjectVersionFilter(BaseModel):
     base_object_classes: list[str] | None = Field(
         default=None,
         description="Filter objects by their base classes",
@@ -1091,7 +1091,7 @@ class TableCreateRes(BaseModel):
     )
 
 
-class TableRowFilter(BaseModelStrict):
+class TableRowFilter(BaseModel):
     row_digests: list[str] | None = Field(
         default=None,
         description="List of row digests to filter by",
@@ -1383,7 +1383,7 @@ _FEEDBACK_AGGREGATION_DEFAULTS: dict[str, list[AggregationType]] = {
 }
 
 
-class FeedbackMetricSpec(BaseModelStrict):
+class FeedbackMetricSpec(BaseModel):
     """Specification for a feedback payload metric to aggregate."""
 
     json_path: str = Field(
@@ -1422,7 +1422,7 @@ MAX_FEEDBACK_STATS_RANGE_DAYS = 31
 MAX_FEEDBACK_STATS_RANGE = datetime.timedelta(days=MAX_FEEDBACK_STATS_RANGE_DAYS)
 
 
-class _FeedbackFilterBase(BaseModelStrict):
+class _FeedbackFilterBase(BaseModel):
     """Shared filter fields for feedback statistics and schema discovery requests."""
 
     project_id: str
@@ -2339,7 +2339,7 @@ class ThreadSchema(BaseModel):
     )
 
 
-class ThreadsQueryFilter(BaseModelStrict):
+class ThreadsQueryFilter(BaseModel):
     after_datetime: datetime.datetime | None = Field(
         default=None,
         description="Only include threads with start_time after this timestamp",
@@ -3370,7 +3370,7 @@ class EvalResultsSortBy(SortBy):
     )
 
 
-class EvalResultsFilter(BaseModelStrict):
+class EvalResultsFilter(BaseModel):
     """A filter scoped to an optional evaluation."""
 
     evaluation_call_id: str | None = Field(
@@ -3912,7 +3912,7 @@ at their own cache rates instead):
 """
 
 
-class UsageMetricSpec(BaseModelStrict):
+class UsageMetricSpec(BaseModel):
     """Specification for a usage metric to aggregate (grouped by model)."""
 
     metric: UsageMetric = Field(
@@ -3941,7 +3941,7 @@ CallMetric = Literal[
 """
 
 
-class CallMetricSpec(BaseModelStrict):
+class CallMetricSpec(BaseModel):
     """Specification for a call-level metric to aggregate (not grouped by model)."""
 
     metric: CallMetric = Field(description="Metric to aggregate.")

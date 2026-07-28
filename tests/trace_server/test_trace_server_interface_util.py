@@ -39,8 +39,8 @@ def test_feedback_create_requests_ignore_unknown_fields() -> None:
     assert batch_req.model_dump()["batch"] == [req.model_dump()]
 
 
-def test_request_models_ignore_unknown_fields_but_filters_remain_strict() -> None:
-    """Request envelopes are upgrade-compatible; query components reject typos."""
+def test_request_models_and_query_components_ignore_unknown_fields() -> None:
+    """Older servers accept additive fields from newer SDKs throughout requests."""
     call_read = tsi.CallReadReq.model_validate(
         {"project_id": "entity/project", "id": "call-id", "future_field": True}
     )
@@ -55,10 +55,29 @@ def test_request_models_ignore_unknown_fields_but_filters_remain_strict() -> Non
     assert projects_info.model_extra is None
     assert obj_tags.model_extra is None
 
+    calls_filter = tsi.CallsFilter.model_validate({"future_filter": True})
+    sort_by = tsi.SortBy.model_validate(
+        {"field": "started_at", "direction": "asc", "future": True}
+    )
+    metric_spec = tsi.FeedbackMetricSpec.model_validate(
+        {"json_path": "payload.score", "future_metric_option": True}
+    )
+
+    assert calls_filter.model_extra is None
+    assert sort_by.model_extra is None
+    assert metric_spec.model_extra is None
+
+
+def test_custom_runtime_configuration_rejects_unknown_fields() -> None:
+    """Partial runtime configuration is worse than rejecting an invalid request."""
     with pytest.raises(ValidationError):
-        tsi.CallsFilter.model_validate({"future_filter": True})
-    with pytest.raises(ValidationError):
-        tsi.SortBy.model_validate({"field": "started_at", "direction": "asc", "future": True})
+        tsi.CustomRuntimeApplyBody.model_validate(
+            {
+                "base_url": "https://runtime.example.com",
+                "runtime_ids": [{"id": "model"}],
+                "future_configuration": True,
+            }
+        )
 
 
 def test_extract_refs_from_values_deduplicates():
