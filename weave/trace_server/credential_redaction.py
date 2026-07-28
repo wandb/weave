@@ -133,7 +133,7 @@ def _redact_field(key: Any, value: Any) -> Any:
     """Replace `value` when `key` names a credential, otherwise recurse into it.
 
     Non-string keys are not checked as names -- `isinstance` rather than an exact
-    type check, because `_CallableStr` in this package subclasses `str`.
+    type check, because the repo has `str` subclasses (`weave/shared/refs_internal.py`).
 
     Values the Python client already redacted arrive holding the marker; skipping
     those saves copying every such payload.

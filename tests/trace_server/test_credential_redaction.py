@@ -133,7 +133,8 @@ def test_only_non_empty_strings_are_replaced() -> None:
         "tools": [{"properties": {"apiKey": {"type": "string"}}}],
         # `has_api_key` matches the policy by suffix, but the value is a flag.
         "has_api_key": True,
-        # A list under a matched name is structured data, e.g. granted scopes.
+        # Descending into a matched name would overwrite the schema's own
+        # `"string"` above, which is the corruption this rule prevents.
         "authorization": ["read", "write"],
         "api_key": 1234,
         "authToken": None,
