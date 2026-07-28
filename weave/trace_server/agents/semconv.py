@@ -367,6 +367,18 @@ PARENT_CALL_TRACE_ID = Attribute(
 )
 # Python emits `integration.*` while Node emits `weave.integration.*`; both
 # aliases stay out of custom attrs and are pinned to their producers by tests.
+# Source attribution. Registering the `integration.*` aliases both drives
+# extraction and keeps them out of `custom_attrs_string`. The resolution ladder
+# that fills these columns lives in `trace_server/source_attribution.py`;
+# `integration.meta.*` stays in the custom-attr maps.
+#
+# Both SDK spellings are accepted: Python's `as_otel_attributes()` emits
+# `integration.*` (`INTEGRATION_ATTRIBUTE_KEY` in
+# `weave/integrations/integration_metadata.py`) while the node SDK emits
+# `weave.integration.*` (`WEAVE_INTEGRATION_NAME` in `sdks/node/src/genai/semconv.ts`).
+# Restated rather than imported because the trace server may not import the client
+# SDK (see the import-linter contract in pyproject.toml);
+# `test_source_attribution.py` pins both to their producers.
 SOURCE_NAME = Attribute(
     "weave.source.name",
     "string",

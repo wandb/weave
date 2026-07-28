@@ -7,6 +7,7 @@ reach a span's scope and resource.
 
 import datetime
 import uuid
+from pathlib import Path
 
 import pytest
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
@@ -264,9 +265,9 @@ def test_source_keys_registered_in_semconv():
 def test_integration_attribute_key_matches_the_sdk_producer():
     """Pin the client/server contract the import-linter stops us from sharing.
 
-    The trace server may not import `weave.integrations`, so the `integration`
-    prefix is restated in semconv. If the SDK ever renames its key, the ladder
-    would silently stop attributing every stamped integration.
+    The trace server may not import `weave.integrations`, so the integration key
+    is restated in semconv. If the SDK ever renames it, the ladder would silently
+    stop attributing every stamped integration.
     """
     from weave.integrations.integration_metadata import (
         INTEGRATION_ATTRIBUTE_KEY,
@@ -276,7 +277,7 @@ def test_integration_attribute_key_matches_the_sdk_producer():
     assert f"{INTEGRATION_ATTRIBUTE_KEY}.name" in semconv.SOURCE_NAME.lookup_keys
     assert f"{INTEGRATION_ATTRIBUTE_KEY}.version" in semconv.SOURCE_VERSION.lookup_keys
 
-    # Both renderings the SDK emits resolve through the ladder identically.
+    # Both renderings the Python SDK emits resolve through the ladder identically.
     metadata = IntegrationMetadata(
         name="openai", version="0.53.1", meta={"package_name": "openai"}
     )
@@ -284,6 +285,36 @@ def test_integration_attribute_key_matches_the_sdk_producer():
     flat = resolve_for_otel_span(attributes=metadata.as_otel_attributes())
     assert (nested.name, nested.version) == ("openai", "0.53.1")
     assert flat == nested
+
+
+def test_node_sdk_integration_keys_are_accepted():
+    """The node SDK emits a different spelling; both must land in the columns.
+
+    `sdks/node/src/genai/semconv.ts` uses `weave.integration.*` where the Python
+    SDK uses `integration.*`. Until the two converge the server accepts either,
+    so node-emitted OTel spans are attributed without a client release.
+    """
+    node_keys_path = "sdks/node/src/genai/semconv.ts"
+    source = (Path(__file__).parents[2] / node_keys_path).read_text()
+    for const, expected in (
+        ("WEAVE_INTEGRATION_NAME", "weave.integration.name"),
+        ("WEAVE_INTEGRATION_VERSION", "weave.integration.version"),
+    ):
+        assert f"export const {const} = '{expected}';" in source, (
+            f"{node_keys_path} no longer defines {const} as {expected!r}"
+        )
+
+    assert "weave.integration.name" in semconv.SOURCE_NAME.lookup_keys
+    assert "weave.integration.version" in semconv.SOURCE_VERSION.lookup_keys
+
+    resolved = resolve_for_otel_span(
+        attributes={
+            "weave.integration.name": "openai",
+            "weave.integration.version": "0.9.2",
+            "weave.integration.meta.package_name": "openai",
+        }
+    )
+    assert (resolved.name, resolved.version) == ("openai", "0.9.2")
 
 
 # ---------------------------------------------------------------------------
