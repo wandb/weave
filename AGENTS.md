@@ -406,6 +406,15 @@ pnpm exec tsx examples/claudeAgents.ts
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
 
+### Python Conversation Turn messages
+
+- `Turn.messages` stores input messages, while `Turn.output_messages` stores
+  the terminal agent response. `Turn.record(messages=..., output_messages=...)`
+  replaces the two lists independently.
+- Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
+  content gating and PII redaction to both lists before passing them to
+  `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+
 ### Claude Agent SDK token accounting
 
 - Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
