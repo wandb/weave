@@ -104,22 +104,35 @@ describe('serializing objects the SDK does not own', () => {
 
   test('a Weave object held by a class instance in inputs is not uploaded', async () => {
     class Holder {
-      dataset = new Dataset({name: 'held-dataset', rows: [{a: 1}]});
+      constructor(name: string) {
+        this.dataset = new Dataset({name, rows: [{a: 1}]});
+      }
+      dataset: Dataset<{a: number}>;
     }
-    const call = op(async (_holder: Holder) => 'ok', {name: 'call'});
+    const uploaded = jest.spyOn(traceServer.obj, 'objCreateObjCreatePost');
+    const call = op(
+      async (_params: {direct: Holder; nested: Holder[]}) => 'ok',
+      {name: 'call', parameterNames: 'useParam0Object'}
+    );
 
-    await call(new Holder());
+    await call({
+      direct: new Holder('held-directly'),
+      nested: [new Holder('held-in-an-array')],
+    });
 
     const calls = await traceServer.getCalls(projectId);
-    expect(calls[0].inputs).toEqual({arg0: '<Holder>'});
+    expect(calls[0].inputs).toEqual({
+      direct: '<Holder>',
+      nested: ['<Holder>'],
+    });
     // Nothing in the call can reference a ref saved through the holder, so it
     // is never saved in the first place.
-    await expect(
-      traceServer.obj.objReadObjReadPost({
-        project_id: projectId,
-        object_id: 'held-dataset',
-      })
-    ).rejects.toThrow('Object not found');
+    expect(uploaded.mock.calls.map(([req]) => req.obj.object_id)).not.toContain(
+      'held-directly'
+    );
+    expect(uploaded.mock.calls.map(([req]) => req.obj.object_id)).not.toContain(
+      'held-in-an-array'
+    );
   });
 
   test('a saved Weave object in inputs is still recorded as a ref', async () => {
@@ -135,9 +148,11 @@ describe('serializing objects the SDK does not own', () => {
 
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
-    expect(calls[0].inputs.arg0).toMatch(
-      /^weave:\/\/\/.*\/object\/serialization-dataset:/
-    );
+    expect(calls[0].inputs).toEqual({
+      arg0: expect.stringMatching(
+        /^weave:\/\/\/test-project\/object\/serialization-dataset:[0-9a-f-]+$/
+      ),
+    });
   });
 
   test('built-in instances in inputs are recorded as a type marker', async () => {
@@ -185,7 +200,9 @@ describe('serializing objects the SDK does not own', () => {
   test('a class instance returned from an op is still recorded in full', async () => {
     class ProviderResponse {
       text = 'hello';
-      usage = {tokens: 1};
+      // A Weave value held by the response still gets its ref, which is what
+      // the save pre-pass is for on the output side.
+      dataset = new Dataset({name: 'returned-dataset', rows: [{a: 1}]});
     }
     const generate = op(async () => new ProviderResponse(), {name: 'generate'});
 
@@ -193,6 +210,11 @@ describe('serializing objects the SDK does not own', () => {
 
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
-    expect(calls[0].output).toEqual({text: 'hello', usage: {tokens: 1}});
+    expect(calls[0].output).toEqual({
+      text: 'hello',
+      dataset: expect.stringMatching(
+        /^weave:\/\/\/test-project\/object\/returned-dataset:[0-9a-f-]+$/
+      ),
+    });
   });
 });
