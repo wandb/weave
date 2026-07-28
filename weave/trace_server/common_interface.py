@@ -29,7 +29,9 @@ class BaseModelStrict(BaseModel):
 
         known_fields = set(cls.model_fields)
         known_fields.update(
-            field.alias for field in cls.model_fields.values() if field.alias is not None
+            field.alias
+            for field in cls.model_fields.values()
+            if field.alias is not None
         )
         extra_fields = sorted(set(values) - known_fields)
         if extra_fields:
