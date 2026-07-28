@@ -1,10 +1,11 @@
 """Replace credential-shaped values in client-authored call data at ingest.
 
 The server receives call data already serialized, so it cannot ask a value what
-kind of object it came from -- the field name is the only signal left. That is
-why the policy here is about names, and why it is deliberately narrow: ordinary
-words (`secret`, `password`, `token`) are left out because they show up as
-legitimate dataset columns.
+kind of object it came from -- the field name is the only signal left, which is
+why the policy here is a name policy.
+
+It is deliberately narrow, because redaction is irreversible: a name is only
+included when it cannot plausibly occur as a legitimate dataset column.
 
 Applied by the ClickHouse schema converters to the two client-authored call
 columns, `inputs_dump` and `attributes_dump`.
@@ -16,11 +17,7 @@ from collections.abc import Sequence
 from functools import lru_cache
 from typing import Any, TypeVar, cast
 
-from weave.trace_server.datadog import _db_insert_path, emit_counter
-
 T = TypeVar("T")
-
-REDACTION_METRIC = "weave_trace_server.credential_redactions"
 
 # The same marker the Python client writes client-side. Declared here rather
 # than imported: an import-linter contract forbids `weave.trace_server` from
@@ -29,24 +26,18 @@ REDACTED_VALUE = "REDACTED"
 
 _STRIP_FROM_KEY = str.maketrans("", "", "_-")
 
-# Normalized names that only ever carry a credential.
+# Policy entries the suffixes below do not reach.
 _CREDENTIAL_NAMES = frozenset(
     {
-        "adminapikey",
-        "apikey",
         "authheaders",
         "authorization",
         "authtoken",
         "awsaccesskey",
         "awsaccesskeyid",
-        "awssecretaccesskey",
-        "awssecretkey",
-        "awssessiontoken",
         "bearertoken",
         "vertexcredentials",
         "webhookkey",
         "webhooksecret",
-        "xapikey",
     }
 )
 
@@ -67,8 +58,8 @@ _CREDENTIAL_SUFFIXES = (
 )
 
 # Cache keys are client-controlled strings, so only plausible field names are
-# memoized: 8191 cached names of a megabyte each would be gigabytes held for the
-# life of the process. Real field names are far shorter than this.
+# memoized: 8192 cached names of a megabyte each would be gigabytes held for the
+# life of the process. Real field names are far shorter than 64 characters.
 _MAX_MEMOIZED_KEY_LEN = 64
 
 
@@ -99,29 +90,23 @@ def should_redact(key: str) -> bool:
     return _matches_credential_name(normalize_key(key))
 
 
-def redact_sensitive_keys(value: T) -> tuple[T, dict[str, int]]:
-    """Replace credential-shaped string values, returning the result and a tally.
+def redact_sensitive_keys(value: T) -> T:
+    """Replace credential-shaped string values anywhere inside `value`.
 
     Only non-empty strings are replaced, and that restriction is what keeps the
     pass from corrupting data: a JSON schema under `apiKey` stays a dict, a
     `has_api_key: true` flag stays a bool, and no consumer doing `.get()` on a
     subtree finds a string where a container used to be.
 
-    Copy-on-write, so a subtree with nothing to redact comes back by identity and
-    payloads the policy does not touch re-serialize byte for byte -- which is
-    what keeps eval-result row digests stable.
-
-    The tally maps normalized field name to how many values were replaced.
+    Copy-on-write, like `sanitize_invalid_utf8_surrogates` in this package: a
+    subtree with nothing to redact comes back by identity, so payloads the policy
+    does not name re-serialize byte for byte -- which is what keeps eval-result
+    row digests stable.
     """
-    tally: dict[str, int] = {}
-    return _redact(value, tally), tally
-
-
-def _redact(value: T, tally: dict[str, int]) -> T:
     if isinstance(value, dict):
         redacted_fields: dict[Any, Any] | None = None
         for key, item in value.items():
-            new_item = _redact_field(key, item, tally)
+            new_item = _redact_field(key, item)
             if new_item is item:
                 continue
             if redacted_fields is None:
@@ -129,59 +114,41 @@ def _redact(value: T, tally: dict[str, int]) -> T:
             redacted_fields[key] = new_item
         return value if redacted_fields is None else cast(T, redacted_fields)
     if isinstance(value, list):
-        redacted_items = _redact_items(value, tally)
+        redacted_items = _redact_items(value)
         return value if redacted_items is None else cast(T, redacted_items)
     if isinstance(value, tuple):
         # `json.dumps` writes a tuple as an array, so tuples reach the stored
         # column: server-built inputs come from `model_dump()`, which keeps
         # tuple fields as tuples.
-        redacted_items = _redact_items(value, tally)
+        redacted_items = _redact_items(value)
         return value if redacted_items is None else cast(T, tuple(redacted_items))
     return value
 
 
-def _redact_field(key: Any, value: Any, tally: dict[str, int]) -> Any:
+def _redact_field(key: Any, value: Any) -> Any:
     """Replace `value` when `key` names a credential, otherwise recurse into it.
 
     Non-string keys are not checked as names -- `isinstance` rather than an exact
-    type check, because the repo has `str` subclasses used as keys.
+    type check, because `_CallableStr` in this package subclasses `str`.
+
+    Values the Python client already redacted arrive holding the marker; skipping
+    those saves copying every such payload.
     """
     if isinstance(key, str) and isinstance(value, str):
         if value and value != REDACTED_VALUE and should_redact(key):
-            normalized = normalize_key(key)
-            tally[normalized] = tally.get(normalized, 0) + 1
             return REDACTED_VALUE
         return value
-    return _redact(value, tally)
+    return redact_sensitive_keys(value)
 
 
-def _redact_items(value: Sequence[Any], tally: dict[str, int]) -> list[Any] | None:
+def _redact_items(value: Sequence[Any]) -> list[Any] | None:
     """A redacted copy of a sequence's items, or None when nothing changed."""
     redacted: list[Any] | None = None
     for index, item in enumerate(value):
-        new_item = _redact(item, tally)
+        new_item = redact_sensitive_keys(item)
         if new_item is item:
             continue
         if redacted is None:
             redacted = list(value)
         redacted[index] = new_item
     return redacted
-
-
-def record_redactions(*tallies: dict[str, int]) -> None:
-    """Emit one counter per redacted field name, tagged with the insert path.
-
-    The tallies of a whole call are summed before emitting so a name hit in
-    several columns costs one packet: a single dogstatsd send is more expensive
-    than the traversal that produced the tally. `weave_trace_server.db_inserts`
-    carries the same `path` tag and is the denominator.
-    """
-    totals: dict[str, int] = {}
-    for tally in tallies:
-        for name, count in tally.items():
-            totals[name] = totals.get(name, 0) + count
-    if not totals:
-        return
-    path = _db_insert_path.get()
-    for name, count in totals.items():
-        emit_counter(REDACTION_METRIC, count, [f"name:{name}", f"path:{path}"])

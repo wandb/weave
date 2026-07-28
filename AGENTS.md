@@ -385,6 +385,21 @@ pnpm exec tsx examples/claudeAgents.ts
 - Include meaningful error messages
 - Add error handling tests
 
+### Credential-shaped fields in call inputs and attributes
+
+- The three call converters in `clickhouse/schema_converters.py` run
+  `redact_sensitive_keys` over `inputs` and `attributes` before extracting
+  refs, so a field whose name matches the policy in
+  `weave/trace_server/credential_redaction.py` is stored with its string value
+  replaced. `in_memory_trace_server.py` applies the same function so both
+  backends read back the same thing.
+- Only non-empty strings are replaced, and the walk is copy-on-write. Both
+  properties are load-bearing: types stay intact for consumers, and a payload
+  the policy does not name re-serializes byte for byte, which is what keeps
+  eval-result row digests stable. Keep them if you touch the walk.
+- The policy deliberately excludes names that occur as legitimate dataset
+  columns. Redaction is irreversible, so widening it needs a reason.
+
 ### LLM Completion Routing
 
 - Built-in and API-key-authenticated custom providers use LiteLLM.

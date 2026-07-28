@@ -10,11 +10,11 @@ from __future__ import annotations
 import datetime
 import json
 import uuid
+from collections.abc import Callable
 from typing import Any
 
 import pytest
 
-from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse.schema_converters import (
@@ -22,8 +22,10 @@ from weave.trace_server.clickhouse.schema_converters import (
     start_call_for_insert_to_ch_insertable,
     start_end_calls_to_ch_complete_insertable,
 )
-from weave.trace_server.clickhouse_schema import CallCHInsertable
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_schema import (
+    CallCompleteCHInsertable,
+    CallStartCHInsertable,
+)
 from weave.trace_server.credential_redaction import (
     REDACTED_VALUE,
     redact_sensitive_keys,
@@ -45,45 +47,44 @@ PROJECT_ID = b64(f"{TEST_ENTITY}/project")
 
 
 @pytest.mark.parametrize(
-    ("key", "normalized"),
+    "key",
     [
-        ("apiKey", "apikey"),
-        ("api_key", "apikey"),
-        ("API_KEY", "apikey"),
-        ("x-api-key", "xapikey"),
+        # One field, four spellings across SDKs: normalization collapses them.
+        "apiKey",
+        "api_key",
+        "API_KEY",
+        "x-api-key",
+        # One per suffix entry, each spelled so only the suffix can match it.
+        "service_access_token",
+        "openai_api_key",
+        "replicate_api_token",
+        "azure_client_secret",
+        "service_private_key",
+        "oauth_refresh_token",
+        "aws_secret_access_key",
+        "service_secret_key",
+        "aws_session_token",
+        # One per exact entry: names no suffix reaches.
+        "auth_headers",
+        "authorization",
+        "auth_token",
+        "aws_access_key",
+        "aws_access_key_id",
+        "bearer_token",
+        "vertex_credentials",
+        "webhook_key",
+        "webhook_secret",
     ],
 )
-def test_every_spelling_of_a_name_is_redacted(key: str, normalized: str) -> None:
-    # One field is spelled four ways across SDKs, so the policy matches on the
-    # name with case and separators normalized away.
-    redacted, tally = redact_sensitive_keys({key: PLACEHOLDER})
-
-    assert redacted == {key: REDACTED_VALUE}
-    assert tally == {normalized: 1}
-
-
-@pytest.mark.parametrize(
-    ("key", "normalized"),
-    [
-        ("aws_secret_access_key", "awssecretaccesskey"),
-        ("openai_api_key", "openaiapikey"),
-        ("api_token", "apitoken"),
-        ("vertex_credentials", "vertexcredentials"),
-    ],
-)
-def test_vendor_prefixed_names_are_redacted(key: str, normalized: str) -> None:
-    # The `<vendor>_<credential>` family is open-ended, so it is matched by
-    # suffix instead of one literal per vendor.
-    redacted, tally = redact_sensitive_keys({key: PLACEHOLDER})
-
-    assert redacted == {key: REDACTED_VALUE}
-    assert tally == {normalized: 1}
+def test_credential_names_are_redacted(key: str) -> None:
+    # Every policy entry has a case here, so the policy cannot silently shrink.
+    assert redact_sensitive_keys({key: PLACEHOLDER}) == {key: REDACTED_VALUE}
 
 
 @pytest.mark.parametrize(
     "key",
     [
-        # Ordinary words: real datasets carry these as columns.
+        # Ordinary words, excluded because they occur as dataset columns.
         "token",
         "secret",
         "password",
@@ -94,7 +95,7 @@ def test_vendor_prefixed_names_are_redacted(key: str, normalized: str) -> None:
         "keywords",
         "client_secret_name",
         # Neighbours of a redacted field that are not themselves credentials.
-        "baseURL",
+        "endpoint",
         "model",
     ],
 )
@@ -116,17 +117,14 @@ def test_nested_credentials_are_replaced_and_the_rest_is_kept() -> None:
     payload = {
         "endpoint": "https://service.example.com/v1",
         "options": {"apiKey": PLACEHOLDER, "retries": 2},
-        "items": [{"label": "first"}, {"authorization": PLACEHOLDER}],
+        "items": [{"label": "first"}, {"deep": {"authorization": PLACEHOLDER}}],
     }
 
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted == {
+    assert redact_sensitive_keys(payload) == {
         "endpoint": "https://service.example.com/v1",
         "options": {"apiKey": REDACTED_VALUE, "retries": 2},
-        "items": [{"label": "first"}, {"authorization": REDACTED_VALUE}],
+        "items": [{"label": "first"}, {"deep": {"authorization": REDACTED_VALUE}}],
     }
-    assert tally == {"apikey": 1, "authorization": 1}
 
 
 def test_only_non_empty_strings_are_replaced() -> None:
@@ -140,65 +138,36 @@ def test_only_non_empty_strings_are_replaced() -> None:
         "x-api-key": "",
     }
 
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted is payload
-    assert tally == {}
+    assert redact_sensitive_keys(payload) is payload
 
 
-def test_token_is_deliberately_outside_the_policy() -> None:
-    # `token` is a normal dataset column for tokenization and NER, so adding it
-    # to the policy would destroy that data. This test fails if anyone does.
+def test_dataset_columns_are_not_treated_as_credentials() -> None:
+    # Redaction is irreversible, so names that occur as legitimate dataset
+    # columns stay out of the policy. These two shapes are why.
     payload = {
         "logprobs": [{"token": "running", "logprob": -0.1}],
         "labels": [{"token": "Ada", "label": "B-PER"}],
     }
 
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted is payload
-    assert tally == {}
+    assert redact_sensitive_keys(payload) is payload
 
 
 def test_credential_inside_a_tuple_is_replaced() -> None:
     # `json.dumps` writes a tuple as an array, so a tuple is a real path into
     # the stored column.
-    payload = {"args": ({"apiKey": PLACEHOLDER},)}
-
-    redacted, tally = redact_sensitive_keys(payload)
+    redacted = redact_sensitive_keys({"args": ({"apiKey": PLACEHOLDER},)})
 
     assert redacted == {"args": ({"apiKey": REDACTED_VALUE},)}
     assert json.loads(json.dumps(redacted)) == {"args": [{"apiKey": REDACTED_VALUE}]}
-    assert tally == {"apikey": 1}
 
 
 def test_non_string_keys_do_not_break_the_walk() -> None:
     payload: dict[Any, Any] = {7: {"apiKey": PLACEHOLDER}, None: "kept"}
 
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted == {7: {"apiKey": REDACTED_VALUE}, None: "kept"}
-    assert tally == {"apikey": 1}
-
-
-def test_credential_five_levels_down_is_replaced() -> None:
-    payload = {"a": [{"b": {"c": [{"authorization": PLACEHOLDER}]}}]}
-
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted == {"a": [{"b": {"c": [{"authorization": REDACTED_VALUE}]}}]}
-    assert tally == {"authorization": 1}
-
-
-def test_tally_counts_every_hit_per_normalized_name() -> None:
-    payload = {
-        "apiKey": PLACEHOLDER,
-        "nested": {"api_key": PLACEHOLDER, "authToken": PLACEHOLDER},
+    assert redact_sensitive_keys(payload) == {
+        7: {"apiKey": REDACTED_VALUE},
+        None: "kept",
     }
-
-    _, tally = redact_sensitive_keys(payload)
-
-    assert tally == {"apikey": 2, "authtoken": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -209,52 +178,49 @@ def test_tally_counts_every_hit_per_normalized_name() -> None:
 def test_clean_payload_comes_back_by_identity() -> None:
     payload = {"model": "a-model", "messages": [{"role": "user", "content": "hi"}]}
 
-    redacted, tally = redact_sensitive_keys(payload)
-
-    assert redacted is payload
-    assert tally == {}
+    assert redact_sensitive_keys(payload) is payload
 
 
 def test_source_payload_is_not_mutated_and_clean_subtrees_are_shared() -> None:
     payload = {
-        "options": {"apiKey": PLACEHOLDER, "baseURL": "https://service.example.com"},
+        "options": {"apiKey": PLACEHOLDER, "endpoint": "https://service.example.com"},
         "message": {"role": "user", "content": "hi"},
     }
 
-    redacted, _ = redact_sensitive_keys(payload)
+    redacted = redact_sensitive_keys(payload)
 
     assert payload == {
-        "options": {"apiKey": PLACEHOLDER, "baseURL": "https://service.example.com"},
+        "options": {"apiKey": PLACEHOLDER, "endpoint": "https://service.example.com"},
         "message": {"role": "user", "content": "hi"},
     }
     assert redacted["message"] is payload["message"]
     assert redacted["options"] == {
         "apiKey": REDACTED_VALUE,
-        "baseURL": "https://service.example.com",
+        "endpoint": "https://service.example.com",
     }
 
 
-def test_second_pass_neither_copies_nor_counts_again() -> None:
-    # Identity on the second pass is what makes the walk idempotent.
-    redacted, _ = redact_sensitive_keys({"options": {"apiKey": PLACEHOLDER}})
+def test_value_the_client_already_redacted_is_left_alone() -> None:
+    # The Python client redacts `api_key`, `auth_headers` and `authorization`
+    # before sending, so those arrive already holding the marker. Returning them
+    # by identity keeps the walk from copying every such payload, and makes it
+    # idempotent.
+    payload = {"options": {"api_key": REDACTED_VALUE}}
 
-    again, tally = redact_sensitive_keys(redacted)
-
-    assert again is redacted
-    assert tally == {}
+    assert redact_sensitive_keys(payload) is payload
 
 
-def test_eval_dataset_row_keeps_its_serialization() -> None:
+def test_eval_dataset_row_keeps_its_identity_when_a_sibling_is_redacted() -> None:
     # Eval-result rows are grouped by a SHA256 of the raw JSON under
-    # `inputs.example`, so a row the policy does not name must serialize
-    # byte for byte as before.
+    # `inputs.example`. Redacting elsewhere in the payload must leave that
+    # subtree byte-identical, or rows regroup and distinct rows collapse.
     example = {"question": "capital of France?", "answer": "Paris", "id": "row-1"}
-    payload = {"example": example, "model": "a-model"}
+    payload = {"example": example, "options": {"apiKey": PLACEHOLDER}}
 
-    redacted, _ = redact_sensitive_keys(payload)
+    redacted = redact_sensitive_keys(payload)
 
-    assert redacted is payload
-    assert json.dumps(redacted["example"]) == json.dumps(example)
+    assert redacted is not payload
+    assert redacted["example"] is example
 
 
 # ---------------------------------------------------------------------------
@@ -264,39 +230,42 @@ def test_eval_dataset_row_keeps_its_serialization() -> None:
 _STARTED_AT = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
 _ENDED_AT = _STARTED_AT + datetime.timedelta(seconds=1)
 
-_INPUTS = {"options": {"authorization": PLACEHOLDER}}
-_ATTRIBUTES = {"options": {"apiKey": PLACEHOLDER}}
 _REDACTED_INPUTS = {"options": {"authorization": REDACTED_VALUE}}
 _REDACTED_ATTRIBUTES = {"options": {"apiKey": REDACTED_VALUE}}
 
 
-def _convert_start() -> CallCHInsertable:
-    return start_call_for_insert_to_ch_insertable(
-        tsi.StartedCallSchemaForInsert(
-            project_id=PROJECT_ID,
-            id=str(uuid.uuid4()),
-            trace_id=str(uuid.uuid4()),
-            op_name="op",
-            started_at=_STARTED_AT,
-            attributes=_ATTRIBUTES,
-            inputs=_INPUTS,
-        ),
-        retention_days=0,
+def _inputs() -> dict[str, Any]:
+    # Built fresh per call: a shared payload would let one case pre-redact the
+    # next one's fixture and hide a missing hook.
+    return {"options": {"authorization": PLACEHOLDER}}
+
+
+def _attributes() -> dict[str, Any]:
+    return {"options": {"apiKey": PLACEHOLDER}}
+
+
+def _started_call(call_id: str) -> tsi.StartedCallSchemaForInsert:
+    return tsi.StartedCallSchemaForInsert(
+        project_id=PROJECT_ID,
+        id=call_id,
+        trace_id=str(uuid.uuid4()),
+        op_name="op",
+        started_at=_STARTED_AT,
+        attributes=_attributes(),
+        inputs=_inputs(),
     )
 
 
-def _convert_start_end() -> CallCHInsertable:
+def _convert_start() -> CallStartCHInsertable:
+    return start_call_for_insert_to_ch_insertable(
+        _started_call(str(uuid.uuid4())), retention_days=0
+    )
+
+
+def _convert_start_end() -> CallCompleteCHInsertable:
     call_id = str(uuid.uuid4())
     return start_end_calls_to_ch_complete_insertable(
-        tsi.StartedCallSchemaForInsert(
-            project_id=PROJECT_ID,
-            id=call_id,
-            trace_id=str(uuid.uuid4()),
-            op_name="op",
-            started_at=_STARTED_AT,
-            attributes=_ATTRIBUTES,
-            inputs=_INPUTS,
-        ),
+        _started_call(call_id),
         tsi.EndedCallSchemaForInsert(
             project_id=PROJECT_ID,
             id=call_id,
@@ -308,7 +277,7 @@ def _convert_start_end() -> CallCHInsertable:
     )
 
 
-def _convert_complete() -> CallCHInsertable:
+def _convert_complete() -> CallCompleteCHInsertable:
     return complete_call_to_ch_insertable(
         tsi.CompletedCallSchemaForInsert(
             project_id=PROJECT_ID,
@@ -317,8 +286,8 @@ def _convert_complete() -> CallCHInsertable:
             op_name="op",
             started_at=_STARTED_AT,
             ended_at=_ENDED_AT,
-            attributes=_ATTRIBUTES,
-            inputs=_INPUTS,
+            attributes=_attributes(),
+            inputs=_inputs(),
             output={},
             summary={},
         ),
@@ -331,7 +300,9 @@ def _convert_complete() -> CallCHInsertable:
     [_convert_start, _convert_start_end, _convert_complete],
     ids=["call_start", "start_end_complete", "complete"],
 )
-def test_converters_redact_both_client_authored_columns(convert: Any) -> None:
+def test_converters_redact_both_client_authored_columns(
+    convert: Callable[[], CallStartCHInsertable | CallCompleteCHInsertable],
+) -> None:
     # The hook lives inside the converters, so any caller inherits it.
     row = convert()
 
@@ -345,19 +316,14 @@ def test_converters_redact_both_client_authored_columns(convert: Any) -> None:
 
 
 @pytest.fixture
-def batch_server(trace_server):
-    """The ClickHouse server underneath the fixture, routing to `call_parts`."""
-    server = trace_server._internal_trace_server
-    assert isinstance(server, ClickHouseTraceServer)
-    server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
-    return server
+def batch_server(ch_server):
+    """The ClickHouse server, routing calls to `call_parts`."""
+    ch_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
+    return ch_server
 
 
-@pytest.mark.skipif(
-    NOT_CLICKHOUSE_BACKEND, reason="ClickHouse-only: raw call column reads"
-)
 def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
-    """A batched call start persists the redacted columns and reads back redacted.
+    """A batched call start persists redacted columns and reads back redacted.
 
     The external adapter does not wrap `call_start_batch`, so this hits the
     internal server directly with a pre-encoded project id.
@@ -376,8 +342,8 @@ def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
                             trace_id=str(uuid.uuid4()),
                             op_name="op",
                             started_at=_STARTED_AT,
-                            attributes=_ATTRIBUTES,
-                            inputs=_INPUTS,
+                            attributes=_attributes(),
+                            inputs=_inputs(),
                         )
                     ),
                 ),
@@ -394,8 +360,28 @@ def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
     assert json.loads(row[0][0]) == _REDACTED_INPUTS
     assert json.loads(row[0][1]) == _REDACTED_ATTRIBUTES
 
-    call = batch_server.call_read(
-        tsi.CallReadReq(project_id=internal_project_id, id=call_id)
+
+def test_call_read_returns_redacted_inputs_and_attributes(trace_server) -> None:
+    """Read-back is redacted on either backend; the fake mirrors the converters."""
+    project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
+    call_id = str(uuid.uuid4())
+
+    trace_server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=str(uuid.uuid4()),
+                op_name="op",
+                started_at=_STARTED_AT,
+                attributes=_attributes(),
+                inputs=_inputs(),
+            )
+        )
+    )
+
+    call = trace_server.call_read(
+        tsi.CallReadReq(project_id=project_id, id=call_id)
     ).call
     assert call is not None
     assert call.inputs == _REDACTED_INPUTS

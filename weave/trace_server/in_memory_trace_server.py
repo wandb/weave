@@ -77,6 +77,7 @@ from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -1203,8 +1204,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     parsable_output = {"output": parsable_output}
                 parsable_output = cast(dict, parsable_output)
 
-                attributes_json = json.dumps(call.attributes)
-                inputs_json = json.dumps(call.inputs)
+                attributes = redact_sensitive_keys(call.attributes)
+                inputs = redact_sensitive_keys(call.inputs)
+                attributes_json = json.dumps(attributes)
+                inputs_json = json.dumps(inputs)
                 output_json = json.dumps(call.output)
                 summary_json = json.dumps(call.summary)
                 storage_size = (
@@ -1232,7 +1235,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     exception=call.exception,
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(list(call.inputs.values())),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     output=json.loads(output_json),
                     output_refs=extract_refs_from_values(
                         list(parsable_output.values())
@@ -1292,8 +1295,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if req.start.id is None:
             raise ValueError("id is required")
         with self.lock:
-            attributes_json = json.dumps(req.start.attributes)
-            inputs_json = json.dumps(req.start.inputs)
+            attributes = redact_sensitive_keys(req.start.attributes)
+            inputs = redact_sensitive_keys(req.start.inputs)
+            attributes_json = json.dumps(attributes)
+            inputs_json = json.dumps(inputs)
             expire_at = self._compute_call_expire_at(
                 req.start.project_id, req.start.started_at
             )
@@ -1310,9 +1315,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.started_at = _ensure_tz(req.start.started_at)
                 existing.attributes = json.loads(attributes_json)
                 existing.inputs = json.loads(inputs_json)
-                existing.input_refs = extract_refs_from_values(
-                    list(req.start.inputs.values())
-                )
+                existing.input_refs = extract_refs_from_values(list(inputs.values()))
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
@@ -1338,9 +1341,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     started_at=_ensure_tz(req.start.started_at),
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(
-                        list(req.start.inputs.values())
-                    ),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     wb_user_id=req.start.wb_user_id,
                     wb_run_id=req.start.wb_run_id,
                     wb_run_step=req.start.wb_run_step,

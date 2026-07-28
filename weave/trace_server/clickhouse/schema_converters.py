@@ -27,10 +27,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     SelectableCHObjSchema,
 )
-from weave.trace_server.credential_redaction import (
-    record_redactions,
-    redact_sensitive_keys,
-)
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 from weave.trace_server.ttl_settings import compute_expire_at
@@ -138,9 +135,8 @@ def start_call_for_insert_to_ch_insertable(
     # Process inputs for base64 content if trace_server is provided
     # Redact before extracting refs, so input_refs cannot name a ref that the
     # stored inputs no longer contain.
-    inputs, inputs_tally = redact_sensitive_keys(start_call.inputs)
-    attributes, attributes_tally = redact_sensitive_keys(start_call.attributes)
-    record_redactions(inputs_tally, attributes_tally)
+    inputs = redact_sensitive_keys(start_call.inputs)
+    attributes = redact_sensitive_keys(start_call.attributes)
     input_refs = extract_refs_from_values(inputs)
 
     otel_dump_str = None
@@ -249,9 +245,8 @@ def start_end_calls_to_ch_complete_insertable(
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
 
-    inputs, inputs_tally = redact_sensitive_keys(start_call.inputs)
-    attributes, attributes_tally = redact_sensitive_keys(start_call.attributes)
-    record_redactions(inputs_tally, attributes_tally)
+    inputs = redact_sensitive_keys(start_call.inputs)
+    attributes = redact_sensitive_keys(start_call.attributes)
     input_refs = extract_refs_from_values(inputs)
 
     output = end_call.output
@@ -311,9 +306,8 @@ def complete_call_to_ch_insertable(
     Returns:
         CallCompleteCHInsertable: The ClickHouse insertable representation.
     """
-    inputs, inputs_tally = redact_sensitive_keys(complete_call.inputs)
-    attributes, attributes_tally = redact_sensitive_keys(complete_call.attributes)
-    record_redactions(inputs_tally, attributes_tally)
+    inputs = redact_sensitive_keys(complete_call.inputs)
+    attributes = redact_sensitive_keys(complete_call.attributes)
     input_refs = extract_refs_from_values(inputs)
 
     output = complete_call.output
