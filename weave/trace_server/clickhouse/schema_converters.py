@@ -133,10 +133,10 @@ def start_call_for_insert_to_ch_insertable(
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
     # Process inputs for base64 content if trace_server is provided
-    # Redact before extracting refs, so input_refs cannot name a ref that the
-    # stored inputs no longer contain.
     inputs = redact_sensitive_keys(start_call.inputs)
     attributes = redact_sensitive_keys(start_call.attributes)
+    # Refs come from the redacted inputs, so input_refs cannot name a ref that
+    # the stored inputs no longer contain.
     input_refs = extract_refs_from_values(inputs)
 
     otel_dump_str = None

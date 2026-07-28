@@ -94,7 +94,7 @@ def test_credential_names_are_redacted(key: str) -> None:
         "keyboard",
         "keywords",
         "client_secret_name",
-        # Neighbours of a redacted field that are not themselves credentials.
+        # Ordinary configuration field names.
         "endpoint",
         "model",
     ],
@@ -133,6 +133,8 @@ def test_only_non_empty_strings_are_replaced() -> None:
         "tools": [{"properties": {"apiKey": {"type": "string"}}}],
         # `has_api_key` matches the policy by suffix, but the value is a flag.
         "has_api_key": True,
+        # A list under a matched name is structured data, e.g. granted scopes.
+        "authorization": ["read", "write"],
         "api_key": 1234,
         "authToken": None,
         "x-api-key": "",
@@ -224,7 +226,7 @@ def test_eval_dataset_row_keeps_its_identity_when_a_sibling_is_redacted() -> Non
 
 
 # ---------------------------------------------------------------------------
-# The hook: every producer of the client-authored call columns
+# The hook: every ClickHouse producer of the client-authored call columns
 # ---------------------------------------------------------------------------
 
 _STARTED_AT = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
@@ -316,13 +318,13 @@ def test_converters_redact_both_client_authored_columns(
 
 
 @pytest.fixture
-def batch_server(ch_server):
-    """The ClickHouse server, routing calls to `call_parts`."""
+def auto_routed_ch_server(ch_server):
+    """The ClickHouse server under AUTO routing, as in `test_ttl_insert_paths.py`."""
     ch_server.table_routing_resolver._mode = CallsStorageServerMode.AUTO
     return ch_server
 
 
-def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
+def test_call_start_batch_stores_redacted_columns(auto_routed_ch_server) -> None:
     """A batched call start persists redacted columns and reads back redacted.
 
     The external adapter does not wrap `call_start_batch`, so this hits the
@@ -331,7 +333,7 @@ def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
     internal_project_id = b64(f"{TEST_ENTITY}/batch_{uuid.uuid4().hex[:8]}")
     call_id = str(uuid.uuid4())
 
-    batch_server.call_start_batch(
+    auto_routed_ch_server.call_start_batch(
         tsi.CallCreateBatchReq(
             batch=[
                 tsi.CallBatchStartMode(
@@ -351,7 +353,7 @@ def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
         )
     )
 
-    row = batch_server.ch_client.query(
+    row = auto_routed_ch_server.ch_client.query(
         "SELECT inputs_dump, attributes_dump FROM call_parts "
         "WHERE project_id = {project_id:String} AND id = {call_id:String}",
         parameters={"project_id": internal_project_id, "call_id": call_id},
@@ -361,12 +363,8 @@ def test_call_start_batch_stores_redacted_columns(batch_server) -> None:
     assert json.loads(row[0][1]) == _REDACTED_ATTRIBUTES
 
 
-def test_call_read_returns_redacted_inputs_and_attributes(trace_server) -> None:
-    """Read-back is redacted on either backend; the fake mirrors the converters."""
-    project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
-    call_id = str(uuid.uuid4())
-
-    trace_server.call_start(
+def _write_via_call_start(server: Any, project_id: str, call_id: str) -> None:
+    server.call_start(
         tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=project_id,
@@ -379,6 +377,44 @@ def test_call_read_returns_redacted_inputs_and_attributes(trace_server) -> None:
             )
         )
     )
+
+
+def _write_via_calls_complete(server: Any, project_id: str, call_id: str) -> None:
+    server.calls_complete(
+        tsi.CallsUpsertCompleteReq(
+            batch=[
+                tsi.CompletedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=str(uuid.uuid4()),
+                    op_name="op",
+                    started_at=_STARTED_AT,
+                    ended_at=_ENDED_AT,
+                    attributes=_attributes(),
+                    inputs=_inputs(),
+                    output=None,
+                    summary={"usage": {}, "status_counts": {}},
+                )
+            ]
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "write",
+    [_write_via_call_start, _write_via_calls_complete],
+    ids=["call_start", "calls_complete"],
+)
+def test_call_read_returns_redacted_inputs_and_attributes(trace_server, write) -> None:
+    """Read-back is redacted on either backend, for both write paths.
+
+    The in-memory backend hooks `call_start` and `calls_complete` separately, so
+    both need covering or one could silently stop matching ClickHouse.
+    """
+    project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
+    call_id = str(uuid.uuid4())
+
+    write(trace_server, project_id, call_id)
 
     call = trace_server.call_read(
         tsi.CallReadReq(project_id=project_id, id=call_id)

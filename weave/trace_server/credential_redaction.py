@@ -4,8 +4,9 @@ The server receives call data already serialized, so it cannot ask a value what
 kind of object it came from -- the field name is the only signal left, which is
 why the policy here is a name policy.
 
-It is deliberately narrow, because redaction is irreversible: a name is only
-included when it cannot plausibly occur as a legitimate dataset column.
+The policy is a conservative denylist: broad, common names are left out because
+redaction is irreversible, so a matched field is destroyed. It is narrow, not
+infallible -- a legitimate field can still carry a matching name.
 
 Applied by the ClickHouse schema converters to the two client-authored call
 columns, `inputs_dump` and `attributes_dump`.
@@ -19,9 +20,12 @@ from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
 
-# The same marker the Python client writes client-side. Declared here rather
-# than imported: an import-linter contract forbids `weave.trace_server` from
-# importing `weave.utils`.
+# `redact_sensitive_keys` and `should_redact` mirror the client-side names in
+# `weave/trace/weave_client.py` and `weave/utils/sanitize.py` on purpose, but the
+# semantics differ (normalization, suffix matching, non-empty strings only) and
+# the two cannot be shared: an import-linter contract forbids
+# `weave.trace_server` from importing `weave.utils`. Hence a local marker, whose
+# value matches what the client writes.
 REDACTED_VALUE = "REDACTED"
 
 _STRIP_FROM_KEY = str.maketrans("", "", "_-")
@@ -63,7 +67,7 @@ _CREDENTIAL_SUFFIXES = (
 _MAX_MEMOIZED_KEY_LEN = 64
 
 
-def normalize_key(key: str) -> str:
+def _normalize_key(key: str) -> str:
     """Collapse the spellings of one field name: `apiKey`, `api_key`, `X-API-Key`."""
     return key.translate(_STRIP_FROM_KEY).lower()
 
@@ -76,18 +80,18 @@ def _matches_credential_name(normalized_key: str) -> bool:
 
 @lru_cache(maxsize=8192)
 def _should_redact_memoized(key: str) -> bool:
-    return _matches_credential_name(normalize_key(key))
+    return _matches_credential_name(_normalize_key(key))
 
 
 def should_redact(key: str) -> bool:
     """Whether a field named `key` holds a credential.
 
     Memoized, because this runs on every string-valued field of every ingested
-    call: ~260ns uncached against ~30ns from the cache.
+    call.
     """
     if len(key) <= _MAX_MEMOIZED_KEY_LEN:
         return _should_redact_memoized(key)
-    return _matches_credential_name(normalize_key(key))
+    return _matches_credential_name(_normalize_key(key))
 
 
 def redact_sensitive_keys(value: T) -> T:
