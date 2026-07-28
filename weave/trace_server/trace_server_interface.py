@@ -37,7 +37,7 @@ from weave.trace_server.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
 # New code should import from weave.trace_server.service_interface directly.
-from weave.trace_server.service_interface import (  # noqa: F401
+from weave.trace_server.service_interface import (  # ruff: ignore[unused-import]
     EnsureProjectExistsRes,
     ProjectsInfoReq,
     ProjectsInfoRes,
@@ -395,7 +395,7 @@ class OTelExportRes(BaseModel):
     )
 
 
-class CallStartReq(BaseModelStrict):
+class CallStartReq(BaseModel):
     start: StartedCallSchemaForInsert
 
 
@@ -404,7 +404,7 @@ class CallStartRes(BaseModel):
     trace_id: str
 
 
-class CallEndReq(BaseModelStrict):
+class CallEndReq(BaseModel):
     end: EndedCallSchemaForInsert
 
 
@@ -422,7 +422,7 @@ class CallBatchEndMode(BaseModel):
     req: CallEndReq
 
 
-class CallCreateBatchReq(BaseModelStrict):
+class CallCreateBatchReq(BaseModel):
     batch: list[CallBatchStartMode | CallBatchEndMode]
 
 
@@ -442,7 +442,7 @@ class CallsUpsertCompleteRes(BaseModel):
     pass
 
 
-class CallStartV2Req(BaseModelStrict):
+class CallStartV2Req(BaseModel):
     """Request for starting a single call via v2 API."""
 
     start: StartedCallSchemaForInsert
@@ -455,7 +455,7 @@ class CallStartV2Res(BaseModel):
     trace_id: str
 
 
-class CallEndV2Req(BaseModelStrict):
+class CallEndV2Req(BaseModel):
     """Request for ending a single call via v2 API."""
 
     end: EndedCallSchemaForInsertWithStartedAt
@@ -467,7 +467,7 @@ class CallEndV2Res(BaseModel):
     pass
 
 
-class CallReadReq(BaseModelStrict):
+class CallReadReq(BaseModel):
     project_id: str
     id: str
     include_costs: bool | None = False
@@ -479,7 +479,7 @@ class CallReadRes(BaseModel):
     call: CallSchema | None
 
 
-class CallsDeleteReq(BaseModelStrict):
+class CallsDeleteReq(BaseModel):
     project_id: str
     call_ids: list[str]
 
@@ -542,7 +542,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     )
 
 
-class CompletionsCreateReq(BaseModelStrict):
+class CompletionsCreateReq(BaseModel):
     project_id: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -614,7 +614,7 @@ class CallsFilter(BaseModelStrict):
     wb_run_ids: list[str] | None = None
 
 
-class CallsQueryReq(BaseModelStrict):
+class CallsQueryReq(BaseModel):
     project_id: str
     filter: CallsFilter | None = None
     limit: int | None = None
@@ -683,7 +683,7 @@ class CallsQueryRes(BaseModel):
     calls: list[CallSchema]
 
 
-class CallsQueryStatsReq(BaseModelStrict):
+class CallsQueryStatsReq(BaseModel):
     project_id: str
     filter: CallsFilter | None = None
     query: Query | None = None
@@ -706,7 +706,7 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: int | None = None
 
 
-class CallUpdateReq(BaseModelStrict):
+class CallUpdateReq(BaseModel):
     # required for all updates
     project_id: str
     call_id: str
@@ -722,7 +722,7 @@ class CallUpdateRes(BaseModel):
     pass
 
 
-class ObjCreateReq(BaseModelStrict):
+class ObjCreateReq(BaseModel):
     obj: ObjSchemaForInsert
 
 
@@ -731,7 +731,7 @@ class ObjCreateRes(BaseModel):
     object_id: str | None = None
 
 
-class ObjReadReq(BaseModelStrict):
+class ObjReadReq(BaseModel):
     project_id: str
     object_id: str
     digest: str
@@ -792,7 +792,7 @@ class ObjectVersionFilter(BaseModelStrict):
     )
 
 
-class ObjQueryReq(BaseModelStrict):
+class ObjQueryReq(BaseModel):
     project_id: str = Field(
         description="The ID of the project to query", examples=["user/project"]
     )
@@ -831,7 +831,7 @@ class ObjQueryReq(BaseModelStrict):
     )
 
 
-class ObjDeleteReq(BaseModelStrict):
+class ObjDeleteReq(BaseModel):
     project_id: str
     object_id: str
     digests: list[str] | None = Field(
@@ -859,7 +859,7 @@ class ObjDeleteRes(BaseModel):
 from weave.trace_server.validation import validate_alias_name, validate_tag_name
 
 
-class ObjAddTagsReq(BaseModelStrict):
+class ObjAddTagsReq(BaseModel):
     project_id: str
     object_id: str
     digest: str
@@ -880,7 +880,7 @@ class ObjAddTagsRes(BaseModel):
     pass
 
 
-class ObjRemoveTagsReq(BaseModelStrict):
+class ObjRemoveTagsReq(BaseModel):
     project_id: str
     object_id: str
     digest: str
@@ -892,7 +892,7 @@ class ObjRemoveTagsRes(BaseModel):
     pass
 
 
-class ObjSetAliasesReq(BaseModelStrict):
+class ObjSetAliasesReq(BaseModel):
     project_id: str
     object_id: str
     digest: str
@@ -911,7 +911,7 @@ class ObjSetAliasesRes(BaseModel):
     pass
 
 
-class ObjRemoveAliasesReq(BaseModelStrict):
+class ObjRemoveAliasesReq(BaseModel):
     project_id: str
     object_id: str
     aliases: list[str]
@@ -929,7 +929,7 @@ class ObjRemoveAliasesRes(BaseModel):
     pass
 
 
-class TagsListReq(BaseModelStrict):
+class TagsListReq(BaseModel):
     project_id: str
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -938,7 +938,7 @@ class TagsListRes(BaseModel):
     tags: list[str]
 
 
-class AliasesListReq(BaseModelStrict):
+class AliasesListReq(BaseModel):
     project_id: str
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -951,11 +951,11 @@ class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
 
-class TableCreateReq(BaseModelStrict):
+class TableCreateReq(BaseModel):
     table: TableSchemaForInsert
 
 
-class TableCreateFromDigestsReq(BaseModelStrict):
+class TableCreateFromDigestsReq(BaseModel):
     project_id: str
     row_digests: list[str]
     expected_digest: str | None = Field(
@@ -1047,7 +1047,7 @@ class TableInsertSpec(BaseModel):
 TableUpdateSpec = TableAppendSpec | TablePopSpec | TableInsertSpec
 
 
-class TableUpdateReq(BaseModelStrict):
+class TableUpdateReq(BaseModel):
     project_id: str
     base_digest: str
     updates: list[TableUpdateSpec]
@@ -1104,7 +1104,7 @@ class TableRowFilter(BaseModelStrict):
     )
 
 
-class TableQueryReq(BaseModelStrict):
+class TableQueryReq(BaseModel):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -1143,7 +1143,7 @@ class TableQueryRes(BaseModel):
     rows: list[TableRowSchema]
 
 
-class TableQueryStatsReq(BaseModelStrict):
+class TableQueryStatsReq(BaseModel):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -1152,7 +1152,7 @@ class TableQueryStatsReq(BaseModelStrict):
     )
 
 
-class TableQueryStatsBatchReq(BaseModelStrict):
+class TableQueryStatsBatchReq(BaseModel):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -1185,7 +1185,7 @@ class TableQueryStatsBatchRes(BaseModel):
     tables: list[TableStatsRow]
 
 
-class RefsReadBatchReq(BaseModelStrict):
+class RefsReadBatchReq(BaseModel):
     refs: list[str]
 
 
@@ -1193,12 +1193,7 @@ class RefsReadBatchRes(BaseModel):
     vals: list[Any]
 
 
-class FeedbackCreateReq(BaseModelStrict):
-    # Newer SDKs may send fields that an older trace server does not yet know.
-    # Ignore those fields so feedback ingestion remains available during a
-    # rolling client/server upgrade; known fields remain fully validated.
-    model_config = ConfigDict(extra="ignore")
-
+class FeedbackCreateReq(BaseModel):
     id: str | None = Field(
         default=None,
         description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
@@ -1321,7 +1316,7 @@ class Feedback(FeedbackCreateReq):
     created_at: datetime.datetime
 
 
-class FeedbackQueryReq(BaseModelStrict):
+class FeedbackQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     fields: list[str] | None = Field(
         default=None, examples=[["id", "feedback_type", "payload.note"]]
@@ -1340,7 +1335,7 @@ class FeedbackQueryRes(BaseModel):
     total_count: int = Field(ge=0)
 
 
-class FeedbackPurgeReq(BaseModelStrict):
+class FeedbackPurgeReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     query: Query
 
@@ -1357,7 +1352,7 @@ class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
-class FeedbackCreateBatchReq(BaseModelStrict):
+class FeedbackCreateBatchReq(BaseModel):
     batch: list[FeedbackCreateReq]
 
 
@@ -1530,7 +1525,7 @@ MAX_FEEDBACK_AGG_TIME_BUCKETS = 256
 DAY_IN_MS = datetime.timedelta(days=1).total_seconds() * 1000
 
 
-class FeedbackAggregateReq(BaseModelStrict):
+class FeedbackAggregateReq(BaseModel):
     """Query for aggregate scores by time bucket and dimension."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -1672,7 +1667,7 @@ class FeedbackAggregateRes(BaseModel):
 # --- Feedback payload schema (discovered paths for stats) ---
 
 
-class FeedbackPayloadPath(BaseModelStrict):
+class FeedbackPayloadPath(BaseModel):
     """Discovered path in feedback payload with inferred type."""
 
     json_path: str = Field(description="Dot path into payload (e.g. 'output.score').")
@@ -1708,7 +1703,7 @@ class FeedbackPayloadSchemaRes(BaseModel):
     )
 
 
-class FileCreateReq(BaseModelStrict):
+class FileCreateReq(BaseModel):
     project_id: str
     name: str
     content: bytes
@@ -1722,12 +1717,12 @@ class FileCreateRes(BaseModel):
     digest: str
 
 
-class FileContentReadReq(BaseModelStrict):
+class FileContentReadReq(BaseModel):
     project_id: str
     digest: str
 
 
-class FilesStatsReq(BaseModelStrict):
+class FilesStatsReq(BaseModel):
     project_id: str
 
 
@@ -1743,7 +1738,7 @@ class FilesStatsRes(BaseModel):
 ExportJobStatus = Literal["running", "done", "error"]
 
 
-class ExportStartReq(BaseModelStrict):
+class ExportStartReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     targets: list[str] = Field(
         description="Supported server-side export targets, e.g. ['calls', 'objects', 'feedback']."
@@ -1757,7 +1752,7 @@ class ExportStartRes(BaseModel):
     )
 
 
-class ExportStatusReq(BaseModelStrict):
+class ExportStatusReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     job_id: str = Field(description="Export job id returned by export_start.")
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1786,7 +1781,7 @@ class ExportStatusRes(BaseModel):
     manifest: list[ExportManifestEntry] = Field(default_factory=list)
 
 
-class CostCreateInput(BaseModelStrict):
+class CostCreateInput(BaseModel):
     prompt_token_cost: float
     completion_token_cost: float
     cache_read_input_token_cost: float = 0
@@ -1807,7 +1802,7 @@ class CostCreateInput(BaseModelStrict):
     )
 
 
-class CostCreateReq(BaseModelStrict):
+class CostCreateReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     costs: dict[str, CostCreateInput]
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -1818,7 +1813,7 @@ class CostCreateRes(BaseModel):
     ids: list[tuple[str, str]]
 
 
-class CostQueryReq(BaseModelStrict):
+class CostQueryReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     fields: list[str] | None = Field(
         default=None,
@@ -1863,7 +1858,7 @@ class CostQueryRes(BaseModel):
     results: list[CostQueryOutput]
 
 
-class CostPurgeReq(BaseModelStrict):
+class CostPurgeReq(BaseModel):
     project_id: str = Field(examples=["entity/project"])
     query: Query
 
@@ -1872,7 +1867,7 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ProjectStatsReq(BaseModelStrict):
+class ProjectStatsReq(BaseModel):
     project_id: str
     include_trace_storage_size: bool | None = True
     include_object_storage_size: bool | None = True
@@ -1891,7 +1886,7 @@ class ProjectStatsRes(BaseModel):
 # ================
 
 
-class ProjectTTLSettingsReadReq(BaseModelStrict):
+class ProjectTTLSettingsReadReq(BaseModel):
     project_id: str
 
 
@@ -1901,7 +1896,7 @@ class ProjectTTLSettingsReadRes(BaseModel):
     )
 
 
-class ProjectTTLSettingsUpdateReq(BaseModelStrict):
+class ProjectTTLSettingsUpdateReq(BaseModel):
     project_id: str
     retention_days: int | None = Field(
         default=None, description="None disables TTL; must be None or >= 1"
@@ -1933,7 +1928,7 @@ class AnnotationQueueSchema(BaseModel):
     deleted_at: datetime.datetime | None = None
 
 
-class AnnotationQueueCreateReq(BaseModelStrict):
+class AnnotationQueueCreateReq(BaseModel):
     """Request to create a new annotation queue."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -1956,7 +1951,7 @@ class AnnotationQueueCreateRes(BaseModel):
     id: str  # UUID of the created queue
 
 
-class AnnotationQueuesQueryReq(BaseModelStrict):
+class AnnotationQueuesQueryReq(BaseModel):
     """Request to query annotation queues for a project."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -1979,7 +1974,7 @@ class AnnotationQueuesQueryRes(BaseModel):
     queues: list[AnnotationQueueSchema]
 
 
-class AnnotationQueueReadReq(BaseModelStrict):
+class AnnotationQueueReadReq(BaseModel):
     """Request to read a specific annotation queue."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -1992,7 +1987,7 @@ class AnnotationQueueReadRes(BaseModel):
     queue: AnnotationQueueSchema
 
 
-class AnnotationQueueDeleteReq(BaseModelStrict):
+class AnnotationQueueDeleteReq(BaseModel):
     """Request to delete (soft-delete) an annotation queue."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2006,7 +2001,7 @@ class AnnotationQueueDeleteRes(BaseModel):
     queue: AnnotationQueueSchema
 
 
-class AnnotationQueueUpdateReq(BaseModelStrict):
+class AnnotationQueueUpdateReq(BaseModel):
     """Request to update an annotation queue.
 
     All fields except project_id and queue_id are optional - only provided fields will be updated.
@@ -2107,7 +2102,7 @@ class AnnotationQueueStatsSchema(BaseModel):
     )
 
 
-class AnnotationQueuesStatsReq(BaseModelStrict):
+class AnnotationQueuesStatsReq(BaseModel):
     """Request to get stats for multiple annotation queues."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2128,7 +2123,7 @@ class AnnotationQueuesStatsRes(BaseModel):
     stats: list[AnnotationQueueStatsSchema]
 
 
-class AnnotatorQueueItemsProgressUpdateReq(BaseModelStrict):
+class AnnotatorQueueItemsProgressUpdateReq(BaseModel):
     """Request to update the annotation state of a queue item for the current annotator.
 
     Valid state transitions:
@@ -2199,7 +2194,7 @@ class DatasetSourceLinkPayload(BaseModel):
     link_metadata: dict[str, Any] | None = None
 
 
-class DatasetSourcesLinkReq(BaseModelStrict):
+class DatasetSourcesLinkReq(BaseModel):
     """Request to link dataset rows to their provenance sources."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2230,7 +2225,7 @@ class DatasetSourcesLinkRes(BaseModel):
     entries: list[DatasetSourcesLinkResEntry]
 
 
-class DatasetSourcesLinkDeleteReq(BaseModelStrict):
+class DatasetSourcesLinkDeleteReq(BaseModel):
     """Request to soft-delete dataset source links by id."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2268,7 +2263,7 @@ class DatasetSourceLinkSchema(BaseModel):
     deleted_at: datetime.datetime | None = None
 
 
-class DatasetSourcesQueryReq(BaseModelStrict):
+class DatasetSourcesQueryReq(BaseModel):
     """Forward query: dataset -> sources."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2287,7 +2282,7 @@ class DatasetSourcesQueryRes(BaseModel):
     links: list[DatasetSourceLinkSchema]
 
 
-class SourceDatasetsQueryReq(BaseModelStrict):
+class SourceDatasetsQueryReq(BaseModel):
     """Reverse query: sources -> datasets."""
 
     project_id: str = Field(examples=["entity/project"])
@@ -2362,7 +2357,7 @@ class ThreadsQueryFilter(BaseModelStrict):
     )
 
 
-class ThreadsQueryReq(BaseModelStrict):
+class ThreadsQueryReq(BaseModel):
     """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
@@ -2388,7 +2383,7 @@ class ThreadsQueryReq(BaseModelStrict):
     )
 
 
-class EvaluateModelReq(BaseModelStrict):
+class EvaluateModelReq(BaseModel):
     project_id: str
     evaluation_ref: str
     model_ref: str
@@ -2486,27 +2481,27 @@ class RescoreRes(BaseModel):
     )
 
 
-class EvaluationStatusReq(BaseModelStrict):
+class EvaluationStatusReq(BaseModel):
     project_id: str
     call_id: str
 
 
-class EvaluationStatusNotFound(BaseModelStrict):
+class EvaluationStatusNotFound(BaseModel):
     code: Literal["not_found"] = "not_found"
 
 
-class EvaluationStatusRunning(BaseModelStrict):
+class EvaluationStatusRunning(BaseModel):
     code: Literal["running"] = "running"
     completed_rows: int
     total_rows: int
 
 
-class EvaluationStatusFailed(BaseModelStrict):
+class EvaluationStatusFailed(BaseModel):
     code: Literal["failed"] = "failed"
     error: str | None = None
 
 
-class EvaluationStatusComplete(BaseModelStrict):
+class EvaluationStatusComplete(BaseModel):
     code: Literal["complete"] = "complete"
     output: dict[str, Any]
 
@@ -2520,7 +2515,7 @@ class EvaluationStatusRes(BaseModel):
     )
 
 
-class CallsScoreReq(BaseModelStrict):
+class CallsScoreReq(BaseModel):
     """Request to enqueue scoring jobs for a list of calls.
 
     Scoring is performed asynchronously by the call_scoring_worker, which
@@ -2692,7 +2687,7 @@ class DatasetListReq(BaseModel):
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class DatasetDeleteReq(BaseModelStrict):
+class DatasetDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset is saved"
     )
@@ -2768,7 +2763,7 @@ class CustomRuntimeIDRes(CustomRuntimeID):
     playground_id: str
 
 
-class CustomRuntimeApplyRes(BaseModelStrict):
+class CustomRuntimeApplyRes(BaseModel):
     name: str = Field(description="Stable custom runtime name")
     base_url: str
     api_key_secret: str | None
@@ -2845,7 +2840,7 @@ class ScorerListReq(BaseModel):
     wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
-class ScorerDeleteReq(BaseModelStrict):
+class ScorerDeleteReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer is saved"
     )
@@ -3388,7 +3383,7 @@ class EvalResultsFilter(BaseModelStrict):
     )
 
 
-class EvalResultsQueryBody(BaseModelStrict):
+class EvalResultsQueryBody(BaseModel):
     evaluation_call_ids: list[str] | None = Field(
         default=None,
         description="Evaluation root call IDs to include.",
@@ -3964,7 +3959,7 @@ MAX_CALL_STATS_RANGE_DAYS = 31
 MAX_CALL_STATS_RANGE = datetime.timedelta(days=MAX_CALL_STATS_RANGE_DAYS)
 
 
-class CallStatsReq(BaseModelStrict):
+class CallStatsReq(BaseModel):
     """Request for aggregated call statistics over a time range."""
 
     project_id: str
@@ -4043,7 +4038,7 @@ class LLMAggregatedUsage(BaseModel):
 # --- /trace/usage endpoint (per-call usage with descendant rollup) ---
 
 
-class TraceUsageReq(BaseModelStrict):
+class TraceUsageReq(BaseModel):
     """Request to compute per-call usage for a trace, with descendant rollup.
 
     This endpoint returns usage metrics for each call in the trace, where each
@@ -4086,7 +4081,7 @@ class TraceUsageRes(BaseModel):
 # --- /calls/usage endpoint (root call usage across multiple traces) ---
 
 
-class CallsUsageReq(BaseModelStrict):
+class CallsUsageReq(BaseModel):
     """Request to compute aggregated usage for multiple root calls.
 
     This endpoint returns usage metrics for each requested root call, where each

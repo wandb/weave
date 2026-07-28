@@ -5,14 +5,17 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
+from weave.trace_server import http_service_interface as hsi
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
 )
+from weave.trace_server.service_interface import ProjectsInfoReq
 
 REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
@@ -34,6 +37,28 @@ def test_feedback_create_requests_ignore_unknown_fields() -> None:
     assert req.model_extra is None
     assert req.model_dump()["payload"] == {"score": 1}
     assert batch_req.model_dump()["batch"] == [req.model_dump()]
+
+
+def test_request_models_ignore_unknown_fields_but_filters_remain_strict() -> None:
+    """Request envelopes are upgrade-compatible; query components reject typos."""
+    call_read = tsi.CallReadReq.model_validate(
+        {"project_id": "entity/project", "id": "call-id", "future_field": True}
+    )
+    projects_info = ProjectsInfoReq.model_validate(
+        {"project_ids": ["entity/project"], "future_field": True}
+    )
+    obj_tags = hsi.ObjTagsBody.model_validate(
+        {"project_id": "entity/project", "tags": ["tag"], "future_field": True}
+    )
+
+    assert call_read.model_extra is None
+    assert projects_info.model_extra is None
+    assert obj_tags.model_extra is None
+
+    with pytest.raises(ValidationError):
+        tsi.CallsFilter.model_validate({"future_filter": True})
+    with pytest.raises(ValidationError):
+        tsi.SortBy.model_validate({"field": "started_at", "direction": "asc", "future": True})
 
 
 def test_extract_refs_from_values_deduplicates():

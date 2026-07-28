@@ -4,8 +4,6 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field
 
-from weave.trace_server.common_interface import BaseModelStrict
-
 
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str
@@ -16,7 +14,7 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
-class ProjectsInfoReq(BaseModelStrict):
+class ProjectsInfoReq(BaseModel):
     project_ids: list[str] = Field(
         description="External project IDs in 'entity/project' format.",
         examples=[["entity-a/project-a", "entity-b/project-b"]],
