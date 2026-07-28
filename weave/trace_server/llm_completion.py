@@ -5,6 +5,7 @@ from typing import Any
 import litellm
 from cachetools import TTLCache
 from litellm import CustomStreamWrapper
+from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
@@ -288,6 +289,17 @@ def lite_llm_completion(
     extra_headers: dict[str, str] | None = None,
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
+    if _use_direct_openai_client(provider, api_key, inputs.model):
+        client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
+        try:
+            with OpenAI(**client_kwargs) as client:
+                res = client.chat.completions.create(
+                    **_openai_compatible_inputs(inputs)
+                )
+            return tsi.CompletionsCreateRes(response=res.model_dump())
+        except Exception as e:
+            return _completion_error_response(e)
+
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
@@ -295,7 +307,7 @@ def lite_llm_completion(
         res = litellm.completion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
-        return _litellm_error_response(e)
+        return _completion_error_response(e)
 
 
 async def lite_llm_acompletion(
@@ -307,6 +319,17 @@ async def lite_llm_acompletion(
     vertex_credentials: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     """Async twin of `lite_llm_completion`. No thread held during the LLM wait."""
+    if _use_direct_openai_client(provider, api_key, inputs.model):
+        client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
+        try:
+            async with AsyncOpenAI(**client_kwargs) as client:
+                res = await client.chat.completions.create(
+                    **_openai_compatible_inputs(inputs)
+                )
+            return tsi.CompletionsCreateRes(response=res.model_dump())
+        except Exception as e:
+            return _completion_error_response(e)
+
     kwargs = _build_litellm_kwargs(
         api_key, inputs, provider, base_url, extra_headers, vertex_credentials
     )
@@ -314,7 +337,51 @@ async def lite_llm_acompletion(
         res = await litellm.acompletion(**kwargs)
         return tsi.CompletionsCreateRes(response=res.model_dump())
     except Exception as e:
-        return _litellm_error_response(e)
+        return _completion_error_response(e)
+
+
+def _openai_compatible_inputs(
+    inputs: tsi.CompletionsCreateRequestInputs,
+) -> dict[str, Any]:
+    inputs_dict = inputs.model_dump(
+        exclude_none=True,
+        exclude={
+            "api_version",
+            "extra_headers",
+            "prompt",
+            "template_vars",
+            "vertex_credentials",
+        },
+    )
+    model = inputs_dict["model"]
+    if model.startswith("openai/"):
+        inputs_dict["model"] = model.removeprefix("openai/")
+    return inputs_dict
+
+
+def _build_openai_client_kwargs(
+    base_url: str | None,
+    extra_headers: dict[str, str] | None,
+) -> dict[str, Any]:
+    if not base_url:
+        raise InvalidRequest(
+            "Invalid provider configuration: must provide base_url if provider is 'custom'"
+        )
+    return {
+        "api_key": "",
+        "base_url": base_url.rstrip("/"),
+        "default_headers": extra_headers,
+    }
+
+
+def _use_direct_openai_client(
+    provider: str | None,
+    api_key: str | None,
+    model: str,
+) -> bool:
+    # LiteLLM handles existing keyed providers. The direct client is only
+    # needed when an OpenAI-compatible custom endpoint has no bearer key.
+    return provider == "custom" and api_key is None and not model.startswith("ollama/")
 
 
 def _build_litellm_kwargs(
@@ -349,7 +416,6 @@ def _build_litellm_kwargs(
         exclude={"prompt", "template_vars", "vertex_credentials"},
     )
 
-    # Handle custom provider
     if provider == "custom" and base_url:
         return {
             **inputs_dict,
@@ -389,10 +455,10 @@ def _build_litellm_kwargs(
 ERROR_STATUS_CODE_KEY = "error_status_code"
 
 
-def _litellm_error_response(e: Exception) -> tsi.CompletionsCreateRes:
+def _completion_error_response(e: Exception) -> tsi.CompletionsCreateRes:
     response: dict[str, Any] = {"error": str(e).replace("litellm.", "", 1)}
-    # litellm exceptions subclass the openai error hierarchy and carry the
-    # provider HTTP status code; preserve it for status-class classification.
+    # OpenAI and LiteLLM exceptions carry the provider HTTP status code;
+    # preserve it for status-class classification.
     status_code = getattr(e, "status_code", None)
     if isinstance(status_code, int):
         response[ERROR_STATUS_CODE_KEY] = status_code
@@ -511,7 +577,7 @@ def _setup_provider_credentials_and_model(
 
 class CustomProviderInfo(BaseModel):
     base_url: str
-    api_key: str
+    api_key: str | None
     extra_headers: dict[str, str]
     return_type: str
     actual_model_name: str
@@ -539,7 +605,7 @@ def get_custom_provider_info(
     Returns:
         CustomProviderInfo containing:
         - base_url: The base URL for the provider
-        - api_key: The API key for the provider
+        - api_key: The resolved API key, or None when no secret is configured
         - extra_headers: Extra headers to send with the request
         - return_type: The return type for the provider
         - actual_model_name: The actual model name to use for the API call
@@ -608,17 +674,15 @@ def get_custom_provider_info(
 
     secret_name = provider_obj.api_key_name
 
-    # Get the API key
-    if not secret_name:
-        raise InvalidRequest(f"No secret name found for provider {provider_name}")
+    api_key = None
+    if secret_name:
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
 
-    api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-
-    if not api_key:
-        raise MissingLLMApiKeyError(
-            f"No API key {secret_name} found for provider {provider_name}",
-            api_key_name=secret_name,
-        )
+        if not api_key:
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for provider {provider_name}",
+                api_key_name=secret_name,
+            )
 
     info = CustomProviderInfo(
         base_url=provider_obj.base_url,
@@ -646,7 +710,7 @@ def lite_llm_completion_stream(
     return_type: str | None = None,
     vertex_credentials: str | None = None,
 ) -> Iterator[dict[str, Any]]:
-    """Stream completion chunks from the underlying LLM provider using litellm.
+    """Stream completion chunks from the underlying LLM provider.
 
     This mirrors :pyfunc:`lite_llm_completion` but sets ``stream=True`` and yields
     dictionary chunks that can be serialized with ``json.dumps``.  Error handling
@@ -669,12 +733,23 @@ def lite_llm_completion_stream(
 
     litellm.drop_params = True
 
-    # Helper to produce a generator of dicts from litellm chunks
+    # Produce serializable dictionaries regardless of the underlying client.
     def _generate_chunks() -> Iterator[dict[str, Any]]:
         try:
-            if provider == "custom" and base_url:
-                headers = extra_headers or {}
-
+            if _use_direct_openai_client(provider, api_key, inputs.model):
+                client_kwargs = _build_openai_client_kwargs(base_url, extra_headers)
+                with OpenAI(**client_kwargs) as client:
+                    request_inputs = _openai_compatible_inputs(inputs)
+                    request_inputs.pop("stream", None)
+                    stream = client.chat.completions.create(
+                        **request_inputs,
+                        stream=True,
+                        stream_options={"include_usage": True},
+                    )
+                    for chunk in stream:
+                        yield chunk.model_dump()
+                return
+            elif provider == "custom" and base_url:
                 model_dict = inputs.model_dump(
                     exclude=[
                         "extra_headers",
@@ -682,12 +757,11 @@ def lite_llm_completion_stream(
                         "stream_options",
                     ]
                 )
-
                 stream = litellm.completion(
                     **model_dict,
                     api_key=api_key,
                     api_base=base_url,
-                    extra_headers=headers,
+                    extra_headers=extra_headers or {},
                     stream=True,
                     stream_options={"include_usage": True},
                 )

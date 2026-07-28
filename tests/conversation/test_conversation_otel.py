@@ -1417,6 +1417,7 @@ class TestLogTurn:
             agent_name="weather-bot",
             conversation_name="Weather Chat",
             messages=[Message(role="user", content="What's the weather?")],
+            output_messages=[Message(role="assistant", content="It is sunny.")],
             started_at=_ts(0),
             ended_at=_ts(3),
         )
@@ -1430,6 +1431,18 @@ class TestLogTurn:
         assert attrs["gen_ai.agent.name"] == "weather-bot"
         assert attrs["gen_ai.conversation.id"] == "convo-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What's the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
+        ]
         assert sp.start_time == int(_ts(0).timestamp() * 1_000_000_000)
         assert sp.end_time == int(_ts(3).timestamp() * 1_000_000_000)
 
@@ -1853,6 +1866,8 @@ class TestLogConversation:
                     agent_description="A helpful bot",
                     agent_version="v2",
                     system_instructions=["You are a weather bot"],
+                    messages=[Message.user("What is the weather?")],
+                    output_messages=[Message.assistant("It is sunny.")],
                     started_at=_ts(0),
                     ended_at=_ts(1),
                 ),
@@ -1864,6 +1879,18 @@ class TestLogConversation:
         attrs = dict(turn_spans[0].attributes or {})
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
             {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What is the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
         ]
         assert attrs["gen_ai.agent.id"] == "agent-123"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
@@ -2198,17 +2225,22 @@ class TestTurnRecord:
 
     def test_partial_record_preserves_existing(self) -> None:
         """Fields not passed (None) keep their existing values."""
-        turn = Turn(agent_name="bot")
+        turn = Turn(
+            agent_name="bot",
+            output_messages=[Message.assistant("existing response")],
+        )
         turn.agent_id = "preset"
         turn.record(system_instructions=["You are a bot"])
         assert turn.agent_id == "preset"
         assert turn.agent_name == "bot"
+        assert turn.output_messages == [Message.assistant("existing response")]
         assert turn.system_instructions == ["You are a bot"]
 
     def test_sets_all_fields(self) -> None:
         turn = Turn()
         turn.record(
             messages=[Message.user("hi")],
+            output_messages=[Message.assistant("hello")],
             system_instructions=["sys"],
             agent_name="bot",
             model="gpt-4o",
@@ -2217,6 +2249,7 @@ class TestTurnRecord:
             agent_version="v1",
         )
         assert turn.messages == [Message.user("hi")]
+        assert turn.output_messages == [Message.assistant("hello")]
         assert turn.system_instructions == ["sys"]
         assert turn.agent_name == "bot"
         assert turn.model == "gpt-4o"
@@ -2235,6 +2268,8 @@ class TestTurnRecord:
         with Conversation(conversation_id="convo-turn-record") as s:
             with s.start_turn(agent_name="weather-bot") as turn:
                 turn.record(
+                    messages=[Message.user("What is the weather?")],
+                    output_messages=[Message.assistant("It is sunny.")],
                     system_instructions=["You are a weather bot"],
                     agent_id="agent-9",
                     agent_description="A helpful bot",
@@ -2247,6 +2282,18 @@ class TestTurnRecord:
         attrs = dict(turn_spans[0].attributes or {})
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
             {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What is the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
         ]
         assert attrs["gen_ai.agent.id"] == "agent-9"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"

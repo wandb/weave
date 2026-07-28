@@ -18,7 +18,8 @@ const OPENAI_INTEGRATION = libraryIntegration('openai');
 const SERVERLESS_INFERENCE_HOST = 'api.inference.wandb.ai';
 const SERVERLESS_INFERENCE_LABEL = 'Serverless Inference';
 const CHAT_COMPLETIONS_CREATE_OP = 'openai.chat.completions.create';
-const CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
+const CHAT_COMPLETIONS_PARSE_OP = 'openai.chat.completions.parse';
+const BETA_CHAT_COMPLETIONS_PARSE_OP = 'openai.beta.chat.completions.parse';
 
 function serverlessInferenceCallDisplayName(
   baseURL: string | undefined,
@@ -137,7 +138,8 @@ export const openAIStreamReducer = {
 export function wrapOpenAIChatCompletionsCreate(
   originalCreate: any,
   name: string,
-  baseURL?: string
+  baseURL?: string,
+  opts: {traceInAgentContext?: boolean} = {}
 ) {
   const opRef = {
     __isOp: true as const,
@@ -153,7 +155,10 @@ export function wrapOpenAIChatCompletionsCreate(
   ) {
     const client = getGlobalClient();
     if (!client) return originalCreate(...args);
-    if (shouldSkipTracingInAgentContext()) {
+    // The agents OTel processor already reports the model calls the agents SDK
+    // makes, so tracing those here would double-report them. `parse` is not one
+    // of them — that SDK never calls it — so its call sites opt back in.
+    if (!opts.traceInAgentContext && shouldSkipTracingInAgentContext()) {
       return originalCreate(...args);
     }
 
@@ -733,13 +738,9 @@ interface OpenAIAPI {
   images: {
     generate: any;
   };
-  beta: {
-    chat: {
-      completions: {
-        parse: any;
-      };
-    };
-  };
+  // The shape moved twice: openai-node 4.0-4.14 had no `beta` at all, 4.15 added
+  // `beta.chat.completions`, and v5 removed that again.
+  beta?: any;
   responses?: {
     create: any;
   };
@@ -766,6 +767,16 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
           openai.baseURL
         );
       }
+      // A read of an absent method reaches `.bind` and throws, and `parse` only
+      // exists on this namespace since openai-node v5.
+      if (p === 'parse' && typeof targetVal === 'function') {
+        return wrapOpenAIChatCompletionsCreate(
+          targetVal.bind(target),
+          CHAT_COMPLETIONS_PARSE_OP,
+          openai.baseURL,
+          {traceInAgentContext: true}
+        );
+      }
       return targetVal;
     },
   });
@@ -789,18 +800,20 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     },
   });
 
-  const hasBetaChatApis = openai.beta.chat != null;
+  const hasBetaChatApis = openai.beta?.chat != null;
   let betaProxy: any = null;
 
   if (hasBetaChatApis) {
     const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
       get(target, p, receiver) {
         const targetVal = Reflect.get(target, p, receiver);
-        if (p === 'parse') {
+        // Guarded like the non-beta branch: `beta.chat` predates `parse`.
+        if (p === 'parse' && typeof targetVal === 'function') {
           return wrapOpenAIChatCompletionsCreate(
             targetVal.bind(target),
-            CHAT_COMPLETIONS_PARSE_OP,
-            openai.baseURL
+            BETA_CHAT_COMPLETIONS_PARSE_OP,
+            openai.baseURL,
+            {traceInAgentContext: true}
           );
         }
         return targetVal;
