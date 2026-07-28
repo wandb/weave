@@ -898,21 +898,21 @@ def _interpolated_quantile(durations: list[float], level: float) -> float | None
     return durations[f] + (k - f) * (durations[c] - durations[f])
 
 
-def _source_fields(
+def _call_source(
     attributes: dict[str, Any] | None, otel_dump: dict[str, Any] | None
-) -> dict[str, str | None]:
-    """Resolve the `source_*` columns for a `_CallRec`, as ClickHouse does on insert.
+) -> tuple[str | None, str | None, str | None]:
+    """Resolve `(source_name, source_version, source_sdk)` as ClickHouse does on insert.
 
     Unresolved rungs become None, not '', to match what the ClickHouse read path
     returns: `ch_sentinel_values.from_ch_value` maps calls_complete's '' sentinel
     back to None, and calls_merged stores NULL outright.
     """
     source = resolve_for_call(attributes=attributes, otel_dump=otel_dump)
-    return {
-        "source_name": empty_str_to_none(source.name),
-        "source_version": empty_str_to_none(source.version),
-        "source_sdk": empty_str_to_none(source.sdk),
-    }
+    return (
+        empty_str_to_none(source.name),
+        empty_str_to_none(source.version),
+        empty_str_to_none(source.sdk),
+    )
 
 
 @dataclass(slots=True)
@@ -1241,6 +1241,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 expire_at = self._compute_call_expire_at(
                     call.project_id, call.started_at
                 )
+                call_source = _call_source(call.attributes, call.otel_dump)
 
                 rec = _CallRec(
                     project_id=call.project_id,
@@ -1278,7 +1279,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     inputs_len=len(inputs_json),
                     output_len=len(output_json),
                     summary_len=len(summary_json),
-                    **_source_fields(call.attributes, call.otel_dump),
+                    source_name=call_source[0],
+                    source_version=call_source[1],
+                    source_sdk=call_source[2],
                 )
                 self._calls[rec.project_id, rec.id] = rec
         return tsi.CallsUpsertCompleteRes()
@@ -1341,10 +1344,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
-                for source_field, source_value in _source_fields(
-                    req.start.attributes, req.start.otel_dump
-                ).items():
-                    setattr(existing, source_field, source_value)
+                (
+                    existing.source_name,
+                    existing.source_version,
+                    existing.source_sdk,
+                ) = _call_source(req.start.attributes, req.start.otel_dump)
                 existing.otel_dump = copy.deepcopy(req.start.otel_dump)
                 existing.otel_dump_len = (
                     len(json.dumps(req.start.otel_dump))
@@ -1355,6 +1359,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.attributes_len = len(attributes_json)
                 existing.inputs_len = len(inputs_json)
             else:
+                start_source = _call_source(req.start.attributes, req.start.otel_dump)
                 rec = _CallRec(
                     project_id=req.start.project_id,
                     id=req.start.id,
@@ -1382,7 +1387,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
                     inputs_len=len(inputs_json),
-                    **_source_fields(req.start.attributes, req.start.otel_dump),
+                    source_name=start_source[0],
+                    source_version=start_source[1],
+                    source_sdk=start_source[2],
                 )
                 self._calls[rec.project_id, rec.id] = rec
 
