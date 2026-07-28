@@ -360,21 +360,24 @@ EVAL_EVALUATION_NAME = Attribute(
 # that fills these columns lives in `trace_server/source_attribution.py`;
 # `integration.meta.*` stays in the custom-attr maps.
 #
-# The `integration` prefix is `INTEGRATION_ATTRIBUTE_KEY` in
-# `weave/integrations/integration_metadata.py`, restated rather than imported
-# because the trace server may not import the client SDK (see the import-linter
-# contract in pyproject.toml). `test_source_attribution.py` pins the two together.
+# Both SDK spellings are accepted: Python's `as_otel_attributes()` emits
+# `integration.*` (`INTEGRATION_ATTRIBUTE_KEY` in
+# `weave/integrations/integration_metadata.py`) while the node SDK emits
+# `weave.integration.*` (`WEAVE_INTEGRATION_NAME` in `sdks/node/src/genai/semconv.ts`).
+# Restated rather than imported because the trace server may not import the client
+# SDK (see the import-linter contract in pyproject.toml);
+# `test_source_attribution.py` pins both to their producers.
 SOURCE_NAME = Attribute(
     "weave.source.name",
     "string",
     "Instrumentation that produced this row: openai, langchain, codex, ...",
-    ["integration.name"],
+    ["integration.name", "weave.integration.name"],
 )
 SOURCE_VERSION = Attribute(
     "weave.source.version",
     "string",
     "Version of the instrumentation that produced this row",
-    ["integration.version"],
+    ["integration.version", "weave.integration.version"],
 )
 SOURCE_SDK = Attribute(
     "weave.source.sdk",
