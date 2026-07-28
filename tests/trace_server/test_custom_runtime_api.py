@@ -290,16 +290,14 @@ def test_custom_runtime_apply_objects_work_with_existing_completion_lookup(
     "request_data",
     [
         {"runtime_name": "", "runtime_ids": [{"id": "runtime"}]},
+        {"runtime_name": "runtime name", "runtime_ids": [{"id": "runtime"}]},
         {"runtime_name": "name::part", "runtime_ids": [{"id": "runtime"}]},
         {"runtime_name": "a" * 129, "runtime_ids": [{"id": "runtime"}]},
         {"runtime_name": "runtime", "runtime_ids": [{"id": ""}]},
+        {"runtime_name": "runtime", "runtime_ids": [{"id": "runtime\tid"}]},
         {
             "runtime_name": "runtime",
             "runtime_ids": [{"id": "duplicate"}, {"id": "duplicate"}],
-        },
-        {
-            "runtime_name": "r" * 64,
-            "runtime_ids": [{"id": "i" * 64}],
         },
     ],
 )
@@ -311,6 +309,59 @@ def test_custom_runtime_apply_validates_names_before_writes(
             project_id=PROJECT_ID,
             base_url="https://agent.example.com/v1",
             **request_data,
+        )
+
+
+def test_custom_runtime_apply_trims_identifiers_before_validation() -> None:
+    request = tsi.CustomRuntimeApplyReq(
+        project_id=PROJECT_ID,
+        runtime_name=f" {'r' * 64} ",
+        base_url="https://agent.example.com/v1",
+        runtime_ids=[
+            {"id": " runtime "},
+        ],
+    )
+
+    assert request.runtime_name == "r" * 64
+    assert request.runtime_ids[0].id == "runtime"
+
+    with pytest.raises(ValidationError, match="duplicate runtime ID"):
+        tsi.CustomRuntimeApplyReq(
+            project_id=PROJECT_ID,
+            runtime_name="runtime",
+            base_url="https://agent.example.com/v1",
+            runtime_ids=[
+                {"id": "duplicate"},
+                {"id": " duplicate "},
+            ],
+        )
+
+
+def test_custom_runtime_id_constraints_are_reflected_in_schema() -> None:
+    id_schema = tsi.CustomRuntimeID.model_json_schema()["properties"]["id"]
+
+    assert id_schema["minLength"] == 1
+    assert id_schema["pattern"] == r"^\S+$"
+
+
+def test_custom_runtime_name_constraints_are_reflected_in_schema() -> None:
+    request_schema = tsi.CustomRuntimeApplyReq.model_json_schema()
+    name_schema = request_schema["properties"]["runtime_name"]
+
+    assert name_schema["minLength"] == 1
+    assert name_schema["pattern"] == r"^[^\s:]*(?::[^\s:]+)*:?$"
+
+
+def test_custom_runtime_request_validates_storage_name_length() -> None:
+    with pytest.raises(
+        InvalidRequest,
+        match="Runtime name and ID together cannot exceed 128 characters",
+    ):
+        tsi.CustomRuntimeApplyReq(
+            project_id=PROJECT_ID,
+            runtime_name="r" * 64,
+            base_url="https://agent.example.com/v1",
+            runtime_ids=[{"id": "i" * 64}],
         )
 
 
