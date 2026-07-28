@@ -961,6 +961,7 @@ class Turn(_SpanBase):
     """
 
     agent_name: str = ""
+    provider_name: str = ""
     model: str = ""
     agent_id: str = ""
     agent_description: str = ""
@@ -1078,6 +1079,7 @@ class Turn(_SpanBase):
         output_messages: list[Message] | None = None,
         system_instructions: list[str] | None = None,
         agent_name: str | None = None,
+        provider_name: str | None = None,
         model: str | None = None,
         agent_id: str | None = None,
         agent_description: str | None = None,
@@ -1108,6 +1110,8 @@ class Turn(_SpanBase):
             self.system_instructions = system_instructions
         if agent_name is not None:
             self.agent_name = agent_name
+        if provider_name is not None:
+            self.provider_name = provider_name
         if model is not None:
             self.model = model
         if agent_id is not None:
@@ -1148,6 +1152,7 @@ class Turn(_SpanBase):
             agent_name=self.agent_name,
             conversation_id=conversation_id,
             conversation_name=conversation_name,
+            provider_name=self.provider_name,
             model=self.model,
             input_messages=messages,
             output_messages=output_messages,
@@ -1251,6 +1256,7 @@ class Conversation(BaseModel):
         user_message: str = "",
         model: str = "",
         agent_name: str = "",
+        provider_name: str = "",
         agent_id: str = "",
         agent_description: str = "",
         agent_version: str = "",
@@ -1262,8 +1268,9 @@ class Conversation(BaseModel):
         ``get_current_turn()`` regardless of whether a context manager is used.
         Each of ``agent_name`` / ``model`` / ``agent_id`` / ``agent_description``
         / ``agent_version`` falls back to the conversation's default when left
-        empty; ``continue_parent_trace`` is inherited. Override any of them later
-        via ``turn.record(...)``.
+        empty; ``provider_name`` is specific to this turn and
+        ``continue_parent_trace`` is inherited. Override any typed turn field
+        later via ``turn.record(...)``.
 
         ``system_instructions`` (the agent's system prompt) is carried on the
         turn's invoke_agent span; it can also be set later via attribute
@@ -1273,6 +1280,7 @@ class Conversation(BaseModel):
             self._current_turn.end()
         turn = Turn(
             agent_name=agent_name or self.agent_name,
+            provider_name=provider_name,
             model=model or self.model,
             agent_id=agent_id or self.agent_id,
             agent_description=agent_description or self.agent_description,
@@ -1367,6 +1375,7 @@ def start_turn(
     user_message: str = "",
     model: str = "",
     agent_name: str = "",
+    provider_name: str = "",
     system_instructions: list[str] | None = None,
 ) -> Turn:
     """Create and activate a turn. Uses the current conversation if available.
@@ -1382,10 +1391,12 @@ def start_turn(
             user_message=user_message,
             model=model,
             agent_name=agent_name,
+            provider_name=provider_name,
             system_instructions=system_instructions,
         )
     turn = Turn(
         agent_name=agent_name,
+        provider_name=provider_name,
         model=model,
         system_instructions=system_instructions or [],
     )
@@ -1655,6 +1666,7 @@ def log_turn(
     conversation_id: str,
     agent_name: str = "",
     conversation_name: str = "",
+    provider_name: str = "",
     model: str = "",
     agent_id: str = "",
     agent_description: str = "",
@@ -1676,7 +1688,7 @@ def log_turn(
     ``ended_at`` set; the emitted OTel span timestamps come from those fields.
     Falls back to the earliest/latest child timestamp, then ``now()``, when
     the turn doesn't supply its own. ``agent_id`` / ``agent_description`` /
-    ``agent_version`` mirror the streaming path.
+    ``agent_version`` and ``provider_name`` mirror the streaming path.
 
     ``attributes`` are stamped on every emitted span; the streaming path reads
     these from the active conversation instead. Use custom, non-semconv keys: a
@@ -1700,6 +1712,7 @@ def log_turn(
     )
     turn = Turn(
         agent_name=agent_name,
+        provider_name=provider_name,
         model=model,
         agent_id=agent_id,
         agent_description=agent_description,

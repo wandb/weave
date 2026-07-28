@@ -425,6 +425,9 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- `Turn.provider_name` is the typed source for `gen_ai.provider.name` on the
+  root `invoke_agent` span. Pass it through `start_turn`, `Turn.record`, or
+  `log_turn` instead of setting that semantic attribute with `set_attributes`.
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
@@ -512,9 +515,9 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
-- [ ] Add `output_messages` to Python `Turn.record()` for parity with
-      TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
-      `invoke_agent_attributes()` builder already supports agent output.
+- [ ] Reconcile Ruff 0.16's `RUF105` requirement to use `ruff: ignore` with
+      this file's instruction to use spot-level `# noqa` for intentional
+      `PLW` suppressions.
 - [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
       OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
       `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.

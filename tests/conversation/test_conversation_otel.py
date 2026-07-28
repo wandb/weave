@@ -963,11 +963,28 @@ class TestOTelSpanEmission:
             {"type": "text", "content": "You are a weather bot"},
         ]
 
+    def test_start_turn_provider_name_param_emitted_on_span(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(agent_name="bot", conversation_id="convo-provider") as s:
+            with s.start_turn(provider_name="anthropic"):
+                pass
+
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.provider.name"] == "anthropic"
+
     def test_module_start_turn_system_instructions_param(self) -> None:
         # weave.start_turn(...) wires the field onto the returned Turn whether
         # or not a conversation is active (delegates to Conversation.start_turn when one is).
         turn = start_turn(system_instructions=["You are a weather bot"])
         assert turn.system_instructions == ["You are a weather bot"]
+
+    def test_module_start_turn_provider_name_param(self) -> None:
+        turn = start_turn(provider_name="anthropic")
+        assert turn.provider_name == "anthropic"
 
     def test_conversation_agent_identity_propagates_to_turn_span(
         self, otel_spans: InMemorySpanExporter
@@ -1549,6 +1566,20 @@ class TestLogTurn:
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
         assert attrs["gen_ai.agent.version"] == "v3"
 
+    def test_provider_name_emitted(self, otel_spans: InMemorySpanExporter) -> None:
+        log_turn(
+            conversation_id="convo-provider",
+            agent_name="bot",
+            provider_name="anthropic",
+            started_at=_ts(0),
+            ended_at=_ts(1),
+        )
+        spans = otel_spans.get_finished_spans()
+        turn_spans = [sp for sp in spans if sp.name == "invoke_agent bot"]
+        assert len(turn_spans) == 1
+        attrs = dict(turn_spans[0].attributes or {})
+        assert attrs["gen_ai.provider.name"] == "anthropic"
+
     def test_subagent_system_instructions_emitted(
         self, otel_spans: InMemorySpanExporter
     ) -> None:
@@ -1862,6 +1893,7 @@ class TestLogConversation:
             turns=[
                 Turn(
                     agent_name="bot",
+                    provider_name="anthropic",
                     agent_id="agent-123",
                     agent_description="A helpful bot",
                     agent_version="v2",
@@ -1895,6 +1927,7 @@ class TestLogConversation:
         assert attrs["gen_ai.agent.id"] == "agent-123"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
         assert attrs["gen_ai.agent.version"] == "v2"
+        assert attrs["gen_ai.provider.name"] == "anthropic"
 
     def test_agent_identity_defaults_applied(
         self, otel_spans: InMemorySpanExporter
@@ -2243,6 +2276,7 @@ class TestTurnRecord:
             output_messages=[Message.assistant("hello")],
             system_instructions=["sys"],
             agent_name="bot",
+            provider_name="openai",
             model="gpt-4o",
             agent_id="id-1",
             agent_description="desc",
@@ -2252,6 +2286,7 @@ class TestTurnRecord:
         assert turn.output_messages == [Message.assistant("hello")]
         assert turn.system_instructions == ["sys"]
         assert turn.agent_name == "bot"
+        assert turn.provider_name == "openai"
         assert turn.model == "gpt-4o"
         assert turn.agent_id == "id-1"
         assert turn.agent_description == "desc"
