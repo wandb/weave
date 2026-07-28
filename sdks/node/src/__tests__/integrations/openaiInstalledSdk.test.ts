@@ -94,4 +94,40 @@ describe('wrapOpenAI against the installed openai package', () => {
       },
     });
   });
+
+  test('records the responses resource as a type marker', async () => {
+    const apiKey = 'not-a-real-key';
+    const client = new OpenAI({
+      apiKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            id: 'resp_1',
+            object: 'response',
+            created_at: 1,
+            model: 'gpt-4o-2024-05-13',
+            status: 'completed',
+            output: [],
+            usage: {input_tokens: 4, output_tokens: 2, total_tokens: 6},
+          }),
+          {status: 200, headers: {'content-type': 'application/json'}}
+        ),
+    });
+
+    await wrapOpenAI(client).responses.create({
+      model: 'gpt-4o-2024-05-13',
+      input: 'Which city?',
+    });
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    // A string for `self` keeps the app's Responses chat view matching the
+    // call, which needs `self` present; nothing reads its contents.
+    expect(calls[0].inputs).toEqual({
+      self: '<Responses>',
+      model: 'gpt-4o-2024-05-13',
+      input: 'Which city?',
+    });
+    expect(JSON.stringify(calls[0])).not.toContain(apiKey);
+  });
 });

@@ -255,7 +255,7 @@ describe('Anthropic Integration', () => {
       version: expect.any(String),
       meta: {package_name: '@anthropic-ai/sdk'},
     });
-    expect(calls[0].inputs).toEqual({arg0: options, self: {}});
+    expect(calls[0].inputs).toEqual({arg0: options, self: '<MockMessages>'});
     expect(calls[0].output).toMatchObject(result);
     expect(calls[0].summary).toEqual({
       usage: {
@@ -295,7 +295,7 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
-    expect(calls[0].inputs).toEqual({arg0: options, self: {}});
+    expect(calls[0].inputs).toEqual({arg0: options, self: '<MockMessages>'});
 
     // Now that we use MockAPIPromise (which can be monkey-patched), the WeaveIterator works properly
     expect(calls[0].output).toMatchObject({
@@ -357,7 +357,10 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('stream');
-    expect(calls[0].inputs).toMatchObject({arg1: options, self: {}});
+    expect(calls[0].inputs).toMatchObject({
+      arg1: options,
+      self: '<MockMessages>',
+    });
     expect(calls[0].output).toMatchObject({
       messages: expect.arrayContaining([
         expect.objectContaining({
@@ -408,7 +411,10 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
-    expect(calls[0].inputs).toEqual({arg0: batchOptions, self: {}});
+    expect(calls[0].inputs).toEqual({
+      arg0: batchOptions,
+      self: '<MockBatches>',
+    });
     expect(calls[0].output).toMatchObject(result);
   });
 
@@ -430,7 +436,7 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('retrieve');
-    expect(calls[0].inputs).toEqual({arg0: batchId, self: {}});
+    expect(calls[0].inputs).toEqual({arg0: batchId, self: '<MockBatches>'});
     expect(calls[0].output).toMatchObject(result);
   });
 
@@ -463,7 +469,7 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('results');
-    expect(calls[0].inputs).toEqual({arg0: batchId, self: {}});
+    expect(calls[0].inputs).toEqual({arg0: batchId, self: '<MockBatches>'});
     expect(calls[0].output).toMatchObject({
       messages: expect.arrayContaining([
         expect.objectContaining({
@@ -505,7 +511,7 @@ describe('Anthropic Integration', () => {
     const calls = await traceServer.getCalls(testProjectName);
     expect(calls).toHaveLength(1);
     expect(calls[0].op_name).toContain('create');
-    expect(calls[0].inputs).toEqual({arg0: options, self: {}});
+    expect(calls[0].inputs).toEqual({arg0: options, self: '<MockMessages>'});
     expect(calls[0].exception).toContain('API Error');
   });
 
