@@ -121,7 +121,6 @@ class _TurnState:
 
     conversation: Conversation
     turn: Turn
-    sdk_conversation_id: str = ""
     model: str = ""
     final_text: str = ""
     is_error: bool = False
@@ -144,14 +143,14 @@ def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> Non
         state.pending_chat = None
 
 
-def _process_message(msg: Any, state: _TurnState) -> None:
-    """Handle one streamed message, creating/closing child spans as needed."""
+def _process_message(msg: Any, state: _TurnState) -> str | None:
+    """Handle one streamed message and return a newly observed SDK session ID."""
     if isinstance(msg, SystemMessage):
         session_id = (msg.data or {}).get("session_id")
-        if session_id:
-            state.sdk_conversation_id = session_id
+        if isinstance(session_id, str) and session_id:
             state.conversation.conversation_id = session_id
-        return
+            return session_id
+        return None
 
     if isinstance(msg, AssistantMessage):
         # Buffer thinking-only messages so extended-thinking deltas fold into
@@ -269,17 +268,13 @@ async def _trace_turn(
             state = _TurnState(
                 conversation=conversation,
                 turn=turn,
-                sdk_conversation_id=conversation_id,
             )
             try:
                 async for msg in messages:
                     try:
-                        _process_message(msg, state)
-                        if (
-                            conversation_id_holder is not None
-                            and state.sdk_conversation_id
-                        ):
-                            conversation_id_holder[0] = state.sdk_conversation_id
+                        session_id = _process_message(msg, state)
+                        if conversation_id_holder is not None and session_id:
+                            conversation_id_holder[0] = session_id
                     except Exception:
                         # Never let span bookkeeping break the user's stream.
                         logger.exception(
