@@ -1442,28 +1442,48 @@ def test_completion_span_redacts_credential_shaped_request_fields():
         model_name="gpt-4o",
         request_inputs=tsi.CompletionsCreateRequestInputs(
             model="gpt-4o",
-            messages=[{"role": "user", "content": "hi"}],
+            messages=[
+                {"role": "system", "content": {"webhook_secret": "value-to-redact"}},
+                {"role": "user", "content": {"openai_api_key": "value-to-redact"}},
+            ],
             extra_headers={"authorization": "value-to-redact"},
             tools=[{"type": "mcp", "headers": {"api_key": "value-to-redact"}}],
+            # Excluded from the dump by name, which the policy no longer relies on.
+            vertex_credentials="value-to-redact",
         ),
-        # A response is generated content, so it is left as the provider sent it.
-        response={"choices": [{"message": {"content": "{'api_key': 'kept'}"}}]},
+        # A response is generated content, so it is left as the provider sent it,
+        # credential-shaped field name and all.
+        response={
+            "choices": [{"message": {"content": "hi"}}],
+            "client_secret": "left-alone",
+        },
         wb_user_id="u-1",
         retention_days=0,
     )
 
     redacted_tools = [{"type": "mcp", "headers": {"api_key": REDACTED_VALUE}}]
+    redacted_messages = [
+        {"role": "system", "content": {"webhook_secret": REDACTED_VALUE}},
+        {"role": "user", "content": {"openai_api_key": REDACTED_VALUE}},
+    ]
     assert json.loads(span.raw_span_dump) == {
         "inputs": {
             "model": "gpt-4o",
-            "messages": [{"role": "user", "content": "hi"}],
+            "messages": redacted_messages,
             "extra_headers": {"authorization": REDACTED_VALUE},
             "tools": redacted_tools,
         },
-        "response": {"choices": [{"message": {"content": "{'api_key': 'kept'}"}}]},
+        "response": {
+            "choices": [{"message": {"content": "hi"}}],
+            "client_secret": "left-alone",
+        },
     }
-    # Derived from the same request field, so it needs the same treatment.
+    # Every other column derived from the request has to agree with that dump.
     assert json.loads(span.tool_definitions) == redacted_tools
+    assert [m.content for m in span.input_messages] == [
+        str(redacted_messages[1]["content"])
+    ]
+    assert span.system_instructions == [str(redacted_messages[0]["content"])]
 
 
 def test_completions_writes_agent_span(

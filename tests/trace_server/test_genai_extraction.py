@@ -656,11 +656,11 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
     assert trace_server.file_create.call_count == 2
 
 
-def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
+def test_redact_credentials_from_span_reaches_every_attribute_container() -> None:
     """Every container a span carries is redacted, not only its own attributes.
-    ``custom_attrs_string`` and ``tool_call_arguments`` are pinned alongside the
-    dumps because both are queryable, and the second one is derived from an
-    event, which is the container easiest to miss.
+
+    ``tool_call_arguments`` is pinned alongside the dumps because it is derived
+    from an event, the container easiest to miss.
     """
     span = _make_span(
         attrs={
@@ -677,7 +677,13 @@ def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
                 },
             )
         ],
-        links=[Link(trace_id="abc123", span_id="fed654", attributes={"api_key": "x"})],
+        links=[
+            Link(
+                trace_id="abc123",
+                span_id="fed654",
+                attributes={"api_key": "value-to-redact"},
+            )
+        ],
     )
 
     redact_credentials_from_span(span)
@@ -705,11 +711,8 @@ def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
     }
 
 
-def test_redaction_runs_before_the_inline_blob_strip() -> None:
-    """A credential value big enough to look like a blob never reaches storage.
-    ``strip_inline_blobs_from_span`` uploads such a value and leaves a ref in its
-    place, so redacting after it would replace the ref and keep the file.
-    """
+def test_redaction_before_the_blob_strip_uploads_nothing() -> None:
+    """A credential value big enough to look like a blob never reaches storage."""
     b64 = base64.b64encode(b"a" * 15000).decode("ascii")
     trace_server = _mock_trace_server()
     span = _make_span(attrs={"openai_api_key": f"data:image/png;base64,{b64}"})

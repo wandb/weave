@@ -64,8 +64,15 @@ def build_completion_span(
     agent_name = _SOURCE_TO_AGENT_NAME.get(source, PLAYGROUND_AGENT_NAME)
     weave_source = source or "playground"
 
-    input_messages = _normalize_input_messages(request_inputs.messages)
-    system_instructions = _extract_system_instructions(request_inputs.messages)
+    # Every column below is derived from this one redacted copy of the request,
+    # so no derived column can keep a value another one replaced.
+    redacted_inputs = redact_sensitive_keys(
+        request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
+    )
+    redacted_messages = redacted_inputs.get("messages", [])
+
+    input_messages = _normalize_input_messages(redacted_messages)
+    system_instructions = _extract_system_instructions(redacted_messages)
     output_messages: list[NormalizedMessage] = []
     finish_reasons: list[str] = []
 
@@ -103,7 +110,7 @@ def build_completion_span(
     tool_definitions = ""
     if request_inputs.tools:
         try:
-            tool_definitions = json.dumps(redact_sensitive_keys(request_inputs.tools))
+            tool_definitions = json.dumps(redacted_inputs.get("tools"))
         except (TypeError, ValueError):
             pass
 
@@ -118,11 +125,7 @@ def build_completion_span(
     if expire_at is None:
         expire_at = EXPIRE_AT_NEVER
 
-    raw_dump: dict[str, Any] = {
-        "inputs": redact_sensitive_keys(
-            request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
-        ),
-    }
+    raw_dump: dict[str, Any] = {"inputs": redacted_inputs}
     if response is not None:
         raw_dump["response"] = response
     if error:

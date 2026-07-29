@@ -476,9 +476,9 @@ def redact_credentials_from_span(span: Span) -> None:
 
     Mutates all four attribute containers a span carries -- its own, its
     resource's, its events' and its links' -- because ``span.as_dict()`` keeps
-    every one of them in ``raw_span_dump``, and the promoted columns are derived
-    from the same values. The name policy lives in
-    ``weave/trace_server/credential_redaction.py``.
+    every one of them in ``raw_span_dump``, and the columns the schema derives
+    come from the same values. That includes derived output, so a
+    credential-shaped name inside a structured output is replaced too.
 
     Runs before ``strip_inline_blobs_from_span``, not after: that step moves a
     long base64-shaped value into file storage and leaves a ref in its place, so

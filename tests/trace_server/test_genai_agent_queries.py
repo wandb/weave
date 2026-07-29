@@ -3274,8 +3274,7 @@ _REDACTED_SPAN_ATTRS = {
 def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
     """A ``chat`` span whose attributes and resource carry credential-shaped names.
 
-    The api-key value is a data-URI past ``AUTO_CONVERSION_MIN_SIZE``, so the
-    inline-blob strip would upload it and leave a ref behind if it ran first.
+    The api-key value is a data-URI past ``AUTO_CONVERSION_MIN_SIZE``.
     """
     span = Span()
     span.name = "chat gpt-4o"
@@ -3351,9 +3350,7 @@ def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_ser
     assert len(stored.spans) == 1
     _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
 
-    # Redaction ran before the blob strip, so the oversized value was never
-    # uploaded. Redacting afterwards would replace the ref and keep the file, and
-    # the stored span would look identical to this one.
+    # Redaction ran before the blob strip, so nothing was uploaded.
     assert (
         ch_server.project_stats(
             tsi.ProjectStatsReq(project_id=internal_project_id)
@@ -3361,7 +3358,7 @@ def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_ser
         == 0
     )
 
-    # The other three dumps are not in any query projection, so read the columns.
+    # Read the stored columns directly.
     row = ch_server.ch_client.query(
         "SELECT attributes_dump, resource_dump, custom_attrs_string FROM spans "
         "WHERE project_id = {project_id:String}",

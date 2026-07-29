@@ -865,18 +865,19 @@ class AgentWriteHandler:
 
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
-            # Before the blob strip: that step can move a value into file storage.
-            redact_credentials_from_span(span)
-            # Strip inline base64/data-URIs into weave refs before the
-            # pure extraction transform runs.
-            if self._trace_server is not None:
-                strip_inline_blobs_from_span(
-                    span,
-                    req.project_id,
-                    self._trace_server,
-                    wb_user_id=req.wb_user_id,
-                )
             try:
+                # Before the blob strip: that step can move a value into file
+                # storage.
+                redact_credentials_from_span(span)
+                # Strip inline base64/data-URIs into weave refs before the
+                # pure extraction transform runs.
+                if self._trace_server is not None:
+                    strip_inline_blobs_from_span(
+                        span,
+                        req.project_id,
+                        self._trace_server,
+                        wb_user_id=req.wb_user_id,
+                    )
                 genai_row = extract_genai_span(
                     span,
                     project_id=req.project_id,
