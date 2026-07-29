@@ -118,6 +118,26 @@ def test_transform_external_field_to_internal_field():
     assert result[0] == "toString(JSON_VALUE(payload_dump, {pb_0:String}))"
     assert result[2] == {"payload_dump"}
 
+    # Qualified fields must preserve simple table aliases.
+    result = _transform_external_field_to_internal_field(
+        "feedback.id", all_columns=all_columns, json_columns=json_columns
+    )
+    assert result[0] == "feedback.id"
+    assert result[2] == {"feedback.id"}
+
+    # Reject SQL expressions disguised as table prefixes or nested fields.
+    invalid_fields = [
+        ("(SELECT 'BENIGN_SQLI_PROBE') AS probe --.id", "Invalid table prefix"),
+        ("id.value) FROM system.one --", "Unknown field"),
+    ]
+    for invalid_field, error_match in invalid_fields:
+        with pytest.raises(ValueError, match=error_match):
+            _transform_external_field_to_internal_field(
+                invalid_field,
+                all_columns=all_columns,
+                json_columns=json_columns,
+            )
+
 
 def test_array_string_column_round_trip():
     table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
