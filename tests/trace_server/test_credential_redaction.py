@@ -246,6 +246,7 @@ _REDACTED_OTEL_DUMP = {
     "name": "span",
     "attributes": {"options": {"apiKey": REDACTED_VALUE}},
     "events": [{"name": "event", "attributes": {"authorization": REDACTED_VALUE}}],
+    "links": [{"span_id": "s", "attributes": {"webhook_key": REDACTED_VALUE}}],
     "resource": {"attributes": {"aws_access_key_id": REDACTED_VALUE}},
 }
 
@@ -261,13 +262,13 @@ def _attributes() -> dict[str, Any]:
 
 
 def _otel_dump() -> dict[str, Any]:
-    # Shaped like the span dict the OTel route stores: attributes, events and
-    # resource each hold their own field names, so the walk has to reach all
-    # three subtrees, not just the one `attributes_dump` is derived from.
+    # A span carries four attribute containers, and only the first is the one
+    # `attributes_dump` is derived from.
     return {
         "name": "span",
         "attributes": {"options": {"apiKey": PLACEHOLDER}},
         "events": [{"name": "event", "attributes": {"authorization": PLACEHOLDER}}],
+        "links": [{"span_id": "s", "attributes": {"webhook_key": PLACEHOLDER}}],
         "resource": {"attributes": {"aws_access_key_id": PLACEHOLDER}},
     }
 
@@ -330,7 +331,7 @@ def _convert_complete() -> CallCompleteCHInsertable:
     [_convert_start, _convert_start_end, _convert_complete],
     ids=["call_start", "start_end_complete", "complete"],
 )
-def test_converters_redact_the_client_authored_columns(
+def test_converters_redact_every_client_authored_column(
     convert: Callable[[], CallStartCHInsertable | CallCompleteCHInsertable],
 ) -> None:
     # The hook lives inside the converters, so any caller inherits it.
@@ -338,7 +339,6 @@ def test_converters_redact_the_client_authored_columns(
 
     assert json.loads(row.inputs_dump) == _REDACTED_INPUTS
     assert json.loads(row.attributes_dump) == _REDACTED_ATTRIBUTES
-    assert row.otel_dump is not None
     assert json.loads(row.otel_dump) == _REDACTED_OTEL_DUMP
 
 
@@ -466,9 +466,7 @@ def test_call_read_returns_redacted_client_authored_columns(
     """Read-back is redacted on either backend, for every write path.
 
     A client can set `otel_dump` on these schemas without going through the OTel
-    route, so the write paths carry it here too. The in-memory backend hooks
-    `call_start` and `calls_complete` separately, so both need covering or one
-    could silently stop matching ClickHouse.
+    route, so the write paths carry it here too.
     """
     project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
     call_id = str(uuid.uuid4())
@@ -480,8 +478,43 @@ def test_call_read_returns_redacted_client_authored_columns(
     ).call
     assert call is not None
     assert call.inputs == _REDACTED_INPUTS
-    # Reading a call re-injects the stored span under `otel_span`.
     assert call.attributes == {**_REDACTED_ATTRIBUTES, "otel_span": _REDACTED_OTEL_DUMP}
+
+
+@pytest.mark.parametrize(
+    ("write", "end_side_payloads"),
+    [
+        (_write_via_call_start, ()),
+        (_write_via_call_end_then_start, (None, {})),
+        (_write_via_calls_complete, (None, {"usage": {}, "status_counts": {}})),
+    ],
+    ids=["call_start", "call_end_then_start", "calls_complete"],
+)
+def test_stored_byte_counts_follow_the_redacted_columns(
+    get_fake_trace_server, write, end_side_payloads
+) -> None:
+    """The counted size is the stored size, not the size of what the client sent.
+
+    These counts are what `project_stats` reports, so a count taken before
+    redaction would overstate storage and drift from ClickHouse, which measures
+    the stored column. The in-memory backend is the one that counts in Python, so
+    this runs against it directly instead of through the backend flag.
+    """
+    server = get_fake_trace_server()
+    project_id = f"{TEST_ENTITY}/size_{uuid.uuid4().hex[:8]}"
+
+    write(server, project_id, str(uuid.uuid4()))
+
+    stats = server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+    assert stats.trace_storage_size_bytes == sum(
+        len(json.dumps(payload))
+        for payload in (
+            _REDACTED_ATTRIBUTES,
+            _REDACTED_INPUTS,
+            _REDACTED_OTEL_DUMP,
+            *end_side_payloads,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -490,13 +523,14 @@ def test_call_read_returns_redacted_client_authored_columns(
 
 
 def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
+    entity, project = project_id.split("/")
     span = Span()
     span.name = "op"
     span.trace_id = uuid.uuid4().bytes
     span.span_id = uuid.uuid4().bytes[:8]
     span.start_time_unix_nano = int(_STARTED_AT.timestamp() * 1_000_000_000)
     span.end_time_unix_nano = int(_ENDED_AT.timestamp() * 1_000_000_000)
-    span.kind = 1  # type: ignore[assignment]
+    span.kind = 1  # CLIENT
     attribute = KeyValue()
     attribute.key = "options.apiKey"
     attribute.value.string_value = PLACEHOLDER
@@ -505,8 +539,8 @@ def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
     scope_spans = ScopeSpans()
     scope_spans.spans.append(span)
 
-    # Resource attributes come from the client too, and they sit beside the span
-    # attributes rather than inside them.
+    # Resource attributes are client-authored too, and they are not part of the
+    # span attributes the derived columns come from.
     resource = Resource()
     resource_attribute = KeyValue()
     resource_attribute.key = "aws_access_key_id"
@@ -521,8 +555,8 @@ def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
         project_id=project_id,
         processed_spans=[
             tsi.ProcessedResourceSpans(
-                entity=TEST_ENTITY,
-                project="otel",
+                entity=entity,
+                project=project,
                 run_id=None,
                 resource_spans=resource_spans,
             )
@@ -531,19 +565,14 @@ def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
     )
 
 
-def test_otel_route_stores_a_redacted_span(trace_server) -> None:
-    """A span ingested through the OTel route is stored redacted.
-
-    This is the route that derives a call from a span, so the same client value
-    lands in the derived columns and in the stored span.
-    """
+def test_otel_route_stores_a_redacted_span_dump(trace_server) -> None:
+    """The span the server builds itself is stored redacted too."""
     project_id = f"{TEST_ENTITY}/otel_{uuid.uuid4().hex[:8]}"
 
     trace_server.otel_export(_otel_export_req(project_id))
 
     calls = trace_server.calls_query(tsi.CallsQueryReq(project_id=project_id)).calls
     assert len(calls) == 1
-    assert calls[0].attributes["options"] == {"apiKey": REDACTED_VALUE}
     span = calls[0].attributes["otel_span"]
     assert span["attributes"]["options"] == {"apiKey": REDACTED_VALUE}
     assert span["resource"]["attributes"] == {"aws_access_key_id": REDACTED_VALUE}
