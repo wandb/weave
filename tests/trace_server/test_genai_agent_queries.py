@@ -3386,7 +3386,7 @@ def test_genai_otel_export_redacts_without_file_storage(ch_server):
     """
     project_id = _make_project_id("genai_otel_redaction_no_fs")
 
-    res, _rows = AgentWriteHandler(ch_server.ch_client).insert_otel_spans(
+    res, _ = AgentWriteHandler(ch_server.ch_client).insert_otel_spans(
         GenAIOTelExportReq(
             processed_spans=[_build_credential_processed_span()],
             project_id=project_id,

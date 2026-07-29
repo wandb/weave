@@ -64,8 +64,8 @@ def build_completion_span(
     agent_name = _SOURCE_TO_AGENT_NAME.get(source, PLAYGROUND_AGENT_NAME)
     weave_source = source or "playground"
 
-    # Every column below is derived from this one redacted copy of the request,
-    # so no derived column can keep a value another one replaced.
+    # Every column that can carry a client string is derived from this one
+    # redacted copy, so no two of them can disagree.
     redacted_inputs = redact_sensitive_keys(
         request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
     )
@@ -100,11 +100,12 @@ def build_completion_span(
     request_presence_penalty = request_inputs.presence_penalty or 0.0
     request_seed = request_inputs.seed or 0
     request_stop_sequences: list[str] = []
-    if request_inputs.stop:
-        if isinstance(request_inputs.stop, list):
-            request_stop_sequences = [str(s) for s in request_inputs.stop]
+    redacted_stop = redacted_inputs.get("stop")
+    if redacted_stop:
+        if isinstance(redacted_stop, list):
+            request_stop_sequences = [str(s) for s in redacted_stop]
         else:
-            request_stop_sequences = [str(request_inputs.stop)]
+            request_stop_sequences = [str(redacted_stop)]
     request_choice_count = request_inputs.n or 0
 
     tool_definitions = ""

@@ -1448,11 +1448,11 @@ def test_completion_span_redacts_credential_shaped_request_fields():
             ],
             extra_headers={"authorization": "value-to-redact"},
             tools=[{"type": "mcp", "headers": {"api_key": "value-to-redact"}}],
-            # Excluded from the dump by name, which the policy no longer relies on.
+            stop=[{"api_key": "value-to-redact"}],
+            # Never reaches the dump: `model_dump` excludes it by name.
             vertex_credentials="value-to-redact",
         ),
-        # A response is generated content, so it is left as the provider sent it,
-        # credential-shaped field name and all.
+        # A response is generated content, so it is left as the provider sent it.
         response={
             "choices": [{"message": {"content": "hi"}}],
             "client_secret": "left-alone",
@@ -1472,6 +1472,7 @@ def test_completion_span_redacts_credential_shaped_request_fields():
             "messages": redacted_messages,
             "extra_headers": {"authorization": REDACTED_VALUE},
             "tools": redacted_tools,
+            "stop": [{"api_key": REDACTED_VALUE}],
         },
         "response": {
             "choices": [{"message": {"content": "hi"}}],
@@ -1480,6 +1481,7 @@ def test_completion_span_redacts_credential_shaped_request_fields():
     }
     # Every other column derived from the request has to agree with that dump.
     assert json.loads(span.tool_definitions) == redacted_tools
+    assert span.request_stop_sequences == [str({"api_key": REDACTED_VALUE})]
     assert [m.content for m in span.input_messages] == [
         str(redacted_messages[1]["content"])
     ]

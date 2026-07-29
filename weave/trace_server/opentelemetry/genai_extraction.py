@@ -474,15 +474,16 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 def redact_credentials_from_span(span: Span) -> None:
     """Replace credential-shaped values in a span's client-authored attributes.
 
-    Mutates all four attribute containers a span carries -- its own, its
-    resource's, its events' and its links' -- because ``span.as_dict()`` keeps
-    every one of them in ``raw_span_dump``, and the columns the schema derives
-    come from the same values. That includes derived output, so a
-    credential-shaped name inside a structured output is replaced too.
+    Replaces values in all four attribute containers a span carries -- its own,
+    its resource's, its events' and its links' -- because ``span.as_dict()`` keeps
+    every one of them in ``raw_span_dump``, and the attribute-derived columns read
+    the same values. That includes the output ones, so a credential-shaped name
+    inside a structured output is replaced too.
 
-    Runs before ``strip_inline_blobs_from_span``, not after: that step moves a
-    long base64-shaped value into file storage and leaves a ref in its place, so
-    redacting afterwards would replace the ref and keep the value.
+    Runs before ``strip_inline_blobs_from_span``, not after: that step replaces a
+    long base64-shaped value with a ref, so this pass has to see the value while
+    it is still inline. Runs outside the caller's file-storage guard as well --
+    the blob strip needs a trace server, this does not.
     """
     span.attributes = redact_sensitive_keys(span.attributes)
     if span.resource is not None:
