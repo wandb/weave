@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 from typing import TypedDict
 
 from azure.core.credentials import TokenCredential
@@ -8,6 +9,8 @@ from google.oauth2.credentials import Credentials as GCPCredentials
 from typing_extensions import NotRequired
 
 from weave.trace_server import environment
+
+logger = logging.getLogger(__name__)
 
 
 class AWSCredentials(TypedDict):
@@ -119,4 +122,9 @@ def get_azure_credentials() -> (
     if access_key is not None:
         account_url = environment.wf_storage_bucket_azure_account_url()
         return AzureAccountCredentials(access_key=access_key, account_url=account_url)
+    logger.info(
+        "using DefaultAzureCredential chain "
+        "(no WF_FILE_STORAGE_AZURE_CONNECTION_STRING or "
+        "WF_FILE_STORAGE_AZURE_ACCESS_KEY set)"
+    )
     return AzureDefaultCredentials(default_credential=DefaultAzureCredential())

@@ -1,4 +1,5 @@
 import base64
+import logging
 import os
 from unittest import mock
 
@@ -111,6 +112,28 @@ def test_get_azure_credentials():
     ):
         creds = get_azure_credentials()
         assert creds == {"default_credential": default_credential}
+
+
+def test_get_azure_credentials_logs_default_credential_fallback(
+    caplog: pytest.LogCaptureFixture,
+):
+    with (
+        mock.patch.dict(os.environ, {}, clear=True),
+        mock.patch(
+            "weave.trace_server.file_storage_credentials.DefaultAzureCredential"
+        ),
+        caplog.at_level(
+            logging.INFO,
+            logger="weave.trace_server.file_storage_credentials",
+        ),
+    ):
+        get_azure_credentials()
+
+    assert caplog.messages == [
+        "using DefaultAzureCredential chain "
+        "(no WF_FILE_STORAGE_AZURE_CONNECTION_STRING or "
+        "WF_FILE_STORAGE_AZURE_ACCESS_KEY set)"
+    ]
 
 
 def test_get_gcp_credentials():
