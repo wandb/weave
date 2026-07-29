@@ -466,6 +466,17 @@ pnpm exec tsx examples/claudeAgents.ts
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+- The Python Claude Agent SDK integration taps async prompt iterables, queues
+  user inputs in FIFO order, and closes one `Turn` for each `ResultMessage`.
+- Keep its output adapters split by SDK contract: string `query()` and each
+  `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
+  only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Name the corresponding test cases "string prompt" and "async-iterable
+  prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
+  one-input success and pre/post-result failure assertions paired across them.
+- SDK output can fail before the first message or between completed turns. Keep
+  the submitted/pending input observable by ending its `Turn` through the
+  exception path so the span records the error before the exception propagates.
 
 ### Claude Agent SDK token accounting
 

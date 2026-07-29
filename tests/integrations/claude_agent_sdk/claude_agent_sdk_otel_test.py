@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterable, AsyncIterator, Generator
 from typing import Any
 
 import pytest
@@ -21,6 +21,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind, StatusCode
 
+import weave.integrations.claude_agent_sdk.otel_integration as claude_agent_sdk_otel_integration
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
 from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
@@ -51,9 +52,7 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporte
 
 @pytest.fixture(autouse=True)
 def patch_claude_agent_sdk_otel() -> Generator[None]:
-    import weave.integrations.claude_agent_sdk.otel_integration as mod
-
-    mod._claude_agent_sdk_otel_patcher = None
+    claude_agent_sdk_otel_integration._claude_agent_sdk_otel_patcher = None
     patcher = get_claude_agent_sdk_otel_patcher()
     patcher.attempt_patch()
     yield
@@ -115,7 +114,36 @@ def get_part_types(messages: list[dict[str, Any]]) -> set[str]:
     }
 
 
-async def run_query(cassette: str, prompt: str) -> None:
+def user_prompt(text: str, *, should_query: bool | None = None) -> dict[str, Any]:
+    prompt: dict[str, Any] = {
+        "type": "user",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+    }
+    if should_query is not None:
+        prompt["shouldQuery"] = should_query
+    return prompt
+
+
+async def async_prompt_messages(
+    *messages: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
+    for message in messages:
+        yield message
+
+
+def text_query_prompt(
+    text: str, *, as_async_iterable: bool
+) -> str | AsyncIterable[dict[str, Any]]:
+    if as_async_iterable:
+        return async_prompt_messages(user_prompt(text))
+    return text
+
+
+async def run_query(
+    cassette: str,
+    prompt: str | AsyncIterable[dict[str, Any]],
+) -> None:
     async for _ in query(
         prompt=prompt,
         options=ClaudeAgentOptions(),
@@ -124,12 +152,23 @@ async def run_query(cassette: str, prompt: str) -> None:
         pass
 
 
-# --- query(): simple text ---------------------------------------------------
+# --- query(): string and single-input async-iterable parity -----------------
 
 
 @pytest.mark.asyncio
-async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await run_query("simple_text_response", "What is 2+2?")
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_single_text_query_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    await run_query(
+        "simple_text_response",
+        text_query_prompt("What is 2+2?", as_async_iterable=as_async_iterable),
+    )
     spans = otel_spans.get_finished_spans()
     assert {span.instrumentation_scope.name for span in spans} == {"weave.conversation"}
 
@@ -824,11 +863,13 @@ async def test_ambient_trace_nesting_otel(otel_spans: InMemorySpanExporter) -> N
     assert agent_span.context.trace_id == outer_context.trace_id
 
 
-# --- ClaudeSDKClient: multi-turn --------------------------------------------
+# --- ClaudeSDKClient: one turn per receive_response() ------------------------
 
 
 @pytest.mark.asyncio
-async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
+async def test_string_client_queries_use_one_turn_per_response_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
     sdk_client = ClaudeSDKClient(
         options=ClaudeAgentOptions(),
         transport=ReplayTransport(load_cassette("multi_turn_response")),
@@ -862,11 +903,51 @@ async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
     assert prompts == {"Hello", "What is the capital of France?"}
 
 
-# --- query(): streamed image prompt -----------------------------------------
+@pytest.mark.asyncio
+async def test_async_iterable_client_query_uses_one_turn_per_response_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each receive_response() remains a single turn for async client input."""
+    sdk_client = ClaudeSDKClient(
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("multi_turn_response")),
+    )
+    await sdk_client.connect()
+    await sdk_client.query(
+        async_prompt_messages(
+            user_prompt("Hello"),
+            user_prompt("What is the capital of France?"),
+        )
+    )
+
+    responses = [
+        [type(message).__name__ async for message in sdk_client.receive_response()],
+        [type(message).__name__ async for message in sdk_client.receive_response()],
+    ]
+    await sdk_client.disconnect()
+
+    assert responses == [
+        ["SystemMessage", "AssistantMessage", "ResultMessage"],
+        ["AssistantMessage", "ResultMessage"],
+    ]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(agent_span, "gen_ai.input.messages"))
+        for agent_span in agent_spans
+    ] == [
+        "Hello",
+        "What is the capital of France?",
+    ]
+
+
+# --- query(): async-iterable image prompt -----------------------------------
 
 
 @pytest.mark.asyncio
-async def test_streamed_image_prompt_otel(
+async def test_async_iterable_image_prompt_otel(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     image_base64 = (
@@ -925,6 +1006,252 @@ async def test_streamed_image_prompt_otel(
                 },
                 {"type": "text", "content": "Describe this image."},
             ],
+        }
+    ]
+
+
+# --- query(): async-iterable multi-turn prompts ------------------------------
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_multi_turn_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = [
+        message
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Hello"),
+                user_prompt("What is the capital of France?"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(load_cassette("multi_turn_response")),
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert len(agent_spans) == 2
+    assert [
+        get_messages(agent_span, "gen_ai.input.messages") for agent_span in agent_spans
+    ] == [
+        [{"role": "user", "parts": [{"type": "text", "content": "Hello"}]}],
+        [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": "What is the capital of France?",
+                    }
+                ],
+            }
+        ],
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.output.messages") for agent_span in agent_spans
+    ] == [
+        [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hello! How can I help you?"}],
+            }
+        ],
+        [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": "The capital of France is Paris.",
+                    }
+                ],
+            }
+        ],
+    ]
+    assert {
+        get_attrs(agent_span)["gen_ai.conversation.id"] for agent_span in agent_spans
+    } == {"s-mt001"}
+    assert len({agent_span.context.trace_id for agent_span in agent_spans}) == 2
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_buffers_non_query_inputs_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = [
+        message
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Background context", should_query=False),
+                user_prompt("Answer using that context"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(load_cassette("simple_text_response")),
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "Background context"}],
+        },
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "Answer using that context"}],
+        },
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_query_failure_before_first_response_records_error_turn_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=0,
+    )
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        _ = [
+            message
+            async for message in query(
+                prompt=text_query_prompt("Hello", as_async_iterable=as_async_iterable),
+                options=ClaudeAgentOptions(),
+                transport=transport,
+            )
+        ]
+
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.ERROR
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_messages(agent_spans[0], "gen_ai.output.messages") == []
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_failure_between_turns_records_error_turn_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("multi_turn_response"),
+        fail_after_messages=3,
+    )
+    seen_messages: list[str] = []
+
+    async def consume_query() -> None:
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Hello"),
+                user_prompt("Second prompt"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        ):
+            seen_messages.append(type(message).__name__)
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        await consume_query()
+
+    assert seen_messages == ["SystemMessage", "AssistantMessage", "ResultMessage"]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert len(agent_spans) == 2
+    assert [span.status.status_code for span in agent_spans] == [
+        StatusCode.UNSET,
+        StatusCode.ERROR,
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.input.messages") for agent_span in agent_spans
+    ] == [
+        [{"role": "user", "parts": [{"type": "text", "content": "Hello"}]}],
+        [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "Second prompt"}],
+            }
+        ],
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.output.messages") for agent_span in agent_spans
+    ] == [
+        [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hello! How can I help you?"}],
+            }
+        ],
+        [],
+    ]
+    assert {
+        get_attrs(agent_span)["gen_ai.conversation.id"] for agent_span in agent_spans
+    } == {"s-mt001"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_query_failure_after_final_result_does_not_add_turn_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=3,
+    )
+    seen_messages: list[str] = []
+
+    async def consume_query() -> None:
+        async for message in query(
+            prompt=text_query_prompt("Hello", as_async_iterable=as_async_iterable),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        ):
+            seen_messages.append(type(message).__name__)
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        await consume_query()
+
+    assert seen_messages == ["SystemMessage", "AssistantMessage", "ResultMessage"]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.UNSET
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_messages(agent_spans[0], "gen_ai.output.messages") == [
+        {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": "The answer is 4."}],
         }
     ]
 

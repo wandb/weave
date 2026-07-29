@@ -26,8 +26,14 @@ class ReplayTransport(Transport):
     then yields recorded messages from the cassette.
     """
 
-    def __init__(self, messages: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        fail_after_messages: int | None = None,
+    ) -> None:
         self._messages = messages
+        self._fail_after_messages = fail_after_messages
         self._connected = False
         self._pending_control_ids: list[str] = []
         self._control_event = anyio.Event()
@@ -66,8 +72,12 @@ class ReplayTransport(Transport):
         # Wait briefly for the user message write + end_input
         await anyio.sleep(0.01)
 
-        for msg in self._messages:
+        for index, msg in enumerate(self._messages):
+            if self._fail_after_messages == index:
+                raise RuntimeError("replay transport failed")
             yield msg
+        if self._fail_after_messages == len(self._messages):
+            raise RuntimeError("replay transport failed")
 
     async def close(self) -> None:
         self._connected = False
