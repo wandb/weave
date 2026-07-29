@@ -38,27 +38,39 @@ def test_attributed_source_inherits_agent_triple_coherently() -> None:
     sql = attributed_spans_source(
         pb, project_id="p1", started_after=None, started_before=None
     )
-    # agent_name / agent_version / agent_id inherit together as one tuple taken
-    # from a single span (argMinIf by started_at, gated on agent_name), so a
+    # agent_name / agent_version / agent_id inherit together as one tuple: the
+    # span's immediate parent if it declares an identity, else the earliest
+    # identity-declaring span in the trace (argMinIf by started_at), so a
     # span's inherited identity can never mix two agents. A span that declares
     # its own agent_name keeps its entire own triple. conversation_id is
     # inherited on its own.
     expected = """
         (SELECT * EXCEPT (agent_name, agent_version, agent_id, conversation_id,
-                          has_own_agent_identity, fb_agent_identity, fb_conversation_id),
-            if(has_own_agent_identity, agent_name, fb_agent_identity.1) AS agent_name,
-            if(has_own_agent_identity, agent_version, fb_agent_identity.2) AS agent_version,
-            if(has_own_agent_identity, agent_id, fb_agent_identity.3) AS agent_id,
+                          has_own_agent_identity, has_parent_agent_identity,
+                          fb_agent_identity, fb_conversation_id, parent_agent_identity),
+            multiIf(has_own_agent_identity, agent_name,
+                    has_parent_agent_identity, parent_agent_identity.1,
+                    fb_agent_identity.1) AS agent_name,
+            multiIf(has_own_agent_identity, agent_version,
+                    has_parent_agent_identity, parent_agent_identity.2,
+                    fb_agent_identity.2) AS agent_version,
+            multiIf(has_own_agent_identity, agent_id,
+                    has_parent_agent_identity, parent_agent_identity.3,
+                    fb_agent_identity.3) AS agent_id,
             if(conversation_id != '', conversation_id, fb_conversation_id) AS conversation_id
          FROM (
            SELECT s0.*, (s0.agent_name != '') AS has_own_agent_identity,
-                  tf.fb_agent_identity, tf.fb_conversation_id
+                  tf.fb_agent_identity, tf.fb_conversation_id,
+                  tf.fb_span_agents[s0.parent_span_id] AS parent_agent_identity,
+                  (parent_agent_identity.1 != '') AS has_parent_agent_identity
            FROM spans s0
            LEFT JOIN (
              SELECT trace_id,
                  argMinIf((agent_name, agent_version, agent_id), started_at, agent_name != '')
                    AS fb_agent_identity,
-                 anyIf(conversation_id, conversation_id != '') AS fb_conversation_id
+                 anyIf(conversation_id, conversation_id != '') AS fb_conversation_id,
+                 CAST(groupArrayIf((span_id, (agent_name, agent_version, agent_id)), agent_name != ''),
+                      'Map(String, Tuple(String, String, String))') AS fb_span_agents
              FROM spans
              WHERE project_id = {genai_0:String}
              GROUP BY trace_id) tf ON s0.trace_id = tf.trace_id
@@ -83,20 +95,31 @@ def test_attributed_source_scopes_fallback_to_trace_ids() -> None:
     )
     expected = """
         (SELECT * EXCEPT (agent_name, agent_version, agent_id, conversation_id,
-                          has_own_agent_identity, fb_agent_identity, fb_conversation_id),
-            if(has_own_agent_identity, agent_name, fb_agent_identity.1) AS agent_name,
-            if(has_own_agent_identity, agent_version, fb_agent_identity.2) AS agent_version,
-            if(has_own_agent_identity, agent_id, fb_agent_identity.3) AS agent_id,
+                          has_own_agent_identity, has_parent_agent_identity,
+                          fb_agent_identity, fb_conversation_id, parent_agent_identity),
+            multiIf(has_own_agent_identity, agent_name,
+                    has_parent_agent_identity, parent_agent_identity.1,
+                    fb_agent_identity.1) AS agent_name,
+            multiIf(has_own_agent_identity, agent_version,
+                    has_parent_agent_identity, parent_agent_identity.2,
+                    fb_agent_identity.2) AS agent_version,
+            multiIf(has_own_agent_identity, agent_id,
+                    has_parent_agent_identity, parent_agent_identity.3,
+                    fb_agent_identity.3) AS agent_id,
             if(conversation_id != '', conversation_id, fb_conversation_id) AS conversation_id
          FROM (
            SELECT s0.*, (s0.agent_name != '') AS has_own_agent_identity,
-                  tf.fb_agent_identity, tf.fb_conversation_id
+                  tf.fb_agent_identity, tf.fb_conversation_id,
+                  tf.fb_span_agents[s0.parent_span_id] AS parent_agent_identity,
+                  (parent_agent_identity.1 != '') AS has_parent_agent_identity
            FROM page s0
            LEFT JOIN (
              SELECT trace_id,
                  argMinIf((agent_name, agent_version, agent_id), started_at, agent_name != '')
                    AS fb_agent_identity,
-                 anyIf(conversation_id, conversation_id != '') AS fb_conversation_id
+                 anyIf(conversation_id, conversation_id != '') AS fb_conversation_id,
+                 CAST(groupArrayIf((span_id, (agent_name, agent_version, agent_id)), agent_name != ''),
+                      'Map(String, Tuple(String, String, String))') AS fb_span_agents
              FROM spans
              WHERE project_id = {genai_0:String} AND trace_id IN (SELECT trace_id FROM page)
              GROUP BY trace_id) tf ON s0.trace_id = tf.trace_id
