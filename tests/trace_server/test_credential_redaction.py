@@ -262,7 +262,6 @@ def _attributes() -> dict[str, Any]:
 
 
 def _otel_dump() -> dict[str, Any]:
-    # A span carries four attribute containers; the walk has to reach all of them.
     return {
         "name": "span",
         "attributes": {"options": {"apiKey": PLACEHOLDER}},
@@ -464,8 +463,9 @@ def test_call_read_returns_redacted_client_authored_columns(
 ) -> None:
     """Read-back is redacted on either backend, for every write path.
 
-    `otel_dump` is a public field on these schemas, so the write paths carry it
-    here too.
+    The in-memory backend hooks `call_start` and `calls_complete` separately, and
+    `call_start` has two branches, so all three need covering or one could
+    silently stop matching ClickHouse.
     """
     project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
     call_id = str(uuid.uuid4())
