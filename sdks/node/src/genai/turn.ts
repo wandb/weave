@@ -21,6 +21,7 @@ import {
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_REQUEST_MODEL,
   ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
@@ -31,6 +32,8 @@ import type {Message} from './types';
 
 export interface TurnInit extends SpanInitBase {
   model?: string;
+  /** GenAI provider emitted as `gen_ai.provider.name` on the invoke_agent span. */
+  providerName?: string;
   systemInstructions?: string[];
   userMessage?: string;
   agentId?: string;
@@ -78,6 +81,7 @@ type Opts = {
  * @example
  * const turn = weave.startTurn({
  *   model: 'gpt-4o',
+ *   providerName: 'openai',
  *   agentName: 'research-bot',
  *   agentId: 'research-bot-prod',
  *   agentDescription: 'Looks up facts on Wikipedia.',
@@ -103,6 +107,7 @@ export class Turn extends SpanBase {
   private _agentDescription: string;
   private _agentVersion: string;
   private _model: string;
+  private _providerName: string;
   private _inputMessages: Message[];
   private _outputMessages: Message[] = [];
   private _systemInstructions: string[];
@@ -116,6 +121,10 @@ export class Turn extends SpanBase {
     return this._model;
   }
 
+  public get providerName() {
+    return this._providerName;
+  }
+
   private constructor(opts: Opts) {
     super(opts.span);
     this._context = opts.context;
@@ -126,6 +135,7 @@ export class Turn extends SpanBase {
     this._agentVersion = opts.agentVersion;
     this._inputMessages = opts.messages;
     this._model = opts.model;
+    this._providerName = opts.providerName;
     this._systemInstructions = opts.systemInstructions;
     this._attributes = opts.attributes;
   }
@@ -154,6 +164,7 @@ export class Turn extends SpanBase {
       context: trace.setSpan(ROOT_CONTEXT, span),
       conversationId: opts.conversationId ?? '',
       model: opts.model ?? '',
+      providerName: opts.providerName ?? '',
       agentName: opts.agentName ?? '',
       messages,
       systemInstructions: opts.systemInstructions ?? [],
@@ -214,6 +225,7 @@ export class Turn extends SpanBase {
     messages?: Message[];
     outputMessages?: Message[];
     model?: string;
+    providerName?: string;
     systemInstructions?: string[];
     agentId?: string;
     agentName?: string;
@@ -230,6 +242,9 @@ export class Turn extends SpanBase {
     }
     if (opts.model !== undefined) {
       this._model = opts.model;
+    }
+    if (opts.providerName !== undefined) {
+      this._providerName = opts.providerName;
     }
     if (opts.systemInstructions !== undefined) {
       this._systemInstructions = opts.systemInstructions;
@@ -265,6 +280,9 @@ export class Turn extends SpanBase {
     }
     if (this._model) {
       this.span.setAttribute(ATTR_GEN_AI_REQUEST_MODEL, this._model);
+    }
+    if (this._providerName) {
+      this.span.setAttribute(ATTR_GEN_AI_PROVIDER_NAME, this._providerName);
     }
     if (this._conversationId) {
       this.span.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, this._conversationId);

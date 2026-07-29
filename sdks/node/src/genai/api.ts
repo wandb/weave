@@ -43,6 +43,7 @@ export const startSession = startConversation;
  * weave.startTurn({
  *   agentId: 'research-bot-prod',
  *   agentName: 'research-bot',
+ *   providerName: 'openai',
  *   agentDescription: 'Looks up facts on Wikipedia.',
  *   agentVersion: '1.4.2',
  *   model: 'gpt-4o',

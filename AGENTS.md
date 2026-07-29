@@ -332,6 +332,9 @@ pnpm exec tsx examples/claudeAgents.ts
 - Record a terminal agent result with
   `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
   `invoke_agent` span as `gen_ai.output.messages`.
+- `Turn.providerName` is the typed source for `gen_ai.provider.name` on the
+  root `invoke_agent` span. Pass it through `startTurn` or `Turn.record`
+  instead of setting that semantic attribute with `setAttributes`.
 
 ### TypeScript GenAI span handles
 

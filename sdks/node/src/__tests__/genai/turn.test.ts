@@ -16,6 +16,7 @@ describe('Turn', () => {
   it('emits an invoke_agent span with GenAI agent / model attributes', () => {
     const turn = Turn.create({
       model: 'gpt-4o',
+      providerName: 'openai',
       agentId: '12345',
       agentName: 'weather-bot',
       agentDescription: 'Finds the most accurate weather',
@@ -37,6 +38,7 @@ describe('Turn', () => {
           "gen_ai.conversation.id": "<uuid>",
           "gen_ai.input.messages": "[{"role":"user","parts":[{"type":"text","content":"What's the weather?"}]}]",
           "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.provider.name": "openai",
           "gen_ai.request.model": "gpt-4o",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
         },
@@ -69,6 +71,7 @@ describe('Turn', () => {
       agentId: 'weather-bot-prod',
       agentDescription: 'Looks up the weather',
       agentVersion: '1.4.2',
+      providerName: 'anthropic',
       systemInstructions: ['Be helpful'],
     });
     turn.end();
@@ -83,6 +86,7 @@ describe('Turn', () => {
           "gen_ai.agent.version": "1.4.2",
           "gen_ai.operation.name": "invoke_agent",
           "gen_ai.output.messages": "[{"role":"assistant","content":"It is sunny."}]",
+          "gen_ai.provider.name": "anthropic",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"}]",
         },
         "endTime": "<timestamp>",
@@ -96,6 +100,7 @@ describe('Turn', () => {
       agentName: 'weather-bot',
       agentId: 'preset',
       agentVersion: 'v1',
+      providerName: 'openai',
       systemInstructions: ['initial'],
     });
     turn.record({agentVersion: 'v2'});
@@ -109,6 +114,7 @@ describe('Turn', () => {
           "gen_ai.agent.name": "weather-bot",
           "gen_ai.agent.version": "v2",
           "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.provider.name": "openai",
           "gen_ai.system_instructions": "[{"type":"text","content":"initial"}]",
         },
         "endTime": "<timestamp>",

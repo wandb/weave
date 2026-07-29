@@ -8,7 +8,6 @@ import {
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
@@ -213,11 +212,9 @@ export class ClaudeAgentOtelTracer {
         attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
       });
       return conversation.startTurn({
+        providerName: PROVIDER_NAME,
         startTime: this.startedAt,
       });
-    });
-    this.turn.setAttributes({
-      [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     });
     if (this.prompt != null) {
       this.turn.record({
