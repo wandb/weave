@@ -457,7 +457,7 @@ function isPlainObject(val: object): boolean {
 
 // An instance of a class we do not own. Call inputs record these as an opaque
 // type marker rather than expanding them.
-function isUnownedInstance(val: unknown): val is object {
+function isUnownedInstance(val: unknown): boolean {
   return (
     typeof val === 'object' &&
     val !== null &&

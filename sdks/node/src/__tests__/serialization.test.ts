@@ -153,19 +153,19 @@ describe('serializing objects the SDK does not own', () => {
       name: 'serialization-dataset',
       rows: [{a: 1}],
     });
-    const call = op(async (_rows: Dataset<{a: number}>) => 'ok', {
+    // Bound as well as passed, because `self` is the key the app reads as a ref.
+    const call = op(dataset, async (_rows: Dataset<{a: number}>) => 'ok', {
       name: 'call',
     });
 
     await call(dataset);
 
+    const ref = expect.stringMatching(
+      /^weave:\/\/\/test-project\/object\/serialization-dataset:[0-9a-f-]+$/
+    );
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
-    expect(calls[0].inputs).toEqual({
-      arg0: expect.stringMatching(
-        /^weave:\/\/\/test-project\/object\/serialization-dataset:[0-9a-f-]+$/
-      ),
-    });
+    expect(calls[0].inputs).toEqual({self: ref, arg0: ref});
   });
 
   test('built-in instances in inputs are recorded as a type marker', async () => {
