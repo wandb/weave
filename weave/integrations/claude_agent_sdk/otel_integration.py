@@ -157,7 +157,7 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
         # the next response's chat span rather than spawning an empty one.
         if all(isinstance(b, ThinkingBlock) for b in msg.content) and msg.content:
             state.pending_thinking.extend(b.thinking for b in msg.content)
-            return
+            return None
 
         # A new response means the previous chat span is done (no usage — only
         # the final one carries the aggregate usage).
@@ -191,7 +191,7 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
                 )
                 tool.started_at = datetime.now(timezone.utc)
                 state.open_tools[block.id] = tool
-        return
+        return None
 
     if isinstance(msg, UserMessage):
         content = msg.content if isinstance(msg.content, list) else []
@@ -201,16 +201,17 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
             state.accumulated.append(
                 Message.tool_result(block.tool_use_id, block.content)
             )
-            tool = state.open_tools.pop(block.tool_use_id, None)
+            tool = state.open_tools.get(block.tool_use_id)
             if tool is None:
                 continue
+            del state.open_tools[block.tool_use_id]
             with tool:
                 tool.result = str(block.content)
                 if block.is_error:
                     tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
                         RuntimeError("tool reported an error")
                     )
-        return
+        return None
 
     if isinstance(msg, ResultMessage):
         _flush_pending_chat(state, usage=_usage_from_result(msg.usage))
@@ -218,7 +219,9 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
             state.final_text = msg.result
         if msg.is_error:
             state.is_error = True
-        return
+        return None
+
+    return None
 
 
 def _finalize_turn(state: _TurnState) -> None:
