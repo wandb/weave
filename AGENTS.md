@@ -495,9 +495,9 @@ pnpm exec tsx examples/claudeAgents.ts
   Both are load-bearing — see that function's docstring — so keep the order and
   the placement if you touch it.
 - It redacts all four attribute containers a span carries: its own, its resource,
-  its events and its links. Every column the schema derives comes from those, so
-  on this path a credential-shaped name inside a structured output is replaced
-  too.
+  its events and its links. The output columns are derived from those too, so on
+  this path a credential-shaped name inside a structured output is replaced as
+  well. Fields that are not attributes, such as the status message, are untouched.
 - The completions path builds a span row without a parsed OTel span, so it never
   reaches that hook. `build_completion_span` redacts the request once and derives
   every request-shaped column from that copy; the provider response is left as
