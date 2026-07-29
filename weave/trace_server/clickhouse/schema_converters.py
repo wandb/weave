@@ -141,7 +141,7 @@ def start_call_for_insert_to_ch_insertable(
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(redact_sensitive_keys(start_call.otel_dump))
 
     return CallStartCHInsertable(
         project_id=start_call.project_id,
@@ -254,7 +254,7 @@ def start_end_calls_to_ch_complete_insertable(
 
     otel_dump_str = None
     if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(redact_sensitive_keys(start_call.otel_dump))
 
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
@@ -315,7 +315,9 @@ def complete_call_to_ch_insertable(
 
     otel_dump_str = None
     if complete_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
+        otel_dump_str = dict_value_to_dump(
+            redact_sensitive_keys(complete_call.otel_dump)
+        )
 
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,

@@ -1206,6 +1206,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
                 attributes = redact_sensitive_keys(call.attributes)
                 inputs = redact_sensitive_keys(call.inputs)
+                otel_dump = redact_sensitive_keys(call.otel_dump)
                 attributes_json = json.dumps(attributes)
                 inputs_json = json.dumps(inputs)
                 output_json = json.dumps(call.output)
@@ -1245,11 +1246,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     wb_run_id=call.wb_run_id,
                     wb_run_step=call.wb_run_step,
                     wb_run_step_end=call.wb_run_step_end,
-                    otel_dump=copy.deepcopy(call.otel_dump),
+                    otel_dump=copy.deepcopy(otel_dump),
                     otel_dump_len=(
-                        len(json.dumps(call.otel_dump))
-                        if call.otel_dump is not None
-                        else None
+                        len(json.dumps(otel_dump)) if otel_dump is not None else None
                     ),
                     storage_size_bytes=storage_size,
                     expire_at=expire_at,
@@ -1297,6 +1296,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         with self.lock:
             attributes = redact_sensitive_keys(req.start.attributes)
             inputs = redact_sensitive_keys(req.start.inputs)
+            otel_dump = redact_sensitive_keys(req.start.otel_dump)
             attributes_json = json.dumps(attributes)
             inputs_json = json.dumps(inputs)
             expire_at = self._compute_call_expire_at(
@@ -1319,11 +1319,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
-                existing.otel_dump = copy.deepcopy(req.start.otel_dump)
+                existing.otel_dump = copy.deepcopy(otel_dump)
                 existing.otel_dump_len = (
-                    len(json.dumps(req.start.otel_dump))
-                    if req.start.otel_dump is not None
-                    else None
+                    len(json.dumps(otel_dump)) if otel_dump is not None else None
                 )
                 existing.expire_at = expire_at
                 existing.attributes_len = len(attributes_json)
@@ -1345,11 +1343,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     wb_user_id=req.start.wb_user_id,
                     wb_run_id=req.start.wb_run_id,
                     wb_run_step=req.start.wb_run_step,
-                    otel_dump=copy.deepcopy(req.start.otel_dump),
+                    otel_dump=copy.deepcopy(otel_dump),
                     otel_dump_len=(
-                        len(json.dumps(req.start.otel_dump))
-                        if req.start.otel_dump is not None
-                        else None
+                        len(json.dumps(otel_dump)) if otel_dump is not None else None
                     ),
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
