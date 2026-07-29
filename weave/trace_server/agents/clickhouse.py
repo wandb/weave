@@ -87,6 +87,7 @@ from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import (
     extract_genai_span,
+    redact_credentials_from_span,
     strip_inline_blobs_from_span,
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
@@ -864,6 +865,8 @@ class AgentWriteHandler:
 
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
+            # Before the blob strip: that step can move a value into file storage.
+            redact_credentials_from_span(span)
             # Strip inline base64/data-URIs into weave refs before the
             # pure extraction transform runs.
             if self._trace_server is not None:

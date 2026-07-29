@@ -47,6 +47,7 @@ from weave.trace_server.agents.types import (
     RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
@@ -3258,6 +3259,103 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
         )
     )
     assert obj.obj.wb_user_id == internal_user_id
+
+
+def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
+    """A ``chat`` span whose attributes and resource carry credential-shaped names."""
+    span = Span()
+    span.name = "chat gpt-4o"
+    span.trace_id = uuid.uuid4().bytes
+    span.span_id = uuid.uuid4().bytes[:8]
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    span.start_time_unix_nano = now_ns
+    span.end_time_unix_nano = now_ns + 1_000_000_000
+    span.kind = 1  # CLIENT
+
+    header_kv = KeyValue()
+    header_kv.key = "http.request.header.authorization"
+    header_kv.value.string_value = "value-to-redact"
+    span.attributes.append(header_kv)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+
+    resource = Resource()
+    resource_kv = KeyValue()
+    resource_kv.key = "openai_api_key"
+    resource_kv.value.string_value = "value-to-redact"
+    resource.attributes.append(resource_kv)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(resource)
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_server):
+    """A span ingested through the external adapter is stored with values replaced."""
+    external_project_id = _ref_safe_external_project_id("genai_otel_redaction")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
+
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=external_project_id,
+            wb_user_id="user-42",
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    stored_span = stored.spans[0]
+    raw_span = json.loads(stored_span.raw_span_dump)
+    assert raw_span["attributes"] == {
+        "http": {"request": {"header": {"authorization": REDACTED_VALUE}}}
+    }
+    assert raw_span["resource"]["attributes"] == {"openai_api_key": REDACTED_VALUE}
+
+
+@pytest.mark.flaky(reruns=3)
+def test_otel_span_ingest_redacts_without_file_storage(ch_server):
+    """Redaction must not depend on a trace server being wired for file storage.
+
+    The blob strip needs one and is skipped without it; redaction does not.
+    """
+    project_id = _make_project_id("genai_otel_redaction_no_fs")
+
+    res, _rows = AgentWriteHandler(ch_server.ch_client).insert_otel_spans(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=project_id,
+            wb_user_id="u-1",
+        )
+    )
+    assert res.accepted_spans == 1
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    raw_span = json.loads(stored.spans[0].raw_span_dump)
+    assert raw_span["attributes"] == {
+        "http": {"request": {"header": {"authorization": REDACTED_VALUE}}}
+    }
+    assert raw_span["resource"]["attributes"] == {"openai_api_key": REDACTED_VALUE}
 
 
 # ---------------------------------------------------------------------------

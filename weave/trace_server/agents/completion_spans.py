@@ -18,6 +18,7 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.trace_server_interface import CompletionsCreateRequestInputs
 from weave.trace_server.ttl_settings import compute_expire_at
 
@@ -165,7 +166,7 @@ def build_completion_span(
         output_messages=output_messages,
         system_instructions=system_instructions,
         custom_attrs_string={"weave.source": weave_source},
-        raw_span_dump=json.dumps(raw_dump, default=str),
+        raw_span_dump=json.dumps(redact_sensitive_keys(raw_dump), default=str),
         wb_user_id=wb_user_id or "",
         expire_at=expire_at,
     )

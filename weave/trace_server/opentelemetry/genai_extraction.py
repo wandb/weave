@@ -28,6 +28,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
 )
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.opentelemetry.helpers import (
     _set_value_in_nested_dict,
     get_attribute,
@@ -501,6 +502,23 @@ def _strip_message_attr(
             else:
                 _set_value_in_nested_dict(attrs, key, stripped)
         return
+
+
+def redact_credentials_from_span(span: Span) -> None:
+    """Replace credential-shaped values in a span's client-authored attributes.
+
+    Mutates ``span.attributes`` and the span's resource attributes in place,
+    before the pure ``extract_genai_span`` transform, so every column derived
+    from them is stored with the value replaced. The name policy lives in
+    `weave/trace_server/credential_redaction.py`.
+
+    Runs before `strip_inline_blobs_from_span`, not after: that step moves a
+    long base64-shaped value into file storage and leaves a ref in its place,
+    so redacting afterwards would replace the ref and keep the value.
+    """
+    span.attributes = redact_sensitive_keys(span.attributes)
+    if span.resource is not None:
+        span.resource.attributes = redact_sensitive_keys(span.resource.attributes)
 
 
 def strip_inline_blobs_from_span(

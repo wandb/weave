@@ -16,8 +16,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.agents import semconv
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.opentelemetry.genai_extraction import (
     extract_genai_span,
+    redact_credentials_from_span,
     strip_inline_blobs_from_span,
 )
 from weave.trace_server.opentelemetry.python_spans import (
@@ -647,6 +649,57 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
     assert "weave-trace-internal:///p1/object/" in result.attributes_dump
     assert "CustomWeaveType" not in result.attributes_dump
     assert trace_server.file_create.call_count == 2
+
+
+def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
+    """Credential-shaped fields are replaced in the attributes and the resource.
+
+    `custom_attrs_string` is asserted alongside the dumps because an attribute
+    the schema does not promote lands there, and that column is queryable.
+    """
+    span = _make_span(
+        attrs={
+            "authorization": "value-to-redact",
+            "options": {"apiKey": "value-to-redact"},
+        }
+    )
+    span.resource = Resource(attributes={"aws_access_key_id": "value-to-redact"})
+
+    redact_credentials_from_span(span)
+    result = extract_genai_span(span, project_id="p1")
+
+    redacted_attrs = {
+        "authorization": REDACTED_VALUE,
+        "options": {"apiKey": REDACTED_VALUE},
+    }
+    assert json.loads(result.attributes_dump) == redacted_attrs
+    assert json.loads(result.raw_span_dump)["attributes"] == redacted_attrs
+    assert json.loads(result.resource_dump) == {
+        "attributes": {"aws_access_key_id": REDACTED_VALUE},
+        "dropped_attributes_count": 0,
+    }
+    assert result.custom_attrs_string == {
+        "authorization": REDACTED_VALUE,
+        "options.apiKey": REDACTED_VALUE,
+    }
+
+
+def test_redaction_runs_before_the_inline_blob_strip() -> None:
+    """A credential value big enough to look like a blob never reaches storage.
+
+    `strip_inline_blobs_from_span` uploads such a value and leaves a ref in its
+    place, so redacting after it would replace the ref and keep the file.
+    """
+    b64 = base64.b64encode(b"a" * 15000).decode("ascii")
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs={"openai_api_key": f"data:image/png;base64,{b64}"})
+
+    redact_credentials_from_span(span)
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
+
+    assert trace_server.file_create.call_count == 0
+    assert json.loads(result.attributes_dump) == {"openai_api_key": REDACTED_VALUE}
 
 
 def test_strip_inline_blobs_attributes_obj_create_to_wb_user_id() -> None:

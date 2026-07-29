@@ -488,6 +488,15 @@ pnpm exec tsx examples/claudeAgents.ts
 - The walk is copy-on-write and replaces only non-empty strings. Both properties
   are load-bearing — see the module docstring — so keep them if you touch it.
 
+### Credential-shaped fields in agent span columns
+
+- The agents OTel ingest calls `redact_credentials_from_span` before
+  `strip_inline_blobs_from_span`, and outside its `_trace_server` guard: the blob
+  strip moves long base64-shaped values into file storage, so redacting after it
+  would leave the value there, and redaction itself needs no file storage.
+- The completions path builds a span row without a parsed OTel span, so it never
+  reaches that hook — `build_completion_span` redacts its own raw dump instead.
+
 ### Documentation
 
 - Update relevant docstrings for Python code
