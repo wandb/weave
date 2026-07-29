@@ -9,7 +9,8 @@ redaction is irreversible, so a matched field is destroyed. It is narrow, not
 infallible -- a legitimate field can still carry a matching name.
 
 Applied by the ClickHouse schema converters to the two client-authored call
-columns, `inputs_dump` and `attributes_dump`.
+columns, `inputs_dump` and `attributes_dump`, and by the agents OTel ingest and
+the completions span builder to the client-authored parts of an agent span.
 """
 
 from __future__ import annotations

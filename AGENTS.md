@@ -491,11 +491,18 @@ pnpm exec tsx examples/claudeAgents.ts
 ### Credential-shaped fields in agent span columns
 
 - The agents OTel ingest calls `redact_credentials_from_span` before
-  `strip_inline_blobs_from_span`, and outside its `_trace_server` guard: the blob
-  strip moves long base64-shaped values into file storage, so redacting after it
-  would leave the value there, and redaction itself needs no file storage.
+  `strip_inline_blobs_from_span`. The blob strip moves a long base64-shaped value
+  into file storage and leaves a ref behind, so redacting after it would replace
+  the ref and keep the value.
+- That call also sits outside the file-storage guard in `agents/clickhouse.py`.
+  The blob strip needs a trace server; redaction does not.
+- It redacts the span's own attributes, its resource, its events and its links,
+  because a span's stored dump keeps all four and the promoted, queryable columns
+  are derived from the same values.
 - The completions path builds a span row without a parsed OTel span, so it never
-  reaches that hook — `build_completion_span` redacts its own raw dump instead.
+  reaches that hook. `build_completion_span` redacts the request it dumps and the
+  tool definitions it derives from it, and leaves the provider response alone —
+  responses are generated content.
 
 ### Documentation
 

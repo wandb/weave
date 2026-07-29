@@ -9,6 +9,8 @@ import pytest
 from weave.trace_server import clickhouse_trace_server_batched as chts
 from weave.trace_server import llm_completion as llm_mod
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.completion_spans import build_completion_span
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
@@ -1423,6 +1425,45 @@ def completions_mock_response():
             "total_tokens": 15,
         },
     }
+
+
+def test_completion_span_redacts_credential_shaped_request_fields():
+    """The request the span row keeps goes through the shared name policy."""
+    started_at = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+    span = build_completion_span(
+        project_id="p1",
+        trace_id="trace",
+        span_id="span",
+        conversation_id="conv",
+        conversation_name="conv",
+        started_at=started_at,
+        ended_at=started_at + datetime.timedelta(seconds=1),
+        provider_name="openai",
+        model_name="gpt-4o",
+        request_inputs=tsi.CompletionsCreateRequestInputs(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": "hi"}],
+            extra_headers={"authorization": "value-to-redact"},
+            tools=[{"type": "mcp", "headers": {"api_key": "value-to-redact"}}],
+        ),
+        # A response is generated content, so it is left as the provider sent it.
+        response={"choices": [{"message": {"content": "{'api_key': 'kept'}"}}]},
+        wb_user_id="u-1",
+        retention_days=0,
+    )
+
+    redacted_tools = [{"type": "mcp", "headers": {"api_key": REDACTED_VALUE}}]
+    assert json.loads(span.raw_span_dump) == {
+        "inputs": {
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": "hi"}],
+            "extra_headers": {"authorization": REDACTED_VALUE},
+            "tools": redacted_tools,
+        },
+        "response": {"choices": [{"message": {"content": "{'api_key': 'kept'}"}}]},
+    }
+    # Derived from the same request field, so it needs the same treatment.
+    assert json.loads(span.tool_definitions) == redacted_tools
 
 
 def test_completions_writes_agent_span(

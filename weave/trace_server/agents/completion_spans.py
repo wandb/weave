@@ -103,7 +103,7 @@ def build_completion_span(
     tool_definitions = ""
     if request_inputs.tools:
         try:
-            tool_definitions = json.dumps(request_inputs.tools)
+            tool_definitions = json.dumps(redact_sensitive_keys(request_inputs.tools))
         except (TypeError, ValueError):
             pass
 
@@ -119,8 +119,8 @@ def build_completion_span(
         expire_at = EXPIRE_AT_NEVER
 
     raw_dump: dict[str, Any] = {
-        "inputs": request_inputs.model_dump(
-            exclude_none=True, exclude={"vertex_credentials"}
+        "inputs": redact_sensitive_keys(
+            request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
         ),
     }
     if response is not None:
@@ -166,7 +166,7 @@ def build_completion_span(
         output_messages=output_messages,
         system_instructions=system_instructions,
         custom_attrs_string={"weave.source": weave_source},
-        raw_span_dump=json.dumps(redact_sensitive_keys(raw_dump), default=str),
+        raw_span_dump=json.dumps(raw_dump, default=str),
         wb_user_id=wb_user_id or "",
         expire_at=expire_at,
     )

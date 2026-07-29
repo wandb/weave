@@ -3261,8 +3261,22 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
     assert obj.obj.wb_user_id == internal_user_id
 
 
+# ---------------------------------------------------------------------------
+# Test: credential redaction on the GenAI OTel agents ingest path
+# ---------------------------------------------------------------------------
+
+_REDACTED_SPAN_ATTRS = {
+    "http": {"request": {"header": {"authorization": REDACTED_VALUE}}},
+    "openai_api_key": REDACTED_VALUE,
+}
+
+
 def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
-    """A ``chat`` span whose attributes and resource carry credential-shaped names."""
+    """A ``chat`` span whose attributes and resource carry credential-shaped names.
+
+    The api-key value is a data-URI past ``AUTO_CONVERSION_MIN_SIZE``, so the
+    inline-blob strip would upload it and leave a ref behind if it ran first.
+    """
     span = Span()
     span.name = "chat gpt-4o"
     span.trace_id = uuid.uuid4().bytes
@@ -3277,12 +3291,19 @@ def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
     header_kv.value.string_value = "value-to-redact"
     span.attributes.append(header_kv)
 
+    blob_kv = KeyValue()
+    blob_kv.key = "openai_api_key"
+    blob_kv.value.string_value = (
+        f"data:image/png;base64,{base64.b64encode(b'a' * 15000).decode('ascii')}"
+    )
+    span.attributes.append(blob_kv)
+
     scope_spans = ScopeSpans()
     scope_spans.spans.append(span)
 
     resource = Resource()
     resource_kv = KeyValue()
-    resource_kv.key = "openai_api_key"
+    resource_kv.key = "aws_access_key_id"
     resource_kv.value.string_value = "value-to-redact"
     resource.attributes.append(resource_kv)
 
@@ -3296,6 +3317,12 @@ def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
         run_id=None,
         resource_spans=resource_spans,
     )
+
+
+def _assert_stored_span_is_redacted(raw_span_dump: str) -> None:
+    raw_span = json.loads(raw_span_dump)
+    assert raw_span["attributes"] == _REDACTED_SPAN_ATTRS
+    assert raw_span["resource"]["attributes"] == {"aws_access_key_id": REDACTED_VALUE}
 
 
 # flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
@@ -3322,16 +3349,40 @@ def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_ser
         AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
     )
     assert len(stored.spans) == 1
-    stored_span = stored.spans[0]
-    raw_span = json.loads(stored_span.raw_span_dump)
-    assert raw_span["attributes"] == {
-        "http": {"request": {"header": {"authorization": REDACTED_VALUE}}}
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
+
+    # Redaction ran before the blob strip, so the oversized value was never
+    # uploaded. Redacting afterwards would replace the ref and keep the file, and
+    # the stored span would look identical to this one.
+    assert (
+        ch_server.project_stats(
+            tsi.ProjectStatsReq(project_id=internal_project_id)
+        ).files_storage_size_bytes
+        == 0
+    )
+
+    # The other three dumps are not in any query projection, so read the columns.
+    row = ch_server.ch_client.query(
+        "SELECT attributes_dump, resource_dump, custom_attrs_string FROM spans "
+        "WHERE project_id = {project_id:String}",
+        parameters={"project_id": internal_project_id},
+    ).result_rows
+    assert len(row) == 1
+    attributes_dump, resource_dump, custom_attrs_string = row[0]
+    assert json.loads(attributes_dump) == _REDACTED_SPAN_ATTRS
+    assert json.loads(resource_dump)["attributes"] == {
+        "aws_access_key_id": REDACTED_VALUE
     }
-    assert raw_span["resource"]["attributes"] == {"openai_api_key": REDACTED_VALUE}
+    assert custom_attrs_string == {
+        "http.request.header.authorization": REDACTED_VALUE,
+        "openai_api_key": REDACTED_VALUE,
+    }
 
 
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
 @pytest.mark.flaky(reruns=3)
-def test_otel_span_ingest_redacts_without_file_storage(ch_server):
+def test_genai_otel_export_redacts_without_file_storage(ch_server):
     """Redaction must not depend on a trace server being wired for file storage.
 
     The blob strip needs one and is skipped without it; redaction does not.
@@ -3346,16 +3397,13 @@ def test_otel_span_ingest_redacts_without_file_storage(ch_server):
         )
     )
     assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
 
     stored = ch_server.agent_spans_query(
         AgentSpansQueryReq(project_id=project_id, include_details=True)
     )
     assert len(stored.spans) == 1
-    raw_span = json.loads(stored.spans[0].raw_span_dump)
-    assert raw_span["attributes"] == {
-        "http": {"request": {"header": {"authorization": REDACTED_VALUE}}}
-    }
-    assert raw_span["resource"]["attributes"] == {"openai_api_key": REDACTED_VALUE}
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
 
 
 # ---------------------------------------------------------------------------

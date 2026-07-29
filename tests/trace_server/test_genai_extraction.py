@@ -23,6 +23,8 @@ from weave.trace_server.opentelemetry.genai_extraction import (
     strip_inline_blobs_from_span,
 )
 from weave.trace_server.opentelemetry.python_spans import (
+    Event,
+    Link,
     Resource,
     Span,
     SpanKind,
@@ -37,11 +39,13 @@ def _make_span(
     name: str = "test-span",
     events: list | None = None,
     status: Status | None = None,
+    resource_attrs: dict[str, Any] | None = None,
+    links: list | None = None,
 ) -> Span:
     """Build a minimal Span for testing."""
     now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
     return Span(
-        resource=Resource(attributes={}),
+        resource=Resource(attributes=resource_attrs or {}),
         name=name,
         trace_id="abc123",
         span_id="def456",
@@ -51,6 +55,7 @@ def _make_span(
         kind=SpanKind.CLIENT,
         status=status or Status(code=StatusCode.OK),
         events=events or [],
+        links=links or [],
     )
 
 
@@ -652,18 +657,28 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
 
 
 def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
-    """Credential-shaped fields are replaced in the attributes and the resource.
-
-    `custom_attrs_string` is asserted alongside the dumps because an attribute
-    the schema does not promote lands there, and that column is queryable.
+    """Every container a span carries is redacted, not only its own attributes.
+    ``custom_attrs_string`` and ``tool_call_arguments`` are pinned alongside the
+    dumps because both are queryable, and the second one is derived from an
+    event, which is the container easiest to miss.
     """
     span = _make_span(
         attrs={
             "authorization": "value-to-redact",
             "options": {"apiKey": "value-to-redact"},
-        }
+        },
+        resource_attrs={"aws_access_key_id": "value-to-redact"},
+        events=[
+            Event(
+                name="gen_ai.tool.input",
+                timestamp=0,
+                attributes={
+                    "gen_ai.tool.call.arguments": {"api_key": "value-to-redact"}
+                },
+            )
+        ],
+        links=[Link(trace_id="abc123", span_id="fed654", attributes={"api_key": "x"})],
     )
-    span.resource = Resource(attributes={"aws_access_key_id": "value-to-redact"})
 
     redact_credentials_from_span(span)
     result = extract_genai_span(span, project_id="p1")
@@ -672,12 +687,18 @@ def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
         "authorization": REDACTED_VALUE,
         "options": {"apiKey": REDACTED_VALUE},
     }
+    raw_span = json.loads(result.raw_span_dump)
     assert json.loads(result.attributes_dump) == redacted_attrs
-    assert json.loads(result.raw_span_dump)["attributes"] == redacted_attrs
+    assert raw_span["attributes"] == redacted_attrs
     assert json.loads(result.resource_dump) == {
         "attributes": {"aws_access_key_id": REDACTED_VALUE},
         "dropped_attributes_count": 0,
     }
+    assert json.loads(result.events_dump)[0]["attributes"] == {
+        "gen_ai.tool.call.arguments": {"api_key": REDACTED_VALUE}
+    }
+    assert raw_span["links"][0]["attributes"] == {"api_key": REDACTED_VALUE}
+    assert result.tool_call_arguments == json.dumps({"api_key": REDACTED_VALUE})
     assert result.custom_attrs_string == {
         "authorization": REDACTED_VALUE,
         "options.apiKey": REDACTED_VALUE,
@@ -686,8 +707,7 @@ def test_redact_credentials_from_span_reaches_every_derived_column() -> None:
 
 def test_redaction_runs_before_the_inline_blob_strip() -> None:
     """A credential value big enough to look like a blob never reaches storage.
-
-    `strip_inline_blobs_from_span` uploads such a value and leaves a ref in its
+    ``strip_inline_blobs_from_span`` uploads such a value and leaves a ref in its
     place, so redacting after it would replace the ref and keep the file.
     """
     b64 = base64.b64encode(b"a" * 15000).decode("ascii")

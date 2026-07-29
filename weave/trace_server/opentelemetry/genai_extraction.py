@@ -467,6 +467,33 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 
 
 # ---------------------------------------------------------------------------
+# Credential redaction
+# ---------------------------------------------------------------------------
+
+
+def redact_credentials_from_span(span: Span) -> None:
+    """Replace credential-shaped values in a span's client-authored attributes.
+
+    Mutates all four attribute containers a span carries -- its own, its
+    resource's, its events' and its links' -- because ``span.as_dict()`` keeps
+    every one of them in ``raw_span_dump``, and the promoted columns are derived
+    from the same values. The name policy lives in
+    ``weave/trace_server/credential_redaction.py``.
+
+    Runs before ``strip_inline_blobs_from_span``, not after: that step moves a
+    long base64-shaped value into file storage and leaves a ref in its place, so
+    redacting afterwards would replace the ref and keep the value.
+    """
+    span.attributes = redact_sensitive_keys(span.attributes)
+    if span.resource is not None:
+        span.resource.attributes = redact_sensitive_keys(span.resource.attributes)
+    for event in span.events:
+        event.attributes = redact_sensitive_keys(event.attributes)
+    for link in span.links:
+        link.attributes = redact_sensitive_keys(link.attributes)
+
+
+# ---------------------------------------------------------------------------
 # Inline blob stripping
 # ---------------------------------------------------------------------------
 
@@ -502,23 +529,6 @@ def _strip_message_attr(
             else:
                 _set_value_in_nested_dict(attrs, key, stripped)
         return
-
-
-def redact_credentials_from_span(span: Span) -> None:
-    """Replace credential-shaped values in a span's client-authored attributes.
-
-    Mutates ``span.attributes`` and the span's resource attributes in place,
-    before the pure ``extract_genai_span`` transform, so every column derived
-    from them is stored with the value replaced. The name policy lives in
-    `weave/trace_server/credential_redaction.py`.
-
-    Runs before `strip_inline_blobs_from_span`, not after: that step moves a
-    long base64-shaped value into file storage and leaves a ref in its place,
-    so redacting afterwards would replace the ref and keep the value.
-    """
-    span.attributes = redact_sensitive_keys(span.attributes)
-    if span.resource is not None:
-        span.resource.attributes = redact_sensitive_keys(span.resource.attributes)
 
 
 def strip_inline_blobs_from_span(
