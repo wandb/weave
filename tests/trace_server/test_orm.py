@@ -150,14 +150,16 @@ def test_transform_external_field_to_internal_field():
 
     # Qualified fields must preserve simple table aliases.
     result = _transform_external_field_to_internal_field(
-        "feedback.id", all_columns=all_columns, json_columns=json_columns
+        "f.id", all_columns=all_columns, json_columns=json_columns
     )
-    assert result[0] == "feedback.id"
-    assert result[2] == {"feedback.id"}
+    assert result[0] == "f.id"
+    assert result[2] == {"f.id"}
 
-    # Reject SQL expressions disguised as table prefixes or nested fields.
+    # Reject malformed qualifiers and SQL expressions disguised as fields.
     invalid_fields = [
         ("(SELECT 'BENIGN_SQLI_PROBE') AS probe --.id", "Invalid table prefix"),
+        (".id", "Invalid table prefix"),
+        ("feedback.", "Unknown field"),
         ("id.value) FROM system.one --", "Unknown field"),
     ]
     for invalid_field, error_match in invalid_fields:
