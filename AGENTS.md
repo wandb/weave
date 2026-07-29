@@ -354,6 +354,14 @@ pnpm exec tsx examples/claudeAgents.ts
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
 
+### TypeScript GenAI media attachments
+
+- `MediaAttachment` is the shared discriminated union for inline base64 blobs,
+  URIs, and file IDs. Export it from both `genai/index.ts` and the public SDK
+  entry point when integrations need to accept tracing-only media.
+- Keep `AttachMediaOpts` as a compatibility alias for `MediaAttachment`; new
+  APIs should use the shared name directly.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements

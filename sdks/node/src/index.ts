@@ -76,6 +76,7 @@ export type {
   ConversationInit,
   LLM,
   LLMInit,
+  MediaAttachment,
   Message,
   MessagePart,
   Modality,

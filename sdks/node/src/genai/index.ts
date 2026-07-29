@@ -42,6 +42,7 @@ export {Turn, type TurnInit} from './turn';
 export type {
   Message,
   MessagePart,
+  MediaAttachment,
   Modality,
   Reasoning,
   Role,

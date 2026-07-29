@@ -12,6 +12,12 @@ export type Role =
 
 export type Modality = 'image' | 'audio' | 'video' | 'document';
 
+/** A media attachment to append to a GenAI input message. */
+export type MediaAttachment =
+  | {content: string; mimeType: string; modality: Modality}
+  | {uri: string; modality: Modality}
+  | {fileId: string; modality: Modality; mimeType?: string};
+
 export interface Message {
   role: Role;
   content?: string;

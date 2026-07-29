@@ -31,7 +31,14 @@ import {
 } from './semconv';
 import {SubAgent, type SubAgentInit} from './subagent';
 import {Tool, type ToolInit} from './tool';
-import type {Message, MessagePart, Modality, Reasoning, Usage} from './types';
+import type {
+  MediaAttachment,
+  Message,
+  MessagePart,
+  Modality,
+  Reasoning,
+  Usage,
+} from './types';
 
 export interface LLMInit extends SpanInitBase {
   model: string;
@@ -39,11 +46,8 @@ export interface LLMInit extends SpanInitBase {
   systemInstructions?: string[];
 }
 
-/** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
-export type AttachMediaOpts =
-  | {content: string; mimeType: string; modality: Modality}
-  | {uri: string; modality: Modality}
-  | {fileId: string; modality: Modality; mimeType?: string};
+/** @deprecated Use {@link MediaAttachment}. */
+export type AttachMediaOpts = MediaAttachment;
 
 /**
  * An LLM call. Emits a `chat` span with `gen_ai.*` attributes.
