@@ -3283,7 +3283,7 @@ def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
     now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
     span.start_time_unix_nano = now_ns
     span.end_time_unix_nano = now_ns + 1_000_000_000
-    span.kind = 1  # CLIENT
+    span.kind = 1  # INTERNAL
 
     header_kv = KeyValue()
     header_kv.key = "http.request.header.authorization"
@@ -3292,8 +3292,9 @@ def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
 
     blob_kv = KeyValue()
     blob_kv.key = "openai_api_key"
+    blob_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
     blob_kv.value.string_value = (
-        f"data:image/png;base64,{base64.b64encode(b'a' * 15000).decode('ascii')}"
+        f"data:image/png;base64,{base64.b64encode(blob_bytes).decode('ascii')}"
     )
     span.attributes.append(blob_kv)
 
