@@ -362,6 +362,17 @@ pnpm exec tsx examples/claudeAgents.ts
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
 
+### Claude Agent SDK streamed images
+
+- Tap `AsyncIterable<SDKUserMessage>` prompts without consuming or cloning
+  them; map text and base64/URL images to GenAI text, blob, and URI parts.
+- Each user-to-result cycle is one root turn. Resumed queries share
+  `session_id`, and long-lived streamed inputs queue turns in FIFO order.
+- Treat `blob.content` as media/ref data exposed through `content_refs`, not
+  prose.
+- Run the example from `sdks/node`, use repository-relative fixtures, keep text
+  and image sessions separate, and set both `tools` and `allowedTools`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
