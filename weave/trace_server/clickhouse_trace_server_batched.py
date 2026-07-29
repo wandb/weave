@@ -1537,9 +1537,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = f"""
         SELECT
             report_id,
-            argMax(period_days, report_version) AS period_days,
-            argMax(period_end, report_version) AS period_end,
-            argMax(created_at, report_version) AS created_at
+            argMax(period_days, created_at) AS period_days,
+            argMax(period_end, created_at) AS period_end,
+            max(created_at) AS created_at
         FROM insights_reports
         WHERE {' AND '.join(conditions)}
         GROUP BY report_id
@@ -1570,15 +1570,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query = f"""
         SELECT
             section_id,
-            argMax(section_type, report_version) AS section_type,
-            argMax(period_days, report_version) AS period_days,
-            argMax(period_end, report_version) AS period_end,
-            argMax(title, report_version) AS title,
-            argMax(subtitle, report_version) AS subtitle,
-            argMax(description, report_version) AS description,
-            argMax(section_schema_version, report_version) AS section_schema_version,
-            argMax(section_json, report_version) AS section_json,
-            argMax(created_at, report_version) AS created_at
+            argMax(section_type, created_at) AS section_type,
+            argMax(period_days, created_at) AS period_days,
+            argMax(period_end, created_at) AS period_end,
+            argMax(title, created_at) AS title,
+            argMax(subtitle, created_at) AS subtitle,
+            argMax(description, created_at) AS description,
+            argMax(section_schema_version, created_at) AS section_schema_version,
+            argMax(section_json, created_at) AS section_json,
+            max(created_at) AS created_at
         FROM insights_reports
         WHERE project_id = {project_id_param} AND report_id = {report_id_param}
         GROUP BY section_id

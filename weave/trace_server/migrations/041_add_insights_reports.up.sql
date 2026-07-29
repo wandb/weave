@@ -2,8 +2,8 @@
 --
 -- New report snapshots receive a new report_id. To destructively replace one
 -- section within an existing report, write the same project_id/report_id/
--- section_id with a strictly greater report_version. Read paths must collapse
--- versions with argMax(..., report_version), not FINAL.
+-- section_id with a later created_at. Read paths must collapse versions with
+-- argMax(..., created_at), not FINAL.
 CREATE TABLE IF NOT EXISTS insights_reports (
     project_id String,
     report_id UUID,
@@ -21,10 +21,8 @@ CREATE TABLE IF NOT EXISTS insights_reports (
     section_json String CODEC(ZSTD(6)),
     -- Raw 32-byte SHA-256 digest, not a 64-character hex string.
     section_json_hash FixedString(32),
-    -- ReplacingMergeTree version. Writers must increase it on replacement.
-    report_version UInt32,
     created_at DateTime64(3) DEFAULT now64(3)
-) ENGINE = ReplacingMergeTree(report_version)
+) ENGINE = ReplacingMergeTree(created_at)
 -- Monthly partitions support the two-year retention policy without creating a
 -- partition per reporting day.
 PARTITION BY toYYYYMM(period_end)
