@@ -452,6 +452,17 @@ pnpm exec tsx examples/claudeAgents.ts
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
 
+### Credential-shaped fields in call inputs and attributes
+
+- The three call converters in `clickhouse/schema_converters.py` run
+  `redact_sensitive_keys` over `inputs` and `attributes` before extracting refs,
+  so a field whose name matches the policy in
+  `weave/trace_server/credential_redaction.py` is stored with its string value
+  replaced. `in_memory_trace_server.py` applies the same function, so both
+  backends read back the same thing.
+- The walk is copy-on-write and replaces only non-empty strings. Both properties
+  are load-bearing — see the module docstring — so keep them if you touch it.
+
 ### Documentation
 
 - Update relevant docstrings for Python code
