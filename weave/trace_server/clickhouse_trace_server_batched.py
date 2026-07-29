@@ -1571,7 +1571,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         SELECT
             section_id,
             argMax(section_type, report_version) AS section_type,
-            argMax(section_order, report_version) AS section_order,
             argMax(period_days, report_version) AS period_days,
             argMax(period_end, report_version) AS period_end,
             argMax(title, report_version) AS title,
@@ -1583,7 +1582,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         FROM insights_reports
         WHERE project_id = {project_id_param} AND report_id = {report_id_param}
         GROUP BY section_id
-        ORDER BY section_order ASC, section_id ASC
+        ORDER BY section_id ASC
         """
         rows = list(self._query(query, pb.get_params()).named_results())
         if not rows:
@@ -1598,7 +1597,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 tsi.InsightsReportSection(
                     section_id=str(row["section_id"]),
                     section_type=row["section_type"],
-                    section_order=row["section_order"],
                     title=row["title"],
                     subtitle=row["subtitle"],
                     description=row["description"],

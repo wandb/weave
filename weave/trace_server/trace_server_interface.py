@@ -1360,7 +1360,6 @@ class InsightsReportsQueryRes(BaseModel):
 class InsightsReportSection(BaseModel):
     section_id: str
     section_type: str
-    section_order: int
     title: str
     subtitle: str
     description: str

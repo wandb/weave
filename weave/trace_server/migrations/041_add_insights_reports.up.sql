@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS insights_reports (
     -- Stable within a report so a section can be replaced independently.
     section_id UUID,
     section_type LowCardinality(String),
-    -- Presentation order is separate from stable section identity.
-    section_order UInt16,
     period_days UInt16,
     -- UTC, exclusive end of the reporting window.
     period_end DateTime64(3),
