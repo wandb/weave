@@ -528,7 +528,7 @@ def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
     span.span_id = uuid.uuid4().bytes[:8]
     span.start_time_unix_nano = int(_STARTED_AT.timestamp() * 1_000_000_000)
     span.end_time_unix_nano = int(_ENDED_AT.timestamp() * 1_000_000_000)
-    span.kind = 1  # CLIENT
+    span.kind = 1  # INTERNAL
     attribute = KeyValue()
     attribute.key = "options.apiKey"
     attribute.value.string_value = PLACEHOLDER
