@@ -201,14 +201,14 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
             state.accumulated.append(
                 Message.tool_result(block.tool_use_id, block.content)
             )
-            tool = state.open_tools.get(block.tool_use_id)
-            if tool is None:
+            open_tool = state.open_tools.get(block.tool_use_id)
+            if open_tool is None:
                 continue
             del state.open_tools[block.tool_use_id]
-            with tool:
-                tool.result = str(block.content)
+            with open_tool:
+                open_tool.result = str(block.content)
                 if block.is_error:
-                    tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+                    open_tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
                         RuntimeError("tool reported an error")
                     )
         return None
