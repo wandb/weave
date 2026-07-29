@@ -1388,23 +1388,23 @@ def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
 
 def test_blob_content_is_media_not_user_message_text() -> None:
     """A Weave blob's `content` is base64/ref data, not displayable prose."""
-    audio_internal = "weave-trace-internal:///PID/object/Content:AUDIODIGEST"
+    image_internal = "weave-trace-internal:///PID/object/Content:IMAGEDIGEST"
     spans = [
         _span(
             span_id="agent",
             operation_name="invoke_agent",
-            agent_name="audio-inspector",
+            agent_name="image-analyzer",
             input_messages=[
                 {
                     "role": "user",
                     "content": _parts(
                         {
                             "type": "blob",
-                            "content": audio_internal,
-                            "mimeType": "audio/mpeg",
-                            "modality": "audio",
+                            "content": image_internal,
+                            "mimeType": "image/png",
+                            "modality": "image",
                         },
-                        _text_part("Inspect this audio."),
+                        _text_part("Describe this image."),
                     ),
                 }
             ],
@@ -1415,8 +1415,8 @@ def test_blob_content_is_media_not_user_message_text() -> None:
     user = next(m for m in messages if m.type == "user_message")
 
     assert _user_payload(user) == AgentChatUserMessage(
-        text="Inspect this audio.",
-        content_refs=[audio_internal],
+        text="Describe this image.",
+        content_refs=[image_internal],
     )
 
 
