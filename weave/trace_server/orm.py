@@ -15,7 +15,7 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
-_SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SQL_IDENTIFIER_RE = re.compile(r"^(?!$)[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class ParamBuilder:
