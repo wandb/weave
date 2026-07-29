@@ -38,7 +38,16 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
-from weave.conversation import LLM, Conversation, Message, Reasoning, Tool, Turn, Usage
+from weave.conversation import (
+    LLM,
+    Conversation,
+    Message,
+    Reasoning,
+    SubAgent,
+    Tool,
+    Turn,
+    Usage,
+)
 from weave.conversation.agent_context import resolve_agent_name
 from weave.conversation.types import (
     BlobPart,
@@ -57,6 +66,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
+_SUBAGENT_TOOL_NAMES = {"Agent", "Task"}
 
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
 
@@ -179,6 +189,37 @@ def _assistant_output_message(
     return _AssistantOutput(message=message, text=text, reasoning=reasoning)
 
 
+def _tool_result_text(content: Any) -> str:
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text = "\n".join(
+            str(block.get("text", ""))
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+        if text:
+            return text
+    return json.dumps(content, ensure_ascii=False, default=str)
+
+
+def _message_attribute(role: str, content: str) -> str:
+    return json.dumps(
+        [
+            {
+                "role": role,
+                "parts": [{"type": "text", "content": content}],
+            }
+        ],
+        ensure_ascii=False,
+    )
+
+
+_SpanParent = Turn | SubAgent
+
+
 @dataclass(slots=True)
 class _TurnState:
     """Mutable per-turn accumulator (one invoke_agent span and its children).
@@ -192,10 +233,11 @@ class _TurnState:
     model: str = ""
     final_text: str = ""
     is_error: bool = False
-    accumulated: list[Message] = field(default_factory=list)
-    pending_thinking: list[str] = field(default_factory=list)
+    accumulated: dict[str | None, list[Message]] = field(default_factory=dict)
+    pending_thinking: dict[str | None, list[str]] = field(default_factory=dict)
     pending_chat: LLM | None = None
     open_tools: dict[str, Tool] = field(default_factory=dict)
+    open_subagents: dict[str, SubAgent] = field(default_factory=dict)
 
 
 def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> None:
@@ -211,6 +253,64 @@ def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> Non
         state.pending_chat = None
 
 
+def _start_subagent(
+    block: ToolUseBlock,
+    parent: _SpanParent,
+    state: _TurnState,
+) -> None:
+    raw_input = block.input if isinstance(block.input, dict) else {}
+    name = next(
+        (
+            value
+            for key in ("subagent_type", "name")
+            if isinstance(value := raw_input.get(key), str) and value
+        ),
+        "subagent",
+    )
+    model = raw_input.get("model")
+    description = raw_input.get("description")
+    prompt = raw_input.get("prompt")
+    subagent = parent.start_subagent(
+        name=name,
+        model=model if isinstance(model, str) else "",
+    )
+    subagent.record(
+        agent_description=description if isinstance(description, str) else None
+    )
+    subagent.__enter__()  # noqa: PLC2801
+    attributes = {
+        "gen_ai.tool.call.id": block.id,
+        "gen_ai.tool.name": block.name,
+        "gen_ai.tool.call.arguments": json.dumps(
+            block.input,
+            ensure_ascii=False,
+            default=str,
+        ),
+    }
+    if isinstance(prompt, str) and prompt:
+        attributes["gen_ai.input.messages"] = _message_attribute("user", prompt)
+    subagent.set_attributes(attributes)
+    state.open_subagents[block.id] = subagent
+
+
+def _span_parent(msg: AssistantMessage, state: _TurnState) -> _SpanParent:
+    parent_tool_use_id = msg.parent_tool_use_id
+    if parent_tool_use_id is None:
+        return state.turn
+    subagent = state.open_subagents.get(parent_tool_use_id)
+    if subagent is None:
+        subagent = state.turn.start_subagent(
+            name="subagent",
+            model=msg.model or "",
+        )
+        subagent.__enter__()  # noqa: PLC2801
+        subagent.set_attributes({"gen_ai.tool.call.id": parent_tool_use_id})
+        state.open_subagents[parent_tool_use_id] = subagent
+    elif msg.model:
+        subagent.record(model=msg.model)
+    return subagent
+
+
 def _process_message(msg: Any, state: _TurnState) -> str | None:
     """Handle one streamed message and return a newly observed SDK session ID."""
     if isinstance(msg, SystemMessage):
@@ -221,38 +321,48 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
         return None
 
     if isinstance(msg, AssistantMessage):
+        parent_tool_use_id = msg.parent_tool_use_id
         # Buffer thinking-only messages so extended-thinking deltas fold into
         # the next response's chat span rather than spawning an empty one.
         if all(isinstance(b, ThinkingBlock) for b in msg.content) and msg.content:
-            state.pending_thinking.extend(b.thinking for b in msg.content)
+            state.pending_thinking.setdefault(parent_tool_use_id, []).extend(
+                b.thinking for b in msg.content
+            )
             return None
 
         # A new response means the previous chat span is done (no usage — only
         # the final one carries the aggregate usage).
         _flush_pending_chat(state)
-        if msg.model:
+        if parent_tool_use_id is None and msg.model:
             state.model = msg.model
 
-        output = _assistant_output_message(msg, state.pending_thinking)
-        state.pending_thinking.clear()
-        if output.text:
+        output = _assistant_output_message(
+            msg,
+            state.pending_thinking.pop(parent_tool_use_id, []),
+        )
+        if parent_tool_use_id is None and output.text:
             state.final_text = output.text
 
-        chat = state.turn.start_llm(
+        parent = _span_parent(msg, state)
+        chat = parent.start_llm(
             model=msg.model or "",
             provider_name=_PROVIDER_NAME,
         )
         state.pending_chat = chat
+        accumulated = state.accumulated.setdefault(parent_tool_use_id, [])
         chat.record(
-            input_messages=list(state.accumulated),
+            input_messages=list(accumulated),
             output_messages=[output.message],
             reasoning=output.reasoning if output.reasoning.content else None,
         )
-        state.accumulated.append(output.message)
+        accumulated.append(output.message)
 
         for block in msg.content:
             if isinstance(block, ToolUseBlock):
-                tool = state.turn.start_tool(
+                if block.name in _SUBAGENT_TOOL_NAMES:
+                    _start_subagent(block, parent, state)
+                    continue
+                tool = parent.start_tool(
                     name=block.name,
                     arguments=json.dumps(block.input, default=str),
                     tool_call_id=block.id,
@@ -263,18 +373,32 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
 
     if isinstance(msg, UserMessage):
         content = msg.content if isinstance(msg.content, list) else []
+        accumulated = state.accumulated.setdefault(msg.parent_tool_use_id, [])
         for block in content:
             if not isinstance(block, ToolResultBlock):
                 continue
-            state.accumulated.append(
-                Message.tool_result(block.tool_use_id, block.content)
-            )
+            result_text = _tool_result_text(block.content)
+            accumulated.append(Message.tool_result(block.tool_use_id, result_text))
+            open_subagent = state.open_subagents.pop(block.tool_use_id, None)
+            if open_subagent is not None:
+                attributes = {"gen_ai.tool.call.result": result_text}
+                if result_text:
+                    attributes["gen_ai.output.messages"] = _message_attribute(
+                        "assistant", result_text
+                    )
+                open_subagent.set_attributes(attributes)
+                if block.is_error:
+                    open_subagent._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+                        RuntimeError(result_text or "subagent reported an error")
+                    )
+                open_subagent.end()
+                continue
             open_tool = state.open_tools.get(block.tool_use_id)
             if open_tool is None:
                 continue
             del state.open_tools[block.tool_use_id]
             with open_tool:
-                open_tool.result = str(block.content)
+                open_tool.result = result_text
                 if block.is_error:
                     open_tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
                         RuntimeError("tool reported an error")
@@ -299,6 +423,9 @@ def _finalize_turn(state: _TurnState) -> None:
         with tool:
             pass
     state.open_tools.clear()
+    for subagent in reversed(state.open_subagents.values()):
+        subagent.end()
+    state.open_subagents.clear()
 
     state.turn.record(
         model=state.model,

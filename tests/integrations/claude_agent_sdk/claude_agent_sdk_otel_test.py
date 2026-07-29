@@ -213,6 +213,96 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
     assert len(tool_call_chats) == 1
 
 
+# --- query(): subagent delegation -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_subagent_query_otel(otel_spans: InMemorySpanExporter) -> None:
+    await run_query("subagent_response", "Find the capital of France")
+    spans = otel_spans.get_finished_spans()
+
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 2
+    root_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "claude_agent_sdk"
+    )
+    subagent_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert subagent_span.name == "invoke_agent researcher"
+    assert subagent_span.parent.span_id == root_span.context.span_id
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.description": "Research factual questions",
+        "gen_ai.tool.call.id": "toolu_agent_01",
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research factual questions",
+                "prompt": "Find the capital of France.",
+            }
+        ),
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Find the capital of France.",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.tool.call.result": "The capital of France is Paris.",
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "The capital of France is Paris.",
+                        }
+                    ],
+                }
+            ]
+        ),
+    }
+
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert len(chat_spans) == 4
+    assert [
+        span.parent.span_id == subagent_span.context.span_id for span in chat_spans
+    ].count(True) == 2
+    assert [
+        span.parent.span_id == root_span.context.span_id for span in chat_spans
+    ].count(True) == 2
+
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert len(tool_spans) == 1
+    tool_span = tool_spans[0]
+    assert tool_span.name == "execute_tool Bash"
+    assert tool_span.parent.span_id == subagent_span.context.span_id
+    assert check_integration_and_strip(get_attrs(tool_span)) == {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.call.id": "toolu_bash_01",
+        "gen_ai.tool.call.arguments": '{"command": "printf Paris"}',
+        "gen_ai.tool.call.result": "Paris",
+        "gen_ai.conversation.id": "s-subagent001",
+    }
+
+
 # --- query(): prompt caching ------------------------------------------------
 
 

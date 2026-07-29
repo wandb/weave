@@ -478,13 +478,16 @@ pnpm exec tsx examples/claudeAgents.ts
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
 - The OTel-selected Claude Agent SDK path composes the Python GenAI
-  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
-  OTel spans or call the low-level GenAI attribute builders itself. Use
-  `set_attributes()` only for semantic fields the typed handles do not expose.
-  The legacy calls-based path remains separate.
+  `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` handles; it must not
+  create raw OTel spans or call the low-level GenAI attribute builders itself.
+  Use `set_attributes()` only for semantic fields the typed handles do not
+  expose. The legacy calls-based path remains separate.
 - Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
   Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
   parts; media payloads remain data for `content_refs`, not chat prose.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
+  Route nested assistant messages and tools through `parent_tool_use_id`, and
+  close each subagent on its matching tool result.
 - Stream adapters can create child handles when work starts, then enter them
   with a normal `with` when the completion message arrives. Preserve logical
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
