@@ -262,8 +262,7 @@ def _attributes() -> dict[str, Any]:
 
 
 def _otel_dump() -> dict[str, Any]:
-    # A span carries four attribute containers, and only the first is the one
-    # `attributes_dump` is derived from.
+    # A span carries four attribute containers; the walk has to reach all of them.
     return {
         "name": "span",
         "attributes": {"options": {"apiKey": PLACEHOLDER}},
@@ -414,7 +413,7 @@ def _write_via_call_start(server: Any, project_id: str, call_id: str) -> None:
 
 def _write_via_call_end_then_start(server: Any, project_id: str, call_id: str) -> None:
     # Call parts merge in any order, so the start can land on a row the end
-    # already created. That is a second write site on the in-memory backend.
+    # already created.
     server.call_end(
         tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
@@ -465,8 +464,8 @@ def test_call_read_returns_redacted_client_authored_columns(
 ) -> None:
     """Read-back is redacted on either backend, for every write path.
 
-    A client can set `otel_dump` on these schemas without going through the OTel
-    route, so the write paths carry it here too.
+    `otel_dump` is a public field on these schemas, so the write paths carry it
+    here too.
     """
     project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
     call_id = str(uuid.uuid4())
@@ -497,8 +496,7 @@ def test_stored_byte_counts_follow_the_redacted_columns(
 
     These counts are what `project_stats` reports, so a count taken before
     redaction would overstate storage and drift from ClickHouse, which measures
-    the stored column. The in-memory backend is the one that counts in Python, so
-    this runs against it directly instead of through the backend flag.
+    the stored column.
     """
     server = get_fake_trace_server()
     project_id = f"{TEST_ENTITY}/size_{uuid.uuid4().hex[:8]}"
@@ -539,8 +537,6 @@ def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
     scope_spans = ScopeSpans()
     scope_spans.spans.append(span)
 
-    # Resource attributes are client-authored too, and they are not part of the
-    # span attributes the derived columns come from.
     resource = Resource()
     resource_attribute = KeyValue()
     resource_attribute.key = "aws_access_key_id"
