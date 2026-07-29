@@ -1386,6 +1386,40 @@ def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+def test_blob_content_is_media_not_user_message_text() -> None:
+    """A Weave blob's `content` is base64/ref data, not displayable prose."""
+    audio_internal = "weave-trace-internal:///PID/object/Content:AUDIODIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="audio-inspector",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        {
+                            "type": "blob",
+                            "content": audio_internal,
+                            "mimeType": "audio/mpeg",
+                            "modality": "audio",
+                        },
+                        _text_part("Inspect this audio."),
+                    ),
+                }
+            ],
+        )
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    assert _user_payload(user) == AgentChatUserMessage(
+        text="Inspect this audio.",
+        content_refs=[audio_internal],
+    )
+
+
 @pytest.mark.xfail(
     reason=(
         "Known limitation (PR #7489 discussion): the inline-ref sweep "

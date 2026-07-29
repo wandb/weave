@@ -709,9 +709,14 @@ def _display_text(content: str) -> str:
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
+            # Weave blob parts carry their base64 payload (or the Content ref
+            # that replaces it at ingest) in `content`. That field is media,
+            # not prose, and must not leak into the chat bubble's text.
+            if p.get("type") in _MEDIA_PART_TYPES:
+                continue
             # Support both the weave parts model (``content``) and the
             # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
-            # images) carry neither and are skipped for display.
+            # images) are skipped for display.
             if isinstance(p.get("content"), str):
                 texts.append(p["content"])
             elif isinstance(p.get("text"), str):
