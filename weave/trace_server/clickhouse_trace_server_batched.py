@@ -1526,37 +1526,66 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def insights_reports_query(
         self, req: tsi.InsightsReportsQueryReq
     ) -> tsi.InsightsReportsQueryRes:
-        """List the newest immutable report snapshots for a project."""
+        """List complete report-period groups, newest period first."""
         pb = ParamBuilder()
         project_id_param = pb.add_param(req.project_id)
-        conditions = [f"project_id = {project_id_param}"]
+        conditions = [f"insights_reports.project_id = {project_id_param}"]
         if req.period_days is not None:
             period_days_param = pb.add_param(req.period_days)
-            conditions.append(f"period_days = {period_days_param}")
+            conditions.append(f"insights_reports.period_days = {period_days_param}")
         limit_param = pb.add_param(req.limit)
         query = f"""
         SELECT
-            report_id,
-            argMax(period_days, created_at) AS period_days,
-            argMax(period_end, created_at) AS period_end,
+            period_days,
+            period_end,
+            section_id,
+            argMax(section_type, created_at) AS section_type,
+            argMax(title, created_at) AS title,
+            argMax(subtitle, created_at) AS subtitle,
+            argMax(description, created_at) AS description,
+            argMax(section_schema_version, created_at) AS section_schema_version,
+            argMax(section_json, created_at) AS section_json,
             max(created_at) AS created_at
         FROM insights_reports
-        WHERE {' AND '.join(conditions)}
-        GROUP BY report_id
-        ORDER BY created_at DESC, report_id DESC
-        LIMIT {limit_param}
+        WHERE {" AND ".join(conditions)}
+          AND (period_days, period_end) IN (
+            SELECT period_days, period_end
+            FROM insights_reports
+            WHERE {" AND ".join(conditions)}
+            GROUP BY period_days, period_end
+            ORDER BY period_end DESC, period_days DESC
+            LIMIT {limit_param}
+          )
+        GROUP BY period_days, period_end, section_id
+        ORDER BY period_end DESC, period_days DESC, section_id ASC
         """
         result = self._query(query, pb.get_params())
-        return tsi.InsightsReportsQueryRes(
-            reports=[
-                tsi.InsightsReportSummary(
-                    report_id=str(row["report_id"]),
-                    period_days=row["period_days"],
-                    period_end=row["period_end"],
-                    created_at=row["created_at"],
+        groups: dict[tuple[int, datetime.datetime], dict[str, Any]] = {}
+        for row in result.named_results():
+            key = (row["period_days"], row["period_end"])
+            group = groups.setdefault(
+                key,
+                {
+                    "period_days": row["period_days"],
+                    "period_end": row["period_end"],
+                    "created_at": row["created_at"],
+                    "sections": [],
+                },
+            )
+            group["created_at"] = max(group["created_at"], row["created_at"])
+            group["sections"].append(
+                tsi.InsightsReportSection(
+                    section_id=str(row["section_id"]),
+                    section_type=row["section_type"],
+                    title=row["title"],
+                    subtitle=row["subtitle"],
+                    description=row["description"],
+                    section_schema_version=row["section_schema_version"],
+                    section_json=json.loads(row["section_json"]),
                 )
-                for row in result.named_results()
-            ]
+            )
+        return tsi.InsightsReportsQueryRes(
+            reports=[tsi.InsightsReportGroup(**group) for group in groups.values()]
         )
 
     @traced(name="clickhouse_trace_server_batched.insights_report_read")

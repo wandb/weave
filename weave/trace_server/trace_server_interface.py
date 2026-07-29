@@ -1346,17 +1346,6 @@ class InsightsReportReadReq(BaseModelStrict):
     report_id: str
 
 
-class InsightsReportSummary(BaseModel):
-    report_id: str
-    period_days: int
-    period_end: datetime.datetime
-    created_at: datetime.datetime
-
-
-class InsightsReportsQueryRes(BaseModel):
-    reports: list[InsightsReportSummary]
-
-
 class InsightsReportSection(BaseModel):
     section_id: str
     section_type: str
@@ -1365,6 +1354,19 @@ class InsightsReportSection(BaseModel):
     description: str
     section_schema_version: int
     section_json: dict[str, Any]
+
+
+class InsightsReportGroup(BaseModel):
+    """Sections from one reporting period, independent of report_id."""
+
+    period_days: int
+    period_end: datetime.datetime
+    created_at: datetime.datetime
+    sections: list[InsightsReportSection]
+
+
+class InsightsReportsQueryRes(BaseModel):
+    reports: list[InsightsReportGroup]
 
 
 class InsightsReportReadRes(BaseModel):
