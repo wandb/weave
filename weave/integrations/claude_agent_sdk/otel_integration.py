@@ -21,7 +21,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from functools import wraps
@@ -40,7 +40,13 @@ from claude_agent_sdk import (
 
 from weave.conversation import LLM, Conversation, Message, Reasoning, Tool, Turn, Usage
 from weave.conversation.agent_context import resolve_agent_name
-from weave.conversation.types import ToolCallPart
+from weave.conversation.types import (
+    BlobPart,
+    MessagePart,
+    TextPart,
+    ToolCallPart,
+    UriPart,
+)
 from weave.integrations.claude_agent_sdk.usage import total_input_tokens
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -69,6 +75,68 @@ class _AssistantOutput:
     message: Message
     text: str
     reasoning: Reasoning
+
+
+def _message_from_prompt(prompt: dict[str, Any]) -> Message | None:
+    if prompt.get("type") != "user":
+        return None
+    raw_message = prompt.get("message")
+    if not isinstance(raw_message, dict):
+        return None
+    content = raw_message.get("content")
+    if isinstance(content, str):
+        return Message.user(content)
+    if not isinstance(content, list):
+        return None
+
+    parts: list[MessagePart] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "text" and isinstance(block.get("text"), str):
+            parts.append(TextPart(content=block["text"]))
+            continue
+        if block.get("type") != "image":
+            continue
+        source = block.get("source")
+        if not isinstance(source, dict):
+            continue
+        if source.get("type") == "base64" and isinstance(source.get("data"), str):
+            media_type = source.get("media_type")
+            parts.append(
+                BlobPart(
+                    mime_type=media_type if isinstance(media_type, str) else "",
+                    modality="image",
+                    content=source["data"],
+                )
+            )
+        elif source.get("type") == "url" and isinstance(source.get("url"), str):
+            media_type = source.get("media_type")
+            parts.append(
+                UriPart(
+                    mime_type=media_type if isinstance(media_type, str) else "",
+                    modality="image",
+                    uri=source["url"],
+                )
+            )
+
+    if len(parts) == 1 and isinstance(parts[0], TextPart):
+        return Message.user(parts[0].content)
+    return Message(role="user", parts=parts) if parts else None
+
+
+async def _track_prompt(
+    prompt: AsyncIterable[dict[str, Any]],
+    input_messages: list[Message],
+) -> AsyncIterator[dict[str, Any]]:
+    async for message in prompt:
+        try:
+            traced_message = _message_from_prompt(message)
+            if traced_message is not None:
+                input_messages.append(traced_message)
+        except Exception:
+            logger.exception("claude_agent_sdk input tracing failed")
+        yield message
 
 
 def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
@@ -247,7 +315,7 @@ def _finalize_turn(state: _TurnState) -> None:
 async def _trace_turn(
     messages: AsyncIterator[Any],
     *,
-    user_prompt: str | None,
+    input_messages: list[Message],
     conversation_id_holder: list[str] | None = None,
 ) -> AsyncIterator[Any]:
     """Wrap a message stream, emitting the span tree for one turn.
@@ -266,7 +334,7 @@ async def _trace_turn(
         continue_parent_trace=True,
         attributes=_INTEGRATION_OTEL_ATTRS,
     ) as conversation:
-        with conversation.start_turn(user_message=user_prompt or "") as turn:
+        with conversation.start_turn() as turn:
             state = _TurnState(
                 conversation=conversation,
                 turn=turn,
@@ -284,6 +352,7 @@ async def _trace_turn(
                         )
                     yield msg
             finally:
+                state.turn.record(messages=list(input_messages))
                 _finalize_turn(state)
 
 
@@ -298,15 +367,27 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             options: Any,
             transport: Any = None,
         ) -> AsyncIterator[Any]:
-            inner = original_process_query(
-                self_client, prompt=prompt, options=options, transport=transport
-            )
             if should_disable_weave():
+                inner = original_process_query(
+                    self_client, prompt=prompt, options=options, transport=transport
+                )
                 async for msg in inner:
                     yield msg
                 return
-            user_prompt = prompt if isinstance(prompt, str) else None
-            async for msg in _trace_turn(inner, user_prompt=user_prompt):
+
+            input_messages = [Message.user(prompt)] if isinstance(prompt, str) else []
+            traced_prompt = (
+                prompt
+                if isinstance(prompt, str)
+                else _track_prompt(prompt, input_messages)
+            )
+            inner = original_process_query(
+                self_client,
+                prompt=traced_prompt,
+                options=options,
+                transport=transport,
+            )
+            async for msg in _trace_turn(inner, input_messages=input_messages):
                 yield msg
 
         return wrapped_process_query
@@ -331,15 +412,23 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             original_receive_response = self.receive_response
             # One-element holder so wrapped_query can hand the prompt to the
             # next receive_response() turn.
-            user_prompt_holder: list[str | None] = [None]
+            input_messages_holder: list[list[Message]] = [[]]
             # Persists the SDK session_id across turns: system/init is only sent
             # on the first turn, so later turns inherit the conversation id here.
             conversation_id_holder: list[str] = [""]
 
             @wraps(original_query)
             async def wrapped_query(prompt: Any, session_id: str = "default") -> None:
-                user_prompt_holder[0] = prompt if isinstance(prompt, str) else None
-                return await original_query(prompt, session_id=session_id)
+                input_messages = (
+                    [Message.user(prompt)] if isinstance(prompt, str) else []
+                )
+                input_messages_holder[0] = input_messages
+                traced_prompt = (
+                    prompt
+                    if isinstance(prompt, str)
+                    else _track_prompt(prompt, input_messages)
+                )
+                return await original_query(traced_prompt, session_id=session_id)
 
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
@@ -350,7 +439,7 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                     return
                 async for msg in _trace_turn(
                     inner,
-                    user_prompt=user_prompt_holder[0],
+                    input_messages=input_messages_holder[0],
                     conversation_id_holder=conversation_id_holder,
                 ):
                     yield msg

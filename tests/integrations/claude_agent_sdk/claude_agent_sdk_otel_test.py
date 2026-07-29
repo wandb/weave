@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
 from typing import Any
 
 import pytest
@@ -355,6 +355,73 @@ async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
         for agent_span in agent_spans
     }
     assert prompts == {"Hello", "What is the capital of France?"}
+
+
+# --- query(): streamed image prompt -----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_streamed_image_prompt_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    image_base64 = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+        "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    image_message = {
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": image_base64,
+                    },
+                },
+                {"type": "text", "text": "Describe this image."},
+            ],
+        },
+        "parent_tool_use_id": None,
+    }
+
+    async def image_prompt() -> AsyncIterator[dict[str, Any]]:
+        yield image_message
+
+    transport = ReplayTransport(load_cassette("simple_text_response"))
+    messages = [
+        message
+        async for message in query(
+            prompt=image_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    assert transport.user_messages == [image_message]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "blob",
+                    "mime_type": "image/png",
+                    "modality": "image",
+                    "content": image_base64,
+                },
+                {"type": "text", "content": "Describe this image."},
+            ],
+        }
+    ]
 
 
 # --- agent name override ----------------------------------------------------
