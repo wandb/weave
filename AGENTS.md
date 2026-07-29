@@ -442,6 +442,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.
+- Python `Turn` spans are same-process `invoke_agent` operations and use OTel's
+  default `SpanKind.INTERNAL`. Do not set `gen_ai.provider.name` on a `Turn`;
+  set it on child `LLM`/`chat` spans, because one turn can use multiple
+  providers.
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.

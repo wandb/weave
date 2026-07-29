@@ -267,7 +267,6 @@ async def _trace_turn(
         attributes=_INTEGRATION_OTEL_ATTRS,
     ) as conversation:
         with conversation.start_turn(user_message=user_prompt or "") as turn:
-            turn.set_attributes({"gen_ai.provider.name": _PROVIDER_NAME})
             state = _TurnState(
                 conversation=conversation,
                 turn=turn,
