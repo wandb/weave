@@ -690,9 +690,9 @@ def _display_text(content: str) -> str:
     """Extract human-readable text from a message content field.
 
     Content is either plain text (legacy) or a JSON-serialized parts array
-    (multimodal messages).  For parts arrays, concatenate the text parts;
-    reasoning parts are excluded (they surface separately via
-    `reasoning_content`).  For plain text, return as-is.
+    (multimodal messages). For parts arrays, concatenate text parts. Reasoning
+    surfaces through ``reasoning_content``; media surfaces through
+    ``content_refs``. For plain text, return as-is.
     """
     if not content or not content.startswith("["):
         return content
@@ -709,9 +709,12 @@ def _display_text(content: str) -> str:
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
+            # Media belongs in content_refs, never chat text.
+            if p.get("type") in _MEDIA_PART_TYPES:
+                continue
             # Support both the weave parts model (``content``) and the
             # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
-            # images) carry neither and are skipped for display.
+            # images) are skipped for display.
             if isinstance(p.get("content"), str):
                 texts.append(p["content"])
             elif isinstance(p.get("text"), str):
