@@ -8,8 +8,9 @@ The policy is a conservative denylist: broad, common names are left out because
 redaction is irreversible, so a matched field is destroyed. It is narrow, not
 infallible -- a legitimate field can still carry a matching name.
 
-Applied by the ClickHouse schema converters to the two client-authored call
-columns, `inputs_dump` and `attributes_dump`.
+Applied by the ClickHouse schema converters to the client-authored call columns:
+`inputs_dump`, `attributes_dump`, and `otel_dump`, which is a raw copy of the
+client's span and so carries the same attribute values a second time.
 
 The agents OTel ingest and the completions span builder apply it to the
 client-authored parts of an agent span.

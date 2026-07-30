@@ -124,6 +124,12 @@ def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list
     ]
 
 
+def _redacted_otel_dump(otel_dump: dict[str, Any] | None) -> str | None:
+    if otel_dump is None:
+        return None
+    return dict_value_to_dump(redact_sensitive_keys(otel_dump))
+
+
 def start_call_for_insert_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     retention_days: int,
@@ -139,9 +145,7 @@ def start_call_for_insert_to_ch_insertable(
     # the stored inputs no longer contain.
     input_refs = extract_refs_from_values(inputs)
 
-    otel_dump_str = None
-    if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
     return CallStartCHInsertable(
         project_id=start_call.project_id,
@@ -252,9 +256,7 @@ def start_end_calls_to_ch_complete_insertable(
     output = end_call.output
     output_refs = extract_refs_from_values(output)
 
-    otel_dump_str = None
-    if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
@@ -313,9 +315,7 @@ def complete_call_to_ch_insertable(
     output = complete_call.output
     output_refs = extract_refs_from_values(output)
 
-    otel_dump_str = None
-    if complete_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(complete_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,

@@ -477,7 +477,7 @@ pnpm exec tsx examples/claudeAgents.ts
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
   keeping contexts open with `ExitStack`.
 
-### Credential-shaped fields in call inputs and attributes
+### Credential-shaped fields in client-authored call columns
 
 - The three call converters in `clickhouse/schema_converters.py` run
   `redact_sensitive_keys` over `inputs` and `attributes` before extracting refs,
@@ -485,6 +485,10 @@ pnpm exec tsx examples/claudeAgents.ts
   `weave/trace_server/credential_redaction.py` is stored with its string value
   replaced. `in_memory_trace_server.py` applies the same function, so both
   backends read back the same thing.
+- The same converters redact `otel_dump`. It is a raw copy of the client's span,
+  so it carries the attribute values that `attributes_dump` holds a second time,
+  and it is a public field on the insert schemas, so the OTel route is not its
+  only producer.
 - The walk is copy-on-write and replaces only non-empty strings. Both properties
   are load-bearing — see the module docstring — so keep them if you touch it.
 

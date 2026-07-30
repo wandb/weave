@@ -14,6 +14,13 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
+from opentelemetry.proto.common.v1.common_pb2 import KeyValue
+from opentelemetry.proto.resource.v1.resource_pb2 import Resource
+from opentelemetry.proto.trace.v1.trace_pb2 import (
+    ResourceSpans,
+    ScopeSpans,
+    Span,
+)
 
 from tests.trace_server.conftest_lib.trace_server_external_adapter import b64
 from weave.trace_server import trace_server_interface as tsi
@@ -235,6 +242,13 @@ _ENDED_AT = _STARTED_AT + datetime.timedelta(seconds=1)
 
 _REDACTED_INPUTS = {"options": {"authorization": REDACTED_VALUE}}
 _REDACTED_ATTRIBUTES = {"options": {"apiKey": REDACTED_VALUE}}
+_REDACTED_OTEL_DUMP = {
+    "name": "span",
+    "attributes": {"options": {"apiKey": REDACTED_VALUE}},
+    "events": [{"name": "event", "attributes": {"authorization": REDACTED_VALUE}}],
+    "links": [{"span_id": "s", "attributes": {"webhook_key": REDACTED_VALUE}}],
+    "resource": {"attributes": {"aws_access_key_id": REDACTED_VALUE}},
+}
 
 
 def _inputs() -> dict[str, Any]:
@@ -247,6 +261,16 @@ def _attributes() -> dict[str, Any]:
     return {"options": {"apiKey": PLACEHOLDER}}
 
 
+def _otel_dump() -> dict[str, Any]:
+    return {
+        "name": "span",
+        "attributes": {"options": {"apiKey": PLACEHOLDER}},
+        "events": [{"name": "event", "attributes": {"authorization": PLACEHOLDER}}],
+        "links": [{"span_id": "s", "attributes": {"webhook_key": PLACEHOLDER}}],
+        "resource": {"attributes": {"aws_access_key_id": PLACEHOLDER}},
+    }
+
+
 def _started_call(call_id: str) -> tsi.StartedCallSchemaForInsert:
     return tsi.StartedCallSchemaForInsert(
         project_id=PROJECT_ID,
@@ -256,6 +280,7 @@ def _started_call(call_id: str) -> tsi.StartedCallSchemaForInsert:
         started_at=_STARTED_AT,
         attributes=_attributes(),
         inputs=_inputs(),
+        otel_dump=_otel_dump(),
     )
 
 
@@ -291,6 +316,7 @@ def _convert_complete() -> CallCompleteCHInsertable:
             ended_at=_ENDED_AT,
             attributes=_attributes(),
             inputs=_inputs(),
+            otel_dump=_otel_dump(),
             output={},
             summary={},
         ),
@@ -303,7 +329,7 @@ def _convert_complete() -> CallCompleteCHInsertable:
     [_convert_start, _convert_start_end, _convert_complete],
     ids=["call_start", "start_end_complete", "complete"],
 )
-def test_converters_redact_both_client_authored_columns(
+def test_converters_redact_every_client_authored_column(
     convert: Callable[[], CallStartCHInsertable | CallCompleteCHInsertable],
 ) -> None:
     # The hook lives inside the converters, so any caller inherits it.
@@ -311,6 +337,7 @@ def test_converters_redact_both_client_authored_columns(
 
     assert json.loads(row.inputs_dump) == _REDACTED_INPUTS
     assert json.loads(row.attributes_dump) == _REDACTED_ATTRIBUTES
+    assert json.loads(row.otel_dump) == _REDACTED_OTEL_DUMP
 
 
 # ---------------------------------------------------------------------------
@@ -347,6 +374,7 @@ def test_call_start_batch_stores_redacted_columns(auto_routed_ch_server) -> None
                             started_at=_STARTED_AT,
                             attributes=_attributes(),
                             inputs=_inputs(),
+                            otel_dump=_otel_dump(),
                         )
                     ),
                 ),
@@ -355,13 +383,14 @@ def test_call_start_batch_stores_redacted_columns(auto_routed_ch_server) -> None
     )
 
     row = auto_routed_ch_server.ch_client.query(
-        "SELECT inputs_dump, attributes_dump FROM call_parts "
+        "SELECT inputs_dump, attributes_dump, otel_dump FROM call_parts "
         "WHERE project_id = {project_id:String} AND id = {call_id:String}",
         parameters={"project_id": internal_project_id, "call_id": call_id},
     ).result_rows
     assert len(row) == 1
     assert json.loads(row[0][0]) == _REDACTED_INPUTS
     assert json.loads(row[0][1]) == _REDACTED_ATTRIBUTES
+    assert json.loads(row[0][2]) == _REDACTED_OTEL_DUMP
 
 
 def _write_via_call_start(server: Any, project_id: str, call_id: str) -> None:
@@ -375,9 +404,27 @@ def _write_via_call_start(server: Any, project_id: str, call_id: str) -> None:
                 started_at=_STARTED_AT,
                 attributes=_attributes(),
                 inputs=_inputs(),
+                otel_dump=_otel_dump(),
             )
         )
     )
+
+
+def _write_via_call_end_then_start(server: Any, project_id: str, call_id: str) -> None:
+    # Call parts merge in any order, so the start can land on a row the end
+    # already created.
+    server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                ended_at=_ENDED_AT,
+                output=None,
+                summary={},
+            )
+        )
+    )
+    _write_via_call_start(server, project_id, call_id)
 
 
 def _write_via_calls_complete(server: Any, project_id: str, call_id: str) -> None:
@@ -393,6 +440,7 @@ def _write_via_calls_complete(server: Any, project_id: str, call_id: str) -> Non
                     ended_at=_ENDED_AT,
                     attributes=_attributes(),
                     inputs=_inputs(),
+                    otel_dump=_otel_dump(),
                     output=None,
                     summary={"usage": {}, "status_counts": {}},
                 )
@@ -403,14 +451,21 @@ def _write_via_calls_complete(server: Any, project_id: str, call_id: str) -> Non
 
 @pytest.mark.parametrize(
     "write",
-    [_write_via_call_start, _write_via_calls_complete],
-    ids=["call_start", "calls_complete"],
+    [
+        _write_via_call_start,
+        _write_via_call_end_then_start,
+        _write_via_calls_complete,
+    ],
+    ids=["call_start", "call_end_then_start", "calls_complete"],
 )
-def test_call_read_returns_redacted_inputs_and_attributes(trace_server, write) -> None:
-    """Read-back is redacted on either backend, for both write paths.
+def test_call_read_returns_redacted_client_authored_columns(
+    trace_server, write
+) -> None:
+    """Read-back is redacted on either backend, for every write path.
 
-    The in-memory backend hooks `call_start` and `calls_complete` separately, so
-    both need covering or one could silently stop matching ClickHouse.
+    The in-memory backend hooks `call_start` and `calls_complete` separately, and
+    `call_start` has two branches, so all three need covering or one could
+    silently stop matching ClickHouse.
     """
     project_id = f"{TEST_ENTITY}/read_{uuid.uuid4().hex[:8]}"
     call_id = str(uuid.uuid4())
@@ -422,4 +477,98 @@ def test_call_read_returns_redacted_inputs_and_attributes(trace_server, write) -
     ).call
     assert call is not None
     assert call.inputs == _REDACTED_INPUTS
-    assert call.attributes == _REDACTED_ATTRIBUTES
+    assert call.attributes == {**_REDACTED_ATTRIBUTES, "otel_span": _REDACTED_OTEL_DUMP}
+
+
+@pytest.mark.parametrize(
+    ("write", "end_side_payloads"),
+    [
+        (_write_via_call_start, ()),
+        (_write_via_call_end_then_start, (None, {})),
+        (_write_via_calls_complete, (None, {"usage": {}, "status_counts": {}})),
+    ],
+    ids=["call_start", "call_end_then_start", "calls_complete"],
+)
+def test_stored_byte_counts_follow_the_redacted_columns(
+    get_fake_trace_server, write, end_side_payloads
+) -> None:
+    """The counted size is the stored size, not the size of what the client sent.
+
+    These counts are what `project_stats` reports, so a count taken before
+    redaction would overstate storage and drift from ClickHouse, which measures
+    the stored column.
+    """
+    server = get_fake_trace_server()
+    project_id = f"{TEST_ENTITY}/size_{uuid.uuid4().hex[:8]}"
+
+    write(server, project_id, str(uuid.uuid4()))
+
+    stats = server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+    assert stats.trace_storage_size_bytes == sum(
+        len(json.dumps(payload))
+        for payload in (
+            _REDACTED_ATTRIBUTES,
+            _REDACTED_INPUTS,
+            _REDACTED_OTEL_DUMP,
+            *end_side_payloads,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# The OTel route, where the server builds the span dump itself
+# ---------------------------------------------------------------------------
+
+
+def _otel_export_req(project_id: str) -> tsi.OTelExportReq:
+    entity, project = project_id.split("/")
+    span = Span()
+    span.name = "op"
+    span.trace_id = uuid.uuid4().bytes
+    span.span_id = uuid.uuid4().bytes[:8]
+    span.start_time_unix_nano = int(_STARTED_AT.timestamp() * 1_000_000_000)
+    span.end_time_unix_nano = int(_ENDED_AT.timestamp() * 1_000_000_000)
+    span.kind = 1  # INTERNAL
+    attribute = KeyValue()
+    attribute.key = "options.apiKey"
+    attribute.value.string_value = PLACEHOLDER
+    span.attributes.append(attribute)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+
+    resource = Resource()
+    resource_attribute = KeyValue()
+    resource_attribute.key = "aws_access_key_id"
+    resource_attribute.value.string_value = PLACEHOLDER
+    resource.attributes.append(resource_attribute)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(resource)
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.OTelExportReq(
+        project_id=project_id,
+        processed_spans=[
+            tsi.ProcessedResourceSpans(
+                entity=entity,
+                project=project,
+                run_id=None,
+                resource_spans=resource_spans,
+            )
+        ],
+        wb_user_id="user",
+    )
+
+
+def test_otel_route_stores_a_redacted_span_dump(trace_server) -> None:
+    """The span the server builds itself is stored redacted too."""
+    project_id = f"{TEST_ENTITY}/otel_{uuid.uuid4().hex[:8]}"
+
+    trace_server.otel_export(_otel_export_req(project_id))
+
+    calls = trace_server.calls_query(tsi.CallsQueryReq(project_id=project_id)).calls
+    assert len(calls) == 1
+    span = calls[0].attributes["otel_span"]
+    assert span["attributes"]["options"] == {"apiKey": REDACTED_VALUE}
+    assert span["resource"]["attributes"] == {"aws_access_key_id": REDACTED_VALUE}
