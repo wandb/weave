@@ -11,6 +11,9 @@ infallible -- a legitimate field can still carry a matching name.
 Applied by the ClickHouse schema converters to the client-authored call columns:
 `inputs_dump`, `attributes_dump`, and `otel_dump`, which is a raw copy of the
 client's span and so carries the same attribute values a second time.
+
+The agents OTel ingest and the completions span builder apply it to the
+client-authored parts of an agent span.
 """
 
 from __future__ import annotations
