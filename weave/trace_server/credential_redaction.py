@@ -10,6 +10,9 @@ infallible -- a legitimate field can still carry a matching name.
 
 Applied by the ClickHouse schema converters to the two client-authored call
 columns, `inputs_dump` and `attributes_dump`.
+
+The agents OTel ingest and the completions span builder apply it to the
+client-authored parts of an agent span.
 """
 
 from __future__ import annotations
