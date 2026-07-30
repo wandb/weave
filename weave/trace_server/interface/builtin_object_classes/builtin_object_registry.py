@@ -1,6 +1,3 @@
-from weave.trace_server.interface.builtin_object_classes.agent_dashboard import (
-    AgentDashboard,
-)
 from weave.trace_server.interface.builtin_object_classes.alert_spec import AlertSpec
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
@@ -53,4 +50,3 @@ register_base_object(SavedView)
 register_base_object(ComparisonView)
 register_base_object(LLMStructuredCompletionModel)
 register_base_object(ChartConfig)
-register_base_object(AgentDashboard)
