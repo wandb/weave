@@ -2190,6 +2190,34 @@ def test_coreweave_requires_its_inference_api_key():
         chts._setup_completion_model_info(None, req, MagicMock())
 
 
+def test_custom_provider_name_matching_selector_prefix_is_preserved(monkeypatch):
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="custom::custom::gpt-4"),
+    )
+    obj_read = MagicMock()
+    get_provider_info = MagicMock(
+        return_value=llm_mod.CustomProviderInfo(
+            base_url="https://runtime.example.com/v1",
+            api_key=None,
+            extra_headers={},
+            return_type="openai",
+            actual_model_name="gpt-4",
+        )
+    )
+    monkeypatch.setattr(chts, "get_custom_provider_info", get_provider_info)
+
+    model_info = chts._setup_completion_model_info(None, req, obj_read)
+
+    get_provider_info.assert_called_once_with(
+        project_id="entity/project",
+        provider_name="custom",
+        model_name="custom-gpt-4",
+        obj_read_func=obj_read,
+    )
+    assert model_info.model_name == "custom/gpt-4"
+
+
 def test_coreweave_with_api_key_keeps_litellm_configuration():
     req = tsi.CompletionsCreateReq(
         project_id="entity/project",

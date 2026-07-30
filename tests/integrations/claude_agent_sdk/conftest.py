@@ -31,12 +31,15 @@ class ReplayTransport(Transport):
         self._connected = False
         self._pending_control_ids: list[str] = []
         self._control_event = anyio.Event()
+        self.user_messages: list[dict[str, Any]] = []
 
     async def connect(self) -> None:
         self._connected = True
 
     async def write(self, data: str) -> None:
         parsed = json.loads(data.strip())
+        if parsed.get("type") == "user":
+            self.user_messages.append(parsed)
         if parsed.get("type") == "control_request":
             self._pending_control_ids.append(parsed["request_id"])
             self._control_event.set()

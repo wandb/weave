@@ -1,6 +1,12 @@
 import {SpanStatusCode} from '@opentelemetry/api';
 
-import {ATTR_GEN_AI_INPUT_MESSAGES} from '../../genai/semconv';
+import {getCurrentLLM, getCurrentTurn} from '../../genai';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+} from '../../genai/semconv';
 import {
   patchClaudeAgentSdk,
   wrapClaudeAgentSdk,
@@ -14,7 +20,7 @@ import {
 } from '../genai/common';
 import type {NonNullableUsage} from '@anthropic-ai/claude-agent-sdk';
 
-const INVOKE = 'invoke_agent claude_agent_sdk';
+const INVOKE = 'invoke_agent';
 
 describe('Claude Agent SDK — toWeaveUsage', () => {
   test('maps the camelCase ModelUsage shape, dropping non-token fields', () => {
@@ -120,7 +126,7 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'hi there'}]);
-    expect(spans.some(s => s.name === 'chat claude-x')).toBe(true);
+    expect(spans.some(s => s.name === 'chat')).toBe(true);
   });
 
   test('forwards Query interface methods (e.g. interrupt) to the underlying query', async () => {
@@ -179,7 +185,123 @@ describe('Claude Agent SDK — query() patch', () => {
     // ...and the root span must be finalized as an error, not a completion.
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
-    expect(invoke.status.message).toContain('subprocess crashed');
+    expect(invoke.status.message).toBe('subprocess crashed');
+  });
+
+  test('isolates two interleaved query streams and preserves each trace tree', async () => {
+    let arrivals = 0;
+    let releaseBoth!: () => void;
+    const bothQueriesStarted = new Promise<void>(resolve => {
+      releaseBoth = resolve;
+    });
+
+    const sdk = {
+      query: ({prompt}: {prompt: string}) => {
+        const suffix = prompt === 'first' ? 'a' : 'b';
+        const sessionId = `session-${suffix}`;
+        const model = `claude-${suffix}`;
+        async function* gen() {
+          yield {
+            type: 'assistant',
+            session_id: sessionId,
+            message: {
+              model,
+              content: [{type: 'text', text: `response-${suffix}`}],
+            },
+          };
+          arrivals += 1;
+          if (arrivals === 2) {
+            releaseBoth();
+          }
+          await bothQueriesStarted;
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: sessionId,
+            is_error: false,
+            result: `done-${suffix}`,
+            total_cost_usd: 0.01,
+            num_turns: 1,
+            modelUsage: {
+              [model]: {
+                inputTokens: 1,
+                outputTokens: 2,
+                cacheReadInputTokens: 0,
+                cacheCreationInputTokens: 0,
+              },
+            },
+          };
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    const drain = async (prompt: string) => {
+      const seen: string[] = [];
+      for await (const message of sdk.query({prompt})) {
+        seen.push(message.type);
+      }
+      return seen;
+    };
+    await expect(
+      Promise.all([drain('first'), drain('second')])
+    ).resolves.toEqual([
+      ['assistant', 'result'],
+      ['assistant', 'result'],
+    ]);
+    expect(getCurrentTurn()).toBeUndefined();
+    expect(getCurrentLLM()).toBeUndefined();
+
+    const spans = getExporter().getFinishedSpans();
+    const roots = spans.filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+
+    for (const [suffix, prompt] of [
+      ['a', 'first'],
+      ['b', 'second'],
+    ] as const) {
+      const sessionId = `session-${suffix}`;
+      const root = roots.find(
+        span => span.attributes[ATTR_GEN_AI_CONVERSATION_ID] === sessionId
+      )!;
+      expect(
+        JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+      ).toEqual([{role: 'user', content: prompt}]);
+      expect(
+        JSON.parse(root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
+      ).toEqual([{role: 'assistant', content: `done-${suffix}`}]);
+
+      const children = spans.filter(
+        span => span.parentSpanId === root.spanContext().spanId
+      );
+      expect(children).toHaveLength(2);
+      expect(
+        children.map(span => ({
+          conversationId: span.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+          hasOutput: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined,
+          hasUsage:
+            span.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS] !== undefined,
+          name: span.name,
+          traceId: span.spanContext().traceId,
+        }))
+      ).toEqual([
+        {
+          conversationId: sessionId,
+          hasOutput: true,
+          hasUsage: false,
+          name: 'chat',
+          traceId: root.spanContext().traceId,
+        },
+        {
+          conversationId: sessionId,
+          hasOutput: false,
+          hasUsage: true,
+          name: 'chat',
+          traceId: root.spanContext().traceId,
+        },
+      ]);
+    }
   });
 
   test('passes through untouched when no weave client is initialized', async () => {

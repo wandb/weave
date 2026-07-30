@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Generator
+from collections.abc import AsyncIterator, Generator
 from typing import Any
 
 import pytest
@@ -19,13 +19,14 @@ from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import SpanKind, StatusCode
 
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
 from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
+from weave.trace.settings import override_settings
 
 
 @pytest.fixture
@@ -55,6 +56,16 @@ def patch_claude_agent_sdk_otel() -> Generator[None]:
     patcher.undo_patch()
 
 
+@pytest.fixture(autouse=True)
+def disable_capture_info() -> Generator[None]:
+    """Keep exact span payload assertions independent of host metadata."""
+    with override_settings(
+        capture_client_info=False,
+        capture_system_info=False,
+    ):
+        yield
+
+
 # --- helpers ----------------------------------------------------------------
 
 
@@ -65,7 +76,7 @@ def get_attrs(span: Any) -> dict[str, Any]:
 def check_integration_and_strip(attrs: dict[str, Any]) -> dict[str, Any]:
     """Assert + remove the flattened integration.* provenance keys.
 
-    The agent OTel processor stamps integration provenance on every span; pop it
+    Conversation attributes stamp integration provenance on every span; pop it
     here so the exact-shape assertions below stay focused on the GenAI semconv keys.
     """
     assert attrs["integration.name"] == "claude_agent_sdk"
@@ -116,6 +127,7 @@ async def run_query(cassette: str, prompt: str) -> None:
 async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     await run_query("simple_text_response", "What is 2+2?")
     spans = otel_spans.get_finished_spans()
+    assert {span.instrumentation_scope.name for span in spans} == {"weave.conversation"}
 
     agent_spans = get_spans_by_op(spans, "invoke_agent")
     chat_spans = get_spans_by_op(spans, "chat")
@@ -126,10 +138,10 @@ async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
     # glance and any spec drift (added/removed/renamed keys) fails the test.
     agent_span = agent_spans[0]
     assert agent_span.name == "invoke_agent claude_agent_sdk"
+    assert agent_span.kind == SpanKind.INTERNAL
     assert check_integration_and_strip(get_attrs(agent_span)) == {
         "gen_ai.operation.name": "invoke_agent",
         "gen_ai.agent.name": "claude_agent_sdk",
-        "gen_ai.provider.name": "anthropic",
         "gen_ai.conversation.id": "s-abc123",
         "gen_ai.request.model": "claude-sonnet-4-6",
         "gen_ai.input.messages": (
@@ -345,6 +357,73 @@ async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
     assert prompts == {"Hello", "What is the capital of France?"}
 
 
+# --- query(): streamed image prompt -----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_streamed_image_prompt_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    image_base64 = (
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+        "+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
+    image_message = {
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": image_base64,
+                    },
+                },
+                {"type": "text", "text": "Describe this image."},
+            ],
+        },
+        "parent_tool_use_id": None,
+    }
+
+    async def image_prompt() -> AsyncIterator[dict[str, Any]]:
+        yield image_message
+
+    transport = ReplayTransport(load_cassette("simple_text_response"))
+    messages = [
+        message
+        async for message in query(
+            prompt=image_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    assert transport.user_messages == [image_message]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "blob",
+                    "mime_type": "image/png",
+                    "modality": "image",
+                    "content": image_base64,
+                },
+                {"type": "text", "content": "Describe this image."},
+            ],
+        }
+    ]
+
+
 # --- agent name override ----------------------------------------------------
 
 
@@ -358,8 +437,7 @@ async def test_custom_agent_name_query_otel(otel_spans: InMemorySpanExporter) ->
     assert agent_span.name == "invoke_agent research_agent"
     attrs = check_integration_and_strip(get_attrs(agent_span))
     assert attrs["gen_ai.agent.name"] == "research_agent"
-    # Only the agent name is overridden — the rest of the GenAI shape is intact.
-    assert attrs["gen_ai.provider.name"] == "anthropic"
+    # Only the agent name is overridden — the model remains intact.
     assert attrs["gen_ai.request.model"] == "claude-sonnet-4-6"
 
 

@@ -293,13 +293,11 @@ def test_filter_sort_by_query_validation(client):
     with pytest.raises(TypeError):
         client.get_calls(filter=["not a filter"])
 
-    # Test invalid field names - these should fail with pydantic validation error
-    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        client.get_calls(filter={"op_name": ["should be op_names"]})
-    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        client.get_calls(filter={"call_id": ["should be call_ids"]})
-    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        client.get_calls(filter={"invalid_field": "invalid_value"})
+    # Unknown fields are ignored so newer API clients remain compatible with
+    # older servers. Their values must not affect the request model.
+    client.get_calls(filter={"op_name": ["should be op_names"]})
+    client.get_calls(filter={"call_id": ["should be call_ids"]})
+    client.get_calls(filter={"invalid_field": "invalid_value"})
 
     # Test that valid fields work
     client.get_calls(filter={"op_names": ["some_op"]})

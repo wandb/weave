@@ -1,8 +1,8 @@
-"""Weave OTel tracing for the Claude Agent SDK.
+"""Weave GenAI agent tracing for the Claude Agent SDK.
 
-Emits OpenTelemetry GenAI spans to Weave's Agents tab; the sibling
-``claude_agent_sdk_integration.py`` emits legacy Weave calls instead. The
-dispatcher selects this variant when ``WEAVE_USE_OTEL_V2`` is set.
+Uses the Weave Python GenAI agent SDK to emit spans to Weave's Agents tab; the
+sibling ``claude_agent_sdk_integration.py`` emits legacy Weave calls instead.
+The dispatcher selects this variant when ``WEAVE_USE_OTEL_V2`` is set.
 
 Each ``query()`` call / ``ClaudeSDKClient`` turn becomes an ``invoke_agent``
 span, with a child ``chat`` span per model response and an ``execute_tool``
@@ -21,8 +21,9 @@ from __future__ import annotations
 import importlib
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any
 
@@ -36,17 +37,16 @@ from claude_agent_sdk import (
     ToolUseBlock,
     UserMessage,
 )
-from opentelemetry import context as otel_context
-from opentelemetry import trace as otel_trace
-from opentelemetry.trace import StatusCode
 
+from weave.conversation import LLM, Conversation, Message, Reasoning, Tool, Turn, Usage
 from weave.conversation.agent_context import resolve_agent_name
-from weave.conversation.conversation_otel import (
-    execute_tool_attributes,
-    invoke_agent_attributes,
-    llm_attributes,
+from weave.conversation.types import (
+    BlobPart,
+    MessagePart,
+    TextPart,
+    ToolCallPart,
+    UriPart,
 )
-from weave.conversation.types import Message, Reasoning, ToolCallPart, Usage
 from weave.integrations.claude_agent_sdk.usage import total_input_tokens
 from weave.integrations.integration_metadata import library_integration
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -55,7 +55,6 @@ from weave.trace.settings import should_disable_weave
 
 logger = logging.getLogger(__name__)
 
-_TRACER_NAME = "weave.claude_agent_sdk"
 _DEFAULT_AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
 
@@ -78,32 +77,66 @@ class _AssistantOutput:
     reasoning: Reasoning
 
 
-@dataclass(frozen=True, slots=True)
-class _PendingChat:
-    """A chat span whose end is deferred until the aggregate usage is known.
+def _message_from_prompt(prompt: dict[str, Any]) -> Message | None:
+    if prompt.get("type") != "user":
+        return None
+    raw_message = prompt.get("message")
+    if not isinstance(raw_message, dict):
+        return None
+    content = raw_message.get("content")
+    if isinstance(content, str):
+        return Message.user(content)
+    if not isinstance(content, list):
+        return None
 
-    ``attrs`` is mutated in place (usage keys added) before the span is ended.
-    """
+    parts: list[MessagePart] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "text" and isinstance(block.get("text"), str):
+            parts.append(TextPart(content=block["text"]))
+            continue
+        if block.get("type") != "image":
+            continue
+        source = block.get("source")
+        if not isinstance(source, dict):
+            continue
+        if source.get("type") == "base64" and isinstance(source.get("data"), str):
+            media_type = source.get("media_type")
+            parts.append(
+                BlobPart(
+                    mime_type=media_type if isinstance(media_type, str) else "",
+                    modality="image",
+                    content=source["data"],
+                )
+            )
+        elif source.get("type") == "url" and isinstance(source.get("url"), str):
+            media_type = source.get("media_type")
+            parts.append(
+                UriPart(
+                    mime_type=media_type if isinstance(media_type, str) else "",
+                    modality="image",
+                    uri=source["url"],
+                )
+            )
 
-    span: Any
-    attrs: dict[str, Any]
+    if len(parts) == 1 and isinstance(parts[0], TextPart):
+        return Message.user(parts[0].content)
+    return Message(role="user", parts=parts) if parts else None
 
 
-@dataclass(frozen=True, slots=True)
-class _OpenTool:
-    """An in-flight execute_tool span awaiting its tool_result.
-
-    ``arguments`` is the JSON-encoded tool input, captured when the tool_use
-    block is seen so it can be attached to the span at its tool_result.
-    """
-
-    span: Any
-    name: str
-    arguments: str
-
-
-def _tracer() -> Any:
-    return otel_trace.get_tracer(_TRACER_NAME)
+async def _track_prompt(
+    prompt: AsyncIterable[dict[str, Any]],
+    input_messages: list[Message],
+) -> AsyncIterator[dict[str, Any]]:
+    async for message in prompt:
+        try:
+            traced_message = _message_from_prompt(message)
+            if traced_message is not None:
+                input_messages.append(traced_message)
+        except Exception:
+            logger.exception("claude_agent_sdk input tracing failed")
+        yield message
 
 
 def _usage_from_result(usage: dict[str, Any] | None) -> Usage:
@@ -154,62 +187,45 @@ class _TurnState:
     turn, owned by ``_trace_turn``.
     """
 
-    user_prompt: str | None
-    # Resolved once at turn start so the span name and gen_ai.agent.name stay
-    # consistent even if finalization runs outside the context that set it.
-    agent_name: str = _DEFAULT_AGENT_NAME
-    conversation_id: str = ""
+    conversation: Conversation
+    turn: Turn
     model: str = ""
     final_text: str = ""
     is_error: bool = False
     accumulated: list[Message] = field(default_factory=list)
     pending_thinking: list[str] = field(default_factory=list)
-    # The most recent chat span, whose end is deferred so the aggregate usage
-    # from ResultMessage can be attached before it closes.
-    pending_chat: _PendingChat | None = None
-    # tool_use_id -> in-flight execute_tool span.
-    open_tool_spans: dict[str, _OpenTool] = field(default_factory=dict)
+    pending_chat: LLM | None = None
+    open_tools: dict[str, Tool] = field(default_factory=dict)
 
 
 def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> None:
-    """Set attrs (optionally usage) on the deferred chat span and end it."""
+    """Record optional aggregate usage on the deferred chat and end it."""
     pending = state.pending_chat
     if pending is None:
         return
-    attrs = pending.attrs
-    if usage is not None:
-        if usage.input_tokens:
-            attrs["gen_ai.usage.input_tokens"] = usage.input_tokens
-        if usage.output_tokens:
-            attrs["gen_ai.usage.output_tokens"] = usage.output_tokens
-        if usage.cache_creation_input_tokens:
-            attrs["gen_ai.usage.cache_creation.input_tokens"] = (
-                usage.cache_creation_input_tokens
-            )
-        if usage.cache_read_input_tokens:
-            attrs["gen_ai.usage.cache_read.input_tokens"] = (
-                usage.cache_read_input_tokens
-            )
-    for key, value in attrs.items():
-        pending.span.set_attribute(key, value)
-    pending.span.end()
-    state.pending_chat = None
+    try:
+        with pending:
+            if usage is not None:
+                pending.record(usage=usage)
+    finally:
+        state.pending_chat = None
 
 
-def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
-    """Handle one streamed message, creating/closing child spans as needed."""
+def _process_message(msg: Any, state: _TurnState) -> str | None:
+    """Handle one streamed message and return a newly observed SDK session ID."""
     if isinstance(msg, SystemMessage):
         session_id = (msg.data or {}).get("session_id")
-        if session_id:
-            state.conversation_id = session_id
-        return
+        if isinstance(session_id, str) and session_id:
+            state.conversation.conversation_id = session_id
+            return session_id
+        return None
 
     if isinstance(msg, AssistantMessage):
         # Buffer thinking-only messages so extended-thinking deltas fold into
         # the next response's chat span rather than spawning an empty one.
         if all(isinstance(b, ThinkingBlock) for b in msg.content) and msg.content:
             state.pending_thinking.extend(b.thinking for b in msg.content)
-            return
+            return None
 
         # A new response means the previous chat span is done (no usage — only
         # the final one carries the aggregate usage).
@@ -222,28 +238,28 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
         if output.text:
             state.final_text = output.text
 
-        chat = tracer.start_span(f"chat {msg.model or ''}".rstrip())
-        chat_attrs = llm_attributes(
+        chat = state.turn.start_llm(
             model=msg.model or "",
             provider_name=_PROVIDER_NAME,
-            conversation_id=state.conversation_id,
+        )
+        state.pending_chat = chat
+        chat.record(
             input_messages=list(state.accumulated),
             output_messages=[output.message],
             reasoning=output.reasoning if output.reasoning.content else None,
         )
-        chat_attrs.update(_INTEGRATION_OTEL_ATTRS)
-        state.pending_chat = _PendingChat(span=chat, attrs=chat_attrs)
         state.accumulated.append(output.message)
 
         for block in msg.content:
             if isinstance(block, ToolUseBlock):
-                tool_span = tracer.start_span(f"execute_tool {block.name}")
-                state.open_tool_spans[block.id] = _OpenTool(
-                    span=tool_span,
+                tool = state.turn.start_tool(
                     name=block.name,
                     arguments=json.dumps(block.input, default=str),
+                    tool_call_id=block.id,
                 )
-        return
+                tool.started_at = datetime.now(timezone.utc)
+                state.open_tools[block.id] = tool
+        return None
 
     if isinstance(msg, UserMessage):
         content = msg.content if isinstance(msg.content, list) else []
@@ -253,23 +269,17 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             state.accumulated.append(
                 Message.tool_result(block.tool_use_id, block.content)
             )
-            open_tool = state.open_tool_spans.pop(block.tool_use_id, None)
+            open_tool = state.open_tools.get(block.tool_use_id)
             if open_tool is None:
                 continue
-            attrs = execute_tool_attributes(
-                tool_name=open_tool.name,
-                conversation_id=state.conversation_id,
-                tool_call_arguments=open_tool.arguments,
-                tool_call_result=str(block.content),
-                tool_call_id=block.tool_use_id,
-            )
-            attrs.update(_INTEGRATION_OTEL_ATTRS)
-            for key, value in attrs.items():
-                open_tool.span.set_attribute(key, value)
-            if block.is_error:
-                open_tool.span.set_status(StatusCode.ERROR, "tool reported an error")
-            open_tool.span.end()
-        return
+            del state.open_tools[block.tool_use_id]
+            with open_tool:
+                open_tool.result = str(block.content)
+                if block.is_error:
+                    open_tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+                        RuntimeError("tool reported an error")
+                    )
+        return None
 
     if isinstance(msg, ResultMessage):
         _flush_pending_chat(state, usage=_usage_from_result(msg.usage))
@@ -277,40 +287,35 @@ def _process_message(msg: Any, tracer: Any, state: _TurnState) -> None:
             state.final_text = msg.result
         if msg.is_error:
             state.is_error = True
-        return
+        return None
+
+    return None
 
 
-def _finalize_turn(root: Any, state: _TurnState) -> None:
-    """Close any open child spans and finish the root invoke_agent span."""
+def _finalize_turn(state: _TurnState) -> None:
+    """Close open children and record terminal fields on the turn."""
     _flush_pending_chat(state)
-    for open_tool in state.open_tool_spans.values():
-        open_tool.span.end()
-    state.open_tool_spans.clear()
+    for tool in state.open_tools.values():
+        with tool:
+            pass
+    state.open_tools.clear()
 
-    attrs = invoke_agent_attributes(
-        agent_name=state.agent_name,
-        conversation_id=state.conversation_id,
-        provider_name=_PROVIDER_NAME,
+    state.turn.record(
         model=state.model,
-        input_messages=[Message(role="user", content=state.user_prompt)]
-        if state.user_prompt
-        else None,
         output_messages=[Message(role="assistant", content=state.final_text)]
         if state.final_text
         else None,
     )
-    attrs.update(_INTEGRATION_OTEL_ATTRS)
-    for key, value in attrs.items():
-        root.set_attribute(key, value)
     if state.is_error:
-        root.set_status(StatusCode.ERROR, state.final_text or "agent run failed")
-    root.end()
+        state.turn._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+            RuntimeError(state.final_text or "agent run failed")
+        )
 
 
 async def _trace_turn(
     messages: AsyncIterator[Any],
     *,
-    user_prompt: str | None,
+    input_messages: list[Message],
     conversation_id_holder: list[str] | None = None,
 ) -> AsyncIterator[Any]:
     """Wrap a message stream, emitting the span tree for one turn.
@@ -319,32 +324,36 @@ async def _trace_turn(
     single ``ClaudeSDKClient``: the ``system/init`` message (which holds the
     session_id) is only sent on the first turn, so later turns must inherit it.
     """
-    tracer = _tracer()
-    # Resolve once here: this runs on the first __anext__, inside the user's
-    # ``agent_name_override(...)`` block, so the override contextvar is visible.
     agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
-    root = tracer.start_span(f"invoke_agent {agent_name}")
-    token = otel_context.attach(otel_trace.set_span_in_context(root))
-    state = _TurnState(user_prompt=user_prompt, agent_name=agent_name)
-    if conversation_id_holder is not None and conversation_id_holder[0]:
-        state.conversation_id = conversation_id_holder[0]
-    try:
-        async for msg in messages:
+    conversation_id = (
+        conversation_id_holder[0] if conversation_id_holder is not None else ""
+    )
+    with Conversation(
+        conversation_id=conversation_id,
+        agent_name=agent_name,
+        continue_parent_trace=True,
+        attributes=_INTEGRATION_OTEL_ATTRS,
+    ) as conversation:
+        with conversation.start_turn() as turn:
+            state = _TurnState(
+                conversation=conversation,
+                turn=turn,
+            )
             try:
-                _process_message(msg, tracer, state)
-                if conversation_id_holder is not None and state.conversation_id:
-                    conversation_id_holder[0] = state.conversation_id
-            except Exception:
-                # Never let span bookkeeping break the user's stream.
-                logger.exception("claude_agent_sdk OTel span processing failed")
-            yield msg
-    except Exception as exc:
-        root.set_status(StatusCode.ERROR, str(exc))
-        root.record_exception(exc)
-        raise
-    finally:
-        _finalize_turn(root, state)
-        otel_context.detach(token)
+                async for msg in messages:
+                    try:
+                        session_id = _process_message(msg, state)
+                        if conversation_id_holder is not None and session_id:
+                            conversation_id_holder[0] = session_id
+                    except Exception:
+                        # Never let span bookkeeping break the user's stream.
+                        logger.exception(
+                            "claude_agent_sdk GenAI span processing failed"
+                        )
+                    yield msg
+            finally:
+                state.turn.record(messages=list(input_messages))
+                _finalize_turn(state)
 
 
 def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
@@ -358,15 +367,27 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             options: Any,
             transport: Any = None,
         ) -> AsyncIterator[Any]:
-            inner = original_process_query(
-                self_client, prompt=prompt, options=options, transport=transport
-            )
             if should_disable_weave():
+                inner = original_process_query(
+                    self_client, prompt=prompt, options=options, transport=transport
+                )
                 async for msg in inner:
                     yield msg
                 return
-            user_prompt = prompt if isinstance(prompt, str) else None
-            async for msg in _trace_turn(inner, user_prompt=user_prompt):
+
+            input_messages = [Message.user(prompt)] if isinstance(prompt, str) else []
+            traced_prompt = (
+                prompt
+                if isinstance(prompt, str)
+                else _track_prompt(prompt, input_messages)
+            )
+            inner = original_process_query(
+                self_client,
+                prompt=traced_prompt,
+                options=options,
+                transport=transport,
+            )
+            async for msg in _trace_turn(inner, input_messages=input_messages):
                 yield msg
 
         return wrapped_process_query
@@ -391,15 +412,23 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             original_receive_response = self.receive_response
             # One-element holder so wrapped_query can hand the prompt to the
             # next receive_response() turn.
-            user_prompt_holder: list[str | None] = [None]
+            input_messages_holder: list[list[Message]] = [[]]
             # Persists the SDK session_id across turns: system/init is only sent
             # on the first turn, so later turns inherit the conversation id here.
             conversation_id_holder: list[str] = [""]
 
             @wraps(original_query)
             async def wrapped_query(prompt: Any, session_id: str = "default") -> None:
-                user_prompt_holder[0] = prompt if isinstance(prompt, str) else None
-                return await original_query(prompt, session_id=session_id)
+                input_messages = (
+                    [Message.user(prompt)] if isinstance(prompt, str) else []
+                )
+                input_messages_holder[0] = input_messages
+                traced_prompt = (
+                    prompt
+                    if isinstance(prompt, str)
+                    else _track_prompt(prompt, input_messages)
+                )
+                return await original_query(traced_prompt, session_id=session_id)
 
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
@@ -410,7 +439,7 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                     return
                 async for msg in _trace_turn(
                     inner,
-                    user_prompt=user_prompt_holder[0],
+                    input_messages=input_messages_holder[0],
                     conversation_id_holder=conversation_id_holder,
                 ):
                     yield msg
