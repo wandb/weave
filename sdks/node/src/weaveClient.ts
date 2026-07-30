@@ -19,6 +19,7 @@ import type {
   CallSchema,
   CallsQueryReq,
   CallsFilter,
+  CustomRuntimeApplyRes,
   EndedCallSchemaForInsert,
   Query,
   SortBy,
@@ -64,6 +65,22 @@ const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
 
 export type Response<T> = HttpResponse<T, HTTPValidationError>;
+
+export interface CustomRuntimeId {
+  id: string;
+  maxTokens?: number;
+}
+
+export interface RegisterCustomRuntimeOptions {
+  name: string;
+  baseUrl: string;
+  /** Complete desired list; omitted IDs are removed from an existing runtime. */
+  runtimeIds: ReadonlyArray<string | CustomRuntimeId>;
+  apiKeySecret?: string;
+  headers?: Readonly<Record<string, string>>;
+}
+
+export type RegisterCustomRuntimeResult = CustomRuntimeApplyRes;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -490,6 +507,28 @@ export class WeaveClient {
     this.projectId = projectId;
     this.settings = makeSettings(settings);
     this.useCallsComplete = this.settings.useCallsComplete;
+  }
+
+  /** Register a custom runtime, replacing its complete configuration if it exists. */
+  public registerCustomRuntime(
+    options: RegisterCustomRuntimeOptions
+  ): Promise<Response<RegisterCustomRuntimeResult>> {
+    const [entity, project] = this.projectId.split('/');
+    return this.traceServerApi.v2.customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut(
+      entity,
+      project,
+      options.name,
+      {
+        base_url: options.baseUrl,
+        api_key_secret: options.apiKeySecret,
+        headers: {...(options.headers ?? {})},
+        runtime_ids: options.runtimeIds.map(runtimeId =>
+          typeof runtimeId === 'string'
+            ? {id: runtimeId}
+            : {id: runtimeId.id, max_tokens: runtimeId.maxTokens}
+        ),
+      }
+    );
   }
 
   /**

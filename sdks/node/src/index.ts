@@ -24,6 +24,7 @@ export type {
   AgentSpan,
   AgentTurn,
   AgentVersion,
+  CustomRuntimeId,
   GetAgentsOptions,
   GetAgentsResult,
   GetAgentSpansOptions,
@@ -35,6 +36,8 @@ export type {
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,
+  RegisterCustomRuntimeOptions,
+  RegisterCustomRuntimeResult,
   Response,
   WeaveClient,
 } from './weaveClient';
