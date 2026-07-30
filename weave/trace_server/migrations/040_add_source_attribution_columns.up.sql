@@ -5,7 +5,7 @@
 --                codex, claude_code, ...), resolved server-side on ingest by
 --                the ladder in weave/trace_server/source_attribution.py.
 -- source_version version of that instrumentation.
--- source_sdk     the ingest surface it arrived on: 'weave' (trace-server call
+-- ingest_source  the ingest surface it arrived on: 'weave' (trace-server call
 --                API) or 'otlp' (OTel trace export).
 --
 -- Not to be confused with the existing calls_complete.source column, which
@@ -19,13 +19,13 @@
 -- ---------------------------------------------------------------------------
 -- spans
 -- ---------------------------------------------------------------------------
--- LowCardinality for name/sdk: bounded by the integration catalog, which makes
--- GROUP BY source_name and WHERE source_name = ... cheap. Plain String for
+-- LowCardinality for source_name/ingest_source: both have bounded cardinality.
+-- Plain String for
 -- source_version -- a long tail of pinned versions would bloat the dictionary.
 ALTER TABLE spans
     ADD COLUMN IF NOT EXISTS source_name    LowCardinality(String) DEFAULT '',
     ADD COLUMN IF NOT EXISTS source_version String DEFAULT '',
-    ADD COLUMN IF NOT EXISTS source_sdk     LowCardinality(String) DEFAULT '';
+    ADD COLUMN IF NOT EXISTS ingest_source  LowCardinality(String) DEFAULT '';
 
 -- No skip index, unlike idx_eval_run_id in migration 037. Every span has a
 -- source_name and a project typically emits only a handful of distinct values,
@@ -44,12 +44,12 @@ ALTER TABLE spans
 ALTER TABLE call_parts
     ADD COLUMN IF NOT EXISTS source_name    Nullable(String) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS source_version Nullable(String) DEFAULT NULL,
-    ADD COLUMN IF NOT EXISTS source_sdk     Nullable(String) DEFAULT NULL;
+    ADD COLUMN IF NOT EXISTS ingest_source  Nullable(String) DEFAULT NULL;
 
 ALTER TABLE calls_merged
     ADD COLUMN IF NOT EXISTS source_name    SimpleAggregateFunction(any, Nullable(String)),
     ADD COLUMN IF NOT EXISTS source_version SimpleAggregateFunction(any, Nullable(String)),
-    ADD COLUMN IF NOT EXISTS source_sdk     SimpleAggregateFunction(any, Nullable(String));
+    ADD COLUMN IF NOT EXISTS ingest_source  SimpleAggregateFunction(any, Nullable(String));
 
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -79,7 +79,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         minSimpleState(expire_at) as expire_at,
         anySimpleState(source_name) as source_name,
         anySimpleState(source_version) as source_version,
-        anySimpleState(source_sdk) as source_sdk
+        anySimpleState(ingest_source) as ingest_source
     FROM call_parts
     GROUP BY project_id,
         id;
@@ -92,7 +92,7 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 ALTER TABLE calls_complete
     ADD COLUMN IF NOT EXISTS source_name    LowCardinality(String) DEFAULT '',
     ADD COLUMN IF NOT EXISTS source_version String DEFAULT '',
-    ADD COLUMN IF NOT EXISTS source_sdk     LowCardinality(String) DEFAULT '';
+    ADD COLUMN IF NOT EXISTS ingest_source  LowCardinality(String) DEFAULT '';
 
 -- calls_merged_stats / calls_complete_stats are deliberately untouched: they
 -- exist for per-call size accounting and thread rollups, neither of which reads

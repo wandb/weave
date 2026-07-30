@@ -121,7 +121,11 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import Table, split_escaped_field_path
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-from weave.trace_server.source_attribution import resolve_for_call
+from weave.trace_server.source_attribution import (
+    INGEST_SOURCE_OTLP,
+    INGEST_SOURCE_WEAVE,
+    resolve_for_call,
+)
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
     LLM_TOKEN_PRICES_TABLE,
@@ -189,7 +193,7 @@ _CALLS_PLAIN_COLUMNS = frozenset(
         "wb_run_step_end",
         "source_name",
         "source_version",
-        "source_sdk",
+        "ingest_source",
         "deleted_at",
         "expire_at",
         "input_refs",
@@ -906,14 +910,20 @@ def _interpolated_quantile(durations: list[float], level: float) -> float | None
 
 
 def _call_source(
-    attributes: dict[str, Any] | None, otel_dump: dict[str, Any] | None
+    attributes: dict[str, Any] | None,
+    otel_dump: dict[str, Any] | None,
+    ingest_source: str,
 ) -> tuple[str | None, str | None, str | None]:
     """Resolve source fields, mapping ClickHouse's empty sentinel to None."""
-    source = resolve_for_call(attributes=attributes, otel_dump=otel_dump)
+    source = resolve_for_call(
+        attributes=attributes,
+        ingest_source=ingest_source,
+        otel_dump=otel_dump,
+    )
     return (
         empty_str_to_none(source.name),
         empty_str_to_none(source.version),
-        empty_str_to_none(source.sdk),
+        empty_str_to_none(source.ingest_source),
     )
 
 
@@ -949,7 +959,7 @@ class _CallRec:
     wb_run_step_end: int | None = None
     source_name: str | None = None
     source_version: str | None = None
-    source_sdk: str | None = None
+    ingest_source: str | None = None
     deleted_at: datetime.datetime | None = None
     storage_size_bytes: int | None = None
 
@@ -1209,10 +1219,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     # ------------------------------------------------------------------
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        return self._call_start_batch(req, INGEST_SOURCE_WEAVE)
+
+    def _call_start_batch(
+        self,
+        req: tsi.CallCreateBatchReq,
+        ingest_source: str,
+    ) -> tsi.CallCreateBatchRes:
         res = []
         for item in req.batch:
             if item.mode == "start":
-                res.append(self.call_start(item.req))
+                res.append(self._call_start(item.req, ingest_source))
             elif item.mode == "end":
                 res.append(self.call_end(item.req))
             else:
@@ -1246,8 +1263,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 expire_at = self._compute_call_expire_at(
                     call.project_id, call.started_at
                 )
-                source_name, source_version, source_sdk = _call_source(
-                    call.attributes, call.otel_dump
+                source_name, source_version, ingest_source = _call_source(
+                    call.attributes,
+                    call.otel_dump,
+                    INGEST_SOURCE_WEAVE,
                 )
 
                 rec = _CallRec(
@@ -1284,7 +1303,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     summary_len=len(summary_json),
                     source_name=source_name,
                     source_version=source_version,
-                    source_sdk=source_sdk,
+                    ingest_source=ingest_source,
                 )
                 self._calls[rec.project_id, rec.id] = rec
         return tsi.CallsUpsertCompleteRes()
@@ -1318,6 +1337,13 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallEndV2Res()
 
     def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
+        return self._call_start(req, INGEST_SOURCE_WEAVE)
+
+    def _call_start(
+        self,
+        req: tsi.CallStartReq,
+        ingest_source: str,
+    ) -> tsi.CallStartRes:
         if req.start.trace_id is None:
             raise ValueError("trace_id is required")
         if req.start.id is None:
@@ -1354,8 +1380,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.attributes_len = len(attributes_json)
                 existing.inputs_len = len(inputs_json)
             else:
-                source_name, source_version, source_sdk = _call_source(
-                    req.start.attributes, req.start.otel_dump
+                source_name, source_version, resolved_ingest_source = _call_source(
+                    req.start.attributes,
+                    req.start.otel_dump,
+                    ingest_source,
                 )
                 rec = _CallRec(
                     project_id=req.start.project_id,
@@ -1380,7 +1408,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     inputs_len=len(inputs_json),
                     source_name=source_name,
                     source_version=source_version,
-                    source_sdk=source_sdk,
+                    ingest_source=resolved_ingest_source,
                 )
                 self._calls[rec.project_id, rec.id] = rec
 
@@ -4689,7 +4717,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                             tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
                         ]
                     )
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        self._call_start_batch(
+            tsi.CallCreateBatchReq(batch=calls),
+            INGEST_SOURCE_OTLP,
+        )
         if rejected_spans > 0:
             return tsi.OTelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(

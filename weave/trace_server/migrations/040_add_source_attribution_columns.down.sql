@@ -33,19 +33,19 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 ALTER TABLE calls_complete
     DROP COLUMN IF EXISTS source_name,
     DROP COLUMN IF EXISTS source_version,
-    DROP COLUMN IF EXISTS source_sdk;
+    DROP COLUMN IF EXISTS ingest_source;
 
 ALTER TABLE calls_merged
     DROP COLUMN IF EXISTS source_name,
     DROP COLUMN IF EXISTS source_version,
-    DROP COLUMN IF EXISTS source_sdk;
+    DROP COLUMN IF EXISTS ingest_source;
 
 ALTER TABLE call_parts
     DROP COLUMN IF EXISTS source_name,
     DROP COLUMN IF EXISTS source_version,
-    DROP COLUMN IF EXISTS source_sdk;
+    DROP COLUMN IF EXISTS ingest_source;
 
 ALTER TABLE spans
     DROP COLUMN IF EXISTS source_name,
     DROP COLUMN IF EXISTS source_version,
-    DROP COLUMN IF EXISTS source_sdk;
+    DROP COLUMN IF EXISTS ingest_source;

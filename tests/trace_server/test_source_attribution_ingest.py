@@ -33,14 +33,17 @@ from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceSe
 from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import CallsStorageServerMode
-from weave.trace_server.source_attribution import SOURCE_SDK_OTLP, SOURCE_SDK_WEAVE
+from weave.trace_server.source_attribution import (
+    INGEST_SOURCE_OTLP,
+    INGEST_SOURCE_WEAVE,
+)
 
 pytestmark = pytest.mark.skipif(
     NOT_CLICKHOUSE_BACKEND,
     reason="ClickHouse-only: asserts raw source_* columns and table residence",
 )
 
-SOURCE_COLUMNS = ("source_name", "source_version", "source_sdk")
+SOURCE_COLUMNS = ("source_name", "source_version", "ingest_source")
 
 
 @pytest.fixture
@@ -197,9 +200,8 @@ def test_spans_ingest_populates_and_queries_source_columns(
             ("opentelemetry.instrumentation.anthropic", "0.40.1", [scope_only]),
             ("", "", [bare]),
         ],
-        # No service.name, so the unattributable span stays unattributable
-        # rather than falling through to a resource identity.
-        resource_attributes={"host.name": "laptop"},
+        # Resource service identity is intentionally not source attribution.
+        resource_attributes={"service.name": "producer-app", "service.version": "9"},
     )
 
     res = trace_server.genai_otel_export(
@@ -215,9 +217,9 @@ def test_spans_ingest_populates_and_queries_source_columns(
         clickhouse_trace_server.ch_client, "spans", internal_project_id, "span_name"
     )
     assert by_span_name == {
-        "chat gpt-5": ("openai", "0.53.1", SOURCE_SDK_OTLP),
-        "chat claude": ("anthropic", "0.40.1", SOURCE_SDK_OTLP),
-        "chat mystery": ("", "", SOURCE_SDK_OTLP),
+        "chat gpt-5": ("openai", "0.53.1", INGEST_SOURCE_OTLP),
+        "chat claude": ("anthropic", "0.40.1", INGEST_SOURCE_OTLP),
+        "chat mystery": ("", "", INGEST_SOURCE_OTLP),
     }
 
     # The promoted keys no longer leak into the custom-attr overflow map, but
@@ -238,7 +240,7 @@ def test_spans_ingest_populates_and_queries_source_columns(
     )
     assert [s.span_name for s in filtered.spans] == ["chat claude"]
     assert filtered.spans[0].source_version == "0.40.1"
-    assert filtered.spans[0].source_sdk == SOURCE_SDK_OTLP
+    assert filtered.spans[0].ingest_source == INGEST_SOURCE_OTLP
 
     # And groupable, which is the "who is sending us traffic" question.
     grouped = trace_server.agent_spans_query(
@@ -308,12 +310,12 @@ def test_calls_merged_source_columns_from_call_parts(
     ).result_rows
     assert sorted(parts) == [
         (False, None, None, None),
-        (True, "langchain", "0.54.0", SOURCE_SDK_WEAVE),
+        (True, "langchain", "0.54.0", INGEST_SOURCE_WEAVE),
     ]
 
     force_optimize_calls_merged(ch_client)
     merged = _source_rows(ch_client, "calls_merged", internal_project_id, "id")
-    assert merged[call_id] == ("langchain", "0.54.0", SOURCE_SDK_WEAVE)
+    assert merged[call_id] == ("langchain", "0.54.0", INGEST_SOURCE_WEAVE)
 
     calls = list(
         trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
@@ -322,7 +324,7 @@ def test_calls_merged_source_columns_from_call_parts(
     assert len(attributed) == 1
     assert attributed[0].source_name == "langchain"
     assert attributed[0].source_version == "0.54.0"
-    assert attributed[0].source_sdk == SOURCE_SDK_WEAVE
+    assert attributed[0].ingest_source == INGEST_SOURCE_WEAVE
 
     # The seeded row has no attribution: NULL reads back as None, not ''.
     seeded = [c for c in calls if c.op_name == "seed_op"]
@@ -367,10 +369,11 @@ def test_calls_complete_source_columns(trace_server, clickhouse_trace_server):
                     op_name="bare_op",
                     started_at=started_at,
                     ended_at=started_at + datetime.timedelta(seconds=1),
-                    attributes={},
+                    attributes={"weave.ingest_source": "otlp"},
                     inputs={},
                     output=None,
                     summary={},
+                    otel_dump={"name": "client-supplied"},
                 ),
             ]
         )
@@ -382,10 +385,10 @@ def test_calls_complete_source_columns(trace_server, clickhouse_trace_server):
         internal_project_id,
         "id",
     )
-    assert rows[attributed_id] == ("openai", "0.53.1", SOURCE_SDK_WEAVE)
+    assert rows[attributed_id] == ("openai", "0.53.1", INGEST_SOURCE_WEAVE)
     # A plain @weave.op stamps nothing, so name/version are the '' sentinel --
     # but the surface is still recorded.
-    assert rows[bare_id] == ("", "", SOURCE_SDK_WEAVE)
+    assert rows[bare_id] == ("", "", INGEST_SOURCE_WEAVE)
 
     calls = {
         c.id: c
@@ -395,11 +398,11 @@ def test_calls_complete_source_columns(trace_server, clickhouse_trace_server):
     }
     assert calls[attributed_id].source_name == "openai"
     assert calls[attributed_id].source_version == "0.53.1"
-    assert calls[attributed_id].source_sdk == SOURCE_SDK_WEAVE
+    assert calls[attributed_id].ingest_source == INGEST_SOURCE_WEAVE
     # '' round-trips to None so the calls read surface matches calls_merged.
     assert calls[bare_id].source_name is None
     assert calls[bare_id].source_version is None
-    assert calls[bare_id].source_sdk == SOURCE_SDK_WEAVE
+    assert calls[bare_id].ingest_source == INGEST_SOURCE_WEAVE
 
     filtered = list(
         trace_server.calls_query_stream(
@@ -442,6 +445,7 @@ def test_otel_calls_export_attributes_from_otel_dump(
                     )
                 ],
             ),
+            ("", "", [_pb_span("chat resource only", {})]),
         ],
         resource_attributes={"service.name": "lower-rung-loses"},
     )
@@ -461,8 +465,9 @@ def test_otel_calls_export_attributes_from_otel_dump(
         "id",
     )
     assert sorted(rows.values()) == [
-        ("bedrock", "0.3.1", SOURCE_SDK_OTLP),
-        ("openai", "0.53.1", SOURCE_SDK_OTLP),
+        ("", "", INGEST_SOURCE_OTLP),
+        ("bedrock", "0.3.1", INGEST_SOURCE_OTLP),
+        ("openai", "0.53.1", INGEST_SOURCE_OTLP),
     ]
 
     calls = {
@@ -471,10 +476,10 @@ def test_otel_calls_export_attributes_from_otel_dump(
             tsi.CallsQueryReq(project_id=project_id)
         )
     }
-    assert set(calls) == {"bedrock", "openai"}
+    assert set(calls) == {None, "bedrock", "openai"}
     assert calls["bedrock"].source_version == "0.3.1"
     assert calls["openai"].source_version == "0.53.1"
-    assert {call.source_sdk for call in calls.values()} == {SOURCE_SDK_OTLP}
+    assert {call.ingest_source for call in calls.values()} == {INGEST_SOURCE_OTLP}
 
 
 def test_otel_calls_export_to_calls_merged_project(
@@ -504,5 +509,5 @@ def test_otel_calls_export_to_calls_merged_project(
     # The seeded residence row is unattributed; the OTel-ingested call is not.
     assert sorted(rows.values(), key=lambda v: v[0] or "") == [
         (None, None, None),
-        ("codex", "1.4.0", SOURCE_SDK_OTLP),
+        ("codex", "1.4.0", INGEST_SOURCE_OTLP),
     ]

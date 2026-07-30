@@ -629,7 +629,6 @@ def extract_genai_span(
         attributes=attrs,
         scope_name=span.scope_name,
         scope_version=span.scope_version,
-        resource_attributes=span.resource.attributes if span.resource else None,
     )
 
     return AgentSpanCHInsertable(

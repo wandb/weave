@@ -18,7 +18,7 @@ which generates the correct comparison for the active ``ReadTable``:
 
 Sentinel string fields: parent_id, display_name, exception, otel_dump,
     wb_user_id, wb_run_id, thread_id, turn_id, source_name, source_version,
-    source_sdk  (sentinel = '')
+    ingest_source  (sentinel = '')
 Sentinel datetime fields: ended_at, updated_at, deleted_at
     (sentinel = SENTINEL_EPOCH, 1970-01-01),
     expire_at (sentinel = EXPIRE_AT_NEVER, 2100-01-01)
@@ -54,7 +54,7 @@ SENTINEL_STRING_FIELDS = frozenset(
         "turn_id",
         "source_name",
         "source_version",
-        "source_sdk",
+        "ingest_source",
     }
 )
 
