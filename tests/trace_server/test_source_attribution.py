@@ -228,6 +228,20 @@ def test_resolve_for_call_distinguishes_ingest_surface():
         name="openai", version="0.6", sdk=SOURCE_SDK_OTLP
     )
 
+    # Normalized call attributes take precedence over the raw OTel fallback.
+    normalized_call = resolve_for_call(
+        attributes={"integration": {"name": "weave", "version": "1.0"}},
+        otel_dump={
+            "attributes": {
+                "integration.name": "raw-otel",
+                "integration.version": "2.0",
+            }
+        },
+    )
+    assert normalized_call == source_attribution.SourceAttribution(
+        name="weave", version="1.0", sdk=SOURCE_SDK_OTLP
+    )
+
     # A client-supplied weave.source.sdk cannot override the real surface.
     spoofed = resolve_for_call(attributes={"weave.source.sdk": "otlp"})
     assert spoofed.sdk == SOURCE_SDK_WEAVE
@@ -459,3 +473,28 @@ def test_otel_dump_carries_scope_so_the_calls_path_agrees_with_the_spans_path():
     scopeless_call = resolve_for_call(attributes={}, otel_dump=scopeless.as_dict())
     assert (scopeless_call.name, scopeless_call.version) == ("svc", "2")
     assert (scopeless_row.source_name, scopeless_row.source_version) == ("svc", "2")
+
+    # Explicit OTel attrs survive only in otel_dump after Span.to_call narrows them.
+    explicit = _parsed_span(
+        attributes={
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-5",
+            "integration.name": "openai",
+            "integration.version": "0.53.1",
+        },
+        scope_name="opentelemetry.instrumentation.httpx",
+        scope_version="0.1.0",
+    )
+    explicit_row = extract_genai_span(explicit, project_id="proj")
+    start, _ = explicit.to_call("proj")
+    explicit_call = resolve_for_call(
+        attributes=start.attributes, otel_dump=start.otel_dump
+    )
+    assert (
+        (explicit_call.name, explicit_call.version)
+        == (
+            explicit_row.source_name,
+            explicit_row.source_version,
+        )
+        == ("openai", "0.53.1")
+    )

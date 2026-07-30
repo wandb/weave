@@ -89,8 +89,6 @@ ALTER TABLE calls_merged_view MODIFY QUERY
 -- ---------------------------------------------------------------------------
 -- Non-nullable with the empty-string sentinel, matching the rest of
 -- calls_complete. The read path maps it back to None via ch_sentinel_values.
--- Keep semicolons out of these comments: the legacy migration splitter splits
--- on every one, so a comment semicolon leaks garbage into the next statement.
 ALTER TABLE calls_complete
     ADD COLUMN IF NOT EXISTS source_name    LowCardinality(String) DEFAULT '',
     ADD COLUMN IF NOT EXISTS source_version String DEFAULT '',

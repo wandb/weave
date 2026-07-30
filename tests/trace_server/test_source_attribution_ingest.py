@@ -409,11 +409,12 @@ def test_calls_complete_source_columns(trace_server, clickhouse_trace_server):
     assert [c.id for c in filtered] == [attributed_id]
 
 
-def test_otel_calls_export_attributes_from_scope(trace_server, clickhouse_trace_server):
-    """An OTel-ingested call resolves through otel_dump's scope, tagged otlp.
+def test_otel_calls_export_attributes_from_otel_dump(
+    trace_server, clickhouse_trace_server
+):
+    """OTel-ingested calls resolve explicit attributes before scope.
 
-    This is the rung that closes the gap for Codex / the Claude Code plugin on
-    the calls path, where a call has no scope of its own.
+    Both survive only in otel_dump after Span.to_call normalizes call attributes.
     """
     project = "source_attr_otel_calls"
     project_id = f"{TEST_ENTITY}/{project}"
@@ -421,7 +422,27 @@ def test_otel_calls_export_attributes_from_scope(trace_server, clickhouse_trace_
 
     processed = _processed_resource_spans(
         project,
-        [("openinference.instrumentation.bedrock", "0.3.1", [_pb_span("chat", {})])],
+        [
+            (
+                "openinference.instrumentation.bedrock",
+                "0.3.1",
+                [_pb_span("chat scope", {})],
+            ),
+            (
+                "opentelemetry.instrumentation.httpx",
+                "0.1.0",
+                [
+                    _pb_span(
+                        "chat explicit",
+                        {
+                            "gen_ai.operation.name": "chat",
+                            "integration.name": "openai",
+                            "integration.version": "0.53.1",
+                        },
+                    )
+                ],
+            ),
+        ],
         resource_attributes={"service.name": "lower-rung-loses"},
     )
     trace_server.otel_export(
@@ -439,15 +460,21 @@ def test_otel_calls_export_attributes_from_scope(trace_server, clickhouse_trace_
         internal_project_id,
         "id",
     )
-    assert list(rows.values()) == [("bedrock", "0.3.1", SOURCE_SDK_OTLP)]
+    assert sorted(rows.values()) == [
+        ("bedrock", "0.3.1", SOURCE_SDK_OTLP),
+        ("openai", "0.53.1", SOURCE_SDK_OTLP),
+    ]
 
-    calls = list(
-        trace_server.calls_query_stream(tsi.CallsQueryReq(project_id=project_id))
-    )
-    assert len(calls) == 1
-    assert calls[0].source_name == "bedrock"
-    assert calls[0].source_version == "0.3.1"
-    assert calls[0].source_sdk == SOURCE_SDK_OTLP
+    calls = {
+        call.source_name: call
+        for call in trace_server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=project_id)
+        )
+    }
+    assert set(calls) == {"bedrock", "openai"}
+    assert calls["bedrock"].source_version == "0.3.1"
+    assert calls["openai"].source_version == "0.53.1"
+    assert {call.source_sdk for call in calls.values()} == {SOURCE_SDK_OTLP}
 
 
 def test_otel_calls_export_to_calls_merged_project(
