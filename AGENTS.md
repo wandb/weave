@@ -562,7 +562,4 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
       OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
       `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
-- [ ] Exclude `.git` from the Ruff pre-push scan. A remote branch whose name
-      ends in `.py` currently makes `nox --no-install -e lint` parse its ref and
-      reflog files as Python source.
 - [ ] ...
