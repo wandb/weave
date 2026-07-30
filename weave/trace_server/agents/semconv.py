@@ -366,8 +366,8 @@ SOURCE_VERSION = Attribute(
     "Version of the instrumentation that produced this row",
     ["integration.version", "weave.integration.version"],
 )
-SOURCE_SDK = Attribute(
-    "weave.source.sdk",
+INGEST_SOURCE = Attribute(
+    "weave.ingest_source",
     "string",
     "Ingest surface the row arrived on: weave or otlp. Server-derived, never read off the wire",
 )
@@ -433,7 +433,7 @@ _DEFS: list[Attribute] = [
     EVAL_EVALUATION_NAME,
     SOURCE_NAME,
     SOURCE_VERSION,
-    SOURCE_SDK,
+    INGEST_SOURCE,
 ]
 
 
@@ -515,7 +515,7 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
     SOURCE_NAME.key: "source_name",
     SOURCE_VERSION.key: "source_version",
-    SOURCE_SDK.key: "source_sdk",
+    INGEST_SOURCE.key: "ingest_source",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",

@@ -1,10 +1,11 @@
 """Resolve which instrumentation produced an ingested row.
 
-Answers "which SDK / integration / agent harness wrote this?" as three promoted
-columns (`source_name`, `source_version`, `source_sdk`) instead of a JSON scan
-over `attributes_dump` / `custom_attrs_string`. This module is the single source
-of truth for that resolution; the calls path (`clickhouse/schema_converters.py`)
-and the spans path (`opentelemetry/genai_extraction.py`) both go through it.
+Answers "which SDK / integration / agent harness wrote this?" as promoted
+`source_name` and `source_version` columns instead of a JSON scan over
+`attributes_dump` / `custom_attrs_string`. `ingest_source` separately records
+the authoritative server endpoint. The calls path
+(`clickhouse/schema_converters.py`) and spans path
+(`opentelemetry/genai_extraction.py`) both go through this module.
 
 `source_name` / `source_version` come from the first rung of the ladder that
 resolves, and are always taken as a pair so a version never describes a
@@ -17,16 +18,13 @@ different rung's name:
 2. The OTel instrumentation scope (`scope.name` / `scope.version`), normalized.
    This is what Codex, the Claude Code plugin, OpenInference and OpenLLMetry
    all set for free, so it attributes them with no client-side work.
-3. Resource identity — `service.name` / `service.version`, then
-   `telemetry.sdk.name` / `telemetry.sdk.version`.
-4. `''` — unattributable.
+3. `''` — unattributable.
 
 Not yet a rung: the ingest request `User-Agent`. Reading it needs the FastAPI
 layer in `wandb/core` to thread the header into the export request; the
 `resolve_*` signatures below are where it would slot in.
 
-`source_sdk` is orthogonal — it records the ingest surface the row arrived on,
-which the server always knows exactly, so it never participates in the ladder.
+`ingest_source` never participates in the ladder.
 """
 
 from __future__ import annotations
@@ -40,11 +38,11 @@ from weave.trace_server.opentelemetry.helpers import get_attribute
 
 @dataclass(frozen=True, slots=True)
 class SourceAttribution:
-    """Resolved values for the `source_*` columns. Empty string means unknown."""
+    """Resolved source attribution. Empty string means unknown."""
 
     name: str = ""
     version: str = ""
-    sdk: str = ""
+    ingest_source: str = ""
 
 
 def resolve_for_otel_span(
@@ -52,38 +50,35 @@ def resolve_for_otel_span(
     attributes: dict[str, Any] | None,
     scope_name: str = "",
     scope_version: str = "",
-    resource_attributes: dict[str, Any] | None = None,
 ) -> SourceAttribution:
     """Resolve attribution for a span ingested on an OTLP endpoint."""
     return _resolve(
-        sdk=SOURCE_SDK_OTLP,
+        ingest_source=INGEST_SOURCE_OTLP,
         attributes=attributes,
         scope_name=scope_name,
         scope_version=scope_version,
-        resource_attributes=resource_attributes,
     )
 
 
 def resolve_for_call(
     *,
     attributes: dict[str, Any] | None,
+    ingest_source: str,
     otel_dump: dict[str, Any] | None = None,
 ) -> SourceAttribution:
     """Resolve attribution from normalized call attributes and its OTel dump.
 
-    OTLP-converted calls retain their full wire attributes, scope, and resource
-    only in `otel_dump`. Normalized call attributes win when both carry an
-    explicit source.
+    OTLP-converted calls retain their full wire attributes and scope only in
+    `otel_dump`. Normalized call attributes win when both carry an explicit
+    source.
     """
     scope = _sub_dict(otel_dump, "scope")
-    resource = _sub_dict(otel_dump, "resource")
     return _resolve(
-        sdk=SOURCE_SDK_OTLP if otel_dump else SOURCE_SDK_WEAVE,
+        ingest_source=ingest_source,
         attributes=attributes,
         fallback_attributes=_sub_dict(otel_dump, "attributes"),
         scope_name=_as_str(scope.get("name")),
         scope_version=_as_str(scope.get("version")),
-        resource_attributes=_sub_dict(resource, "attributes"),
     )
 
 
@@ -95,8 +90,8 @@ def resolve_for_call(
 # `/call/upsert_batch`, `/calls/complete`); `otlp` is the OTel trace export.
 # Deliberately coarse: separating weave-python from weave-node needs the
 # request `User-Agent`, and there is only one OTLP transport (HTTP) today.
-SOURCE_SDK_WEAVE = "weave"
-SOURCE_SDK_OTLP = "otlp"
+INGEST_SOURCE_WEAVE = "weave"
+INGEST_SOURCE_OTLP = "otlp"
 
 # Namespaces producers put in front of the library they instrument. Longest
 # match is not needed — none of these is a prefix of another.
@@ -107,37 +102,27 @@ _SCOPE_NAME_PREFIXES = (
     "weave.",
 )
 
-# Resource keys probed for identity, name paired with its version. `service.name`
-# comes first because it is the identifying one: `telemetry.sdk.name` is
-# `opentelemetry` for nearly every producer, which names nothing.
-_RESOURCE_IDENTITY_KEYS = (
-    ("service.name", "service.version"),
-    ("telemetry.sdk.name", "telemetry.sdk.version"),
-)
-
-# What OTel SDKs use for `service.name` when the producer never set one. Bare
-# and `unknown_service:<executable>` forms both appear.
-_PLACEHOLDER_SERVICE_NAME = "unknown_service"
-
 
 def _resolve(
     *,
-    sdk: str,
+    ingest_source: str,
     attributes: dict[str, Any] | None,
     fallback_attributes: dict[str, Any] | None = None,
     scope_name: str,
     scope_version: str,
-    resource_attributes: dict[str, Any] | None,
 ) -> SourceAttribution:
     """Walk the ladder, taking name and version from the same rung."""
     name, version = (
         _from_explicit_attributes(attributes)
         or _from_explicit_attributes(fallback_attributes)
         or _from_scope(scope_name, scope_version)
-        or _from_resource(resource_attributes)
         or ("", "")
     )
-    return SourceAttribution(name=name, version=version, sdk=sdk)
+    return SourceAttribution(
+        name=name,
+        version=version,
+        ingest_source=ingest_source,
+    )
 
 
 def _from_explicit_attributes(
@@ -170,25 +155,6 @@ def _from_scope(scope_name: str, scope_version: str) -> tuple[str, str] | None:
     if not normalized:
         return None
     return normalized, scope_version.strip()
-
-
-def _from_resource(
-    resource_attributes: dict[str, Any] | None,
-) -> tuple[str, str] | None:
-    if not resource_attributes:
-        return None
-    for name_key, version_key in _RESOURCE_IDENTITY_KEYS:
-        name = _as_str(get_attribute(resource_attributes, name_key))
-        if not name or _is_placeholder_service_name(name):
-            continue
-        return name, _as_str(get_attribute(resource_attributes, version_key))
-    return None
-
-
-def _is_placeholder_service_name(name: str) -> bool:
-    return name == _PLACEHOLDER_SERVICE_NAME or name.startswith(
-        f"{_PLACEHOLDER_SERVICE_NAME}:"
-    )
 
 
 def _first_str(attributes: dict[str, Any], keys: tuple[str, ...]) -> str:

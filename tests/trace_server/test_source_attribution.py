@@ -2,7 +2,7 @@
 
 Covers `source_attribution` in isolation, its use by the spans extraction path,
 and the `Span.as_dict` -> `resolve_for_call` handoff that lets the calls path
-reach a span's scope and resource.
+reach a span's scope.
 """
 
 import datetime
@@ -24,8 +24,8 @@ from weave.trace_server.opentelemetry.python_spans import (
     Span,
 )
 from weave.trace_server.source_attribution import (
-    SOURCE_SDK_OTLP,
-    SOURCE_SDK_WEAVE,
+    INGEST_SOURCE_OTLP,
+    INGEST_SOURCE_WEAVE,
     resolve_for_call,
     resolve_for_otel_span,
 )
@@ -36,14 +36,13 @@ from weave.trace_server.source_attribution import (
 
 
 @pytest.mark.parametrize(
-    ("case", "attributes", "scope", "resource", "expected"),
+    ("case", "attributes", "scope", "expected"),
     [
         (
-            # Rung 1, nested: the integration block beats both lower rungs.
+            # Rung 1, nested: the integration block beats scope.
             "nested_integration_wins",
             {"integration": {"name": "openai", "version": "0.53.1"}},
             ("opentelemetry.instrumentation.openai", "0.62b1"),
-            {"service.name": "my-app", "service.version": "9.9"},
             ("openai", "0.53.1"),
         ),
         (
@@ -51,7 +50,6 @@ from weave.trace_server.source_attribution import (
             "flat_integration_keys",
             {"integration.name": "langchain", "integration.version": "0.54.0"},
             ("", ""),
-            None,
             ("langchain", "0.54.0"),
         ),
         (
@@ -64,7 +62,6 @@ from weave.trace_server.source_attribution import (
                 "integration.version": "0.1",
             },
             ("", ""),
-            None,
             ("claude_code", "2.1"),
         ),
         (
@@ -73,7 +70,6 @@ from weave.trace_server.source_attribution import (
             "version_never_crosses_rungs",
             {"integration.name": "custom_harness"},
             ("codex", "1.4.0"),
-            None,
             ("custom_harness", ""),
         ),
         (
@@ -81,35 +77,30 @@ from weave.trace_server.source_attribution import (
             "scope_used_when_no_integration",
             {"gen_ai.operation.name": "chat"},
             ("codex", "1.4.0"),
-            None,
             ("codex", "1.4.0"),
         ),
         (
             "scope_strips_python_instrumentation_prefix",
             {},
             ("opentelemetry.instrumentation.anthropic", "0.40.1"),
-            None,
             ("anthropic", "0.40.1"),
         ),
         (
             "scope_strips_js_instrumentation_prefix",
             {},
             ("@opentelemetry/instrumentation-http", "0.57.0"),
-            None,
             ("http", "0.57.0"),
         ),
         (
             "scope_strips_openinference_prefix",
             {},
             ("openinference.instrumentation.openai", "0.1.2"),
-            None,
             ("openai", "0.1.2"),
         ),
         (
             "scope_strips_weave_prefix",
             {},
             ("weave.claude_agent_sdk", "0.53.1"),
-            None,
             ("claude_agent_sdk", "0.53.1"),
         ),
         (
@@ -117,57 +108,12 @@ from weave.trace_server.source_attribution import (
             "scope_prefix_only_is_kept",
             {},
             ("weave.", ""),
-            None,
             ("weave.", ""),
-        ),
-        (
-            # Rung 3: service.* is probed before telemetry.sdk.*, because
-            # telemetry.sdk.name is `opentelemetry` for nearly every producer.
-            "resource_prefers_service_name",
-            {},
-            ("", ""),
-            {
-                "service.name": "claude-code",
-                "service.version": "3.0",
-                "telemetry.sdk.name": "opentelemetry",
-                "telemetry.sdk.version": "1.29.0",
-            },
-            ("claude-code", "3.0"),
-        ),
-        (
-            "resource_skips_bare_placeholder_service_name",
-            {},
-            ("", ""),
-            {
-                "service.name": "unknown_service",
-                "telemetry.sdk.name": "opentelemetry",
-                "telemetry.sdk.version": "1.29.0",
-            },
-            ("opentelemetry", "1.29.0"),
-        ),
-        (
-            "resource_skips_suffixed_placeholder_service_name",
-            {},
-            ("", ""),
-            {
-                "service.name": "unknown_service:python3.11",
-                "telemetry.sdk.name": "opentelemetry",
-            },
-            ("opentelemetry", ""),
-        ),
-        (
-            # Nested resource attributes resolve the same as flat dotted ones.
-            "resource_nested_shape",
-            {},
-            ("", ""),
-            {"service": {"name": "codex-cli", "version": "0.2"}},
-            ("codex-cli", "0.2"),
         ),
         (
             "nothing_resolves_to_empty",
             {"gen_ai.request.model": "gpt-5"},
             ("", ""),
-            {"host.name": "laptop"},
             ("", ""),
         ),
         (
@@ -175,16 +121,14 @@ from weave.trace_server.source_attribution import (
             "blank_values_fall_through",
             {"integration.name": "   "},
             ("  ", "1.0"),
-            {"service.name": "fallback"},
-            ("fallback", ""),
+            ("", ""),
         ),
         (
             # A non-scalar integration name is not stringified into a column.
             "non_scalar_name_ignored",
             {"integration": {"name": {"nope": 1}, "version": "1"}},
             ("", ""),
-            {"service.name": "fallback"},
-            ("fallback", ""),
+            ("", ""),
         ),
     ],
 )
@@ -192,45 +136,48 @@ def test_ladder_resolves_name_and_version(
     case: str,
     attributes: dict | None,
     scope: tuple[str, str],
-    resource: dict | None,
     expected: tuple[str, str],
 ):
     resolved = resolve_for_otel_span(
         attributes=attributes,
         scope_name=scope[0],
         scope_version=scope[1],
-        resource_attributes=resource,
     )
     assert (resolved.name, resolved.version) == expected, case
     # Every OTLP-ingested row is tagged with its surface regardless of rung.
-    assert resolved.sdk == SOURCE_SDK_OTLP, case
+    assert resolved.ingest_source == INGEST_SOURCE_OTLP, case
 
 
 def test_resolve_for_call_distinguishes_ingest_surface():
-    """`source_sdk` records the surface, and is never read off the wire."""
-    sdk_call = resolve_for_call(
-        attributes={"integration": {"name": "openai", "version": "0.53.1"}}
+    """`ingest_source` records the surface, and is never read off the wire."""
+    weave_call = resolve_for_call(
+        attributes={"integration": {"name": "openai", "version": "0.53.1"}},
+        ingest_source=INGEST_SOURCE_WEAVE,
     )
-    assert sdk_call == source_attribution.SourceAttribution(
-        name="openai", version="0.53.1", sdk=SOURCE_SDK_WEAVE
+    assert weave_call == source_attribution.SourceAttribution(
+        name="openai",
+        version="0.53.1",
+        ingest_source=INGEST_SOURCE_WEAVE,
     )
 
-    # An OTel-converted call: no integration attrs, scope and resource live
-    # inside otel_dump, and the surface flips to otlp.
+    # An OTel-converted call can resolve scope from otel_dump.
     otel_call = resolve_for_call(
         attributes={},
+        ingest_source=INGEST_SOURCE_OTLP,
         otel_dump={
             "scope": {"name": "opentelemetry.instrumentation.openai", "version": "0.6"},
-            "resource": {"attributes": {"service.name": "ignored-lower-rung"}},
         },
     )
     assert otel_call == source_attribution.SourceAttribution(
-        name="openai", version="0.6", sdk=SOURCE_SDK_OTLP
+        name="openai",
+        version="0.6",
+        ingest_source=INGEST_SOURCE_OTLP,
     )
 
     # Normalized call attributes take precedence over the raw OTel fallback.
     normalized_call = resolve_for_call(
         attributes={"integration": {"name": "weave", "version": "1.0"}},
+        ingest_source=INGEST_SOURCE_OTLP,
         otel_dump={
             "attributes": {
                 "integration.name": "raw-otel",
@@ -239,16 +186,18 @@ def test_resolve_for_call_distinguishes_ingest_surface():
         },
     )
     assert normalized_call == source_attribution.SourceAttribution(
-        name="weave", version="1.0", sdk=SOURCE_SDK_OTLP
+        name="weave",
+        version="1.0",
+        ingest_source=INGEST_SOURCE_OTLP,
     )
 
-    # A client-supplied weave.source.sdk cannot override the real surface.
-    spoofed = resolve_for_call(attributes={"weave.source.sdk": "otlp"})
-    assert spoofed.sdk == SOURCE_SDK_WEAVE
-
-    # An otel_dump with neither scope nor resource still reads as otlp.
-    bare_otel = resolve_for_call(attributes={}, otel_dump={"name": "chat"})
-    assert bare_otel == source_attribution.SourceAttribution(sdk=SOURCE_SDK_OTLP)
+    # Client attributes and otel_dump cannot override authoritative context.
+    spoofed = resolve_for_call(
+        attributes={"weave.ingest_source": "otlp"},
+        ingest_source=INGEST_SOURCE_WEAVE,
+        otel_dump={"name": "chat"},
+    )
+    assert spoofed.ingest_source == INGEST_SOURCE_WEAVE
 
 
 def test_source_keys_registered_in_semconv():
@@ -256,7 +205,7 @@ def test_source_keys_registered_in_semconv():
     for attribute, column in (
         (semconv.SOURCE_NAME, "source_name"),
         (semconv.SOURCE_VERSION, "source_version"),
-        (semconv.SOURCE_SDK, "source_sdk"),
+        (semconv.INGEST_SOURCE, "ingest_source"),
     ):
         assert semconv.CANONICAL_KEY_TO_COLUMN[attribute.key] == column
         assert semconv.FILTERABLE_KEY_TO_COLUMN[attribute.key] == column
@@ -401,10 +350,10 @@ def test_extract_genai_span_fills_source_columns_from_scope():
     )
     row = extract_genai_span(span, project_id="proj")
 
-    assert (row.source_name, row.source_version, row.source_sdk) == (
+    assert (row.source_name, row.source_version, row.ingest_source) == (
         "openai",
         "0.62b1",
-        SOURCE_SDK_OTLP,
+        INGEST_SOURCE_OTLP,
     )
 
 
@@ -433,9 +382,9 @@ def test_extract_genai_span_unattributable_leaves_name_empty():
     row = extract_genai_span(span, project_id="proj")
 
     assert (row.source_name, row.source_version) == ("", "")
-    # The surface is still recorded, so `source_sdk` can size raw-OTLP traffic
+    # The surface is still recorded, so `ingest_source` can size raw-OTLP traffic
     # even for rows nothing else identifies.
-    assert row.source_sdk == SOURCE_SDK_OTLP
+    assert row.ingest_source == INGEST_SOURCE_OTLP
 
 
 def test_otel_dump_carries_scope_so_the_calls_path_agrees_with_the_spans_path():
@@ -458,21 +407,29 @@ def test_otel_dump_carries_scope_so_the_calls_path_agrees_with_the_spans_path():
     }
 
     span_row = extract_genai_span(span, project_id="proj")
-    call_resolved = resolve_for_call(attributes={}, otel_dump=otel_dump)
+    call_resolved = resolve_for_call(
+        attributes={},
+        ingest_source=INGEST_SOURCE_OTLP,
+        otel_dump=otel_dump,
+    )
     assert (call_resolved.name, call_resolved.version) == (
         span_row.source_name,
         span_row.source_version,
     )
     assert call_resolved.name == "bedrock"
 
-    # Falling through to the resource rung agrees across paths too.
+    # Resource service identity is not instrumentation attribution.
     scopeless = _parsed_span(
         resource_attributes={"service.name": "svc", "service.version": "2"}
     )
     scopeless_row = extract_genai_span(scopeless, project_id="proj")
-    scopeless_call = resolve_for_call(attributes={}, otel_dump=scopeless.as_dict())
-    assert (scopeless_call.name, scopeless_call.version) == ("svc", "2")
-    assert (scopeless_row.source_name, scopeless_row.source_version) == ("svc", "2")
+    scopeless_call = resolve_for_call(
+        attributes={},
+        ingest_source=INGEST_SOURCE_OTLP,
+        otel_dump=scopeless.as_dict(),
+    )
+    assert (scopeless_call.name, scopeless_call.version) == ("", "")
+    assert (scopeless_row.source_name, scopeless_row.source_version) == ("", "")
 
     # Explicit OTel attrs survive only in otel_dump after Span.to_call narrows them.
     explicit = _parsed_span(
@@ -488,7 +445,9 @@ def test_otel_dump_carries_scope_so_the_calls_path_agrees_with_the_spans_path():
     explicit_row = extract_genai_span(explicit, project_id="proj")
     start, _ = explicit.to_call("proj")
     explicit_call = resolve_for_call(
-        attributes=start.attributes, otel_dump=start.otel_dump
+        attributes=start.attributes,
+        ingest_source=INGEST_SOURCE_OTLP,
+        otel_dump=start.otel_dump,
     )
     assert (
         (explicit_call.name, explicit_call.version)

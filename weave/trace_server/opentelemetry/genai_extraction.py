@@ -596,7 +596,6 @@ def extract_genai_span(
         attributes=attrs,
         scope_name=span.scope_name,
         scope_version=span.scope_version,
-        resource_attributes=span.resource.attributes if span.resource else None,
     )
 
     return AgentSpanCHInsertable(
@@ -629,7 +628,7 @@ def extract_genai_span(
         eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
         source_name=source.name,
         source_version=source.version,
-        source_sdk=source.sdk,
+        ingest_source=source.ingest_source,
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),

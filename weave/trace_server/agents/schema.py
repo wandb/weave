@@ -113,7 +113,7 @@ class AgentSpanCHInsertable(BaseModel):
     # [Weave] server-resolved source attribution.
     source_name: str = ""
     source_version: str = ""
-    source_sdk: str = ""
+    ingest_source: str = ""
 
     # [OTel GenAI] model info — gen_ai.request.model, gen_ai.response.*
     request_model: str = ""

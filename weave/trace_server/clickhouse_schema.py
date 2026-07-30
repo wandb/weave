@@ -46,7 +46,7 @@ class CallSourceAttributionCHMixin(BaseModel):
 
     source_name: str | None = None
     source_version: str | None = None
-    source_sdk: str | None = None
+    ingest_source: str | None = None
 
 
 class CallWBMetadataCHMixin(BaseModel):
@@ -186,7 +186,7 @@ class SelectableCHCallSchema(BaseModel):
 
     source_name: str | None = None
     source_version: str | None = None
-    source_sdk: str | None = None
+    ingest_source: str | None = None
 
     deleted_at: datetime.datetime | None = None
 
