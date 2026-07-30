@@ -1453,9 +1453,10 @@ def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> N
             )
         )
 
-    # Two monitors whose ids share a prefix ("mon" vs "monday"), one scoring an
-    # agent_turn ref and one an agent_conversation ref.
+    # Monitors whose ids share a prefix ("mon" vs "monday"), covering every
+    # supported agent feedback target ref.
     _monitor("t1", "mon", f"weave:///{project_id}/agent_turn/trace_t1")
+    _monitor("s1", "mon", f"weave:///{project_id}/agent_span/span_s1")
     _monitor("c1", "monday", f"weave:///{project_id}/agent_conversation/conv_c1")
 
     # feedback_create (via the external adapter) stores the internal project_id and
@@ -1481,20 +1482,21 @@ def test_feedback_aggregate_filter_matching_functional(client: WeaveClient) -> N
         ]
         return sum(int(r["total_count"]) for r in rows)
 
-    # Sanity: both rows are present absent any id/type filter.
-    assert _total() == 2
+    # Sanity: all rows are present absent any id/type filter.
+    assert _total() == 3
 
     # monitor_ids: exact by default, so "mon" must NOT match "monday".
-    assert _total(monitor_ids=["mon"]) == 1
+    assert _total(monitor_ids=["mon"]) == 2
     assert _total(monitor_ids=["monday"]) == 1
     assert _total(monitor_ids=["mond"]) == 0  # no partial match without '*'
-    # A trailing '*' opts into prefix matching -> matches both ids.
-    assert _total(monitor_ids=["mon*"]) == 2
+    # A trailing '*' opts into prefix matching -> matches all three rows.
+    assert _total(monitor_ids=["mon*"]) == 3
 
     # span_types: matches the exact span-type segment of the ref, not a substring.
     assert _total(span_types=["agent_turn"]) == 1
+    assert _total(span_types=["agent_span"]) == 1
     assert _total(span_types=["agent_conversation"]) == 1
-    assert _total(span_types=["agent_turn", "agent_conversation"]) == 2
+    assert _total(span_types=["agent_turn", "agent_span", "agent_conversation"]) == 3
 
 
 class MatchAnyDatetime:  # noqa: PLW1641
