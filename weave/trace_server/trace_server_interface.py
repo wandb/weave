@@ -166,6 +166,11 @@ class CallSchema(BaseModel):
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
 
+    # Source attribution resolved server-side on ingest.
+    source_name: str | None = None
+    source_version: str | None = None
+    ingest_source: str | None = None
+
     deleted_at: datetime.datetime | None = None
 
     expire_at: datetime.datetime | None = Field(

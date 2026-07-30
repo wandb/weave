@@ -29,6 +29,10 @@ from weave.trace_server.clickhouse_schema import (
 )
 from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.ids import generate_id
+from weave.trace_server.source_attribution import (
+    INGEST_SOURCE_WEAVE,
+    resolve_for_call,
+)
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 from weave.trace_server.ttl_settings import compute_expire_at
 
@@ -92,6 +96,9 @@ def ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": sv["wb_user_id"],
+        "source_name": sv["source_name"],
+        "source_version": sv["source_version"],
+        "ingest_source": sv["ingest_source"],
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
         "total_storage_size_bytes": ch_call_dict.get("total_storage_size_bytes"),
@@ -127,6 +134,8 @@ def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list
 def start_call_for_insert_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     retention_days: int,
+    *,
+    ingest_source: str = INGEST_SOURCE_WEAVE,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
@@ -142,6 +151,12 @@ def start_call_for_insert_to_ch_insertable(
     otel_dump_str = None
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+
+    source = resolve_for_call(
+        attributes=start_call.attributes,
+        ingest_source=ingest_source,
+        otel_dump=start_call.otel_dump,
+    )
 
     return CallStartCHInsertable(
         project_id=start_call.project_id,
@@ -160,6 +175,9 @@ def start_call_for_insert_to_ch_insertable(
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
+        source_name=source.name,
+        source_version=source.version,
+        ingest_source=source.ingest_source,
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -198,6 +216,9 @@ def start_call_insertable_to_complete_start(
         wb_run_id=ch_start.wb_run_id,
         wb_run_step=ch_start.wb_run_step,
         wb_run_step_end=None,
+        source_name=ch_start.source_name,
+        source_version=ch_start.source_version,
+        ingest_source=ch_start.ingest_source,
         expire_at=ch_start.expire_at,
     )
 
@@ -229,6 +250,8 @@ def start_end_calls_to_ch_complete_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     end_call: tsi.EndedCallSchemaForInsert,
     retention_days: int,
+    *,
+    ingest_source: str = INGEST_SOURCE_WEAVE,
 ) -> CallCompleteCHInsertable:
     """Combine start and end call data into a CallCompleteCHInsertable.
 
@@ -256,6 +279,12 @@ def start_end_calls_to_ch_complete_insertable(
     if start_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(start_call.otel_dump)
 
+    source = resolve_for_call(
+        attributes=start_call.attributes,
+        ingest_source=ingest_source,
+        otel_dump=start_call.otel_dump,
+    )
+
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -279,6 +308,9 @@ def start_end_calls_to_ch_complete_insertable(
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_run_step_end=end_call.wb_run_step_end,
+        source_name=source.name,
+        source_version=source.version,
+        ingest_source=source.ingest_source,
         expire_at=compute_expire_at(retention_days, start_call.started_at),
     )
 
@@ -317,6 +349,12 @@ def complete_call_to_ch_insertable(
     if complete_call.otel_dump is not None:
         otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
 
+    source = resolve_for_call(
+        attributes=complete_call.attributes,
+        ingest_source=INGEST_SOURCE_WEAVE,
+        otel_dump=complete_call.otel_dump,
+    )
+
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
         id=complete_call.id,
@@ -340,6 +378,9 @@ def complete_call_to_ch_insertable(
         wb_run_id=complete_call.wb_run_id,
         wb_run_step=complete_call.wb_run_step,
         wb_run_step_end=complete_call.wb_run_step_end,
+        source_name=source.name,
+        source_version=source.version,
+        ingest_source=source.ingest_source,
         expire_at=compute_expire_at(retention_days, complete_call.started_at),
     )
 

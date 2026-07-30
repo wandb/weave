@@ -465,6 +465,9 @@ class AgentSpanSchema(BaseModel):
     eval_example_id: str | None = None
     eval_trial_index: int | None = None
     eval_evaluation_name: str | None = None
+    source_name: str | None = None
+    source_version: str | None = None
+    ingest_source: str | None = None
     request_model: str | None = None
     response_model: str | None = None
     response_id: str | None = None

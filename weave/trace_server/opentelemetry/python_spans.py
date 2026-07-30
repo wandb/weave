@@ -201,6 +201,9 @@ class Span:
     span_id: str
     start_time_unix_nano: int
     end_time_unix_nano: int
+    # Instrumentation scope from the enclosing ScopeSpans.
+    scope_name: str = ""
+    scope_version: str = ""
     attributes: dict[str, Any] = field(default_factory=dict)
     kind: SpanKind = SpanKind.UNSPECIFIED
     parent_id: str | None = None
@@ -236,7 +239,12 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(cls, proto_span: PbSpan, resource: Resource | None = None) -> Self:
+    def from_proto(
+        cls,
+        proto_span: PbSpan,
+        resource: Resource | None = None,
+        scope: InstrumentationScope | None = None,
+    ) -> Self:
         """Create a Span from a protobuf Span."""
         parent_id = None
         if (
@@ -251,6 +259,8 @@ class Span:
             span_id=hexlify(proto_span.span_id).decode("ascii"),
             start_time_unix_nano=proto_span.start_time_unix_nano,
             end_time_unix_nano=proto_span.end_time_unix_nano,
+            scope_name=scope.name if scope is not None else "",
+            scope_version=scope.version if scope is not None else "",
             kind=SpanKind.from_proto(proto_span.kind),
             parent_id=parent_id,
             trace_state=proto_span.trace_state,
@@ -284,6 +294,8 @@ class Span:
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
+                # Preserve scope for call attribution through otel_dump.
+                "scope": {"name": self.scope_name, "version": self.scope_version},
             }
         )
 
@@ -456,7 +468,10 @@ class ScopeSpans:
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
-            spans=[Span.from_proto(s, resource) for s in proto_scope_spans.spans],
+            spans=[
+                Span.from_proto(s, resource, proto_scope_spans.scope)
+                for s in proto_scope_spans.spans
+            ],
             schema_url=proto_scope_spans.schema_url,
         )
 

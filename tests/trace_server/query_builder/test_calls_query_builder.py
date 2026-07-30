@@ -3501,9 +3501,10 @@ def test_disallowed_fields():
     # the message lists filterable fields and never the rejected field itself
     clause = (
         "Allowed fields: attributes, display_name, ended_at, exception, id, "
-        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
-        "started_at, summary, thread_id, trace_id, turn_id, wb_run_id, "
-        "wb_run_step, wb_run_step_end, wb_user_id. "
+        "ingest_source, input_refs, inputs, op_name, otel, output, output_refs, "
+        "parent_id, source_name, source_version, started_at, summary, "
+        "thread_id, trace_id, turn_id, wb_run_id, wb_run_step, "
+        "wb_run_step_end, wb_user_id. "
         "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
         "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )
@@ -3546,10 +3547,11 @@ def test_invalid_field_message_lists_allowed_fields():
     expected = (
         "Field made_up_field is not allowed. "
         "Allowed fields: attributes, display_name, ended_at, exception, id, "
-        "input_refs, inputs, op_name, otel, output, output_refs, parent_id, "
-        "started_at, storage_size_bytes, summary, thread_id, "
-        "total_storage_size_bytes, trace_id, turn_id, wb_run_id, wb_run_step, "
-        "wb_run_step_end, wb_user_id. "
+        "ingest_source, input_refs, inputs, op_name, otel, output, output_refs, "
+        "parent_id, source_name, source_version, started_at, "
+        "storage_size_bytes, summary, thread_id, total_storage_size_bytes, "
+        "trace_id, turn_id, wb_run_id, wb_run_step, wb_run_step_end, "
+        "wb_user_id. "
         "Allowed dynamic prefixes: annotation_queue_items.*, attributes.*, "
         "feedback.*, inputs.*, output.*, summary.*, summary.weave.*."
     )

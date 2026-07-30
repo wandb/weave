@@ -91,6 +91,9 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
         "eval_example_id",
         "eval_trial_index",
         "eval_evaluation_name",
+        "source_name",
+        "source_version",
+        "ingest_source",
     }
 )
 
@@ -315,6 +318,9 @@ _SPANS_LIST_FIELD_NAMES = [
     "eval_example_id",
     "eval_trial_index",
     "eval_evaluation_name",
+    "source_name",
+    "source_version",
+    "ingest_source",
     "request_model",
     "response_model",
     "response_id",

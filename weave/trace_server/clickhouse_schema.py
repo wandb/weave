@@ -41,6 +41,14 @@ class CallTraceMetadataCHMixin(BaseModel):
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
 
 
+class CallSourceAttributionCHMixin(BaseModel):
+    """Server-derived source attribution for call-start rows."""
+
+    source_name: str | None = None
+    source_version: str | None = None
+    ingest_source: str | None = None
+
+
 class CallWBMetadataCHMixin(BaseModel):
     """Mixin for W&B metadata fields."""
 
@@ -59,7 +67,10 @@ class CallWBMetadataCHMixin(BaseModel):
 
 
 class CallStartCHInsertable(
-    CallBaseCHInsertable, CallTraceMetadataCHMixin, CallWBMetadataCHMixin
+    CallBaseCHInsertable,
+    CallTraceMetadataCHMixin,
+    CallWBMetadataCHMixin,
+    CallSourceAttributionCHMixin,
 ):
     """Schema for call start data insertion."""
 
@@ -106,7 +117,10 @@ class CallUpdateCHInsertable(CallBaseCHInsertable):
 
 
 class CallCompleteCHInsertable(
-    CallBaseCHInsertable, CallTraceMetadataCHMixin, CallWBMetadataCHMixin
+    CallBaseCHInsertable,
+    CallTraceMetadataCHMixin,
+    CallWBMetadataCHMixin,
+    CallSourceAttributionCHMixin,
 ):
     """Schema for inserting a complete call directly into the calls_complete table.
 
@@ -169,6 +183,10 @@ class SelectableCHCallSchema(BaseModel):
     wb_run_id: str | None = None
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
+
+    source_name: str | None = None
+    source_version: str | None = None
+    ingest_source: str | None = None
 
     deleted_at: datetime.datetime | None = None
 

@@ -924,6 +924,12 @@ export interface AgentSpanSchema {
   eval_trial_index?: number | null;
   /** Eval Evaluation Name */
   eval_evaluation_name?: string | null;
+  /** Source Name */
+  source_name?: string | null;
+  /** Source Version */
+  source_version?: string | null;
+  /** Ingest Source */
+  ingest_source?: string | null;
   /** Request Model */
   request_model?: string | null;
   /** Response Model */
@@ -2018,6 +2024,12 @@ export interface CallSchema {
   wb_run_step?: number | null;
   /** Wb Run Step End */
   wb_run_step_end?: number | null;
+  /** Source Name */
+  source_name?: string | null;
+  /** Source Version */
+  source_version?: string | null;
+  /** Ingest Source */
+  ingest_source?: string | null;
   /** Deleted At */
   deleted_at?: string | null;
   /**
@@ -2765,6 +2777,85 @@ export interface CreateAndLinkTarget {
 export interface CreateAndLinkWeaveAssetRes {
   /** Version Index */
   version_index?: number | null;
+}
+
+/** CustomRuntimeApplyBody */
+export interface CustomRuntimeApplyBody {
+  /**
+   * Base Url
+   * Public OpenAI-compatible endpoint base URL
+   */
+  base_url: string;
+  /**
+   * Api Key Secret
+   * Team secret name used as the endpoint API key; never the secret value
+   */
+  api_key_secret?: string | null;
+  /**
+   * Headers
+   * Literal headers forwarded to the endpoint
+   */
+  headers?: Record<string, string>;
+  /**
+   * Runtime Ids
+   * Complete desired list of IDs exposed by the endpoint
+   */
+  runtime_ids: CustomRuntimeID[];
+}
+
+/** CustomRuntimeApplyRes */
+export interface CustomRuntimeApplyRes {
+  /**
+   * Name
+   * Stable custom runtime name
+   */
+  name: string;
+  /** Base Url */
+  base_url: string;
+  /** Api Key Secret */
+  api_key_secret: string | null;
+  /** Headers */
+  headers: Record<string, string>;
+  /** Runtime Ids */
+  runtime_ids: CustomRuntimeIDRes[];
+}
+
+/** CustomRuntimeID */
+export interface CustomRuntimeID {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   * @minLength 1
+   * @pattern ^\S+$
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+}
+
+/** CustomRuntimeIDRes */
+export interface CustomRuntimeIDRes {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   * @minLength 1
+   * @pattern ^\S+$
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+  /** Playground Id */
+  playground_id: string;
 }
 
 /** Datacenter */
@@ -4441,6 +4532,25 @@ export interface LLMModelDetails {
   featureLoRA: boolean;
   /** Featuretrainableserverlessrl */
   featureTrainableServerlessRL: boolean;
+  /** Reasoningsupport */
+  reasoningSupport?:
+    | 'unsupported'
+    | 'default-off'
+    | 'adaptive'
+    | 'default-on'
+    | 'always-on';
+  /** Reasoningefforts */
+  reasoningEfforts?: (
+    | 'none'
+    | 'minimal'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'xhigh'
+    | 'max'
+  )[];
+  /** Reasoningargument */
+  reasoningArgument?: string;
   /** Parametercounttotal */
   parameterCountTotal: number;
   /** Parametercountactive */
@@ -6271,81 +6381,6 @@ export interface ValidationError {
   msg: string;
   /** Error Type */
   type: string;
-}
-
-/** CustomRuntimeApplyBody */
-export interface CustomRuntimeApplyBody {
-  /**
-   * Base Url
-   * Public OpenAI-compatible endpoint base URL
-   */
-  base_url: string;
-  /**
-   * Api Key Secret
-   * Team secret name used as the endpoint API key; never the secret value
-   */
-  api_key_secret?: string | null;
-  /**
-   * Headers
-   * Literal headers forwarded to the endpoint
-   */
-  headers?: Record<string, string>;
-  /**
-   * Runtime Ids
-   * Complete desired list of IDs exposed by the endpoint
-   */
-  runtime_ids: CustomRuntimeID[];
-}
-
-/** CustomRuntimeApplyRes */
-export interface CustomRuntimeApplyRes {
-  /**
-   * Name
-   * Stable custom runtime name
-   */
-  name: string;
-  /** Base Url */
-  base_url: string;
-  /** Api Key Secret */
-  api_key_secret: string | null;
-  /** Headers */
-  headers: Record<string, string>;
-  /** Runtime Ids */
-  runtime_ids: CustomRuntimeIDRes[];
-}
-
-/** CustomRuntimeID */
-export interface CustomRuntimeID {
-  /**
-   * Id
-   * Value sent in the OpenAI-compatible request model field
-   */
-  id: string;
-  /**
-   * Max Tokens
-   * Maximum tokens supported by this runtime ID
-   * @exclusiveMin 0
-   * @default 4096
-   */
-  max_tokens?: number;
-}
-
-/** CustomRuntimeIDRes */
-export interface CustomRuntimeIDRes {
-  /**
-   * Id
-   * Value sent in the OpenAI-compatible request model field
-   */
-  id: string;
-  /**
-   * Max Tokens
-   * Maximum tokens supported by this runtime ID
-   * @exclusiveMin 0
-   * @default 4096
-   */
-  max_tokens?: number;
-  /** Playground Id */
-  playground_id: string;
 }
 
 export type QueryParamsType = Record<string | number, any>;
@@ -8511,6 +8546,30 @@ export class Api<
       }),
 
     /**
+     * @description Create or replace a custom runtime configuration.
+     *
+     * @tags Custom Runtimes
+     * @name CustomRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut
+     * @summary Custom Runtime Apply
+     * @request PUT:/v2/{entity}/{project}/runtimes/{runtime_name}
+     */
+    customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: (
+      entity: string,
+      project: string,
+      runtimeName: string,
+      data: CustomRuntimeApplyBody,
+      params: RequestParams = {}
+    ) =>
+      this.request<CustomRuntimeApplyRes, HTTPValidationError>({
+        path: `/v2/${entity}/${project}/runtimes/${encodeURIComponent(runtimeName)}`,
+        method: 'PUT',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
      * @description Create a scorer object.
      *
      * @tags Scorers
@@ -9207,30 +9266,6 @@ export class Api<
       this.request<EvalResultsQueryRes, HTTPValidationError>({
         path: `/v2/${entity}/${project}/eval_results/query`,
         method: 'POST',
-        body: data,
-        type: ContentType.Json,
-        format: 'json',
-        ...params,
-      }),
-
-    /**
-     * @description Create or replace a custom runtime configuration.
-     *
-     * @tags Custom Runtimes
-     * @name CustomRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut
-     * @summary Custom Runtime Apply
-     * @request PUT:/v2/{entity}/{project}/runtimes/{runtime_name}
-     */
-    customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: (
-      entity: string,
-      project: string,
-      runtimeName: string,
-      data: CustomRuntimeApplyBody,
-      params: RequestParams = {}
-    ) =>
-      this.request<CustomRuntimeApplyRes, HTTPValidationError>({
-        path: `/v2/${entity}/${project}/runtimes/${encodeURIComponent(runtimeName)}`,
-        method: 'PUT',
         body: data,
         type: ContentType.Json,
         format: 'json',

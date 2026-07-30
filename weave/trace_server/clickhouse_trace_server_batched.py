@@ -308,6 +308,7 @@ from weave.trace_server.query_builder.table_query_builder import (
     make_table_stats_query_with_storage_size,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
+from weave.trace_server.source_attribution import INGEST_SOURCE_OTLP
 from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
@@ -817,7 +818,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
-                        span = Span.from_proto(proto_span, resource)
+                        span = Span.from_proto(
+                            proto_span, resource, proto_scope_spans.scope
+                        )
                     except AttributePathConflictError as e:
                         # Record and skip malformed spans so we can partially accept the batch
                         rejected_spans += 1
@@ -878,7 +881,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             rows = [
                 ch_complete_call_to_row(
                     start_end_calls_to_ch_complete_insertable(
-                        start, end, retention_days
+                        start,
+                        end,
+                        retention_days,
+                        ingest_source=INGEST_SOURCE_OTLP,
                     )
                 )
                 for start, end in calls
@@ -888,7 +894,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             for start, end in calls:
                 rows.append(
                     ch_call_to_row(
-                        start_call_for_insert_to_ch_insertable(start, retention_days)
+                        start_call_for_insert_to_ch_insertable(
+                            start,
+                            retention_days,
+                            ingest_source=INGEST_SOURCE_OTLP,
+                        )
                     )
                 )
                 rows.append(

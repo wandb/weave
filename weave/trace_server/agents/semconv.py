@@ -30,17 +30,16 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_aliases`` lists the OTel ``gen_ai.*`` wire key(s) for this
-    column. The first entry is the canonical upstream name; later entries
-    are parallel forms recognised on ingest. See ``USAGE_REASONING_TOKENS``
-    for an example with multiple aliases.
+    ``aliases`` lists wire keys recognised as equivalent to this column. The
+    first entry is the canonical upstream name; later entries are parallel
+    forms also accepted on ingest.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
-    # OTel gen_ai.* equivalent(s), if any
-    gen_ai_aliases: list[str] = field(default_factory=list)
+    # Wire key equivalent(s), if any -- usually gen_ai.*
+    aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate that canonical attributes stay in the Weave namespace."""
@@ -57,7 +56,7 @@ class Attribute:
         so callers can rely on the weave.* key winning over OTel aliases
         when both are present on a span.
         """
-        return (self.key, *self.gen_ai_aliases)
+        return (self.key, *self.aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -353,6 +352,25 @@ EVAL_EVALUATION_NAME = Attribute(
     "string",
     "Evaluation display name associated with this span",
 )
+# Python emits `integration.*` while Node emits `weave.integration.*`; both
+# aliases stay out of custom attrs and are pinned to their producers by tests.
+SOURCE_NAME = Attribute(
+    "weave.source.name",
+    "string",
+    "Instrumentation that produced this row: openai, langchain, codex, ...",
+    ["integration.name", "weave.integration.name"],
+)
+SOURCE_VERSION = Attribute(
+    "weave.source.version",
+    "string",
+    "Version of the instrumentation that produced this row",
+    ["integration.version", "weave.integration.version"],
+)
+INGEST_SOURCE = Attribute(
+    "weave.ingest_source",
+    "string",
+    "Ingest surface the row arrived on: weave or otlp. Server-derived, never read off the wire",
+)
 
 _DEFS: list[Attribute] = [
     # Keep this registry in sync with Attribute constants. The unit tests
@@ -413,6 +431,9 @@ _DEFS: list[Attribute] = [
     EVAL_EXAMPLE_ID,
     EVAL_TRIAL_INDEX,
     EVAL_EVALUATION_NAME,
+    SOURCE_NAME,
+    SOURCE_VERSION,
+    INGEST_SOURCE,
 ]
 
 
@@ -429,12 +450,12 @@ ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
 # Map from any recognized key (weave.* or any registered gen_ai.* alias) to
-# canonical weave.* key. Every entry in ``gen_ai_aliases`` participates so
+# canonical weave.* key. Every entry in ``aliases`` participates so
 # parallel client emissions all resolve to the same column.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
-    for _alias in _a.gen_ai_aliases:
+    for _alias in _a.aliases:
         _ALIAS_TO_CANONICAL[_alias] = _a.key
 
 
@@ -492,6 +513,9 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     EVAL_ROW_DIGEST.key: "eval_row_digest",
     EVAL_EXAMPLE_ID.key: "eval_example_id",
     EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
+    SOURCE_NAME.key: "source_name",
+    SOURCE_VERSION.key: "source_version",
+    INGEST_SOURCE.key: "ingest_source",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",
@@ -523,9 +547,9 @@ def _build_filterable_lookup() -> dict[str, str]:
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
         out[canonical] = col
         attr = ATTRIBUTES[canonical]
-        for alias in attr.gen_ai_aliases:
+        for alias in attr.aliases:
             out[alias] = col
-        for k in (canonical, *attr.gen_ai_aliases):
+        for k in (canonical, *attr.aliases):
             for prefix in ("weave.", "gen_ai."):
                 if k.startswith(prefix):
                     out[k[len(prefix) :]] = col
