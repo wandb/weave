@@ -42,12 +42,7 @@ class CallTraceMetadataCHMixin(BaseModel):
 
 
 class CallSourceAttributionCHMixin(BaseModel):
-    """Mixin for the source-attribution columns.
-
-    Server-derived on insert by `source_attribution.resolve_for_call`, never
-    taken from the client's request body. Only the call-start part carries them;
-    the call-end part writes NULL and `calls_merged`'s `any` aggregate skips it.
-    """
+    """Server-derived source attribution for call-start rows."""
 
     source_name: str | None = None
     source_version: str | None = None

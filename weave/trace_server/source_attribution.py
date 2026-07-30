@@ -69,18 +69,18 @@ def resolve_for_call(
     attributes: dict[str, Any] | None,
     otel_dump: dict[str, Any] | None = None,
 ) -> SourceAttribution:
-    """Resolve attribution for a call, from its attributes and OTel dump.
+    """Resolve attribution from normalized call attributes and its OTel dump.
 
-    A call carries no scope or resource of its own: when it was converted from
-    an OTel span they survive only inside `otel_dump` (see `Span.as_dict`), so
-    that is where rungs 2 and 3 read from. The presence of `otel_dump` is also
-    what distinguishes an OTLP-ingested call from a Weave-SDK one.
+    OTLP-converted calls retain their full wire attributes, scope, and resource
+    only in `otel_dump`. Normalized call attributes win when both carry an
+    explicit source.
     """
     scope = _sub_dict(otel_dump, "scope")
     resource = _sub_dict(otel_dump, "resource")
     return _resolve(
         sdk=SOURCE_SDK_OTLP if otel_dump else SOURCE_SDK_WEAVE,
         attributes=attributes,
+        fallback_attributes=_sub_dict(otel_dump, "attributes"),
         scope_name=_as_str(scope.get("name")),
         scope_version=_as_str(scope.get("version")),
         resource_attributes=_sub_dict(resource, "attributes"),
@@ -124,6 +124,7 @@ def _resolve(
     *,
     sdk: str,
     attributes: dict[str, Any] | None,
+    fallback_attributes: dict[str, Any] | None = None,
     scope_name: str,
     scope_version: str,
     resource_attributes: dict[str, Any] | None,
@@ -131,6 +132,7 @@ def _resolve(
     """Walk the ladder, taking name and version from the same rung."""
     name, version = (
         _from_explicit_attributes(attributes)
+        or _from_explicit_attributes(fallback_attributes)
         or _from_scope(scope_name, scope_version)
         or _from_resource(resource_attributes)
         or ("", "")
@@ -199,7 +201,7 @@ def _first_str(attributes: dict[str, Any], keys: tuple[str, ...]) -> str:
 
 
 def _as_str(value: Any) -> str:
-    """Coerce an attribute value to a trimmed string; None and False-y -> ''."""
+    """Coerce a scalar to a trimmed string; containers and None become empty."""
     if value is None or isinstance(value, (dict, list)):
         return ""
     return str(value).strip()

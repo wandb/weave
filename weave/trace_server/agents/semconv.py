@@ -30,19 +30,16 @@ AttributeType = Literal["string", "int", "float", "string[]", "json"]
 class Attribute:
     """A single semantic convention attribute.
 
-    ``gen_ai_aliases`` lists the wire key(s) recognised as equivalent to this
-    column. The first entry is the canonical upstream name; later entries are
-    parallel forms also accepted on ingest. See ``USAGE_REASONING_TOKENS`` for an
-    example with multiple aliases. Most are ``gen_ai.*``, hence the field name,
-    but any recognised key belongs here — ``ERROR_TYPE`` uses OTel core's
-    ``error.type`` and ``SOURCE_NAME`` uses Weave's ``integration.name``.
+    ``aliases`` lists wire keys recognised as equivalent to this column. The
+    first entry is the canonical upstream name; later entries are parallel
+    forms also accepted on ingest.
     """
 
     key: str  # canonical weave.* key
     type: AttributeType
     description: str
     # Wire key equivalent(s), if any -- usually gen_ai.*
-    gen_ai_aliases: list[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Validate that canonical attributes stay in the Weave namespace."""
@@ -59,7 +56,7 @@ class Attribute:
         so callers can rely on the weave.* key winning over OTel aliases
         when both are present on a span.
         """
-        return (self.key, *self.gen_ai_aliases)
+        return (self.key, *self.aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -355,18 +352,8 @@ EVAL_EVALUATION_NAME = Attribute(
     "string",
     "Evaluation display name associated with this span",
 )
-# Source attribution. Registering the `integration.*` aliases both drives
-# extraction and keeps them out of `custom_attrs_string`. The resolution ladder
-# that fills these columns lives in `trace_server/source_attribution.py`;
-# `integration.meta.*` stays in the custom-attr maps.
-#
-# Both SDK spellings are accepted: Python's `as_otel_attributes()` emits
-# `integration.*` (`INTEGRATION_ATTRIBUTE_KEY` in
-# `weave/integrations/integration_metadata.py`) while the node SDK emits
-# `weave.integration.*` (`WEAVE_INTEGRATION_NAME` in `sdks/node/src/genai/semconv.ts`).
-# Restated rather than imported because the trace server may not import the client
-# SDK (see the import-linter contract in pyproject.toml);
-# `test_source_attribution.py` pins both to their producers.
+# Python emits `integration.*` while Node emits `weave.integration.*`; both
+# aliases stay out of custom attrs and are pinned to their producers by tests.
 SOURCE_NAME = Attribute(
     "weave.source.name",
     "string",
@@ -463,12 +450,12 @@ ATTRIBUTES: dict[str, Attribute] = {a.key: a for a in _DEFS}
 SEMCONV_LOOKUP_KEYS: dict[str, tuple[str, ...]] = {a.key: a.lookup_keys for a in _DEFS}
 
 # Map from any recognized key (weave.* or any registered gen_ai.* alias) to
-# canonical weave.* key. Every entry in ``gen_ai_aliases`` participates so
+# canonical weave.* key. Every entry in ``aliases`` participates so
 # parallel client emissions all resolve to the same column.
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _a in _DEFS:
     _ALIAS_TO_CANONICAL[_a.key] = _a.key
-    for _alias in _a.gen_ai_aliases:
+    for _alias in _a.aliases:
         _ALIAS_TO_CANONICAL[_alias] = _a.key
 
 
@@ -560,9 +547,9 @@ def _build_filterable_lookup() -> dict[str, str]:
     for canonical, col in CANONICAL_KEY_TO_COLUMN.items():
         out[canonical] = col
         attr = ATTRIBUTES[canonical]
-        for alias in attr.gen_ai_aliases:
+        for alias in attr.aliases:
             out[alias] = col
-        for k in (canonical, *attr.gen_ai_aliases):
+        for k in (canonical, *attr.aliases):
             for prefix in ("weave.", "gen_ai."):
                 if k.startswith(prefix):
                     out[k[len(prefix) :]] = col

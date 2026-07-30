@@ -163,9 +163,7 @@ class CallSchema(BaseModel):
     wb_run_step: int | None = None
     wb_run_step_end: int | None = None
 
-    # Source attribution, resolved server-side on ingest: which instrumentation
-    # produced this call, at what version, and which ingest surface it arrived
-    # on ("weave" or "otlp"). None when unattributable.
+    # Source attribution resolved server-side on ingest.
     source_name: str | None = None
     source_version: str | None = None
     source_sdk: str | None = None

@@ -110,8 +110,7 @@ class AgentSpanCHInsertable(BaseModel):
     eval_trial_index: int = -1
     eval_evaluation_name: str = ""
 
-    # [Weave] source attribution — weave.source.* / integration.*, resolved by
-    # the ladder in `trace_server/source_attribution.py`.
+    # [Weave] server-resolved source attribution.
     source_name: str = ""
     source_version: str = ""
     source_sdk: str = ""

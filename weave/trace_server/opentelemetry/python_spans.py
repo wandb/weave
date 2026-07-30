@@ -201,9 +201,7 @@ class Span:
     span_id: str
     start_time_unix_nano: int
     end_time_unix_nano: int
-    # Instrumentation scope identity, carried down from the enclosing
-    # ScopeSpans. OTel's canonical answer to "which library emitted this", and
-    # the second rung of the source-attribution ladder.
+    # Instrumentation scope from the enclosing ScopeSpans.
     scope_name: str = ""
     scope_version: str = ""
     attributes: dict[str, Any] = field(default_factory=dict)
@@ -296,8 +294,7 @@ class Span:
                 "events": self.events,
                 "links": self.links,
                 "resource": self.resource.as_dict() if self.resource else None,
-                # Carried so the calls path can resolve source attribution off
-                # `otel_dump`, which is the only place a call retains its scope.
+                # Preserve scope for call attribution through otel_dump.
                 "scope": {"name": self.scope_name, "version": self.scope_version},
             }
         )

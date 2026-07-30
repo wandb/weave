@@ -2018,8 +2018,7 @@ ALLOWED_CALL_FIELDS = {
         join_table_name=ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME,
     ),
     "otel_dump": CallsMergedAggField(field="otel_dump", agg_fn="any"),
-    # Source attribution (migration 040). Only the call-start part carries these,
-    # so `any` picks it up on calls_merged exactly as it does for op_name.
+    # Source attribution is carried by the call-start part.
     "source_name": CallsMergedAggField(field="source_name", agg_fn="any"),
     "source_version": CallsMergedAggField(field="source_version", agg_fn="any"),
     "source_sdk": CallsMergedAggField(field="source_sdk", agg_fn="any"),
