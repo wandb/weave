@@ -359,6 +359,8 @@ pnpm exec tsx examples/claudeAgents.ts
   without typed `record()` methods.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
+- For streamed sessions, queue observed user inputs in FIFO order and close one
+  `Turn` for each matching SDK `result`.
 
 ## Code Review & PR Guidelines
 

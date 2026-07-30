@@ -1,6 +1,7 @@
 import {
   Conversation,
   runIsolated,
+  type Message,
   type MessagePart,
   type Tool,
   type Turn,
@@ -80,6 +81,33 @@ function toolResultText(content: ToolResultBlock['content']): string {
   return text || JSON.stringify(content);
 }
 
+function userInputMessage(msg: SDKUserMessage): Message {
+  const content = msg.message.content;
+  if (typeof content === 'string') {
+    return {role: 'user', content};
+  }
+
+  const parts: MessagePart[] = [];
+  for (const block of content) {
+    if (block.type === 'text') {
+      parts.push({type: 'text', content: block.text});
+    } else if (block.type === 'tool_result') {
+      parts.push({
+        type: 'tool_result',
+        toolCallId: block.tool_use_id,
+        result: toolResultText(block.content),
+      });
+    } else {
+      return {role: 'user', content: JSON.stringify(content)};
+    }
+  }
+
+  if (parts.length === 1 && parts[0].type === 'text') {
+    return {role: 'user', content: parts[0].content};
+  }
+  return {role: 'user', parts};
+}
+
 type NormalizedUsage = {
   usage: Usage;
   totalTokens: number;
@@ -131,31 +159,72 @@ type ClaudeAgentOtelTracerOptions = {
   agent?: string;
 };
 
+type PendingTurn = {
+  inputMessages: Message[];
+  startedAt: Date;
+};
+
 /** Emits Claude Agent SDK traces through Weave GenAI handles. */
 export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
-  private readonly prompt: string | undefined;
   private readonly startedAt = new Date();
   private readonly openTools = new Map<string, Tool>();
+  private readonly pendingTurns: PendingTurn[] = [];
 
-  private turn: Turn | null = null;
+  private conversation: Conversation | null = null;
+  private conversationId: string | undefined;
+  private activeTurn: Turn | null = null;
+  private bufferedInputMessages: Message[] = [];
+  private bufferedTurnStartedAt: Date | null = null;
+  private completedTurns = 0;
   private rootModel: string | null = null;
   private finished = false;
 
   constructor(opts: ClaudeAgentOtelTracerOptions = {}) {
     this.agentName = opts.agent || AGENT_NAME;
-    this.prompt = opts.prompt;
+    if (opts.prompt != null) {
+      this.pendingTurns.push({
+        inputMessages: [{role: 'user', content: opts.prompt}],
+        startedAt: this.startedAt,
+      });
+    }
+  }
+
+  processInput(msg: SDKUserMessage): void {
+    if (this.finished) {
+      return;
+    }
+    this.rememberConversationId(msg.session_id);
+    if (this.bufferedTurnStartedAt == null) {
+      this.bufferedTurnStartedAt = new Date();
+    }
+    this.bufferedInputMessages.push(userInputMessage(msg));
+
+    if (msg.shouldQuery !== false) {
+      this.pendingTurns.push({
+        inputMessages: this.bufferedInputMessages,
+        startedAt: this.bufferedTurnStartedAt,
+      });
+      this.bufferedInputMessages = [];
+      this.bufferedTurnStartedAt = null;
+    }
   }
 
   processMessage(msg: SDKMessage): void {
-    const turn = this.getOrCreateTurn(msg.session_id);
+    if (this.finished) {
+      return;
+    }
+    this.rememberConversationId(msg.session_id);
 
     switch (msg.type) {
       case 'assistant':
-        this.processAssistant(msg, turn);
+        this.processAssistant(msg, this.getOrCreateTurn());
         break;
       case 'user':
         this.processUser(msg);
+        break;
+      case 'result':
+        this.endTurn(msg);
         break;
       default:
         break;
@@ -166,10 +235,24 @@ export class ClaudeAgentOtelTracer {
     if (this.finished) {
       return;
     }
+
+    if (result) {
+      this.processMessage(result);
+    }
     this.finished = true;
 
-    const turn = this.getOrCreateTurn(result?.session_id);
+    if (
+      this.activeTurn ||
+      this.pendingTurns.length > 0 ||
+      this.bufferedInputMessages.length > 0 ||
+      this.completedTurns === 0
+    ) {
+      this.endTurn(undefined, error);
+    }
+  }
 
+  private endTurn(result?: SDKResultMessage, error?: unknown): void {
+    const turn = this.getOrCreateTurn();
     for (const tool of this.openTools.values()) {
       tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
       tool.end({error: new Error('Agent ended with open tool span')});
@@ -198,33 +281,74 @@ export class ClaudeAgentOtelTracer {
     } else {
       turn.end();
     }
+
+    this.activeTurn = null;
+    this.rootModel = null;
+    this.completedTurns += 1;
   }
 
-  private getOrCreateTurn(conversationId: string | undefined): Turn {
-    if (this.turn) {
-      return this.turn;
+  private rememberConversationId(conversationId: string | undefined): void {
+    if (this.conversationId == null && conversationId) {
+      this.conversationId = conversationId;
+    }
+  }
+
+  private getOrCreateConversation(): Conversation {
+    if (this.conversation) {
+      return this.conversation;
     }
 
-    // Defer conversation creation without losing the query start time.
-    this.turn = runIsolated(() => {
-      const conversation = Conversation.create({
+    this.conversation = runIsolated(() =>
+      Conversation.create({
         agentName: this.agentName,
-        conversationId: conversationId ?? '',
+        conversationId: this.conversationId ?? '',
         attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
-      });
-      return conversation.startTurn({
-        startTime: this.startedAt,
-      });
-    });
-    this.turn.setAttributes({
+      })
+    );
+    return this.conversation;
+  }
+
+  private nextPendingTurn(): PendingTurn {
+    const pending = this.pendingTurns.shift();
+    if (pending) {
+      return pending;
+    }
+    if (this.bufferedTurnStartedAt) {
+      const buffered = {
+        inputMessages: this.bufferedInputMessages,
+        startedAt: this.bufferedTurnStartedAt,
+      };
+      this.bufferedInputMessages = [];
+      this.bufferedTurnStartedAt = null;
+      return buffered;
+    }
+    return {
+      inputMessages: [],
+      startedAt: this.completedTurns === 0 ? this.startedAt : new Date(),
+    };
+  }
+
+  private getOrCreateTurn(): Turn {
+    if (this.activeTurn) {
+      return this.activeTurn;
+    }
+
+    const pending = this.nextPendingTurn();
+    const conversation = this.getOrCreateConversation();
+    this.activeTurn = runIsolated(() =>
+      conversation.startTurn({
+        startTime: pending.startedAt,
+      })
+    );
+    this.activeTurn.setAttributes({
       [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
     });
-    if (this.prompt != null) {
-      this.turn.record({
-        messages: [{role: 'user', content: this.prompt}],
+    if (pending.inputMessages.length > 0) {
+      this.activeTurn.record({
+        messages: pending.inputMessages,
       });
     }
-    return this.turn;
+    return this.activeTurn;
   }
 
   private emitModelUsageSpans(result: SDKResultMessage, turn: Turn): void {
