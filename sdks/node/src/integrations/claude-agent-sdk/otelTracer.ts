@@ -89,16 +89,35 @@ function userInputMessage(msg: SDKUserMessage): Message {
 
   const parts: MessagePart[] = [];
   for (const block of content) {
-    if (block.type === 'text') {
-      parts.push({type: 'text', content: block.text});
-    } else if (block.type === 'tool_result') {
-      parts.push({
-        type: 'tool_result',
-        toolCallId: block.tool_use_id,
-        result: toolResultText(block.content),
-      });
-    } else {
-      return {role: 'user', content: JSON.stringify(content)};
+    switch (block.type) {
+      case 'text':
+        parts.push({type: 'text', content: block.text});
+        break;
+      case 'image':
+        if (block.source.type === 'base64') {
+          parts.push({
+            type: 'blob',
+            content: block.source.data,
+            mimeType: block.source.media_type,
+            modality: 'image',
+          });
+        } else {
+          parts.push({
+            type: 'uri',
+            uri: block.source.url,
+            modality: 'image',
+          });
+        }
+        break;
+      case 'tool_result':
+        parts.push({
+          type: 'tool_result',
+          toolCallId: block.tool_use_id,
+          result: toolResultText(block.content),
+        });
+        break;
+      default:
+        break;
     }
   }
 
