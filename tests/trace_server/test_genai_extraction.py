@@ -711,6 +711,20 @@ def test_redact_credentials_from_span_reaches_every_attribute_container() -> Non
     }
 
 
+def test_credential_inside_a_json_string_is_not_reached() -> None:
+    """The policy matches field names, and the walk stops at a string.
+
+    Parsing those payloads is tracked separately on WB-38040.
+    """
+    payload = '[{"openai_api_key": "value-to-redact"}]'
+    span = _make_span(attrs={"gen_ai.input.messages": payload})
+
+    redact_credentials_from_span(span)
+    result = extract_genai_span(span, project_id="p1")
+
+    assert json.loads(result.attributes_dump) == {"gen_ai.input.messages": payload}
+
+
 def test_redaction_before_the_blob_strip_uploads_nothing() -> None:
     """A credential value big enough to look like a blob never reaches storage."""
     b64 = base64.b64encode(b"a" * 15000).decode("ascii")
