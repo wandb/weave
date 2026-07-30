@@ -8203,14 +8203,14 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "6.6.0"
+version = "6.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "(python_full_version < '3.11' and platform_python_implementation == 'CPython') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (python_full_version >= '3.11' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (python_full_version >= '3.11' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (python_full_version >= '3.11' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-dspy') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-instructor') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-langchain') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-crewai' and extra == 'extra-5-weave-scorers') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-dspy' and extra == 'extra-5-weave-gepa') or (platform_python_implementation != 'CPython' and extra == 'extra-5-weave-langchain' and extra == 'extra-5-weave-vertexai')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/f4/801632a8b62a805378b6af2b5a3fcbfd8923abf647e0ed1af846a83433b2/pypdf-6.6.0.tar.gz", hash = "sha256:4c887ef2ea38d86faded61141995a3c7d068c9d6ae8477be7ae5de8a8e16592f", size = 5281063, upload-time = "2026-01-09T11:20:11.786Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/72/7dfd5ff1c9c37de97a731701f51af091325f123d9d4270361c9c69e4431f/pypdf-6.14.2.tar.gz", hash = "sha256:7873f502fe4385e79539b21d872392dc0c4e3714327c15881cbc7fbfd1f95b25", size = 6491182, upload-time = "2026-06-23T14:18:30.859Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/ba/96f99276194f720e74ed99905a080f6e77810558874e8935e580331b46de/pypdf-6.6.0-py3-none-any.whl", hash = "sha256:bca9091ef6de36c7b1a81e09327c554b7ce51e88dad68f5890c2b4a4417f1fd7", size = 328963, upload-time = "2026-01-09T11:20:09.278Z" },
+    { url = "https://files.pythonhosted.org/packages/49/e6/136aa8993a2ae7214e0b0ef2edaa0d2e08d1d4e4982635b08a835ff31ec8/pypdf-6.14.2-py3-none-any.whl", hash = "sha256:3f07891af76dc002657e04993ab9b4de81de29f9013b9761d0b7968bff12e946", size = 349514, upload-time = "2026-06-23T14:18:28.867Z" },
 ]
 
 [[package]]
