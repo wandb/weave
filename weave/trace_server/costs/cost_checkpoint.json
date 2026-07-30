@@ -11557,6 +11557,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 3e-08,
+      "output": 1.7e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "openai/gpt-oss-20b": [
@@ -25349,6 +25357,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 1e-07,
+      "output": 3.4e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "zai-org/GLM-5.1": [
@@ -25619,6 +25635,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-04-30 13:13:24"
+    },
+    {
+      "provider": "coreweave",
+      "input": 6.5e-07,
+      "output": 3.41e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "azure/gpt-image-2": [
@@ -26653,6 +26677,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 7.6e-07,
+      "output": 2.42e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "moonshotai/Kimi-K2.7-Code": [
@@ -26663,6 +26695,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 7.1e-07,
+      "output": 3.5e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "amazon.titan-embed-g1-text-02": [
@@ -27157,6 +27197,14 @@
       "cache_read_input": 2.6e-07,
       "cache_creation_input": 0.0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "fireworks_ai",
+      "input": 1.4e-06,
+      "output": 4.4e-06,
+      "cache_read_input": 1.4e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "fireworks_ai/accounts/fireworks/models/kimi-k2p6": [
@@ -27237,6 +27285,14 @@
       "cache_read_input": 2.6e-07,
       "cache_creation_input": 0.0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "fireworks_ai",
+      "input": 1.4e-06,
+      "output": 4.4e-06,
+      "cache_read_input": 1.4e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "fireworks_ai/gpt-oss-120b": [
@@ -28299,6 +28355,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 3e-08,
+      "output": 1.7e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "coreweave/openai/gpt-oss-20b": [
@@ -28509,6 +28573,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 1e-07,
+      "output": 3.4e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "coreweave/zai-org/GLM-5.1": [
@@ -28559,6 +28631,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-04-30 13:13:24"
+    },
+    {
+      "provider": "coreweave",
+      "input": 6.5e-07,
+      "output": 3.41e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "coreweave/deepseek-ai/DeepSeek-V4-Flash": [
@@ -28637,6 +28717,14 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 7.6e-07,
+      "output": 2.42e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
     }
   ],
   "coreweave/moonshotai/Kimi-K2.7-Code": [
@@ -28647,6 +28735,404 @@
       "cache_read_input": 0,
       "cache_creation_input": 0,
       "created_at": "2026-07-01 09:59:23"
+    },
+    {
+      "provider": "coreweave",
+      "input": 7.1e-07,
+      "output": 3.5e-06,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "MiniMaxAI/MiniMax-M3": [
+    {
+      "provider": "coreweave",
+      "input": 2.3e-07,
+      "output": 9.6e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "coreweave/MiniMaxAI/MiniMax-M3": [
+    {
+      "provider": "coreweave",
+      "input": 2.3e-07,
+      "output": 9.6e-07,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "moonshotai/Kimi-K3": [
+    {
+      "provider": "coreweave",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "coreweave/moonshotai/Kimi-K3": [
+    {
+      "provider": "coreweave",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 0,
+      "cache_creation_input": 0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "global.anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "us.anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "eu.anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "au.anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "jp.anthropic.claude-opus-5": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "jp.anthropic.claude-opus-4-8": [
+    {
+      "provider": "bedrock_converse",
+      "input": 5.5e-06,
+      "output": 2.75e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure_ai/claude-opus-5": [
+    {
+      "provider": "azure_ai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/gpt-5.6": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/gpt-5.6-sol": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 3e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/gpt-5.6-terra": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1.5e-05,
+      "cache_read_input": 2.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/gpt-5.6-luna": [
+    {
+      "provider": "azure",
+      "input": 1e-06,
+      "output": 6e-06,
+      "cache_read_input": 1e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/us/gpt-5.6": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/us/gpt-5.6-sol": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/us/gpt-5.6-terra": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.75e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/us/gpt-5.6-luna": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 6.6e-06,
+      "cache_read_input": 1.1e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/eu/gpt-5.6": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/eu/gpt-5.6-sol": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/eu/gpt-5.6-terra": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.75e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "azure/eu/gpt-5.6-luna": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 6.6e-06,
+      "cache_read_input": 1.1e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "claude-opus-5": [
+    {
+      "provider": "anthropic",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini-3.5-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "cache_read_input": 3e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "vertex_ai/gemini-3.6-flash": [
+    {
+      "provider": "vertex_ai",
+      "input": 1.5e-06,
+      "output": 7.5e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini/gemini-3.5-flash-lite": [
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "cache_read_input": 3e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini/gemini-3.6-flash": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-06,
+      "output": 7.5e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini/gemini-omni-flash-preview": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini-omni-flash-preview": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-06,
+      "output": 9e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "gemini-3.6-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-06,
+      "output": 7.5e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "meta/muse-spark-1.1": [
+    {
+      "provider": "meta",
+      "input": 1.25e-06,
+      "output": 4.25e-06,
+      "cache_read_input": 1.5e-07,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "vertex_ai/claude-opus-5": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "vertex_ai/claude-opus-5@default": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "cache_read_input": 5e-07,
+      "cache_creation_input": 6.25e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "vertex_ai/gemini-3.5-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "cache_read_input": 3e-08,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-5.6-sol": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 5.5e-06,
+      "output": 3.3e-05,
+      "cache_read_input": 5.5e-07,
+      "cache_creation_input": 6.875e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-5.6-terra": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 2.75e-06,
+      "output": 1.65e-05,
+      "cache_read_input": 2.75e-07,
+      "cache_creation_input": 3.4375e-06,
+      "created_at": "2026-07-30 08:31:57"
+    }
+  ],
+  "bedrock_mantle/openai.gpt-5.6-luna": [
+    {
+      "provider": "bedrock_mantle",
+      "input": 1.1e-06,
+      "output": 6.6e-06,
+      "cache_read_input": 1.1e-07,
+      "cache_creation_input": 1.375e-06,
+      "created_at": "2026-07-30 08:31:57"
     }
   ]
 }
