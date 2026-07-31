@@ -26,9 +26,11 @@ Outstanding Optimizations/Work:
 """
 
 import logging
+import os
 import re
 from collections.abc import Callable, Collection, KeysView, Sequence
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
@@ -54,6 +56,8 @@ from weave.trace_server.calls_query_builder.object_ref_query_builder import (
 )
 from weave.trace_server.calls_query_builder.optimization_builder import (
     DATETIME_BUFFER_TIME_SECONDS,
+    HeavyFieldOptimizationProcessor,
+    apply_processor,
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
@@ -91,6 +95,10 @@ CTE_FILTERED_CALLS = "filtered_calls"
 CTE_ALL_CALLS = "all_calls"
 CTE_FILTER_CANDIDATE_IDS = "filter_candidate_ids"
 CTE_STORAGE_SCOPE_IDS = "storage_scope_ids"
+
+# Cap on the number of `$or` branches the UNION DISTINCT rewrite will plan for.
+# Beyond this, per-arm overhead outweighs the skip-index win.
+MAX_OR_UNION_ARMS = 5
 
 # Deferred: server-side defense-in-depth cap for unfiltered calls_merged stats.
 # Wired up in `build_calls_stats_query` but currently commented out; callers
@@ -139,6 +147,29 @@ class QueryBodyResult:
 
     sql: str
     needs_feedback_join: bool
+
+
+class _UnionBranchKind(Enum):
+    """How a single `$or` branch is planned into a UNION DISTINCT arm."""
+
+    ID_MASK = "id_mask"
+    TRACE_IDS = "trace_ids"
+    THREAD_IDS = "thread_ids"
+    HEAVY_JSON = "heavy_json"
+
+
+@dataclass(frozen=True, slots=True)
+class _OrUnionArmSpec:
+    """One arm of a top-level `$or` rewritten as a UNION DISTINCT branch.
+
+    `lowered_values` is set for ID_MASK/TRACE_IDS/THREAD_IDS branches (the
+    literal values pushed into the arm's hardcoded filter) and None for
+    HEAVY_JSON branches, which keep `operand` as the arm's sole condition.
+    """
+
+    branch_kind: _UnionBranchKind
+    operand: "tsi_query.Operand"
+    lowered_values: list[str] | None
 
 
 def maybe_agg(expr: str, use_agg_fn: bool) -> str:
@@ -1075,6 +1106,104 @@ class CallsQuery(BaseModel):
         # No predicate pushdown possible
         return False
 
+    def _plan_or_union_arms(self, table_alias: str) -> list[_OrUnionArmSpec] | None:
+        """Plan a top-level `$or` as UNION DISTINCT arms, or None if it can't fire.
+
+        Must be called BEFORE the deleted_at/op_name conditions are injected
+        into `self.query_conditions`, so only user conditions are inspected.
+        Returns None unless: there is exactly one top-level `$or` condition
+        with 2-`MAX_OR_UNION_ARMS` branches, every branch classifies via
+        `_classify_or_union_branch`, every other condition and order field is
+        light, and each id/trace_id/thread_id branch can be lowered onto a
+        currently-unset hardcoded filter field.
+        """
+        if os.getenv("WEAVE_CALLS_OR_UNION_REWRITE", "1") == "0":
+            return None
+
+        or_conditions = [
+            condition
+            for condition in self.query_conditions
+            if isinstance(condition.operand, tsi_query.OrOperation)
+        ]
+        if len(or_conditions) != 1:
+            return None
+        or_operand = or_conditions[0].operand
+        assert isinstance(or_operand, tsi_query.OrOperation)
+        branches = or_operand.or_
+        if not (2 <= len(branches) <= MAX_OR_UNION_ARMS):
+            return None
+
+        table_name = get_calls_table_name(self.read_table)
+        other_conditions = [
+            c for c in self.query_conditions if c is not or_conditions[0]
+        ]
+        for condition in other_conditions:
+            if (
+                condition.is_heavy(table_name)
+                or condition.is_feedback(table_name)
+                or condition.is_queue_item(table_name)
+                or is_object_ref_operand(condition.operand, self.expand_columns)
+            ):
+                return None
+
+        for order_field in self.order_fields:
+            if isinstance(
+                order_field.field,
+                (
+                    CallsMergedDynamicField,
+                    CallsMergedSummaryField,
+                    CallsMergedFeedbackPayloadField,
+                    CallsMergedQueueItemField,
+                ),
+            ):
+                return None
+
+        already_has_call_ids = bool(
+            self.hardcoded_filter and self.hardcoded_filter.filter.call_ids
+        )
+        already_has_trace_ids = bool(
+            self.hardcoded_filter and self.hardcoded_filter.filter.trace_ids
+        )
+        already_has_thread_ids = bool(
+            self.hardcoded_filter
+            and self.hardcoded_filter.filter.thread_ids is not None
+        )
+
+        arm_specs: list[_OrUnionArmSpec] = []
+        for branch in branches:
+            kind = _classify_or_union_branch(branch, table_alias)
+            if kind is None:
+                return None
+
+            lowered_values: list[str] | None = None
+            if kind == _UnionBranchKind.HEAVY_JSON:
+                pass
+            elif kind in {
+                _UnionBranchKind.ID_MASK,
+                _UnionBranchKind.TRACE_IDS,
+                _UnionBranchKind.THREAD_IDS,
+            }:
+                extracted = _extract_eq_or_in_literal_field(branch)
+                if extracted is None:
+                    return None
+                _, lowered_values = extracted
+                if kind == _UnionBranchKind.ID_MASK and already_has_call_ids:
+                    return None
+                if kind == _UnionBranchKind.TRACE_IDS and already_has_trace_ids:
+                    return None
+                if kind == _UnionBranchKind.THREAD_IDS and already_has_thread_ids:
+                    return None
+            else:
+                raise ValueError(f"Unhandled _UnionBranchKind: {kind}")
+
+            arm_specs.append(
+                _OrUnionArmSpec(
+                    branch_kind=kind, operand=branch, lowered_values=lowered_values
+                )
+            )
+
+        return arm_specs
+
     def as_sql(self, pb: ParamBuilder, table_alias: str | None = None) -> str:
         """This is the main entry point for building the query.
 
@@ -1153,6 +1282,12 @@ class CallsQuery(BaseModel):
         # Determine if we should use the two-step filtered_calls CTE pattern.
         should_use_filter_cte = self._should_use_filter_cte()
 
+        table_alias_resolved = table_alias or get_calls_table_name(self.read_table)
+
+        # Plan the $or -> UNION DISTINCT rewrite before deleted_at/op_name are
+        # injected below, so only user conditions are inspected.
+        or_union_arms = self._plan_or_union_arms(table_alias_resolved)
+
         # Important: Always inject deleted_at into the query.
         # We use None as the literal for both table types. The sentinel handling
         # in process_operation converts None to the correct sentinel value with
@@ -1187,14 +1322,15 @@ class CallsQuery(BaseModel):
                 )
             )
 
-        table_alias_resolved = table_alias or get_calls_table_name(self.read_table)
-
         object_ref_conditions = get_all_object_ref_conditions(
             self.query_conditions,
             self.order_fields,
             self.expand_columns,
             table_alias_resolved,
         )
+        if object_ref_conditions:
+            # A qualifying $or never coexists with object-ref conditions.
+            or_union_arms = None
 
         # Build object-ref and candidate-id CTEs up front so all downstream
         # code paths (early-return, single-pass, two-pass) can reference them.
@@ -1227,9 +1363,13 @@ class CallsQuery(BaseModel):
         # the page's payloads instead of every scanned row's (prod: 28 GiB -> 1.7 GiB
         # on a fat-payload list read). calls_merged additionally uses it for costs /
         # object-ref pushdown ahead of its GROUP BY.
-        use_filter_cte = should_use_filter_cte or (
-            self.read_table != ReadTable.CALLS_COMPLETE
-            and (self.include_costs or bool(object_ref_conditions))
+        use_filter_cte = (
+            should_use_filter_cte
+            or or_union_arms is not None
+            or (
+                self.read_table != ReadTable.CALLS_COMPLETE
+                and (self.include_costs or bool(object_ref_conditions))
+            )
         )
 
         # On calls_complete the total-storage rollup otherwise aggregates the
@@ -1248,6 +1388,7 @@ class CallsQuery(BaseModel):
 
         if (
             not should_use_filter_cte
+            and or_union_arms is None
             and not self.include_costs
             and not object_ref_conditions
         ):
@@ -1265,9 +1406,6 @@ class CallsQuery(BaseModel):
             # Build two queries: a filter CTE that narrows rows by light
             # conditions first, then a select query that loads heavy columns
             # only for the matched ids.
-            filter_query = CallsQuery(
-                project_id=self.project_id, read_table=self.read_table
-            )
             select_query = CallsQuery(
                 project_id=self.project_id,
                 include_storage_size=self.include_storage_size,
@@ -1285,27 +1423,8 @@ class CallsQuery(BaseModel):
                 and not self.include_total_storage_size
             )
 
-            filter_query.add_field("id")
-            if page_started_at_bound:
-                filter_query.add_field("started_at")
             for field in self.select_fields:
                 select_query.select_fields.append(field)
-
-            for condition in self.query_conditions:
-                filter_query.query_conditions.append(condition)
-
-            filter_query.hardcoded_filter = self.hardcoded_filter
-            # Total-order pass 1 with an id tiebreaker so the min/max started_at
-            # bound and the id set derive from the identical LIMIT cut.
-            if page_started_at_bound:
-                filter_query.order_fields = [
-                    *self.order_fields,
-                    OrderField(field=get_field_by_name("id"), direction="ASC"),
-                ]
-            else:
-                filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
             # SUPER IMPORTANT: still need to re-sort the final query
             select_query.order_fields = self.order_fields
 
@@ -1315,13 +1434,41 @@ class CallsQuery(BaseModel):
             if self.include_costs:
                 self._ensure_order_fields_selected(select_query.select_fields)
 
-            filtered_calls_sql = filter_query._as_sql_base_format(
-                pb,
-                table_alias_resolved,
-                id_subquery_name=candidate_cte_name,
-                field_to_object_join_alias_map=field_to_object_join_alias_map,
-                expand_columns=self.expand_columns,
-            )
+            if or_union_arms is not None:
+                filtered_calls_sql = self._build_or_union_filtered_calls_sql(
+                    pb, table_alias_resolved, or_union_arms, page_started_at_bound
+                )
+            else:
+                filter_query = CallsQuery(
+                    project_id=self.project_id, read_table=self.read_table
+                )
+                filter_query.add_field("id")
+                if page_started_at_bound:
+                    filter_query.add_field("started_at")
+
+                for condition in self.query_conditions:
+                    filter_query.query_conditions.append(condition)
+
+                filter_query.hardcoded_filter = self.hardcoded_filter
+                # Total-order pass 1 with an id tiebreaker so the min/max started_at
+                # bound and the id set derive from the identical LIMIT cut.
+                if page_started_at_bound:
+                    filter_query.order_fields = [
+                        *self.order_fields,
+                        OrderField(field=get_field_by_name("id"), direction="ASC"),
+                    ]
+                else:
+                    filter_query.order_fields = self.order_fields
+                filter_query.limit = self.limit
+                filter_query.offset = self.offset
+
+                filtered_calls_sql = filter_query._as_sql_base_format(
+                    pb,
+                    table_alias_resolved,
+                    id_subquery_name=candidate_cte_name,
+                    field_to_object_join_alias_map=field_to_object_join_alias_map,
+                    expand_columns=self.expand_columns,
+                )
             ctes.add_cte(CTE_FILTERED_CALLS, filtered_calls_sql)
 
             base_sql = select_query._as_sql_base_format(
@@ -1919,6 +2066,92 @@ class CallsQuery(BaseModel):
             field_to_object_join_alias_map=field_to_object_join_alias_map,
             expand_columns=self.expand_columns,
         )
+
+    def _build_or_union_filtered_calls_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        arms: list[_OrUnionArmSpec],
+        page_started_at_bound: bool,
+    ) -> str:
+        """Build the `filtered_calls` CTE body as a UNION DISTINCT of per-branch arms.
+
+        Each arm is a child `CallsQuery` carrying every other light conjunct
+        plus its own branch condition (kept as-is for HEAVY_JSON so the LIKE
+        prefilter fires as a top-level conjunct, or lowered into the arm's
+        hardcoded filter for ID_MASK/TRACE_IDS/THREAD_IDS). Arms share `pb` so
+        params never collide. The union is wrapped in one outer
+        `ORDER BY ... LIMIT ... OFFSET ...` re-sort on the arms' own aliases.
+        """
+        or_condition = next(
+            c
+            for c in self.query_conditions
+            if isinstance(c.operand, tsi_query.OrOperation)
+        )
+        other_conditions = [c for c in self.query_conditions if c is not or_condition]
+
+        already_ordered_by_id = any(of.field.field == "id" for of in self.order_fields)
+        if already_ordered_by_id:
+            total_order_fields = list(self.order_fields)
+        else:
+            total_order_fields = [
+                *self.order_fields,
+                OrderField(field=get_field_by_name("id"), direction="ASC"),
+            ]
+
+        arm_limit = self.limit + (self.offset or 0) if self.limit is not None else None
+
+        arm_sqls = []
+        for arm in arms:
+            arm_query = CallsQuery(
+                project_id=self.project_id, read_table=self.read_table
+            )
+            arm_query.add_field("id")
+            if page_started_at_bound:
+                arm_query.add_field("started_at")
+            for order_field in self.order_fields:
+                arm_query.add_field(order_field.field.field)
+
+            for condition in other_conditions:
+                arm_query.query_conditions.append(condition)
+
+            if arm.branch_kind == _UnionBranchKind.HEAVY_JSON:
+                arm_query.query_conditions.append(Condition(operand=arm.operand))
+                arm_query.hardcoded_filter = self.hardcoded_filter
+            elif arm.branch_kind in {
+                _UnionBranchKind.ID_MASK,
+                _UnionBranchKind.TRACE_IDS,
+                _UnionBranchKind.THREAD_IDS,
+            }:
+                arm_query.hardcoded_filter = _lower_or_union_branch_filter(
+                    self.hardcoded_filter, arm
+                )
+            else:
+                raise ValueError(f"Unhandled _UnionBranchKind: {arm.branch_kind}")
+
+            arm_query.order_fields = total_order_fields
+            arm_query.limit = arm_limit
+            arm_query.offset = None
+
+            arm_sqls.append(arm_query._as_sql_base_format(pb, table_alias))
+
+        union_sql = "\nUNION DISTINCT\n".join(arm_sqls)
+
+        outer_select_cols = ["id"]
+        if page_started_at_bound:
+            outer_select_cols.append("started_at")
+        outer_order_sql = ", ".join(
+            f"{of.field.field} {of.direction}" for of in total_order_fields
+        )
+        limit_sql = f"LIMIT {self.limit}" if self.limit is not None else ""
+        offset_sql = f"OFFSET {self.offset}" if self.offset is not None else ""
+
+        return f"""SELECT {", ".join(outer_select_cols)} FROM (
+        {union_sql}
+        )
+        ORDER BY {outer_order_sql}
+        {limit_sql}
+        {offset_sql}"""
 
     def _as_sql_base_format(
         self,
@@ -2701,6 +2934,116 @@ def process_thread_id_filter_to_sql(
         param_builder, table_alias, read_table, use_agg_fn=False
     )
     return f" AND ({thread_cond} OR {thread_null})"
+
+
+# Fields whose `$eq`/`$in` branches lower into a hardcoded-filter pushdown;
+# maps field name -> the _UnionBranchKind that branch classifies as.
+_OR_UNION_LOWERABLE_FIELDS = {
+    "id": _UnionBranchKind.ID_MASK,
+    "trace_id": _UnionBranchKind.TRACE_IDS,
+    "thread_id": _UnionBranchKind.THREAD_IDS,
+}
+
+
+def _extract_eq_or_in_literal_field(
+    operand: "tsi_query.Operand",
+) -> tuple[str, list[str]] | None:
+    """Extract (field name, string literal values) from a plain `$eq`/`$in` operand.
+
+    Returns None for anything else: wrong arity, non-GetField operand, or a
+    literal that isn't a string (id/trace_id/thread_id are all string columns).
+    """
+    if isinstance(operand, tsi_query.EqOperation):
+        if len(operand.eq_) != 2:
+            return None
+        lhs, rhs = operand.eq_
+        if isinstance(lhs, tsi_query.GetFieldOperator) and isinstance(
+            rhs, tsi_query.LiteralOperation
+        ):
+            field, literal = lhs.get_field_, rhs.literal_
+        elif isinstance(rhs, tsi_query.GetFieldOperator) and isinstance(
+            lhs, tsi_query.LiteralOperation
+        ):
+            field, literal = rhs.get_field_, lhs.literal_
+        else:
+            return None
+        if not isinstance(literal, str):
+            return None
+        return field, [literal]
+
+    if isinstance(operand, tsi_query.InOperation):
+        lhs, values = operand.in_
+        if not isinstance(lhs, tsi_query.GetFieldOperator):
+            return None
+        literals: list[str] = []
+        for value_operand in values:
+            if not isinstance(
+                value_operand, tsi_query.LiteralOperation
+            ) or not isinstance(value_operand.literal_, str):
+                return None
+            literals.append(value_operand.literal_)
+        if not literals:
+            return None
+        return lhs.get_field_, literals
+
+    return None
+
+
+def _classify_or_union_branch(
+    operand: "tsi_query.Operand", table_alias: str
+) -> _UnionBranchKind | None:
+    """Classify a single `$or` branch for the UNION DISTINCT rewrite, or None.
+
+    `$eq`/`$in` on id/trace_id/thread_id lower into a hardcoded-filter pushdown.
+    `$eq`/`$in`/`$contains` on a heavy JSON field qualify when
+    `HeavyFieldOptimizationProcessor` can emit a LIKE prefilter for them (the
+    same probe `process_query_to_optimization_sql` uses). Anything else (gt/lt,
+    nested and/or/not, non-literal operands, feedback/summary/object-ref
+    fields) disqualifies the branch.
+    """
+    extracted = _extract_eq_or_in_literal_field(operand)
+    if extracted is not None:
+        field, _ = extracted
+        lowered_kind = _OR_UNION_LOWERABLE_FIELDS.get(field)
+        if lowered_kind is not None:
+            return lowered_kind
+
+    if isinstance(
+        operand,
+        (tsi_query.EqOperation, tsi_query.InOperation, tsi_query.ContainsOperation),
+    ):
+        probe = apply_processor(
+            HeavyFieldOptimizationProcessor(ParamBuilder(), table_alias),
+            operand,
+        )
+        if probe is not None:
+            return _UnionBranchKind.HEAVY_JSON
+
+    return None
+
+
+def _lower_or_union_branch_filter(
+    base_filter: HardCodedFilter | None, arm: _OrUnionArmSpec
+) -> HardCodedFilter:
+    """Build the arm's hardcoded filter for an ID_MASK/TRACE_IDS/THREAD_IDS branch.
+
+    Copies `base_filter` (if any) with the branch's literal values set on the
+    matching field, reusing existing index-shaped pushdowns for that field.
+    """
+    if arm.lowered_values is None:
+        raise ValueError(f"Branch {arm.branch_kind} has no lowered_values to apply")
+
+    if arm.branch_kind == _UnionBranchKind.ID_MASK:
+        update = {"call_ids": arm.lowered_values}
+    elif arm.branch_kind == _UnionBranchKind.TRACE_IDS:
+        update = {"trace_ids": arm.lowered_values}
+    elif arm.branch_kind == _UnionBranchKind.THREAD_IDS:
+        update = {"thread_ids": arm.lowered_values}
+    else:
+        raise ValueError(f"Unhandled lowered branch kind: {arm.branch_kind}")
+
+    base = base_filter.filter if base_filter is not None else tsi.CallsFilter()
+    return HardCodedFilter(filter=base.model_copy(update=update))
 
 
 def process_turn_id_filter_to_sql(

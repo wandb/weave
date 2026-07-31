@@ -27,6 +27,7 @@ from tests.trace.util import (
     DatetimeMatcher,
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
+    client_is_clickhouse,
     get_info_loglines,
 )
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
@@ -55,6 +56,7 @@ from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE
 from weave.trace_server.common_interface import SortBy
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
+from weave.trace_server.project_version.types import CallsStorageServerMode
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
 from weave.utils.project_id import from_project_id, to_project_id
@@ -96,6 +98,49 @@ def get_client_project_id(client: weave_client.WeaveClient) -> str:
 
 
 ## End hacky interface compatibility helpers
+
+
+def _make_or_union_test_call(
+    client: weave_client.WeaveClient,
+    *,
+    base_time: datetime.datetime,
+    offset_seconds: float,
+    turn_value: str | None = None,
+    thread_id: str | None = None,
+) -> str:
+    """Create a completed call for $or -> UNION DISTINCT rewrite functional tests.
+
+    `started_at` is deterministically offset from `base_time` so ordering
+    assertions never depend on wall-clock timing.
+    """
+    call_id = generate_id()
+    started_at = base_time + datetime.timedelta(seconds=offset_seconds)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=client.project_id,
+                id=call_id,
+                op_name="test_or_union",
+                trace_id=generate_id(),
+                thread_id=thread_id,
+                started_at=started_at,
+                attributes={},
+                inputs={"turn": {"root_turn_id": turn_value or "no_match"}},
+            )
+        )
+    )
+    client.server.call_end(
+        tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=client.project_id,
+                id=call_id,
+                ended_at=started_at + datetime.timedelta(seconds=1),
+                summary={},
+                output={},
+            )
+        )
+    )
+    return call_id
 
 
 @pytest.mark.flaky(reruns=2, reruns_delay=0.2)
@@ -4481,6 +4526,347 @@ def test_call_stream_query_heavy_query_batch(client):
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["empty"] == ""
+
+
+@pytest.mark.parametrize(
+    "force_calls_merged", [False, True], ids=["calls_complete", "calls_merged"]
+)
+def test_calls_query_or_union_rewrite_equivalence_and_pagination(
+    client, force_calls_merged
+):
+    """The $or -> UNION DISTINCT rewrite returns the same rows as a brute-force filter.
+
+    Runs on both calls_complete (default routing, also covers --trace-server=fake)
+    and calls_merged (FORCE_LEGACY routing, real ClickHouse only) so the
+    per-arm GROUP BY + UNION DISTINCT dedup path is exercised, not just the
+    single-row calls_complete path.
+
+    Exercises id `$in` lowering (branch A) unioned with a heavy JSON `$eq`
+    (branch B). One call matches both branches, two match branch B only, one
+    matches branch A only, and one matches neither (and must be excluded).
+    Also asserts paginated pages partition the full ordered result with no
+    duplicates or misses.
+    """
+    if force_calls_merged:
+        if not client_is_clickhouse(client):
+            pytest.skip("calls_merged routing requires a real ClickHouse backend")
+        ch_server = find_server_layer(client.server, ClickHouseTraceServer)
+        ch_server.table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+
+    project_id = client.project_id
+    turn_target = f"root_turn_{generate_id()}"
+    base_time = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    def _make_call(turn_value: str, offset_seconds: float) -> str:
+        return _make_or_union_test_call(
+            client,
+            base_time=base_time,
+            offset_seconds=offset_seconds,
+            turn_value=turn_value,
+        )
+
+    call_a_only = _make_call("not_the_marker", 1)
+    call_both = _make_call(turn_target, 2)
+    call_b_only_1 = _make_call(turn_target, 3)
+    call_b_only_2 = _make_call(turn_target, 4)
+    call_neither = _make_call("also_not_the_marker", 5)
+
+    id_list = [call_a_only, call_both]
+    expected_ids = {call_a_only, call_both, call_b_only_1, call_b_only_2}
+
+    query = {
+        "$or": [
+            {"$in": [{"$getField": "id"}, [{"$literal": i} for i in id_list]]},
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    base_req = {
+        "project_id": project_id,
+        "query": {"$expr": query},
+        "sort_by": [{"field": "started_at", "direction": "asc"}],
+    }
+
+    full_ordered = [
+        call.id
+        for call in client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(base_req)
+        )
+    ]
+    assert set(full_ordered) == expected_ids
+    assert call_neither not in full_ordered
+    assert full_ordered == [call_a_only, call_both, call_b_only_1, call_b_only_2]
+    # call_both matches BOTH arms (id `$in` and heavy JSON `$eq`); UNION
+    # DISTINCT must still yield it exactly once, not once per matching arm.
+    assert full_ordered.count(call_both) == 1
+
+    # Pagination: pages must partition the full ordered set with no dup/miss.
+    page_size = 2
+    paged_ids: list[str] = []
+    for offset in range(0, len(full_ordered), page_size):
+        page_req = {**base_req, "limit": page_size, "offset": offset}
+        paged_ids.extend(
+            call.id
+            for call in client.server.calls_query_stream(
+                tsi.CallsQueryReq.model_validate(page_req)
+            )
+        )
+    assert paged_ids == full_ordered
+
+
+def test_calls_query_or_union_trace_id_and_thread_id_lowering_functional(client):
+    """trace_id and thread_id `$or` branches functionally match only their own calls.
+
+    Exercises the ID_MASK-adjacent lowering paths (TRACE_IDS via `$eq`,
+    THREAD_IDS via `$in`) end to end against a real backend, each unioned
+    with a heavy JSON branch that a *different* call satisfies.
+    """
+    base_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    turn_target = f"root_turn_{generate_id()}"
+    trace_id = generate_id()
+    call_trace_match = generate_id()
+
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=client.project_id,
+                id=call_trace_match,
+                op_name="test_or_union",
+                trace_id=trace_id,
+                started_at=base_time + datetime.timedelta(seconds=1),
+                attributes={},
+                inputs={"turn": {"root_turn_id": "not_the_marker"}},
+            )
+        )
+    )
+    call_turn_match = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=2, turn_value=turn_target
+    )
+    call_neither = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=3
+    )
+
+    trace_query = {
+        "$or": [
+            {"$eq": [{"$getField": "trace_id"}, {"$literal": trace_id}]},
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    res = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {"project_id": client.project_id, "query": {"$expr": trace_query}}
+            )
+        )
+    )
+    assert {c.id for c in res} == {call_trace_match, call_turn_match}
+    assert call_neither not in {c.id for c in res}
+
+    thread_a = f"thread_{generate_id()}"
+    thread_b = f"thread_{generate_id()}"
+    call_thread_a = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=4, thread_id=thread_a
+    )
+    call_thread_b = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=5, thread_id=thread_b
+    )
+    call_thread_other = _make_or_union_test_call(
+        client,
+        base_time=base_time,
+        offset_seconds=6,
+        thread_id=f"thread_{generate_id()}",
+    )
+
+    thread_query = {
+        "$or": [
+            {
+                "$in": [
+                    {"$getField": "thread_id"},
+                    [{"$literal": thread_a}, {"$literal": thread_b}],
+                ]
+            },
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    res = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {"project_id": client.project_id, "query": {"$expr": thread_query}}
+            )
+        )
+    )
+    got_ids = {c.id for c in res}
+    assert got_ids == {call_thread_a, call_thread_b, call_turn_match}
+    assert call_thread_other not in got_ids
+
+
+def test_calls_query_or_union_kill_switch_and_guardrails_functional(
+    client, monkeypatch
+) -> None:
+    """The rewrite is transparent: results are identical with it on, off, and never-firing.
+
+    Covers three edge cases end to end: (1) the env kill-switch must not
+    change results, only the SQL shape; (2) a 6-branch $or (over
+    MAX_OR_UNION_ARMS) never qualifies but must still filter correctly via
+    the fallback path; (3) a $or with a non-eq/in branch (a `$gt`, which
+    never classifies) must likewise still filter correctly.
+    """
+    base_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    turn_target = f"root_turn_{generate_id()}"
+    call_match = _make_or_union_test_call(
+        client, base_time=base_time, offset_seconds=1, turn_value=turn_target
+    )
+    call_other = _make_or_union_test_call(client, base_time=base_time, offset_seconds=2)
+
+    query = {
+        "$or": [
+            {"$eq": [{"$getField": "id"}, {"$literal": call_match}]},
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    req = tsi.CallsQueryReq.model_validate(
+        {"project_id": client.project_id, "query": {"$expr": query}}
+    )
+
+    baseline_ids = {c.id for c in client.server.calls_query_stream(req)}
+    assert baseline_ids == {call_match}
+    assert call_other not in baseline_ids
+
+    monkeypatch.setenv("WEAVE_CALLS_OR_UNION_REWRITE", "0")
+    kill_switch_ids = {c.id for c in client.server.calls_query_stream(req)}
+    assert kill_switch_ids == baseline_ids
+    monkeypatch.delenv("WEAVE_CALLS_OR_UNION_REWRITE")
+
+    # Guardrail: > MAX_OR_UNION_ARMS branches never qualifies.
+    six_arm_query = {
+        "$or": [
+            {"$eq": [{"$getField": "id"}, {"$literal": call_match}]},
+            *[
+                {"$eq": [{"$getField": "id"}, {"$literal": generate_id()}]}
+                for _ in range(5)
+            ],
+        ]
+    }
+    res = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {"project_id": client.project_id, "query": {"$expr": six_arm_query}}
+            )
+        )
+    )
+    assert {c.id for c in res} == {call_match}
+
+    # Guardrail: a $gt branch never classifies.
+    gt_query = {
+        "$or": [
+            {"$eq": [{"$getField": "id"}, {"$literal": call_match}]},
+            {"$gt": [{"$getField": "inputs.turn.missing_count"}, {"$literal": 999999}]},
+        ]
+    }
+    res = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {"project_id": client.project_id, "query": {"$expr": gt_query}}
+            )
+        )
+    )
+    assert {c.id for c in res} == {call_match}
+
+
+def test_calls_query_or_union_calls_merged_started_at_tie_pagination_functional(
+    client, ch_server
+):
+    """A started_at tie spanning both UNION arms on calls_merged paginates cleanly.
+
+    Four calls share one `started_at` value: two match branch A (id `$in`),
+    two match branch B (heavy JSON `$eq`). With only the started_at tie to
+    resolve, ordering falls entirely on the id ASC tiebreak appended by the
+    rewrite. Forces calls_merged (real ClickHouse only, via `ch_server`) so
+    this exercises the per-arm GROUP BY + UNION DISTINCT path, not the
+    single-row calls_complete path. LIMIT (2) is smaller than the match count
+    (4), so pagination must partition the full ordered set with no
+    duplicates or misses.
+    """
+    ch_server.table_routing_resolver._mode = CallsStorageServerMode.FORCE_LEGACY
+
+    project_id = client.project_id
+    turn_target = f"root_turn_{generate_id()}"
+    tied_time = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    id_branch_ids = [
+        _make_or_union_test_call(client, base_time=tied_time, offset_seconds=0)
+        for _ in range(2)
+    ]
+    turn_branch_ids = [
+        _make_or_union_test_call(
+            client, base_time=tied_time, offset_seconds=0, turn_value=turn_target
+        )
+        for _ in range(2)
+    ]
+    call_neither = _make_or_union_test_call(
+        client, base_time=tied_time, offset_seconds=1
+    )
+
+    query = {
+        "$or": [
+            {"$in": [{"$getField": "id"}, [{"$literal": i} for i in id_branch_ids]]},
+            {
+                "$eq": [
+                    {"$getField": "inputs.turn.root_turn_id"},
+                    {"$literal": turn_target},
+                ]
+            },
+        ]
+    }
+    base_req = {
+        "project_id": project_id,
+        "query": {"$expr": query},
+        "sort_by": [{"field": "started_at", "direction": "asc"}],
+    }
+
+    expected_ids = set(id_branch_ids) | set(turn_branch_ids)
+    full_ordered = [
+        call.id
+        for call in client.server.calls_query_stream(
+            tsi.CallsQueryReq.model_validate(base_req)
+        )
+    ]
+    assert set(full_ordered) == expected_ids
+    assert call_neither not in full_ordered
+    # All four share started_at, so the id ASC tiebreak alone determines order.
+    assert full_ordered == sorted(expected_ids)
+
+    # Pagination: LIMIT (2) < match count (4) must still partition cleanly.
+    page_size = 2
+    paged_ids: list[str] = []
+    for offset in range(0, len(full_ordered), page_size):
+        page_req = {**base_req, "limit": page_size, "offset": offset}
+        paged_ids.extend(
+            call.id
+            for call in client.server.calls_query_stream(
+                tsi.CallsQueryReq.model_validate(page_req)
+            )
+        )
+    assert paged_ids == full_ordered
 
 
 @pytest.fixture
