@@ -23,7 +23,7 @@ def _dependencies_met() -> bool:
     """Check if the dependencies are met.  This import is deferred to avoid
     an expensive module import at the top level.
     """
-    import sys  # noqa: PLC0415
+    import sys
 
     # First check if already imported
     if "moviepy" in sys.modules:
@@ -158,7 +158,7 @@ def save(
         name: Ignored, see comment below
     """
     _ensure_registered()
-    from moviepy.editor import VideoFileClip  # noqa: PLC0415
+    from moviepy.editor import VideoFileClip
 
     is_video_file = isinstance(obj, VideoFileClip)
 
@@ -182,7 +182,7 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> VideoClip:
         The loaded VideoClip
     """
     _ensure_registered()
-    from moviepy.editor import VideoFileClip  # noqa: PLC0415
+    from moviepy.editor import VideoFileClip
 
     # Assume there can only be 1 video in the artifact
     for filename in artifact.path_contents:
@@ -196,7 +196,7 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> VideoClip:
 def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     """Check if the object is any subclass of VideoClip."""
     _ensure_registered()
-    from moviepy.editor import VideoClip  # noqa: PLC0415
+    from moviepy.editor import VideoClip
 
     return isinstance(obj, VideoClip)
 
@@ -205,7 +205,7 @@ def _ensure_registered() -> None:
     """Ensure the video type handler is registered if MoviePy is available."""
     global _registered
     if not _registered and _dependencies_met():
-        from moviepy.editor import VideoClip  # noqa: PLC0415
+        from moviepy.editor import VideoClip
 
         serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
         _registered = True

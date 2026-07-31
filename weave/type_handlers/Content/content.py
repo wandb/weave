@@ -22,8 +22,8 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
 
 
 def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:
-    from weave.type_wrappers.Content.content import Content  # noqa: PLC0415
-    from weave.type_wrappers.Content.content_types import (  # noqa: PLC0415
+    from weave.type_wrappers.Content.content import Content
+    from weave.type_wrappers.Content.content_types import (
         ResolvedContentArgs,
         ResolvedContentArgsWithoutData,
     )
@@ -42,7 +42,7 @@ def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:
 
 
 def register() -> None:
-    from weave.trace.serialization import serializer  # noqa: PLC0415
-    from weave.type_wrappers.Content.content import Content  # noqa: PLC0415
+    from weave.trace.serialization import serializer
+    from weave.type_wrappers.Content.content import Content
 
     serializer.register_serializer(Content, save, load)

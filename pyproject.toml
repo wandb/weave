@@ -336,9 +336,12 @@ exclude = ["rules"]
 "tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
-"weave/type_handlers/Video/video.py" = ["PLW0603"]
 "weave/type_handlers/Audio/audio.py" = ["PLW1514"]
-"weave/type_handlers/Content/content.py" = ["PLW1514"]
+# These lazy imports are part of persisted object or loader hashes. Inline
+# suppressions would change their digests.
+"weave/flow/scorer.py" = ["PLC0415"]
+"weave/type_handlers/Content/content.py" = ["PLC0415", "PLW1514"]
+"weave/type_handlers/Video/video.py" = ["PLC0415", "PLW0603"]
 
 [tool.pyright]
 include = ["weave"]
