@@ -2,19 +2,17 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-import contextlib
 import datetime
 import json
 import keyword
 import logging
 import re
-import types
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 from threading import Lock
-from types import MethodType
-from typing import Any, TypeVar, cast, overload
+from types import MethodType, TracebackType
+from typing import Any, Final, TypeVar, cast, overload
 
 from typing_extensions import Self
 
@@ -60,7 +58,8 @@ _active_evaluation_loggers: list[EvaluationLogger] = []
 
 # Register cleanup handler for program exit
 def _cleanup_all_evaluations() -> None:
-    for eval_logger in _active_evaluation_loggers:
+    # Iterate over a shallow copy. Otherwise, cleanup can drop items mid-iteration.
+    for eval_logger in list(_active_evaluation_loggers):
         _cleanup_evaluation(eval_logger)
 
 
@@ -84,8 +83,11 @@ current_predict_call: ContextVar[Call | None] = ContextVar(
     "current_predict_call", default=None
 )
 
-IMPERATIVE_EVAL_META_MARKER = {"imperative": True}
-IMPERATIVE_SCORE_META_MARKER = {"imperative": True, "score": True}
+IMPERATIVE_EVAL_META_MARKER: Final[dict[str, Any]] = {"imperative": True}
+IMPERATIVE_SCORE_META_MARKER: Final[dict[str, Any]] = {
+    "imperative": True,
+    "score": True,
+}
 
 
 def _as_call_attributes(eval_meta: dict[str, Any]) -> dict[str, Any]:
@@ -100,31 +102,25 @@ def _compute_default_row_digest(inputs: dict[str, Any]) -> str | None:
 
 
 @contextmanager
-def _set_current_output(output: Any) -> Iterator[None]:
-    """Set the current output in a thread-safe way using context variables."""
-    token = current_output.set(output)
+def _set_contextvar(var: ContextVar[T], value: T, /) -> Iterator[None]:
+    """Set the value of a context variable in a thread-safe way for the duration of the block."""
+    token = var.set(value)
     try:
         yield
     finally:
-        current_output.reset(token)
+        var.reset(token)
 
 
-@contextmanager
-def _set_current_score(score: ScoreType) -> Iterator[None]:
-    token = current_score.set(score)
-    try:
-        yield
-    finally:
-        current_score.reset(token)
+def _set_current_output(output: Any) -> AbstractContextManager[None]:
+    return _set_contextvar(current_output, output)
 
 
-@contextmanager
-def _set_current_summary(summary: dict) -> Iterator[None]:
-    token = current_summary.set(summary)
-    try:
-        yield
-    finally:
-        current_summary.reset(token)
+def _set_current_score(score: ScoreType) -> AbstractContextManager[None]:
+    return _set_contextvar(current_score, score)
+
+
+def _set_current_summary(summary: dict) -> AbstractContextManager[None]:
+    return _set_contextvar(current_summary, summary)
 
 
 def _sanitize_class_name(name: str) -> str:
@@ -212,14 +208,14 @@ def _validate_class_name(name: str, base_class_name: str = "Class") -> str:
 
     if not VALID_CLASS_NAME_REGEX.match(name):
         raise ValueError(
-            f"Invalid `{base_class_name}` name: '{name}'. `{base_class_name}` names must start with a letter or underscore "
+            f"Invalid `{base_class_name}` name: {name!r}. `{base_class_name}` names must start with a letter or underscore "
             "and contain only alphanumeric characters and underscores."
         )
 
     # Check if name is not a Python keyword
     if keyword.iskeyword(name):
         raise ValueError(
-            f"`{base_class_name}` name '{name}' cannot be a Python keyword"
+            f"`{base_class_name}` name {name!r} cannot be a Python keyword"
         )
 
     return name
@@ -227,7 +223,7 @@ def _validate_class_name(name: str, base_class_name: str = "Class") -> str:
 
 class ScorerCache:
     _cached_scorers: dict[str, Scorer]
-    _cached_scorers_lock: Any
+    _cached_scorers_lock: Lock
     _max_size: int
 
     def __init__(self, max_size: int = DEFAULT_SCORER_CACHE_SIZE) -> None:
@@ -268,9 +264,7 @@ class _LogScoreContext:
         self.scorer = scorer
         self.score_call = score_call
         self._score_value: ScoreType | None = None
-        self._call_stack_context: (
-            contextlib.AbstractContextManager[list[Call]] | None
-        ) = None
+        self._call_stack_context: AbstractContextManager[list[Call]] | None = None
 
     @property
     def value(self) -> ScoreType | None:
@@ -299,7 +293,7 @@ class _LogScoreContext:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
@@ -317,7 +311,7 @@ class _LogScoreContext:
             else:
                 # If no exception occurred but no value was set, raise an error
                 raise ValueError(
-                    f"Score value was not set for scorer '{cast(Scorer, self.scorer).name}'. "
+                    f"Score value was not set for scorer {cast(Scorer, self.scorer).name!r}. "
                     "Please set score_ctx.value within the context manager."
                 )
         finally:
@@ -381,16 +375,12 @@ class ScoreLogger:
         self._captured_scores: dict[str, ScoreType] = {}
         self._has_finished: bool = False
         self._predict_output: Any = None
-        self._call_stack_context: (
-            contextlib.AbstractContextManager[list[Call]] | None
-        ) = None
-        self._eval_prediction_context: (
-            contextlib.AbstractContextManager[None] | None
-        ) = None
+        self._call_stack_context: AbstractContextManager[list[Call]] | None = None
+        self._eval_prediction_context: AbstractContextManager[None] | None = None
 
     def _apply_eval_meta(self, eval_meta: dict[str, Any]) -> None:
         """Internal-only: Merge potential caller-provided fields into the eval meta."""
-        self._score_meta = {**eval_meta, **IMPERATIVE_SCORE_META_MARKER}
+        self._score_meta = eval_meta | IMPERATIVE_SCORE_META_MARKER
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -598,12 +588,14 @@ class ScoreLogger:
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
-        with call_context.set_call_stack(
-            [self.evaluate_call, self.predict_and_score_call]
+        with (
+            call_context.set_call_stack(
+                [self.evaluate_call, self.predict_and_score_call]
+            ),
+            _set_current_score(score),
+            attributes(_as_call_attributes(self._score_meta)),
         ):
-            with _set_current_score(score):
-                with attributes(_as_call_attributes(self._score_meta)):
-                    await self.predict_call.apply_scorer(scorer)
+            await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
         scorer_name = cast(str, scorer.name)
@@ -634,7 +626,7 @@ class ScoreLogger:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         """Exit context manager, restore call stack, and automatically finish."""
         try:
@@ -665,7 +657,7 @@ class EvaluationLogger:
     ev = EvaluationLogger()
 
     # Log predictions with known inputs/outputs
-    pred = ev.log_prediction(inputs={'q': 'Hello'}, outputs={'a': 'Hi there!'})
+    pred = ev.log_prediction(inputs={'q': 'Hello'}, output='Hi there!')
     pred.log_score("correctness", 0.9)
 
     # Finish the evaluation
@@ -698,10 +690,7 @@ class EvaluationLogger:
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
     ) -> None:
-        self._eval_meta = {
-            **(self._client_eval_meta or {}),
-            **IMPERATIVE_EVAL_META_MARKER,
-        }
+        self._eval_meta = (self._client_eval_meta or {}) | IMPERATIVE_EVAL_META_MARKER
 
         self.name = name
         self.scorers = scorers
@@ -729,7 +718,7 @@ class EvaluationLogger:
         self._pseudo_evaluation = Evaluation(
             dataset=self.dataset,
             scorers=[],
-            metadata={"scorers": self.scorers, **self.eval_attributes},
+            metadata={"scorers": self.scorers} | self.eval_attributes,
         )
 
         # The following section is a "hacky" way to create Model and Evaluation
@@ -954,18 +943,21 @@ class EvaluationLogger:
         self.model.__dict__["predict"] = self._context_predict_method
 
         try:
-            with call_context.set_call_stack([self._evaluate_call]):
-                # Make the prediction call
-                with _set_current_output(output):
-                    with attributes(_as_call_attributes(self._eval_meta)):
-                        _, predict_and_score_call = (
-                            self._pseudo_evaluation.predict_and_score.call(
-                                self._pseudo_evaluation,
-                                self.model,
-                                inputs,
-                                __require_explicit_finish=True,
-                            )
-                        )
+            # Make the prediction call
+
+            with (
+                call_context.set_call_stack([self._evaluate_call]),
+                _set_current_output(output),
+                attributes(_as_call_attributes(self._eval_meta)),
+            ):
+                _, predict_and_score_call = (
+                    self._pseudo_evaluation.predict_and_score.call(
+                        self._pseudo_evaluation,
+                        self.model,
+                        inputs,
+                        __require_explicit_finish=True,
+                    )
+                )
         finally:
             # Restore the original predict method
             if original_method is not None:
@@ -1080,11 +1072,9 @@ class EvaluationLogger:
         else:
             summary_data = summary
 
-        final_summary = {}
-        if summary_data:
-            final_summary = summary_data
-        if summary is not None:
-            final_summary = {**final_summary, "output": summary}
+        # Merge into a new dict. When auto_summarize is False, summary_data is the
+        # same object as summary, and mutating it would nest the dict inside itself.
+        final_summary = (summary_data or {}) | {"output": summary}
 
         # Call the summarize op
         assert self._evaluate_call is not None, (
@@ -1094,9 +1084,11 @@ class EvaluationLogger:
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
             try:
-                with _set_current_summary(final_summary):
-                    with attributes(_as_call_attributes(self._eval_meta)):
-                        self._pseudo_evaluation.summarize()
+                with (
+                    _set_current_summary(final_summary),
+                    attributes(_as_call_attributes(self._eval_meta)),
+                ):
+                    self._pseudo_evaluation.summarize()
             except Exception:
                 logger.exception("Error during execution of summarize op.")
                 # Even if summarize fails, try to finalize with the calculated summary
@@ -1189,8 +1181,8 @@ class ImperativeEvaluationLogger(EvaluationLogger):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         logger.warning(
-            "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"
-            "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will"
+            "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44. "
+            "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will "
             "be removed in a future version."
         )
         super().__init__(*args, **kwargs)
