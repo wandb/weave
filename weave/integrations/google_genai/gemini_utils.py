@@ -85,7 +85,7 @@ def google_genai_gemini_postprocess_output(output: Any) -> Any:
     The model is returned as-is so ``map_to_refs`` creates an ``ObjectRecord``
     (which supports attribute access) rather than a plain dict.
     """
-    import google.genai.types as genai_types
+    import google.genai.types as genai_types  # noqa: PLC0415
 
     genai_types._response_text_non_text_warning_logged = True
 

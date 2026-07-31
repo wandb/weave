@@ -64,7 +64,7 @@ def _lazy_get_ipython() -> InteractiveShell | None:
     if "IPython" not in sys.modules:
         return None
     try:
-        from IPython.core.getipython import get_ipython
+        from IPython.core.getipython import get_ipython  # noqa: PLC0415
     except (ImportError, ModuleNotFoundError):
         return None
     return get_ipython()

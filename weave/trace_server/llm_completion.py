@@ -108,7 +108,7 @@ def parse_prompt_reference(prompt: str) -> tuple[str, str, str | None]:
         >>> parse_prompt_reference("weave:///entity/project/object/my_prompt:abc123")
         ("my_prompt", "abc123", "project_id")
     """
-    from weave.shared import refs_internal as ri
+    from weave.shared import refs_internal as ri  # noqa: PLC0415
 
     # Handle Weave URI formats (internal and external)
     if prompt.startswith(("weave-trace-internal:///", "weave:///")):

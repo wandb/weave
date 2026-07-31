@@ -284,9 +284,8 @@ ignore = [
   # Initial TRY rollout: defer high-volume rules for a dedicated cleanup pass.
   "TRY003", # https://docs.astral.sh/ruff/rules/raise-vanilla-args/
   "TRY301", # https://docs.astral.sh/ruff/rules/raise-within-try/
-  # Existing code intentionally uses many lazy imports and private symbols;
-  # keep these disabled until we do a dedicated cleanup.
-  "PLC0415", # https://docs.astral.sh/ruff/rules/import-outside-top-level/
+  # Existing code intentionally uses many private symbols; keep this disabled
+  # until we do a dedicated cleanup.
   "PLC2701", # https://docs.astral.sh/ruff/rules/import-private-name/
   # Keep explicit empty-string checks for readability in tests and parsing paths.
   "PLC1901", # https://docs.astral.sh/ruff/rules/compare-to-empty-string/
@@ -337,9 +336,12 @@ exclude = ["rules"]
 "tests/**/*.py" = ["RUF029", "RUF043", "RUF069"]
 "weave/trace/serialization/op_type.py" = ["RUF100", "N802"]
 "weave/trace_server/costs/update_costs.py" = ["PLW1514"]
-"weave/type_handlers/Video/video.py" = ["PLW0603"]
 "weave/type_handlers/Audio/audio.py" = ["PLW1514"]
-"weave/type_handlers/Content/content.py" = ["PLW1514"]
+# These lazy imports are part of persisted object or loader hashes. Inline
+# suppressions would change their digests.
+"weave/flow/scorer.py" = ["PLC0415"]
+"weave/type_handlers/Content/content.py" = ["PLC0415", "PLW1514"]
+"weave/type_handlers/Video/video.py" = ["PLC0415", "PLW0603"]
 
 [tool.pyright]
 include = ["weave"]

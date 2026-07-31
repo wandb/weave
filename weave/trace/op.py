@@ -288,7 +288,7 @@ def _is_unbound_method(func: Callable) -> bool:
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     # Avoid circular import: Content -> serialization.op_type -> op.
-    from weave.type_wrappers import Content
+    from weave.type_wrappers import Content  # noqa: PLC0415
 
     try:
         sig = inspect.signature(func)
@@ -384,7 +384,7 @@ def _create_call(
 
     parent_call = call_context.get_current_call()
 
-    from weave.trace.serialization.serialize import dictify
+    from weave.trace.serialization.serialize import dictify  # noqa: PLC0415
 
     attributes = dictify(call_attributes.get())
 
@@ -435,13 +435,13 @@ def _should_sample_traces(op: Op) -> bool:
 
 def placeholder_call() -> Call:
     # Import here to avoid circular dependency
-    from weave.trace.call import NoOpCall
+    from weave.trace.call import NoOpCall  # noqa: PLC0415
 
     return NoOpCall()
 
 
 def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
-    from weave.trace.call import NoOpCall
+    from weave.trace.call import NoOpCall  # noqa: PLC0415
 
     return isinstance(call, NoOpCall)
 

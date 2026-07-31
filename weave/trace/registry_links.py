@@ -29,7 +29,7 @@ def resolve_prompt_ref(prompt: LinkablePrompt) -> ObjectRef:
         return ObjectRef.parse_uri(prompt)
 
     # Imported lazily to avoid a registry_links -> prompt -> api cycle.
-    from weave.prompt.prompt import Prompt
+    from weave.prompt.prompt import Prompt  # noqa: PLC0415
 
     if isinstance(prompt, Prompt) and prompt.ref is not None:
         return prompt.ref

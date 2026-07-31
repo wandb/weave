@@ -19,7 +19,7 @@ def is_available() -> bool:
     """Check whether polyfile is installed and usable."""
     matcher = None
     try:
-        from polyfile.magic import MagicMatcher
+        from polyfile.magic import MagicMatcher  # noqa: PLC0415
 
         matcher = MagicMatcher
     except (ImportError, ModuleNotFoundError):
@@ -43,7 +43,7 @@ def detect(
     if not is_available():
         return None, None
 
-    from polyfile.magic import MagicMatcher
+    from polyfile.magic import MagicMatcher  # noqa: PLC0415
 
     try:
         mimetype = next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]

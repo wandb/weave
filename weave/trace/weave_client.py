@@ -692,7 +692,7 @@ class WeaveClient:
             print(evaluation.name)
             ```
         """
-        import weave
+        import weave  # noqa: PLC0415
 
         res = weave.ref(uri).get()
         if not isinstance(res, weave.Evaluation):
@@ -1564,7 +1564,7 @@ class WeaveClient:
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
-                from weave.utils.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii  # noqa: PLC0415
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
@@ -1744,7 +1744,7 @@ class WeaveClient:
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
-                from weave.utils.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii  # noqa: PLC0415
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
@@ -2629,7 +2629,7 @@ class WeaveClient:
                 return
             remove_ref(obj)
         # Must defer import here to avoid circular import
-        from weave.object.obj import Object
+        from weave.object.obj import Object  # noqa: PLC0415
 
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
@@ -3328,7 +3328,7 @@ class WeaveClient:
                       Overrides use_progress_bar.
         """
         if use_progress_bar and callback is None:
-            from weave.trace.display.client_progress_bar import (
+            from weave.trace.display.client_progress_bar import (  # noqa: PLC0415
                 create_progress_bar_callback,
             )
 

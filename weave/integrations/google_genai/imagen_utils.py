@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def google_genai_gemini_postprocess_outputs(
     outputs: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    from PIL import Image  # type: ignore
+    from PIL import Image  # type: ignore  # noqa: PLC0415
 
     modified_outputs = []
     if hasattr(outputs, "generated_images"):

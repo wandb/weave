@@ -95,7 +95,7 @@ class Sentry:
         if set_env:
             return set_env
 
-        import weave
+        import weave  # noqa: PLC0415
 
         is_dev = _is_local_dev_install(weave)
         if is_dev:
@@ -111,7 +111,7 @@ class Sentry:
         to avoid the possibility of interfering with the user's
         own Sentry SDK setup.
         """
-        from weave import version
+        from weave import version  # noqa: PLC0415
 
         client = sentry_sdk.Client(
             dsn=self.dsn,

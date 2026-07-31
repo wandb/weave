@@ -73,8 +73,8 @@ def assert_correct_calls_for_chain_invoke(
 def test_simple_chain_invoke(
     client: WeaveClient,
 ) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -115,8 +115,8 @@ def test_simple_chain_invoke(
 )
 def test_simple_chain_invoke_no_client(client) -> None:
     """If no client is available, we should not trace the call, and also not crash."""
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     client.finish()
 
@@ -144,8 +144,8 @@ def test_simple_chain_invoke_no_client(client) -> None:
 async def test_simple_chain_ainvoke(
     client: WeaveClient,
 ) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -166,8 +166,8 @@ async def test_simple_chain_ainvoke(
 def test_simple_chain_stream(
     client: WeaveClient,
 ) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -190,8 +190,8 @@ def test_simple_chain_stream(
 async def test_simple_chain_astream(
     client: WeaveClient,
 ) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -236,8 +236,8 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     reason="Currently not working on Windows",
 )
 def test_simple_chain_batch(client: WeaveClient) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -259,8 +259,8 @@ def test_simple_chain_batch(client: WeaveClient) -> None:
 async def test_simple_chain_abatch(
     client: WeaveClient,
 ) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -306,8 +306,8 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
 )
 def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
     # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -395,7 +395,7 @@ def fix_chroma_ci() -> Generator[None, None, None]:
         yield None
         return
 
-    import sys
+    import sys  # noqa: PLC0415
 
     # Try to import pysqlite3, but skip patching if not available (e.g., on Windows)
     try:
@@ -417,14 +417,14 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     before_record_request=filter_body,
 )
 def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    from langchain_community.document_loaders import TextLoader
-    from langchain_community.vectorstores import Chroma
-    from langchain_core.documents import Document
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.runnables import RunnablePassthrough
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+    from langchain.text_splitter import RecursiveCharacterTextSplitter  # noqa: PLC0415
+    from langchain_community.document_loaders import TextLoader  # noqa: PLC0415
+    from langchain_community.vectorstores import Chroma  # noqa: PLC0415
+    from langchain_core.documents import Document  # noqa: PLC0415
+    from langchain_core.output_parsers import StrOutputParser  # noqa: PLC0415
+    from langchain_core.prompts import ChatPromptTemplate  # noqa: PLC0415
+    from langchain_core.runnables import RunnablePassthrough  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI, OpenAIEmbeddings  # noqa: PLC0415
 
     test_data_path = Path(__file__).parent / "test_data" / "paul_graham_essay.txt"
     loader = TextLoader(str(test_data_path))
@@ -498,15 +498,24 @@ def assert_correct_calls_for_agent_with_tool(calls: list[Call]) -> None:
 def test_agent_run_with_tools(
     client: WeaveClient,
 ) -> None:
-    from langchain.agents import AgentExecutor
-    from langchain.agents.format_scratchpad import format_to_openai_function_messages
-    from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.tools import StructuredTool
-    from langchain_core.messages import AIMessage, HumanMessage
-    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_core.utils.function_calling import convert_to_openai_tool
-    from langchain_openai import ChatOpenAI
-    from pydantic import BaseModel, Field
+    from langchain.agents import AgentExecutor  # noqa: PLC0415
+    from langchain.agents.format_scratchpad import (  # noqa: PLC0415
+        format_to_openai_function_messages,
+    )
+    from langchain.agents.output_parsers import (  # noqa: PLC0415
+        OpenAIFunctionsAgentOutputParser,
+    )
+    from langchain.tools import StructuredTool  # noqa: PLC0415
+    from langchain_core.messages import AIMessage, HumanMessage  # noqa: PLC0415
+    from langchain_core.prompts import (  # noqa: PLC0415
+        ChatPromptTemplate,
+        MessagesPlaceholder,
+    )
+    from langchain_core.utils.function_calling import (  # noqa: PLC0415
+        convert_to_openai_tool,
+    )
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
+    from pydantic import BaseModel, Field  # noqa: PLC0415
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -612,15 +621,24 @@ def assert_correct_calls_for_agent_with_function_call(calls: list[Call]) -> None
 def test_agent_run_with_function_call(
     client: WeaveClient,
 ) -> None:
-    from langchain.agents import AgentExecutor
-    from langchain.agents.format_scratchpad import format_to_openai_function_messages
-    from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.tools import StructuredTool
-    from langchain_core.messages import AIMessage, HumanMessage
-    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-    from langchain_core.utils.function_calling import convert_to_openai_function
-    from langchain_openai import ChatOpenAI
-    from pydantic import BaseModel, Field
+    from langchain.agents import AgentExecutor  # noqa: PLC0415
+    from langchain.agents.format_scratchpad import (  # noqa: PLC0415
+        format_to_openai_function_messages,
+    )
+    from langchain.agents.output_parsers import (  # noqa: PLC0415
+        OpenAIFunctionsAgentOutputParser,
+    )
+    from langchain.tools import StructuredTool  # noqa: PLC0415
+    from langchain_core.messages import AIMessage, HumanMessage  # noqa: PLC0415
+    from langchain_core.prompts import (  # noqa: PLC0415
+        ChatPromptTemplate,
+        MessagesPlaceholder,
+    )
+    from langchain_core.utils.function_calling import (  # noqa: PLC0415
+        convert_to_openai_function,
+    )
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
+    from pydantic import BaseModel, Field  # noqa: PLC0415
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -701,8 +719,8 @@ def test_agent_run_with_function_call(
     before_record_request=filter_body,
 )
 def test_weave_attributes_in_call(client: WeaveClient) -> None:
-    from langchain_core.prompts import PromptTemplate
-    from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import PromptTemplate  # noqa: PLC0415
+    from langchain_openai import ChatOpenAI  # noqa: PLC0415
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
@@ -728,8 +746,8 @@ def test_weave_attributes_in_call(client: WeaveClient) -> None:
     match_on=["method", "scheme", "path", "query"],
 )
 def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
-    from google.auth.credentials import AnonymousCredentials
-    from langchain_google_vertexai import ChatVertexAI
+    from google.auth.credentials import AnonymousCredentials  # noqa: PLC0415
+    from langchain_google_vertexai import ChatVertexAI  # noqa: PLC0415
 
     with patch(
         "google.auth.default", return_value=(AnonymousCredentials(), "wandb-qa")
@@ -770,7 +788,7 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
     match_on=["method", "scheme", "path", "query"],
 )
 def test_langchain_google_genai_usage(client: WeaveClient) -> None:
-    from langchain_google_genai import GoogleGenerativeAI
+    from langchain_google_genai import GoogleGenerativeAI  # noqa: PLC0415
 
     llm = GoogleGenerativeAI(
         model="gemini-1.5-pro",
@@ -800,7 +818,7 @@ def test_langchain_google_genai_usage(client: WeaveClient) -> None:
     match_on=["method", "scheme", "path", "query"],
 )
 def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_google_genai import ChatGoogleGenerativeAI  # noqa: PLC0415
 
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-pro",
@@ -829,7 +847,7 @@ def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
     before_record_request=filter_body,
 )
 def test_langchain_anthropic_usage(client: WeaveClient) -> None:
-    from langchain_anthropic import ChatAnthropic
+    from langchain_anthropic import ChatAnthropic  # noqa: PLC0415
 
     model = ChatAnthropic(
         model="claude-opus-4-20250514",
@@ -863,7 +881,7 @@ def test_langchain_anthropic_usage(client: WeaveClient) -> None:
     before_record_request=filter_body,
 )
 def test_langchain_cohere_usage(client: WeaveClient) -> None:
-    from langchain_cohere import ChatCohere
+    from langchain_cohere import ChatCohere  # noqa: PLC0415
 
     model = ChatCohere(
         model="command-r",
@@ -897,7 +915,7 @@ def test_langchain_cohere_usage(client: WeaveClient) -> None:
     before_record_request=filter_body,
 )
 def test_langchain_litellm_usage(client: WeaveClient) -> None:
-    from langchain_litellm import ChatLiteLLM
+    from langchain_litellm import ChatLiteLLM  # noqa: PLC0415
 
     model = ChatLiteLLM(
         model="gpt-4.1-mini",

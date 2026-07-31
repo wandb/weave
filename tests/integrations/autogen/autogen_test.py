@@ -30,8 +30,8 @@ def patch_autogen() -> Generator[None, None, None]:
 async def test_simple_client_create(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_core.models import UserMessage
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_core.models import UserMessage  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
     openai_model_client = OpenAIChatCompletionClient(model=model_name)
@@ -75,9 +75,9 @@ async def test_simple_client_create(
 async def test_simple_client_create_with_exception(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_core.models import UserMessage
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
-    from openai import AuthenticationError
+    from autogen_core.models import UserMessage  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
+    from openai import AuthenticationError  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
     openai_model_client = OpenAIChatCompletionClient(
@@ -117,8 +117,8 @@ async def test_simple_client_create_with_exception(
 async def test_simple_client_create_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_core.models import UserMessage
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_core.models import UserMessage  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
     openai_model_client = OpenAIChatCompletionClient(model=model_name)
@@ -155,10 +155,13 @@ async def test_simple_client_create_stream(
 async def test_simple_cached_client_create(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_core._cache_store import InMemoryStore
-    from autogen_core.models import UserMessage
-    from autogen_ext.models.cache import CHAT_CACHE_VALUE_TYPE, ChatCompletionCache
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_core._cache_store import InMemoryStore  # noqa: PLC0415
+    from autogen_core.models import UserMessage  # noqa: PLC0415
+    from autogen_ext.models.cache import (  # noqa: PLC0415
+        CHAT_CACHE_VALUE_TYPE,
+        ChatCompletionCache,
+    )
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
     # Initialize the original client
@@ -210,10 +213,13 @@ async def test_simple_cached_client_create(
 async def test_simple_cached_client_create_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_core._cache_store import InMemoryStore
-    from autogen_core.models import UserMessage
-    from autogen_ext.models.cache import CHAT_CACHE_VALUE_TYPE, ChatCompletionCache
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_core._cache_store import InMemoryStore  # noqa: PLC0415
+    from autogen_core.models import UserMessage  # noqa: PLC0415
+    from autogen_ext.models.cache import (  # noqa: PLC0415
+        CHAT_CACHE_VALUE_TYPE,
+        ChatCompletionCache,
+    )
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
     # Initialize the original client
@@ -260,8 +266,8 @@ async def test_simple_cached_client_create_stream(
 async def test_agentchat_run_with_tool(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_agentchat.agents import AssistantAgent
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_agentchat.agents import AssistantAgent  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is 73 degrees and Sunny."
@@ -341,8 +347,8 @@ async def test_agentchat_run_with_tool(
 async def test_agentchat_run_stream_with_tool(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_agentchat.agents import AssistantAgent
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_agentchat.agents import AssistantAgent  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     def get_weather(city: str) -> str:
         return f"The weather in {city} is 73 degrees and Sunny."
@@ -413,10 +419,10 @@ async def test_agentchat_run_stream_with_tool(
 async def test_agentchat_group_chat(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_agentchat.agents import AssistantAgent
-    from autogen_agentchat.conditions import TextMessageTermination
-    from autogen_agentchat.teams import RoundRobinGroupChat
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_agentchat.agents import AssistantAgent  # noqa: PLC0415
+    from autogen_agentchat.conditions import TextMessageTermination  # noqa: PLC0415
+    from autogen_agentchat.teams import RoundRobinGroupChat  # noqa: PLC0415
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model = "gpt-4.1-nano-2025-04-14"
     model_client = OpenAIChatCompletionClient(
@@ -690,9 +696,13 @@ async def test_agentchat_group_chat(
 async def test_agent_with_memory(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from autogen_agentchat.agents import AssistantAgent
-    from autogen_core.memory import ListMemory, MemoryContent, MemoryMimeType
-    from autogen_ext.models.openai import OpenAIChatCompletionClient
+    from autogen_agentchat.agents import AssistantAgent  # noqa: PLC0415
+    from autogen_core.memory import (  # noqa: PLC0415
+        ListMemory,
+        MemoryContent,
+        MemoryMimeType,
+    )
+    from autogen_ext.models.openai import OpenAIChatCompletionClient  # noqa: PLC0415
 
     model_name = "gpt-4.1-nano-2025-04-14"
 
@@ -809,10 +819,10 @@ async def test_agent_with_memory(
 async def test_workflows_singlethreaded_runtime(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from collections.abc import Callable
-    from dataclasses import dataclass
+    from collections.abc import Callable  # noqa: PLC0415
+    from dataclasses import dataclass  # noqa: PLC0415
 
-    from autogen_core import (
+    from autogen_core import (  # noqa: PLC0415
         AgentId,
         DefaultTopicId,
         MessageContext,

@@ -38,8 +38,8 @@ _PRESIDIO_INSTALL_HINT = (
 def _get_engines() -> tuple[AnalyzerEngine, AnonymizerEngine]:
     """Lazy-load presidio engines, re-raising with a friendly install hint."""
     try:
-        from presidio_analyzer import AnalyzerEngine
-        from presidio_anonymizer import AnonymizerEngine
+        from presidio_analyzer import AnalyzerEngine  # noqa: PLC0415
+        from presidio_anonymizer import AnonymizerEngine  # noqa: PLC0415
     except ImportError as e:
         raise ImportError(_PRESIDIO_INSTALL_HINT) from e
     return AnalyzerEngine(), AnonymizerEngine()

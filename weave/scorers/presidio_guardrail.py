@@ -49,8 +49,11 @@ class PresidioScorer(weave.Scorer):
     _anonymizer: "AnonymizerEngine | None" = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
-        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
-        from presidio_anonymizer import AnonymizerEngine
+        from presidio_analyzer import (  # noqa: PLC0415
+            AnalyzerEngine,
+            RecognizerRegistry,
+        )
+        from presidio_anonymizer import AnonymizerEngine  # noqa: PLC0415
 
         registry = RecognizerRegistry()
         self._analyzer = AnalyzerEngine(registry=registry)

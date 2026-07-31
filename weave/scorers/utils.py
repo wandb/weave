@@ -12,7 +12,7 @@ from weave.trace.settings import scorers_dir
 
 def download_model_from_wandb(artifact_path: str | Path) -> Path:
     try:
-        from wandb import Api
+        from wandb import Api  # noqa: PLC0415
     except ImportError:
         raise ImportError(
             "Loading a scorer model from a W&B Artifact requires the `wandb` "
@@ -79,7 +79,7 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
     Returns:
         str: Path to the downloaded model directory.
     """
-    from huggingface_hub import snapshot_download
+    from huggingface_hub import snapshot_download  # noqa: PLC0415
 
     model_dir_name = model_name.rsplit("/", maxsplit=1)[-1].replace(":", "_")
     local_dir = Path(scorers_dir()) / model_dir_name

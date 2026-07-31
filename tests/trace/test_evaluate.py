@@ -451,9 +451,9 @@ async def test_evaluate_table_order(weave_active):
     """Test that evaluation results maintain the original order of the dataset
     when using a published dataset with images.
     """
-    import random
+    import random  # noqa: PLC0415
 
-    from PIL import Image
+    from PIL import Image  # noqa: PLC0415
 
     def make_image(i):
         return Image.new(

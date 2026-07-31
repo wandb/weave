@@ -70,7 +70,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     model_max_length: int = DEFAULT_MODEL_MAX_LENGTH
 
     def load_model(self) -> None:
-        from transformers import AutoModelForTokenClassification
+        from transformers import AutoModelForTokenClassification  # noqa: PLC0415
 
         self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
@@ -81,7 +81,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         self._model.eval()
 
     def load_tokenizer(self) -> None:
-        from transformers import AutoTokenizer
+        from transformers import AutoTokenizer  # noqa: PLC0415
 
         self._tokenizer = AutoTokenizer.from_pretrained(
             self._local_model_path,
@@ -92,7 +92,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         self, query: str, document: str, threshold: float
     ) -> tuple[list[dict[str, Any]], int, int]:
         """Score a single document."""
-        import torch
+        import torch  # noqa: PLC0415
 
         assert self._tokenizer is not None  # keep mypy happy
         assert self._model is not None  # keep mypy happy

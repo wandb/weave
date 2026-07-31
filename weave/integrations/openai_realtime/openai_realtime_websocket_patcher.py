@@ -138,7 +138,9 @@ def get_openai_realtime_websocket_patcher(
     # Configure connection-level graceful-exit behavior
     try:
         # Import late to avoid circulars at module import time
-        from weave.integrations.openai_realtime import connection as _conn
+        from weave.integrations.openai_realtime import (  # noqa: PLC0415
+            connection as _conn,
+        )
 
         if isinstance(settings, OpenAIRealtimeSettings):
             _conn.configure_realtime_finish_timeout(settings.finish_timeout)

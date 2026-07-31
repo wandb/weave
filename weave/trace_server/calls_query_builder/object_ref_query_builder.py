@@ -501,7 +501,7 @@ class ObjectRefQueryProcessor:
             )
         else:
             # Handle as normal condition
-            from weave.trace_server.calls_query_builder.calls_query_builder import (
+            from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
                 process_query_to_conditions,
             )
 

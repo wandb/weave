@@ -80,7 +80,7 @@ def with_weave_client(
             raise WeaveInitError("You must call `weave.init(<project_name>)` first")
         yield current_client
     else:
-        from weave.trace.weave_init import init_weave
+        from weave.trace.weave_init import init_weave  # noqa: PLC0415
 
         scoped_name = f"{entity}/{project}"
         try:

@@ -29,7 +29,7 @@ def test_auto_viewer_with_rich_available():
 def test_auto_viewer_without_rich():
     """Test that auto viewer falls back to print when rich is not available."""
     # Mock ImportError for rich
-    import builtins
+    import builtins  # noqa: PLC0415
 
     original_import = builtins.__import__
 
@@ -54,7 +54,7 @@ def test_explicit_viewer_selection():
 
     # Test rich viewer (if available)
     try:
-        import rich  # noqa: F401
+        import rich  # noqa: F401, PLC0415
 
         rich_console = display.Console(viewer="rich")
         assert rich_console is not None
@@ -237,7 +237,7 @@ def test_capture_context():
 
     # Test capture with rich viewer if available
     try:
-        import rich  # noqa: F401
+        import rich  # noqa: F401, PLC0415
 
         rich_console = display.Console(viewer="rich")
         with rich_console.capture() as capture:
@@ -315,8 +315,6 @@ def test_viewer_registry():
     display.register_viewer("custom_test", CustomViewer)
 
     # Test that it works - CustomViewer prints to stdout, not the file parameter
-    from io import StringIO
-
     old_stdout = sys.stdout
     try:
         sys.stdout = StringIO()
@@ -384,7 +382,7 @@ def test_fallback_behavior_simulation():
 
     This is tested by using display.get_viewer with "auto" which internally calls _get_auto_viewer
     """
-    from weave.trace.display.display import _get_auto_viewer
+    from weave.trace.display.display import _get_auto_viewer  # noqa: PLC0415
 
     with patch(
         "weave.trace.display.viewers.rich_viewer.RichViewer", side_effect=ImportError

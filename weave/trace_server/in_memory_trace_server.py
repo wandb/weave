@@ -7165,7 +7165,7 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
     """Mirror `maybe_convert_datetime_operands`: a literal compared against a
     DateTime column is normalized to 'YYYY-MM-DD HH:MM:SS.ffffff'.
     """
-    from weave.trace_server.orm import (
+    from weave.trace_server.orm import (  # noqa: PLC0415
         parse_string_to_utc_timestamp,
     )
 

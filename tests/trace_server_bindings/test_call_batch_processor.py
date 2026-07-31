@@ -305,7 +305,7 @@ def test_queue_full_writes_to_disk(tmp_path: pathlib.Path) -> None:
 
 def test_retryable_error_requeues_complete_batch() -> None:
     """Retryable error on complete_processor_fn requeues items and raises SkipIndividualProcessingError."""
-    from weave.trace_server_bindings.async_batch_processor import (
+    from weave.trace_server_bindings.async_batch_processor import (  # noqa: PLC0415
         SkipIndividualProcessingError,
     )
 
@@ -343,7 +343,7 @@ def test_retryable_error_requeues_complete_batch() -> None:
 @pytest.mark.disable_logging_error_check
 def test_non_retryable_error_drops_complete_items_but_eager_succeeds(caplog) -> None:
     """Non-retryable error drops complete items but eager items still process."""
-    import logging
+    import logging  # noqa: PLC0415
 
     complete_fn = MagicMock(
         side_effect=httpx.HTTPStatusError(
@@ -382,7 +382,7 @@ def test_non_retryable_error_drops_complete_items_but_eager_succeeds(caplog) -> 
 
 def test_mixed_batch_error_does_not_break_eager_processing() -> None:
     """Complete path failure does not prevent eager items from being processed."""
-    from weave.trace_server_bindings.async_batch_processor import (
+    from weave.trace_server_bindings.async_batch_processor import (  # noqa: PLC0415
         SkipIndividualProcessingError,
     )
 

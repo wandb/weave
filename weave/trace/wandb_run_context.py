@@ -33,7 +33,7 @@ def _get_global_wandb_run() -> wandb.sdk.wandb_run.Run | None:
         The global wandb.run object, or None if wandb is not installed or no run is active.
     """
     try:
-        import wandb
+        import wandb  # noqa: PLC0415
     except ImportError:
         return None
     return wandb.run

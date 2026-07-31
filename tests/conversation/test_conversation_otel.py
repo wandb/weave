@@ -1743,7 +1743,7 @@ class TestLogTurnNoOtel:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # Simulate OTel not installed.
-        import weave.conversation.conversation as conversation_mod
+        import weave.conversation.conversation as conversation_mod  # noqa: PLC0415
 
         monkeypatch.setattr(conversation_mod, "_OTEL_AVAILABLE", False)
         result = log_turn(

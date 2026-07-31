@@ -122,7 +122,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        from transformers import AutoModelForSequenceClassification
+        from transformers import AutoModelForSequenceClassification  # noqa: PLC0415
 
         self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
@@ -133,7 +133,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         self._model.eval()
 
     def load_tokenizer(self) -> None:
-        from transformers import AutoTokenizer
+        from transformers import AutoTokenizer  # noqa: PLC0415
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
 
@@ -146,7 +146,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         Returns:
             A list of prediction scores for each category.
         """
-        import torch
+        import torch  # noqa: PLC0415
 
         with torch.inference_mode():
             attention_mask = (input_ids != 0).long()
@@ -219,7 +219,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     )
 
     def load_model(self) -> None:
-        from transformers import AutoModelForSequenceClassification
+        from transformers import AutoModelForSequenceClassification  # noqa: PLC0415
 
         self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
@@ -230,12 +230,12 @@ class WeaveBiasScorerV1(RollingWindowScorer):
         self._model.eval()
 
     def load_tokenizer(self) -> None:
-        from transformers import AutoTokenizer
+        from transformers import AutoTokenizer  # noqa: PLC0415
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
 
     def predict_chunk(self, input_ids: "Tensor") -> list[float]:
-        import torch
+        import torch  # noqa: PLC0415
 
         assert self._model is not None
         assert self._tokenizer is not None

@@ -27,7 +27,7 @@ def patch_groq() -> Generator[None, None, None]:
 def test_groq_quickstart(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from groq import Groq
+    from groq import Groq  # noqa: PLC0415
 
     groq_client = Groq(
         api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"),
@@ -80,7 +80,7 @@ def test_groq_quickstart(
 async def test_groq_async_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from groq import AsyncGroq
+    from groq import AsyncGroq  # noqa: PLC0415
 
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
@@ -139,7 +139,7 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
 def test_groq_streaming_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from groq import Groq
+    from groq import Groq  # noqa: PLC0415
 
     groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
@@ -217,7 +217,7 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
 async def test_groq_async_streaming_chat_completion(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from groq import AsyncGroq
+    from groq import AsyncGroq  # noqa: PLC0415
 
     groq_client = AsyncGroq(api_key=os.environ.get("GROQ_API_KEY", "DUMMY_API_KEY"))
 
@@ -285,9 +285,9 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
 def test_groq_tool_call(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    import json
+    import json  # noqa: PLC0415
 
-    from groq import Groq
+    from groq import Groq  # noqa: PLC0415
 
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
 

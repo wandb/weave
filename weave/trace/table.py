@@ -12,7 +12,7 @@ class Table:  # noqa: PLW1641
     def __init__(self, rows: list[dict]) -> None:
         if not isinstance(rows, list):
             try:
-                import pandas as pd
+                import pandas as pd  # noqa: PLC0415
 
                 if isinstance(rows, pd.DataFrame):
                     rows = rows.to_dict(orient="records")

@@ -78,7 +78,7 @@ def server_class(request):
     """Returns the appropriate server class based on --remote-http-trace-server flag."""
     flag = request.config.getoption("--remote-http-trace-server", default="remote")
     if flag == "stainless":
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+        from weave.trace_server_bindings.stainless_remote_http_trace_server import (  # noqa: PLC0415
             StainlessRemoteHTTPTraceServer,
         )
 

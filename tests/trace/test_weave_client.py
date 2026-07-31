@@ -3128,8 +3128,6 @@ def test_calls_query_sort_by_trace_name(client):
 
 def test_calls_query_sort_by_display_name_prioritized(client):
     """Test that sorting by trace_name prioritizes display_name over op_name when op_names are identical."""
-    import uuid
-
     # Use a unique test ID to identify these calls
     test_id = str(uuid.uuid4())
     op_name = "same_op_name"  # Use the same op_name for all calls
@@ -3191,7 +3189,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
 def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
-    from weave.trace.call import Call
+    from weave.trace.call import Call  # noqa: PLC0415
 
     @weave.op
     def test_op():

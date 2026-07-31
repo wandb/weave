@@ -43,7 +43,7 @@ class LLMScorer(weave.Scorer):
 
     def model_post_init(self, context: Any, /) -> None:
         try:
-            from litellm import acompletion, aembedding, amoderation
+            from litellm import acompletion, aembedding, amoderation  # noqa: PLC0415
         except ImportError:
             raise ImportError(
                 "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
@@ -62,7 +62,7 @@ class InstructorLLMScorer:
 
 
 def check_cuda(device: str) -> None:
-    import torch
+    import torch  # noqa: PLC0415
 
     if torch.cuda.is_available() and device == "cpu":
         warnings.warn(

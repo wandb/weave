@@ -270,14 +270,16 @@ async def test_process_timeout(client):
 
 async def exit_code_function(req: TestRequest) -> TestResponse:
     """A function that exits with a specific code."""
-    import sys
+    import sys  # noqa: PLC0415
 
     sys.exit(req.exit_code or 1)
 
 
 async def check_isolation_function(req: TestRequest) -> TestResponse:
     """A function that checks the current context matches expectations."""
-    from weave.trace.context.weave_client_context import get_weave_client
+    from weave.trace.context.weave_client_context import (  # noqa: PLC0415
+        get_weave_client,
+    )
 
     client = get_weave_client()
     if client is None:

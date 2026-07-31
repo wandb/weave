@@ -39,7 +39,7 @@ class DummyWSApp:
 
 class DummyWeaveClient:
     def create_call(self, op=None, inputs=None, parent=None):
-        from weave.trace.call import Call
+        from weave.trace.call import Call  # noqa: PLC0415
 
         return Call(
             _op_name=op or "",
@@ -54,7 +54,7 @@ class DummyWeaveClient:
 
 
 def test_weave_media_connection_wrapping_sends_and_receives(monkeypatch):
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(se, "require_weave_client", DummyWeaveClient)
 
@@ -136,7 +136,7 @@ class DummyAsyncConn:
 
 @pytest.mark.asyncio
 async def test_async_wrapper_basic(monkeypatch):
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(se, "require_weave_client", DummyWeaveClient)
 

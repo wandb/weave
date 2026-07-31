@@ -23,7 +23,7 @@ class LevenshteinScorer(weave.Scorer):
     @model_validator(mode="after")
     def check_levenshtein(self) -> "LevenshteinScorer":
         try:
-            from Levenshtein import distance
+            from Levenshtein import distance  # noqa: PLC0415
 
             self.distance = distance
         except ImportError:

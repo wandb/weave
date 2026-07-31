@@ -139,15 +139,17 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     """
     global _conversation_tracer_provider, _conversation_span_exporter  # noqa: PLW0603
     try:
-        from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+        from opentelemetry import trace  # noqa: PLC0415
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (  # noqa: PLC0415
             OTLPSpanExporter,
         )
-        from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.sdk.resources import Resource  # noqa: PLC0415
+        from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor  # noqa: PLC0415
 
-        from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
+        from weave.evaluation.otel_eval_linker import (  # noqa: PLC0415
+            EvalLinkSpanProcessor,
+        )
     except ImportError as e:
         logger.warning(
             "Conversation SDK tracing skipped: opentelemetry not available (%s)", e
@@ -308,7 +310,9 @@ def init_weave(
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
-        from weave.utils.pii_redaction import track_pii_redaction_enabled
+        from weave.utils.pii_redaction import (  # noqa: PLC0415
+            track_pii_redaction_enabled,
+        )
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
@@ -386,7 +390,7 @@ def init_weave_get_server(
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
     if should_use_stainless_server():
-        from weave.trace_server_bindings.stainless_remote_http_trace_server import (
+        from weave.trace_server_bindings.stainless_remote_http_trace_server import (  # noqa: PLC0415
             StainlessRemoteHTTPTraceServer,
         )
 

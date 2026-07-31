@@ -630,7 +630,7 @@ def test_error_records_status_and_data(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:
     """A span with an error records ERROR status and surfaces error.data attr."""
-    from opentelemetry.trace import StatusCode
+    from opentelemetry.trace import StatusCode  # noqa: PLC0415
 
     processor = WeaveOtelTracingProcessor()
 
@@ -697,7 +697,7 @@ def test_processor_cleanup(
 
 def test_iso_to_ns_roundtrip() -> None:
     """``_iso_to_ns`` converts ISO 8601 strings to nanoseconds since epoch."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone  # noqa: PLC0415
 
     now = datetime(2026, 5, 20, 12, 30, 45, tzinfo=timezone.utc)
     iso = now.isoformat()
@@ -715,13 +715,13 @@ def test_patcher_install_and_uninstall_lifecycle() -> None:
     processors — we install a sentinel processor first, then install our
     patcher, then uninstall, and confirm the sentinel is still there.
     """
-    from agents.tracing import TracingProcessor, set_trace_processors
+    from agents.tracing import TracingProcessor, set_trace_processors  # noqa: PLC0415
 
-    from weave.integrations.openai_agents.patcher import (
+    from weave.integrations.openai_agents.patcher import (  # noqa: PLC0415
         OpenAIAgentsOtelPatcher,
         _registered_processors,
     )
-    from weave.trace.autopatch import IntegrationSettings
+    from weave.trace.autopatch import IntegrationSettings  # noqa: PLC0415
 
     original = _registered_processors() or []
 
@@ -1027,8 +1027,10 @@ def test_unhandled_span_type_emits_warning(
 
 def test_undo_patch_is_noop_when_not_patched() -> None:
     """Calling undo_patch on a non-installed patcher returns True without error."""
-    from weave.integrations.openai_agents.patcher import OpenAIAgentsOtelPatcher
-    from weave.trace.autopatch import IntegrationSettings
+    from weave.integrations.openai_agents.patcher import (  # noqa: PLC0415
+        OpenAIAgentsOtelPatcher,
+    )
+    from weave.trace.autopatch import IntegrationSettings  # noqa: PLC0415
 
     patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
     assert patcher.patched is False

@@ -784,10 +784,10 @@ class TestRegressions:
         created the lock second.  A sender polling in between would see
         an "inactive" file and delete it.
         """
-        from unittest.mock import patch
+        from unittest.mock import patch  # noqa: PLC0415
 
-        from weave.durability import wal_writer as wmod
-        from weave.durability.wal_lock import acquire_lock
+        from weave.durability import wal_writer as wmod  # noqa: PLC0415
+        from weave.durability.wal_lock import acquire_lock  # noqa: PLC0415
 
         call_order: list[str] = []
         original_open = open

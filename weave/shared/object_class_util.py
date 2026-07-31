@@ -51,7 +51,7 @@ class ProcessIncomingObjectResult(TypedDict):
 def _get_builtin_object_registry() -> dict[str, type[BaseModel]]:
     # Circular import avoidance: importing this eagerly during `import weave`
     # can recurse through builtin object class modules before weave is initialized.
-    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY
+    from weave.trace.base_objects import BUILTIN_OBJECT_REGISTRY  # noqa: PLC0415
 
     return BUILTIN_OBJECT_REGISTRY
 

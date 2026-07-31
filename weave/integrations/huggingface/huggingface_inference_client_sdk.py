@@ -35,7 +35,7 @@ def huggingface_accumulator(
     acc: "ChatCompletionStreamOutput | ChatCompletionOutput | None",
     value: "ChatCompletionStreamOutput",
 ) -> "ChatCompletionOutput":
-    from huggingface_hub.inference._generated.types.chat_completion import (
+    from huggingface_hub.inference._generated.types.chat_completion import (  # noqa: PLC0415
         ChatCompletionOutput,
         ChatCompletionOutputComplete,
         ChatCompletionOutputMessage,

@@ -460,7 +460,7 @@ def mock_invoke_exception_make_api_call(
 ) -> dict:
     if operation_name == "InvokeModel":
         # Simulate a ValidationException for invalid model ID
-        from botocore.exceptions import ClientError
+        from botocore.exceptions import ClientError  # noqa: PLC0415
 
         raise ClientError(
             error_response={
@@ -882,7 +882,7 @@ def test_bedrock_invoke(
 
 @mock_aws
 def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -> None:
-    from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
+    from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer  # noqa: PLC0415
 
     scorer = BedrockGuardrailScorer(
         guardrail_id="test-guardrail-id",

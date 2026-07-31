@@ -557,8 +557,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
 
 
 def test_trace_call_wb_run_step_query(client):
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
+    from weave.trace.wandb_run_context import WandbRunContext  # noqa: PLC0415
 
     step_counter = iter(range(100))
 
@@ -910,8 +909,7 @@ def test_trace_call_query_filter_trace_roots_only(client, no_autoflush):
 def test_trace_call_query_filter_wb_run_ids(client, no_autoflush):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
-    from weave.trace import weave_client
-    from weave.trace.wandb_run_context import WandbRunContext
+    from weave.trace.wandb_run_context import WandbRunContext  # noqa: PLC0415
 
     with mock.patch.object(
         weave_client,
@@ -1138,7 +1136,7 @@ def test_trace_call_query_timings(client, no_autoflush):
 def test_trace_call_sort(client):
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
-        import time
+        import time  # noqa: PLC0415
 
         time.sleep(delay)
         return in_val
@@ -1170,7 +1168,7 @@ def test_trace_call_sort_with_mixed_types(client):
 
     @weave.op
     def basic_op(in_val: dict) -> dict:
-        import time
+        import time  # noqa: PLC0415
 
         time.sleep(1 / 10)
         return in_val
@@ -2128,7 +2126,7 @@ def _no_graph_client():
 
 @contextmanager
 def _patched_default_initializer(trace_client: weave_client.WeaveClient):
-    from weave.trace import weave_init
+    from weave.trace import weave_init  # noqa: PLC0415
 
     def init_weave_get_server_patched(api_key):
         return trace_client.server
@@ -2244,8 +2242,6 @@ def map_with_copying_thread_executor(fn, vals):
     ],
 )
 def test_mapped_execution(client, mapper):
-    import time
-
     events = []
 
     @weave.op
@@ -3047,8 +3043,6 @@ def test_sort_and_filter_through_refs(client):
 
     def test_obj(val):
         return weave.publish(TestObj(val=val))
-
-    import random
 
     # Purposely shuffled and contains values that would not sort correctly as strings
     values = [3, 9, 15, 21, 0, 12, 6, 18]
@@ -5456,8 +5450,7 @@ def test_calls_query_with_descendant_error(client):
 
 def test_thread_context_with_weave_api(client):
     """Test thread context using the weave.thread() API with ThreadContext."""
-    import weave
-    from weave.trace.context import call_context
+    from weave.trace.context import call_context  # noqa: PLC0415
 
     # Test default thread_id is None (using internal context for verification)
     assert call_context.get_thread_id() is None
@@ -5486,7 +5479,6 @@ def test_thread_context_with_weave_api(client):
 
 def test_thread_id_in_calls(client):
     """Test that thread_id is properly captured in call records, including auto-generation."""
-    import weave
 
     @weave.op
     def test_op_with_thread(x: int) -> int:
@@ -5548,7 +5540,6 @@ def test_thread_id_in_calls(client):
 
 def test_thread_id_inheritance(client):
     """Test that thread_id is inherited by child calls, demonstrated via ThreadContext."""
-    import weave
 
     @weave.op
     def child_op(x: int) -> int:
@@ -5596,7 +5587,6 @@ def test_thread_id_inheritance(client):
 
 def test_thread_id_query_filtering(client):
     """Test that calls can be filtered by thread_id."""
-    import weave
 
     @weave.op
     def query_test_op(value: str) -> str:
@@ -5691,8 +5681,7 @@ def test_get_calls_filter_by_thread_ids_only(client):
 
 def test_thread_context_error_handling(weave_active):
     """Test that ThreadContext is properly managed even when exceptions occur."""
-    import weave
-    from weave.trace.context import call_context
+    from weave.trace.context import call_context  # noqa: PLC0415
 
     @weave.op
     def failing_op(should_fail: bool) -> str:
@@ -5736,10 +5725,6 @@ def test_thread_context_error_handling(weave_active):
 
 def test_threads_query_endpoint(client):
     """Test the threads_query endpoint (/threads/query) functionality."""
-    import datetime
-
-    import weave
-    from weave.trace_server import trace_server_interface as tsi
 
     # Create some test operations
     @weave.op
@@ -5982,10 +5967,6 @@ def test_threads_query_endpoint(client):
 
 def test_threads_query_aggregation_fields(client):
     """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
-    import time
-
-    import weave
-    from weave.trace_server import trace_server_interface as tsi
 
     @weave.op
     def quick_op(value: str) -> str:
@@ -6138,7 +6119,6 @@ def test_threads_query_aggregation_fields(client):
 
 def test_turn_id_functionality(client):
     """Test that turn_id is properly assigned for turn calls and descendants."""
-    import weave
 
     @weave.op
     def child_op(x: int) -> int:
@@ -6208,7 +6188,6 @@ def test_turn_id_functionality(client):
 
 def test_nested_thread_contexts_turn_lineage(client):
     """Test that nested thread contexts properly cut off turn lineage."""
-    import weave
 
     @weave.op
     def child_op(x: int) -> int:
@@ -6296,8 +6275,7 @@ def test_nested_thread_contexts_turn_lineage(client):
 
 def test_thread_id_none_turn_id_none(client):
     """Test that when thread_id is None, turn_id is also None."""
-    import weave
-    from weave.trace.context import call_context
+    from weave.trace.context import call_context  # noqa: PLC0415
 
     @weave.op
     def child_op(x: int) -> int:
@@ -6356,8 +6334,7 @@ def test_thread_id_none_turn_id_none(client):
 
 def test_nested_thread_disable_with_none(client):
     """Test that ThreadContext properly shows thread_id=None when threading is disabled."""
-    import weave
-    from weave.trace.context import call_context
+    from weave.trace.context import call_context  # noqa: PLC0415
 
     @weave.op
     def turn_a(x: int) -> int:
@@ -6441,7 +6418,6 @@ def test_nested_thread_disable_with_none(client):
 
 def test_thread_api_with_auto_generation(client):
     """Test the thread API with ThreadContext and auto-generation."""
-    import weave
 
     @weave.op
     def test_op(x: int) -> int:

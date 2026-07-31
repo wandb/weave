@@ -711,7 +711,7 @@ def span_measure_sql(
     if value_sql is not None:
         valid_parts.append(value_sql.valid_sql)
     if measure.filter is not None:
-        from weave.trace_server.query_builder.agent_query_compiler import (
+        from weave.trace_server.query_builder.agent_query_compiler import (  # noqa: PLC0415
             compile_agent_query,
         )
 
@@ -881,7 +881,9 @@ def _spans_filter_sql(
     if req.query is not None:
         # Imported lazily to avoid a circular import between this module
         # (used by agent_query_compiler) and the compiler itself.
-        from weave.trace_server.query_builder import agent_query_compiler
+        from weave.trace_server.query_builder import (  # noqa: PLC0415
+            agent_query_compiler,
+        )
 
         where_conditions.append(agent_query_compiler.compile_agent_query(req.query, pb))
     return _FilterSQL(where=" AND ".join(where_conditions))

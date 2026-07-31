@@ -244,11 +244,11 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.context.weave_client_context import (
+        from weave.trace.context.weave_client_context import (  # noqa: PLC0415
             get_weave_client,
             set_weave_client_global,
         )
-        from weave.trace.weave_init import init_weave
+        from weave.trace.weave_init import init_weave  # noqa: PLC0415
 
         gc = get_weave_client()
         if gc is not None:
@@ -285,7 +285,9 @@ class ObjectRef(RefWithExtra):
         )
 
     def delete(self) -> None:
-        from weave.trace.context.weave_client_context import get_weave_client
+        from weave.trace.context.weave_client_context import (  # noqa: PLC0415
+            get_weave_client,
+        )
 
         gc = get_weave_client()
         if gc is not None:
@@ -308,7 +310,9 @@ class OpRef(ObjectRef):
         return u
 
     def delete(self) -> None:
-        from weave.trace.context.weave_client_context import get_weave_client
+        from weave.trace.context.weave_client_context import (  # noqa: PLC0415
+            get_weave_client,
+        )
 
         gc = get_weave_client()
         if gc is not None:

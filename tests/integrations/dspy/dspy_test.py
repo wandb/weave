@@ -389,7 +389,7 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
     integration can handle BaseModel outputs during evaluation without raising
     errors and logs a proper Evaluation.evaluate root with an Average Metric.
     """
-    from pydantic import BaseModel
+    from pydantic import BaseModel  # noqa: PLC0415
 
     class PResult(BaseModel):
         question: str

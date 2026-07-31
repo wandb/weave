@@ -545,7 +545,7 @@ def _preload_autogen_extensions() -> None:
             logger.info("autogen-ext package not found, skipping extension preloading")
             return
 
-        import autogen_ext
+        import autogen_ext  # noqa: PLC0415
 
         for _, name, _ in pkgutil.walk_packages(
             autogen_ext.__path__, autogen_ext.__name__ + "."

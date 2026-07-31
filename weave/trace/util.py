@@ -147,7 +147,7 @@ def is_notebook() -> bool:
     if is_colab():  # type: ignore[no-untyped-call]
         return True
     try:
-        from IPython import get_ipython
+        from IPython import get_ipython  # noqa: PLC0415
     except ImportError:
         return False
     else:

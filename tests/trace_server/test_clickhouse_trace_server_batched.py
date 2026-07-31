@@ -387,8 +387,6 @@ def test_clickhouse_distributed_mode_properties():
         # Test distributed mode property
         assert server.use_distributed_mode is True
         assert server.clickhouse_cluster_name == "test_cluster"
-        from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-
         expected_table = f"calls_complete{ch_settings.LOCAL_TABLE_SUFFIX}"
         assert server._get_calls_complete_table_name() == expected_table
 
@@ -1074,7 +1072,7 @@ def test_completions_create_stream_prompt_not_found_error():
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
         # Mock obj_read to raise NotFoundError
-        from weave.trace_server.errors import NotFoundError
+        from weave.trace_server.errors import NotFoundError  # noqa: PLC0415
 
         mock_obj_read.side_effect = NotFoundError("Prompt not found")
 

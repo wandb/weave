@@ -709,7 +709,7 @@ def test_otel_many_unique_ops_in_batch(trace_server, clickhouse_trace_server):
     assert len(calls_after) == 40
 
     # All refs for the same op name should be identical across batches
-    from collections import defaultdict
+    from collections import defaultdict  # noqa: PLC0415
 
     by_op: dict[str, set[str]] = defaultdict(set)
     for c in calls_after:

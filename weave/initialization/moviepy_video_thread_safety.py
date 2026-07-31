@@ -71,7 +71,7 @@ def _apply_threadsafe_patch() -> None:
         ImportError: If moviepy is not installed
         Exception: For any other unexpected errors during patching
     """
-    from moviepy.editor import VideoFileClip
+    from moviepy.editor import VideoFileClip  # noqa: PLC0415
 
     global _original_methods  # noqa: PLW0602
 
@@ -142,7 +142,7 @@ def _undo_threadsafe_patch() -> None:
         ImportError: If moviepy is not installed
         Exception: For any other unexpected errors during unpatching
     """
-    from moviepy.editor import VideoFileClip
+    from moviepy.editor import VideoFileClip  # noqa: PLC0415
 
     global _original_methods  # noqa: PLW0603
 

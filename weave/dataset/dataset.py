@@ -71,8 +71,8 @@ class Dataset(Object):
     @classmethod
     def from_hf(cls, hf_dataset: "HFDataset | HFDatasetDict") -> Self:
         try:
-            from datasets import Dataset as HFDataset
-            from datasets import DatasetDict as HFDatasetDict
+            from datasets import Dataset as HFDataset  # noqa: PLC0415
+            from datasets import DatasetDict as HFDatasetDict  # noqa: PLC0415
         except ImportError:
             raise ImportError(
                 "huggingface datasets is required to use this method. "
@@ -106,7 +106,7 @@ class Dataset(Object):
 
     def to_pandas(self) -> "pd.DataFrame":
         try:
-            import pandas as pd
+            import pandas as pd  # noqa: PLC0415
         except ImportError:
             raise ImportError("pandas is required to use this method") from None
 
@@ -114,7 +114,7 @@ class Dataset(Object):
 
     def to_hf(self) -> "HFDataset":
         try:
-            from datasets import Dataset as HFDataset
+            from datasets import Dataset as HFDataset  # noqa: PLC0415
         except ImportError:
             raise ImportError(
                 "huggingface datasets is required to use this method. "
@@ -138,7 +138,7 @@ class Dataset(Object):
         Returns:
             The updated dataset.
         """
-        import weave
+        import weave  # noqa: PLC0415
 
         client = require_weave_client()
         if not isinstance(self.rows, WeaveTable) or not self.rows.table_ref:

@@ -686,7 +686,7 @@ class TestAttributes:
 
     def test_to_json_serializable_date_time(self):
         """Test converting date and time objects."""
-        from datetime import date, time
+        from datetime import date, time  # noqa: PLC0415
 
         # Test date
         d = date(2023, 1, 1)
@@ -698,7 +698,7 @@ class TestAttributes:
 
     def test_to_json_serializable_timedelta(self):
         """Test converting timedelta objects."""
-        from datetime import timedelta
+        from datetime import timedelta  # noqa: PLC0415
 
         # Test one day
         td = timedelta(days=1)
@@ -711,15 +711,13 @@ class TestAttributes:
 
     def test_to_json_serializable_uuid(self):
         """Test converting UUID objects."""
-        import uuid
-
         # Create a UUID with a known value
         test_uuid = uuid.UUID("12345678-1234-5678-1234-567812345678")
         assert to_json_serializable(test_uuid) == "12345678-1234-5678-1234-567812345678"
 
     def test_to_json_serializable_decimal(self):
         """Test converting Decimal objects."""
-        from decimal import Decimal
+        from decimal import Decimal  # noqa: PLC0415
 
         # Test simple decimal
         assert to_json_serializable(Decimal("10.5")) == 10.5
@@ -778,7 +776,7 @@ class TestAttributes:
 
     def test_to_json_serializable_dataclass(self):
         """Test converting dataclass objects."""
-        from dataclasses import dataclass
+        from dataclasses import dataclass  # noqa: PLC0415
 
         @dataclass
         class Person:
@@ -994,7 +992,9 @@ class TestSemanticConventionParsing:
 
     def test_openinference_attributes_extraction(self):
         """Test extracting attributes from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+        from openinference.semconv.trace import (  # noqa: PLC0415
+            SpanAttributes as OISpanAttr,
+        )
 
         # Create attribute dictionary with OpenInference attributes
         attributes = create_attributes(
@@ -1136,7 +1136,9 @@ class TestSemanticConventionParsing:
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+        from openinference.semconv.trace import (  # noqa: PLC0415
+            SpanAttributes as OISpanAttr,
+        )
 
         # Create attribute dictionary with OpenInference input value and mime type
         attributes = create_attributes(
@@ -1179,7 +1181,9 @@ class TestSemanticConventionParsing:
 
     def test_openinference_outputs_extraction(self):
         """Test extracting outputs from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+        from openinference.semconv.trace import (  # noqa: PLC0415
+            SpanAttributes as OISpanAttr,
+        )
 
         # Create attribute dictionary with OpenInference output value and mime type
         attributes = create_attributes(
@@ -1222,7 +1226,9 @@ class TestSemanticConventionParsing:
 
     def test_openinference_usage_extraction(self):
         """Test extracting usage from OpenInference attributes."""
-        from openinference.semconv.trace import SpanAttributes as OISpanAttr
+        from openinference.semconv.trace import (  # noqa: PLC0415
+            SpanAttributes as OISpanAttr,
+        )
 
         # Create attribute dictionary with OpenInference token counts
         attributes = create_attributes(
@@ -1241,8 +1247,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_attributes_extraction(self):
         """Test extracting attributes from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
         # Create attribute dictionary with OpenTelemetry attributes
         attributes = create_attributes(
             {
@@ -1262,8 +1266,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_inputs_extraction(self):
         """Test extracting inputs from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
         # Create attribute dictionary with OpenTelemetry prompts
         prompts = {"0": {"role": "user", "content": "Tell me about quantum computing"}}
         attributes = create_attributes(
@@ -1282,8 +1284,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_outputs_extraction(self):
         """Test extracting outputs from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
         # Create attribute dictionary with OpenTelemetry completions
         completions = {
             "0": {
@@ -1312,8 +1312,6 @@ class TestSemanticConventionParsing:
 
     def test_opentelemetry_usage_extraction(self):
         """Test extracting usage from OpenTelemetry attributes."""
-        from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
-
         # Create attribute dictionary with OpenTelemetry token usage
         attributes = create_attributes(
             {
@@ -1739,8 +1737,6 @@ class TestHelpers:
 
     def test_try_parse_timestamp(self):
         """Test parsing timestamps from various formats."""
-        from datetime import datetime
-
         # Test parsing ISO 8601 format string
         iso_timestamp = "2023-01-01T12:00:00"
         result = try_parse_timestamp(iso_timestamp)
@@ -1806,8 +1802,6 @@ class TestSpanOverrides:
 
     def test_get_span_overrides_with_timestamps(self):
         """Test extracting span overrides with different timestamp formats."""
-        from datetime import datetime
-
         # Create attribute dictionary with epoch timestamps
         start_ns = 1672574400000000000  # 2023-01-01T12:00:00 in nanoseconds
         end_seconds = 1672574460.0  # 2023-01-01T12:01:00 in seconds

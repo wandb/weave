@@ -28,7 +28,7 @@ def litellm_accumulator(
     value: ModelResponse,
 ) -> ModelResponse:
     # This import should be safe at this point
-    from litellm.utils import Choices, Message, ModelResponse, Usage
+    from litellm.utils import Choices, Message, ModelResponse, Usage  # noqa: PLC0415
 
     if acc is None:
         acc = ModelResponse(
@@ -90,7 +90,7 @@ def litellm_accumulator(
 # LiteLLM does so odd stuff with pydantic objects which result in our auto
 # serialization not working correctly. Here we just blindly dump to a dict instead.
 def litellm_on_finish_post_processor(value: Any) -> Any:
-    import pydantic
+    import pydantic  # noqa: PLC0415
 
     value_to_finish = value
     if isinstance(value, pydantic.BaseModel):

@@ -182,7 +182,7 @@ class PaginatedIterator(Generic[T, R_co]):
             or filters to reduce the amount of data fetched.
         """
         try:
-            import pandas as pd
+            import pandas as pd  # noqa: PLC0415
         except ImportError:
             raise ImportError("pandas is required to use this method") from None
 

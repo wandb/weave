@@ -28,7 +28,7 @@ from weave.integrations.integration_utilities import op_name_from_call
 
 @pytest.fixture(autouse=True)
 def patch_claude_agent_sdk() -> Generator[None, None, None]:
-    import weave.integrations.claude_agent_sdk.claude_agent_sdk_integration as mod
+    import weave.integrations.claude_agent_sdk.claude_agent_sdk_integration as mod  # noqa: PLC0415
 
     mod._claude_agent_sdk_patcher = None
     patcher = get_claude_agent_sdk_patcher()
@@ -296,7 +296,7 @@ async def test_error_query(
 async def test_multi_turn_client(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
-    from claude_agent_sdk import ClaudeSDKClient
+    from claude_agent_sdk import ClaudeSDKClient  # noqa: PLC0415
 
     cassette = load_cassette("multi_turn_response")
     transport = ReplayTransport(cassette)

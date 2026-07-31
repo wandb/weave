@@ -120,7 +120,7 @@ def lite_llm_image_generation(
                 inputs={"model": "dall-e-3", "prompt": "A cat wearing a hat"}
             )
     """
-    from litellm import image_generation
+    from litellm import image_generation  # noqa: PLC0415
 
     model_name = inputs.get("model", "")
 

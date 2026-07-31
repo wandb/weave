@@ -88,7 +88,7 @@ def get_gcp_credentials() -> GCPCredentials | None:
     Raises:
         ValueError: If credentials are missing or invalid JSON format
     """
-    from google.oauth2 import service_account
+    from google.oauth2 import service_account  # noqa: PLC0415
 
     creds_json_b64 = environment.wf_storage_bucket_gcp_credentials_json_b64()
     if not creds_json_b64:

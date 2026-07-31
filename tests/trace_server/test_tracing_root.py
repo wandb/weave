@@ -73,7 +73,7 @@ def test_local_root_visible_across_await() -> None:
 
 def test_get_local_root_returns_none_for_non_recording_span() -> None:
     """Per the contract, non-recording spans are treated as 'no local root'."""
-    from opentelemetry import trace as _otel_trace
+    from opentelemetry import trace as _otel_trace  # noqa: PLC0415
 
     invalid_span = _otel_trace.INVALID_SPAN
     with local_root_scope(invalid_span):

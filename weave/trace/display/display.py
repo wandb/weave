@@ -56,7 +56,7 @@ def _get_auto_viewer(**kwargs: Any) -> ViewerProtocol:
         The auto-detected viewer.
     """
     try:
-        from weave.trace.display.viewers.rich_viewer import RichViewer
+        from weave.trace.display.viewers.rich_viewer import RichViewer  # noqa: PLC0415
 
         return RichViewer(**kwargs)
     except ImportError:
@@ -298,13 +298,13 @@ def get_console() -> Console:
 def _register_viewers() -> None:
     """Register built-in viewers after module initialization."""
     # Register print viewer (always available)
-    from weave.trace.display.viewers import print_viewer
+    from weave.trace.display.viewers import print_viewer  # noqa: PLC0415
 
     print_viewer.register()
 
     # Register rich viewer if available
     try:
-        from weave.trace.display.viewers import rich_viewer
+        from weave.trace.display.viewers import rich_viewer  # noqa: PLC0415
     except ImportError:
         pass  # Rich viewer not available
     else:

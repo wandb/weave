@@ -227,9 +227,12 @@ def _make_otel_export_req_with_ref_attrs(
     `weave` kvlist parent (the form some OTel SDKs emit) instead of the
     flat-dotted `weave.object_refs` form.
     """
-    from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-    from opentelemetry.proto.resource.v1.resource_pb2 import Resource
-    from opentelemetry.proto.trace.v1.trace_pb2 import (
+    from opentelemetry.proto.common.v1.common_pb2 import (  # noqa: PLC0415
+        AnyValue,
+        KeyValue,
+    )
+    from opentelemetry.proto.resource.v1.resource_pb2 import Resource  # noqa: PLC0415
+    from opentelemetry.proto.trace.v1.trace_pb2 import (  # noqa: PLC0415
         ResourceSpans,
         ScopeSpans,
         Span,
@@ -413,9 +416,9 @@ def _make_otel_export_req_with_string_attr(
     project_id: str = "ent/proj",
 ) -> tsi.agent_types.GenAIOTelExportReq:
     """Build a `GenAIOTelExportReq` with a single string-valued span attr."""
-    from opentelemetry.proto.common.v1.common_pb2 import KeyValue
-    from opentelemetry.proto.resource.v1.resource_pb2 import Resource
-    from opentelemetry.proto.trace.v1.trace_pb2 import (
+    from opentelemetry.proto.common.v1.common_pb2 import KeyValue  # noqa: PLC0415
+    from opentelemetry.proto.resource.v1.resource_pb2 import Resource  # noqa: PLC0415
+    from opentelemetry.proto.trace.v1.trace_pb2 import (  # noqa: PLC0415
         ResourceSpans,
         ScopeSpans,
         Span,
@@ -510,9 +513,12 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
     """A single per-request cache means ext→int_project_id runs once per
     distinct entity/project pair, even across many spans and many refs.
     """
-    from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-    from opentelemetry.proto.resource.v1.resource_pb2 import Resource
-    from opentelemetry.proto.trace.v1.trace_pb2 import (
+    from opentelemetry.proto.common.v1.common_pb2 import (  # noqa: PLC0415
+        AnyValue,
+        KeyValue,
+    )
+    from opentelemetry.proto.resource.v1.resource_pb2 import Resource  # noqa: PLC0415
+    from opentelemetry.proto.trace.v1.trace_pb2 import (  # noqa: PLC0415
         ResourceSpans,
         ScopeSpans,
         Span,

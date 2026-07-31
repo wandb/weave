@@ -31,7 +31,7 @@ CLAUDE_AGENT_SDK_INTEGRATION = library_integration("claude_agent_sdk")
 
 
 def _serialize_msg(msg: Any) -> dict[str, Any]:
-    from claude_agent_sdk import (
+    from claude_agent_sdk import (  # noqa: PLC0415
         AssistantMessage,
         ResultMessage,
         SystemMessage,
@@ -69,7 +69,7 @@ def _process_message_inline(
       - accumulated_messages: list of serialized messages (shared history)
       - root_model: first model name seen
     """
-    from claude_agent_sdk import (
+    from claude_agent_sdk import (  # noqa: PLC0415
         AssistantMessage,
         SystemMessage,
         TextBlock,
@@ -251,7 +251,7 @@ def _resolve_thread_id() -> tuple[str, bool]:
     If a thread_id is already in context, reuse it.  Otherwise generate
     one in the form ``claude-session-YYYY-MM-DD-HH-MM-SS``.
     """
-    from weave.trace.context import call_context
+    from weave.trace.context import call_context  # noqa: PLC0415
 
     existing = call_context.get_thread_id()
     if existing is not None:
@@ -276,9 +276,9 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
             options: Any,
             transport: Any = None,
         ) -> AsyncIterator[Any]:
-            from claude_agent_sdk import ResultMessage
+            from claude_agent_sdk import ResultMessage  # noqa: PLC0415
 
-            from weave.trace.context import call_context
+            from weave.trace.context import call_context  # noqa: PLC0415
 
             wc = get_weave_client()
             if wc is None:
@@ -362,9 +362,9 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
 
             @wraps(original_receive_response)
             async def wrapped_receive_response() -> AsyncIterator[Any]:
-                from claude_agent_sdk import ResultMessage
+                from claude_agent_sdk import ResultMessage  # noqa: PLC0415
 
-                from weave.trace.context import call_context
+                from weave.trace.context import call_context  # noqa: PLC0415
 
                 wc = get_weave_client()
                 if wc is None:

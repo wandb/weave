@@ -483,7 +483,7 @@ def _prepare_final_select_fields(
     Returns:
         Final list of field names to select
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
         CallsMergedFeedbackPayloadField,
     )
 
@@ -510,7 +510,7 @@ def _needs_feedback_join(order_fields: list["OrderField"]) -> bool:
     Returns:
         True if feedback JOIN is needed
     """
-    from weave.trace_server.calls_query_builder.calls_query_builder import (
+    from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
         CallsMergedFeedbackPayloadField,
     )
 
@@ -640,7 +640,7 @@ def get_cost_final_select(
     order_by = ""
     if order_fields:
         # Circular import avoidance: calls_query_builder imports from token_costs
-        from weave.trace_server.calls_query_builder.calls_query_builder import (
+        from weave.trace_server.calls_query_builder.calls_query_builder import (  # noqa: PLC0415
             CallsMergedDynamicField,
             CallsMergedSummaryField,
         )

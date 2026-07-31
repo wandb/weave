@@ -570,7 +570,7 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
             return False
 
         try:
-            import llama_index.core.instrumentation as instrument
+            import llama_index.core.instrumentation as instrument  # noqa: PLC0415
 
             self.dispatcher = instrument.get_dispatcher()
             self._original_event_handlers = list(self.dispatcher.event_handlers)

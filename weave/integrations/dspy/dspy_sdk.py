@@ -30,9 +30,11 @@ class DSPyPatcher(MultiPatcher):
     def __init__(self, patchers: Sequence[Patcher]) -> None:
         super().__init__(patchers)
         try:
-            import dspy
+            import dspy  # noqa: PLC0415
 
-            from weave.integrations.dspy.dspy_callback import WeaveCallback
+            from weave.integrations.dspy.dspy_callback import (  # noqa: PLC0415
+                WeaveCallback,
+            )
 
             is_callback_present = False
             for callback in dspy.settings.callbacks:
@@ -56,11 +58,11 @@ class DSPyPatcher(MultiPatcher):
         if _evaluate_patched:
             return
         try:
-            import dspy
-            from dspy.evaluate import Evaluate
-            from dspy.evaluate.evaluate import EvaluationResult
-            from dspy.utils.callback import with_callbacks
-            from dspy.utils.parallelizer import ParallelExecutor
+            import dspy  # noqa: PLC0415
+            from dspy.evaluate import Evaluate  # noqa: PLC0415
+            from dspy.evaluate.evaluate import EvaluationResult  # noqa: PLC0415
+            from dspy.utils.callback import with_callbacks  # noqa: PLC0415
+            from dspy.utils.parallelizer import ParallelExecutor  # noqa: PLC0415
 
             orig_call = Evaluate.__call__
 

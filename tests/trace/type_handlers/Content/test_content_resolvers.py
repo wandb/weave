@@ -52,7 +52,7 @@ def _make_unavailable(module: Any) -> Any:
 
 def _get_utils_module():
     """Import the utils module avoiding the Content class re-export."""
-    import importlib
+    import importlib  # noqa: PLC0415
 
     return importlib.import_module("weave.type_wrappers.Content.utils")
 
@@ -129,8 +129,8 @@ def pdf_bytes() -> bytes:
     Adds enough content to exceed typical magic detection thresholds (~2 KB),
     avoiding false-positive MIME matches on small binary payloads.
     """
-    from reportlab.lib.pagesizes import letter
-    from reportlab.pdfgen import canvas as pdf_canvas
+    from reportlab.lib.pagesizes import letter  # noqa: PLC0415
+    from reportlab.pdfgen import canvas as pdf_canvas  # noqa: PLC0415
 
     buf = io.BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=letter)

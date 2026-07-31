@@ -179,7 +179,7 @@ def _encode_weave_scorer_result(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool
 ) -> Any:
     # Phase-3 target: replace with a registered serializer in weave/flow/scorer.py.
-    from weave.flow.scorer import WeaveScorerResult
+    from weave.flow.scorer import WeaveScorerResult  # noqa: PLC0415
 
     if isinstance(obj, WeaveScorerResult):
         return {
@@ -442,7 +442,7 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
 
             return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
-            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (  # noqa: PLC0415
                 BUILTIN_OBJECT_REGISTRY,
             )
 

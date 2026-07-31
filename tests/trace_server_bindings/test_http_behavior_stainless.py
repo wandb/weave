@@ -51,7 +51,7 @@ def test_call_start_ok(unbatched_server):
 
 def test_400_no_retry(unbatched_server):
     """Test that 400 errors are not retried."""
-    from weave_server_sdk import APIStatusError
+    from weave_server_sdk import APIStatusError  # noqa: PLC0415
 
     call_id = generate_id()
     error_response = MagicMock()

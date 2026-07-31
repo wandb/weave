@@ -510,7 +510,9 @@ def test_auto_upgrade_to_calls_complete_on_error(mock_post, monkeypatch):
 @patch("weave.utils.http_requests.post")
 def test_eager_calls_complete_required_is_reraised(mock_post, monkeypatch):
     """Verify CallsCompleteModeRequired in eager path is re-raised for caller to handle."""
-    from weave.trace_server_bindings.http_utils import CallsCompleteModeRequired
+    from weave.trace_server_bindings.http_utils import (  # noqa: PLC0415
+        CallsCompleteModeRequired,
+    )
 
     monkeypatch.setenv("WEAVE_USE_CALLS_COMPLETE", "true")
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)

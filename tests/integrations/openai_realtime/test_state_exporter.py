@@ -12,8 +12,8 @@ class DummyWeaveClient:
         self.created_attributes: list[dict | None] = []
 
     def create_call(self, op, inputs=None, parent=None, **kwargs):
-        from weave.trace.call import Call
-        from weave.trace.context.call_context import get_thread_id
+        from weave.trace.call import Call  # noqa: PLC0415
+        from weave.trace.context.call_context import get_thread_id  # noqa: PLC0415
 
         self.created.append(op)
         self.created_attributes.append(kwargs.get("attributes"))
@@ -33,8 +33,8 @@ class DummyWeaveClient:
 
 
 def install_require_weave_client(monkeypatch, client: DummyWeaveClient):
-    import weave.integrations.openai_realtime.state_exporter as se
-    import weave.trace.context.weave_client_context as wcc
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
+    import weave.trace.context.weave_client_context as wcc  # noqa: PLC0415
 
     # Patch module-level import in state_exporter (used by SessionSpan methods)
     monkeypatch.setattr(se, "require_weave_client", lambda: client)
@@ -150,7 +150,7 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     install_require_weave_client(monkeypatch, client)
 
     # Stub Content.from_bytes to simplify assertions
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(
         se.Content,
@@ -233,7 +233,7 @@ def test_response_calls_have_thread_id_set_to_conversation_id(monkeypatch):
     """Each realtime.response call should be created with thread_id = conversation_id."""
     client = DummyWeaveClient()
     install_require_weave_client(monkeypatch, client)
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(
         se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
@@ -268,7 +268,7 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
     """When conversation_id is None (Beta API), no thread_id should be set."""
     client = DummyWeaveClient()
     install_require_weave_client(monkeypatch, client)
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(
         se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
@@ -308,7 +308,7 @@ def test_response_without_conversation_id_has_no_thread_id(monkeypatch):
 def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
     client = DummyWeaveClient()
     install_require_weave_client(monkeypatch, client)
-    import weave.integrations.openai_realtime.state_exporter as se
+    import weave.integrations.openai_realtime.state_exporter as se  # noqa: PLC0415
 
     monkeypatch.setattr(
         se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})

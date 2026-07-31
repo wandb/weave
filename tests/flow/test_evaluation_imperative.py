@@ -722,7 +722,7 @@ def test_evaluation_invalid_model_name_not_fixable(model_name):
 
 def test_evaluation_logger_with_predefined_scorers(client, caplog):
     """Test that EvaluationLogger can track predefined scorers and warn when using unlisted ones."""
-    import logging
+    import logging  # noqa: PLC0415
 
     # Create evaluation with predefined scorer names
     ev = EvaluationLogger(

@@ -47,7 +47,7 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporte
 
 @pytest.fixture(autouse=True)
 def patch_claude_agent_sdk_otel() -> Generator[None]:
-    import weave.integrations.claude_agent_sdk.otel_integration as mod
+    import weave.integrations.claude_agent_sdk.otel_integration as mod  # noqa: PLC0415
 
     mod._claude_agent_sdk_otel_patcher = None
     patcher = get_claude_agent_sdk_otel_patcher()

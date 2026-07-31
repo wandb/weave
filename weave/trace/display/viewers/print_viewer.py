@@ -345,6 +345,6 @@ def register() -> None:
     This function is called by the display module after initialization
     to avoid circular import issues.
     """
-    from weave.trace.display import display
+    from weave.trace.display import display  # noqa: PLC0415
 
     display.register_viewer("print", PrintViewer)

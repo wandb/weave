@@ -318,8 +318,8 @@ def _publish_media_content(
 
     Returns the ``weave://`` ref URI string.
     """
-    from weave.trace.api import publish
-    from weave.type_wrappers.Content.content import Content
+    from weave.trace.api import publish  # noqa: PLC0415
+    from weave.type_wrappers.Content.content import Content  # noqa: PLC0415
 
     content_obj: Content
     if content:

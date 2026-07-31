@@ -46,7 +46,7 @@ def patch_smolagents() -> Generator[None, None, None]:
     match_on=["method", "scheme", "host", "port", "path", "query"],
 )
 def test_hf_api_model(client):
-    from smolagents import HfApiModel
+    from smolagents import HfApiModel  # noqa: PLC0415
 
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
         "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
@@ -94,7 +94,7 @@ def test_hf_api_model(client):
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_openai_server_model(client):
-    from smolagents import OpenAIServerModel
+    from smolagents import OpenAIServerModel  # noqa: PLC0415
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
@@ -125,7 +125,11 @@ def test_openai_server_model(client):
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_search(client):
-    from smolagents import GoogleSearchTool, OpenAIServerModel, ToolCallingAgent
+    from smolagents import (  # noqa: PLC0415
+        GoogleSearchTool,
+        OpenAIServerModel,
+        ToolCallingAgent,
+    )
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
@@ -152,7 +156,7 @@ def test_tool_calling_agent_search(client):
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_tool_calling_agent_weather(client):
-    from smolagents import OpenAIServerModel, ToolCallingAgent, tool
+    from smolagents import OpenAIServerModel, ToolCallingAgent, tool  # noqa: PLC0415
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
@@ -188,7 +192,11 @@ def test_tool_calling_agent_weather(client):
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_search(client):
-    from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
+    from smolagents import (  # noqa: PLC0415
+        CodeAgent,
+        GoogleSearchTool,
+        OpenAIServerModel,
+    )
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
@@ -216,7 +224,7 @@ def test_code_agent_search(client):
     match_on=["method", "scheme", "host", "port", "path"],
 )
 def test_code_agent_weather(client):
-    from smolagents import CodeAgent, OpenAIServerModel, tool
+    from smolagents import CodeAgent, OpenAIServerModel, tool  # noqa: PLC0415
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(

@@ -74,7 +74,7 @@ def test_log_session_forwards_and_warns() -> None:
 
 
 def test_legacy_import_path_warns_and_reexports() -> None:
-    import weave.session as legacy
+    import weave.session as legacy  # noqa: PLC0415
 
     # Re-importing the deprecated path emits the module-level warning.
     with pytest.warns(DeprecationWarning, match="weave.session has been renamed"):
@@ -82,7 +82,7 @@ def test_legacy_import_path_warns_and_reexports() -> None:
 
     # Unchanged names are still re-exported from the old path, identical to
     # the canonical objects; the session-named callables forward to weave's.
-    from weave.conversation import TextPart
+    from weave.conversation import TextPart  # noqa: PLC0415
 
     assert legacy.TextPart is TextPart
     assert legacy.start_session is weave.start_session
