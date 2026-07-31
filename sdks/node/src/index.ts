@@ -106,7 +106,7 @@ export {op} from './op';
 export type {Op, OpDecorator} from './opType';
 export {WeaveObject, ObjectRef} from './weaveObject';
 export {MessagesPrompt, StringPrompt} from './prompt';
-export {agentConversationPath} from './urls';
+export * as urls from './urls';
 
 // CJS-only side-effect: install the `require()` patcher so CJS hosts
 // auto-instrument supported modules. ESM hosts use the loader hook in
