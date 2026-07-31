@@ -74,15 +74,15 @@ def get_attrs(span: Any) -> dict[str, Any]:
 
 
 def check_integration_and_strip(attrs: dict[str, Any]) -> dict[str, Any]:
-    """Assert + remove the flattened integration.* provenance keys.
+    """Assert + remove the flattened weave.integration.* provenance keys.
 
     Conversation attributes stamp integration provenance on every span; pop it
     here so the exact-shape assertions below stay focused on the GenAI semconv keys.
     """
-    assert attrs["integration.name"] == "claude_agent_sdk"
-    assert attrs["integration.version"]  # weave SDK version
-    assert attrs["integration.meta.package_name"] == "claude_agent_sdk"
-    return {k: v for k, v in attrs.items() if not k.startswith("integration.")}
+    assert attrs["weave.integration.name"] == "claude_agent_sdk"
+    assert attrs["weave.integration.version"]  # weave SDK version
+    assert attrs["weave.integration.meta.package_name"] == "claude_agent_sdk"
+    return {k: v for k, v in attrs.items() if not k.startswith("weave.integration.")}
 
 
 def get_spans_by_op(spans: list[Any], op: str) -> list[Any]:

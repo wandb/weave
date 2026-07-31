@@ -117,7 +117,11 @@ from weave.trace_server.model_providers.model_providers import (
     read_model_to_provider_info_map,
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
-from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.python_spans import (
+    Resource,
+    Span,
+    iter_proto_spans,
+)
 from weave.trace_server.orm import Table, split_escaped_field_path
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
@@ -4584,53 +4588,50 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
 
             proto_resource_spans = processed_span.resource_spans
             resource = Resource.from_proto(proto_resource_spans.resource)
-            for proto_scope_spans in proto_resource_spans.scope_spans:
-                for proto_span in proto_scope_spans.spans:
+            for proto_span, scope in iter_proto_spans(proto_resource_spans):
+                try:
+                    span = Span.from_proto(proto_span, resource, scope=scope)
+                except AttributePathConflictError as e:
+                    rejected_spans += 1
                     try:
-                        span = Span.from_proto(proto_span, resource)
-                    except AttributePathConflictError as e:
-                        rejected_spans += 1
-                        try:
-                            trace_id = proto_span.trace_id.hex()
-                            span_id = proto_span.span_id.hex()
-                            name = getattr(proto_span, "name", "")
-                        except Exception:
-                            trace_id = ""
-                            span_id = ""
-                            name = ""
-                        span_ident = (
-                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
-                        )
-                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
-                        continue
+                        trace_id = proto_span.trace_id.hex()
+                        span_id = proto_span.span_id.hex()
+                        name = getattr(proto_span, "name", "")
+                    except Exception:
+                        trace_id = ""
+                        span_id = ""
+                        name = ""
+                    span_ident = (
+                        f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                    )
+                    error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                    continue
 
-                    start_call, end_call = span.to_call(
-                        req.project_id,
-                        wb_user_id=req.wb_user_id,
-                        wb_run_id=wb_run_id,
-                    )
-                    # ClickHouse resolves span names to op objects and stores
-                    # op refs as op_name; placeholder ops are content-
-                    # addressed so repeats dedupe.
-                    op_res = self.op_create(
-                        tsi.OpCreateReq(
-                            project_id=req.project_id,
-                            name=start_call.op_name,
-                        )
-                    )
-                    start_call.op_name = ri.InternalOpRef(
+                start_call, end_call = span.to_call(
+                    req.project_id,
+                    wb_user_id=req.wb_user_id,
+                    wb_run_id=wb_run_id,
+                )
+                # ClickHouse resolves span names to op objects and stores
+                # op refs as op_name; placeholder ops are content-
+                # addressed so repeats dedupe.
+                op_res = self.op_create(
+                    tsi.OpCreateReq(
                         project_id=req.project_id,
-                        name=op_res.object_id,
-                        version=op_res.digest,
-                    ).uri
-                    calls.extend(
-                        [
-                            tsi.CallBatchStartMode(
-                                req=tsi.CallStartReq(start=start_call)
-                            ),
-                            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
-                        ]
+                        name=start_call.op_name,
                     )
+                )
+                start_call.op_name = ri.InternalOpRef(
+                    project_id=req.project_id,
+                    name=op_res.object_id,
+                    version=op_res.digest,
+                ).uri
+                calls.extend(
+                    [
+                        tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
+                        tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
+                    ]
+                )
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         if rejected_spans > 0:
             return tsi.OTelExportRes(

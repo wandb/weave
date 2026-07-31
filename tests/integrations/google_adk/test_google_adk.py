@@ -642,11 +642,13 @@ class TestAdkRunnerE2E:
         stamped = [
             span.attributes
             for span in adk_test_harness.exporter.get_finished_spans()
-            if "integration.name" in (span.attributes or {})
+            if "weave.integration.name" in (span.attributes or {})
         ]
         assert stamped, "expected >=1 ADK span to carry integration metadata"
-        assert all(a["integration.name"] == "google_adk" for a in stamped)
-        assert all(a["integration.meta.package_name"] == "google-adk" for a in stamped)
+        assert all(a["weave.integration.name"] == "google_adk" for a in stamped)
+        assert all(
+            a["weave.integration.meta.package_name"] == "google-adk" for a in stamped
+        )
 
         # ADK opens exactly one invoke_agent span per turn.
         invoke_spans = by_op.get("invoke_agent", [])

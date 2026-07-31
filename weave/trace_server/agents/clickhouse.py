@@ -13,6 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
+from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
+
 from weave.shared import refs_internal as ri
 from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
@@ -91,7 +93,11 @@ from weave.trace_server.opentelemetry.genai_extraction import (
     strip_inline_blobs_from_span,
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
-from weave.trace_server.opentelemetry.python_spans import Resource, Span
+from weave.trace_server.opentelemetry.python_spans import (
+    Resource,
+    Span,
+    iter_proto_spans,
+)
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.agent_query_builder import (
     make_agent_versions_count_query,
@@ -849,10 +855,14 @@ class AgentWriteHandler:
 
         # Both branches below account every parse/extraction failure through
         # these two helpers, so the bookkeeping cannot drift between them.
-        def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
+        def parse_span(
+            protobuf_span: Any,
+            resource: Resource,
+            scope: InstrumentationScope | None,
+        ) -> Span | None:
             nonlocal rejected
             try:
-                return Span.from_proto(protobuf_span, resource)
+                return Span.from_proto(protobuf_span, resource, scope=scope)
             except AttributePathConflictError as e:
                 _record_ingest_failure(
                     failure_counts,
@@ -908,14 +918,15 @@ class AgentWriteHandler:
             # Sampler off (the default): the unmodified single-pass path.
             for processed_span in req.processed_spans:
                 resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        row = extract_row(span, processed_span.run_id)
-                        if row is not None:
-                            span_rows.append(row)
+                for protobuf_span, scope in iter_proto_spans(
+                    processed_span.resource_spans
+                ):
+                    span = parse_span(protobuf_span, resource, scope)
+                    if span is None:
+                        continue
+                    row = extract_row(span, processed_span.run_id)
+                    if row is not None:
+                        span_rows.append(row)
         else:
             # Pass 1 (cheap): parse everything, then decide keep/drop per
             # trace before any blob-strip/extraction work happens.
@@ -923,13 +934,14 @@ class AgentWriteHandler:
             byte_sizes: list[int] = []
             for processed_span in req.processed_spans:
                 resource = Resource.from_proto(processed_span.resource_spans.resource)
-                for protobuf_scope_spans in processed_span.resource_spans.scope_spans:
-                    for protobuf_span in protobuf_scope_spans.spans:
-                        span = parse_span(protobuf_span, resource)
-                        if span is None:
-                            continue
-                        parsed.append((span, processed_span.run_id))
-                        byte_sizes.append(protobuf_span.ByteSize())
+                for protobuf_span, scope in iter_proto_spans(
+                    processed_span.resource_spans
+                ):
+                    span = parse_span(protobuf_span, resource, scope)
+                    if span is None:
+                        continue
+                    parsed.append((span, processed_span.run_id))
+                    byte_sizes.append(protobuf_span.ByteSize())
 
             decisions = ingest_sampling.decide_spans(
                 sampling, [span for span, _ in parsed], byte_sizes

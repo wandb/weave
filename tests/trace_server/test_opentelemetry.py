@@ -44,11 +44,12 @@ from weave.trace_server.opentelemetry.helpers import (
     unflatten_key_values,
 )
 from weave.trace_server.opentelemetry.python_spans import (
-    Span as PySpan,
-)
-from weave.trace_server.opentelemetry.python_spans import (
+    Scope,
     SpanKind,
     StatusCode,
+)
+from weave.trace_server.opentelemetry.python_spans import (
+    Span as PySpan,
 )
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
 
@@ -168,6 +169,13 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
 
     assert call.id == decoded_span
     assert call.trace_id == decoded_trace
+
+    # The instrumentation scope survives the real ingest path, not just
+    # ScopeSpans.from_proto.
+    assert call.attributes["otel_span"]["scope"] == {
+        "name": "test_instrumentation",
+        "version": "1.0.0",
+    }
 
     for kv in export_span.attributes:
         key = kv.key
@@ -643,6 +651,24 @@ class TestPythonSpans:
 
         assert span.name == "test_span"
         assert span.kind == SpanKind.INTERNAL
+        assert span.scope == Scope(name="test_instrumentation", version="1.0.0")
+        assert span.as_dict()["scope"] == {
+            "name": "test_instrumentation",
+            "version": "1.0.0",
+        }
+
+        # A sender that omits the scope is distinguishable from one that sends
+        # an empty scope, rather than both collapsing to "".
+        omitted = PyTracesData.from_proto(
+            TracesData(
+                resource_spans=[
+                    ResourceSpans(scope_spans=[ScopeSpans(spans=[create_test_span()])])
+                ]
+            )
+        )
+        omitted_span = omitted.resource_spans[0].scope_spans[0].spans[0]
+        assert omitted_span.scope is None
+        assert omitted_span.as_dict()["scope"] is None
 
 
 class TestAttributes:
