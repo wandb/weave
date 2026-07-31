@@ -166,6 +166,7 @@ class _SpanBase(BaseModel):
         *,
         new_trace: bool = False,
         start_time_ns: int | None = None,
+        set_current: bool = True,
     ) -> None:
         """Create an OTel span and attach it to the current context.
 
@@ -177,6 +178,9 @@ class _SpanBase(BaseModel):
         When ``_parent_otel_context`` is set (a child threaded from its parent
         Turn/SubAgent), that context wins over ambient. ``new_trace`` is only
         honored when no explicit parent was provided.
+
+        ``set_current=False`` starts the span without pushing it onto the
+        ambient OTel context stack — see ``SubAgent.start``.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -189,9 +193,10 @@ class _SpanBase(BaseModel):
         elif new_trace:
             kwargs["context"] = Context()
         self._otel_span = tracer.start_span(name, **kwargs)
-        self._otel_token = otel_context.attach(
-            otel_trace.set_span_in_context(self._otel_span)
-        )
+        if set_current:
+            self._otel_token = otel_context.attach(
+                otel_trace.set_span_in_context(self._otel_span)
+            )
         # Stamp the active conversation's attributes on every span. Read from the
         # conversation contextvar (not OTel context) so they reach the root turn
         # span too, which starts in a fresh OTel Context to force a new trace.
@@ -926,12 +931,29 @@ class SubAgent(_SpanBase):
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
-    def __enter__(self) -> Self:
+    def start(self, *, set_current: bool = True) -> Self:
+        """Start this sub-agent's span. ``__enter__`` without the ``with``.
+
+        Pass ``set_current=False`` when sub-agents can be in flight
+        concurrently. ``end()`` detaches via ``ContextVar.reset``, which
+        silently corrupts the ambient context stack when overlapping spans
+        end out of LIFO order — the surviving sibling stops being current,
+        and the last detach restores an already-ended span. Children created
+        through ``start_llm`` / ``start_tool`` / ``start_subagent`` nest under
+        this span either way, because those factories thread an explicit
+        parent context.
+        """
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
-        start_ns = int(self.started_at.timestamp() * 1_000_000_000)
-        self._start_otel_span(f"invoke_agent {self.name}", start_time_ns=start_ns)
+        self._start_otel_span(
+            f"invoke_agent {self.name}",
+            start_time_ns=_to_ns(self.started_at),
+            set_current=set_current,
+        )
         return self
+
+    def __enter__(self) -> Self:
+        return self.start()
 
     def __exit__(
         self,

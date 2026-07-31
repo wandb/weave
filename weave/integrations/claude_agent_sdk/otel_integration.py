@@ -277,7 +277,8 @@ def _start_subagent(
     subagent.record(
         agent_description=description if isinstance(description, str) else None
     )
-    subagent.__enter__()  # noqa: PLC2801
+    # Parallel delegations finish in completion order, not launch order.
+    subagent.start(set_current=False)
     attributes = {
         "gen_ai.tool.call.id": block.id,
         "gen_ai.tool.name": block.name,
@@ -303,7 +304,7 @@ def _span_parent(msg: AssistantMessage, state: _TurnState) -> _SpanParent:
             name="subagent",
             model=msg.model or "",
         )
-        subagent.__enter__()  # noqa: PLC2801
+        subagent.start(set_current=False)
         subagent.set_attributes({"gen_ai.tool.call.id": parent_tool_use_id})
         state.open_subagents[parent_tool_use_id] = subagent
     elif msg.model:
@@ -423,7 +424,7 @@ def _finalize_turn(state: _TurnState) -> None:
         with tool:
             pass
     state.open_tools.clear()
-    for subagent in reversed(state.open_subagents.values()):
+    for subagent in state.open_subagents.values():
         subagent.end()
     state.open_subagents.clear()
 

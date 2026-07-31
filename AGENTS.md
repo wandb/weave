@@ -488,6 +488,12 @@ pnpm exec tsx examples/claudeAgents.ts
 - Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
   Route nested assistant messages and tools through `parent_tool_use_id`, and
   close each subagent on its matching tool result.
+- Start those subagents with `SubAgent.start(set_current=False)`, never
+  `__enter__`. Parallel delegations close in completion order, and `end()`
+  detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the
+  ambient OTel context pointing at an ended span — user code running between
+  streamed messages would nest under it. Children nest either way, because
+  `start_llm` / `start_tool` / `start_subagent` thread an explicit parent.
 - Stream adapters can create child handles when work starts, then enter them
   with a normal `with` when the completion message arrives. Preserve logical
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of

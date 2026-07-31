@@ -303,6 +303,76 @@ async def test_subagent_query_otel(otel_spans: InMemorySpanExporter) -> None:
     }
 
 
+@pytest.mark.asyncio
+async def test_parallel_subagents_close_out_of_order_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Two delegations open A, B and close A, B — completion, not LIFO, order.
+
+    Spans the integration creates itself are pinned to an explicit parent, so
+    the risk is to the ambient OTel context that surrounds user code running
+    between streamed messages. ``user_code`` stands in for that.
+    """
+    tracer = otel_trace.get_tracer("test.user_code")
+    async for _ in query(
+        prompt="Find the capital of France and the largest planet",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("parallel_subagent_response")),
+    ):
+        tracer.start_span("user_code").end()
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 3
+    by_name = {get_attrs(span)["gen_ai.agent.name"]: span for span in agent_spans}
+    root = by_name["claude_agent_sdk"]
+    geographer = by_name["geographer"]
+    astronomer = by_name["astronomer"]
+
+    assert geographer.parent.span_id == root.context.span_id
+    assert astronomer.parent.span_id == root.context.span_id
+    assert get_attrs(geographer)["gen_ai.tool.call.result"] == (
+        "The capital of France is Paris."
+    )
+    assert get_attrs(astronomer)["gen_ai.tool.call.result"] == (
+        "The largest planet is Jupiter."
+    )
+
+    # Each delegation's own chat nests under it, not under its sibling.
+    chats_by_parent: dict[int, list[Any]] = {}
+    for chat in get_spans_by_op(spans, "chat"):
+        chats_by_parent.setdefault(chat.parent.span_id, []).append(chat)
+    assert (
+        get_all_text(
+            get_messages(
+                chats_by_parent[geographer.context.span_id][0], "gen_ai.output.messages"
+            )
+        )
+        == "The capital of France is Paris."
+    )
+    assert (
+        get_all_text(
+            get_messages(
+                chats_by_parent[astronomer.context.span_id][0], "gen_ai.output.messages"
+            )
+        )
+        == "The largest planet is Jupiter."
+    )
+
+    # The ambient context must never hand user code an ended span as its
+    # parent: detaching out of LIFO order restores whichever span was current
+    # when the later token was attached, and that sibling has already ended.
+    ended_subagents = {geographer.context.span_id, astronomer.context.span_id}
+    orphaned = [
+        span
+        for span in spans
+        if span.name == "user_code"
+        and span.parent is not None
+        and span.parent.span_id in ended_subagents
+    ]
+    assert orphaned == []
+
+
 # --- query(): prompt caching ------------------------------------------------
 
 
