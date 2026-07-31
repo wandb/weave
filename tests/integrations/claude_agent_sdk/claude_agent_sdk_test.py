@@ -76,10 +76,14 @@ async def test_simple_text_query(
     assert all(
         i["meta"]["package_name"] == "claude_agent_sdk" for i in claude_agent_sdk_meta
     )
-    assert len(calls) == 1
+    assert sorted(op_name_from_call(call) for call in calls) == [
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+    ]
 
-    root_call = calls[0]
-    assert op_name_from_call(root_call) == "claude_agent_sdk.query"
+    root_call = next(
+        call for call in calls if op_name_from_call(call) == "claude_agent_sdk.query"
+    )
     assert root_call.inputs["prompt"] == "What is 2+2?"
     assert root_call.exception is None
     assert root_call.ended_at is not None
@@ -122,9 +126,14 @@ async def test_tool_use_query(
 
     assert any(isinstance(m, ResultMessage) for m in messages)
 
-    # Verify weave calls: root + 1 tool use child
+    # Verify weave calls: root + 2 text children + 1 tool-use child
     calls = list(client.get_calls())
-    assert len(calls) == 2
+    assert sorted(op_name_from_call(call) for call in calls) == [
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+        "claude_agent_sdk.text",
+        "claude_agent_sdk.tool_use.Bash",
+    ]
 
     root_call = next(
         c for c in calls if op_name_from_call(c) == "claude_agent_sdk.query"
@@ -143,7 +152,7 @@ async def test_tool_use_query(
     assert tool_call.ended_at is not None
     assert tool_call.output is not None
     assert tool_call.output["tool_use_id"] == "toolu_01ABC"
-    assert "file1.py" in tool_call.output["content"]
+    assert tool_call.output["content"] == "file1.py\nfile2.py\nREADME.md"
 
 
 # =====================================================================
@@ -166,9 +175,14 @@ async def test_multi_tool_query(
     ):
         messages.append(msg)
 
-    # Verify weave calls: root + 2 tool use children
+    # Verify weave calls: root + 1 text child + 2 tool-use children
     calls = list(client.get_calls())
-    assert len(calls) == 3
+    assert sorted(op_name_from_call(call) for call in calls) == [
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+        "claude_agent_sdk.tool_use.Bash",
+        "claude_agent_sdk.tool_use.Read",
+    ]
 
     root_call = next(
         c for c in calls if op_name_from_call(c) == "claude_agent_sdk.query"
@@ -179,8 +193,10 @@ async def test_multi_tool_query(
     assert len(tool_calls) == 2
 
     tool_names = {op_name_from_call(c) for c in tool_calls}
-    assert "claude_agent_sdk.tool_use.Read" in tool_names
-    assert "claude_agent_sdk.tool_use.Bash" in tool_names
+    assert tool_names == {
+        "claude_agent_sdk.tool_use.Bash",
+        "claude_agent_sdk.tool_use.Read",
+    }
 
     # Both are children of root
     for tc in tool_calls:
@@ -211,11 +227,17 @@ async def test_thinking_query(
     # Thinking messages should still be yielded to the caller
     assert any(isinstance(m, AssistantMessage) for m in messages)
 
-    # Verify weave calls — no tool calls, just the root
+    # Verify weave calls — root plus thinking and text children
     calls = list(client.get_calls())
-    assert len(calls) == 1
+    assert sorted(op_name_from_call(call) for call in calls) == [
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+        "claude_agent_sdk.thinking",
+    ]
 
-    root_call = calls[0]
+    root_call = next(
+        call for call in calls if op_name_from_call(call) == "claude_agent_sdk.query"
+    )
     assert root_call.output["status"] == "completed"
     assert (
         root_call.output["result"] == "After careful consideration, the answer is 42."
@@ -251,12 +273,18 @@ async def test_error_query(
     assert result_msg.is_error is True
 
     calls = list(client.get_calls())
-    assert len(calls) == 1
+    assert sorted(op_name_from_call(call) for call in calls) == [
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+    ]
 
-    root_call = calls[0]
+    root_call = next(
+        call for call in calls if op_name_from_call(call) == "claude_agent_sdk.query"
+    )
     assert root_call.output["status"] == "error"
-    assert root_call.exception is not None
-    assert "something went wrong" in root_call.exception
+    assert root_call.exception == (
+        '{"type": "Exception", "message": "Error: something went wrong"}'
+    )
 
 
 # =====================================================================
@@ -371,3 +399,39 @@ async def test_usage_summary(
     assert model_usage["requests"] == 1
     assert model_usage["input_tokens"] == 150
     assert model_usage["output_tokens"] == 75
+
+
+@pytest.mark.asyncio
+async def test_cached_usage_is_normalized_in_call_summary(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    async for _ in query(
+        prompt="Use the cache",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("cache_usage_response")),
+    ):
+        pass
+
+    calls_by_op = {op_name_from_call(call): call for call in client.get_calls()}
+    assert set(calls_by_op) == {
+        "claude_agent_sdk.query",
+        "claude_agent_sdk.text",
+    }
+    root_call = calls_by_op["claude_agent_sdk.query"]
+    raw_usage = {
+        "input_tokens": 10,
+        "output_tokens": 75,
+        "cache_read_input_tokens": 19447,
+        "cache_creation_input_tokens": 1024,
+    }
+    expected_summary_usage = {
+        **raw_usage,
+        "input_tokens": 20481,
+    }
+    assert root_call.output["usage"] == raw_usage
+    assert root_call.summary["usage"] == {
+        "claude-sonnet-4-6": {
+            "requests": 1,
+            **expected_summary_usage,
+        }
+    }

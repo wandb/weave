@@ -28,6 +28,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
 )
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.opentelemetry.helpers import (
     _set_value_in_nested_dict,
     get_attribute,
@@ -463,6 +464,34 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
             # produce high-cardinality map keys and make typed filters awkward.
             result.append((full_key, val))
     return result
+
+
+# ---------------------------------------------------------------------------
+# Credential redaction
+# ---------------------------------------------------------------------------
+
+
+def redact_credentials_from_span(span: Span) -> None:
+    """Replace credential-shaped values in a span's client-authored attributes.
+
+    Replaces values in all four attribute containers a span carries -- its own,
+    its resource's, its events' and its links' -- because ``span.as_dict()`` keeps
+    every one of them in ``raw_span_dump``, and the attribute-derived columns read
+    the same values. That includes the output ones, so a credential-shaped name
+    inside a structured output is replaced too.
+
+    Runs before ``strip_inline_blobs_from_span``, not after: that step replaces a
+    long base64-shaped value with a ref, so this pass has to see the value while
+    it is still inline. Runs outside the caller's file-storage guard as well --
+    the blob strip needs a trace server, this does not.
+    """
+    span.attributes = redact_sensitive_keys(span.attributes)
+    if span.resource is not None:
+        span.resource.attributes = redact_sensitive_keys(span.resource.attributes)
+    for event in span.events:
+        event.attributes = redact_sensitive_keys(event.attributes)
+    for link in span.links:
+        link.attributes = redact_sensitive_keys(link.attributes)
 
 
 # ---------------------------------------------------------------------------

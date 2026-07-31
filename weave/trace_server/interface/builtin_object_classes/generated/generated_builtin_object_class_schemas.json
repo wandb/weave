@@ -1,5 +1,75 @@
 {
   "$defs": {
+    "AgentDashboard": {
+      "description": "A saved agent dashboard configuration.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/AgentDashboardDefinition"
+        }
+      },
+      "required": [
+        "label",
+        "definition"
+      ],
+      "title": "AgentDashboard",
+      "type": "object"
+    },
+    "AgentDashboardDefinition": {
+      "additionalProperties": false,
+      "description": "The validated panels and grid layouts in an agent dashboard.",
+      "properties": {
+        "panels": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KpiDashboardPanel"
+              },
+              {
+                "$ref": "#/$defs/TimelineDashboardPanel"
+              },
+              {
+                "$ref": "#/$defs/BreakdownDashboardPanel"
+              }
+            ]
+          },
+          "title": "Panels",
+          "type": "array"
+        }
+      },
+      "required": [
+        "panels"
+      ],
+      "title": "AgentDashboardDefinition",
+      "type": "object"
+    },
     "AlertSpec": {
       "properties": {
         "name": {
@@ -207,6 +277,121 @@
         }
       },
       "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "BreakdownDashboardPanel": {
+      "additionalProperties": false,
+      "description": "A metric grouped into ranked categorical rows.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/PanelGridLayout"
+        },
+        "panel_type": {
+          "const": "breakdown",
+          "title": "Panel Type",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/BreakdownPanelSettings"
+        }
+      },
+      "required": [
+        "id",
+        "layout",
+        "panel_type",
+        "settings"
+      ],
+      "title": "BreakdownDashboardPanel",
+      "type": "object"
+    },
+    "BreakdownPanelQueryConfig": {
+      "additionalProperties": false,
+      "description": "A grouped Top-N query used by breakdown panels.",
+      "properties": {
+        "version": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "filter": {
+          "default": "",
+          "title": "Filter",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "number",
+                "percent",
+                "cost",
+                "duration"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "groupBy": {
+          "minLength": 1,
+          "title": "Groupby",
+          "type": "string"
+        },
+        "limit": {
+          "default": 6,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "metric",
+        "groupBy"
+      ],
+      "title": "BreakdownPanelQueryConfig",
+      "type": "object"
+    },
+    "BreakdownPanelSettings": {
+      "additionalProperties": false,
+      "description": "Supported configuration for a breakdown panel.",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/BreakdownPanelQueryConfig"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "BreakdownPanelSettings",
       "type": "object"
     },
     "CallsFilter": {
@@ -1402,6 +1587,108 @@
       "title": "InOperation",
       "type": "object"
     },
+    "KpiDashboardPanel": {
+      "additionalProperties": false,
+      "description": "A single-value KPI tile.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/PanelGridLayout"
+        },
+        "panel_type": {
+          "const": "kpi",
+          "title": "Panel Type",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/KpiPanelSettings"
+        }
+      },
+      "required": [
+        "id",
+        "layout",
+        "panel_type",
+        "settings"
+      ],
+      "title": "KpiDashboardPanel",
+      "type": "object"
+    },
+    "KpiPanelQueryConfig": {
+      "additionalProperties": false,
+      "description": "A scalar query; KPI panels do not support grouping or Top-N.",
+      "properties": {
+        "version": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "filter": {
+          "default": "",
+          "title": "Filter",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "number",
+                "percent",
+                "cost",
+                "duration"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "title": "KpiPanelQueryConfig",
+      "type": "object"
+    },
+    "KpiPanelSettings": {
+      "additionalProperties": false,
+      "description": "Supported configuration for a KPI panel.",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/KpiPanelQueryConfig"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "KpiPanelSettings",
+      "type": "object"
+    },
     "LLMStructuredCompletionModel": {
       "additionalProperties": false,
       "properties": {
@@ -2265,6 +2552,42 @@
       "title": "OrOperation",
       "type": "object"
     },
+    "PanelGridLayout": {
+      "additionalProperties": false,
+      "description": "Position and size of a panel in the dashboard's 24-column grid.",
+      "properties": {
+        "x": {
+          "exclusiveMaximum": 24,
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        },
+        "w": {
+          "maximum": 24,
+          "minimum": 1,
+          "title": "W",
+          "type": "integer"
+        },
+        "h": {
+          "minimum": 1,
+          "title": "H",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "title": "PanelGridLayout",
+      "type": "object"
+    },
     "Pin": {
       "properties": {
         "left": {
@@ -2911,6 +3234,134 @@
       "title": "TestOnlyNestedBaseObject",
       "type": "object"
     },
+    "TimelineDashboardPanel": {
+      "additionalProperties": false,
+      "description": "A metric plotted over time.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/PanelGridLayout"
+        },
+        "panel_type": {
+          "const": "timeline",
+          "title": "Panel Type",
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/$defs/TimelinePanelSettings"
+        }
+      },
+      "required": [
+        "id",
+        "layout",
+        "panel_type",
+        "settings"
+      ],
+      "title": "TimelineDashboardPanel",
+      "type": "object"
+    },
+    "TimelinePanelQueryConfig": {
+      "additionalProperties": false,
+      "description": "A time-bucketed query with optional series grouping.",
+      "properties": {
+        "version": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "metric": {
+          "minLength": 1,
+          "title": "Metric",
+          "type": "string"
+        },
+        "filter": {
+          "default": "",
+          "title": "Filter",
+          "type": "string"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "number",
+                "percent",
+                "cost",
+                "duration"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Format"
+        },
+        "groupBy": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Groupby"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "title": "TimelinePanelQueryConfig",
+      "type": "object"
+    },
+    "TimelinePanelSettings": {
+      "additionalProperties": false,
+      "description": "Supported configuration for a timeline panel.",
+      "properties": {
+        "query": {
+          "$ref": "#/$defs/TimelinePanelQueryConfig"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "TimelinePanelSettings",
+      "type": "object"
+    },
     "WeaveMetricThresholdSpec": {
       "additionalProperties": true,
       "description": "Alert specification for weave metric threshold alerts.\n\nFields align with gorilla's WeaveMetricThresholdFilter and the\nalert_worker's WeaveMetricFilter.  Extra keys are permitted so that\nthe schema can evolve without breaking existing stored objects.",
@@ -3081,6 +3532,9 @@
     },
     "ChartConfig": {
       "$ref": "#/$defs/ChartConfig"
+    },
+    "AgentDashboard": {
+      "$ref": "#/$defs/AgentDashboard"
     }
   },
   "required": [
@@ -3095,7 +3549,8 @@
     "SavedView",
     "ComparisonView",
     "LLMStructuredCompletionModel",
-    "ChartConfig"
+    "ChartConfig",
+    "AgentDashboard"
   ],
   "title": "CompositeBaseObject",
   "type": "object"

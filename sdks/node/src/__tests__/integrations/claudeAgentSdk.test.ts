@@ -1,6 +1,12 @@
 import {SpanStatusCode} from '@opentelemetry/api';
 
-import {ATTR_GEN_AI_INPUT_MESSAGES} from '../../genai/semconv';
+import {getCurrentLLM, getCurrentTurn} from '../../genai';
+import {
+  ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
+  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
+} from '../../genai/semconv';
 import {
   patchClaudeAgentSdk,
   wrapClaudeAgentSdk,
@@ -12,9 +18,12 @@ import {
   setupExporterPerTest,
   setupGenAITestEnvironment,
 } from '../genai/common';
-import type {NonNullableUsage} from '@anthropic-ai/claude-agent-sdk';
+import type {
+  NonNullableUsage,
+  SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 
-const INVOKE = 'invoke_agent claude_agent_sdk';
+const INVOKE = 'invoke_agent';
 
 describe('Claude Agent SDK — toWeaveUsage', () => {
   test('maps the camelCase ModelUsage shape, dropping non-token fields', () => {
@@ -120,7 +129,254 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'hi there'}]);
-    expect(spans.some(s => s.name === 'chat claude-x')).toBe(true);
+    expect(spans.some(s => s.name === 'chat')).toBe(true);
+  });
+
+  test('streaming input emits one root per user turn', async () => {
+    async function* prompts() {
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'first question'},
+        parent_tool_use_id: null,
+      };
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'second question'},
+        parent_tool_use_id: null,
+      };
+    }
+
+    const sdk = {
+      query: ({prompt}: {prompt: AsyncIterable<any>}) => {
+        async function* gen() {
+          let turn = 0;
+          for await (const _input of prompt) {
+            turn += 1;
+            yield {
+              type: 'assistant',
+              session_id: 'sess-multi',
+              message: {
+                model: `claude-${turn}`,
+                content: [{type: 'text', text: `response-${turn}`}],
+              },
+            };
+            yield {
+              type: 'result',
+              subtype: 'success',
+              session_id: 'sess-multi',
+              is_error: false,
+              result: `result-${turn}`,
+              total_cost_usd: turn / 100,
+              modelUsage: {
+                [`claude-${turn}`]: {
+                  inputTokens: turn,
+                  outputTokens: turn + 1,
+                  cacheReadInputTokens: 0,
+                  cacheCreationInputTokens: 0,
+                },
+              },
+            };
+          }
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    const query = sdk.query({prompt: prompts()});
+    await expect(query.next()).resolves.toMatchObject({
+      value: {type: 'assistant'},
+      done: false,
+    });
+    await expect(query.next()).resolves.toMatchObject({
+      value: {type: 'result', result: 'result-1'},
+      done: false,
+    });
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(span => span.name === INVOKE)
+    ).toHaveLength(1);
+
+    for await (const _message of query) {
+      void _message;
+    }
+
+    const roots = getExporter()
+      .getFinishedSpans()
+      .filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+    expect(
+      roots.map(root => ({
+        conversationId: root.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+        input: JSON.parse(
+          root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
+        ),
+        output: JSON.parse(
+          root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+        ),
+      }))
+    ).toEqual([
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'first question'}],
+        output: [{role: 'assistant', content: 'result-1'}],
+      },
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'second question'}],
+        output: [{role: 'assistant', content: 'result-2'}],
+      },
+    ]);
+  });
+
+  test('traces user messages sent through Query.streamInput()', async () => {
+    const streamInput = jest.fn(async (stream: AsyncIterable<any>) => {
+      for await (const _message of stream) {
+        void _message;
+      }
+    });
+    const sdk = fakeSdk(
+      [
+        {
+          type: 'assistant',
+          session_id: 'sess-stream-input',
+          message: {
+            model: 'claude-x',
+            content: [{type: 'text', text: 'response'}],
+          },
+        },
+        {
+          type: 'result',
+          subtype: 'success',
+          session_id: 'sess-stream-input',
+          is_error: false,
+          result: 'done',
+          modelUsage: {},
+        },
+      ],
+      {streamInput}
+    );
+    patchClaudeAgentSdk(sdk);
+
+    const emptyPrompt: AsyncIterable<any> = {
+      [Symbol.asyncIterator]: () => ({
+        next: async () => ({done: true, value: undefined}),
+      }),
+    };
+    async function* nextTurn() {
+      yield {
+        type: 'user',
+        message: {role: 'user', content: 'sent later'},
+        parent_tool_use_id: null,
+      };
+    }
+
+    const query = sdk.query({prompt: emptyPrompt});
+    await query.streamInput(nextTurn());
+    for await (const _message of query) {
+      void _message;
+    }
+
+    expect(streamInput).toHaveBeenCalledTimes(1);
+    const root = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    expect(
+      JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([{role: 'user', content: 'sent later'}]);
+  });
+
+  test('records a streamed base64 image prompt and groups resumed queries as separate turns', async () => {
+    const imageBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    const imageInput: SDKUserMessage = {
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: imageBase64,
+            },
+          },
+          {type: 'text', text: 'Describe this image.'},
+        ],
+      },
+    };
+    const consumedInputs: SDKUserMessage[] = [];
+    const sdk = {
+      query: (args: any) => {
+        async function* gen() {
+          if (typeof args.prompt !== 'string') {
+            for await (const message of args.prompt) {
+              consumedInputs.push(message);
+            }
+          }
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: 'sess-image',
+            is_error: false,
+            result: 'done',
+            total_cost_usd: 0,
+            num_turns: 1,
+            modelUsage: {},
+          };
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    async function* imagePrompt(): AsyncGenerator<SDKUserMessage> {
+      yield imageInput;
+    }
+
+    for await (const _message of sdk.query({prompt: imagePrompt()})) {
+      void _message;
+    }
+    for await (const _message of sdk.query({
+      prompt: 'Now summarize the image.',
+      options: {resume: 'sess-image'},
+    })) {
+      void _message;
+    }
+
+    expect(consumedInputs).toEqual([imageInput]);
+    expect(consumedInputs[0]).toBe(imageInput);
+
+    const turns = getExporter()
+      .getFinishedSpans()
+      .filter(span => span.name === INVOKE);
+    expect(turns).toHaveLength(2);
+    expect(
+      JSON.parse(turns[0].attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [
+          {
+            type: 'blob',
+            content: imageBase64,
+            mimeType: 'image/png',
+            modality: 'image',
+          },
+          {type: 'text', content: 'Describe this image.'},
+        ],
+      },
+    ]);
+    expect(
+      JSON.parse(turns[1].attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([{role: 'user', content: 'Now summarize the image.'}]);
+    expect(
+      turns.map(turn => turn.attributes[ATTR_GEN_AI_CONVERSATION_ID])
+    ).toEqual(['sess-image', 'sess-image']);
+    expect(turns[0].spanContext().traceId).not.toBe(
+      turns[1].spanContext().traceId
+    );
   });
 
   test('forwards Query interface methods (e.g. interrupt) to the underlying query', async () => {
@@ -179,7 +435,123 @@ describe('Claude Agent SDK — query() patch', () => {
     // ...and the root span must be finalized as an error, not a completion.
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
-    expect(invoke.status.message).toContain('subprocess crashed');
+    expect(invoke.status.message).toBe('subprocess crashed');
+  });
+
+  test('isolates two interleaved query streams and preserves each trace tree', async () => {
+    let arrivals = 0;
+    let releaseBoth!: () => void;
+    const bothQueriesStarted = new Promise<void>(resolve => {
+      releaseBoth = resolve;
+    });
+
+    const sdk = {
+      query: ({prompt}: {prompt: string}) => {
+        const suffix = prompt === 'first' ? 'a' : 'b';
+        const sessionId = `session-${suffix}`;
+        const model = `claude-${suffix}`;
+        async function* gen() {
+          yield {
+            type: 'assistant',
+            session_id: sessionId,
+            message: {
+              model,
+              content: [{type: 'text', text: `response-${suffix}`}],
+            },
+          };
+          arrivals += 1;
+          if (arrivals === 2) {
+            releaseBoth();
+          }
+          await bothQueriesStarted;
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: sessionId,
+            is_error: false,
+            result: `done-${suffix}`,
+            total_cost_usd: 0.01,
+            num_turns: 1,
+            modelUsage: {
+              [model]: {
+                inputTokens: 1,
+                outputTokens: 2,
+                cacheReadInputTokens: 0,
+                cacheCreationInputTokens: 0,
+              },
+            },
+          };
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    const drain = async (prompt: string) => {
+      const seen: string[] = [];
+      for await (const message of sdk.query({prompt})) {
+        seen.push(message.type);
+      }
+      return seen;
+    };
+    await expect(
+      Promise.all([drain('first'), drain('second')])
+    ).resolves.toEqual([
+      ['assistant', 'result'],
+      ['assistant', 'result'],
+    ]);
+    expect(getCurrentTurn()).toBeUndefined();
+    expect(getCurrentLLM()).toBeUndefined();
+
+    const spans = getExporter().getFinishedSpans();
+    const roots = spans.filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+
+    for (const [suffix, prompt] of [
+      ['a', 'first'],
+      ['b', 'second'],
+    ] as const) {
+      const sessionId = `session-${suffix}`;
+      const root = roots.find(
+        span => span.attributes[ATTR_GEN_AI_CONVERSATION_ID] === sessionId
+      )!;
+      expect(
+        JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+      ).toEqual([{role: 'user', content: prompt}]);
+      expect(
+        JSON.parse(root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
+      ).toEqual([{role: 'assistant', content: `done-${suffix}`}]);
+
+      const children = spans.filter(
+        span => span.parentSpanId === root.spanContext().spanId
+      );
+      expect(children).toHaveLength(2);
+      expect(
+        children.map(span => ({
+          conversationId: span.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+          hasOutput: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined,
+          hasUsage:
+            span.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS] !== undefined,
+          name: span.name,
+          traceId: span.spanContext().traceId,
+        }))
+      ).toEqual([
+        {
+          conversationId: sessionId,
+          hasOutput: true,
+          hasUsage: false,
+          name: 'chat',
+          traceId: root.spanContext().traceId,
+        },
+        {
+          conversationId: sessionId,
+          hasOutput: false,
+          hasUsage: true,
+          name: 'chat',
+          traceId: root.spanContext().traceId,
+        },
+      ]);
+    }
   });
 
   test('passes through untouched when no weave client is initialized', async () => {

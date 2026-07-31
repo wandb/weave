@@ -11,7 +11,6 @@ from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
-from re import sub
 from typing import Any, NamedTuple, TypeVar, cast
 from zoneinfo import ZoneInfo
 
@@ -59,7 +58,10 @@ from weave.trace_server import trace_server_interface as tsi
 # GenAI / Agent observability imports
 from weave.trace_server.agents.clickhouse import AgentQueryHandler, AgentWriteHandler
 from weave.trace_server.agents.completion_spans import build_completion_span
-from weave.trace_server.agents.kafka_events import ScoreAgentSpansEvent
+from weave.trace_server.agents.kafka_events import (
+    EmbedAgentSpansEvent,
+    ScoreAgentSpansEvent,
+)
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import (
     AgentConversationChatReq,
@@ -173,6 +175,7 @@ from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
+from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.datadog import (
     record_db_insert,
     set_current_span_dd_tags,
@@ -215,6 +218,9 @@ from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.interface.builtin_object_classes.provider import (
+    sanitize_name_for_object_id,
+)
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
 )
@@ -544,8 +550,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @property
     def kafka_producer(self) -> KafkaProducer | None:
-        """Lazily initialize the Kafka producer, only if online eval is enabled."""
-        if not wf_env.wf_enable_online_eval():
+        """Lazily initialize the producer when an event consumer is enabled."""
+        if not (
+            wf_env.wf_enable_online_eval()
+            or wf_env.wf_enable_agent_scoring()
+            or wf_env.wf_enable_agent_insights()
+        ):
             return None
         if self._kafka_producer is not None:
             return self._kafka_producer
@@ -4373,6 +4383,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.DatasetDeleteRes(num_deleted=result.num_deleted)
 
+    def custom_runtime_apply(
+        self, req: tsi.CustomRuntimeApplyReq
+    ) -> tsi.CustomRuntimeApplyRes:
+        return apply_custom_runtime(
+            req,
+            self.obj_create,
+            self.objs_query,
+            self.obj_delete,
+        )
+
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         """Create a scorer object by first creating its score op, then creating the scorer object.
 
@@ -6656,16 +6676,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         expr = {
             "$and": [
-                (
-                    req.query.expr_
-                    if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
-                ),
+                *([req.query.expr_] if req.query else []),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
                 {
                     "$eq": [
                         {"$getField": "pricing_level"},
@@ -6773,6 +6790,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
+        count_query = TABLE_FEEDBACK.select()
+        count_query = count_query.project_id(req.project_id)
+        count_query = count_query.fields(["count(*)"])
+        count_query = count_query.where(req.query)
+        prepared_count = count_query.prepare()
+        count_result = self._query(prepared_count.sql, prepared_count.parameters)
+        total_count = int(count_result.result_rows[0][0])
+
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)
         query = query.fields(req.fields)
@@ -6788,7 +6813,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         for row in result:
             if "created_at" in row and isinstance(row["created_at"], datetime.datetime):
                 row["created_at"] = ensure_datetimes_have_tz(row["created_at"])
-        return tsi.FeedbackQueryRes(result=result)
+        return tsi.FeedbackQueryRes(result=result, total_count=total_count)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         # TODO: Instead of passing conditions to DELETE FROM,
@@ -7071,7 +7096,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             api_inputs.template_vars = None
 
         chunk_iter = lite_llm_completion_stream(
-            api_key=api_key or "",
+            api_key=api_key,
             inputs=api_inputs,
             provider=provider,
             base_url=base_url,
@@ -7353,19 +7378,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             self.ch_client, self._async_insert_settings(), self
         ).insert_otel_spans(req)
 
-        # Return early without emitting kafka events if online eval or agent scoring are disabled
-        if not wf_env.wf_enable_online_eval() or not wf_env.wf_enable_agent_scoring():
+        scoring_enabled = wf_env.wf_enable_agent_scoring()
+        insights_enabled = wf_env.wf_enable_agent_insights()
+        if not (scoring_enabled or insights_enabled):
             return res
 
-        # Emit for each row that produces a valid event type
+        producer = self.kafka_producer
         for row in span_rows:
-            if event := ScoreAgentSpansEvent.from_row(row):
-                event.emit(self.kafka_producer)
+            if scoring_enabled and (event := ScoreAgentSpansEvent.from_row(row)):
+                event.emit(producer)
+            if insights_enabled and (event := EmbedAgentSpansEvent.from_row(row)):
+                event.emit(producer)
 
         # Flush kafka producer
-        if span_rows and self.kafka_producer:
+        if span_rows and producer:
             try:
-                self.kafka_producer.flush(0)
+                producer.flush(0)
             except Exception:
                 logger.exception(
                     "Failed to flush Kafka producer during OTel span ingest"
@@ -8302,6 +8330,11 @@ def _setup_completion_model_info(
             api_key = req.inputs.extra_headers.pop("api_key", None)
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
+        if not api_key:
+            raise MissingLLMApiKeyError(
+                f"No API key found for model {model_name}",
+                api_key_name="WANDB_API_KEY",
+            )
         return_type = "openai"
         return CompletionModelInfo(
             model_name=model_name,
@@ -8315,7 +8348,7 @@ def _setup_completion_model_info(
     elif is_explicit_custom:
         # Custom provider path - model_name format: custom::<provider>::<model>
         # Parse provider and model names, create sanitized object_id for lookup
-        name_part = model_name.replace("custom::", "")
+        name_part = model_name.removeprefix("custom::")
 
         if "::" in name_part:
             # Format: custom::<provider>::<model>
@@ -8323,8 +8356,8 @@ def _setup_completion_model_info(
 
             # Create sanitized object_id to match what was created during provider setup
 
-            sanitized_provider = _sanitize_name_for_object_id(provider_name)
-            sanitized_model = _sanitize_name_for_object_id(model_name_part)
+            sanitized_provider = sanitize_name_for_object_id(provider_name)
+            sanitized_model = sanitize_name_for_object_id(model_name_part)
             sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
         else:
             # Fallback: assume it's already in object_id format
@@ -8402,7 +8435,3 @@ def _setup_completion_model_info(
         return_type=return_type,
         vertex_credentials=vertex_credentials,
     )
-
-
-def _sanitize_name_for_object_id(name: str) -> str:
-    return sub(r"[^a-zA-Z0-9_-]", "_", name)
