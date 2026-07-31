@@ -1115,6 +1115,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(
             self._internal_trace_server.op_create, req, req.project_id
         )
@@ -1142,6 +1144,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(
             self._internal_trace_server.dataset_create, req, req.project_id
         )
@@ -1181,6 +1185,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(
             self._internal_trace_server.scorer_create, req, req.project_id
         )
@@ -1211,6 +1217,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationCreateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(
             self._internal_trace_server.evaluation_create, req, req.project_id
         )

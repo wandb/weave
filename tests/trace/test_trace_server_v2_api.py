@@ -13,6 +13,7 @@ This module tests the V2 API endpoints for:
 The tests run against the ClickHouse backend.
 """
 
+import base64
 import datetime
 
 import pytest
@@ -23,6 +24,72 @@ from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.utils.project_id import from_project_id
+
+
+def test_object_creation_preserves_wb_user_id(client):
+    project_id = client.project_id
+    wb_user_id = client.entity
+
+    client.server.op_create(
+        tsi.OpCreateReq(
+            project_id=project_id,
+            name="user_id_op",
+            source_code="def user_id_op():\n    return 42",
+            wb_user_id=wb_user_id,
+        )
+    )
+    dataset_res = client.server.dataset_create(
+        tsi.DatasetCreateReq(
+            project_id=project_id,
+            name="user_id_dataset",
+            rows=[{"input": "hello", "output": "world"}],
+            wb_user_id=wb_user_id,
+        )
+    )
+    client.server.scorer_create(
+        tsi.ScorerCreateReq(
+            project_id=project_id,
+            name="user_id_scorer",
+            op_source_code="def score(output):\n    return output",
+            wb_user_id=wb_user_id,
+        )
+    )
+
+    entity, project = from_project_id(project_id)
+    dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+    client.server.evaluation_create(
+        tsi.EvaluationCreateReq(
+            project_id=project_id,
+            name="user_id_evaluation",
+            dataset=dataset_ref,
+            wb_user_id=wb_user_id,
+        )
+    )
+
+    object_ids = {
+        "user_id_op",
+        "user_id_dataset",
+        "user_id_scorer",
+        "user_id_scorer_score",
+        "user_id_scorer_summarize",
+        "user_id_evaluation",
+        "user_id_evaluation.evaluate",
+        "user_id_evaluation.predict_and_score",
+        "user_id_evaluation.summarize",
+    }
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=project_id,
+            filter=tsi.ObjectVersionFilter(
+                object_ids=list(object_ids),
+                latest_only=True,
+            ),
+        )
+    )
+    internal_user_id = base64.b64encode(wb_user_id.encode()).decode()
+    assert {obj.object_id: obj.wb_user_id for obj in res.objs} == dict.fromkeys(
+        object_ids, internal_user_id
+    )
 
 
 class TestOpsV2API:

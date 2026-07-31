@@ -4043,7 +4043,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 object_id=object_id,
                 val=op_val,
-                wb_user_id=None,
+                wb_user_id=req.wb_user_id,
             )
         )
         obj_result = self.obj_create(obj_req)
@@ -4272,7 +4272,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 object_id=dataset_id,
                 val=dataset_val,
-                wb_user_id=None,
+                wb_user_id=req.wb_user_id,
             )
         )
         obj_result = self.obj_create(obj_req)
@@ -4406,6 +4406,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=f"{scorer_id}_score",
             source_code=req.op_source_code,
+            wb_user_id=req.wb_user_id,
         )
         score_op_res = self.op_create(score_op_req)
         score_op_ref = score_op_res.digest
@@ -4415,6 +4416,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=f"{scorer_id}_summarize",
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
+            wb_user_id=req.wb_user_id,
         )
         summarize_op_res = self.op_create(summarize_op_req)
         summarize_op_ref = summarize_op_res.digest
@@ -4431,7 +4433,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 object_id=scorer_id,
                 val=scorer_val,
-                wb_user_id=None,
+                wb_user_id=req.wb_user_id,
             )
         )
         obj_result = self.obj_create(obj_req)
@@ -4511,6 +4513,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=f"{evaluation_id}.evaluate",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
+            wb_user_id=req.wb_user_id,
         )
         evaluate_op_res = self.op_create(evaluate_op_req)
         evaluate_ref = evaluate_op_res.digest
@@ -4520,6 +4523,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=f"{evaluation_id}.predict_and_score",
             source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
+            wb_user_id=req.wb_user_id,
         )
         predict_and_score_op_res = self.op_create(predict_and_score_op_req)
         predict_and_score_ref = predict_and_score_op_res.digest
@@ -4529,6 +4533,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             project_id=req.project_id,
             name=f"{evaluation_id}.summarize",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
+            wb_user_id=req.wb_user_id,
         )
         summarize_op_res = self.op_create(summarize_op_req)
         summarize_ref = summarize_op_res.digest
@@ -4553,7 +4558,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 project_id=req.project_id,
                 object_id=evaluation_id,
                 val=evaluation_val,
-                wb_user_id=None,
+                wb_user_id=req.wb_user_id,
             )
         )
         obj_result = self.obj_create(obj_req)
