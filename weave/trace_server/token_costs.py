@@ -69,7 +69,7 @@ LLM_TOKEN_PRICES_TABLE = Table(
 
 
 def build_model_prices_query(
-    project_id: str, models: list[str]
+    project_id: str, models: list[str], provider_id: str | None = None
 ) -> tuple[str, dict[str, Any]]:
     """Build SQL to get the current price per model.
 
@@ -78,6 +78,7 @@ def build_model_prices_query(
     Args:
         project_id: Project ID for project-level pricing.
         models: List of model/llm_id values to look up.
+        provider_id: Optional provider ID to restrict price resolution to.
 
     Returns:
         SQL string and parameters dict.
@@ -103,6 +104,7 @@ def build_model_prices_query(
             ) AS rank
         FROM {LLM_TOKEN_PRICES_TABLE_NAME}
         WHERE llm_id IN {{models:Array(String)}}
+          AND ({{provider_id:String}} = '' OR provider_id = {{provider_id:String}})
           AND (
               (pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND pricing_level_id = {{project:String}})
               OR (pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND pricing_level_id = {{default:String}})
@@ -114,6 +116,7 @@ def build_model_prices_query(
         "models": models,
         "project": project_id,
         "default": DEFAULT_PRICING_LEVEL_ID,
+        "provider_id": provider_id or "",
     }
     return sql, params
 

@@ -16,6 +16,7 @@ from tests.trace.util import client_is_clickhouse
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.token_costs import build_model_prices_query
 from weave.trace_server.trace_server_interface import (
     AggregationType,
     CallMetricSpec,
@@ -163,11 +164,12 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     )
 
 
-def test_call_stats_date_range_limit_validation():
-    """Reject CallStatsReq with a date range exceeding 31 days."""
+def test_call_stats_all_time_cost_validation_and_provider_filter():
+    """Keep broad stats bounded while allowing the one-bucket provider cost use case."""
     end_time = _BASE_TIME
     start_time = end_time - datetime.timedelta(days=32)
 
+    # Normal requests remain limited to 31 days.
     with pytest.raises(ValidationError):
         tsi.CallStatsReq(
             project_id="entity/project",
@@ -176,6 +178,34 @@ def test_call_stats_date_range_limit_validation():
             granularity=3600,
             usage_metrics=[tsi.UsageMetricSpec(metric="total_tokens")],
         )
+
+    # All-time requests must collapse into one bucket.
+    with pytest.raises(ValidationError):
+        tsi.CallStatsReq(
+            project_id="entity/project",
+            start=start_time,
+            end=end_time,
+            granularity=3600,
+            usage_metrics=[tsi.UsageMetricSpec(metric="total_cost")],
+            allow_large_range=True,
+        )
+
+    req = tsi.CallStatsReq(
+        project_id="entity/project",
+        start=start_time,
+        end=end_time,
+        granularity=int((end_time - start_time).total_seconds()),
+        usage_metrics=[tsi.UsageMetricSpec(metric="total_cost")],
+        cost_provider_id="coreweave",
+        allow_large_range=True,
+    )
+    assert req.cost_provider_id == "coreweave"
+
+    sql, params = build_model_prices_query(
+        req.project_id, ["google/gemma-4-31B-it"], req.cost_provider_id
+    )
+    assert "provider_id = {provider_id:String}" in sql
+    assert params["provider_id"] == "coreweave"
 
 
 def test_call_stats_multiple_models(client: weave_client.WeaveClient):
