@@ -18,6 +18,7 @@ from weave.trace_server.agents.schema import (
     NormalizedMessage,
 )
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOCH
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.trace_server_interface import CompletionsCreateRequestInputs
 from weave.trace_server.ttl_settings import compute_expire_at
 
@@ -63,8 +64,15 @@ def build_completion_span(
     agent_name = _SOURCE_TO_AGENT_NAME.get(source, PLAYGROUND_AGENT_NAME)
     weave_source = source or "playground"
 
-    input_messages = _normalize_input_messages(request_inputs.messages)
-    system_instructions = _extract_system_instructions(request_inputs.messages)
+    # Every column that can carry a client string is derived from this one
+    # redacted copy, so no two of them can disagree.
+    redacted_inputs = redact_sensitive_keys(
+        request_inputs.model_dump(exclude_none=True, exclude={"vertex_credentials"})
+    )
+    redacted_messages = redacted_inputs.get("messages", [])
+
+    input_messages = _normalize_input_messages(redacted_messages)
+    system_instructions = _extract_system_instructions(redacted_messages)
     output_messages: list[NormalizedMessage] = []
     finish_reasons: list[str] = []
 
@@ -92,17 +100,18 @@ def build_completion_span(
     request_presence_penalty = request_inputs.presence_penalty or 0.0
     request_seed = request_inputs.seed or 0
     request_stop_sequences: list[str] = []
-    if request_inputs.stop:
-        if isinstance(request_inputs.stop, list):
-            request_stop_sequences = [str(s) for s in request_inputs.stop]
+    redacted_stop = redacted_inputs.get("stop")
+    if redacted_stop:
+        if isinstance(redacted_stop, list):
+            request_stop_sequences = [str(s) for s in redacted_stop]
         else:
-            request_stop_sequences = [str(request_inputs.stop)]
+            request_stop_sequences = [str(redacted_stop)]
     request_choice_count = request_inputs.n or 0
 
     tool_definitions = ""
     if request_inputs.tools:
         try:
-            tool_definitions = json.dumps(request_inputs.tools)
+            tool_definitions = json.dumps(redacted_inputs.get("tools"))
         except (TypeError, ValueError):
             pass
 
@@ -117,11 +126,7 @@ def build_completion_span(
     if expire_at is None:
         expire_at = EXPIRE_AT_NEVER
 
-    raw_dump: dict[str, Any] = {
-        "inputs": request_inputs.model_dump(
-            exclude_none=True, exclude={"vertex_credentials"}
-        ),
-    }
+    raw_dump: dict[str, Any] = {"inputs": redacted_inputs}
     if response is not None:
         raw_dump["response"] = response
     if error:

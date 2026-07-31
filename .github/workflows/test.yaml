@@ -150,6 +150,13 @@ jobs:
             # "stainless",
             "autogen_tests",
           ]
+        # The Claude Agent SDK has both ClickHouse-backed calls tests and
+        # no-server OTel tests. Run it once to collect coverage for both paths
+        # without multiplying the integration shard across every Python version.
+        include:
+          - python-version-major: "3"
+            python-version-minor: "10"
+            nox-shard: "claude_agent_sdk"
         # Shards that don't support certain Python versions. Excluding here
         # (vs. skipping inside noxfile) avoids spinning up a runner just to
         # emit an empty coverage.xml that Codecov then rejects.
@@ -217,8 +224,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-1234567890abcdef1234567890abcdef' }}
           DD_TRACE_ENABLED: false
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server"
+          if [[ "${{ matrix.nox-shard }}" == "claude_agent_sdk" ]]; then
+            nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+          else
+            nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+              -m "trace_server"
+          fi
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:

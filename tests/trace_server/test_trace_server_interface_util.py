@@ -5,9 +5,11 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import Field, ValidationError
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server.errors import NotFoundError
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
@@ -16,6 +18,37 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
 
 REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
+
+
+class _BaseModelStrictTestModel(BaseModelStrict):
+    required_field: str
+    aliased_field: str = Field(alias="aliasedField")
+
+
+def test_base_model_strict_ignores_and_warns_on_unknown_fields(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        model = _BaseModelStrictTestModel.model_validate(
+            {
+                "required_field": "required",
+                "aliasedField": "aliased",
+                "future_sdk_field": "sensitive value",
+            }
+        )
+
+    assert model.required_field == "required"
+    assert model.aliased_field == "aliased"
+    assert model.model_extra is None
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field"
+    ]
+
+
+def test_base_model_strict_preserves_required_field_validation() -> None:
+    with pytest.raises(ValidationError, match="required_field"):
+        _BaseModelStrictTestModel.model_validate({"aliasedField": "aliased"})
 
 
 def test_extract_refs_from_values_deduplicates():

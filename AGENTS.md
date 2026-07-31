@@ -6,6 +6,7 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
 ## Python Import Rules
 
@@ -72,6 +73,14 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
+
+### Azure file storage authentication
+
+The trace server preserves explicit Azure connection strings and account keys
+for backward compatibility. When neither is configured, it uses
+`DefaultAzureCredential`, including AKS workload identity. Read-only export
+links use an account-key SAS for explicit credentials and a user-delegation SAS
+for workload identity.
 
 ## Generated Files — Do Not Hand-Edit
 
@@ -173,6 +182,12 @@ Focus on these primary test shards:
 - `tests-3.12(shard='flow')` - Higher level work"flow" objects
 - `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
+
+The Claude Agent SDK shard combines ClickHouse-backed calls tests with
+no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
+without a marker filter so both tracing paths contribute coverage.
+Calls-based tests must include the integration's intentional text and thinking
+child calls in exact operation-set assertions.
 
 ### Running Tests
 
@@ -332,6 +347,32 @@ pnpm exec tsx examples/claudeAgents.ts
   `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
   `invoke_agent` span as `gen_ai.output.messages`.
 
+### TypeScript GenAI span handles
+
+- `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
+  `invoke_agent`, `chat`, and `execute_tool` spans through
+  `/agents/otel/v1/traces`.
+- For callback or generator integrations, create `Conversation`, `Turn`, and
+  `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
+  `Tool` and `SubAgent` do not use ambient state.
+- Keep response models on child `chat` spans; use `setAttributes()` for fields
+  without typed `record()` methods.
+- The Claude Agent SDK integration keeps each `Tool` open until its matching
+  `tool_result`.
+- For streamed sessions, queue observed user inputs in FIFO order and close one
+  `Turn` for each matching SDK `result`.
+
+### Claude Agent SDK streamed images
+
+- Tap `AsyncIterable<SDKUserMessage>` prompts without consuming or cloning
+  them; map text and base64/URL images to GenAI text, blob, and URI parts.
+- Each user-to-result cycle is one root turn. Resumed queries share
+  `session_id`, and long-lived streamed inputs queue turns in FIFO order.
+- Treat `blob.content` as media/ref data exposed through `content_refs`, not
+  prose.
+- Run the example from `sdks/node`, use repository-relative fixtures, keep text
+  and image sessions separate, and set both `tools` and `allowedTools`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -411,6 +452,13 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- Mypy requires explicit `return None` paths in functions annotated with
+  `T | None`; bare `return` and implicit fallthrough trigger return-value
+  errors.
+- Python `Turn` spans are same-process `invoke_agent` operations and use OTel's
+  default `SpanKind.INTERNAL`. Do not set `gen_ai.provider.name` on a `Turn`;
+  set it on child `LLM`/`chat` spans, because one turn can use multiple
+  providers.
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
@@ -429,6 +477,47 @@ pnpm exec tsx examples/claudeAgents.ts
   rollups.
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
+- The OTel-selected Claude Agent SDK path composes the Python GenAI
+  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
+  OTel spans or call the low-level GenAI attribute builders itself. Use
+  `set_attributes()` only for semantic fields the typed handles do not expose.
+  The legacy calls-based path remains separate.
+- Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
+  Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
+  parts; media payloads remain data for `content_refs`, not chat prose.
+- Stream adapters can create child handles when work starts, then enter them
+  with a normal `with` when the completion message arrives. Preserve logical
+  timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
+  keeping contexts open with `ExitStack`.
+
+### Credential-shaped fields in client-authored call columns
+
+- The three call converters in `clickhouse/schema_converters.py` run
+  `redact_sensitive_keys` over `inputs` and `attributes` before extracting refs,
+  so a field whose name matches the policy in
+  `weave/trace_server/credential_redaction.py` is stored with its string value
+  replaced. `in_memory_trace_server.py` applies the same function, so both
+  backends read back the same thing.
+- The same converters redact `otel_dump`. It is a raw copy of the client's span,
+  so it carries the attribute values that `attributes_dump` holds a second time,
+  and it is a public field on the insert schemas, so the OTel route is not its
+  only producer.
+- The walk is copy-on-write and replaces only non-empty strings. Both properties
+  are load-bearing — see the module docstring — so keep them if you touch it.
+
+### Credential-shaped fields in agent span columns
+
+- The agents OTel ingest calls `redact_credentials_from_span` before
+  `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
+  Both are load-bearing — see that function's docstring — so keep the order and
+  the placement if you touch it.
+- It redacts all four attribute containers a span carries: its own, its resource,
+  its events and its links. The output columns derive from those too, so on this
+  path a credential-shaped name inside a structured output is replaced as well.
+- The completions path builds a span row without a parsed OTel span, so it never
+  reaches that hook. `build_completion_span` redacts the request once and every
+  column that can carry a client string reads that copy; the provider response is
+  left as the provider sent it, because a response is generated content.
 
 ### Documentation
 
@@ -501,4 +590,7 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Add `output_messages` to Python `Turn.record()` for parity with
       TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
       `invoke_agent_attributes()` builder already supports agent output.
+- [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
+      OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
+      `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
 - [ ] ...

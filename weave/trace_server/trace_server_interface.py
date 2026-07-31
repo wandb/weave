@@ -7,11 +7,13 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     field_serializer,
+    field_validator,
     model_validator,
     with_config,
 )
-from typing_extensions import TypedDict
+from typing_extensions import Self, TypedDict
 
 if TYPE_CHECKING:
     from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -33,6 +35,7 @@ from weave.trace_server.constants import (
     DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
     MAX_OBJECT_NAME_LENGTH,
 )
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
@@ -2703,10 +2706,28 @@ class DatasetDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of dataset versions deleted")
 
 
+CustomRuntimeName: TypeAlias = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=MAX_OBJECT_NAME_LENGTH,
+        # Forbid whitespace and "::".
+        pattern=r"^[^\s:]*(?::[^\s:]+)*:?$",
+    ),
+]
+
+
 class CustomRuntimeID(BaseModelStrict):
-    id: str = Field(
-        description="Value sent in the OpenAI-compatible request model field"
-    )
+    id: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            min_length=1,
+            # Forbid whitespace.
+            pattern=r"^\S+$",
+        ),
+    ] = Field(description="Value sent in the OpenAI-compatible request model field")
     max_tokens: int = Field(
         default=DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
         gt=0,
@@ -2728,33 +2749,31 @@ class CustomRuntimeApplyBody(BaseModelStrict):
         description="Complete desired list of IDs exposed by the endpoint"
     )
 
-
-class CustomRuntimeApplyReq(CustomRuntimeApplyBody):
-    project_id: str
-    runtime_name: str
-    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-    @model_validator(mode="after")
-    def validate_runtime_identity(self) -> "CustomRuntimeApplyReq":
-        if not self.runtime_name.strip():
-            raise ValueError("runtime_name must not be empty")
-        if len(self.runtime_name) > MAX_OBJECT_NAME_LENGTH:
-            raise ValueError(
-                f"runtime_name cannot exceed {MAX_OBJECT_NAME_LENGTH} characters"
-            )
-        if "::" in self.runtime_name:
-            raise ValueError("runtime_name cannot contain '::'")
-
+    @field_validator("runtime_ids")
+    @classmethod
+    def validate_unique_runtime_ids(
+        cls, runtime_ids: list[CustomRuntimeID]
+    ) -> list[CustomRuntimeID]:
         seen_ids: set[str] = set()
-        for runtime_id in self.runtime_ids:
-            if not runtime_id.id.strip():
-                raise ValueError("runtime ID must not be empty")
+        for runtime_id in runtime_ids:
             if runtime_id.id in seen_ids:
                 raise ValueError(f"duplicate runtime ID: {runtime_id.id}")
             seen_ids.add(runtime_id.id)
+        return runtime_ids
+
+
+class CustomRuntimeApplyReq(CustomRuntimeApplyBody):
+    project_id: str
+    runtime_name: CustomRuntimeName
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_storage_name_length(self) -> Self:
+        for runtime_id in self.runtime_ids:
             if len(f"{self.runtime_name}/{runtime_id.id}") > MAX_OBJECT_NAME_LENGTH:
-                raise ValueError(
-                    f"runtime name and ID cannot exceed {MAX_OBJECT_NAME_LENGTH} characters"
+                raise InvalidRequest(
+                    f"Runtime name and ID together cannot exceed "
+                    f"{MAX_OBJECT_NAME_LENGTH} characters"
                 )
         return self
 

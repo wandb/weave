@@ -28,15 +28,19 @@ import {
   ATTR_GEN_AI_USAGE_INPUT_TOKENS,
   ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
+  WEAVE_INTEGRATION_META_PREFIX,
+  WEAVE_INTEGRATION_NAME,
+  WEAVE_INTEGRATION_VERSION,
 } from '../../../genai/semconv';
 import {ClaudeAgentOtelTracer} from '../../../integrations/claude-agent-sdk/otelTracer';
+import {packageVersion} from '../../../utils/packageVersion';
 import {
   findSpan,
   setupExporterPerTest,
   setupGenAITestEnvironment,
 } from '../../genai/common';
 
-const INVOKE = 'invoke_agent claude_agent_sdk';
+const INVOKE = 'invoke_agent';
 
 // ---------------------------------------------------------------------------
 // Typed SDK-message fixtures.
@@ -143,6 +147,18 @@ function userToolResult(opts: {
     session_id: opts.sessionId,
     parent_tool_use_id: null,
     message: {role: 'user', content: [block]},
+  };
+}
+
+function userPrompt(opts: {
+  content: string;
+  sessionId?: string;
+}): SDKUserMessage {
+  return {
+    type: 'user',
+    session_id: opts.sessionId,
+    parent_tool_use_id: null,
+    message: {role: 'user', content: opts.content},
   };
 }
 
@@ -269,20 +285,44 @@ describe('Claude Agent SDK — OTel tracer', () => {
     );
 
     const spans = getExporter().getFinishedSpans();
+    expect(spans.map(span => span.name)).toEqual([
+      'chat',
+      'execute_tool',
+      'chat',
+      'invoke_agent',
+    ]);
+    for (const span of spans) {
+      expect({
+        name: span.attributes[WEAVE_INTEGRATION_NAME],
+        version: span.attributes[WEAVE_INTEGRATION_VERSION],
+        packageName:
+          span.attributes[`${WEAVE_INTEGRATION_META_PREFIX}.package_name`],
+        legacyName: span.attributes['integration.name'],
+        legacyVersion: span.attributes['integration.version'],
+        legacyPackageName: span.attributes['integration.meta.package_name'],
+      }).toEqual({
+        name: 'claude_agent_sdk',
+        version: packageVersion,
+        packageName: '@anthropic-ai/claude-agent-sdk',
+        legacyName: undefined,
+        legacyVersion: undefined,
+        legacyPackageName: undefined,
+      });
+    }
 
     const invoke = findSpan(spans, INVOKE);
-    expect(invoke.kind).toBe(SpanKind.INTERNAL);
+    expect(invoke.kind).toBe(SpanKind.CLIENT);
     expect(invoke.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
+    expect(invoke.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBeUndefined();
     expect(invoke.parentSpanId).toBeUndefined();
     // The root carries no token usage of its own — per-model usage rides on
     // child `chat` spans (asserted below) so the trace server costs and rolls
     // it up per model. The SDK's authoritative total cost stays on the root.
     expect(invoke.attributes[ATTR_GEN_AI_USAGE_INPUT_TOKENS]).toBeUndefined();
     expect(invoke.attributes['claude_agent_sdk.usage.cost_usd']).toBe(0.01);
-    expect(invoke.attributes['claude_agent_sdk.num_turns']).toBe(1);
     expect(
       JSON.parse(invoke.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'What is the weather in Tokyo?'}]);
@@ -290,9 +330,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
       JSON.parse(invoke.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string)
     ).toEqual([{role: 'assistant', content: 'It is sunny.'}]);
 
-    // Two spans are named `chat claude-x`: the per-message content span and the
-    // per-model usage span. Distinguish them by what each carries.
-    const chatSpans = spans.filter(s => s.name === 'chat claude-x');
+    const chatSpans = spans.filter(
+      s =>
+        s.name === 'chat' &&
+        s.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-x'
+    );
     const chat = chatSpans.find(
       s => s.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] != null
     )!;
@@ -300,9 +342,6 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(chat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(chat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    // Child spans carry the agent name so per-agent usage rollups (which group
-    // by gen_ai.agent.name) attribute their tokens to the agent.
-    expect(chat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
       'tool_use',
     ]);
@@ -342,12 +381,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
     // total_tokens = inclusive input (13) + output (5).
     expect(usageChat.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS]).toBe(18);
     expect(usageChat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
-    expect(usageChat.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe(
-      'claude_agent_sdk'
-    );
     expect(usageChat.parentSpanId).toBe(invoke.spanContext().spanId);
 
-    const tool = findSpan(spans, 'execute_tool Bash');
+    const tool = findSpan(spans, 'execute_tool');
     expect(tool.kind).toBe(SpanKind.INTERNAL);
     expect(tool.attributes[ATTR_GEN_AI_TOOL_NAME]).toBe('Bash');
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_ID]).toBe('t1');
@@ -355,13 +391,92 @@ describe('Claude Agent SDK — OTel tracer', () => {
       '{"command":"ls"}'
     );
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('Sunny');
-    expect(tool.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(tool.parentSpanId).toBe(invoke.spanContext().spanId);
 
     // The whole tree shares one trace.
     const traceId = invoke.spanContext().traceId;
     expect(chat.spanContext().traceId).toBe(traceId);
     expect(tool.spanContext().traceId).toBe(traceId);
+  });
+
+  test('emits one invoke_agent root per streaming-input turn', () => {
+    const tracer = new ClaudeAgentOtelTracer();
+
+    tracer.processInput(userPrompt({content: 'first question'}));
+    tracer.processInput(userPrompt({content: 'second question'}));
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-multi',
+        model: 'claude-first',
+        content: [textBlock('first response')],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({
+        sessionId: 'sess-multi',
+        result: 'first result',
+        modelUsage: {
+          'claude-first': modelUsage({inputTokens: 2, outputTokens: 3}),
+        },
+      })
+    );
+
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-multi',
+        model: 'claude-second',
+        content: [textBlock('second response')],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({
+        sessionId: 'sess-multi',
+        result: 'second result',
+        modelUsage: {
+          'claude-second': modelUsage({inputTokens: 5, outputTokens: 7}),
+        },
+      })
+    );
+    tracer.finalize();
+
+    const spans = getExporter().getFinishedSpans();
+    const roots = spans.filter(span => span.name === INVOKE);
+    expect(roots).toHaveLength(2);
+    expect(
+      roots.map(root => ({
+        conversationId: root.attributes[ATTR_GEN_AI_CONVERSATION_ID],
+        input: JSON.parse(
+          root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
+        ),
+        output: JSON.parse(
+          root.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+        ),
+      }))
+    ).toEqual([
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'first question'}],
+        output: [{role: 'assistant', content: 'first result'}],
+      },
+      {
+        conversationId: 'sess-multi',
+        input: [{role: 'user', content: 'second question'}],
+        output: [{role: 'assistant', content: 'second result'}],
+      },
+    ]);
+    expect(roots[0].spanContext().traceId).not.toBe(
+      roots[1].spanContext().traceId
+    );
+
+    const contentChats = spans.filter(
+      span =>
+        span.name === 'chat' &&
+        span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] !== undefined
+    );
+    expect(contentChats.map(span => span.parentSpanId)).toEqual([
+      roots[0].spanContext().spanId,
+      roots[1].spanContext().spanId,
+    ]);
   });
 
   test('emits one usage chat span per model, preserving the per-model split', () => {
@@ -429,6 +544,32 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(haiku.parentSpanId).toBe(invoke.spanContext().spanId);
   });
 
+  test('uses an options.agent override on the root span', () => {
+    const tracer = new ClaudeAgentOtelTracer({
+      agent: 'researcher',
+      prompt: 'p',
+    });
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-agent',
+        model: 'claude-x',
+        content: [textBlock('hi')],
+      })
+    );
+    tracer.finalize(
+      resultSuccess({
+        sessionId: 'sess-agent',
+        result: 'done',
+        modelUsage: {
+          'claude-x': modelUsage({inputTokens: 1, outputTokens: 2}),
+        },
+      })
+    );
+
+    const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
+    expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('researcher');
+  });
+
   test('a tool_result flagged is_error marks the execute_tool span as error', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.processMessage(
@@ -448,10 +589,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     );
     tracer.finalize(resultSuccess({}));
 
-    const tool = findSpan(
-      getExporter().getFinishedSpans(),
-      'execute_tool Bash'
-    );
+    const tool = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
     expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('tool_error');
     expect(tool.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
@@ -473,10 +611,10 @@ describe('Claude Agent SDK — OTel tracer', () => {
     const spans = getExporter().getFinishedSpans();
     const invoke = findSpan(spans, INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
-    expect(invoke.status.message).toContain('subprocess crashed');
+    expect(invoke.status.message).toBe('subprocess crashed');
     expect(invoke.attributes[ATTR_ERROR_TYPE]).toBe('agent_error');
 
-    const tool = findSpan(spans, 'execute_tool Bash');
+    const tool = findSpan(spans, 'execute_tool');
     expect(tool.status.code).toBe(SpanStatusCode.ERROR);
     expect(tool.attributes[ATTR_ERROR_TYPE]).toBe('aborted');
   });
@@ -496,16 +634,32 @@ describe('Claude Agent SDK — OTel tracer', () => {
 
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.status.code).toBe(SpanStatusCode.ERROR);
-    expect(invoke.status.message).toContain('boom');
+    expect(invoke.status.message).toBe('boom');
   });
 
-  test('late-binds the conversation id from the result when no earlier message carried one', () => {
+  test('uses the result conversation id for a result-only stream', () => {
     // A result-only stream (no system/assistant turn) still groups into its
-    // session: finalize reads session_id off the result.
+    // session because finalize creates the Turn with the result's session_id.
     const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
     tracer.finalize(resultSuccess({sessionId: 'sess-late', result: 'ok'}));
 
     const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-late');
+  });
+
+  test('backdates the lazily-created Turn to tracer construction time', () => {
+    const startedAt = new Date('2026-07-23T12:00:00.000Z');
+    jest.useFakeTimers();
+    jest.setSystemTime(startedAt);
+    try {
+      const tracer = new ClaudeAgentOtelTracer({prompt: 'p'});
+      jest.setSystemTime(new Date('2026-07-23T12:00:05.000Z'));
+      tracer.finalize(resultSuccess({sessionId: 'sess-time', result: 'ok'}));
+
+      const invoke = findSpan(getExporter().getFinishedSpans(), INVOKE);
+      expect(invoke.startTime[0]).toBe(Math.floor(startedAt.getTime() / 1_000));
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

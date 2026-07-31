@@ -1386,6 +1386,40 @@ def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
     assert _assistant_payload(assistant).content_refs == []
 
 
+def test_blob_content_is_media_not_user_message_text() -> None:
+    """A Weave blob's `content` is base64/ref data, not displayable prose."""
+    image_internal = "weave-trace-internal:///PID/object/Content:IMAGEDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-analyzer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        {
+                            "type": "blob",
+                            "content": image_internal,
+                            "mimeType": "image/png",
+                            "modality": "image",
+                        },
+                        _text_part("Describe this image."),
+                    ),
+                }
+            ],
+        )
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    assert _user_payload(user) == AgentChatUserMessage(
+        text="Describe this image.",
+        content_refs=[image_internal],
+    )
+
+
 @pytest.mark.xfail(
     reason=(
         "Known limitation (PR #7489 discussion): the inline-ref sweep "

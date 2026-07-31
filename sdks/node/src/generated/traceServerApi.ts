@@ -9217,11 +9217,11 @@ export class Api<
      * @description Create or replace a custom runtime configuration.
      *
      * @tags Custom Runtimes
-     * @name CustomRuntimeApplyV2EntityProjectCustomRuntimesRuntimeNamePut
+     * @name CustomRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut
      * @summary Custom Runtime Apply
-     * @request PUT:/v2/{entity}/{project}/custom-runtimes/{runtime_name}
+     * @request PUT:/v2/{entity}/{project}/runtimes/{runtime_name}
      */
-    customRuntimeApplyV2EntityProjectCustomRuntimesRuntimeNamePut: (
+    customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: (
       entity: string,
       project: string,
       runtimeName: string,
@@ -9229,7 +9229,7 @@ export class Api<
       params: RequestParams = {}
     ) =>
       this.request<CustomRuntimeApplyRes, HTTPValidationError>({
-        path: `/v2/${entity}/${project}/custom-runtimes/${runtimeName}`,
+        path: `/v2/${entity}/${project}/runtimes/${encodeURIComponent(runtimeName)}`,
         method: 'PUT',
         body: data,
         type: ContentType.Json,

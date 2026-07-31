@@ -6676,16 +6676,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         expr = {
             "$and": [
-                (
-                    req.query.expr_
-                    if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
-                ),
+                *([req.query.expr_] if req.query else []),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
                 {
                     "$eq": [
                         {"$getField": "pricing_level"},

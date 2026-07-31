@@ -77,6 +77,7 @@ from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
@@ -254,6 +255,11 @@ def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
 def _minify_json(val: Any) -> str:
     """JSON text with minified separators, as the backends store dumps."""
     return json.dumps(val, separators=(",", ":"))
+
+
+def _otel_dump_len(otel_dump: Any) -> int | None:
+    """Stored length of an otel dump, or None when the call carries none."""
+    return len(json.dumps(otel_dump)) if otel_dump is not None else None
 
 
 def _json_extract(parsed: Any, path_parts: list[str] | None) -> tuple[Any, str | None]:
@@ -1203,8 +1209,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     parsable_output = {"output": parsable_output}
                 parsable_output = cast(dict, parsable_output)
 
-                attributes_json = json.dumps(call.attributes)
-                inputs_json = json.dumps(call.inputs)
+                attributes = redact_sensitive_keys(call.attributes)
+                inputs = redact_sensitive_keys(call.inputs)
+                otel_dump = redact_sensitive_keys(call.otel_dump)
+                attributes_json = json.dumps(attributes)
+                inputs_json = json.dumps(inputs)
                 output_json = json.dumps(call.output)
                 summary_json = json.dumps(call.summary)
                 storage_size = (
@@ -1232,7 +1241,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     exception=call.exception,
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(list(call.inputs.values())),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     output=json.loads(output_json),
                     output_refs=extract_refs_from_values(
                         list(parsable_output.values())
@@ -1242,12 +1251,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     wb_run_id=call.wb_run_id,
                     wb_run_step=call.wb_run_step,
                     wb_run_step_end=call.wb_run_step_end,
-                    otel_dump=copy.deepcopy(call.otel_dump),
-                    otel_dump_len=(
-                        len(json.dumps(call.otel_dump))
-                        if call.otel_dump is not None
-                        else None
-                    ),
+                    otel_dump=copy.deepcopy(otel_dump),
+                    otel_dump_len=_otel_dump_len(otel_dump),
                     storage_size_bytes=storage_size,
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
@@ -1292,8 +1297,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if req.start.id is None:
             raise ValueError("id is required")
         with self.lock:
-            attributes_json = json.dumps(req.start.attributes)
-            inputs_json = json.dumps(req.start.inputs)
+            attributes = redact_sensitive_keys(req.start.attributes)
+            inputs = redact_sensitive_keys(req.start.inputs)
+            otel_dump = redact_sensitive_keys(req.start.otel_dump)
+            attributes_json = json.dumps(attributes)
+            inputs_json = json.dumps(inputs)
             expire_at = self._compute_call_expire_at(
                 req.start.project_id, req.start.started_at
             )
@@ -1310,18 +1318,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.started_at = _ensure_tz(req.start.started_at)
                 existing.attributes = json.loads(attributes_json)
                 existing.inputs = json.loads(inputs_json)
-                existing.input_refs = extract_refs_from_values(
-                    list(req.start.inputs.values())
-                )
+                existing.input_refs = extract_refs_from_values(list(inputs.values()))
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
-                existing.otel_dump = copy.deepcopy(req.start.otel_dump)
-                existing.otel_dump_len = (
-                    len(json.dumps(req.start.otel_dump))
-                    if req.start.otel_dump is not None
-                    else None
-                )
+                existing.otel_dump = copy.deepcopy(otel_dump)
+                existing.otel_dump_len = _otel_dump_len(otel_dump)
                 existing.expire_at = expire_at
                 existing.attributes_len = len(attributes_json)
                 existing.inputs_len = len(inputs_json)
@@ -1338,18 +1340,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     started_at=_ensure_tz(req.start.started_at),
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(
-                        list(req.start.inputs.values())
-                    ),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     wb_user_id=req.start.wb_user_id,
                     wb_run_id=req.start.wb_run_id,
                     wb_run_step=req.start.wb_run_step,
-                    otel_dump=copy.deepcopy(req.start.otel_dump),
-                    otel_dump_len=(
-                        len(json.dumps(req.start.otel_dump))
-                        if req.start.otel_dump is not None
-                        else None
-                    ),
+                    otel_dump=copy.deepcopy(otel_dump),
+                    otel_dump_len=_otel_dump_len(otel_dump),
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
                     inputs_len=len(inputs_json),
@@ -4175,16 +4171,13 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         expr = {
             "$and": [
-                (
-                    req.query.expr_
-                    if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
-                ),
+                *([req.query.expr_] if req.query else []),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
                 {
                     "$eq": [
                         {"$getField": "pricing_level"},
