@@ -774,17 +774,20 @@ class AgentQueryHandler:
         list_builder: Callable[[ParamBuilder, PaginatedReqT], str],
         req: PaginatedReqT,
     ) -> tuple[int, list[ClickHouseRow]]:
-        """Run a (count, list) SQL pair with a shared `ParamBuilder`.
+        """Run a count query and, when requested, its paginated list query.
 
-        Returns `(total_count, list_rows_as_dicts)`. Both queries reuse the
-        same `pb` so the `WHERE` parameters aren't added twice.
+        Returns `(total_count, list_rows_as_dicts)`. A zero limit only needs
+        the count; otherwise both builders reuse the same `pb` so the `WHERE`
+        parameters aren't added twice.
         """
         pb = ParamBuilder(PARAM_NAMESPACE)
         count_sql = count_builder(pb, req)
+        total = _first_cell_int(self._query(count_sql, pb.get_params()))
+        if req.limit == 0:
+            return total, []
+
         list_sql = list_builder(pb, req)
-        params = pb.get_params()
-        total = _first_cell_int(self._query(count_sql, params))
-        rows = _rows_as_dicts(self._query(list_sql, params))
+        rows = _rows_as_dicts(self._query(list_sql, pb.get_params()))
         return total, rows
 
     def _run_message_search_query(self, req: AgentSearchReq) -> list[ClickHouseRow]:
