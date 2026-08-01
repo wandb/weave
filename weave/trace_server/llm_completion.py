@@ -555,7 +555,12 @@ def _setup_provider_credentials_and_model(
         )
         # Nova models need the region in the model name
         if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
-            aws_inference_region = aws_region_name.split("-")[0]
+            # Bedrock cross-region inference profile IDs use the AWS geography
+            # prefix. Most geographies match the first segment of the region
+            # name (us-east-1 -> us), but Asia-Pacific regions start with "ap"
+            # while the geography prefix is "apac" (ap-southeast-1 -> apac).
+            region_prefix = aws_region_name.split("-")[0]
+            aws_inference_region = "apac" if region_prefix == "ap" else region_prefix
             inputs.model = "bedrock/" + aws_inference_region + "." + inputs.model
     # XAI models don't support response_format
     elif provider == "xai":
