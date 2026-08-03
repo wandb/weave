@@ -359,6 +359,10 @@ pnpm exec tsx examples/claudeAgents.ts
   without typed `record()` methods.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
+- Parallel/background Claude Agent SDK `Agent` calls can emit an
+  `async_launched` tool result before forwarded child messages, then finish via
+  a `task_notification`. Keep one `SubAgent` keyed by tool-use ID across turn
+  boundaries until that notification arrives.
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
 - Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
@@ -584,4 +588,8 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
       OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
       `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
+- [ ] Isolate Node GenAI test exit hooks: a full in-band Jest run can register
+      more than ten `beforeExit` listeners and flush queued test calls to the
+      real trace server after teardown when developer W&B credentials are
+      present, turning an otherwise-green run into a post-test failure.
 - [ ] ...

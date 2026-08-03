@@ -26,6 +26,7 @@ import type {
   SDKAssistantMessage,
   SDKMessage,
   SDKResultMessage,
+  SDKTaskNotificationMessage,
   SDKUserMessage,
   SDKUserMessageReplay,
 } from '@anthropic-ai/claude-agent-sdk';
@@ -137,6 +138,20 @@ function isSubagentTool(name: string): boolean {
   return name === 'Agent' || name === 'Task';
 }
 
+function asyncSubagentLaunch(value: unknown): {
+  model?: string;
+  taskId?: string;
+} | null {
+  const result = recordOf(value);
+  if (result.status !== 'async_launched') {
+    return null;
+  }
+  return {
+    model: stringField(result, 'resolvedModel'),
+    taskId: stringField(result, 'agentId'),
+  };
+}
+
 type NormalizedUsage = {
   usage: Usage;
   totalTokens: number;
@@ -198,11 +213,23 @@ type SpanParent = Pick<
   'startLLM' | 'startSubagent' | 'startTool'
 >;
 
+type SubagentCompletion = {
+  error?: Error;
+  errorType?: 'aborted' | 'subagent_error';
+};
+
+type OpenSubagent = {
+  background: boolean;
+  completion?: SubagentCompletion;
+  span: SubAgent;
+  taskId?: string;
+};
+
 /** Emits Claude Agent SDK traces through Weave GenAI handles. */
 export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
   private readonly startedAt = new Date();
-  private readonly openSubagents = new Map<string, SubAgent>();
+  private readonly openSubagents = new Map<string, OpenSubagent>();
   private readonly openTools = new Map<string, Tool>();
   private readonly pendingTurns: PendingTurn[] = [];
 
@@ -261,6 +288,11 @@ export class ClaudeAgentOtelTracer {
       case 'result':
         this.endTurn(msg);
         break;
+      case 'system':
+        if (msg.subtype === 'task_notification') {
+          this.processTaskNotification(msg);
+        }
+        break;
       default:
         break;
     }
@@ -284,6 +316,7 @@ export class ClaudeAgentOtelTracer {
     ) {
       this.endTurn(undefined, error);
     }
+    this.finishOpenSubagents(true);
   }
 
   private endTurn(result?: SDKResultMessage, error?: unknown): void {
@@ -293,11 +326,7 @@ export class ClaudeAgentOtelTracer {
       tool.end({error: new Error('Agent ended with open tool span')});
     }
     this.openTools.clear();
-    for (const subagent of [...this.openSubagents.values()].reverse()) {
-      subagent.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
-      subagent.end({error: new Error('Agent ended with open subagent span')});
-    }
-    this.openSubagents.clear();
+    this.finishOpenSubagents(false);
 
     if (result) {
       this.emitModelUsageSpans(result, turn);
@@ -470,20 +499,21 @@ export class ClaudeAgentOtelTracer {
       return turn;
     }
 
-    let subagent = this.openSubagents.get(parentToolUseId);
-    if (!subagent) {
-      subagent = turn.startSubagent({
+    let openSubagent = this.openSubagents.get(parentToolUseId);
+    if (!openSubagent) {
+      const span = turn.startSubagent({
         name: msg.subagent_type ?? 'subagent',
         model: msg.message.model,
         agentDescription: msg.task_description,
       });
-      subagent.setAttributes({
+      span.setAttributes({
         [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
         [ATTR_GEN_AI_TOOL_CALL_ID]: parentToolUseId,
       });
-      this.openSubagents.set(parentToolUseId, subagent);
+      openSubagent = {background: false, span};
+      this.openSubagents.set(parentToolUseId, openSubagent);
     } else {
-      subagent.record({
+      openSubagent.span.record({
         ...(msg.subagent_type ? {name: msg.subagent_type} : {}),
         ...(msg.message.model ? {model: msg.message.model} : {}),
         ...(msg.task_description
@@ -491,7 +521,7 @@ export class ClaudeAgentOtelTracer {
           : {}),
       });
     }
-    return subagent;
+    return openSubagent.span;
   }
 
   private startSubagent(block: ToolUseBlock, parent: SpanParent): void {
@@ -519,7 +549,7 @@ export class ClaudeAgentOtelTracer {
           }
         : {}),
     });
-    this.openSubagents.set(block.id, subagent);
+    this.openSubagents.set(block.id, {background: false, span: subagent});
   }
 
   private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
@@ -531,10 +561,19 @@ export class ClaudeAgentOtelTracer {
         continue;
       }
       const resultText = toolResultText(block.content);
-      const subagent = this.openSubagents.get(block.tool_use_id);
-      if (subagent) {
-        this.openSubagents.delete(block.tool_use_id);
-        subagent.setAttributes({
+      const openSubagent = this.openSubagents.get(block.tool_use_id);
+      if (openSubagent) {
+        const launch = asyncSubagentLaunch(msg.tool_use_result);
+        if (launch && !block.is_error) {
+          openSubagent.background = true;
+          openSubagent.taskId = launch.taskId;
+          openSubagent.span.record({
+            ...(launch.model ? {model: launch.model} : {}),
+            ...(launch.taskId ? {agentId: launch.taskId} : {}),
+          });
+          continue;
+        }
+        openSubagent.span.setAttributes({
           [ATTR_GEN_AI_TOOL_CALL_RESULT]: resultText,
           ...(resultText
             ? {
@@ -545,12 +584,12 @@ export class ClaudeAgentOtelTracer {
             : {}),
         });
         if (block.is_error) {
-          subagent.setAttributes({[ATTR_ERROR_TYPE]: 'subagent_error'});
-          subagent.end({
+          openSubagent.completion = {
+            errorType: 'subagent_error',
             error: new Error(resultText || 'Subagent execution failed'),
-          });
+          };
         } else {
-          subagent.end();
+          openSubagent.completion = {};
         }
         continue;
       }
@@ -566,6 +605,62 @@ export class ClaudeAgentOtelTracer {
       } else {
         tool.end();
       }
+    }
+  }
+
+  private processTaskNotification(msg: SDKTaskNotificationMessage): void {
+    let toolUseId = msg.tool_use_id;
+    if (!toolUseId) {
+      toolUseId = [...this.openSubagents.entries()].find(
+        ([, openSubagent]) => openSubagent.taskId === msg.task_id
+      )?.[0];
+    }
+    if (!toolUseId) {
+      return;
+    }
+
+    const openSubagent = this.openSubagents.get(toolUseId);
+    if (!openSubagent) {
+      return;
+    }
+    openSubagent.background = true;
+    openSubagent.taskId = msg.task_id;
+    openSubagent.span.record({agentId: msg.task_id});
+    if (msg.status === 'completed') {
+      openSubagent.completion = {};
+      return;
+    }
+
+    openSubagent.completion = {
+      errorType: msg.status === 'stopped' ? 'aborted' : 'subagent_error',
+      error: new Error(msg.summary || `Background subagent ${msg.status}`),
+    };
+  }
+
+  private finishOpenSubagents(finalizing: boolean): void {
+    const openSubagents = [...this.openSubagents.entries()].reverse();
+    for (const [toolUseId, openSubagent] of openSubagents) {
+      const completion = openSubagent.completion;
+      if (completion) {
+        if (completion.errorType) {
+          openSubagent.span.setAttributes({
+            [ATTR_ERROR_TYPE]: completion.errorType,
+          });
+        }
+        openSubagent.span.end(
+          completion.error ? {error: completion.error} : undefined
+        );
+        this.openSubagents.delete(toolUseId);
+        continue;
+      }
+      if (openSubagent.background && !finalizing) {
+        continue;
+      }
+      openSubagent.span.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
+      openSubagent.span.end({
+        error: new Error('Agent ended with open subagent span'),
+      });
+      this.openSubagents.delete(toolUseId);
     }
   }
 }
