@@ -26,6 +26,14 @@ from weave.conversation.conversation import (
     SubAgent,
     Tool,
     Turn,
+    get_current_llm,
+    get_current_span,
+    get_current_subagent,
+    get_current_turn,
+    start_llm,
+    start_subagent,
+    start_tool,
+    start_turn,
 )
 
 
@@ -333,3 +341,259 @@ class TestCrossThread:
         llm_span = _by_prefix(spans, "chat")
         assert llm_span.parent is not None
         assert llm_span.parent.span_id == sa_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# The `_current_subagent` contextvar: `get_current_subagent()` reflects the
+# subagent whose ``with`` block we're inside, and nested subagents stack.
+# ---------------------------------------------------------------------------
+
+
+class TestCurrentSubagentContextvar:
+    def test_current_subagent_set_inside_reset_outside(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        assert get_current_subagent() is None
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            assert get_current_subagent() is None  # a Turn is not a SubAgent
+            with turn.start_subagent(name="researcher") as sa:
+                assert get_current_subagent() is sa
+            assert get_current_subagent() is None
+        assert get_current_subagent() is None
+
+    def test_current_subagent_stacks_for_nested(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="outer") as outer:
+                assert get_current_subagent() is outer
+                with outer.start_subagent(name="inner") as inner:
+                    assert get_current_subagent() is inner
+                assert get_current_subagent() is outer  # restored on inner exit
+            assert get_current_subagent() is None
+
+
+# ---------------------------------------------------------------------------
+# Gap 1: the IMPLICIT top-level factories resolve the current SubAgent (not just
+# the Turn), so `weave.start_llm()` / `start_tool()` / `start_subagent()` used
+# inside a subagent nest under the subagent — matching the explicit `sa.start_*`.
+# ---------------------------------------------------------------------------
+
+
+class TestImplicitPathNestsUnderSubagent:
+    def test_implicit_start_llm_inside_subagent_nests_under_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="researcher"):
+                with start_llm(model="gpt-4o"):  # top-level implicit
+                    pass
+        spans = otel_spans.get_finished_spans()
+        sa_span = _by_agent_name(spans, "researcher")
+        llm_span = _by_prefix(spans, "chat")
+        assert llm_span.parent.span_id == sa_span.context.span_id
+
+    def test_implicit_start_tool_inside_subagent_nests_under_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="researcher"):
+                with start_tool(name="web_search", tool_call_id="tc-1"):
+                    pass
+        spans = otel_spans.get_finished_spans()
+        sa_span = _by_agent_name(spans, "researcher")
+        tool_span = _by_prefix(spans, "execute_tool")
+        assert tool_span.parent.span_id == sa_span.context.span_id
+
+    def test_implicit_start_subagent_inside_subagent_nests_under_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="outer"):
+                with start_subagent(name="inner"):  # top-level implicit
+                    pass
+        spans = otel_spans.get_finished_spans()
+        outer_span = _by_agent_name(spans, "outer")
+        inner_span = _by_agent_name(spans, "inner")
+        assert inner_span.parent.span_id == outer_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# Gap 2: top-level `start_tool` / `start_subagent` DELEGATE (like `start_llm`),
+# so a child built in-block but entered after the parent exits nests under the
+# parent instead of detaching into its own trace.
+# ---------------------------------------------------------------------------
+
+
+class TestImplicitOutOfBlockNesting:
+    def test_implicit_tool_after_turn_exits_nests_under_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"):
+            turn = Turn(agent_name="bot")
+            with turn:
+                tool = start_tool(name="web_search", tool_call_id="tc-1")  # implicit
+            with tool:  # entered after the turn exits
+                pass
+        spans = otel_spans.get_finished_spans()
+        turn_span = _by_prefix(spans, "invoke_agent bot")
+        tool_span = _by_prefix(spans, "execute_tool")
+        assert tool_span.parent is not None
+        assert tool_span.parent.span_id == turn_span.context.span_id
+        assert tool_span.context.trace_id == turn_span.context.trace_id
+
+    def test_implicit_subagent_after_turn_exits_nests_under_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"):
+            turn = Turn(agent_name="bot")
+            with turn:
+                sa = start_subagent(name="researcher")  # implicit
+            with sa:  # entered after the turn exits
+                pass
+        spans = otel_spans.get_finished_spans()
+        turn_span = _by_prefix(spans, "invoke_agent bot")
+        sa_span = _by_agent_name(spans, "researcher")
+        assert sa_span.parent is not None
+        assert sa_span.parent.span_id == turn_span.context.span_id
+        assert sa_span.context.trace_id == turn_span.context.trace_id
+
+    def test_implicit_tool_inside_subagent_after_subagent_exits_nests_under_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            sa = turn.start_subagent(name="researcher")
+            with sa:
+                tool = start_tool(name="web_search", tool_call_id="tc-1")  # implicit
+            with tool:
+                pass
+        spans = otel_spans.get_finished_spans()
+        sa_span = _by_agent_name(spans, "researcher")
+        tool_span = _by_prefix(spans, "execute_tool")
+        assert tool_span.parent.span_id == sa_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# Gap 4: an explicit child built in one thread and entered/ended in another must
+# not strand the source thread's `_current_llm` contextvar on the ended span.
+# ---------------------------------------------------------------------------
+
+
+class TestNoCrossThreadContextvarLeak:
+    def test_llm_entered_in_worker_does_not_strand_source_thread_current_llm(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="researcher") as sa:
+                llm = sa.start_llm(model="gpt-4o")  # built in this (main) thread
+
+            def worker() -> None:
+                with llm:  # entered + ended entirely in the worker thread
+                    pass
+
+            thread = threading.Thread(target=worker)
+            thread.start()
+            thread.join()
+
+            # The main thread never entered the LLM, so it must not be left as
+            # the "current" LLM — least of all the now-ended one.
+            assert get_current_llm() is None
+
+        spans = otel_spans.get_finished_spans()
+        sa_span = _by_agent_name(spans, "researcher")
+        llm_span = _by_prefix(spans, "chat")
+        assert llm_span.parent.span_id == sa_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# A Turn is never a child of a SubAgent ("a sub-agent can't start a turn").
+# Starting a new turn — or entering one — drops any lingering current sub-agent
+# from a prior turn, so the turn's own implicit children nest under the Turn,
+# not a stale sub-agent (which would land them in the previous turn's trace).
+# ---------------------------------------------------------------------------
+
+
+class TestStartTurnSkipsActiveSubagent:
+    def test_implicit_start_turn_clears_current_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa"):
+                assert get_current_subagent() is not None
+                start_turn(agent_name="bot2")  # top-level implicit
+                assert get_current_subagent() is None
+                assert get_current_turn() is not None
+
+    def test_entering_a_turn_clears_subagent_and_restores_on_exit(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa") as sa:
+                with Turn(agent_name="bot2"):
+                    assert get_current_subagent() is None
+                # back inside the enclosing sub-agent's block
+                assert get_current_subagent() is sa
+
+    def test_implicit_llm_after_start_turn_in_subagent_nests_under_new_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """The core bug: an LLM started (implicitly) under a turn begun while a
+        sub-agent was still current must nest under that new turn — same trace —
+        not the stale sub-agent from the previous turn's trace.
+        """
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn1:
+            with turn1.start_subagent(name="sa"):
+                turn2 = start_turn(agent_name="bot2")
+                with turn2:
+                    with start_llm(model="gpt-4o"):
+                        pass
+        spans = otel_spans.get_finished_spans()
+        turn2_span = _by_agent_name(spans, "bot2")
+        llm_span = _by_prefix(spans, "chat")
+        assert llm_span.parent is not None
+        assert llm_span.parent.span_id == turn2_span.context.span_id
+        assert llm_span.context.trace_id == turn2_span.context.trace_id
+
+
+# ---------------------------------------------------------------------------
+# get_current_span(): the single "what's active?" accessor. Returns the nearest
+# open container (Turn or SubAgent) — the thing an implicit start_* nests under.
+# Turn and SubAgent are containers; LLM and Tool are leaves and never appear.
+# ---------------------------------------------------------------------------
+
+
+class TestGetCurrentSpan:
+    def test_none_when_nothing_active(self) -> None:
+        assert get_current_span() is None
+
+    def test_turn_then_subagent_then_turn(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        assert get_current_span() is None
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            assert get_current_span() is turn  # the turn is the current container
+            with turn.start_subagent(name="researcher") as sa:
+                assert get_current_span() is sa  # sub-agent shadows the turn
+            assert get_current_span() is turn  # restored on sub-agent exit
+        assert get_current_span() is None
+
+    def test_returns_innermost_nested_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_subagent(name="outer") as outer:
+                assert get_current_span() is outer
+                with outer.start_subagent(name="inner") as inner:
+                    assert get_current_span() is inner
+                assert get_current_span() is outer
+            assert get_current_span() is turn
+
+    def test_llm_is_a_leaf_not_a_container(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        """An open LLM does not become the current span — it's a leaf, so an
+        implicit tool started alongside it still nests under the turn.
+        """
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            with turn.start_llm(model="gpt-4o"):
+                assert get_current_span() is turn
