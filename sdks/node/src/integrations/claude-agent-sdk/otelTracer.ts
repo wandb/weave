@@ -208,11 +208,6 @@ type PendingTurn = {
   startedAt: Date;
 };
 
-type SpanParent = Pick<
-  Turn | SubAgent,
-  'startLLM' | 'startSubagent' | 'startTool'
->;
-
 type SubagentCompletion = {
   error?: Error;
   errorType?: 'aborted' | 'subagent_error';
@@ -493,7 +488,7 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private spanParent(msg: SDKAssistantMessage, turn: Turn): SpanParent {
+  private spanParent(msg: SDKAssistantMessage, turn: Turn): Turn | SubAgent {
     const parentToolUseId = msg.parent_tool_use_id;
     if (parentToolUseId == null) {
       return turn;
@@ -524,7 +519,7 @@ export class ClaudeAgentOtelTracer {
     return openSubagent.span;
   }
 
-  private startSubagent(block: ToolUseBlock, parent: SpanParent): void {
+  private startSubagent(block: ToolUseBlock, parent: Turn | SubAgent): void {
     const input = recordOf(block.input);
     const name =
       stringField(input, 'subagent_type') ??
