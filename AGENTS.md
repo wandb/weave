@@ -357,6 +357,8 @@ pnpm exec tsx examples/claudeAgents.ts
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- Do not set `gen_ai.provider.name` on a `Turn`; one turn can use multiple
+  providers, so provider identity belongs on its child model spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
 - Parallel/background Claude Agent SDK `Agent` calls can emit an

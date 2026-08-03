@@ -404,9 +404,6 @@ export class ClaudeAgentOtelTracer {
         startTime: pending.startedAt,
       })
     );
-    this.activeTurn.setAttributes({
-      [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
-    });
     if (pending.inputMessages.length > 0) {
       this.activeTurn.record({
         messages: pending.inputMessages,

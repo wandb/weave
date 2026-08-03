@@ -349,7 +349,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     expect(invoke.kind).toBe(SpanKind.CLIENT);
     expect(invoke.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
-    expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
+    expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBeUndefined();
     expect(invoke.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(invoke.attributes[ATTR_GEN_AI_RESPONSE_MODEL]).toBeUndefined();
     expect(invoke.parentSpanId).toBeUndefined();
