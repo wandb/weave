@@ -449,7 +449,7 @@ export class ClaudeAgentOtelTracer {
       this.rootModel = model;
     }
 
-    const parent = this.spanParent(msg, turn);
+    const parent = this.getOrCreateMessageParent(msg, turn);
     const content = msg.message.content;
     const parts = assistantParts(content);
 
@@ -488,7 +488,10 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private spanParent(msg: SDKAssistantMessage, turn: Turn): Turn | SubAgent {
+  private getOrCreateMessageParent(
+    msg: SDKAssistantMessage,
+    turn: Turn
+  ): Turn | SubAgent {
     const parentToolUseId = msg.parent_tool_use_id;
     if (parentToolUseId == null) {
       return turn;
