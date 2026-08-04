@@ -8,14 +8,14 @@ CREATE TABLE IF NOT EXISTS intent_records
     id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
     intent_ordinal UInt16 DEFAULT 0,         -- position among intents extracted from a single turn, folded into the id hash
     signature_id FixedString(16),            -- 128-bit hash of the canonicalized signature, groups every occurrence of the same intent
-    space LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure'; already folded into the id hash, so it stays out of ORDER BY
+    space LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id hash so it stays out of ORDER BY
     pipeline_version UInt32,                 -- recipe id, in ORDER BY so versions coexist during re-embed/backfill
     record_version UInt64,                   -- ReplacingMergeTree version, highest for a key wins
 
     category String,                         -- mutable taxonomy label, excluded from identity, plain String because generated categories can be high-cardinality
     signature String,
     -- Judge decomposition of the signature. action/outcome/operation_mode are
-    -- bounded vocabularies; object is a free-text noun phrase, so plain String.
+    -- bounded vocabularies. object is a free-text noun phrase, so plain String.
     action LowCardinality(String) DEFAULT '',
     object String DEFAULT '',
     outcome LowCardinality(String) DEFAULT '',
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS intent_records
 
     source LowCardinality(String),
     insights_type LowCardinality(String) DEFAULT 'turn', -- grain of analyzed unit: 'turn' or 'conversation'
-    source_id String DEFAULT '',             -- id within the source system, hashed into id; turn identity is (conversation_id, turn_index)
+    source_id String DEFAULT '',             -- id within the source system, hashed into id. Turn identity is (conversation_id, turn_index)
     trace_id String DEFAULT '',
     span_id String DEFAULT '',
     parent_span_id String DEFAULT '',
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS intent_records
     user_id String DEFAULT '',               -- pseudonymous source subject, distinct from the writer
 
     -- Clustering assignment for the run named by cluster_run_id. An empty
-    -- cluster_run_id means never clustered; cluster_id -1 is the HDBSCAN noise label.
+    -- cluster_run_id means never clustered. cluster_id -1 is the HDBSCAN noise label.
     cluster_run_id String DEFAULT '',
     cluster_id Int32 DEFAULT -1,
     cluster_label String DEFAULT '',         -- generated per cluster, plain String for the same reason as category
