@@ -67,6 +67,8 @@ logger = logging.getLogger(__name__)
 _DEFAULT_AGENT_NAME = "claude_agent_sdk"
 _PROVIDER_NAME = "anthropic"
 _SUBAGENT_TOOL_NAMES = {"Agent", "Task"}
+_TASK_STATUS_ATTRIBUTE = "claude_agent_sdk.task.status"
+_TASK_ERROR_STATUSES = {"failed", "stopped"}
 
 _claude_agent_sdk_otel_patcher: MultiPatcher | None = None
 
@@ -179,7 +181,15 @@ def _assistant_output_message(
             thinking_chunks.append(block.thinking)
         elif isinstance(block, ToolUseBlock):
             tool_calls.append(
-                ToolCallPart(id=block.id, name=block.name, arguments=block.input)
+                ToolCallPart(
+                    id=block.id,
+                    name=block.name,
+                    arguments=json.dumps(
+                        block.input,
+                        ensure_ascii=False,
+                        default=str,
+                    ),
+                )
             )
     text = "\n".join(text_chunks)
     reasoning = Reasoning(
@@ -205,7 +215,33 @@ def _tool_result_text(content: Any) -> str:
     return json.dumps(content, ensure_ascii=False, default=str)
 
 
+def _async_launch_payload(content: Any) -> dict[str, Any] | None:
+    candidates = content if isinstance(content, list) else [content]
+    for candidate in candidates:
+        payload = candidate
+        if isinstance(candidate, dict) and candidate.get("type") == "text":
+            payload = candidate.get("text")
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (json.JSONDecodeError, TypeError):
+                continue
+        if isinstance(payload, dict) and payload.get("status") == "async_launched":
+            return payload
+    return None
+
+
+def _nonempty_string(value: Any) -> str:
+    return value if isinstance(value, str) and value else ""
+
+
 _SpanParent = Turn | SubAgent
+
+
+@dataclass(slots=True)
+class _OpenSubagent:
+    span: SubAgent
+    background: bool = False
 
 
 @dataclass(slots=True)
@@ -225,7 +261,8 @@ class _TurnState:
     pending_thinking: dict[str | None, list[str]] = field(default_factory=dict)
     pending_chat: LLM | None = None
     open_tools: dict[str, Tool] = field(default_factory=dict)
-    open_subagents: dict[str, SubAgent] = field(default_factory=dict)
+    open_subagents: dict[str, _OpenSubagent] = field(default_factory=dict)
+    task_tool_use_ids: dict[str, str] = field(default_factory=dict)
 
 
 def _flush_pending_chat(state: _TurnState, *, usage: Usage | None = None) -> None:
@@ -277,43 +314,147 @@ def _start_subagent(
     )
     # Parallel delegations finish in completion order, not launch order.
     subagent.start(set_current=False)
-    state.open_subagents[block.id] = subagent
+    state.open_subagents[block.id] = _OpenSubagent(
+        span=subagent,
+        background=raw_input.get("run_in_background") is True,
+    )
 
 
 def _span_parent(msg: AssistantMessage, state: _TurnState) -> _SpanParent:
     parent_tool_use_id = msg.parent_tool_use_id
     if parent_tool_use_id is None:
         return state.turn
-    subagent = state.open_subagents.get(parent_tool_use_id)
-    if subagent is None:
+    open_subagent = state.open_subagents.get(parent_tool_use_id)
+    if open_subagent is None:
         subagent = state.turn.start_subagent(
             name="subagent",
             model=msg.model or "",
         )
         subagent.start(set_current=False)
         subagent.set_attributes({"gen_ai.tool.call.id": parent_tool_use_id})
-        state.open_subagents[parent_tool_use_id] = subagent
+        state.open_subagents[parent_tool_use_id] = _OpenSubagent(span=subagent)
     elif msg.model:
+        subagent = open_subagent.span
         subagent.record(model=msg.model)
+    else:
+        subagent = open_subagent.span
     return subagent
+
+
+def _task_tool_use_id(data: dict[str, Any], state: _TurnState) -> str:
+    task_id = _nonempty_string(data.get("task_id"))
+    tool_use_id = _nonempty_string(data.get("tool_use_id"))
+    if task_id and tool_use_id:
+        state.task_tool_use_ids[task_id] = tool_use_id
+    elif task_id:
+        tool_use_id = state.task_tool_use_ids.get(task_id, "")
+    return tool_use_id
+
+
+def _record_task_identity(data: dict[str, Any], state: _TurnState) -> None:
+    task_id = _nonempty_string(data.get("task_id"))
+    tool_use_id = _task_tool_use_id(data, state)
+    if not tool_use_id:
+        return
+    open_subagent = state.open_subagents.get(tool_use_id)
+    if open_subagent is None:
+        return
+    open_subagent.background = True
+    if task_id:
+        open_subagent.span.record(agent_id=task_id)
+
+
+def _discard_task_mappings(tool_use_id: str, state: _TurnState) -> None:
+    state.task_tool_use_ids = {
+        task_id: mapped_tool_use_id
+        for task_id, mapped_tool_use_id in state.task_tool_use_ids.items()
+        if mapped_tool_use_id != tool_use_id
+    }
+
+
+def _finish_task_notification(data: dict[str, Any], state: _TurnState) -> None:
+    task_id = _nonempty_string(data.get("task_id"))
+    tool_use_id = _task_tool_use_id(data, state)
+    if not tool_use_id:
+        return
+    open_subagent = state.open_subagents.get(tool_use_id)
+    if open_subagent is None:
+        return
+
+    _flush_pending_chat(state)
+    summary = _nonempty_string(data.get("summary"))
+    status = _nonempty_string(data.get("status"))
+    open_subagent.span.record(
+        agent_id=task_id or None,
+        output_messages=[Message.assistant(summary)] if summary else [],
+        tool_call_result=summary,
+    )
+    if status:
+        attributes = {_TASK_STATUS_ATTRIBUTE: status}
+        if status in _TASK_ERROR_STATUSES:
+            attributes["error.type"] = f"claude_agent_sdk.task_{status}"
+        open_subagent.span.set_attributes(attributes)
+    if status in _TASK_ERROR_STATUSES:
+        open_subagent.span._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+            RuntimeError(f"background subagent {status}")
+        )
+    open_subagent.span.end()
+    del state.open_subagents[tool_use_id]
+    _discard_task_mappings(tool_use_id, state)
+
+
+def _process_system_message(msg: SystemMessage, state: _TurnState) -> str | None:
+    data = msg.data if isinstance(msg.data, dict) else {}
+    session_id = _nonempty_string(data.get("session_id"))
+    if session_id:
+        state.conversation.conversation_id = session_id
+
+    if msg.subtype in {"task_started", "task_progress"}:
+        _record_task_identity(data, state)
+    elif msg.subtype == "task_notification":
+        _finish_task_notification(data, state)
+    return session_id or None
+
+
+def _record_background_launch(
+    tool_use_id: str,
+    payload: dict[str, Any] | None,
+    state: _TurnState,
+) -> None:
+    open_subagent = state.open_subagents.get(tool_use_id)
+    if open_subagent is None:
+        return
+    open_subagent.background = True
+    if payload is None:
+        return
+    task_id = next(
+        (
+            value
+            for key in ("agentId", "taskId", "task_id")
+            if (value := _nonempty_string(payload.get(key)))
+        ),
+        "",
+    )
+    if task_id:
+        state.task_tool_use_ids[task_id] = tool_use_id
+        open_subagent.span.record(agent_id=task_id)
 
 
 def _process_message(msg: Any, state: _TurnState) -> str | None:
     """Handle one streamed message and return a newly observed SDK session ID."""
     if isinstance(msg, SystemMessage):
-        session_id = (msg.data or {}).get("session_id")
-        if isinstance(session_id, str) and session_id:
-            state.conversation.conversation_id = session_id
-            return session_id
-        return None
+        return _process_system_message(msg, state)
 
     if isinstance(msg, AssistantMessage):
         parent_tool_use_id = msg.parent_tool_use_id
         # Buffer thinking-only messages so extended-thinking deltas fold into
         # the next response's chat span rather than spawning an empty one.
-        if all(isinstance(b, ThinkingBlock) for b in msg.content) and msg.content:
+        thinking_blocks = [
+            block for block in msg.content if isinstance(block, ThinkingBlock)
+        ]
+        if thinking_blocks and len(thinking_blocks) == len(msg.content):
             state.pending_thinking.setdefault(parent_tool_use_id, []).extend(
-                b.thinking for b in msg.content
+                block.thinking for block in thinking_blocks
             )
             return None
 
@@ -366,19 +507,31 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
                 continue
             result_text = _tool_result_text(block.content)
             accumulated.append(Message.tool_result(block.tool_use_id, result_text))
-            open_subagent = state.open_subagents.pop(block.tool_use_id, None)
+            open_subagent = state.open_subagents.get(block.tool_use_id)
             if open_subagent is not None:
-                open_subagent.record(
+                launch_payload = _async_launch_payload(block.content)
+                if not block.is_error and (
+                    open_subagent.background or launch_payload is not None
+                ):
+                    _record_background_launch(
+                        block.tool_use_id,
+                        launch_payload,
+                        state,
+                    )
+                    continue
+                open_subagent.span.record(
                     output_messages=[Message.assistant(result_text)]
                     if result_text
                     else [],
                     tool_call_result=result_text,
                 )
                 if block.is_error:
-                    open_subagent._record_otel_error(  # pyright: ignore[reportPrivateUsage]
-                        RuntimeError(result_text or "subagent reported an error")
+                    open_subagent.span._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+                        RuntimeError("subagent reported an error")
                     )
-                open_subagent.end()
+                open_subagent.span.end()
+                del state.open_subagents[block.tool_use_id]
+                _discard_task_mappings(block.tool_use_id, state)
                 continue
             open_tool = state.open_tools.get(block.tool_use_id)
             if open_tool is None:
@@ -410,9 +563,10 @@ def _finalize_turn(state: _TurnState) -> None:
         with tool:
             pass
     state.open_tools.clear()
-    for subagent in state.open_subagents.values():
-        subagent.end()
+    for open_subagent in state.open_subagents.values():
+        open_subagent.span.end()
     state.open_subagents.clear()
+    state.task_tool_use_ids.clear()
 
     state.turn.record(
         model=state.model,

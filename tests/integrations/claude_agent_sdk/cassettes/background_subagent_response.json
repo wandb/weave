@@ -1,0 +1,163 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-background-subagent001"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I will launch a background researcher."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_background_agent_01",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "researcher",
+            "description": "Research while the root agent continues",
+            "prompt": "Find the capital of France.",
+            "model": "claude-haiku-4-5",
+            "run_in_background": true
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_background_agent_01",
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"isAsync\": true, \"status\": \"async_launched\", \"agentId\": \"task-background-01\", \"description\": \"Research while the root agent continues\", \"outputFile\": \"/tmp/task-background-01.output\"}"
+            }
+          ]
+        }
+      ]
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "While that runs, I will prepare the response."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "system",
+    "subtype": "task_started",
+    "task_id": "task-background-01",
+    "description": "Research while the root agent continues",
+    "uuid": "uuid-task-started-01",
+    "session_id": "s-background-subagent001",
+    "tool_use_id": "toolu_background_agent_01",
+    "task_type": "agent"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I will verify the capital."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_background_bash_01",
+          "name": "Bash",
+          "input": {
+            "command": "printf Paris"
+          }
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_background_agent_01"
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_background_bash_01",
+          "content": "Paris"
+        }
+      ]
+    },
+    "parent_tool_use_id": "toolu_background_agent_01"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The delegated research is complete."
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_background_agent_01"
+  },
+  {
+    "type": "system",
+    "subtype": "task_notification",
+    "task_id": "task-background-01",
+    "status": "completed",
+    "output_file": "/tmp/task-background-01.output",
+    "summary": "The capital of France is Paris.",
+    "uuid": "uuid-task-notification-01",
+    "session_id": "s-background-subagent001",
+    "usage": {
+      "total_tokens": 42,
+      "tool_uses": 1,
+      "duration_ms": 800
+    }
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The background researcher confirmed Paris."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 2200,
+    "duration_api_ms": 1700,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-background-subagent001",
+    "total_cost_usd": 0.007,
+    "usage": {
+      "input_tokens": 140,
+      "output_tokens": 55
+    },
+    "result": "The background researcher confirmed Paris."
+  }
+]

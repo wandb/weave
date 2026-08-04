@@ -490,8 +490,12 @@ pnpm exec tsx examples/claudeAgents.ts
   Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
   parts; media payloads remain data for `content_refs`, not chat prose.
 - Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
-  Route nested assistant messages and tools through `parent_tool_use_id`, and
-  close each subagent on its matching tool result.
+  Route nested assistant messages and tools through `parent_tool_use_id`.
+  Synchronous calls close on their matching tool result; background launch
+  acknowledgements stay open until `task_notification`. Dispatch task events
+  through `SystemMessage.subtype` and `data`, map `task_id` to tool-use ID from
+  `task_started` / `task_progress`, and do not import typed task messages that
+  are absent from older supported Claude Agent SDK versions.
 - Start those subagents with `SubAgent.start(set_current=False)`, never
   `__enter__`. Parallel delegations close in completion order, and `end()`
   detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the

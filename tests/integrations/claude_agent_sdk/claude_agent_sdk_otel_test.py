@@ -381,6 +381,273 @@ async def test_subagent_query_content_is_pii_redacted_otel(
     }
 
 
+@pytest.mark.parametrize(
+    (
+        "status",
+        "summary",
+        "tool_name",
+        "notification_has_tool_use_id",
+        "launch_has_task_id",
+        "expected_status_code",
+        "expected_status_description",
+        "expected_error_type",
+    ),
+    [
+        pytest.param(
+            "completed",
+            "The capital of France is Paris.",
+            "Agent",
+            False,
+            True,
+            StatusCode.UNSET,
+            None,
+            None,
+            id="completed-agent-task-id-fallback",
+        ),
+        pytest.param(
+            "failed",
+            "The background researcher failed.",
+            "Agent",
+            True,
+            True,
+            StatusCode.ERROR,
+            "background subagent failed",
+            "claude_agent_sdk.task_failed",
+            id="failed-agent-direct-tool-use-id",
+        ),
+        pytest.param(
+            "stopped",
+            "The background researcher was stopped.",
+            "Task",
+            False,
+            False,
+            StatusCode.ERROR,
+            "background subagent stopped",
+            "claude_agent_sdk.task_stopped",
+            id="stopped-legacy-task-task-id-fallback",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_background_subagent_closes_on_task_notification_otel(
+    status: str,
+    summary: str,
+    tool_name: str,
+    notification_has_tool_use_id: bool,
+    launch_has_task_id: bool,
+    expected_status_code: StatusCode,
+    expected_status_description: str | None,
+    expected_error_type: str | None,
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = load_cassette("background_subagent_response")
+    messages[1]["message"]["content"][1]["name"] = tool_name
+
+    launch_text = messages[2]["message"]["content"][0]["content"][0]["text"]
+    launch_payload = json.loads(launch_text)
+    if not launch_has_task_id:
+        del launch_payload["agentId"]
+    messages[2]["message"]["content"][0]["content"][0]["text"] = json.dumps(
+        launch_payload
+    )
+
+    notification = messages[8]
+    notification["status"] = status
+    notification["summary"] = summary
+    if notification_has_tool_use_id:
+        notification["tool_use_id"] = "toolu_background_agent_01"
+
+    async for _ in query(
+        prompt="Research in the background",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(messages),
+    ):
+        pass
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 2
+    root_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "claude_agent_sdk"
+    )
+    subagent_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+
+    expected_subagent_attrs = {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-background-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.id": "task-background-01",
+        "gen_ai.agent.description": "Research while the root agent continues",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Find the capital of France.",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": summary}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": tool_name,
+        "gen_ai.tool.call.id": "toolu_background_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research while the root agent continues",
+                "prompt": "Find the capital of France.",
+                "model": "claude-haiku-4-5",
+                "run_in_background": True,
+            }
+        ),
+        "gen_ai.tool.call.result": summary,
+        "claude_agent_sdk.task.status": status,
+    }
+    if expected_error_type is not None:
+        expected_subagent_attrs["error.type"] = expected_error_type
+    assert check_integration_and_strip(get_attrs(subagent_span)) == (
+        expected_subagent_attrs
+    )
+    assert subagent_span.name == "invoke_agent researcher"
+    assert subagent_span.parent.span_id == root_span.context.span_id
+    assert subagent_span.status.status_code == expected_status_code
+    assert subagent_span.status.description == expected_status_description
+
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert [
+        (
+            span.parent.span_id,
+            get_all_text(get_messages(span, "gen_ai.output.messages")),
+        )
+        for span in chat_spans
+    ] == [
+        (root_span.context.span_id, "I will launch a background researcher."),
+        (root_span.context.span_id, "While that runs, I will prepare the response."),
+        (subagent_span.context.span_id, "I will verify the capital."),
+        (subagent_span.context.span_id, "The delegated research is complete."),
+        (root_span.context.span_id, "The background researcher confirmed Paris."),
+    ]
+    child_chat_spans = [
+        span
+        for span in chat_spans
+        if span.parent.span_id == subagent_span.context.span_id
+    ]
+    assert [span.end_time <= subagent_span.end_time for span in child_chat_spans] == [
+        True,
+        True,
+    ]
+
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert len(tool_spans) == 1
+    assert tool_spans[0].parent.span_id == subagent_span.context.span_id
+    assert check_integration_and_strip(get_attrs(tool_spans[0])) == {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.call.id": "toolu_background_bash_01",
+        "gen_ai.tool.call.arguments": '{"command": "printf Paris"}',
+        "gen_ai.tool.call.result": "Paris",
+        "gen_ai.conversation.id": "s-background-subagent001",
+    }
+
+
+@pytest.mark.asyncio
+async def test_background_subagent_summary_is_pii_redacted_otel(
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = load_cassette("background_subagent_response")
+    messages[1]["message"]["content"][1]["input"]["prompt"] = f"Research {_PII_EMAIL}"
+    messages[8]["summary"] = f"Found {_PII_EMAIL}"
+
+    def redact_messages(messages: list[Any]) -> list[Any]:
+        return [
+            message.model_copy(
+                update={"content": message.content.replace(_PII_EMAIL, _REDACTED_EMAIL)}
+            )
+            for message in messages
+        ]
+
+    monkeypatch.setattr(pii_redaction, "redact_messages", redact_messages)
+    monkeypatch.setattr(
+        pii_redaction,
+        "redact_pii_string",
+        lambda value: value.replace(_PII_EMAIL, _REDACTED_EMAIL),
+    )
+
+    with override_settings(redact_pii=True):
+        async for _ in query(
+            prompt="Delegate sensitive background research",
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(messages),
+        ):
+            pass
+
+    subagent_span = next(
+        span
+        for span in get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-background-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.id": "task-background-01",
+        "gen_ai.agent.description": "Research while the root agent continues",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": f"Research {_REDACTED_EMAIL}",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": f"Found {_REDACTED_EMAIL}"}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_background_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research while the root agent continues",
+                "prompt": f"Research {_REDACTED_EMAIL}",
+                "model": "claude-haiku-4-5",
+                "run_in_background": True,
+            }
+        ),
+        "gen_ai.tool.call.result": f"Found {_REDACTED_EMAIL}",
+        "claude_agent_sdk.task.status": "completed",
+    }
+
+
 @pytest.mark.asyncio
 async def test_parallel_subagents_close_out_of_order_otel(
     otel_spans: InMemorySpanExporter,
