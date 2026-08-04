@@ -1,4 +1,4 @@
-import {SpanStatusCode} from '@opentelemetry/api';
+import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -27,6 +27,7 @@ describe('Turn', () => {
     turn.end();
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.kind).toBe(SpanKind.INTERNAL);
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {

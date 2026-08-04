@@ -12,7 +12,6 @@ import {
   ATTR_ERROR_TYPE,
   ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OUTPUT_MESSAGES,
-  ATTR_GEN_AI_PROVIDER_NAME,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
@@ -502,7 +501,6 @@ export class ClaudeAgentOtelTracer {
         agentDescription: msg.task_description,
       });
       span.setAttributes({
-        [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
         [ATTR_GEN_AI_TOOL_CALL_ID]: parentToolUseId,
       });
       openSubagent = {background: false, span};
@@ -532,7 +530,6 @@ export class ClaudeAgentOtelTracer {
       agentDescription: stringField(input, 'description'),
     });
     subagent.setAttributes({
-      [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
       [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
       [ATTR_GEN_AI_TOOL_NAME]: block.name,
       [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(block.input ?? {}),

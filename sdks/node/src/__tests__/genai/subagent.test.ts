@@ -1,3 +1,4 @@
+import {SpanKind} from '@opentelemetry/api';
 import type {ReadableSpan} from '@opentelemetry/sdk-trace-base';
 
 import {ATTR_GEN_AI_AGENT_NAME} from '../../genai/semconv';
@@ -38,6 +39,8 @@ describe('SubAgent', () => {
     );
     expect(subSpan).toBeDefined();
     expect(parentTurnSpan).toBeDefined();
+    expect(subSpan!.kind).toBe(SpanKind.INTERNAL);
+    expect(parentTurnSpan!.kind).toBe(SpanKind.INTERNAL);
     expect(subSpan!.parentSpanId).toBe(parentTurnSpan!.spanContext().spanId);
 
     expect(spanSnapshot(subSpan!)).toMatchInlineSnapshot(`

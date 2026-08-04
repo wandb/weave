@@ -346,7 +346,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     }
 
     const invoke = findSpan(spans, INVOKE);
-    expect(invoke.kind).toBe(SpanKind.CLIENT);
+    expect(invoke.kind).toBe(SpanKind.INTERNAL);
     expect(invoke.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('invoke_agent');
     expect(invoke.attributes[ATTR_GEN_AI_AGENT_NAME]).toBe('claude_agent_sdk');
     expect(invoke.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBeUndefined();
@@ -375,6 +375,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     )!;
     expect(chat.kind).toBe(SpanKind.CLIENT);
     expect(chat.attributes[ATTR_GEN_AI_OPERATION_NAME]).toBe('chat');
+    expect(chat.attributes[ATTR_GEN_AI_PROVIDER_NAME]).toBe('anthropic');
     expect(chat.attributes[ATTR_GEN_AI_REQUEST_MODEL]).toBe('claude-x');
     expect(chat.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('sess-1');
     expect(chat.attributes[ATTR_GEN_AI_RESPONSE_FINISH_REASONS]).toEqual([
@@ -883,9 +884,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
         inputMessages: JSON.parse(
           span.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
         ),
+        kind: span.kind,
         model: span.attributes[ATTR_GEN_AI_REQUEST_MODEL],
         name: span.attributes[ATTR_GEN_AI_AGENT_NAME],
         outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
+        providerName: span.attributes[ATTR_GEN_AI_PROVIDER_NAME],
         statusCode: span.status.code,
         toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
         toolCallResult: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
@@ -903,9 +906,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
         ],
         errorType: undefined,
         inputMessages: [{role: 'user', content: 'Return ALPHA_OK'}],
+        kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'alpha-verifier',
         outputMessages: undefined,
+        providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
         toolCallId: 'agent-a',
         toolCallResult: undefined,
@@ -922,9 +927,11 @@ describe('Claude Agent SDK — OTel tracer', () => {
         ],
         errorType: undefined,
         inputMessages: [{role: 'user', content: 'Return BETA_OK'}],
+        kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'beta-verifier',
         outputMessages: undefined,
+        providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
         toolCallId: 'agent-b',
         toolCallResult: undefined,

@@ -115,7 +115,7 @@ export class SubAgent extends SpanBase {
     const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
+      {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
     return new SubAgent({
