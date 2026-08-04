@@ -40,6 +40,7 @@ import {
   imageTypeFromFileName,
   isWeaveAudio,
   isWeaveImage,
+  weaveAudio,
   weaveImage,
 } from './media';
 import {
@@ -1420,8 +1421,13 @@ export class WeaveClient {
           imageType: imageTypeFromFileName(fileName),
         });
       } else if (typeName == 'wave.Wave_read') {
-        // TODO: Implement getting audio back as buffer
-        return 'Coming soon!';
+        const files: Record<string, string | undefined> = val.files ?? {};
+        // Every writer of this type stores one file, never a _metadata.json.
+        const [digest] = Object.values(files);
+        if (digest == null) {
+          throw new Error(`No audio file stored for ref uri: ${ref.uri()}`);
+        }
+        return weaveAudio({data: await this.downloadFile(ref, digest)});
       }
     }
     return val;

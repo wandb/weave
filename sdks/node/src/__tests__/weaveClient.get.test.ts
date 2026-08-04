@@ -9,12 +9,17 @@ const IMAGE_DIGEST = 'test-digest';
 const REF = new ObjectRef('other-entity/other-project', 'my-image', 'v1');
 const REF_URI = 'weave:///other-entity/other-project/object/my-image:v1';
 
-function objReadBody(files: Record<string, string> | null) {
+const AUDIO_BYTES = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0xff, 0xfe]);
+const AUDIO_DIGEST = 'test-audio-digest';
+const AUDIO_REF = new ObjectRef('other-entity/other-project', 'my-audio', 'v1');
+const AUDIO_REF_URI = 'weave:///other-entity/other-project/object/my-audio:v1';
+
+function objReadBody(weaveType: string, files: Record<string, string> | null) {
   return JSON.stringify({
     obj: {
       val: {
         _type: 'CustomWeaveType',
-        weave_type: {type: 'PIL.Image.Image'},
+        weave_type: {type: weaveType},
         files,
         load_op: 'NO_LOAD_OP',
       },
@@ -24,10 +29,12 @@ function objReadBody(files: Record<string, string> | null) {
 
 // The endpoint sends the file with no content type, so neither does this.
 const respondWithImageBytes = async () => new Response(IMAGE_BYTES);
+const respondWithAudioBytes = async () => new Response(AUDIO_BYTES);
 
 function clientServingFileContent(
   fileContent: () => Promise<Response>,
-  files: Record<string, string> | null = {'image.png': IMAGE_DIGEST}
+  files: Record<string, string> | null = {'image.png': IMAGE_DIGEST},
+  weaveType = 'PIL.Image.Image'
 ) {
   const fileRequests: unknown[] = [];
   const traceServerApi = new TraceServerApi({
@@ -35,7 +42,7 @@ function clientServingFileContent(
     customFetch: async (input, init) => {
       const url = input.toString();
       if (url.endsWith('/obj/read')) {
-        return new Response(objReadBody(files), {
+        return new Response(objReadBody(weaveType, files), {
           headers: {'content-type': 'application/json'},
         });
       }
@@ -117,6 +124,37 @@ describe('WeaveClient.get on a published image', () => {
 
     await expect(client.get(REF)).rejects.toThrow(
       `No image file stored for ref uri: ${REF_URI}`
+    );
+  });
+});
+
+describe('WeaveClient.get on published audio', () => {
+  it('returns a WeaveAudio carrying the stored bytes', async () => {
+    const {client, fileRequests} = clientServingFileContent(
+      respondWithAudioBytes,
+      {'audio.wav': AUDIO_DIGEST},
+      'wave.Wave_read'
+    );
+
+    expect(await client.get(AUDIO_REF)).toEqual({
+      _weaveType: 'Audio',
+      data: AUDIO_BYTES,
+      audioType: 'wav',
+    });
+    expect(fileRequests).toEqual([
+      {project_id: 'other-entity/other-project', digest: AUDIO_DIGEST},
+    ]);
+  });
+
+  it('rejects when the object stores no audio file', async () => {
+    const {client} = clientServingFileContent(
+      respondWithAudioBytes,
+      null,
+      'wave.Wave_read'
+    );
+
+    await expect(client.get(AUDIO_REF)).rejects.toThrow(
+      `No audio file stored for ref uri: ${AUDIO_REF_URI}`
     );
   });
 });
