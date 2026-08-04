@@ -171,6 +171,7 @@ function taskNotification(opts: {
   summary: string;
   taskId: string;
   toolUseId?: string;
+  usage?: SDKTaskNotificationMessage['usage'];
 }): SDKTaskNotificationMessage {
   return {
     type: 'system',
@@ -181,9 +182,13 @@ function taskNotification(opts: {
     tool_use_id: opts.toolUseId,
     status: opts.status,
     summary: opts.summary,
+    usage: opts.usage,
     output_file: '',
   };
 }
+
+const outputMessagesJson = (content: string): string =>
+  JSON.stringify([{role: 'assistant', content}]);
 
 function userPrompt(opts: {
   content: string;
@@ -920,7 +925,9 @@ describe('Claude Agent SDK — OTel tracer', () => {
         kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'alpha-verifier',
-        outputMessages: undefined,
+        // A background subagent reports no tool_result, so the notification
+        // summary is its only output text.
+        outputMessages: outputMessagesJson('Alpha verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
         toolCallId: undefined,
@@ -941,7 +948,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         kind: SpanKind.INTERNAL,
         model: 'claude-haiku',
         name: 'beta-verifier',
-        outputMessages: undefined,
+        outputMessages: outputMessagesJson('Beta verification finished'),
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
         toolCallId: undefined,
@@ -1074,6 +1081,490 @@ describe('Claude Agent SDK — OTel tracer', () => {
         toolCallId: undefined,
       },
     ]);
+  });
+
+  test('keeps a background subagent tool call open across a turn boundary', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-bg-tool',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-bg', 'Agent', {
+            prompt: 'Inspect the repo',
+            run_in_background: true,
+            subagent_type: 'inspector',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-bg-tool',
+        toolUseId: 'agent-bg',
+        content: 'Async agent launched successfully',
+        toolUseResult: {status: 'async_launched', agentId: 'task-bg'},
+      })
+    );
+    // The subagent starts a tool, then the main turn ends while it is still
+    // running — the tool must not be swept as aborted.
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-bg-tool',
+        parentToolUseId: 'agent-bg',
+        subagentType: 'inspector',
+        model: 'claude-haiku',
+        content: [toolUseBlock('read-bg', 'Read', {file_path: 'sdk.d.ts'})],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({sessionId: 'sess-bg-tool', result: 'launched'})
+    );
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(span => span.name === 'execute_tool')
+    ).toEqual([]);
+
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-bg-tool',
+        parentToolUseId: 'agent-bg',
+        toolUseId: 'read-bg',
+        content: 'file contents',
+      })
+    );
+    tracer.processMessage(
+      taskNotification({
+        sessionId: 'sess-bg-tool',
+        taskId: 'task-bg',
+        toolUseId: 'agent-bg',
+        status: 'completed',
+        summary: 'Inspection finished',
+        usage: {total_tokens: 1234, tool_uses: 1, duration_ms: 50},
+      })
+    );
+    tracer.finalize(resultSuccess({sessionId: 'sess-bg-tool', result: 'done'}));
+
+    const spans = getExporter().getFinishedSpans();
+    const subagent = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'inspector'
+    )!;
+    expect(
+      spans
+        .filter(span => span.name === 'execute_tool')
+        .map(span => ({
+          errorType: span.attributes[ATTR_ERROR_TYPE],
+          parentSpanId: span.parentSpanId,
+          result: span.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
+          statusCode: span.status.code,
+          toolCallId: span.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
+        }))
+    ).toEqual([
+      {
+        errorType: undefined,
+        parentSpanId: subagent.spanContext().spanId,
+        result: 'file contents',
+        statusCode: SpanStatusCode.UNSET,
+        toolCallId: 'read-bg',
+      },
+    ]);
+    expect({
+      errorType: subagent.attributes[ATTR_ERROR_TYPE],
+      outputMessages: subagent.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
+      statusCode: subagent.status.code,
+      totalTokens: subagent.attributes[ATTR_GEN_AI_USAGE_TOTAL_TOKENS],
+    }).toEqual({
+      errorType: undefined,
+      outputMessages: outputMessagesJson('Inspection finished'),
+      statusCode: SpanStatusCode.UNSET,
+      totalTokens: 1234,
+    });
+  });
+
+  test('keeps a subagent nested in a background subagent open across a turn boundary', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate recursively'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-bg-nested',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-bg', 'Agent', {
+            prompt: 'Coordinate in the background',
+            run_in_background: true,
+            subagent_type: 'coordinator',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-bg-nested',
+        toolUseId: 'agent-bg',
+        content: 'Async agent launched successfully',
+        toolUseResult: {status: 'async_launched', agentId: 'task-bg'},
+      })
+    );
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-bg-nested',
+        parentToolUseId: 'agent-bg',
+        subagentType: 'coordinator',
+        model: 'claude-coordinator',
+        content: [
+          toolUseBlock('task-child', 'Task', {
+            prompt: 'Do the work',
+            subagent_type: 'worker',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({sessionId: 'sess-bg-nested', result: 'launched'})
+    );
+    // The nested subagent inherits its background ancestor's lifetime, so the
+    // turn boundary must neither close nor forget it.
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+    ).toEqual([]);
+
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-bg-nested',
+        parentToolUseId: 'task-child',
+        subagentType: 'worker',
+        model: 'claude-worker',
+        content: [textBlock('done')],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-bg-nested',
+        parentToolUseId: 'agent-bg',
+        toolUseId: 'task-child',
+        content: 'worker complete',
+      })
+    );
+    tracer.processMessage(
+      taskNotification({
+        sessionId: 'sess-bg-nested',
+        taskId: 'task-bg',
+        toolUseId: 'agent-bg',
+        status: 'completed',
+        summary: 'Coordination finished',
+      })
+    );
+    tracer.finalize(
+      resultSuccess({sessionId: 'sess-bg-nested', result: 'done'})
+    );
+
+    const spans = getExporter().getFinishedSpans();
+    const coordinator = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'coordinator'
+    )!;
+    // Exactly one span per subagent — no duplicate from the lazy-create path.
+    expect(
+      spans
+        .filter(
+          span =>
+            span.name === INVOKE &&
+            span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'worker'
+        )
+        .map(span => ({
+          errorType: span.attributes[ATTR_ERROR_TYPE],
+          parentSpanId: span.parentSpanId,
+          outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
+          statusCode: span.status.code,
+        }))
+    ).toEqual([
+      {
+        errorType: undefined,
+        outputMessages: outputMessagesJson('worker complete'),
+        parentSpanId: coordinator.spanContext().spanId,
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ]);
+  });
+
+  test('treats a remote launch as a background subagent', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate remotely'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-remote',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-remote', 'Agent', {
+            prompt: 'Run in the cloud',
+            isolation: 'remote',
+            subagent_type: 'remote-worker',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-remote',
+        toolUseId: 'agent-remote',
+        content: 'Remote agent launched successfully',
+        toolUseResult: {
+          status: 'remote_launched',
+          taskId: 'task-remote',
+          sessionUrl: 'https://example.invalid/session',
+        },
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({sessionId: 'sess-remote', result: 'launched'})
+    );
+    // A remote launch only acknowledges — the span stays open past the turn.
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(span => span.name === INVOKE && span.parentSpanId != null)
+    ).toEqual([]);
+
+    tracer.processMessage(
+      taskNotification({
+        sessionId: 'sess-remote',
+        taskId: 'task-remote',
+        status: 'failed',
+        summary: 'Remote agent crashed',
+      })
+    );
+    tracer.finalize(resultSuccess({sessionId: 'sess-remote', result: 'done'}));
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(
+          span =>
+            span.name === INVOKE &&
+            span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'remote-worker'
+        )
+        .map(span => ({
+          agentId: span.attributes[ATTR_GEN_AI_AGENT_ID],
+          errorType: span.attributes[ATTR_ERROR_TYPE],
+          statusCode: span.status.code,
+          statusMessage: span.status.message,
+        }))
+    ).toEqual([
+      {
+        // No `agentId` in a remote launch payload, so the task handle stands in.
+        agentId: 'task-remote',
+        errorType: 'subagent_error',
+        statusCode: SpanStatusCode.ERROR,
+        statusMessage: 'Remote agent crashed',
+      },
+    ]);
+  });
+
+  test('records the resolved model and agent id from a synchronous subagent result', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate once'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-sync',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-sync', 'Agent', {
+            prompt: 'Answer briefly',
+            // The input carries a model *alias*, not a model id.
+            model: 'haiku',
+            subagent_type: 'answerer',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-sync',
+        toolUseId: 'agent-sync',
+        content: 'the answer',
+        toolUseResult: {
+          status: 'completed',
+          agentId: 'agent-sync-1',
+          resolvedModel: 'claude-haiku-4-5',
+        },
+      })
+    );
+    tracer.finalize(resultSuccess({sessionId: 'sess-sync', result: 'done'}));
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(
+          span =>
+            span.name === INVOKE &&
+            span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'answerer'
+        )
+        .map(span => ({
+          agentId: span.attributes[ATTR_GEN_AI_AGENT_ID],
+          model: span.attributes[ATTR_GEN_AI_REQUEST_MODEL],
+          outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
+          statusCode: span.status.code,
+        }))
+    ).toEqual([
+      {
+        agentId: 'agent-sync-1',
+        model: 'claude-haiku-4-5',
+        outputMessages: outputMessagesJson('the answer'),
+        statusCode: SpanStatusCode.UNSET,
+      },
+    ]);
+  });
+
+  test('marks a stopped background subagent as aborted', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-stopped',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-stopped', 'Agent', {
+            prompt: 'Run until stopped',
+            run_in_background: true,
+            subagent_type: 'stoppable',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-stopped',
+        toolUseId: 'agent-stopped',
+        content: 'Async agent launched successfully',
+        toolUseResult: {status: 'async_launched', agentId: 'task-stopped'},
+      })
+    );
+    tracer.processMessage(
+      taskNotification({
+        sessionId: 'sess-stopped',
+        taskId: 'task-stopped',
+        toolUseId: 'agent-stopped',
+        status: 'stopped',
+        summary: 'Stopped by the user',
+      })
+    );
+    tracer.finalize(resultSuccess({sessionId: 'sess-stopped', result: 'done'}));
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(
+          span =>
+            span.name === INVOKE &&
+            span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'stoppable'
+        )
+        .map(span => ({
+          errorType: span.attributes[ATTR_ERROR_TYPE],
+          statusCode: span.status.code,
+          statusMessage: span.status.message,
+        }))
+    ).toEqual([
+      {
+        errorType: 'aborted',
+        statusCode: SpanStatusCode.ERROR,
+        statusMessage: 'Stopped by the user',
+      },
+    ]);
+  });
+
+  test('a subagent tool_result flagged is_error fails the invoke_agent span', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-subagent-error',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-err', 'Agent', {
+            prompt: 'Fail please',
+            subagent_type: 'failer',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-subagent-error',
+        toolUseId: 'agent-err',
+        content: 'subagent blew up',
+        isError: true,
+      })
+    );
+    tracer.finalize(
+      resultSuccess({sessionId: 'sess-subagent-error', result: 'done'})
+    );
+
+    expect(
+      getExporter()
+        .getFinishedSpans()
+        .filter(
+          span =>
+            span.name === INVOKE &&
+            span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'failer'
+        )
+        .map(span => ({
+          errorType: span.attributes[ATTR_ERROR_TYPE],
+          outputMessages: span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES],
+          statusCode: span.status.code,
+          statusMessage: span.status.message,
+        }))
+    ).toEqual([
+      {
+        errorType: 'subagent_error',
+        outputMessages: outputMessagesJson('subagent blew up'),
+        statusCode: SpanStatusCode.ERROR,
+        statusMessage: 'subagent blew up',
+      },
+    ]);
+  });
+
+  test('creates a SubAgent span for a forwarded message with no observed tool block', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'resume mid-delegation'});
+    // No `Agent` tool_use block is ever seen — only the forwarded child.
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-orphan',
+        parentToolUseId: 'agent-unseen',
+        subagentType: 'orphan',
+        taskDescription: 'Work started before the tracer attached',
+        model: 'claude-orphan',
+        content: [textBlock('still working')],
+      })
+    );
+    tracer.finalize(resultSuccess({sessionId: 'sess-orphan', result: 'done'}));
+
+    const spans = getExporter().getFinishedSpans();
+    const orphan = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'orphan'
+    )!;
+    const root = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
+    )!;
+    expect({
+      agentDescription: orphan.attributes[ATTR_GEN_AI_AGENT_DESCRIPTION],
+      // With no launch options observed the span is turn-scoped, so an absent
+      // result closes it as aborted rather than leaking it.
+      errorType: orphan.attributes[ATTR_ERROR_TYPE],
+      model: orphan.attributes[ATTR_GEN_AI_REQUEST_MODEL],
+      parentSpanId: orphan.parentSpanId,
+      statusCode: orphan.status.code,
+    }).toEqual({
+      agentDescription: 'Work started before the tracer attached',
+      errorType: 'aborted',
+      model: 'claude-orphan',
+      parentSpanId: root.spanContext().spanId,
+      statusCode: SpanStatusCode.ERROR,
+    });
   });
 
   test('nests a legacy Task subagent under a forwarded Agent span', () => {

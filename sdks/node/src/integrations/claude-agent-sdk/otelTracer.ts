@@ -127,21 +127,57 @@ function stringField(
   return typeof value[key] === 'string' ? value[key] : undefined;
 }
 
+// `Task` is the pre-rename name for `Agent`; older SDK versions still emit it.
+const SUBAGENT_TOOL_NAMES = new Set(['Agent', 'Task']);
+
 function isSubagentTool(name: string): boolean {
-  return name === 'Agent' || name === 'Task';
+  return SUBAGENT_TOOL_NAMES.has(name);
 }
 
-function asyncSubagentLaunch(value: unknown): {
+function booleanField(value: Record<string, unknown>, key: string): boolean {
+  return value[key] === true;
+}
+
+/**
+ * `run_in_background` and `isolation: 'remote'` (which the SDK documents as
+ * always backgrounded) are declared on the `Agent` input, so read the lifetime
+ * from the caller's request rather than inferring it from the result shape —
+ * an unrecognized result status must not silently downgrade it.
+ */
+function subagentLifetime(
+  input: Record<string, unknown>
+): 'turn-scoped' | 'background' {
+  return booleanField(input, 'run_in_background') ||
+    stringField(input, 'isolation') === 'remote'
+    ? 'background'
+    : 'turn-scoped';
+}
+
+type SubagentIdentity = {
+  agentId?: string;
   model?: string;
   taskId?: string;
-} | null {
-  const result = recordOf(value);
-  if (result.status !== 'async_launched') {
-    return null;
-  }
+};
+
+/**
+ * Reads an `Agent`/`Task` tool result. `async_launched` and `remote_launched`
+ * only acknowledge the launch — the real outcome arrives later as a
+ * `task_notification` — so neither is terminal.
+ */
+function subagentResult(value: unknown): {
+  acknowledgesLaunch: boolean;
+  identity: SubagentIdentity;
+} {
+  const raw = recordOf(value);
   return {
-    model: stringField(result, 'resolvedModel'),
-    taskId: stringField(result, 'agentId'),
+    acknowledgesLaunch:
+      raw.status === 'async_launched' || raw.status === 'remote_launched',
+    identity: {
+      agentId: stringField(raw, 'agentId'),
+      model: stringField(raw, 'resolvedModel'),
+      // A remote launch names its handle `taskId`; the others use `agentId`.
+      taskId: stringField(raw, 'taskId'),
+    },
   };
 }
 
@@ -201,16 +237,38 @@ type PendingTurn = {
   startedAt: Date;
 };
 
-type SubagentCompletion = {
-  error?: Error;
-  errorType?: 'aborted' | 'subagent_error';
-};
+/**
+ * A subagent's terminal state. Buffered rather than applied on the spot because
+ * `SpanBase` only exposes error recording through `end()`, so deferring the
+ * close (to keep child spans closing before their parent) also defers the
+ * `Error`. `endedAt` preserves the real duration across that deferral.
+ */
+type SubagentOutcome =
+  | {status: 'ok'; endedAt: Date}
+  | {
+      status: 'error';
+      errorType: 'aborted' | 'subagent_error';
+      error: Error;
+      endedAt: Date;
+    };
 
 type OpenSubagent = {
-  background: boolean;
-  completion?: SubagentCompletion;
+  /** `AgentOutput.agentId` — the subagent's own identity. */
+  agentId?: string;
+  /** `background` subagents outlive the turn that launched them. */
+  lifetime: 'turn-scoped' | 'background';
+  /** Owning subagent's tool-use ID; undefined when the parent is the Turn. */
+  parentToolUseId?: string;
   span: SubAgent;
+  /** `task_notification.task_id` — the task-registry handle, not assumed equal to `agentId`. */
   taskId?: string;
+  outcome?: SubagentOutcome;
+};
+
+type OpenTool = {
+  /** Owning subagent's tool-use ID; undefined when the parent is the Turn. */
+  ownerToolUseId?: string;
+  tool: Tool;
 };
 
 /** Emits Claude Agent SDK traces through Weave GenAI handles. */
@@ -218,7 +276,7 @@ export class ClaudeAgentOtelTracer {
   private readonly agentName: string;
   private readonly startedAt = new Date();
   private readonly openSubagents = new Map<string, OpenSubagent>();
-  private readonly openTools = new Map<string, Tool>();
+  private readonly openTools = new Map<string, OpenTool>();
   private readonly pendingTurns: PendingTurn[] = [];
 
   private conversation: Conversation | null = null;
@@ -304,17 +362,16 @@ export class ClaudeAgentOtelTracer {
     ) {
       this.endTurn(undefined, error);
     }
-    this.finishOpenSubagents(true);
+    this.finishOpenTools('shutdown');
+    this.finishOpenSubagents('shutdown');
   }
 
   private endTurn(result?: SDKResultMessage, error?: unknown): void {
     const turn = this.getOrCreateTurn();
-    for (const tool of this.openTools.values()) {
-      tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
-      tool.end({error: new Error('Agent ended with open tool span')});
-    }
-    this.openTools.clear();
-    this.finishOpenSubagents(false);
+    // Sweep children before their parents, and spare anything owned by a
+    // background subagent that is still running past this turn boundary.
+    this.finishOpenTools('turn-boundary');
+    this.finishOpenSubagents('turn-boundary');
 
     if (result) {
       this.emitModelUsageSpans(result, turn);
@@ -460,13 +517,15 @@ export class ClaudeAgentOtelTracer {
       llm.end();
     });
 
-    // Tool spans stay open until the matching tool_result arrives.
+    // Tool spans stay open until the matching tool_result arrives. Record the
+    // owning subagent so a turn boundary can tell whose children these are.
+    const ownerToolUseId = msg.parent_tool_use_id ?? undefined;
     for (const block of content) {
       if (block.type !== 'tool_use') {
         continue;
       }
       if (isSubagentTool(block.name)) {
-        this.startSubagent(block, parent);
+        this.startSubagent(block, parent, ownerToolUseId);
         continue;
       }
       const tool = parent.startTool({
@@ -474,7 +533,7 @@ export class ClaudeAgentOtelTracer {
         toolCallId: block.id,
         args: JSON.stringify(block.input ?? {}),
       });
-      this.openTools.set(block.id, tool);
+      this.openTools.set(block.id, {ownerToolUseId, tool});
     }
   }
 
@@ -494,7 +553,9 @@ export class ClaudeAgentOtelTracer {
         model: msg.message.model,
         agentDescription: msg.task_description,
       });
-      openSubagent = {background: false, span};
+      // Reached only when the `Agent` tool_use block was never observed, so
+      // the launch options are unknown and the parent is this Turn.
+      openSubagent = {lifetime: 'turn-scoped', span};
       this.openSubagents.set(parentToolUseId, openSubagent);
     } else {
       openSubagent.span.record({
@@ -508,7 +569,11 @@ export class ClaudeAgentOtelTracer {
     return openSubagent.span;
   }
 
-  private startSubagent(block: ToolUseBlock, parent: Turn | SubAgent): void {
+  private startSubagent(
+    block: ToolUseBlock,
+    parent: Turn | SubAgent,
+    parentToolUseId: string | undefined
+  ): void {
     const input = recordOf(block.input);
     const name =
       stringField(input, 'subagent_type') ??
@@ -523,7 +588,11 @@ export class ClaudeAgentOtelTracer {
     subagent.record({
       messages: prompt ? [{role: 'user', content: prompt}] : [],
     });
-    this.openSubagents.set(block.id, {background: false, span: subagent});
+    this.openSubagents.set(block.id, {
+      lifetime: subagentLifetime(input),
+      parentToolUseId,
+      span: subagent,
+    });
   }
 
   private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
@@ -537,36 +606,15 @@ export class ClaudeAgentOtelTracer {
       const resultText = toolResultText(block.content);
       const openSubagent = this.openSubagents.get(block.tool_use_id);
       if (openSubagent) {
-        const launch = asyncSubagentLaunch(msg.tool_use_result);
-        if (launch && !block.is_error) {
-          openSubagent.background = true;
-          openSubagent.taskId = launch.taskId;
-          openSubagent.span.record({
-            ...(launch.model ? {model: launch.model} : {}),
-            ...(launch.taskId ? {agentId: launch.taskId} : {}),
-          });
-          continue;
-        }
-        openSubagent.span.record({
-          outputMessages: resultText
-            ? [{role: 'assistant', content: resultText}]
-            : [],
-        });
-        if (block.is_error) {
-          openSubagent.completion = {
-            errorType: 'subagent_error',
-            error: new Error(resultText || 'Subagent execution failed'),
-          };
-        } else {
-          openSubagent.completion = {};
-        }
+        this.processSubagentResult(openSubagent, block, resultText, msg);
         continue;
       }
-      const tool = this.openTools.get(block.tool_use_id);
-      if (!tool) {
+      const openTool = this.openTools.get(block.tool_use_id);
+      if (!openTool) {
         continue;
       }
       this.openTools.delete(block.tool_use_id);
+      const tool = openTool.tool;
       tool.result = resultText;
       if (block.is_error) {
         tool.setAttributes({[ATTR_ERROR_TYPE]: 'tool_error'});
@@ -577,13 +625,52 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private processTaskNotification(msg: SDKTaskNotificationMessage): void {
-    let toolUseId = msg.tool_use_id;
-    if (!toolUseId) {
-      toolUseId = [...this.openSubagents.entries()].find(
-        ([, openSubagent]) => openSubagent.taskId === msg.task_id
-      )?.[0];
+  private processSubagentResult(
+    openSubagent: OpenSubagent,
+    block: ToolResultBlock,
+    resultText: string,
+    msg: SDKUserMessage | SDKUserMessageReplay
+  ): void {
+    const {acknowledgesLaunch, identity} = subagentResult(msg.tool_use_result);
+    // The identity fields ride on every `Agent` result shape, launch or not.
+    openSubagent.agentId = identity.agentId ?? openSubagent.agentId;
+    openSubagent.taskId = identity.taskId ?? openSubagent.taskId;
+    openSubagent.span.record({
+      ...(identity.model ? {model: identity.model} : {}),
+      ...(identity.agentId ? {agentId: identity.agentId} : {}),
+    });
+
+    if (acknowledgesLaunch && !block.is_error) {
+      // Only an acknowledgement — the outcome arrives as a task_notification.
+      openSubagent.lifetime = 'background';
+      return;
     }
+
+    openSubagent.span.record({
+      outputMessages: resultText
+        ? [{role: 'assistant', content: resultText}]
+        : [],
+    });
+    openSubagent.outcome = block.is_error
+      ? {
+          status: 'error',
+          errorType: 'subagent_error',
+          error: new Error(resultText || 'Subagent execution failed'),
+          endedAt: new Date(),
+        }
+      : {status: 'ok', endedAt: new Date()};
+  }
+
+  private processTaskNotification(msg: SDKTaskNotificationMessage): void {
+    // `task_id` and the launch result's `agentId` are not documented as the
+    // same value, so match either before giving up.
+    const toolUseId =
+      msg.tool_use_id ??
+      [...this.openSubagents.entries()].find(
+        ([, openSubagent]) =>
+          openSubagent.taskId === msg.task_id ||
+          openSubagent.agentId === msg.task_id
+      )?.[0];
     if (!toolUseId) {
       return;
     }
@@ -592,37 +679,91 @@ export class ClaudeAgentOtelTracer {
     if (!openSubagent) {
       return;
     }
-    openSubagent.background = true;
     openSubagent.taskId = msg.task_id;
-    openSubagent.span.record({agentId: msg.task_id});
+    if (openSubagent.agentId == null) {
+      openSubagent.agentId = msg.task_id;
+      openSubagent.span.record({agentId: msg.task_id});
+    }
+    if (msg.usage) {
+      openSubagent.span.setAttributes({
+        [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: msg.usage.total_tokens,
+      });
+    }
+    const endedAt = new Date();
     if (msg.status === 'completed') {
-      openSubagent.completion = {};
+      // The summary is the only result text a background subagent ever reports.
+      if (msg.summary) {
+        openSubagent.span.record({
+          outputMessages: [{role: 'assistant', content: msg.summary}],
+        });
+      }
+      openSubagent.outcome = {status: 'ok', endedAt};
       return;
     }
 
-    openSubagent.completion = {
+    openSubagent.outcome = {
+      status: 'error',
       errorType: msg.status === 'stopped' ? 'aborted' : 'subagent_error',
       error: new Error(msg.summary || `Background subagent ${msg.status}`),
+      endedAt,
     };
   }
 
-  private finishOpenSubagents(finalizing: boolean): void {
+  /**
+   * True when `toolUseId` is a background subagent, or a descendant of one, so
+   * it must outlive the turn that launched it. Terminates because a parent is
+   * always registered before its children.
+   */
+  private outlivesTurn(toolUseId: string | undefined): boolean {
+    let cursor = toolUseId;
+    while (cursor) {
+      const openSubagent = this.openSubagents.get(cursor);
+      if (!openSubagent) {
+        return false;
+      }
+      if (openSubagent.lifetime === 'background') {
+        return true;
+      }
+      cursor = openSubagent.parentToolUseId;
+    }
+    return false;
+  }
+
+  private finishOpenTools(reason: 'turn-boundary' | 'shutdown'): void {
+    for (const [toolUseId, openTool] of [...this.openTools.entries()]) {
+      if (
+        reason === 'turn-boundary' &&
+        this.outlivesTurn(openTool.ownerToolUseId)
+      ) {
+        continue;
+      }
+      openTool.tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
+      openTool.tool.end({error: new Error('Agent ended with open tool span')});
+      this.openTools.delete(toolUseId);
+    }
+  }
+
+  private finishOpenSubagents(reason: 'turn-boundary' | 'shutdown'): void {
+    // Newest-first so a nested subagent closes before the parent it hangs off.
     const openSubagents = [...this.openSubagents.entries()].reverse();
     for (const [toolUseId, openSubagent] of openSubagents) {
-      const completion = openSubagent.completion;
-      if (completion) {
-        if (completion.errorType) {
+      const outcome = openSubagent.outcome;
+      if (outcome) {
+        if (outcome.status === 'error') {
           openSubagent.span.setAttributes({
-            [ATTR_ERROR_TYPE]: completion.errorType,
+            [ATTR_ERROR_TYPE]: outcome.errorType,
           });
+          openSubagent.span.end({
+            error: outcome.error,
+            endTime: outcome.endedAt,
+          });
+        } else {
+          openSubagent.span.end({endTime: outcome.endedAt});
         }
-        openSubagent.span.end(
-          completion.error ? {error: completion.error} : undefined
-        );
         this.openSubagents.delete(toolUseId);
         continue;
       }
-      if (openSubagent.background && !finalizing) {
+      if (reason === 'turn-boundary' && this.outlivesTurn(toolUseId)) {
         continue;
       }
       openSubagent.span.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});

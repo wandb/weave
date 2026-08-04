@@ -374,9 +374,20 @@ deterministic.
   use an `AgentSpansQueryReq` with `include_details=True` when validating stored
   span details.
 - Parallel/background Claude Agent SDK `Agent` calls can emit an
-  `async_launched` tool result before forwarded child messages, then finish via
-  a `task_notification`. Keep one `SubAgent` keyed by tool-use ID across turn
-  boundaries until that notification arrives.
+  `async_launched` or `remote_launched` tool result before forwarded child
+  messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
+  tool-use ID across turn boundaries until that notification arrives.
+- Read a subagent's lifetime from the launch request (`run_in_background`, or
+  `isolation: 'remote'`, which is always backgrounded) rather than inferring it
+  from the result status — an unrecognized status must not downgrade it.
+- Surviving a turn boundary is transitive: a background `SubAgent`'s open
+  `Tool`s and nested `SubAgent`s survive with it. Closing a descendant early
+  also drops it from the open map, so the next forwarded message re-creates it
+  under the wrong `Turn`.
+- Buffer a subagent's terminal state (and the timestamp it was observed) instead
+  of ending the span on the spot: `SpanBase` only records an error through
+  `end()`, and the span must close after its children. Pass the timestamp as
+  `endTime` so the deferral doesn't inflate the duration.
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
 - Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
