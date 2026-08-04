@@ -39,6 +39,7 @@ import {
   type ImageType,
   isWeaveAudio,
   isWeaveImage,
+  weaveImage,
 } from './media';
 import {
   type Op,
@@ -1407,40 +1408,31 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        const loadedFiles: {[key: string]: Buffer} = {};
-        for (const [name, digest] of Object.entries(val.files)) {
-          try {
-            const fileContent =
-              await this.traceServerApi.file.fileContentFileContentPost({
-                project_id: this.projectId,
-                digest: digest as string,
-              });
-            loadedFiles[name] = fileContent.data?.content;
-          } catch (error) {
-            console.error('Error loading file:', error);
-          }
+        const [digest] = Object.values<string | undefined>(val.files ?? {});
+        if (digest == null) {
+          throw new Error(`No image file stored for ref uri: ${ref.uri()}`);
         }
-        // TODO: Implement getting img back as buffer
-        return 'Coming soon!';
+        return weaveImage({data: await this.downloadFile(ref, digest)});
       } else if (typeName == 'wave.Wave_read') {
-        const loadedFiles: {[key: string]: Buffer} = {};
-        for (const [name, digest] of Object.entries(val.files)) {
-          try {
-            const fileContent =
-              await this.traceServerApi.file.fileContentFileContentPost({
-                project_id: this.projectId,
-                digest: digest as string,
-              });
-            loadedFiles[name] = fileContent.data?.content;
-          } catch (error) {
-            console.error('Error loading file:', error);
-          }
-        }
         // TODO: Implement getting audio back as buffer
         return 'Coming soon!';
       }
     }
     return val;
+  }
+
+  // Reads from the project the ref points at, not the one this client is on.
+  private async downloadFile(ref: ObjectRef, digest: string): Promise<Buffer> {
+    const fileContent =
+      await this.traceServerApi.file.fileContentFileContentPost(
+        {project_id: ref.projectId, digest},
+        // The endpoint streams the file, so the body is not JSON.
+        {format: 'arrayBuffer'}
+      );
+    if (fileContent.data == null) {
+      throw new Error(`Unable to download file for ref uri: ${ref.uri()}`);
+    }
+    return Buffer.from(fileContent.data);
   }
 
   private async resolveRegistryPromptRef(
