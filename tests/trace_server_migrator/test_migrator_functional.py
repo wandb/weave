@@ -647,7 +647,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("id", "String"),
         ("intent_ordinal", "UInt16"),
         ("signature_id", "FixedString(16)"),
-        ("space", "LowCardinality(String)"),
+        ("lens", "LowCardinality(String)"),
         ("pipeline_version", "UInt32"),
         ("record_version", "UInt64"),
         ("category", "String"),
@@ -696,7 +696,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ]
 
     insert_columns = """
-        project_id, id, intent_ordinal, signature_id, space, pipeline_version,
+        project_id, id, intent_ordinal, signature_id, lens, pipeline_version,
         record_version, category, signature, action, object, outcome, operation_mode,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
         source, insights_type, source_id, trace_id, span_id, parent_span_id,
@@ -766,7 +766,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
 
     # The promoted columns round-trip as typed values rather than Map strings.
     promoted = ch_client.query(
-        "SELECT space, action, object, outcome, operation_mode, judge_model, "
+        "SELECT lens, action, object, outcome, operation_mode, judge_model, "
         "prompt_version, length(pipeline_recipe_sha256), turn_index, "
         "cluster_run_id, cluster_id, cluster_label, cluster_confidence, "
         "formatDateTime(source_started_at, '%F %T'), "

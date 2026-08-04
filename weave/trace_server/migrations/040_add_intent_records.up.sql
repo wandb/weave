@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS intent_records
     id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
     intent_ordinal UInt16 DEFAULT 0,         -- position among intents extracted from a single turn, folded into the id hash
     signature_id FixedString(16),            -- 128-bit hash of the canonicalized signature, groups every occurrence of the same intent
-    space LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id hash so it stays out of ORDER BY
+    lens LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id hash so it stays out of ORDER BY
     pipeline_version UInt32,                 -- recipe id, in ORDER BY so versions coexist during re-embed/backfill
     record_version UInt64,                   -- ReplacingMergeTree version, highest for a key wins
 
