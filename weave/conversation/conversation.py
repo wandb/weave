@@ -766,12 +766,20 @@ class SubAgent(_SpanBase):
     Maps to a nested invoke_agent OTel span in the same trace.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     name: str = ""
     model: str = ""
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
     system_instructions: list[str] = Field(default_factory=list)
+    input_messages: list[Message] = Field(default_factory=list)
+    output_messages: list[Message] = Field(default_factory=list)
+    tool_name: str = ""
+    tool_call_id: str = ""
+    tool_call_arguments: JSONString = ""
+    tool_call_result: JSONString = ""
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -852,6 +860,12 @@ class SubAgent(_SpanBase):
         name: str | None = None,
         model: str | None = None,
         system_instructions: list[str] | None = None,
+        input_messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
+        tool_name: str | None = None,
+        tool_call_id: str | None = None,
+        tool_call_arguments: str | None = None,
+        tool_call_result: str | None = None,
         agent_id: str | None = None,
         agent_description: str | None = None,
         agent_version: str | None = None,
@@ -876,6 +890,18 @@ class SubAgent(_SpanBase):
             self.model = model
         if system_instructions is not None:
             self.system_instructions = system_instructions
+        if input_messages is not None:
+            self.input_messages = input_messages
+        if output_messages is not None:
+            self.output_messages = output_messages
+        if tool_name is not None:
+            self.tool_name = tool_name
+        if tool_call_id is not None:
+            self.tool_call_id = tool_call_id
+        if tool_call_arguments is not None:
+            self.tool_call_arguments = tool_call_arguments
+        if tool_call_result is not None:
+            self.tool_call_result = tool_call_result
         if agent_id is not None:
             self.agent_id = agent_id
         if agent_description is not None:
@@ -890,29 +916,55 @@ class SubAgent(_SpanBase):
         """Build the full OTel attribute dict for this sub-agent span.
 
         Shared between streaming (``end``) and batch (``_attrs_for_span``).
-        ``system_instructions`` is the only content-bearing field — it is
-        gated by ``include_content`` and PII-redacted, mirroring ``Turn``;
-        the identifiers are always emitted.
+        Content-bearing fields are gated by ``include_content`` and
+        PII-redacted, mirroring ``Turn`` and ``Tool``. Identifiers are always
+        emitted.
         """
+        input_messages: list[Message] | None
+        output_messages: list[Message] | None
         system_instructions: list[str] | None
         if include_content:
+            input_messages = self.input_messages
+            output_messages = self.output_messages
             system_instructions = self.system_instructions
+            tool_call_arguments = self.tool_call_arguments
+            tool_call_result = self.tool_call_result
             if should_redact_pii():
+                input_messages = pii_redaction.redact_messages(input_messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
                 system_instructions = pii_redaction.redact_system_instructions(
                     system_instructions
                 )
+                tool_call_arguments = pii_redaction.redact_pii_string(
+                    tool_call_arguments
+                )
+                tool_call_result = pii_redaction.redact_pii_string(tool_call_result)
         else:
+            input_messages = None
+            output_messages = None
             system_instructions = None
+            tool_call_arguments = ""
+            tool_call_result = ""
         attrs = invoke_agent_attributes(
             agent_name=self.name,
             model=self.model,
             conversation_id=conversation_id,
             conversation_name=conversation_name,
+            input_messages=input_messages,
+            output_messages=output_messages,
             system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        if self.tool_name:
+            attrs["gen_ai.tool.name"] = self.tool_name
+        if self.tool_call_id:
+            attrs["gen_ai.tool.call.id"] = self.tool_call_id
+        if tool_call_arguments:
+            attrs["gen_ai.tool.call.arguments"] = tool_call_arguments
+        if tool_call_result:
+            attrs["gen_ai.tool.call.result"] = tool_call_result
         attrs.update(_capture_info_attrs())
         return attrs
 

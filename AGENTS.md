@@ -452,6 +452,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- `SubAgent` owns its input/output messages and originating tool-call
+  arguments/result. Integrations populate them through `SubAgent.record()` so
+  `_build_attrs()` applies `include_content` and PII redaction; do not write
+  those content attributes directly with `set_attributes()`.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.

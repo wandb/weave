@@ -27,6 +27,10 @@ from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
 from weave.trace.settings import override_settings
+from weave.utils import pii_redaction
+
+_PII_EMAIL = "alice@example.com"
+_REDACTED_EMAIL = "<EMAIL>"
 
 
 @pytest.fixture
@@ -300,6 +304,80 @@ async def test_subagent_query_otel(otel_spans: InMemorySpanExporter) -> None:
         "gen_ai.tool.call.arguments": '{"command": "printf Paris"}',
         "gen_ai.tool.call.result": "Paris",
         "gen_ai.conversation.id": "s-subagent001",
+    }
+
+
+@pytest.mark.asyncio
+async def test_subagent_query_content_is_pii_redacted_otel(
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = load_cassette("subagent_response")
+    messages[1]["message"]["content"][1]["input"]["prompt"] = f"Research {_PII_EMAIL}"
+    messages[5]["message"]["content"][0]["content"][0]["text"] = f"Found {_PII_EMAIL}"
+
+    def redact_messages(messages: list[Any]) -> list[Any]:
+        return [
+            message.model_copy(
+                update={"content": message.content.replace(_PII_EMAIL, _REDACTED_EMAIL)}
+            )
+            for message in messages
+        ]
+
+    monkeypatch.setattr(pii_redaction, "redact_messages", redact_messages)
+    monkeypatch.setattr(
+        pii_redaction,
+        "redact_pii_string",
+        lambda value: value.replace(_PII_EMAIL, _REDACTED_EMAIL),
+    )
+
+    with override_settings(redact_pii=True):
+        async for _ in query(
+            prompt="Delegate sensitive research",
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(messages),
+        ):
+            pass
+
+    subagent_span = next(
+        span
+        for span in get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.description": "Research factual questions",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": f"Research {_REDACTED_EMAIL}"}
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": f"Found {_REDACTED_EMAIL}"}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research factual questions",
+                "prompt": f"Research {_REDACTED_EMAIL}",
+            }
+        ),
+        "gen_ai.tool.call.result": f"Found {_REDACTED_EMAIL}",
     }
 
 

@@ -205,18 +205,6 @@ def _tool_result_text(content: Any) -> str:
     return json.dumps(content, ensure_ascii=False, default=str)
 
 
-def _message_attribute(role: str, content: str) -> str:
-    return json.dumps(
-        [
-            {
-                "role": role,
-                "parts": [{"type": "text", "content": content}],
-            }
-        ],
-        ensure_ascii=False,
-    )
-
-
 _SpanParent = Turn | SubAgent
 
 
@@ -275,22 +263,20 @@ def _start_subagent(
         model=model if isinstance(model, str) else "",
     )
     subagent.record(
-        agent_description=description if isinstance(description, str) else None
-    )
-    # Parallel delegations finish in completion order, not launch order.
-    subagent.start(set_current=False)
-    attributes = {
-        "gen_ai.tool.call.id": block.id,
-        "gen_ai.tool.name": block.name,
-        "gen_ai.tool.call.arguments": json.dumps(
+        agent_description=description if isinstance(description, str) else None,
+        input_messages=[Message.user(prompt)]
+        if isinstance(prompt, str) and prompt
+        else [],
+        tool_name=block.name,
+        tool_call_id=block.id,
+        tool_call_arguments=json.dumps(
             block.input,
             ensure_ascii=False,
             default=str,
         ),
-    }
-    if isinstance(prompt, str) and prompt:
-        attributes["gen_ai.input.messages"] = _message_attribute("user", prompt)
-    subagent.set_attributes(attributes)
+    )
+    # Parallel delegations finish in completion order, not launch order.
+    subagent.start(set_current=False)
     state.open_subagents[block.id] = subagent
 
 
@@ -382,12 +368,12 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
             accumulated.append(Message.tool_result(block.tool_use_id, result_text))
             open_subagent = state.open_subagents.pop(block.tool_use_id, None)
             if open_subagent is not None:
-                attributes = {"gen_ai.tool.call.result": result_text}
-                if result_text:
-                    attributes["gen_ai.output.messages"] = _message_attribute(
-                        "assistant", result_text
-                    )
-                open_subagent.set_attributes(attributes)
+                open_subagent.record(
+                    output_messages=[Message.assistant(result_text)]
+                    if result_text
+                    else [],
+                    tool_call_result=result_text,
+                )
                 if block.is_error:
                     open_subagent._record_otel_error(  # pyright: ignore[reportPrivateUsage]
                         RuntimeError(result_text or "subagent reported an error")

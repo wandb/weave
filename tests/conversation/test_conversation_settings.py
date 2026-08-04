@@ -19,6 +19,7 @@ happens" patch ``_get_engines`` and assert it isn't called.
 
 from __future__ import annotations
 
+import json
 import platform
 import sys
 from collections.abc import Callable
@@ -34,6 +35,7 @@ from weave.conversation.conversation import (
     LLM,
     Message,
     Reasoning,
+    SubAgent,
     Tool,
     Turn,
     log_conversation,
@@ -289,6 +291,92 @@ def test_redact_pii_applied(
         assert _REDACTED_EMAIL in attrs[key], key
 
 
+def _streaming_subagent_with_content(include_content: bool) -> None:
+    with start_conversation(
+        conversation_id="convo-subagent-content",
+        include_content=include_content,
+    ) as session:
+        with session.start_turn() as turn:
+            with turn.start_subagent(name="researcher") as subagent:
+                subagent.record(
+                    input_messages=[Message.user(f"Research {_PII_EMAIL}")],
+                    output_messages=[Message.assistant(f"Found {_PII_EMAIL}")],
+                    tool_name="Agent",
+                    tool_call_id="toolu_01",
+                    tool_call_arguments=json.dumps({"email": _PII_EMAIL}),
+                    tool_call_result=f"Found {_PII_EMAIL}",
+                )
+
+
+def _batch_subagent_with_content(include_content: bool) -> None:
+    log_turn(
+        conversation_id="convo-subagent-content",
+        agent_name="orchestrator",
+        include_content=include_content,
+        spans=[
+            SubAgent(
+                name="researcher",
+                input_messages=[Message.user(f"Research {_PII_EMAIL}")],
+                output_messages=[Message.assistant(f"Found {_PII_EMAIL}")],
+                tool_name="Agent",
+                tool_call_id="toolu_01",
+                tool_call_arguments=json.dumps({"email": _PII_EMAIL}),
+                tool_call_result=f"Found {_PII_EMAIL}",
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    "emit_subagent",
+    [
+        pytest.param(_streaming_subagent_with_content, id="streaming"),
+        pytest.param(_batch_subagent_with_content, id="batch"),
+    ],
+)
+def test_subagent_content_is_pii_redacted(
+    emit_subagent: Callable[[bool], None],
+    otel_spans: InMemorySpanExporter,
+    fake_presidio: None,
+) -> None:
+    with override_settings(
+        redact_pii=True,
+        capture_client_info=False,
+        capture_system_info=False,
+    ):
+        emit_subagent(True)
+
+    spans = _spans_with_prefix(otel_spans, "invoke_agent researcher")
+    assert len(spans) == 1
+    assert dict(spans[0].attributes) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "convo-subagent-content",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": f"Research {_REDACTED_EMAIL}"}
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": f"Found {_REDACTED_EMAIL}"}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_01",
+        "gen_ai.tool.call.arguments": json.dumps({"email": _REDACTED_EMAIL}),
+        "gen_ai.tool.call.result": f"Found {_REDACTED_EMAIL}",
+    }
+
+
 # ---------------------------------------------------------------------------
 # include_content=False — content dropped at source, Presidio never loaded
 # ---------------------------------------------------------------------------
@@ -356,6 +444,37 @@ def test_include_content_false_skips_presidio(
         with patch("weave.utils.pii_redaction._get_engines") as mock_get_engines:
             user_func()
     mock_get_engines.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "emit_subagent",
+    [
+        pytest.param(_streaming_subagent_with_content, id="streaming"),
+        pytest.param(_batch_subagent_with_content, id="batch"),
+    ],
+)
+def test_subagent_include_content_false_drops_content_before_redaction(
+    emit_subagent: Callable[[bool], None],
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    with override_settings(
+        redact_pii=True,
+        capture_client_info=False,
+        capture_system_info=False,
+    ):
+        with patch("weave.utils.pii_redaction._get_engines") as mock_get_engines:
+            emit_subagent(False)
+
+    mock_get_engines.assert_not_called()
+    spans = _spans_with_prefix(otel_spans, "invoke_agent researcher")
+    assert len(spans) == 1
+    assert dict(spans[0].attributes) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "convo-subagent-content",
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_01",
+    }
 
 
 def _reasoning_content_off_streaming() -> None:
