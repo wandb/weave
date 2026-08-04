@@ -330,6 +330,11 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+Pure ESM auto-instrumentation requires the `weave/instrument` loader. For
+one-off `tsx` live validation scripts where that loader is not installed, call
+`wrapClaudeAgentSdk()` and consume the returned module view so tracing is
+deterministic.
+
 ### TypeScript integration metadata
 
 - `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
@@ -365,6 +370,9 @@ pnpm exec tsx examples/claudeAgents.ts
   not agent spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
+- Agent span list queries omit heavy message, tool-payload, and raw-span fields;
+  use an `AgentSpansQueryReq` with `include_details=True` when validating stored
+  span details.
 - Parallel/background Claude Agent SDK `Agent` calls can emit an
   `async_launched` tool result before forwarded child messages, then finish via
   a `task_notification`. Keep one `SubAgent` keyed by tool-use ID across turn
