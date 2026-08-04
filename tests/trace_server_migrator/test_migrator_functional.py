@@ -624,7 +624,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert table_metadata == [
         (
             "ReplacingMergeTree",
-            "toYYYYMM(intent_extracted_at)",
+            "toYYYYMM(source_started_at)",
             "project_id, pipeline_version, id",
             "project_id, pipeline_version, id",
             "expire_at",
@@ -641,13 +641,21 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("id", "String"),
         ("intent_ordinal", "UInt16"),
         ("signature_id", "FixedString(16)"),
+        ("space", "LowCardinality(String)"),
         ("pipeline_version", "UInt32"),
         ("record_version", "UInt64"),
         ("category", "String"),
         ("signature", "String"),
+        ("action", "LowCardinality(String)"),
+        ("object", "String"),
+        ("outcome", "LowCardinality(String)"),
+        ("operation_mode", "LowCardinality(String)"),
         ("embedding_model", "LowCardinality(String)"),
         ("embedding_dimensions", "UInt16"),
         ("vector", "Array(Float32)"),
+        ("judge_model", "LowCardinality(String)"),
+        ("prompt_version", "LowCardinality(String)"),
+        ("pipeline_recipe_sha256", "String"),
         ("source", "LowCardinality(String)"),
         ("insights_type", "LowCardinality(String)"),
         ("source_id", "String"),
@@ -655,8 +663,13 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("span_id", "String"),
         ("parent_span_id", "String"),
         ("conversation_id", "String"),
-        ("turn_id", "String"),
+        ("turn_index", "UInt16"),
         ("user_id", "String"),
+        ("cluster_run_id", "String"),
+        ("cluster_id", "Int32"),
+        ("cluster_label", "String"),
+        ("cluster_confidence", "Float32"),
+        ("source_started_at", "DateTime64(6, 'UTC')"),
         ("intent_extracted_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
         ("expire_at", "DateTime"),
@@ -677,18 +690,28 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ]
 
     insert_columns = """
-        project_id, id, intent_ordinal, signature_id, pipeline_version, record_version,
-        category, signature, embedding_model, vector, source, insights_type,
-        source_id, trace_id, span_id, parent_span_id, conversation_id,
-        turn_id, user_id, intent_extracted_at, attributes
+        project_id, id, intent_ordinal, signature_id, space, pipeline_version,
+        record_version, category, signature, action, object, outcome, operation_mode,
+        embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
+        source, insights_type, source_id, trace_id, span_id, parent_span_id,
+        conversation_id, turn_index, user_id, cluster_run_id, cluster_id,
+        cluster_label, cluster_confidence, source_started_at, intent_extracted_at,
+        attributes
     """
+    # source_started_at is deliberately a month before intent_extracted_at: the
+    # partition must follow source time, which is what a backfill depends on.
     row_template = """
         SELECT
             'project-1', 'intent-1', 0, unhex('00112233445566778899aabbccddeeff'),
-            {pipeline_version}, {record_version}, '{category}', 'Add Stripe checkout',
+            'intent', {pipeline_version}, {record_version}, '{category}',
+            'Add Stripe checkout', 'add', 'stripe checkout', 'integrated',
+            'build_or_extend',
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
+            'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
             'weave', 'turn', 'source-1', 'trace-1', 'span-1', 'parent-1',
-            'conversation-1', 'turn-1', 'user-1',
+            'conversation-1', 7, 'user-1', 'run-1', 3, 'Payments setup',
+            toFloat32(0.75),
+            toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
             toDateTime64('2026-06-20 14:32:00', 6, 'UTC'),
             map('environment', 'test')
     """
@@ -735,13 +758,43 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ),
     ]
 
+    # The promoted columns round-trip as typed values rather than Map strings.
+    promoted = ch_client.query(
+        "SELECT space, action, object, outcome, operation_mode, judge_model, "
+        "prompt_version, length(pipeline_recipe_sha256), turn_index, "
+        "cluster_run_id, cluster_id, cluster_label, cluster_confidence, "
+        "formatDateTime(source_started_at, '%F %T'), "
+        "formatDateTime(intent_extracted_at, '%F %T') "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' AND pipeline_version = 2"
+    ).result_rows
+    assert promoted == [
+        (
+            "intent",
+            "add",
+            "stripe checkout",
+            "integrated",
+            "build_or_extend",
+            "gemma-4-31b-it",
+            "intent-v1",
+            64,
+            7,
+            "run-1",
+            3,
+            "Payments setup",
+            0.75,
+            "2026-05-30 09:15:00",
+            "2026-06-20 14:32:00",
+        )
+    ]
+
     active_partitions = ch_client.query(
         "SELECT DISTINCT partition "
         "FROM system.parts "
         f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
         "ORDER BY partition"
     ).result_rows
-    assert active_partitions == [("202606",)]
+    assert active_partitions == [("202605",)]
 
 
 def test_all_production_down_migrations_replicated(ch_client):
