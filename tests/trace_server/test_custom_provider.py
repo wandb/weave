@@ -363,16 +363,16 @@ def test_custom_provider_completions_create(client):
                 f"API base URL mismatch. Expected 'https://api.example.com', "
                 f"got '{call_args['api_base']}'"
             )
-            assert call_args["extra_headers"] == {"X-Custom-Header": "value"}, (
-                f"Extra headers mismatch. Expected {{'X-Custom-Header': 'value'}}, "
-                f"got {call_args['extra_headers']}"
-            )
+            assert res.conversation_id
+            assert call_args["extra_headers"] == {
+                "X-Custom-Header": "value",
+                "X-Weave-Conversation-Id": res.conversation_id,
+            }
 
-            # Completions now write to the spans table, not calls.
-            # Verify the span was created with correct identifiers.
-            assert res.weave_call_id is not None, "Expected a span_id in response"
-            assert res.span_id is not None, "Expected span_id in response"
-            assert res.trace_id is not None, "Expected trace_id in response"
+            # The runtime owns tracing; W&B returns only shared conversation context.
+            assert res.weave_call_id is None
+            assert res.span_id is None
+            assert res.trace_id is None
         finally:
             _secret_fetcher_context.reset(token)
 

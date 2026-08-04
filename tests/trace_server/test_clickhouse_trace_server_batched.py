@@ -566,10 +566,12 @@ def test_completions_create_stream_custom_provider():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        assert len(chunks) == 2
-        assert chunks[0]["choices"][0]["delta"]["content"] == "Streamed"
-        assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-        assert "usage" in chunks[1]
+        assert len(chunks) == 3
+        assert req.conversation_id
+        assert chunks[0] == {"_meta": {"conversation_id": req.conversation_id}}
+        assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
+        assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+        assert "usage" in chunks[2]
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -578,11 +580,13 @@ def test_completions_create_stream_custom_provider():
             call_args.get("api_base")
             or call_args.get("base_url") == "https://api.custom.com"
         )
-        assert call_args["extra_headers"] == {"X-Custom": "value"}
+        assert call_args["extra_headers"] == {
+            "X-Custom": "value",
+            "X-Weave-Conversation-Id": req.conversation_id,
+        }
 
 
-def test_completions_create_stream_custom_provider_with_tracking():
-    """Test completions_create_stream for a custom provider with call tracking enabled."""
+def test_custom_runtime_stream_owns_tracing_and_receives_conversation_context():
     # Mock chunks to be returned by the stream
     mock_chunks = [
         {
@@ -706,17 +710,16 @@ def test_completions_create_stream_custom_provider_with_tracking():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        assert len(chunks) == 3  # Meta chunk + 2 content chunks
-        assert "_meta" in chunks[0]
-        assert "weave_call_id" in chunks[0]["_meta"]
+        assert len(chunks) == 3
+        conversation_id = req.conversation_id
+        assert conversation_id
+        assert req.track_llm_call is False
+        assert chunks[0] == {"_meta": {"conversation_id": conversation_id}}
         assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
         assert "usage" in chunks[2]
 
-        # Open span + completed span
-        assert mock_agent_writer.insert_span.call_count == 2
-        completed_span = mock_agent_writer.insert_span.call_args_list[1][0][0]
-        assert completed_span.project_id == "dGVzdF9wcm9qZWN0"
+        mock_agent_writer.insert_span.assert_not_called()
 
         mock_litellm.assert_called_once()
         call_args = mock_litellm.call_args[1]
@@ -724,7 +727,10 @@ def test_completions_create_stream_custom_provider_with_tracking():
             call_args.get("api_base")
             or call_args.get("base_url") == "https://api.custom.com"
         )
-        assert call_args["extra_headers"] == {"X-Custom": "value"}
+        assert call_args["extra_headers"] == {
+            "X-Custom": "value",
+            "X-Weave-Conversation-Id": conversation_id,
+        }
 
 
 def test_completions_create_stream_multiple_choices():

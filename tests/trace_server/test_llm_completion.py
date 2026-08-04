@@ -672,9 +672,11 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             chunks = list(stream)
 
             # Verify the chunks
-            assert len(chunks) == 2
-            assert chunks[0]["choices"][0]["delta"]["content"] == "Custom"
-            assert chunks[1]["choices"][0]["finish_reason"] == "stop"
+            assert len(chunks) == 3
+            assert req.conversation_id
+            assert chunks[0] == {"_meta": {"conversation_id": req.conversation_id}}
+            assert chunks[1]["choices"][0]["delta"]["content"] == "Custom"
+            assert chunks[2]["choices"][0]["finish_reason"] == "stop"
 
             # Verify litellm was called with correct parameters
             mock_litellm.assert_called_once()
@@ -682,7 +684,10 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             assert (
                 call_args.get("api_base") or call_args.get("base_url")
             ) == "https://api.custom.com"
-            assert call_args["extra_headers"] == {"X-Custom": "value"}
+            assert call_args["extra_headers"] == {
+                "X-Custom": "value",
+                "X-Weave-Conversation-Id": req.conversation_id,
+            }
 
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
@@ -2253,6 +2258,36 @@ def test_coreweave_requires_its_inference_api_key():
         chts._setup_completion_model_info(None, req, MagicMock())
 
 
+@pytest.mark.parametrize(
+    ("model", "track_llm_call", "conversation_id", "should_have_id"),
+    [
+        ("gpt-4o", True, None, True),
+        ("gpt-4o", False, None, False),
+        ("custom::runtime::model", False, None, True),
+        ("gpt-4o", False, "conv-1", True),
+    ],
+)
+def test_ensure_completion_conversation_id(
+    model: str,
+    track_llm_call: bool,
+    conversation_id: str | None,
+    should_have_id: bool,
+):
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model=model),
+        track_llm_call=track_llm_call,
+        conversation_id=conversation_id,
+    )
+
+    result = chts._ensure_completion_conversation_id(req)
+
+    assert bool(result) is should_have_id
+    assert req.conversation_id == result
+    if conversation_id is not None:
+        assert result == conversation_id
+
+
 def test_custom_provider_name_matching_selector_prefix_is_preserved(monkeypatch):
     req = tsi.CompletionsCreateReq(
         project_id="entity/project",
@@ -2279,6 +2314,85 @@ def test_custom_provider_name_matching_selector_prefix_is_preserved(monkeypatch)
         obj_read_func=obj_read,
     )
     assert model_info.model_name == "custom/gpt-4"
+
+
+def test_custom_runtime_conversation_context_overrides_configured_header(
+    monkeypatch,
+):
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="custom::runtime::model"),
+        track_llm_call=False,
+        conversation_id="conv-1",
+    )
+    monkeypatch.setattr(
+        chts,
+        "get_custom_provider_info",
+        MagicMock(
+            return_value=llm_mod.CustomProviderInfo(
+                base_url="https://runtime.example.com/v1",
+                api_key=None,
+                extra_headers={
+                    "X-Tenant": "customer",
+                    "x-weave-conversation-id": "configured-value",
+                },
+                return_type="openai",
+                actual_model_name="model",
+            )
+        ),
+    )
+
+    info = chts._setup_completion_model_info(None, req, MagicMock())
+
+    assert info.is_custom_runtime is True
+    assert info.extra_headers == {
+        "X-Tenant": "customer",
+        "X-Weave-Conversation-Id": "conv-1",
+    }
+
+
+def test_custom_runtime_conversation_context_is_header_safe(monkeypatch):
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=_completion_inputs(model="custom::runtime::model"),
+        track_llm_call=False,
+        conversation_id="support/café\n",
+    )
+    monkeypatch.setattr(
+        chts,
+        "get_custom_provider_info",
+        MagicMock(
+            return_value=llm_mod.CustomProviderInfo(
+                base_url="https://runtime.example.com/v1",
+                api_key=None,
+                extra_headers={},
+                return_type="openai",
+                actual_model_name="model",
+            )
+        ),
+    )
+
+    info = chts._setup_completion_model_info(None, req, MagicMock())
+
+    assert info.extra_headers == {"X-Weave-Conversation-Id": "support%2Fcaf%C3%A9%0A"}
+
+
+def test_coreweave_does_not_receive_custom_runtime_conversation_context():
+    req = tsi.CompletionsCreateReq(
+        project_id="entity/project",
+        inputs=tsi.CompletionsCreateRequestInputs(
+            model="coreweave/test-model",
+            messages=[{"role": "user", "content": "hi"}],
+            extra_headers={"api_key": "wandb-key", "X-Tenant": "customer"},
+        ),
+        conversation_id="conv-1",
+    )
+
+    info = chts._setup_completion_model_info(None, req, MagicMock())
+
+    assert info.is_custom_runtime is False
+    assert info.extra_headers == {"X-Tenant": "customer"}
+    assert req.track_llm_call is True
 
 
 def test_coreweave_with_api_key_keeps_litellm_configuration():
