@@ -27,6 +27,7 @@ from weave.trace_server.clickhouse_schema import (
     CallStartCHInsertable,
     SelectableCHObjSchema,
 )
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.ids import generate_id
 from weave.trace_server.trace_server_common import make_derived_summary_fields
 from weave.trace_server.ttl_settings import compute_expire_at
@@ -123,6 +124,12 @@ def ch_call_to_row(ch_call: CallCHInsertable | CallCompleteCHInsertable) -> list
     ]
 
 
+def _redacted_otel_dump(otel_dump: dict[str, Any] | None) -> str | None:
+    if otel_dump is None:
+        return None
+    return dict_value_to_dump(redact_sensitive_keys(otel_dump))
+
+
 def start_call_for_insert_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     retention_days: int,
@@ -132,12 +139,13 @@ def start_call_for_insert_to_ch_insertable(
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
     # Process inputs for base64 content if trace_server is provided
-    inputs = start_call.inputs
+    inputs = redact_sensitive_keys(start_call.inputs)
+    attributes = redact_sensitive_keys(start_call.attributes)
+    # Refs come from the redacted inputs, so input_refs cannot name a ref that
+    # the stored inputs no longer contain.
     input_refs = extract_refs_from_values(inputs)
 
-    otel_dump_str = None
-    if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
     return CallStartCHInsertable(
         project_id=start_call.project_id,
@@ -148,7 +156,7 @@ def start_call_for_insert_to_ch_insertable(
         turn_id=start_call.turn_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
-        attributes_dump=dict_value_to_dump(start_call.attributes),
+        attributes_dump=dict_value_to_dump(attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         otel_dump=otel_dump_str,
@@ -241,15 +249,14 @@ def start_end_calls_to_ch_complete_insertable(
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
 
-    inputs = start_call.inputs
+    inputs = redact_sensitive_keys(start_call.inputs)
+    attributes = redact_sensitive_keys(start_call.attributes)
     input_refs = extract_refs_from_values(inputs)
 
     output = end_call.output
     output_refs = extract_refs_from_values(output)
 
-    otel_dump_str = None
-    if start_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(start_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(start_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=start_call.project_id,
@@ -263,7 +270,7 @@ def start_end_calls_to_ch_complete_insertable(
         started_at=start_call.started_at,
         ended_at=end_call.ended_at,
         exception=end_call.exception,
-        attributes_dump=dict_value_to_dump(start_call.attributes),
+        attributes_dump=dict_value_to_dump(attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),
@@ -301,15 +308,14 @@ def complete_call_to_ch_insertable(
     Returns:
         CallCompleteCHInsertable: The ClickHouse insertable representation.
     """
-    inputs = complete_call.inputs
+    inputs = redact_sensitive_keys(complete_call.inputs)
+    attributes = redact_sensitive_keys(complete_call.attributes)
     input_refs = extract_refs_from_values(inputs)
 
     output = complete_call.output
     output_refs = extract_refs_from_values(output)
 
-    otel_dump_str = None
-    if complete_call.otel_dump is not None:
-        otel_dump_str = dict_value_to_dump(complete_call.otel_dump)
+    otel_dump_str = _redacted_otel_dump(complete_call.otel_dump)
 
     return CallCompleteCHInsertable(
         project_id=complete_call.project_id,
@@ -323,7 +329,7 @@ def complete_call_to_ch_insertable(
         started_at=complete_call.started_at,
         ended_at=complete_call.ended_at,
         exception=complete_call.exception,
-        attributes_dump=dict_value_to_dump(complete_call.attributes),
+        attributes_dump=dict_value_to_dump(attributes),
         inputs_dump=dict_value_to_dump(inputs),
         input_refs=input_refs,
         output_dump=any_value_to_dump(output),

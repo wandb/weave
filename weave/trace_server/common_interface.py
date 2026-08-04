@@ -4,19 +4,43 @@ This module contains base classes and common types used by both
 trace_server_interface.py and http_service_interface.py to avoid circular dependencies.
 """
 
-from typing import Literal
+import logging
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 WB_USER_ID_DESCRIPTION = (
     "Do not set directly. Server will automatically populate this field."
 )
 
+logger = logging.getLogger(__name__)
+
 
 class BaseModelStrict(BaseModel):
-    """Base model with strict validation that forbids extra fields."""
+    """API model that tolerates and reports unknown additive fields."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def warn_on_extra_fields(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+
+        known_fields = set(cls.model_fields)
+        known_fields.update(
+            field.alias
+            for field in cls.model_fields.values()
+            if field.alias is not None
+        )
+        extra_fields = sorted(set(values) - known_fields)
+        if extra_fields:
+            logger.warning(
+                "Ignoring unexpected fields while validating %s: %s",
+                cls.__name__,
+                ", ".join(extra_fields),
+            )
+        return values
 
 
 class SortBy(BaseModelStrict):

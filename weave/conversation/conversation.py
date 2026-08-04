@@ -967,6 +967,7 @@ class Turn(_SpanBase):
     agent_version: str = ""
     system_instructions: list[str] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
+    output_messages: list[Message] = Field(default_factory=list)
     spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
     started_at: datetime | None = None
@@ -1074,6 +1075,7 @@ class Turn(_SpanBase):
         self,
         *,
         messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
         system_instructions: list[str] | None = None,
         agent_name: str | None = None,
         model: str | None = None,
@@ -1087,8 +1089,9 @@ class Turn(_SpanBase):
         otherwise makes on a turn (``system_instructions``, ``agent_id``,
         ...) into a single keyword call. Only fields explicitly passed
         (non-``None``) are applied — existing values are preserved.
-        ``messages`` **replaces** the turn's existing messages (unlike
-        ``Turn.user(...)``, which appends a single message). Returns
+        ``messages`` and ``output_messages`` independently replace the turn's
+        existing input and output messages. This differs from
+        ``Turn.user(...)``, which appends a single input message. Returns
         ``self`` for chaining. Mirrors ``LLM.record``.
 
         Note: on the streaming (``with``) path the turn span is named from
@@ -1099,6 +1102,8 @@ class Turn(_SpanBase):
         """
         if messages is not None:
             self.messages = messages
+        if output_messages is not None:
+            self.output_messages = output_messages
         if system_instructions is not None:
             self.system_instructions = system_instructions
         if agent_name is not None:
@@ -1119,21 +1124,25 @@ class Turn(_SpanBase):
         """Build the full OTel attribute dict for this turn span.
 
         Shared by streaming (``end``) and batch (``log_turn``). The Turn
-        carries user messages; ``include_content=False`` strips them at
-        source so Presidio is never called for already-dropped content.
+        carries input and output messages; ``include_content=False`` strips
+        both at source so Presidio is never called for already-dropped content.
         """
         messages: list[Message] | None
+        output_messages: list[Message] | None
         system_instructions: list[str] | None
         if include_content:
             messages = self.messages
+            output_messages = self.output_messages
             system_instructions = self.system_instructions
             if should_redact_pii():
                 messages = pii_redaction.redact_messages(messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
                 system_instructions = pii_redaction.redact_system_instructions(
                     system_instructions
                 )
         else:
             messages = None
+            output_messages = None
             system_instructions = None
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
@@ -1141,6 +1150,7 @@ class Turn(_SpanBase):
             conversation_name=conversation_name,
             model=self.model,
             input_messages=messages,
+            output_messages=output_messages,
             system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
@@ -1650,6 +1660,7 @@ def log_turn(
     agent_description: str = "",
     agent_version: str = "",
     messages: list[Message] | None = None,
+    output_messages: list[Message] | None = None,
     system_instructions: list[str] | None = None,
     spans: list[LLM | Tool | SubAgent] | None = None,
     started_at: datetime | None = None,
@@ -1671,6 +1682,9 @@ def log_turn(
     these from the active conversation instead. Use custom, non-semconv keys: a
     key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
     is unsupported (which value wins is path-dependent).
+
+    ``messages`` records the turn input and ``output_messages`` records the
+    terminal agent response on the same ``invoke_agent`` span.
     """
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(conversation_id=conversation_id)
@@ -1692,6 +1706,7 @@ def log_turn(
         agent_version=agent_version,
         system_instructions=system_instructions or [],
         messages=messages or [],
+        output_messages=output_messages or [],
         spans=resolved_spans,
         started_at=turn_started_at,
         ended_at=turn_ended_at,
