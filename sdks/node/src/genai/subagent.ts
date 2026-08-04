@@ -16,12 +16,15 @@ import {
   ATTR_GEN_AI_AGENT_NAME,
   ATTR_GEN_AI_AGENT_VERSION,
   ATTR_GEN_AI_CONVERSATION_ID,
+  ATTR_GEN_AI_INPUT_MESSAGES,
   ATTR_GEN_AI_OPERATION_NAME,
+  ATTR_GEN_AI_OUTPUT_MESSAGES,
   ATTR_GEN_AI_REQUEST_MODEL,
   ATTR_GEN_AI_SYSTEM_INSTRUCTIONS,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
 import {Tool, type ToolInit} from './tool';
+import type {Message} from './types';
 
 export interface SubAgentInit extends SpanInitBase {
   name: string;
@@ -83,6 +86,8 @@ export class SubAgent extends SpanBase {
   private _conversationId: string;
   private _name: string;
   private _model: string;
+  private _inputMessages: Message[] = [];
+  private _outputMessages: Message[] = [];
   private _systemInstructions: string[];
   private _agentId: string;
   private _agentDescription: string;
@@ -163,9 +168,12 @@ export class SubAgent extends SpanBase {
   }
 
   /**
-   * Bulk-set any fields. Replaces (does not merge).
+   * Bulk-set any subset of the mutable fields. Replaces (does not merge).
+   * Input and output messages are serialized when the span ends.
    */
   record(opts: {
+    messages?: Message[];
+    outputMessages?: Message[];
     name?: string;
     model?: string;
     systemInstructions?: string[];
@@ -175,6 +183,12 @@ export class SubAgent extends SpanBase {
   }): this {
     if (this._warnIfEnded('record')) return this;
 
+    if (opts.messages !== undefined) {
+      this._inputMessages = opts.messages;
+    }
+    if (opts.outputMessages !== undefined) {
+      this._outputMessages = opts.outputMessages;
+    }
     if (opts.name !== undefined) {
       this._name = opts.name;
     }
@@ -226,6 +240,18 @@ export class SubAgent extends SpanBase {
     }
     if (this._agentVersion) {
       this.span.setAttribute(ATTR_GEN_AI_AGENT_VERSION, this._agentVersion);
+    }
+    if (this._inputMessages.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_INPUT_MESSAGES,
+        JSON.stringify(this._inputMessages)
+      );
+    }
+    if (this._outputMessages.length > 0) {
+      this.span.setAttribute(
+        ATTR_GEN_AI_OUTPUT_MESSAGES,
+        JSON.stringify(this._outputMessages)
+      );
     }
     if (this._systemInstructions.length > 0) {
       this.span.setAttribute(

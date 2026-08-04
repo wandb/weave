@@ -113,6 +113,8 @@ describe('SubAgent', () => {
     const turn = Turn.create({});
     const subagent = turn.startSubagent({name: 'researcher'});
     subagent.record({
+      messages: [{role: 'user', content: 'Research the SDK'}],
+      outputMessages: [{role: 'assistant', content: 'The SDK supports agents'}],
       agentId: 'agent-9',
       agentDescription: 'A research bot',
       agentVersion: 'v4',
@@ -129,7 +131,9 @@ describe('SubAgent', () => {
           "gen_ai.agent.id": "agent-9",
           "gen_ai.agent.name": "researcher",
           "gen_ai.agent.version": "v4",
+          "gen_ai.input.messages": "[{"role":"user","content":"Research the SDK"}]",
           "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.output.messages": "[{"role":"assistant","content":"The SDK supports agents"}]",
           "gen_ai.system_instructions": "[{"type":"text","content":"Find authoritative sources"}]",
         },
         "endTime": "<timestamp>",

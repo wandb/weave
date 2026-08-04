@@ -605,6 +605,17 @@ describe('Claude Agent SDK — OTel tracer', () => {
         content: 'Set forwardSubagentText to include nested text.',
       },
     ]);
+    expect({
+      toolCallArguments: subagent.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS],
+      toolCallId: subagent.attributes[ATTR_GEN_AI_TOOL_CALL_ID],
+      toolCallResult: subagent.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT],
+      toolName: subagent.attributes[ATTR_GEN_AI_TOOL_NAME],
+    }).toEqual({
+      toolCallArguments: undefined,
+      toolCallId: undefined,
+      toolCallResult: undefined,
+      toolName: undefined,
+    });
 
     const nestedChat = spans.find(
       span =>
@@ -912,7 +923,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: undefined,
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
-        toolCallId: 'agent-a',
+        toolCallId: undefined,
         toolCallResult: undefined,
       },
       {
@@ -933,7 +944,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         outputMessages: undefined,
         providerName: undefined,
         statusCode: SpanStatusCode.UNSET,
-        toolCallId: 'agent-b',
+        toolCallId: undefined,
         toolCallResult: undefined,
       },
     ]);
@@ -1000,7 +1011,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: 'subagent_error',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Subagent crashed',
-        toolCallId: 'agent-failed',
+        toolCallId: undefined,
       },
     ]);
   });
@@ -1060,7 +1071,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
         errorType: 'aborted',
         statusCode: SpanStatusCode.ERROR,
         statusMessage: 'Agent ended with open subagent span',
-        toolCallId: 'agent-unfinished',
+        toolCallId: undefined,
       },
     ]);
   });
@@ -1156,13 +1167,13 @@ describe('Claude Agent SDK — OTel tracer', () => {
           )!
           .spanContext().spanId,
         statusCode: SpanStatusCode.UNSET,
-        toolName: 'Agent',
+        toolName: undefined,
       },
       {
         name: 'worker',
         parentSpanId: coordinator.spanContext().spanId,
         statusCode: SpanStatusCode.UNSET,
-        toolName: 'Task',
+        toolName: undefined,
       },
     ]);
   });

@@ -10,12 +10,6 @@ import {
 } from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_INPUT_MESSAGES,
-  ATTR_GEN_AI_OUTPUT_MESSAGES,
-  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
-  ATTR_GEN_AI_TOOL_CALL_ID,
-  ATTR_GEN_AI_TOOL_CALL_RESULT,
-  ATTR_GEN_AI_TOOL_NAME,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
@@ -500,9 +494,6 @@ export class ClaudeAgentOtelTracer {
         model: msg.message.model,
         agentDescription: msg.task_description,
       });
-      span.setAttributes({
-        [ATTR_GEN_AI_TOOL_CALL_ID]: parentToolUseId,
-      });
       openSubagent = {background: false, span};
       this.openSubagents.set(parentToolUseId, openSubagent);
     } else {
@@ -529,17 +520,8 @@ export class ClaudeAgentOtelTracer {
       model: stringField(input, 'model'),
       agentDescription: stringField(input, 'description'),
     });
-    subagent.setAttributes({
-      [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
-      [ATTR_GEN_AI_TOOL_NAME]: block.name,
-      [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(block.input ?? {}),
-      ...(prompt
-        ? {
-            [ATTR_GEN_AI_INPUT_MESSAGES]: JSON.stringify([
-              {role: 'user', content: prompt},
-            ]),
-          }
-        : {}),
+    subagent.record({
+      messages: prompt ? [{role: 'user', content: prompt}] : [],
     });
     this.openSubagents.set(block.id, {background: false, span: subagent});
   }
@@ -565,15 +547,10 @@ export class ClaudeAgentOtelTracer {
           });
           continue;
         }
-        openSubagent.span.setAttributes({
-          [ATTR_GEN_AI_TOOL_CALL_RESULT]: resultText,
-          ...(resultText
-            ? {
-                [ATTR_GEN_AI_OUTPUT_MESSAGES]: JSON.stringify([
-                  {role: 'assistant', content: resultText},
-                ]),
-              }
-            : {}),
+        openSubagent.span.record({
+          outputMessages: resultText
+            ? [{role: 'assistant', content: resultText}]
+            : [],
         });
         if (block.is_error) {
           openSubagent.completion = {

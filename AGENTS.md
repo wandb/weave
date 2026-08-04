@@ -360,6 +360,9 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
   `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
   belongs on child model spans.
+- Record `invoke_agent` inputs and outputs through `Turn.record()` or
+  `SubAgent.record()`. Keep `gen_ai.tool.*` attributes on `execute_tool` spans,
+  not agent spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
 - Parallel/background Claude Agent SDK `Agent` calls can emit an
