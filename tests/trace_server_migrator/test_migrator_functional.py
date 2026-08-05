@@ -650,8 +650,10 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("object", "String"),
         ("outcome", "LowCardinality(String)"),
         ("operation_mode", "LowCardinality(String)"),
+        ("sentiment", "LowCardinality(String)"),
+        ("sentiment_confidence", "Float32"),
+        ("sentiment_score", "Float32"),
         ("embedding_model", "LowCardinality(String)"),
-        ("embedding_dimensions", "UInt16"),
         ("vector", "Array(Float32)"),
         ("judge_model", "LowCardinality(String)"),
         ("prompt_version", "LowCardinality(String)"),
@@ -697,6 +699,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     insert_columns = """
         project_id, id, intent_ordinal, signature_id, lens, pipeline_version,
         record_version, category, signature, action, object, outcome, operation_mode,
+        sentiment, sentiment_confidence,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
         source, insights_type, source_id, trace_id, span_id, parent_span_id,
         conversation_id, turn_index, user_id,
@@ -713,6 +716,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             'intent', {pipeline_version}, {record_version}, '{category}',
             'Add Stripe checkout', 'add', 'stripe checkout', 'integrated',
             'build_or_extend',
+            'frustrated', toFloat32(0.75),
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
             'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
             'weave', 'turn', 'source-1', 'trace-1', 'span-1', 'parent-1',
@@ -768,7 +772,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
 
     # The promoted columns round-trip as typed values rather than Map strings.
     promoted = ch_client.query(
-        "SELECT lens, action, object, outcome, operation_mode, judge_model, "
+        "SELECT lens, action, object, outcome, operation_mode, "
+        "sentiment, sentiment_confidence, sentiment_score, judge_model, "
         "prompt_version, length(pipeline_recipe_sha256), turn_index, "
         "agent_name, agent_version, provider, request_model, surface, status_code, "
         "turn_duration_ms, turn_cost_usd, turn_summary, "
@@ -784,6 +789,9 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             "stripe checkout",
             "integrated",
             "build_or_extend",
+            "frustrated",
+            0.75,
+            -1.0,
             "gemma-4-31b-it",
             "intent-v1",
             64,
