@@ -41,6 +41,18 @@ CREATE TABLE IF NOT EXISTS intent_records
     turn_index UInt16 DEFAULT 0,             -- position of the source turn in its conversation, numeric so ranges and ordering work
     user_id String DEFAULT '',               -- pseudonymous source subject, distinct from the writer
 
+    -- Execution context of the source turn, denormalized at extraction like
+    -- source_started_at. A turn's rows all repeat these, lens='failure' included.
+    agent_name LowCardinality(String) DEFAULT '',
+    agent_version String DEFAULT '',          -- free-form version label, so plain String rather than a bounded vocabulary
+    provider LowCardinality(String) DEFAULT '',
+    request_model LowCardinality(String) DEFAULT '', -- model the source turn called, distinct from judge_model and embedding_model
+    surface LowCardinality(String) DEFAULT '',
+    status_code LowCardinality(String) DEFAULT '', -- String, not numeric: sources report both HTTP codes and symbolic names
+    turn_duration_ms UInt32 DEFAULT 0,
+    turn_cost_usd Float64 DEFAULT 0,
+    turn_summary String DEFAULT '',           -- describes the assistant response, so it repeats across a turn's rows
+
     -- Denormalized SNAPSHOT of the source turn's start time, captured at
     -- extraction and never re-read from the source. This is the analysis clock.
     source_started_at DateTime64(6, 'UTC'),

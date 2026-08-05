@@ -665,6 +665,15 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("conversation_id", "String"),
         ("turn_index", "UInt16"),
         ("user_id", "String"),
+        ("agent_name", "LowCardinality(String)"),
+        ("agent_version", "String"),
+        ("provider", "LowCardinality(String)"),
+        ("request_model", "LowCardinality(String)"),
+        ("surface", "LowCardinality(String)"),
+        ("status_code", "LowCardinality(String)"),
+        ("turn_duration_ms", "UInt32"),
+        ("turn_cost_usd", "Float64"),
+        ("turn_summary", "String"),
         ("source_started_at", "DateTime64(6, 'UTC')"),
         ("intent_extracted_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
@@ -690,7 +699,10 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         record_version, category, signature, action, object, outcome, operation_mode,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
         source, insights_type, source_id, trace_id, span_id, parent_span_id,
-        conversation_id, turn_index, user_id, source_started_at, intent_extracted_at,
+        conversation_id, turn_index, user_id,
+        agent_name, agent_version, provider, request_model, surface, status_code,
+        turn_duration_ms, turn_cost_usd, turn_summary,
+        source_started_at, intent_extracted_at,
         attributes
     """
     # source_started_at is deliberately a month before intent_extracted_at: the
@@ -705,6 +717,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
             'weave', 'turn', 'source-1', 'trace-1', 'span-1', 'parent-1',
             'conversation-1', 7, 'user-1',
+            'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', '200',
+            4200, toFloat64(0.0123), 'Wired up a Stripe checkout endpoint.',
             toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
             toDateTime64('2026-06-20 14:32:00', 6, 'UTC'),
             map('environment', 'test')
@@ -756,6 +770,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     promoted = ch_client.query(
         "SELECT lens, action, object, outcome, operation_mode, judge_model, "
         "prompt_version, length(pipeline_recipe_sha256), turn_index, "
+        "agent_name, agent_version, provider, request_model, surface, status_code, "
+        "turn_duration_ms, turn_cost_usd, turn_summary, "
         "formatDateTime(source_started_at, '%F %T'), "
         "formatDateTime(intent_extracted_at, '%F %T') "
         f"FROM {target_db}.intent_records FINAL "
@@ -772,6 +788,15 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             "intent-v1",
             64,
             7,
+            "checkout-agent",
+            "1.4.2",
+            "anthropic",
+            "claude-sonnet-5",
+            "cli",
+            "200",
+            4200,
+            0.0123,
+            "Wired up a Stripe checkout endpoint.",
             "2026-05-30 09:15:00",
             "2026-06-20 14:32:00",
         )
