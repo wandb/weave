@@ -184,8 +184,14 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "spans": "trace_id",
     "messages": "trace_id",
     # All intent APIs are project-scoped. Co-locate a project's vectors so
-    # filtered ANN search and clustering do not fan out across shards.
+    # filtered ANN search and clustering do not fan out across shards. Every
+    # intent table shares this key, so occurrence/signature/assignment joins
+    # stay shard-local and plain IN is correct without GLOBAL IN.
     "intent_records": "project_id",
+    "intent_cluster_runs": "project_id",
+    "intent_clusters": "project_id",
+    "intent_cluster_assignments": "project_id",
+    "intent_cluster_daily": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
