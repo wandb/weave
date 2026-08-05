@@ -4,10 +4,12 @@ Uses the Weave Python GenAI agent SDK to emit spans to Weave's Agents tab; the
 sibling ``claude_agent_sdk_integration.py`` emits legacy Weave calls instead.
 The dispatcher selects this variant when ``WEAVE_USE_OTEL_V2`` is set.
 
-Each ``query()`` call / ``ClaudeSDKClient`` turn becomes an ``invoke_agent``
-span, with a child ``chat`` span per model response and an ``execute_tool``
-span per tool call. The SDK reports token usage only on the final
-``ResultMessage``, so it is attached to the last ``chat`` span.
+String queries and ``ClaudeSDKClient.receive_response()`` calls each emit one
+``invoke_agent`` turn. A standalone ``query()`` driven by an async prompt
+iterable can return several results, so that path emits one turn per
+``ResultMessage``. Each turn has a child ``chat`` span per model response and an
+``execute_tool`` span per tool call. The SDK reports token usage only on a
+turn's final ``ResultMessage``, so it is attached to the last ``chat`` span.
 
 The Claude Agent SDK has no agent-name concept, so ``invoke_agent`` spans
 default to ``claude_agent_sdk``. Users relabel them for a block of work with the
@@ -21,6 +23,7 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+from collections import deque
 from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -89,6 +92,74 @@ class _AssistantOutput:
     reasoning: Reasoning
 
 
+@dataclass(frozen=True, slots=True)
+class _PendingTurnInput:
+    messages: list[Message]
+    started_at: datetime
+
+
+def _text_turn_input(prompt: str) -> _PendingTurnInput:
+    return _PendingTurnInput(
+        messages=[Message.user(prompt)],
+        started_at=datetime.now(timezone.utc),
+    )
+
+
+@dataclass(slots=True)
+class _InputTracker:
+    """FIFO queue of user inputs, one entry per turn the SDK will answer."""
+
+    pending: deque[_PendingTurnInput] = field(default_factory=deque)
+    buffered: list[Message] = field(default_factory=list)
+    buffered_started_at: datetime | None = None
+
+    @classmethod
+    def from_prompt(cls, prompt: Any) -> _InputTracker:
+        tracker = cls()
+        if isinstance(prompt, str):
+            tracker.pending.append(_text_turn_input(prompt))
+        return tracker
+
+    def record(self, prompt: dict[str, Any]) -> None:
+        message = _message_from_prompt(prompt)
+        if message is None:
+            return
+        if self.buffered_started_at is None:
+            self.buffered_started_at = datetime.now(timezone.utc)
+        self.buffered.append(message)
+        # ``shouldQuery: False`` means the SDK keeps collecting input instead of
+        # answering, so those messages belong to the next turn's input.
+        if prompt.get("shouldQuery") is not False:
+            self.pending.append(
+                _PendingTurnInput(
+                    messages=self.buffered,
+                    started_at=self.buffered_started_at,
+                )
+            )
+            self.buffered = []
+            self.buffered_started_at = None
+
+    def take(self) -> _PendingTurnInput:
+        if self.pending:
+            return self.pending.popleft()
+        if self.buffered:
+            pending = _PendingTurnInput(
+                messages=self.buffered,
+                started_at=self.buffered_started_at or datetime.now(timezone.utc),
+            )
+            self.buffered = []
+            self.buffered_started_at = None
+            return pending
+        return _PendingTurnInput(
+            messages=[],
+            started_at=datetime.now(timezone.utc),
+        )
+
+    def has_pending_turn(self) -> bool:
+        """Return whether a submitted input still expects an SDK result."""
+        return bool(self.pending)
+
+
 def _message_from_prompt(prompt: dict[str, Any]) -> Message | None:
     if prompt.get("type") != "user":
         return None
@@ -137,15 +208,13 @@ def _message_from_prompt(prompt: dict[str, Any]) -> Message | None:
     return Message(role="user", parts=parts) if parts else None
 
 
-async def _track_prompt(
+async def _track_async_prompt(
     prompt: AsyncIterable[dict[str, Any]],
-    input_messages: list[Message],
+    tracker: _InputTracker,
 ) -> AsyncIterator[dict[str, Any]]:
     async for message in prompt:
         try:
-            traced_message = _message_from_prompt(message)
-            if traced_message is not None:
-                input_messages.append(traced_message)
+            tracker.record(message)
         except Exception:
             logger.exception("claude_agent_sdk input tracing failed")
         yield message
@@ -248,8 +317,8 @@ class _OpenSubagent:
 class _TurnState:
     """Mutable per-turn accumulator (one invoke_agent span and its children).
 
-    Not frozen: it accumulates as the message stream is consumed. Scope is one
-    turn, owned by ``_trace_turn``.
+    Not frozen: it accumulates as the message stream is consumed. Its scope is
+    one turn, regardless of which query adapter owns that turn.
     """
 
     conversation: Conversation
@@ -580,48 +649,122 @@ def _finalize_turn(state: _TurnState) -> None:
         )
 
 
-async def _trace_turn(
+def _start_tracked_turn(
+    conversation: Conversation, turn_input: _PendingTurnInput
+) -> Turn:
+    # Resolve per turn so an ``agent_name_override(...)`` block that spans only
+    # part of the stream labels only the turns inside it.
+    turn = conversation.start_turn(agent_name=resolve_agent_name(_DEFAULT_AGENT_NAME))
+    turn.started_at = turn_input.started_at
+    turn.record(messages=turn_input.messages)
+    return turn
+
+
+def _process_message_for_turn(
+    msg: Any,
+    state: _TurnState,
+    conversation_id_holder: list[str] | None = None,
+) -> None:
+    """Record one SDK message without allowing tracing to break the stream."""
+    try:
+        session_id = _process_message(msg, state)
+        if conversation_id_holder is not None and session_id:
+            conversation_id_holder[0] = session_id
+    except Exception:
+        logger.exception("claude_agent_sdk GenAI span processing failed")
+
+
+async def _trace_single_turn(
     messages: AsyncIterator[Any],
     *,
-    input_messages: list[Message],
+    turn_input: _PendingTurnInput,
     conversation_id_holder: list[str] | None = None,
 ) -> AsyncIterator[Any]:
-    """Wrap a message stream, emitting the span tree for one turn.
+    """Trace a stream whose public API contract permits exactly one result.
 
     ``conversation_id_holder`` carries the SDK ``session_id`` across turns of a
     single ``ClaudeSDKClient``: the ``system/init`` message (which holds the
     session_id) is only sent on the first turn, so later turns must inherit it.
     """
-    agent_name = resolve_agent_name(_DEFAULT_AGENT_NAME)
+    message_iterator = aiter(messages)
     conversation_id = (
         conversation_id_holder[0] if conversation_id_holder is not None else ""
     )
     with Conversation(
         conversation_id=conversation_id,
-        agent_name=agent_name,
+        agent_name=_DEFAULT_AGENT_NAME,
         continue_parent_trace=True,
         attributes=_INTEGRATION_OTEL_ATTRS,
     ) as conversation:
-        with conversation.start_turn() as turn:
-            state = _TurnState(
-                conversation=conversation,
-                turn=turn,
-            )
+        turn = _start_tracked_turn(conversation, turn_input)
+        with turn:
+            state = _TurnState(conversation=conversation, turn=turn)
             try:
-                async for msg in messages:
-                    try:
-                        session_id = _process_message(msg, state)
-                        if conversation_id_holder is not None and session_id:
-                            conversation_id_holder[0] = session_id
-                    except Exception:
-                        # Never let span bookkeeping break the user's stream.
-                        logger.exception(
-                            "claude_agent_sdk GenAI span processing failed"
-                        )
+                async for msg in message_iterator:
+                    _process_message_for_turn(
+                        msg,
+                        state,
+                        conversation_id_holder,
+                    )
                     yield msg
+                    if isinstance(msg, ResultMessage):
+                        break
             finally:
-                state.turn.record(messages=list(input_messages))
                 _finalize_turn(state)
+
+    # A ResultMessage completes the one allowed turn. Continue forwarding any
+    # teardown messages or errors without retroactively changing that turn.
+    async for msg in message_iterator:
+        yield msg
+
+
+async def _trace_async_iterable_query(
+    messages: AsyncIterator[Any],
+    *,
+    inputs: _InputTracker,
+) -> AsyncIterator[Any]:
+    """Trace every result produced by a standalone async-iterable query.
+
+    Unlike the single-turn APIs, this output stream may contain several
+    ``ResultMessage`` boundaries. Looking ahead between turns keeps transport
+    failures after a completed result out of that completed turn while still
+    assigning failures to an already-submitted next input.
+    """
+    with Conversation(
+        conversation_id="",
+        agent_name=_DEFAULT_AGENT_NAME,
+        continue_parent_trace=True,
+        attributes=_INTEGRATION_OTEL_ATTRS,
+    ) as conversation:
+        message_iterator = aiter(messages)
+        while True:
+            try:
+                next_message = await anext(message_iterator)
+            except StopAsyncIteration:
+                return
+            except BaseException:
+                if not inputs.has_pending_turn():
+                    raise
+                turn = _start_tracked_turn(conversation, inputs.take())
+                with turn:
+                    raise
+
+            turn = _start_tracked_turn(conversation, inputs.take())
+            with turn:
+                state = _TurnState(conversation=conversation, turn=turn)
+                try:
+                    while True:
+                        msg = next_message
+                        _process_message_for_turn(msg, state)
+                        yield msg
+                        if isinstance(msg, ResultMessage):
+                            break
+                        try:
+                            next_message = await anext(message_iterator)
+                        except StopAsyncIteration:
+                            return
+                finally:
+                    _finalize_turn(state)
 
 
 def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
@@ -643,19 +786,28 @@ def _patched_process_query_wrapper(settings: IntegrationSettings) -> Any:
                     yield msg
                 return
 
-            input_messages = [Message.user(prompt)] if isinstance(prompt, str) else []
-            traced_prompt = (
-                prompt
-                if isinstance(prompt, str)
-                else _track_prompt(prompt, input_messages)
-            )
+            if isinstance(prompt, str):
+                inner = original_process_query(
+                    self_client,
+                    prompt=prompt,
+                    options=options,
+                    transport=transport,
+                )
+                async for msg in _trace_single_turn(
+                    inner,
+                    turn_input=_text_turn_input(prompt),
+                ):
+                    yield msg
+                return
+
+            inputs = _InputTracker()
             inner = original_process_query(
                 self_client,
-                prompt=traced_prompt,
+                prompt=_track_async_prompt(prompt, inputs),
                 options=options,
                 transport=transport,
             )
-            async for msg in _trace_turn(inner, input_messages=input_messages):
+            async for msg in _trace_async_iterable_query(inner, inputs=inputs):
                 yield msg
 
         return wrapped_process_query
@@ -680,21 +832,19 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
             original_receive_response = self.receive_response
             # One-element holder so wrapped_query can hand the prompt to the
             # next receive_response() turn.
-            input_messages_holder: list[list[Message]] = [[]]
+            input_tracker_holder: list[_InputTracker] = [_InputTracker()]
             # Persists the SDK session_id across turns: system/init is only sent
             # on the first turn, so later turns inherit the conversation id here.
             conversation_id_holder: list[str] = [""]
 
             @wraps(original_query)
             async def wrapped_query(prompt: Any, session_id: str = "default") -> None:
-                input_messages = (
-                    [Message.user(prompt)] if isinstance(prompt, str) else []
-                )
-                input_messages_holder[0] = input_messages
+                inputs = _InputTracker.from_prompt(prompt)
+                input_tracker_holder[0] = inputs
                 traced_prompt = (
                     prompt
                     if isinstance(prompt, str)
-                    else _track_prompt(prompt, input_messages)
+                    else _track_async_prompt(prompt, inputs)
                 )
                 return await original_query(traced_prompt, session_id=session_id)
 
@@ -705,9 +855,9 @@ def _patched_init_wrapper(settings: IntegrationSettings) -> Any:
                     async for msg in inner:
                         yield msg
                     return
-                async for msg in _trace_turn(
+                async for msg in _trace_single_turn(
                     inner,
-                    input_messages=input_messages_holder[0],
+                    turn_input=input_tracker_holder[0].take(),
                     conversation_id_holder=conversation_id_holder,
                 ):
                     yield msg
