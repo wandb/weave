@@ -100,6 +100,10 @@ from weave.trace_server.feedback import (
     validate_feedback_purge_req,
 )
 from weave.trace_server.feedback_payload_schema import discover_payload_schema
+from weave.trace_server.historical_turns import (
+    HistoricalTurnUnsupportedError,
+    unsupported_historical_turn_capabilities,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
@@ -4569,6 +4573,27 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     # ------------------------------------------------------------------
     # OTel export
     # ------------------------------------------------------------------
+
+    def historical_turn_capabilities(
+        self, req: tsi.agent_types.HistoricalTurnCapabilitiesReq
+    ) -> tsi.agent_types.HistoricalTurnCapabilitiesRes:
+        return unsupported_historical_turn_capabilities(
+            "InMemoryTraceServer has no durable historical-turn commit store."
+        )
+
+    def historical_turn_upsert(
+        self, req: tsi.agent_types.HistoricalTurnUpsertReq
+    ) -> tsi.agent_types.HistoricalTurnUpsertRes:
+        raise HistoricalTurnUnsupportedError(
+            "InMemoryTraceServer cannot provide durable historical-turn upsert."
+        )
+
+    def historical_turn_status(
+        self, req: tsi.agent_types.HistoricalTurnStatusReq
+    ) -> tsi.agent_types.HistoricalTurnStatusRes:
+        raise HistoricalTurnUnsupportedError(
+            "InMemoryTraceServer cannot provide durable historical-turn status."
+        )
 
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         calls: list[tsi.CallBatchStartMode | tsi.CallBatchEndMode] = []

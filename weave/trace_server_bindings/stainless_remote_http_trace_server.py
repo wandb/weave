@@ -14,6 +14,10 @@ from weave_server_sdk import Client as StainlessClient
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.historical_turns import (
+    HistoricalTurnUnsupportedError,
+    unsupported_historical_turn_capabilities,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -447,6 +451,28 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             NotImplementedError: OTEL export is not yet supported.
         """
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
+
+    def historical_turn_capabilities(
+        self, req: tsi.agent_types.HistoricalTurnCapabilitiesReq
+    ) -> tsi.agent_types.HistoricalTurnCapabilitiesRes:
+        return unsupported_historical_turn_capabilities(
+            "The generated Stainless client does not yet include historical-turn routes; "
+            "use the default HTTP client for this preview API."
+        )
+
+    def historical_turn_upsert(
+        self, req: tsi.agent_types.HistoricalTurnUpsertReq
+    ) -> tsi.agent_types.HistoricalTurnUpsertRes:
+        raise HistoricalTurnUnsupportedError(
+            "Historical turn upsert is unavailable in the generated Stainless client."
+        )
+
+    def historical_turn_status(
+        self, req: tsi.agent_types.HistoricalTurnStatusReq
+    ) -> tsi.agent_types.HistoricalTurnStatusRes:
+        raise HistoricalTurnUnsupportedError(
+            "Historical turn status is unavailable in the generated Stainless client."
+        )
 
     # Call API
     @validate_call

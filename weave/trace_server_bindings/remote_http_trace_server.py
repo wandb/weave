@@ -19,6 +19,11 @@ from weave.trace.settings import (
 )
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents.historical_turn_validation import (
+    HistoricalTurnCapabilityMismatchError,
+    HistoricalTurnPayloadTooLargeError,
+    HistoricalTurnValidationError,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server.trace_server_interface import agent_types
@@ -49,6 +54,13 @@ from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
+
+_HISTORICAL_TURN_UPSERT_STATUS = {
+    200: "replayed",
+    201: "committed",
+    202: "committing",
+    409: "conflict",
+}
 
 # Default timeout values (in seconds)
 # DEFAULT_CONNECT_TIMEOUT = 10
@@ -537,6 +549,7 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         handle_response_error(r, url)
         return r
 
+    @with_retry
     def _put_request_executor(
         self,
         url: str,
@@ -550,6 +563,20 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
         handle_response_error(r, url)
         return r
+
+    @with_retry
+    def _historical_turn_put_request_executor(
+        self,
+        url: str,
+        req: agent_types.HistoricalTurnUpsertReq,
+    ) -> httpx.Response:
+        response = self.put(
+            url,
+            data=req.model_dump_json(by_alias=True).encode("utf-8"),
+        )
+        if response.status_code != 409:
+            handle_response_error(response, url)
+        return response
 
     @with_retry
     def _delete_request_executor(
@@ -627,6 +654,69 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
+
+    # === Historical turn ingest ===
+
+    @validate_call
+    def historical_turn_upsert(
+        self, req: agent_types.HistoricalTurnUpsertReq
+    ) -> agent_types.HistoricalTurnUpsertRes:
+        url = f"/agents/v1/historical-turns/{quote(req.turn.logical_key, safe='')}"
+        try:
+            response = self._historical_turn_put_request_executor(url, req)
+        except httpx.HTTPStatusError as error:
+            status_code = error.response.status_code
+            if status_code == 412:
+                raise HistoricalTurnCapabilityMismatchError(
+                    "historical turn capability version changed before commit"
+                ) from error
+            if status_code == 413:
+                raise HistoricalTurnPayloadTooLargeError(
+                    "historical turn exceeds the server's atomic envelope limit"
+                ) from error
+            if status_code == 422:
+                raise HistoricalTurnValidationError(
+                    "historical turn failed server schema or graph validation"
+                ) from error
+            raise
+
+        result = agent_types.HistoricalTurnUpsertRes.model_validate(response.json())
+        expected_status = _HISTORICAL_TURN_UPSERT_STATUS.get(response.status_code)
+        if expected_status is None:
+            raise RuntimeError(
+                "historical turn server returned an unsupported success status code"
+            )
+        if result.status != expected_status:
+            raise RuntimeError(
+                "historical turn HTTP status disagrees with its response status"
+            )
+        return result
+
+    @validate_call
+    def historical_turn_status(
+        self, req: agent_types.HistoricalTurnStatusReq
+    ) -> agent_types.HistoricalTurnStatusRes:
+        return self._generic_request(
+            f"/agents/v1/historical-turns/{quote(req.logical_key, safe='')}",
+            req,
+            agent_types.HistoricalTurnStatusReq,
+            agent_types.HistoricalTurnStatusRes,
+            method="GET",
+            params={"project_id": req.project_id},
+        )
+
+    @validate_call
+    def historical_turn_capabilities(
+        self, req: agent_types.HistoricalTurnCapabilitiesReq
+    ) -> agent_types.HistoricalTurnCapabilitiesRes:
+        return self._generic_request(
+            "/agents/v1/historical-turns/capabilities",
+            req,
+            agent_types.HistoricalTurnCapabilitiesReq,
+            agent_types.HistoricalTurnCapabilitiesRes,
+            method="GET",
+            params={"project_id": req.project_id},
+        )
 
     # === GenAI / Agent Observability API (read) ===
 

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 from pydantic import (
     AwareDatetime,
     BaseModel,
+    ConfigDict,
     Field,
     field_validator,
     model_validator,
@@ -1313,3 +1314,177 @@ class GenAIOTelExportRes(BaseModel):
     accepted_spans: int = 0
     rejected_spans: int = 0
     error_message: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Historical turn ingest
+# ---------------------------------------------------------------------------
+
+
+HistoricalTurnSpanKind = Literal["turn", "llm", "tool", "subagent"]
+HistoricalTurnCommitStatus = Literal["committing", "committed", "replayed", "conflict"]
+HistoricalTurnStoredStatus = Literal["absent", "committing", "committed"]
+
+
+class HistoricalTurnSpan(BaseModel):
+    """One fully materialized span in a prepared historical turn.
+
+    IDs and timestamps are chosen by the SDK before transport. This makes a
+    retry byte-identical and gives the server stable identifiers to reconcile
+    after a process crash. Historical turns are intentionally a flat root +
+    children tree, matching ``log_turn``'s public shape.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: HistoricalTurnSpanKind
+    name: str = Field(min_length=1, max_length=512)
+    trace_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    span_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    parent_span_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+    start_time_unix_nano: int = Field(ge=0)
+    end_time_unix_nano: int = Field(ge=0)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_times(self) -> HistoricalTurnSpan:
+        if self.end_time_unix_nano < self.start_time_unix_nano:
+            raise ValueError("span end timestamp must not precede its start")
+        return self
+
+
+class PreparedTurn(BaseModel):
+    """Canonical, immutable payload produced by :func:`weave.prepare_turn`.
+
+    ``wire_sha256`` covers every other field in this model. The server
+    recomputes it before consulting the idempotency store, so a caller cannot
+    use a stale digest to alias different content onto an existing logical key.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    capability_version: str = Field(
+        default="historical-turn-v1", min_length=1, max_length=128
+    )
+    schema_version: Literal["1"] = "1"
+    producer: str = Field(default="weave-python", min_length=1, max_length=128)
+    logical_key: str = Field(pattern=r"^[0-9a-f]{64}$")
+    turn_key: str = Field(min_length=1, max_length=2048)
+    source_payload_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    wire_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    compressed_bytes: int = Field(ge=0)
+    uncompressed_bytes: int = Field(ge=0)
+    reference_count: int = Field(default=0, ge=0)
+    destination_project_id: str = Field(min_length=1, max_length=2048)
+    conversation_id: str = Field(min_length=1, max_length=2048)
+    trace_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    root_span_id: str = Field(pattern=r"^[0-9a-f]{16}$")
+    spans: list[HistoricalTurnSpan] = Field(min_length=1)
+    span_count: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_span_tree(self) -> PreparedTurn:
+        if self.span_count != len(self.spans):
+            raise ValueError("span_count must equal the number of spans")
+
+        root = self.spans[0]
+        if root.kind != "turn":
+            raise ValueError("the first historical span must be the turn root")
+        if root.parent_span_id is not None:
+            raise ValueError("the turn root must not have a parent_span_id")
+        if root.trace_id != self.trace_id or root.span_id != self.root_span_id:
+            raise ValueError("turn root IDs must match the prepared turn IDs")
+
+        span_ids: set[str] = set()
+        for index, span in enumerate(self.spans):
+            if span.span_id in span_ids:
+                raise ValueError(f"duplicate span_id at spans[{index}]")
+            span_ids.add(span.span_id)
+            if span.trace_id != self.trace_id:
+                raise ValueError(f"spans[{index}] has a different trace_id")
+            if index > 0:
+                if span.kind == "turn":
+                    raise ValueError("a historical turn may contain only one turn root")
+                if span.parent_span_id != self.root_span_id:
+                    raise ValueError(
+                        f"spans[{index}] must be a direct child of the turn root"
+                    )
+                if span.start_time_unix_nano < root.start_time_unix_nano:
+                    raise ValueError(f"spans[{index}] starts before the turn root")
+                if span.end_time_unix_nano > root.end_time_unix_nano:
+                    raise ValueError(f"spans[{index}] ends after the turn root")
+        return self
+
+
+class HistoricalTurnUpsertReq(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1)
+    capability_version: str = Field(
+        default="historical-turn-v1", min_length=1, max_length=128
+    )
+    turn: PreparedTurn
+    wb_user_id: str | None = None
+
+
+class HistoricalTurnUpsertRes(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    logical_key: str
+    wire_sha256: str
+    status: HistoricalTurnCommitStatus
+    commit_id: str | None = None
+    storage_row_key: str | None = None
+    trace_ids: list[str] = Field(default_factory=list)
+    root_span_ids: list[str] = Field(default_factory=list)
+    span_count: int = 0
+    existing_wire_sha256: str | None = None
+
+
+class HistoricalTurnStatusReq(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1)
+    logical_key: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class HistoricalTurnStatusRes(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    logical_key: str
+    status: HistoricalTurnStoredStatus
+    wire_sha256: str | None = None
+    commit_id: str | None = None
+    storage_row_key: str | None = None
+    trace_ids: list[str] = Field(default_factory=list)
+    root_span_ids: list[str] = Field(default_factory=list)
+    span_count: int = 0
+    last_error: str | None = None
+
+
+class HistoricalTurnCapabilitiesReq(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: str = Field(min_length=1)
+
+
+class HistoricalTurnCapabilitiesRes(BaseModel):
+    """Feature and hard-limit declaration for historical turn ingest."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    supported: bool
+    capability_version: Literal["historical-turn-v1"] = "historical-turn-v1"
+    transport_encoding: Literal["canonical-json"] = "canonical-json"
+    content_encoding: Literal["identity"] = "identity"
+    preview_compression: Literal["gzip-mtime-0"] = "gzip-mtime-0"
+    schema_versions: list[str] = Field(default_factory=lambda: ["1"])
+    max_envelope_bytes: int = Field(ge=0)
+    max_spans: int = Field(ge=0)
+    max_logical_key_bytes: int = Field(ge=0)
+    atomic_turn_commit: bool
+    durable_idempotency: bool
+    status_lookup: bool
+    content_refs: Literal["unsupported"] = "unsupported"
+    recovery_lease_seconds: int = Field(ge=0)
+    reason: str = ""
