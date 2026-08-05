@@ -41,13 +41,6 @@ CREATE TABLE IF NOT EXISTS intent_records
     turn_index UInt16 DEFAULT 0,             -- position of the source turn in its conversation, numeric so ranges and ordering work
     user_id String DEFAULT '',               -- pseudonymous source subject, distinct from the writer
 
-    -- Clustering assignment for the run named by cluster_run_id. An empty
-    -- cluster_run_id means never clustered. cluster_id -1 is the HDBSCAN noise label.
-    cluster_run_id String DEFAULT '',
-    cluster_id Int32 DEFAULT -1,
-    cluster_label String DEFAULT '',         -- generated per cluster, plain String for the same reason as category
-    cluster_confidence Float32 DEFAULT 0,
-
     -- Denormalized SNAPSHOT of the source turn's start time, captured at
     -- extraction and never re-read from the source. This is the analysis clock.
     source_started_at DateTime64(6, 'UTC'),
