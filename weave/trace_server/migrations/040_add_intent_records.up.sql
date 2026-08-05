@@ -21,9 +21,14 @@ CREATE TABLE IF NOT EXISTS intent_records
     outcome LowCardinality(String) DEFAULT '',
     operation_mode LowCardinality(String) DEFAULT '',
 
+    -- Judged sentiment of the source turn. sentiment_score is an ALIAS so the
+    -- ordinal scale has one home: rescoring is a migration, not a row rewrite.
+    sentiment LowCardinality(String) DEFAULT '',
+    sentiment_confidence Float32 DEFAULT 0,
+    sentiment_score Float32 ALIAS transform(sentiment, ['frustrated', 'dissatisfied', 'neutral', 'satisfied', 'delighted'], [-1., -0.5, 0., 0.5, 1.], 0.),
+
     embedding_model LowCardinality(String),
-    embedding_dimensions UInt16 DEFAULT 1024,
-    vector Array(Float32),                   -- searched by exact cosine distance, intentionally no ANN index
+    vector Array(Float32),                   -- searched by exact cosine distance, intentionally no ANN index. length(vector) is the dimensionality
 
     judge_model LowCardinality(String) DEFAULT '',
     prompt_version LowCardinality(String) DEFAULT '',
