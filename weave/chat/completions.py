@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from contextlib import ExitStack
 from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
@@ -249,17 +250,21 @@ class Completions:
             response.raise_for_status()
 
         if request_stream:
-            # For streaming, we need to keep the client and response context
-            client = httpx.Client(timeout=timeout)
-            with client.stream(
-                "POST",
-                url,
-                auth=auth,
-                headers=headers,
-                json=data,
-            ) as response:
+            with ExitStack() as stack:
+                client = stack.enter_context(httpx.Client(timeout=timeout))
+                response = stack.enter_context(
+                    client.stream(
+                        "POST",
+                        url,
+                        auth=auth,
+                        headers=headers,
+                        json=data,
+                    )
+                )
                 check_response(response)
-                return ChatCompletionChunkStream(response)
+
+                # Transfer ownership so the returned stream controls cleanup.
+                return ChatCompletionChunkStream(response, stack.pop_all())
         else:
             with httpx.Client(timeout=timeout) as client:
                 response = client.post(
