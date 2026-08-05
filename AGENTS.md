@@ -452,6 +452,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- `SubAgent` owns its input/output messages and originating tool-call
+  arguments/result. Integrations populate them through `SubAgent.record()` so
+  `_build_attrs()` applies `include_content` and PII redaction; do not write
+  those content attributes directly with `set_attributes()`.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.
@@ -478,13 +482,26 @@ pnpm exec tsx examples/claudeAgents.ts
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
 - The OTel-selected Claude Agent SDK path composes the Python GenAI
-  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
-  OTel spans or call the low-level GenAI attribute builders itself. Use
-  `set_attributes()` only for semantic fields the typed handles do not expose.
-  The legacy calls-based path remains separate.
+  `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` handles; it must not
+  create raw OTel spans or call the low-level GenAI attribute builders itself.
+  Use `set_attributes()` only for semantic fields the typed handles do not
+  expose. The legacy calls-based path remains separate.
 - Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
   Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
   parts; media payloads remain data for `content_refs`, not chat prose.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
+  Route nested assistant messages and tools through `parent_tool_use_id`.
+  Synchronous calls close on their matching tool result; background launch
+  acknowledgements stay open until `task_notification`. Dispatch task events
+  through `SystemMessage.subtype` and `data`, map `task_id` to tool-use ID from
+  `task_started` / `task_progress`, and do not import typed task messages that
+  are absent from older supported Claude Agent SDK versions.
+- Start those subagents with `SubAgent.start(set_current=False)`, never
+  `__enter__`. Parallel delegations close in completion order, and `end()`
+  detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the
+  ambient OTel context pointing at an ended span — user code running between
+  streamed messages would nest under it. Children nest either way, because
+  `start_llm` / `start_tool` / `start_subagent` thread an explicit parent.
 - Stream adapters can create child handles when work starts, then enter them
   with a normal `with` when the completion message arrives. Preserve logical
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of

@@ -2318,6 +2318,12 @@ class TestSubAgentRecord:
             name="research-bot",
             model="gpt-4o-mini",
             system_instructions=["sys"],
+            input_messages=[Message.user("question")],
+            output_messages=[Message.assistant("answer")],
+            tool_name="Agent",
+            tool_call_id="toolu_1",
+            tool_call_arguments='{"prompt": "question"}',
+            tool_call_result="answer",
             agent_id="id-1",
             agent_description="desc",
             agent_version="v1",
@@ -2325,6 +2331,12 @@ class TestSubAgentRecord:
         assert sa.name == "research-bot"
         assert sa.model == "gpt-4o-mini"
         assert sa.system_instructions == ["sys"]
+        assert sa.input_messages == [Message.user("question")]
+        assert sa.output_messages == [Message.assistant("answer")]
+        assert sa.tool_name == "Agent"
+        assert sa.tool_call_id == "toolu_1"
+        assert sa.tool_call_arguments == '{"prompt": "question"}'
+        assert sa.tool_call_result == "answer"
         assert sa.agent_id == "id-1"
         assert sa.agent_description == "desc"
         assert sa.agent_version == "v1"
