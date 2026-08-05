@@ -37,6 +37,7 @@ import {
   DEFAULT_AUDIO_TYPE,
   DEFAULT_IMAGE_TYPE,
   type ImageType,
+  imageTypeFromFileName,
   isWeaveAudio,
   isWeaveImage,
   weaveImage,
@@ -1408,11 +1409,16 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        const [digest] = Object.values<string | undefined>(val.files ?? {});
+        const files: Record<string, string | undefined> = val.files ?? {};
+        const [fileName] = Object.keys(files);
+        const digest = files[fileName];
         if (digest == null) {
           throw new Error(`No image file stored for ref uri: ${ref.uri()}`);
         }
-        return weaveImage({data: await this.downloadFile(ref, digest)});
+        return weaveImage({
+          data: await this.downloadFile(ref, digest),
+          imageType: imageTypeFromFileName(fileName),
+        });
       } else if (typeName == 'wave.Wave_read') {
         // TODO: Implement getting audio back as buffer
         return 'Coming soon!';

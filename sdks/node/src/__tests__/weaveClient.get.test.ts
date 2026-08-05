@@ -1,4 +1,5 @@
 import {Api as TraceServerApi} from '../generated/traceServerApi';
+import {type ImageType} from '../media';
 import {WeaveClient} from '../weaveClient';
 import {ObjectRef} from '../weaveObject';
 
@@ -68,12 +69,23 @@ describe('WeaveClient.get on a published image', () => {
     ]);
   });
 
-  it('takes the stored file whatever it is named', async () => {
+  // The Python SDK stores the image under its own format's extension; an
+  // extension we do not know keeps the png default.
+  const formatCases: Array<[string, ImageType]> = [
+    ['image.jpg', 'jpeg'],
+    ['image.webp', 'webp'],
+    ['image.gif', 'png'],
+  ];
+  it.each(formatCases)('reads %s back as %s', async (fileName, imageType) => {
     const {client} = clientServingFileContent(respondWithImageBytes, {
-      'image.jpg': IMAGE_DIGEST,
+      [fileName]: IMAGE_DIGEST,
     });
 
-    expect((await client.get(REF)).data).toEqual(IMAGE_BYTES);
+    expect(await client.get(REF)).toEqual({
+      _weaveType: 'Image',
+      data: IMAGE_BYTES,
+      imageType,
+    });
   });
 
   it('rejects when the file request fails', async () => {
