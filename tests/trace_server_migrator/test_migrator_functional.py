@@ -631,8 +631,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         (
             "ReplacingMergeTree",
             "toYYYYMM(source_started_at)",
-            "project_id, pipeline_version, toDate(source_started_at), id",
-            "project_id, pipeline_version, toDate(source_started_at), id",
+            "project_id, pipeline_version, lens, toDate(source_started_at), id",
+            "project_id, pipeline_version, lens, toDate(source_started_at), id",
             "expire_at",
         )
     ]
@@ -645,7 +645,6 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert columns == [
         ("project_id", "String"),
         ("id", "String"),
-        ("intent_ordinal", "UInt16"),
         ("signature_id", "FixedString(16)"),
         ("lens", "LowCardinality(String)"),
         ("pipeline_version", "UInt32"),
@@ -661,12 +660,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("judge_model", "LowCardinality(String)"),
         ("prompt_version", "LowCardinality(String)"),
         ("pipeline_recipe_sha256", "String"),
-        ("source", "LowCardinality(String)"),
-        ("insights_type", "LowCardinality(String)"),
-        ("source_id", "String"),
         ("trace_id", "String"),
         ("span_id", "String"),
-        ("parent_span_id", "String"),
         ("conversation_id", "String"),
         ("turn_index", "UInt16"),
         ("user_id", "String"),
@@ -675,7 +670,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("provider", "LowCardinality(String)"),
         ("request_model", "LowCardinality(String)"),
         ("surface", "LowCardinality(String)"),
-        ("status_code", "LowCardinality(String)"),
+        ("status_code", "Enum8('UNSET' = 0, 'OK' = 1, 'ERROR' = 2)"),
         ("turn_duration_ms", "UInt32"),
         ("turn_cost_usd", "Float64"),
         ("turn_summary", "String"),
@@ -683,8 +678,15 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("intent_extracted_at", "DateTime64(6, 'UTC')"),
         ("inserted_at", "DateTime64(3, 'UTC')"),
         ("expire_at", "DateTime"),
-        ("attributes", "Map(String, String)"),
     ]
+
+    # 'und' is the DEFAULT as well as the indeterminate sentinel, so an omitted
+    # language has one unknown value rather than two.
+    assert ch_client.query(
+        "SELECT default_expression FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "AND name = 'language'"
+    ).result_rows == [("'und'",)]
 
     indexes = ch_client.query(
         "SELECT name, expr, type_full, granularity "
@@ -700,34 +702,30 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ]
 
     insert_columns = """
-        project_id, id, intent_ordinal, signature_id, lens, pipeline_version,
+        project_id, id, signature_id, lens, pipeline_version,
         record_version, category, signature, language,
         sentiment, sentiment_confidence,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
-        source, insights_type, source_id, trace_id, span_id, parent_span_id,
-        conversation_id, turn_index, user_id,
+        trace_id, span_id, conversation_id, turn_index, user_id,
         agent_name, agent_version, provider, request_model, surface, status_code,
         turn_duration_ms, turn_cost_usd, turn_summary,
-        source_started_at, intent_extracted_at,
-        attributes
+        source_started_at, intent_extracted_at
     """
     # source_started_at is deliberately a month before intent_extracted_at: the
     # partition must follow source time, which is what a backfill depends on.
     row_template = """
         SELECT
-            'project-1', 'intent-1', 0, unhex('00112233445566778899aabbccddeeff'),
+            'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
             'intent', {pipeline_version}, {record_version}, '{category}',
             'Add Stripe checkout', 'es',
             'frustrated', toFloat32(0.75),
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
             'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
-            'weave', 'turn', 'source-1', 'trace-1', 'span-1', 'parent-1',
-            'conversation-1', 7, 'user-1',
-            'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', '200',
+            'trace-1', 'span-1', 'conversation-1', 7, 'user-1',
+            'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', 'OK',
             4200, toFloat64(0.0123), 'Wired up a Stripe checkout endpoint.',
             toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
-            toDateTime64('2026-06-20 14:32:00', 6, 'UTC'),
-            map('environment', 'test')
+            toDateTime64('2026-06-20 14:32:00', 6, 'UTC')
     """
     for pipeline_version, record_version, category in [
         (1, 1, "action_request"),
@@ -746,30 +744,14 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     # Highest record_version wins within a pipeline_version, and each
     # pipeline_version is retained as its own row.
     current_rows = ch_client.query(
-        "SELECT pipeline_version, record_version, category, insights_type, "
-        "formatDateTime(expire_at, '%F %T'), length(vector), attributes "
+        "SELECT pipeline_version, record_version, category, "
+        "formatDateTime(expire_at, '%F %T'), length(vector) "
         f"FROM {target_db}.intent_records FINAL "
         "WHERE project_id = 'project-1' ORDER BY pipeline_version"
     ).result_rows
     assert current_rows == [
-        (
-            1,
-            2,
-            "payments",
-            "turn",
-            "2100-01-01 00:00:00",
-            1024,
-            {"environment": "test"},
-        ),
-        (
-            2,
-            1,
-            "action_request",
-            "turn",
-            "2100-01-01 00:00:00",
-            1024,
-            {"environment": "test"},
-        ),
+        (1, 2, "payments", "2100-01-01 00:00:00", 1024),
+        (2, 1, "action_request", "2100-01-01 00:00:00", 1024),
     ]
 
     # The promoted columns round-trip as typed values rather than Map strings.
@@ -800,7 +782,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             "anthropic",
             "claude-sonnet-5",
             "cli",
-            "200",
+            "OK",
             4200,
             0.0123,
             "Wired up a Stripe checkout endpoint.",
