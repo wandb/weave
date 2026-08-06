@@ -7,8 +7,13 @@ CREATE TABLE IF NOT EXISTS intent_records
     project_id String,
     id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
     intent_ordinal UInt16 DEFAULT 0,         -- position among intents extracted from a single turn, folded into the id hash
-    signature_id FixedString(16),            -- 128-bit hash of the canonicalized signature, groups every occurrence of the same intent
-    lens LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id hash so it stays out of ORDER BY
+    -- 128-bit hash of the canonicalized signature AND the lens, so it groups
+    -- every occurrence of the same intent while keeping the two lenses distinct.
+    -- The same text as an intent and as a failure are different objects, and a
+    -- shared id would let one lens inflate the other's counts. Downstream
+    -- cluster tables rely on this to key on signature_id with no lens column.
+    signature_id FixedString(16),
+    lens LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id and signature_id hashes so it stays out of ORDER BY
     pipeline_version UInt32,                 -- recipe id, in ORDER BY so versions coexist during re-embed/backfill
     record_version UInt64,                   -- ReplacingMergeTree version, highest for a key wins
 
@@ -76,6 +81,11 @@ ENGINE = ReplacingMergeTree(record_version)
 -- reads follow user activity. A backfill spanning >100 months needs a raised
 -- max_partitions_per_insert_block.
 PARTITION BY toYYYYMM(source_started_at)
-ORDER BY (project_id, pipeline_version, id)
+-- toDate(source_started_at) precedes id so a sub-month read prunes granules.
+-- Without it, source time lives only in the partition key and any window
+-- narrower than a month still scans the whole month. Day granularity, not the
+-- raw timestamp, keeps the dedup identity coarse: same-day drift in the
+-- denormalized snapshot still collapses, which a microsecond key would not.
+ORDER BY (project_id, pipeline_version, toDate(source_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
