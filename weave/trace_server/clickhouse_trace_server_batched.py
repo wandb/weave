@@ -84,6 +84,12 @@ from weave.trace_server.agents.types import (
     AgentVersionsQueryRes,
     GenAIOTelExportReq,
     GenAIOTelExportRes,
+    HistoricalTurnCapabilitiesReq,
+    HistoricalTurnCapabilitiesRes,
+    HistoricalTurnStatusReq,
+    HistoricalTurnStatusRes,
+    HistoricalTurnUpsertReq,
+    HistoricalTurnUpsertRes,
 )
 from weave.trace_server.base64_content_conversion import (
     PendingContentObjs,
@@ -215,6 +221,10 @@ from weave.trace_server.file_storage import (
     store_in_bucket,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
+from weave.trace_server.historical_turns import (
+    HistoricalTurnUnsupportedError,
+    unsupported_historical_turn_capabilities,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.interface import query as tsi_query
@@ -7400,6 +7410,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
 
         return res
+
+    def historical_turn_capabilities(
+        self, req: HistoricalTurnCapabilitiesReq
+    ) -> HistoricalTurnCapabilitiesRes:
+        return unsupported_historical_turn_capabilities(
+            "No durable historical-turn commit store is configured for ClickHouse."
+        )
+
+    def historical_turn_upsert(
+        self, req: HistoricalTurnUpsertReq
+    ) -> HistoricalTurnUpsertRes:
+        raise HistoricalTurnUnsupportedError(
+            "Historical turn upsert requires a durable commit store and atomic span "
+            "writer; query-before-insert ClickHouse fallback is intentionally disabled."
+        )
+
+    def historical_turn_status(
+        self, req: HistoricalTurnStatusReq
+    ) -> HistoricalTurnStatusRes:
+        raise HistoricalTurnUnsupportedError(
+            "Historical turn status requires a durable commit store."
+        )
 
     def export_start(self, req: tsi.ExportStartReq) -> tsi.ExportStartRes:
         calls_read_table = ReadTable.CALLS_COMPLETE

@@ -81,6 +81,19 @@ from weave.conversation.conversation import (
     start_tool,
     start_turn,
 )
+from weave.conversation.historical_turn import (
+    HistoricalTurnCapabilities,
+    HistoricalTurnCapabilityMismatchError,
+    HistoricalTurnPayloadTooLargeError,
+    HistoricalTurnStatus,
+    HistoricalTurnUpsertResult,
+    HistoricalTurnValidationError,
+    PreparedTurn,
+    get_turn_capabilities,
+    get_turn_status,
+    prepare_turn,
+    upsert_turn,
+)
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
@@ -119,6 +132,12 @@ __all__ = [
     "Evaluation",
     "EvaluationLogger",
     "File",
+    "HistoricalTurnCapabilities",
+    "HistoricalTurnCapabilityMismatchError",
+    "HistoricalTurnPayloadTooLargeError",
+    "HistoricalTurnStatus",
+    "HistoricalTurnUpsertResult",
+    "HistoricalTurnValidationError",
     "LogResult",
     "Markdown",
     "MediaAttachment",
@@ -128,6 +147,7 @@ __all__ = [
     "Monitor",
     "Object",
     "ObjectRef",
+    "PreparedTurn",
     "Prompt",
     "SavedView",
     "Scorer",
@@ -157,6 +177,8 @@ __all__ = [
     "get_current_turn",
     "get_tags",
     "get_tags_and_aliases",
+    "get_turn_capabilities",
+    "get_turn_status",
     "init",
     "link_prompt_to_registry",
     "list_aliases",
@@ -167,6 +189,7 @@ __all__ = [
     "log_turn",
     "op",
     "otel_traces_endpoint",
+    "prepare_turn",
     "publish",
     "ref",
     "remove_aliases",
@@ -181,5 +204,6 @@ __all__ = [
     "start_tool",
     "start_turn",
     "thread",
+    "upsert_turn",
     "weave_client_context",
 ]

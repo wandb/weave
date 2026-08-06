@@ -7,6 +7,10 @@ from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.async_clickhouse_trace_server import AsyncClickHouseTraceServer
+from weave.trace_server.historical_turns import (
+    HistoricalTurnUnsupportedError,
+    unsupported_historical_turn_capabilities,
+)
 from weave.trace_server.trace_server_converter import (
     replace_external_weave_ref,
     universal_ext_to_int_ref_converter,
@@ -1473,6 +1477,29 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         # protobuf span attributes here. See `_rewrite_processed_spans_refs_inplace`.
         self._rewrite_processed_spans_refs_inplace(req.processed_spans, req.project_id)
         return self._internal_trace_server.genai_otel_export(req)
+
+    def historical_turn_upsert(
+        self, req: tsi.agent_types.HistoricalTurnUpsertReq
+    ) -> tsi.agent_types.HistoricalTurnUpsertRes:
+        raise HistoricalTurnUnsupportedError(
+            "Hosted historical-turn upsert requires a trusted route-level project "
+            "ownership and user-identity adapter; body-supplied identity is refused."
+        )
+
+    def historical_turn_status(
+        self, req: tsi.agent_types.HistoricalTurnStatusReq
+    ) -> tsi.agent_types.HistoricalTurnStatusRes:
+        raise HistoricalTurnUnsupportedError(
+            "Hosted historical-turn status requires a trusted route-level project "
+            "ownership adapter."
+        )
+
+    def historical_turn_capabilities(
+        self, req: tsi.agent_types.HistoricalTurnCapabilitiesReq
+    ) -> tsi.agent_types.HistoricalTurnCapabilitiesRes:
+        return unsupported_historical_turn_capabilities(
+            "Trusted hosted project/auth routing is not implemented in this repository."
+        )
 
     def agent_spans_query(
         self, req: tsi.agent_types.AgentSpansQueryReq
