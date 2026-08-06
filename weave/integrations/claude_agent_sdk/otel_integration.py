@@ -737,6 +737,7 @@ async def _trace_async_iterable_query(
         attributes=_INTEGRATION_OTEL_ATTRS,
     ) as conversation:
         message_iterator = aiter(messages)
+        deferred_messages: list[Any] = []
         while True:
             try:
                 next_message = await anext(message_iterator)
@@ -747,12 +748,28 @@ async def _trace_async_iterable_query(
                     raise
                 turn = _start_tracked_turn(conversation, inputs.take())
                 with turn:
-                    raise
+                    state = _TurnState(conversation=conversation, turn=turn)
+                    try:
+                        for msg in deferred_messages:
+                            _process_message_for_turn(msg, state)
+                        raise
+                    finally:
+                        _finalize_turn(state)
+
+            # Input tracking happens before the SDK writes each prompt, but
+            # bootstrap output can arrive before the first prompt is consumed.
+            if not inputs.has_pending_turn():
+                deferred_messages.append(next_message)
+                yield next_message
+                continue
 
             turn = _start_tracked_turn(conversation, inputs.take())
             with turn:
                 state = _TurnState(conversation=conversation, turn=turn)
                 try:
+                    for msg in deferred_messages:
+                        _process_message_for_turn(msg, state)
+                    deferred_messages.clear()
                     while True:
                         msg = next_message
                         _process_message_for_turn(msg, state)
