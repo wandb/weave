@@ -622,16 +622,16 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_result') {
         continue;
       }
-      const resultText = toolResultText(block.content);
       const openSubagent = this.openSubagents.get(block.tool_use_id);
       if (openSubagent) {
-        this.processSubagentResult(openSubagent, block, resultText, msg);
+        this.processSubagentResult(openSubagent, block, msg);
         continue;
       }
       const openTool = this.openTools.get(block.tool_use_id);
       if (!openTool) {
         continue;
       }
+      const resultText = toolResultText(block.content);
       this.openTools.delete(block.tool_use_id);
       const tool = openTool.tool;
       tool.result = resultText;
@@ -647,7 +647,6 @@ export class ClaudeAgentOtelTracer {
   private processSubagentResult(
     openSubagent: OpenSubagent,
     block: ToolResultBlock,
-    resultText: string,
     msg: SDKUserMessage | SDKUserMessageReplay
   ): void {
     const {acknowledgesLaunch, identity, outputText} = subagentResult(
@@ -667,9 +666,11 @@ export class ClaudeAgentOtelTracer {
       return;
     }
 
-    const terminalOutputText = block.is_error
-      ? resultText
-      : (outputText ?? resultText);
+    let terminalOutputText = outputText;
+    if (block.is_error || terminalOutputText === undefined) {
+      const fallbackText = toolResultText(block.content);
+      terminalOutputText = fallbackText;
+    }
     openSubagent.span.record({
       outputMessages: terminalOutputText
         ? [{role: 'assistant', content: terminalOutputText}]
