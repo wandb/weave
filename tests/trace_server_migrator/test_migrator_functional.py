@@ -631,8 +631,8 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         (
             "ReplacingMergeTree",
             "toYYYYMM(source_started_at)",
-            "project_id, pipeline_version, id",
-            "project_id, pipeline_version, id",
+            "project_id, pipeline_version, toDate(source_started_at), id",
+            "project_id, pipeline_version, toDate(source_started_at), id",
             "expire_at",
         )
     ]
