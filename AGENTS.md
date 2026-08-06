@@ -116,6 +116,12 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
+Insights reports are immutable, project-scoped snapshots. The frontend owns
+section presentation order; do not persist or expose `section_order` in the
+report read contract. The storage interface methods require matching
+authenticated HTTP routes in `services/weave-trace`, Remote HTTP bindings,
+and frontend client types before a browser client can read them.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines

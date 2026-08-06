@@ -1338,6 +1338,52 @@ class FeedbackQueryRes(BaseModel):
     total_count: int = Field(ge=0)
 
 
+class InsightsReportsQueryReq(BaseModelStrict):
+    """List immutable report snapshots visible to one project."""
+
+    project_id: str = Field(examples=["entity/project"])
+    period_days: int | None = Field(default=None, ge=1, le=2**16 - 1)
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class InsightsReportReadReq(BaseModelStrict):
+    """Read every current section belonging to one immutable report snapshot."""
+
+    project_id: str = Field(examples=["entity/project"])
+    report_id: str
+
+
+class InsightsReportSection(BaseModel):
+    section_id: str
+    section_type: str
+    title: str
+    subtitle: str
+    description: str
+    section_schema_version: int
+    section_json: dict[str, Any]
+
+
+class InsightsReportGroup(BaseModel):
+    """Sections from one reporting period, independent of report_id."""
+
+    period_days: int
+    period_end: datetime.datetime
+    created_at: datetime.datetime
+    sections: list[InsightsReportSection]
+
+
+class InsightsReportsQueryRes(BaseModel):
+    reports: list[InsightsReportGroup]
+
+
+class InsightsReportReadRes(BaseModel):
+    report_id: str
+    period_days: int
+    period_end: datetime.datetime
+    created_at: datetime.datetime
+    sections: list[InsightsReportSection]
+
+
 class FeedbackPurgeReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     query: Query
@@ -3648,6 +3694,12 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def insights_reports_query(
+        self, req: InsightsReportsQueryReq
+    ) -> InsightsReportsQueryRes: ...
+    def insights_report_read(
+        self, req: InsightsReportReadReq
+    ) -> InsightsReportReadRes: ...
     def call_stats(self, req: "CallStatsReq") -> "CallStatsRes": ...
     def trace_usage(self, req: "TraceUsageReq") -> "TraceUsageRes": ...
     def calls_usage(self, req: "CallsUsageReq") -> "CallsUsageRes": ...

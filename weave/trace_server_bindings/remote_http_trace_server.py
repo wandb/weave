@@ -1046,6 +1046,28 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     @validate_call
+    def insights_reports_query(
+        self, req: tsi.InsightsReportsQueryReq
+    ) -> tsi.InsightsReportsQueryRes:
+        return self._generic_request(
+            "/insights/reports/query",
+            req,
+            tsi.InsightsReportsQueryReq,
+            tsi.InsightsReportsQueryRes,
+        )
+
+    @validate_call
+    def insights_report_read(
+        self, req: tsi.InsightsReportReadReq
+    ) -> tsi.InsightsReportReadRes:
+        return self._generic_request(
+            "/insights/reports/read",
+            req,
+            tsi.InsightsReportReadReq,
+            tsi.InsightsReportReadRes,
+        )
+
+    @validate_call
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         return self._generic_request(
             "/feedback/purge", req, tsi.FeedbackPurgeReq, tsi.FeedbackPurgeRes

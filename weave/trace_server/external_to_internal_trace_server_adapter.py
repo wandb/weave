@@ -515,6 +515,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.calls_query_stats, req, req.project_id
         )
 
+    def insights_reports_query(
+        self, req: tsi.InsightsReportsQueryReq
+    ) -> tsi.InsightsReportsQueryRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.insights_reports_query, req, req.project_id
+        )
+
+    def insights_report_read(
+        self, req: tsi.InsightsReportReadReq
+    ) -> tsi.InsightsReportReadRes:
+        req = req.model_copy(deep=True)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.insights_report_read, req, req.project_id
+        )
+
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         req = req.model_copy(deep=True)
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
