@@ -5,6 +5,8 @@ import {
   type TimeInput,
 } from '@opentelemetry/api';
 
+import {ATTR_WEAVE_DISPLAY_NAME} from './semconv';
+
 /**
  * Init fields shared by every emitter's `create()` factory.
  *
@@ -15,6 +17,14 @@ import {
  */
 export interface SpanInitBase {
   startTime?: TimeInput;
+  /** User-facing label shown for the span in Weave. */
+  displayName?: string;
+}
+
+export function spanInitAttributes(opts: SpanInitBase): Attributes {
+  return opts.displayName === undefined
+    ? {}
+    : {[ATTR_WEAVE_DISPLAY_NAME]: opts.displayName};
 }
 
 /**
@@ -63,6 +73,12 @@ export abstract class SpanBase {
   setAttributes(attributes: Attributes): this {
     if (this._warnIfEnded('setAttributes')) return this;
     this.span.setAttributes(attributes);
+    return this;
+  }
+
+  setDisplayName(displayName: string): this {
+    if (this._warnIfEnded('setDisplayName')) return this;
+    this.span.setAttribute(ATTR_WEAVE_DISPLAY_NAME, displayName);
     return this;
   }
 

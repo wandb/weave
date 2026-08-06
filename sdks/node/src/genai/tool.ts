@@ -2,7 +2,12 @@ import {type Attributes, type Span, SpanKind} from '@opentelemetry/api';
 
 import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanInitAttributes,
+} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -58,6 +63,7 @@ export class Tool extends SpanBase {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
     const attributes: Attributes = {
       ...(opts.attributes ?? {}),
+      ...spanInitAttributes(opts),
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
       [ATTR_GEN_AI_TOOL_NAME]: opts.name,
     };

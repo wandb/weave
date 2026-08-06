@@ -19,6 +19,7 @@ describe('SubAgent', () => {
     const subagent = turn.startSubagent({
       name: 'child-bot',
       model: 'gpt-4o',
+      displayName: 'Research assistant',
       systemInstructions: ['Be helpful', 'Be concise'],
     });
     subagent.end();
@@ -47,6 +48,7 @@ describe('SubAgent', () => {
           "gen_ai.operation.name": "invoke_agent",
           "gen_ai.request.model": "gpt-4o",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+          "weave.display_name": "Research assistant",
         },
         "endTime": "<timestamp>",
         "startTime": "<timestamp>",

@@ -28,6 +28,7 @@ describe('LLM (via Turn.startLLM)', () => {
     const llm = turn.startLLM({
       model: 'gpt-4o',
       providerName: 'openai',
+      displayName: 'Weather response',
       systemInstructions: ['Be helpful', 'Be concise'],
     });
     llm.end();
@@ -49,6 +50,7 @@ describe('LLM (via Turn.startLLM)', () => {
           "gen_ai.provider.name": "openai",
           "gen_ai.request.model": "gpt-4o",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"},{"type":"text","content":"Be concise"}]",
+          "weave.display_name": "Weather response",
         },
         "endTime": "<timestamp>",
         "startTime": "<timestamp>",

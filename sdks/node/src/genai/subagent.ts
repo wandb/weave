@@ -9,7 +9,12 @@ import {
 import type {ChildSpanContext} from './common';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanInitAttributes,
+} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_ID,
@@ -76,7 +81,7 @@ type Opts = {
   context: Context;
   conversationId: string;
   attributes: Attributes;
-} & Required<Omit<SubAgentInit, 'startTime'>>;
+} & Required<Omit<SubAgentInit, 'displayName' | 'startTime'>>;
 
 export class SubAgent extends SpanBase {
   private _context: Context;
@@ -112,7 +117,10 @@ export class SubAgent extends SpanBase {
 
   static create(opts: SubAgentInit & ChildSpanContext): SubAgent {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(opts.attributes ?? {})};
+    const attributes: Attributes = {
+      ...(opts.attributes ?? {}),
+      ...spanInitAttributes(opts),
+    };
     const span = tracer.startSpan(
       'invoke_agent',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},

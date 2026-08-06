@@ -11,7 +11,12 @@ import {
 import {getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+  spanInitAttributes,
+} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_ID,
@@ -50,7 +55,7 @@ type Opts = {
   messages: Message[];
   span: Span;
   context: Context;
-} & Required<Omit<TurnInit, 'userMessage' | 'startTime'>>;
+} & Required<Omit<TurnInit, 'displayName' | 'userMessage' | 'startTime'>>;
 
 /**
  * An agent invocation. Typically wraps the work to respond to a single
@@ -138,7 +143,10 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(opts.attributes ?? {})};
+    const attributes: Attributes = {
+      ...(opts.attributes ?? {}),
+      ...spanInitAttributes(opts),
+    };
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];

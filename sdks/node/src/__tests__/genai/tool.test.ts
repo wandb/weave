@@ -7,6 +7,7 @@ import {
   ATTR_GEN_AI_TOOL_CALL_ID,
   ATTR_GEN_AI_TOOL_CALL_RESULT,
   ATTR_GEN_AI_TOOL_NAME,
+  ATTR_WEAVE_DISPLAY_NAME,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
@@ -27,6 +28,7 @@ describe('Tool', () => {
       name: 'get_weather',
       args: '{"city":"Tokyo"}',
       toolCallId: 'tc-1',
+      displayName: 'Weather lookup',
     });
     tool.result = '75F';
     tool.end();
@@ -46,6 +48,7 @@ describe('Tool', () => {
       '{"city":"Tokyo"}'
     );
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe('75F');
+    expect(toolSpan.attributes[ATTR_WEAVE_DISPLAY_NAME]).toBe('Weather lookup');
     expect(toolSpan.attributes[ATTR_GEN_AI_CONVERSATION_ID]).toBe('conv-1');
     expect(toolSpan.parentSpanId).toBe(turnSpan.spanContext().spanId);
   });
@@ -84,6 +87,23 @@ describe('Tool', () => {
     expect(toolSpan.attributes['after.end']).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Tool.setAttributes() called after end()')
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('setDisplayName updates the display name; warns + no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    const tool = turn.startTool({name: 'get_weather'});
+    expect(tool.setDisplayName('Weather lookup')).toBe(tool);
+    tool.end();
+    tool.setDisplayName('after end');
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes[ATTR_WEAVE_DISPLAY_NAME]).toBe('Weather lookup');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Tool.setDisplayName() called after end()')
     );
     warnSpy.mockRestore();
   });

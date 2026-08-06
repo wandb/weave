@@ -92,6 +92,8 @@ export const ATTR_GEN_AI_USAGE_TOTAL_TOKENS = 'gen_ai.usage.total_tokens';
  *  (e.g. on `gen_ai.system.message`). */
 export const ATTR_GEN_AI_EVENT_CONTENT = 'gen_ai.event.content';
 
+export const ATTR_WEAVE_DISPLAY_NAME = 'weave.display_name';
+
 // Unlike gen_ai.agent.name, conversation-scoped integration identity is fixed and inherited by every span.
 export const WEAVE_INTEGRATION_META_PREFIX = 'weave.integration.meta';
 export const WEAVE_INTEGRATION_NAME = 'weave.integration.name';
