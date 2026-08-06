@@ -18,7 +18,10 @@ import {
   setupExporterPerTest,
   setupGenAITestEnvironment,
 } from '../genai/common';
-import type {NonNullableUsage} from '@anthropic-ai/claude-agent-sdk';
+import type {
+  NonNullableUsage,
+  SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 
 const INVOKE = 'invoke_agent';
 
@@ -292,6 +295,100 @@ describe('Claude Agent SDK — query() patch', () => {
     expect(
       JSON.parse(root.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
     ).toEqual([{role: 'user', content: 'sent later'}]);
+  });
+
+  test('records a streamed base64 image prompt and groups resumed queries as separate turns', async () => {
+    const imageBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    const imageInput: SDKUserMessage = {
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: imageBase64,
+            },
+          },
+          {type: 'text', text: 'Describe this image.'},
+        ],
+      },
+    };
+    const consumedInputs: SDKUserMessage[] = [];
+    const sdk = {
+      query: (args: any) => {
+        async function* gen() {
+          if (typeof args.prompt !== 'string') {
+            for await (const message of args.prompt) {
+              consumedInputs.push(message);
+            }
+          }
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: 'sess-image',
+            is_error: false,
+            result: 'done',
+            total_cost_usd: 0,
+            num_turns: 1,
+            modelUsage: {},
+          };
+        }
+        return gen() as any;
+      },
+    };
+    patchClaudeAgentSdk(sdk);
+
+    async function* imagePrompt(): AsyncGenerator<SDKUserMessage> {
+      yield imageInput;
+    }
+
+    for await (const _message of sdk.query({prompt: imagePrompt()})) {
+      void _message;
+    }
+    for await (const _message of sdk.query({
+      prompt: 'Now summarize the image.',
+      options: {resume: 'sess-image'},
+    })) {
+      void _message;
+    }
+
+    expect(consumedInputs).toEqual([imageInput]);
+    expect(consumedInputs[0]).toBe(imageInput);
+
+    const turns = getExporter()
+      .getFinishedSpans()
+      .filter(span => span.name === INVOKE);
+    expect(turns).toHaveLength(2);
+    expect(
+      JSON.parse(turns[0].attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([
+      {
+        role: 'user',
+        parts: [
+          {
+            type: 'blob',
+            content: imageBase64,
+            mimeType: 'image/png',
+            modality: 'image',
+          },
+          {type: 'text', content: 'Describe this image.'},
+        ],
+      },
+    ]);
+    expect(
+      JSON.parse(turns[1].attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string)
+    ).toEqual([{role: 'user', content: 'Now summarize the image.'}]);
+    expect(
+      turns.map(turn => turn.attributes[ATTR_GEN_AI_CONVERSATION_ID])
+    ).toEqual(['sess-image', 'sess-image']);
+    expect(turns[0].spanContext().traceId).not.toBe(
+      turns[1].spanContext().traceId
+    );
   });
 
   test('forwards Query interface methods (e.g. interrupt) to the underlying query', async () => {

@@ -1,7 +1,7 @@
 export const DEFAULT_IMAGE_TYPE = 'png';
 export const DEFAULT_AUDIO_TYPE = 'wav';
 
-export type ImageType = 'png';
+export type ImageType = 'png' | 'jpeg' | 'webp';
 export type AudioType = 'wav';
 
 // Define WeaveImage type
@@ -19,7 +19,8 @@ export interface WeaveImage extends WeaveImageInput {
  *
  * @param options The options for this media type
  *    - data: The raw image data as a Buffer
- *    - imageType: (Optional) The type of image file, currently only 'png' is supported
+ *    - imageType: (Optional) The image format: 'png' (default), 'jpeg' or 'webp'.
+ *      Publishing always names the stored file image.png
  *
  * @example
  * const imageBuffer = fs.readFileSync('path/to/image.png');
@@ -32,6 +33,25 @@ export function weaveImage({data, imageType}: WeaveImageInput): WeaveImage {
     data,
     imageType: resolvedImageType,
   };
+}
+
+// Mirrors ext_to_pil_format in weave/type_handlers/Image/image.py; the label is
+// MIME spelling, so a stored `jpg` reads back as `jpeg`.
+const IMAGE_TYPE_BY_EXTENSION = new Map<string, ImageType>([
+  ['png', 'png'],
+  ['jpg', 'jpeg'],
+  ['webp', 'webp'],
+]);
+
+/**
+ * Read the image format off a stored file name, e.g. `image.jpg` -> `jpeg`.
+ * Returns undefined for an extension we do not know, so the caller keeps the
+ * default format.
+ */
+export function imageTypeFromFileName(fileName: string): ImageType | undefined {
+  return IMAGE_TYPE_BY_EXTENSION.get(
+    fileName.slice(fileName.lastIndexOf('.') + 1)
+  );
 }
 
 // Function to check if a value is a WeaveImage

@@ -4,6 +4,26 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.5] - 2026-07-30
+
+### Security
+
+- Call inputs now record a type marker for instances of classes the SDK does not own, instead of expanding them field by field. This keeps provider SDK internals, including client configuration, out of traced calls. Upgrading is recommended if you trace OpenAI or Anthropic calls, or use `op()` on a class that holds a provider client. ([#7652](https://github.com/wandb/weave/pull/7652))
+
+
+## [0.16.4] - 2026-07-27
+
+### Added
+
+- Record a terminal agent result with `Turn.record({outputMessages: [...]})`, stored separately from input messages. ([#7624](https://github.com/wandb/weave/pull/7624))
+
+### Changed
+
+- Default the JS client to the `calls_complete` ingest path. ([#7386](https://github.com/wandb/weave/pull/7386))
+- Emit canonical `weave.integration.name` and `weave.integration.version` attributes on OTel integrations. ([#7627](https://github.com/wandb/weave/pull/7627))
+- Label serverless inference traces by model. ([#7613](https://github.com/wandb/weave/pull/7613))
+
+
 ## [0.16.3] - 2026-07-15
 
 ### Added

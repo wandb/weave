@@ -344,6 +344,19 @@ deterministic.
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript media round trip
+
+- `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
+  `WeaveAudio` from a `wave.Wave_read` one, downloading the stored file from
+  `ref.projectId`, not the client's project.
+- `wave.Wave_read` is what this SDK writes, and what Python wrote until May
+  2025. Both store one `audio.wav` and no metadata file.
+- Python now records every `Audio` and `wave.Wave_read` object as
+  `weave.type_handlers.Audio.audio.Audio` with an extra `_metadata.json`,
+  because `register()` in `weave/type_handlers/Audio/audio.py` puts the `Audio`
+  serializer first and its `is_audio_instance` predicate also accepts
+  `wave.Wave_read`.
+
 ### TypeScript GenAI Turn output
 
 - The existing `Turn.record({messages: [...]})` path records input messages;
@@ -399,6 +412,17 @@ deterministic.
   `Turn` for each matching SDK `result`.
 - Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
   and preserve the caller's `forwardSubagentText` option.
+
+### Claude Agent SDK streamed images
+
+- Tap `AsyncIterable<SDKUserMessage>` prompts without consuming or cloning
+  them; map text and base64/URL images to GenAI text, blob, and URI parts.
+- Each user-to-result cycle is one root turn. Resumed queries share
+  `session_id`, and long-lived streamed inputs queue turns in FIFO order.
+- Treat `blob.content` as media/ref data exposed through `content_refs`, not
+  prose.
+- Run the example from `sdks/node`, use repository-relative fixtures, keep text
+  and image sessions separate, and set both `tools` and `allowedTools`.
 
 ## Code Review & PR Guidelines
 
@@ -479,6 +503,10 @@ deterministic.
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- `SubAgent` owns its input/output messages and originating tool-call
+  arguments/result. Integrations populate them through `SubAgent.record()` so
+  `_build_attrs()` applies `include_content` and PII redaction; do not write
+  those content attributes directly with `set_attributes()`.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.
@@ -489,6 +517,17 @@ deterministic.
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+- The Python Claude Agent SDK integration taps async prompt iterables, queues
+  user inputs in FIFO order, and closes one `Turn` for each `ResultMessage`.
+- Keep its output adapters split by SDK contract: string `query()` and each
+  `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
+  only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Name the corresponding test cases "string prompt" and "async-iterable
+  prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
+  one-input success and pre/post-result failure assertions paired across them.
+- SDK output can fail before the first message or between completed turns. Keep
+  the submitted/pending input observable by ending its `Turn` through the
+  exception path so the span records the error before the exception propagates.
 
 ### Claude Agent SDK token accounting
 
@@ -505,13 +544,26 @@ deterministic.
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
 - The OTel-selected Claude Agent SDK path composes the Python GenAI
-  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
-  OTel spans or call the low-level GenAI attribute builders itself. Use
-  `set_attributes()` only for semantic fields the typed handles do not expose.
-  The legacy calls-based path remains separate.
+  `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` handles; it must not
+  create raw OTel spans or call the low-level GenAI attribute builders itself.
+  Use `set_attributes()` only for semantic fields the typed handles do not
+  expose. The legacy calls-based path remains separate.
 - Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
   Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
   parts; media payloads remain data for `content_refs`, not chat prose.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
+  Route nested assistant messages and tools through `parent_tool_use_id`.
+  Synchronous calls close on their matching tool result; background launch
+  acknowledgements stay open until `task_notification`. Dispatch task events
+  through `SystemMessage.subtype` and `data`, map `task_id` to tool-use ID from
+  `task_started` / `task_progress`, and do not import typed task messages that
+  are absent from older supported Claude Agent SDK versions.
+- Start those subagents with `SubAgent.start(set_current=False)`, never
+  `__enter__`. Parallel delegations close in completion order, and `end()`
+  detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the
+  ambient OTel context pointing at an ended span — user code running between
+  streamed messages would nest under it. Children nest either way, because
+  `start_llm` / `start_tool` / `start_subagent` thread an explicit parent.
 - Stream adapters can create child handles when work starts, then enter them
   with a normal `with` when the completion message arrives. Preserve logical
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
