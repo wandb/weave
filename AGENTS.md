@@ -339,6 +339,19 @@ pnpm exec tsx examples/claudeAgents.ts
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript media round trip
+
+- `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
+  `WeaveAudio` from a `wave.Wave_read` one, downloading the stored file from
+  `ref.projectId`, not the client's project.
+- `wave.Wave_read` is what this SDK writes, and what Python wrote until May
+  2025. Both store one `audio.wav` and no metadata file.
+- Python now records every `Audio` and `wave.Wave_read` object as
+  `weave.type_handlers.Audio.audio.Audio` with an extra `_metadata.json`,
+  because `register()` in `weave/type_handlers/Audio/audio.py` puts the `Audio`
+  serializer first and its `is_audio_instance` predicate also accepts
+  `wave.Wave_read`.
+
 ### TypeScript GenAI Turn output
 
 - The existing `Turn.record({messages: [...]})` path records input messages;
