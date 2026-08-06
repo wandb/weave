@@ -1428,6 +1428,8 @@ export class WeaveClient {
           throw new Error(`No audio file stored for ref uri: ${ref.uri()}`);
         }
         return weaveAudio({data: await this.downloadFile(ref, digest)});
+      } else if (typeName == 'datetime.datetime') {
+        return new Date(val.val);
       }
     }
     return val;
