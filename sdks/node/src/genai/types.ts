@@ -8,7 +8,6 @@ export type JsonValue =
   | boolean
   | number
   | string
-  | JsonValue[]
   | readonly JsonValue[]
   | JsonObject;
 
