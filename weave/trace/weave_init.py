@@ -148,6 +148,7 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
+        from weave.trace.otel_op_linker import OpLinkSpanProcessor
     except ImportError as e:
         logger.warning(
             "Conversation SDK tracing skipped: opentelemetry not available (%s)", e
@@ -213,6 +214,8 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
     # metadata (call ID, project, evaluation name) onto spans for
     # deep-linking in the agent traces UI.
     provider.add_span_processor(EvalLinkSpanProcessor())
+    # Link spans back to the @weave.op call that was running when they started.
+    provider.add_span_processor(OpLinkSpanProcessor())
     trace.set_tracer_provider(provider)
     # No-op if another provider won the set-once race after our check above;
     # only record ownership if ours took, else we leak/mis-route on re-init.

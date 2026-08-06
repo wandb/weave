@@ -327,6 +327,103 @@ def test_eval_spans_filter_by_kind_and_predict_and_score_call(ch_server):
     assert by_pas.spans[0].eval_kind == "agent"
 
 
+def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
+    """The promoted op-linkage columns answer "which spans did this call
+    produce" through the existing spans query.
+
+    Asserts on the returned rows, not just the count: an unregistered field
+    name compiles into a custom-attribute read and returns zero rows without
+    erroring, and a column missing from the list projection comes back null.
+    """
+    project_id = _make_project_id("parent_call")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            agent_name="from-call-1",
+            parent_call_id="call-1",
+            parent_call_trace_id="weave-trace-1",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            agent_name="from-call-1",
+            parent_call_id="call-1",
+            parent_call_trace_id="weave-trace-1",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            agent_name="from-call-2",
+            parent_call_id="call-2",
+            parent_call_trace_id="weave-trace-2",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+        # No enclosing op: the columns stay empty, which is a normal state.
+        _make_span(
+            project_id,
+            agent_name="no-call",
+            started_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    by_call = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "parent_call.id"},
+                            {"$literal": "call-1"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert by_call.total_count == 2
+    assert {
+        (s.agent_name, s.parent_call_id, s.parent_call_trace_id) for s in by_call.spans
+    } == {("from-call-1", "call-1", "weave-trace-1")}
+
+    by_weave_trace = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "parent_call.trace_id"},
+                            {"$literal": "weave-trace-2"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert by_weave_trace.total_count == 1
+    assert by_weave_trace.spans[0].agent_name == "from-call-2"
+    assert by_weave_trace.spans[0].parent_call_id == "call-2"
+
+    unlinked = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [{"$getField": "agent.name"}, {"$literal": "no-call"}]
+                    }
+                }
+            ),
+        )
+    )
+    assert unlinked.spans[0].parent_call_id == ""
+    assert unlinked.spans[0].parent_call_trace_id == ""
+
+
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
     """`AgentWriteHandler.insert_spans` bulk-writes every span in one insert
     (the scoring-worker batch path); empty input is a no-op.
