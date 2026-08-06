@@ -19,6 +19,7 @@ happens" patch ``_get_engines`` and assert it isn't called.
 
 from __future__ import annotations
 
+import json
 import platform
 import sys
 from collections.abc import Callable
@@ -34,8 +35,10 @@ from weave.conversation.conversation import (
     LLM,
     Message,
     Reasoning,
+    TextPart,
     Tool,
     Turn,
+    UriPart,
     log_conversation,
     log_turn,
     start_conversation,
@@ -44,6 +47,8 @@ from weave.trace.settings import override_settings
 
 _PII_EMAIL = "alice@example.com"
 _REDACTED_EMAIL = "<EMAIL>"
+_PROTOCOL_FALSE_POSITIVE = "uri"
+_REDACTED_PROTOCOL_FALSE_POSITIVE = "<PERSON>"
 
 
 @dataclass
@@ -60,11 +65,17 @@ class _FakeResult:
 class _FakeAnalyzer:
     def analyze(self, *, text: str, **_: Any) -> list[_FakeEntity]:
         i = text.find(_PII_EMAIL)
-        return [_FakeEntity(i, i + len(_PII_EMAIL))] if i >= 0 else []
+        if i >= 0:
+            return [_FakeEntity(i, i + len(_PII_EMAIL))]
+        if text == _PROTOCOL_FALSE_POSITIVE:
+            return [_FakeEntity(0, len(text))]
+        return []
 
 
 class _FakeAnonymizer:
     def anonymize(self, *, text: str, analyzer_results: Any) -> _FakeResult:
+        if text == _PROTOCOL_FALSE_POSITIVE:
+            return _FakeResult(_REDACTED_PROTOCOL_FALSE_POSITIVE)
         return _FakeResult(text.replace(_PII_EMAIL, _REDACTED_EMAIL))
 
 
@@ -287,6 +298,48 @@ def test_redact_pii_applied(
     for key in checked_keys:
         assert _PII_EMAIL not in attrs[key], key
         assert _REDACTED_EMAIL in attrs[key], key
+
+
+def test_redact_pii_preserves_uri_part_protocol_fields(
+    otel_spans: InMemorySpanExporter, fake_presidio: None
+) -> None:
+    """A Presidio false positive cannot corrupt a typed message discriminator."""
+    source_ref = "weave:///team/project/object/source:abc123"
+    with override_settings(redact_pii=True):
+        log_turn(
+            conversation_id="convo-pii-uri-part",
+            agent_name="a",
+            messages=[
+                Message(
+                    role="user",
+                    parts=[
+                        UriPart(
+                            mime_type="text/plain",
+                            modality="document",
+                            uri=source_ref,
+                        ),
+                        TextPart(content=f"contact {_PII_EMAIL}"),
+                    ],
+                )
+            ],
+        )
+
+    spans = _spans_with_prefix(otel_spans, "invoke_agent")
+    assert len(spans) == 1
+    assert json.loads(spans[0].attributes["gen_ai.input.messages"]) == [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "uri",
+                    "mime_type": "text/plain",
+                    "modality": "document",
+                    "uri": source_ref,
+                },
+                {"type": "text", "content": f"contact {_REDACTED_EMAIL}"},
+            ],
+        }
+    ]
 
 
 # ---------------------------------------------------------------------------

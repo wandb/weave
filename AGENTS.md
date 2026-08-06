@@ -462,6 +462,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+- Conversation message PII redaction walks typed parts directly. Preserve
+  roles, discriminators, identifiers, MIME/modality metadata, and media/file
+  references; only flat text, text/reasoning parts, and tool arguments/results
+  are Presidio-scanned.
 
 ### Claude Agent SDK token accounting
 
