@@ -861,7 +861,7 @@ def test_intent_cluster_tables_lifecycle(ch_client):
         (
             "intent_cluster_runs",
             "ReplacingMergeTree",
-            "project_id, lens, cluster_run_id",
+            "project_id, cluster_run_id",
             "expire_at",
         ),
         (
@@ -1012,7 +1012,7 @@ def test_intent_cluster_tables_lifecycle(ch_client):
     # Scoped to the run's project, lens, pipeline version, and source-time
     # window, and deduplicated per occurrence first. A rollup row is persisted,
     # so a duplicate counted here is never corrected by a later merge.
-    ch_client.command(
+    fold_sql = (
         f"INSERT INTO {target_db}.intent_cluster_daily (project_id, cluster_run_id, "
         "day, cluster_id, occurrences, signatures, users, conversations) "
         "SELECT 'project-1', 'run-1', toDate(o.source_started_at), a.cluster_id, "
@@ -1044,16 +1044,26 @@ def test_intent_cluster_tables_lifecycle(ch_client):
         ") AS a ON a.signature_id = o.signature_id "
         "GROUP BY toDate(o.source_started_at), a.cluster_id"
     )
-    assert ch_client.query(
+    fold_settings = {"insert_deduplication_token": "run-1:intent_cluster_daily:0"}
+    ch_client.command(fold_sql, settings=fold_settings)
+    daily_sql = (
         "SELECT day, cluster_id, occurrences "
         f"FROM {target_db}.intent_cluster_daily "
         "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
         "ORDER BY day, cluster_id"
-    ).result_rows == [
+    )
+    expected_daily = [
         (datetime.date(2026, 5, 30), 3, 2),
         (datetime.date(2026, 5, 31), 3, 1),
         (datetime.date(2026, 5, 31), 7, 1),
     ]
+    assert ch_client.query(daily_sql).result_rows == expected_daily
+
+    # Immutability took replacement away, so the insert token is the only thing
+    # standing between a retried fold and a permanently doubled occurrence count.
+    # Replaying the same batch under the same token is a no-op.
+    ch_client.command(fold_sql, settings=fold_settings)
+    assert ch_client.query(daily_sql).result_rows == expected_daily
 
     # Across a day range every distinct-entity column merges instead of summing.
     # sig_a spans both days under one user who also spans both, so a per-day
