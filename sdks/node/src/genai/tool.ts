@@ -4,6 +4,7 @@ import type {ChildSpanContext} from './common';
 import {getWeaveTracer} from './provider';
 import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
+  ATTR_ERROR_TYPE,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
@@ -15,33 +16,60 @@ import {
 
 export interface ToolInit extends SpanInitBase {
   name: string;
-  args?: string;
+  /** String values are recorded as-is; other values are JSON-serialized. */
+  args?: unknown;
   toolCallId?: string;
+}
+
+export interface ToolEndOptions extends SpanEndOptions {
+  /** String values are recorded as-is; other values are JSON-serialized. */
+  result?: unknown;
+  /** Stable failure classification recorded on the `error.type` attribute. */
+  errorType?: string;
+}
+
+function serializeToolValue(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    try {
+      return String(value);
+    } catch {
+      return '[unserializable]';
+    }
+  }
 }
 
 /**
  * A tool invocation. Emits an `execute_tool` span carrying the tool name,
- * the JSON-encoded arguments, the tool-call id, and the result.
+ * the arguments, the tool-call id, and the result. String arguments and
+ * results are recorded as-is; other values are JSON-serialized when possible.
  *
  * Created by `weave.startTool()` (or `turn.startTool()`, or
- * `llm.startTool()`) and terminated with `end()`. Assign `result` before
- * calling `end()` to record the tool's output on the span.
+ * `llm.startTool()`) and terminated with `end()`, which accepts the result and
+ * optional error metadata.
  *
  * @example
- * const tool = weave.startTool({
- *   name: tc.function.name,
- *   args: tc.function.arguments,
- *   toolCallId: tc.id,
- * });
+ * const tool = weave.startTool({name: 'get_weather', args: {city: 'Tokyo'}});
  * try {
- *   tool.result = await wikipediaSearch(JSON.parse(tc.function.arguments));
- * } finally {
- *   tool.end();
+ *   const result = await getWeather('Tokyo');
+ *   tool.end({result});
+ * } catch (error) {
+ *   tool.end({error: error as Error, errorType: 'weather_error'});
+ *   throw error;
  * }
  */
 export class Tool extends SpanBase {
   /**
-   * Tool output as a string. Recorded on `gen_ai.tool.call.result` at `end()`.
+   * Tool output as a string. Prefer passing `result` to `end()`.
+   *
+   * @deprecated Pass `result` to `end()` instead.
    */
   result?: string;
 
@@ -56,6 +84,7 @@ export class Tool extends SpanBase {
 
   static create(opts: ToolInit & ChildSpanContext): Tool {
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
+    const args = serializeToolValue(opts.args);
     const attributes: Attributes = {
       ...(opts.attributes ?? {}),
       [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
@@ -64,8 +93,8 @@ export class Tool extends SpanBase {
     if (opts.toolCallId) {
       attributes[ATTR_GEN_AI_TOOL_CALL_ID] = opts.toolCallId;
     }
-    if (opts.args) {
-      attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = opts.args;
+    if (args) {
+      attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = args;
     }
     if (opts.conversationId) {
       attributes[ATTR_GEN_AI_CONVERSATION_ID] = opts.conversationId;
@@ -75,20 +104,28 @@ export class Tool extends SpanBase {
       {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       opts.parentContext
     );
-    return new Tool(span, opts.name, opts.args ?? '', opts.toolCallId ?? '');
+    return new Tool(span, opts.name, args ?? '', opts.toolCallId ?? '');
   }
 
   /**
-   * Flush `result` to the span and close it. Idempotent. Pass `error` to mark
-   * the span as failed; pass `endTime` to backdate the close.
+   * Record an optional result and error type, then close the span. Idempotent.
+   * Pass `error` to mark the span as failed and `endTime` to backdate the close.
    */
-  end(opts?: SpanEndOptions): void {
+  end(opts?: ToolEndOptions): void {
     if (this._ended) {
       return;
     }
     this._ended = true;
-    if (this.result !== undefined) {
-      this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, this.result);
+    const result =
+      opts?.result === undefined
+        ? this.result
+        : serializeToolValue(opts.result);
+    if (result !== undefined) {
+      this.result = result;
+      this.span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, result);
+    }
+    if (opts?.errorType) {
+      this.span.setAttribute(ATTR_ERROR_TYPE, opts.errorType);
     }
     this._closeSpan(opts);
   }

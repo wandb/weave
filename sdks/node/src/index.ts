@@ -87,6 +87,7 @@ export type {
   SubAgent,
   SubAgentInit,
   Tool,
+  ToolEndOptions,
   ToolInit,
   Turn,
   TurnInit,

@@ -36,7 +36,7 @@ export {
   type SessionInit,
 } from './conversation';
 export {SubAgent, type SubAgentInit} from './subagent';
-export {Tool, type ToolInit} from './tool';
+export {Tool, type ToolEndOptions, type ToolInit} from './tool';
 export {Turn, type TurnInit} from './turn';
 
 export type {
