@@ -41,6 +41,7 @@ _AUTO_GENERATE = object()
 def init(
     project_name: str,
     *,
+    ensure_project_exists: bool = True,
     settings: UserSettings | dict[str, Any] | None = None,
     autopatch_settings: AutopatchSettings | None = None,
     postprocess_inputs: PostprocessInputsFunc | None = None,
@@ -63,6 +64,10 @@ def init(
         project_name: The name of the Weights & Biases team and project to log to. If you don't
             specify a team, your default entity is used.
             To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/platform/app/settings-page/user-settings#default-team) in the W&B Models documentation.
+        ensure_project_exists: If `True` (default), create the project when it does not exist.
+            Set this to `False` to initialize a client without creating the project. This option
+            does not verify that the project exists or that the caller can access it; callers
+            requiring those guarantees must check them before initialization.
         settings: Configuration for the Weave client generally. Can be a UserSettings instance or a dict
             with any of the following keys (all optional). All settings can also be configured
             via environment variables using the prefix WEAVE_ (e.g., WEAVE_DISABLED=true).
@@ -175,6 +180,7 @@ def init(
 
     return weave_init.init_weave(
         project_name,
+        ensure_project_exists=ensure_project_exists,
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
         attributes=attributes,
