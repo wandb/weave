@@ -490,6 +490,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - SDK output can fail before the first message or between completed turns. Keep
   the submitted/pending input observable by ending its `Turn` through the
   exception path so the span records the error before the exception propagates.
+- Conversation message PII redaction walks typed parts directly. Preserve
+  roles, discriminators, identifiers, MIME/modality metadata, and media/file
+  references; only flat text, text/reasoning parts, and tool arguments/results
+  are Presidio-scanned.
 
 ### Claude Agent SDK token accounting
 
