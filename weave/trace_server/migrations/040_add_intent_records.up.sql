@@ -5,7 +5,14 @@
 CREATE TABLE IF NOT EXISTS intent_records
 (
     project_id String,
-    id String,                               -- deterministic hash of the occurrence, so retries collapse instead of duplicating
+    -- Deterministic hash of the occurrence, so retries collapse instead of
+    -- duplicating. It MUST fold in toDate(source_started_at), because that
+    -- expression is part of the sorting key and therefore part of the
+    -- ReplacingMergeTree identity. If it did not, a re-extraction whose snapshot
+    -- drifted across midnight would land a second row under an id the reader
+    -- believes is unique. Folding it in makes a drifted snapshot a visibly new
+    -- id instead of a silent duplicate.
+    id String,
     intent_ordinal UInt16 DEFAULT 0,         -- position among intents extracted from a single turn, folded into the id hash
     -- 128-bit hash of the canonicalized signature AND the lens, so it groups
     -- every occurrence of the same intent while keeping the two lenses distinct.
@@ -13,7 +20,13 @@ CREATE TABLE IF NOT EXISTS intent_records
     -- shared id would let one lens inflate the other's counts. Downstream
     -- cluster tables rely on this to key on signature_id with no lens column.
     signature_id FixedString(16),
-    lens LowCardinality(String) DEFAULT 'intent', -- analysis lens, 'intent' or 'failure', already folded into the id and signature_id hashes so it stays out of ORDER BY
+    -- Analysis lens, 'intent' or 'failure', already folded into the id and
+    -- signature_id hashes so it stays out of ORDER BY. Deliberately has no
+    -- DEFAULT: it is a discriminator, the rollup fold filters on it, and a row
+    -- whose column disagrees with its own hashes is undetectable. An omitted
+    -- lens reads back empty and matches no run, which is louder than silently
+    -- claiming to be an intent.
+    lens LowCardinality(String),
     pipeline_version UInt32,                 -- recipe id, in ORDER BY so versions coexist during re-embed/backfill
     record_version UInt64,                   -- ReplacingMergeTree version, highest for a key wins
 
@@ -83,9 +96,12 @@ ENGINE = ReplacingMergeTree(record_version)
 PARTITION BY toYYYYMM(source_started_at)
 -- toDate(source_started_at) precedes id so a sub-month read prunes granules.
 -- Without it, source time lives only in the partition key and any window
--- narrower than a month still scans the whole month. Day granularity, not the
--- raw timestamp, keeps the dedup identity coarse: same-day drift in the
--- denormalized snapshot still collapses, which a microsecond key would not.
+-- narrower than a month still scans the whole month.
+--
+-- This expression is part of the replacement identity, so the id hash must fold
+-- it in (see id above). Day rather than the raw timestamp keeps the identity as
+-- coarse as it can be while still pruning: a microsecond key would make every
+-- sub-second snapshot difference a distinct row.
 ORDER BY (project_id, pipeline_version, toDate(source_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
