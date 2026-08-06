@@ -31,11 +31,11 @@ class ReplayTransport(Transport):
         messages: list[dict[str, Any]],
         *,
         fail_after_messages: int | None = None,
-        wait_for_user_after_first_message: bool = False,
+        wait_for_user_messages_after: dict[int, int] | None = None,
     ) -> None:
         self._messages = messages
         self._fail_after_messages = fail_after_messages
-        self._wait_for_user_after_first_message = wait_for_user_after_first_message
+        self._wait_for_user_messages_after = wait_for_user_messages_after or {}
         self._connected = False
         self._pending_control_ids: list[str] = []
         self._control_event = anyio.Event()
@@ -80,8 +80,13 @@ class ReplayTransport(Transport):
             if self._fail_after_messages == index:
                 raise RuntimeError("replay transport failed")
             yield msg
-            if index == 0 and self._wait_for_user_after_first_message:
+            required_user_messages = self._wait_for_user_messages_after.get(index)
+            while (
+                required_user_messages is not None
+                and len(self.user_messages) < required_user_messages
+            ):
                 await self._user_message_event.wait()
+                self._user_message_event = anyio.Event()
         if self._fail_after_messages == len(self._messages):
             raise RuntimeError("replay transport failed")
 

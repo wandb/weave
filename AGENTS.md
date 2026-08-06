@@ -484,6 +484,12 @@ pnpm exec tsx examples/claudeAgents.ts
 - Keep its output adapters split by SDK contract: string `query()` and each
   `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
   only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Standalone async-iterable queries can emit bootstrap `system/init` before the
+  first prompt is consumed. Defer only that init for trace attribution; forward
+  other output received without a pending query-triggering input without
+  attaching it to the next turn, especially late background-task notifications.
+  Correctly completing background subagents across results requires separate
+  conversation-scoped task ownership.
 - Name the corresponding test cases "string prompt" and "async-iterable
   prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
   one-input success and pre/post-result failure assertions paired across them.
