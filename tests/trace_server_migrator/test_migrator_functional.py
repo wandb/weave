@@ -646,10 +646,6 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("record_version", "UInt64"),
         ("category", "String"),
         ("signature", "String"),
-        ("action", "LowCardinality(String)"),
-        ("object", "String"),
-        ("outcome", "LowCardinality(String)"),
-        ("operation_mode", "LowCardinality(String)"),
         ("sentiment", "LowCardinality(String)"),
         ("sentiment_confidence", "Float32"),
         ("sentiment_score", "Float32"),
@@ -698,7 +694,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
 
     insert_columns = """
         project_id, id, intent_ordinal, signature_id, lens, pipeline_version,
-        record_version, category, signature, action, object, outcome, operation_mode,
+        record_version, category, signature,
         sentiment, sentiment_confidence,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
         source, insights_type, source_id, trace_id, span_id, parent_span_id,
@@ -714,8 +710,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         SELECT
             'project-1', 'intent-1', 0, unhex('00112233445566778899aabbccddeeff'),
             'intent', {pipeline_version}, {record_version}, '{category}',
-            'Add Stripe checkout', 'add', 'stripe checkout', 'integrated',
-            'build_or_extend',
+            'Add Stripe checkout',
             'frustrated', toFloat32(0.75),
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
             'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
@@ -772,7 +767,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
 
     # The promoted columns round-trip as typed values rather than Map strings.
     promoted = ch_client.query(
-        "SELECT lens, action, object, outcome, operation_mode, "
+        "SELECT lens, "
         "sentiment, sentiment_confidence, sentiment_score, judge_model, "
         "prompt_version, length(pipeline_recipe_sha256), turn_index, "
         "agent_name, agent_version, provider, request_model, surface, status_code, "
@@ -785,10 +780,6 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert promoted == [
         (
             "intent",
-            "add",
-            "stripe checkout",
-            "integrated",
-            "build_or_extend",
             "frustrated",
             0.75,
             -1.0,
