@@ -8,6 +8,7 @@ import type {
   SDKTaskNotificationMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
+import type {AgentOutput} from '@anthropic-ai/claude-agent-sdk/sdk-tools';
 
 import {
   ATTR_ERROR_TYPE,
@@ -162,6 +163,35 @@ function userToolResult(opts: {
     task_description: opts.taskDescription,
     tool_use_result: opts.toolUseResult,
     message: {role: 'user', content: [block]},
+  };
+}
+
+type CompletedAgentOutput = Extract<AgentOutput, {status: 'completed'}>;
+
+function completedAgentOutput(opts: {
+  agentId: string;
+  content: string[];
+  prompt: string;
+  resolvedModel?: string;
+}): CompletedAgentOutput {
+  return {
+    status: 'completed',
+    agentId: opts.agentId,
+    content: opts.content.map(text => ({type: 'text', text})),
+    ...(opts.resolvedModel ? {resolvedModel: opts.resolvedModel} : {}),
+    totalToolUseCount: 0,
+    totalDurationMs: 0,
+    totalTokens: 0,
+    usage: {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_read_input_tokens: 0,
+      server_tool_use: null,
+      service_tier: null,
+      cache_creation: null,
+    },
+    prompt: opts.prompt,
   };
 }
 
@@ -957,6 +987,122 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ]);
   });
 
+  test('routes a late background message without creating another root turn', () => {
+    const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate'});
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-late-background',
+        model: 'claude-main',
+        content: [
+          toolUseBlock('agent-late', 'Agent', {
+            prompt: 'Finish in the background',
+            run_in_background: true,
+            subagent_type: 'late-worker',
+          }),
+        ],
+      })
+    );
+    tracer.processMessage(
+      userToolResult({
+        sessionId: 'sess-late-background',
+        toolUseId: 'agent-late',
+        content: 'Async agent launched successfully',
+        toolUseResult: {
+          status: 'async_launched',
+          agentId: 'task-late',
+        },
+      })
+    );
+    tracer.processMessage(
+      resultSuccess({sessionId: 'sess-late-background', result: 'launched'})
+    );
+
+    tracer.processMessage(
+      assistantMessage({
+        sessionId: 'sess-late-background',
+        parentToolUseId: 'agent-late',
+        subagentType: 'late-worker',
+        model: 'claude-worker',
+        content: [textBlock('late child output')],
+      })
+    );
+    tracer.processMessage(
+      taskNotification({
+        sessionId: 'sess-late-background',
+        taskId: 'task-late',
+        toolUseId: 'agent-late',
+        status: 'completed',
+        summary: 'Background work finished',
+      })
+    );
+    tracer.finalize();
+
+    const spans = getExporter().getFinishedSpans();
+    const root = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'claude_agent_sdk'
+    )!;
+    const subagent = spans.find(
+      span =>
+        span.name === INVOKE &&
+        span.attributes[ATTR_GEN_AI_AGENT_NAME] === 'late-worker'
+    )!;
+    expect(
+      spans
+        .filter(span => span.name === INVOKE)
+        .map(span => ({
+          agentName: span.attributes[ATTR_GEN_AI_AGENT_NAME],
+          inputMessages: JSON.parse(
+            span.attributes[ATTR_GEN_AI_INPUT_MESSAGES] as string
+          ),
+          outputMessages: JSON.parse(
+            span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+          ),
+          parentSpanId: span.parentSpanId,
+        }))
+    ).toEqual([
+      {
+        agentName: 'claude_agent_sdk',
+        inputMessages: [{role: 'user', content: 'delegate'}],
+        outputMessages: [{role: 'assistant', content: 'launched'}],
+        parentSpanId: undefined,
+      },
+      {
+        agentName: 'late-worker',
+        inputMessages: [{role: 'user', content: 'Finish in the background'}],
+        outputMessages: [
+          {role: 'assistant', content: 'Background work finished'},
+        ],
+        parentSpanId: root.spanContext().spanId,
+      },
+    ]);
+    expect(
+      spans
+        .filter(
+          span =>
+            span.name === 'chat' &&
+            span.attributes[ATTR_GEN_AI_REQUEST_MODEL] === 'claude-worker'
+        )
+        .map(span => ({
+          outputMessages: JSON.parse(
+            span.attributes[ATTR_GEN_AI_OUTPUT_MESSAGES] as string
+          ),
+          parentSpanId: span.parentSpanId,
+        }))
+    ).toEqual([
+      {
+        outputMessages: [
+          {
+            role: 'assistant',
+            parts: [{type: 'text', content: 'late child output'}],
+          },
+        ],
+        parentSpanId: subagent.spanContext().spanId,
+      },
+    ]);
+  });
+
   test('marks a failed background subagent from its task notification', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate'});
     tracer.processMessage(
@@ -1364,7 +1510,7 @@ describe('Claude Agent SDK — OTel tracer', () => {
     ]);
   });
 
-  test('records the resolved model and agent id from a synchronous subagent result', () => {
+  test('records structured output and identity from a synchronous subagent result', () => {
     const tracer = new ClaudeAgentOtelTracer({prompt: 'delegate once'});
     tracer.processMessage(
       assistantMessage({
@@ -1384,12 +1530,13 @@ describe('Claude Agent SDK — OTel tracer', () => {
       userToolResult({
         sessionId: 'sess-sync',
         toolUseId: 'agent-sync',
-        content: 'the answer',
-        toolUseResult: {
-          status: 'completed',
+        content: 'Agent completed successfully',
+        toolUseResult: completedAgentOutput({
           agentId: 'agent-sync-1',
+          content: ['the answer'],
+          prompt: 'Answer briefly',
           resolvedModel: 'claude-haiku-4-5',
-        },
+        }),
       })
     );
     tracer.finalize(resultSuccess({sessionId: 'sess-sync', result: 'done'}));

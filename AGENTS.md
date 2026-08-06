@@ -377,6 +377,13 @@ deterministic.
   `async_launched` or `remote_launched` tool result before forwarded child
   messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
   tool-use ID across turn boundaries until that notification arrives.
+- Route a forwarded assistant message to an already-open `SubAgent` before
+  creating a `Turn`; background messages can arrive after the root result and
+  must not create an empty root turn or consume the next pending input.
+- For synchronous `Agent`/`Task` completion, read terminal output from the
+  structured `SDKUserMessage.tool_use_result.content`; use the model-facing
+  `tool_result` block content only as a compatibility fallback. Background
+  completion output continues to come from `task_notification.summary`.
 - Read a subagent's lifetime from the launch request (`run_in_background`, or
   `isolation: 'remote'`, which is always backgrounded) rather than inferring it
   from the result status — an unrecognized status must not downgrade it.

@@ -127,6 +127,25 @@ function stringField(
   return typeof value[key] === 'string' ? value[key] : undefined;
 }
 
+function completedSubagentOutputText(
+  value: Record<string, unknown>
+): string | undefined {
+  if (value.status !== 'completed' || !Array.isArray(value.content)) {
+    return undefined;
+  }
+
+  const text: string[] = [];
+  for (const item of value.content) {
+    const block = recordOf(item);
+    const blockText = stringField(block, 'text');
+    if (block.type !== 'text' || blockText == null) {
+      return undefined;
+    }
+    text.push(blockText);
+  }
+  return text.join('\n');
+}
+
 // `Task` is the pre-rename name for `Agent`; older SDK versions still emit it.
 const SUBAGENT_TOOL_NAMES = new Set(['Agent', 'Task']);
 
@@ -167,6 +186,7 @@ type SubagentIdentity = {
 function subagentResult(value: unknown): {
   acknowledgesLaunch: boolean;
   identity: SubagentIdentity;
+  outputText: string | undefined;
 } {
   const raw = recordOf(value);
   return {
@@ -178,6 +198,7 @@ function subagentResult(value: unknown): {
       // A remote launch names its handle `taskId`; the others use `agentId`.
       taskId: stringField(raw, 'taskId'),
     },
+    outputText: completedSubagentOutputText(raw),
   };
 }
 
@@ -326,7 +347,7 @@ export class ClaudeAgentOtelTracer {
 
     switch (msg.type) {
       case 'assistant':
-        this.processAssistant(msg, this.getOrCreateTurn());
+        this.processAssistant(msg);
         break;
       case 'user':
         this.processUser(msg);
@@ -490,13 +511,13 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private processAssistant(msg: SDKAssistantMessage, turn: Turn): void {
+  private processAssistant(msg: SDKAssistantMessage): void {
     const model = msg.message.model;
     if (msg.parent_tool_use_id == null && this.rootModel == null && model) {
       this.rootModel = model;
     }
 
-    const parent = this.getOrCreateMessageParent(msg, turn);
+    const parent = this.getOrCreateMessageParent(msg);
     const content = msg.message.content;
     const parts = assistantParts(content);
 
@@ -537,17 +558,15 @@ export class ClaudeAgentOtelTracer {
     }
   }
 
-  private getOrCreateMessageParent(
-    msg: SDKAssistantMessage,
-    turn: Turn
-  ): Turn | SubAgent {
+  private getOrCreateMessageParent(msg: SDKAssistantMessage): Turn | SubAgent {
     const parentToolUseId = msg.parent_tool_use_id;
     if (parentToolUseId == null) {
-      return turn;
+      return this.getOrCreateTurn();
     }
 
     let openSubagent = this.openSubagents.get(parentToolUseId);
     if (!openSubagent) {
+      const turn = this.getOrCreateTurn();
       const span = turn.startSubagent({
         name: msg.subagent_type ?? 'subagent',
         model: msg.message.model,
@@ -631,7 +650,9 @@ export class ClaudeAgentOtelTracer {
     resultText: string,
     msg: SDKUserMessage | SDKUserMessageReplay
   ): void {
-    const {acknowledgesLaunch, identity} = subagentResult(msg.tool_use_result);
+    const {acknowledgesLaunch, identity, outputText} = subagentResult(
+      msg.tool_use_result
+    );
     // The identity fields ride on every `Agent` result shape, launch or not.
     openSubagent.agentId = identity.agentId ?? openSubagent.agentId;
     openSubagent.taskId = identity.taskId ?? openSubagent.taskId;
@@ -646,16 +667,19 @@ export class ClaudeAgentOtelTracer {
       return;
     }
 
+    const terminalOutputText = block.is_error
+      ? resultText
+      : (outputText ?? resultText);
     openSubagent.span.record({
-      outputMessages: resultText
-        ? [{role: 'assistant', content: resultText}]
+      outputMessages: terminalOutputText
+        ? [{role: 'assistant', content: terminalOutputText}]
         : [],
     });
     openSubagent.outcome = block.is_error
       ? {
           status: 'error',
           errorType: 'subagent_error',
-          error: new Error(resultText || 'Subagent execution failed'),
+          error: new Error(terminalOutputText || 'Subagent execution failed'),
           endedAt: new Date(),
         }
       : {status: 'ok', endedAt: new Date()};
