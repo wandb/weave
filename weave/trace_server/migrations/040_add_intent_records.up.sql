@@ -32,12 +32,6 @@ CREATE TABLE IF NOT EXISTS intent_records
 
     category String,                         -- mutable taxonomy label, excluded from identity, plain String because generated categories can be high-cardinality
     signature String,
-    -- Judge decomposition of the signature. action/outcome/operation_mode are
-    -- bounded vocabularies. object is a free-text noun phrase, so plain String.
-    action LowCardinality(String) DEFAULT '',
-    object String DEFAULT '',
-    outcome LowCardinality(String) DEFAULT '',
-    operation_mode LowCardinality(String) DEFAULT '',
 
     -- Judged sentiment of the source turn. sentiment_score is an ALIAS so the
     -- ordinal scale has one home: rescoring is a migration, not a row rewrite.
