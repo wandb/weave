@@ -13,22 +13,23 @@ import {
   ATTR_GEN_AI_TOOL_NAME,
   WEAVE_GENAI_TRACER_NAME,
 } from './semconv';
+import type {JsonObject, JsonValue} from './types';
 
 export interface ToolInit extends SpanInitBase {
   name: string;
-  /** String values are recorded as-is; other values are JSON-serialized. */
-  args?: unknown;
+  /** A JSON object, or a pre-serialized string recorded as-is. */
+  args?: JsonObject | string;
   toolCallId?: string;
 }
 
 export interface ToolEndOptions extends SpanEndOptions {
-  /** String values are recorded as-is; other values are JSON-serialized. */
-  result?: unknown;
+  /** A JSON value. Strings are recorded as-is; other values are serialized. */
+  result?: JsonValue;
   /** Stable failure classification recorded on the `error.type` attribute. */
   errorType?: string;
 }
 
-function serializeToolValue(value: unknown): string | undefined {
+function serializeToolValue(value: JsonValue | undefined): string | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -36,20 +37,16 @@ function serializeToolValue(value: unknown): string | undefined {
     return value;
   }
   try {
-    return JSON.stringify(value) ?? String(value);
+    return JSON.stringify(value) ?? '[unserializable]';
   } catch {
-    try {
-      return String(value);
-    } catch {
-      return '[unserializable]';
-    }
+    return '[unserializable]';
   }
 }
 
 /**
  * A tool invocation. Emits an `execute_tool` span carrying the tool name,
  * the arguments, the tool-call id, and the result. String arguments and
- * results are recorded as-is; other values are JSON-serialized when possible.
+ * results are recorded as-is; other JSON values are serialized.
  *
  * Created by `weave.startTool()` (or `turn.startTool()`, or
  * `llm.startTool()`) and terminated with `end()`, which accepts the result and
@@ -93,7 +90,7 @@ export class Tool extends SpanBase {
     if (opts.toolCallId) {
       attributes[ATTR_GEN_AI_TOOL_CALL_ID] = opts.toolCallId;
     }
-    if (args) {
+    if (args !== undefined) {
       attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS] = args;
     }
     if (opts.conversationId) {

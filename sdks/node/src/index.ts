@@ -77,6 +77,8 @@ export {
 export type {
   Conversation,
   ConversationInit,
+  JsonObject,
+  JsonValue,
   LLM,
   LLMInit,
   Message,

@@ -2,6 +2,19 @@
  * Public data types for the Weave GenAI conversation SDK.
  */
 
+/** A value representable in JSON. */
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | readonly JsonValue[]
+  | JsonObject;
+
+/** An object whose properties are representable in JSON. */
+export type JsonObject = {[key: string]: JsonValue};
+
 export type Role =
   | 'user'
   | 'assistant'

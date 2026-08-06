@@ -10,6 +10,7 @@ import {
   ATTR_GEN_AI_TOOL_NAME,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
+import type {JsonObject} from '../../genai/types';
 
 import {
   expectSpanTimesToMatch,
@@ -69,7 +70,7 @@ describe('Tool', () => {
     const turn = Turn.create({});
     const tool = turn.startTool({
       name: 'get_weather',
-      args: {city: 'Tokyo', units: ['celsius', 'fahrenheit']},
+      args: {city: 'Tokyo', units: ['celsius', 'fahrenheit'] as const},
     });
     tool.end({result: {temperature: 24, raining: false}});
     tool.end({result: {temperature: 99}});
@@ -105,18 +106,12 @@ describe('Tool', () => {
     });
   });
 
-  it('does not throw when a tool value cannot be serialized', () => {
-    const unserializable = {
-      toJSON() {
-        throw new Error('no JSON');
-      },
-      [Symbol.toPrimitive]() {
-        throw new Error('no string');
-      },
-    };
+  it('does not throw when a typed tool value contains a cycle', () => {
+    const cyclic: JsonObject = {};
+    cyclic.self = cyclic;
     const turn = Turn.create({});
-    const tool = turn.startTool({name: 'broken_value', args: unserializable});
-    tool.end({result: unserializable});
+    const tool = turn.startTool({name: 'cyclic_value', args: cyclic});
+    tool.end({result: cyclic});
     turn.end();
 
     const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');

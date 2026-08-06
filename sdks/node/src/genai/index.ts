@@ -40,6 +40,8 @@ export {Tool, type ToolEndOptions, type ToolInit} from './tool';
 export {Turn, type TurnInit} from './turn';
 
 export type {
+  JsonObject,
+  JsonValue,
   Message,
   MessagePart,
   Modality,
