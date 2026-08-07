@@ -102,9 +102,9 @@ from tenacity import (
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
 from weave.trace_server.costs.insert_costs import (
+    costs_schema_is_ready,
     has_pending_costs,
     insert_costs,
-    should_insert_costs,
 )
 from weave.trace_server.database_engine import (
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
@@ -215,7 +215,7 @@ PostMigrationWorkCheck = Callable[[PostMigrationHookContext], bool]
 def _default_trace_server_costs_post_migration_hook(
     ctx: PostMigrationHookContext,
 ) -> None:
-    if should_insert_costs(ctx.current_version, ctx.target_version):
+    if costs_schema_is_ready(ctx.ch_client, ctx.target_db):
         insert_costs(ctx.ch_client, ctx.target_db)
 
 
@@ -224,12 +224,12 @@ def _default_trace_server_costs_post_migration_work_check(
 ) -> bool:
     """Whether the costs hook has anything to do, checked before the migration lock.
 
-    Checks the cheap version gate first so the ClickHouse read in
-    `has_pending_costs` only runs once the schema is known to have the table.
+    Checks the schema gate first so the checkpoint diff in `has_pending_costs`
+    only reads a table that has the columns the diff compares.
     """
-    return should_insert_costs(
-        ctx.current_version, ctx.target_version
-    ) and has_pending_costs(ctx.ch_client, ctx.target_db)
+    return costs_schema_is_ready(ctx.ch_client, ctx.target_db) and has_pending_costs(
+        ctx.ch_client, ctx.target_db
+    )
 
 
 class MigrationStatus(TypedDict):

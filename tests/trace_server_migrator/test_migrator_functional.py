@@ -9,12 +9,18 @@ import uuid
 
 import clickhouse_connect
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _NON_RECOVERABLE_MIGRATION_VERSIONS,
     MigrationError,
     get_clickhouse_trace_server_migrator,
+)
+from weave.trace_server.costs.insert_costs import (
+    COSTS_TABLE,
+    costs_schema_is_ready,
+    get_current_costs,
 )
 
 _TEST_MIGRATION_DIR = os.path.abspath(
@@ -943,3 +949,54 @@ def test_apply_migrations_backfills_costs_on_an_already_current_schema(ch_client
 
     assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
     assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+
+
+@pytest.mark.parametrize(
+    ("target_version", "expect_table", "expect_ready"),
+    [(4, False, False), (26, True, False), (None, True, True)],
+)
+def test_costs_schema_gate_tracks_the_columns_the_cost_code_reads(
+    ch_client, target_version, expect_table, expect_ready
+):
+    """The costs gate approves a database exactly when the cost read works there.
+
+    Migration 5 creates `llm_token_prices`, but 27 adds the two cache cost
+    columns that `get_current_costs` selects, so a gate hardcoded to version 5
+    approved versions 5 through 26, where that read fails. Version 4 has no
+    table at all, 26 has the table without the cache columns, and latest has
+    every column.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_gate")
+    target_db = _unique_name(f"cost_gate_{target_version or 'latest'}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db, target_version=target_version)
+
+    # `expect_table and not expect_ready` is the case a version-5 gate got wrong:
+    # the table is there, so it approved a database the cost read cannot use.
+    table_rows = ch_client.query(
+        "SELECT count() FROM system.tables "
+        "WHERE database = %(database)s AND name = %(table)s",
+        parameters={"database": target_db, "table": COSTS_TABLE},
+    ).result_rows[0][0]
+    assert bool(table_rows) is expect_table
+    assert costs_schema_is_ready(ch_client, target_db) is expect_ready
+
+    prev_database = ch_client.database
+    ch_client.database = target_db
+    try:
+        if expect_ready:
+            get_current_costs(ch_client)
+        else:
+            with pytest.raises(DatabaseError):
+                get_current_costs(ch_client)
+    finally:
+        ch_client.database = prev_database

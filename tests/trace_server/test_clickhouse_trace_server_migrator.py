@@ -113,7 +113,7 @@ def mock_migration_lock():
 def mock_costs():
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
+            "weave.trace_server.clickhouse_trace_server_migrator.costs_schema_is_ready",
             return_value=False,
         ),
         patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"),
@@ -454,15 +454,15 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
-        ) as mock_should_insert_costs,
+            "weave.trace_server.clickhouse_trace_server_migrator.costs_schema_is_ready"
+        ) as mock_costs_schema_is_ready,
         patch(
             "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
         ) as mock_insert_costs,
     ):
         migrator.apply_migrations("test_db")
 
-    mock_should_insert_costs.assert_not_called()
+    mock_costs_schema_is_ready.assert_not_called()
     mock_insert_costs.assert_not_called()
 
 

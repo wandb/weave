@@ -31,7 +31,7 @@ def get_current_costs(
             cache_read_input_token_cost,
             cache_creation_input_token_cost,
             effective_date
-        FROM llm_token_prices
+        FROM {COSTS_TABLE}
         WHERE
         created_by = 'system'
         -- There should not ever be more than {MAX_DEFAULT_COST_ROWS} default rows in the table, but just in case we limit
@@ -99,27 +99,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
                     created_at,
                 ),
             )
-    # Insert the data into the table
-    client.insert(
-        "llm_token_prices",
-        rows,
-        column_names=[
-            "id",
-            "pricing_level",
-            "pricing_level_id",
-            "provider_id",
-            "llm_id",
-            "effective_date",
-            "prompt_token_cost",
-            "prompt_token_cost_unit",
-            "completion_token_cost",
-            "completion_token_cost_unit",
-            "cache_read_input_token_cost",
-            "cache_creation_input_token_cost",
-            "created_by",
-            "created_at",
-        ],
-    )
+    # `rows` above is built in `COST_COLUMNS` order.
+    client.insert(COSTS_TABLE, rows, column_names=list(COST_COLUMNS))
 
 
 def filter_out_current_costs(
@@ -233,14 +214,51 @@ def has_pending_costs(client: Client, target_db: str) -> bool:
         client.database = prev_database
 
 
-def should_insert_costs(
-    db_curr_version: int, db_target_version: int | None = None
-) -> bool:
-    """Costs are insertable once `llm_token_prices` exists (migration 5)."""
-    effective_version = (
-        db_target_version if db_target_version is not None else db_curr_version
-    )
-    return effective_version >= COSTS_TABLE_MIGRATION_VERSION
+def costs_schema_is_ready(client: Client, target_db: str) -> bool:
+    """Whether `target_db` has a `COSTS_TABLE` carrying every `COST_COLUMNS` column.
+
+    Asks the schema rather than comparing against a hardcoded migration version,
+    so adding a cost column cannot leave this gate approving a database whose
+    table predates it. Never raises, for the same reason as `has_pending_costs`.
+    """
+    try:
+        result = client.query(
+            """
+            SELECT count()
+            FROM system.columns
+            WHERE database = %(database)s
+                AND table = %(table)s
+                AND name IN %(columns)s
+            """,
+            parameters={
+                "database": target_db,
+                "table": COSTS_TABLE,
+                "columns": COST_COLUMNS,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to check the costs table schema")
+        return False
+    return int(result.result_rows[0][0]) == len(COST_COLUMNS)
 
 
-COSTS_TABLE_MIGRATION_VERSION = 5
+COSTS_TABLE = "llm_token_prices"
+
+# Every column the cost code touches, in the order `insert_costs_into_db` builds
+# rows. `get_current_costs` reads a subset, so gating on all of them covers both.
+COST_COLUMNS = (
+    "id",
+    "pricing_level",
+    "pricing_level_id",
+    "provider_id",
+    "llm_id",
+    "effective_date",
+    "prompt_token_cost",
+    "prompt_token_cost_unit",
+    "completion_token_cost",
+    "completion_token_cost_unit",
+    "cache_read_input_token_cost",
+    "cache_creation_input_token_cost",
+    "created_by",
+    "created_at",
+)
