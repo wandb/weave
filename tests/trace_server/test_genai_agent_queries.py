@@ -416,12 +416,23 @@ def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
     grouped = ch_server.agent_spans_query(
         AgentSpansQueryReq(
             project_id=project_id,
-            group_by=[AgentGroupByRef(source="field", key="parent_call.id")],
+            group_by=[
+                AgentGroupByRef(source="field", key="parent_call.id"),
+                AgentGroupByRef(source="field", key="parent_call.trace_id"),
+            ],
         )
     )
     assert {
-        group.group_keys["parent_call_id"]: group.span_count for group in grouped.groups
-    } == {"call-1": 2, "call-2": 1, "": 1}
+        (
+            group.group_keys["parent_call_id"],
+            group.group_keys["parent_call_trace_id"],
+        ): group.span_count
+        for group in grouped.groups
+    } == {
+        ("call-1", "weave-trace-1"): 2,
+        ("call-2", "weave-trace-2"): 1,
+        ("", ""): 1,
+    }
 
 
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
