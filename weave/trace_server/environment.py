@@ -251,10 +251,6 @@ def wf_scoring_worker_remote_scorer_allowed_private_cidrs() -> list[str]:
     Values are comma-separated CIDR networks, for example "10.0.0.0/8". Empty
     and whitespace-only entries are ignored, and the default empty list keeps
     every private IP address denied.
-
-    This does not affect the http/https requirement: an exempted address is
-    still reachable only over https unless
-    wf_scoring_worker_remote_scorer_allow_insecure_http is also set.
     """
     raw = os.environ.get(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV)
     if raw is None:
