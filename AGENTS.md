@@ -545,6 +545,14 @@ deterministic.
 - SDK output can fail before the first message or between completed turns. Keep
   the submitted/pending input observable by ending its `Turn` through the
   exception path so the span records the error before the exception propagates.
+- The Agents conversation tree renders recognized GenAI operations. Generic
+  OTel spans with an empty `gen_ai.operation.name` remain stored and queryable
+  through `agent_spans_query`, but are omitted from that visual tree; use a
+  semantic marker span when a UI-visible trace regression is required.
+- Use the Trace tree view for parentage comparisons. The default flamegraph
+  collapses overlapping siblings into synthetic groups, which can make flat
+  and nested traces look deceptively similar; give live-example spans realistic
+  duration and verify their stored parent IDs with `agent_spans_query`.
 
 ### Claude Agent SDK token accounting
 
