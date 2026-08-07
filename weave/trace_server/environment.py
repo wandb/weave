@@ -236,9 +236,9 @@ def wf_scoring_worker_remote_scorer_validate_hosts() -> bool:
 def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
     """Whether remote scorer URLs may use the http scheme instead of https.
 
-    That is the only thing this setting controls. The host allowlist still
-    applies when it is enabled, and private IP addresses are governed
-    independently by wf_scoring_worker_remote_scorer_allowed_private_cidrs.
+    The host allowlist still applies when it is enabled, and private IP
+    addresses are governed independently by
+    wf_scoring_worker_remote_scorer_allowed_private_cidrs.
     """
     return (
         os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
