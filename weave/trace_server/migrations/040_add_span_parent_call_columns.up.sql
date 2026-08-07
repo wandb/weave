@@ -1,6 +1,6 @@
 -- Link a @weave.op call to the agent spans it produced. The SDK stamps
 -- weave.parent_call.id / weave.parent_call.trace_id on spans that start while
--- a call is running; these columns are the promoted form. Populated going
+-- a call is running, and these columns are the promoted form. Populated going
 -- forward only, while `spans` remains the source of truth.
 --
 -- bloom_filter(0.001) rather than the 0.01 of idx_eval_run_id in 037: both
