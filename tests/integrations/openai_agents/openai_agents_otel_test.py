@@ -58,7 +58,6 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch):
     exporter = InMemorySpanExporter()
     provider = SDKTracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    provider.add_span_processor(OpLinkSpanProcessor())
     monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
     yield exporter
     provider.shutdown()
@@ -1042,21 +1041,16 @@ def test_undo_patch_is_noop_when_not_patched() -> None:
     assert patcher.undo_patch() is True
 
 
-def test_spans_link_to_the_enclosing_op_call(
+def test_agents_spans_link_to_enclosing_op_call(
     client: WeaveClient, otel_spans: InMemorySpanExporter
 ) -> None:
     """Agents spans start inline in the caller's stack, so an agent run wrapped
     in a @weave.op links back to that call.
     """
-    captured: dict[str, str] = {}
+    otel_trace.get_tracer_provider().add_span_processor(OpLinkSpanProcessor())
 
     @weave.op
     def orchestrate() -> None:
-        call = weave.get_current_call()
-        assert call is not None
-        assert call.id is not None
-        captured.update({"id": call.id, "trace_id": call.trace_id})
-
         processor = WeaveOtelTracingProcessor()
         trace = Mock(spec=Trace)
         trace.trace_id = "trace_link"
@@ -1078,9 +1072,10 @@ def test_spans_link_to_the_enclosing_op_call(
 
     orchestrate()
 
+    call = next(iter(orchestrate.calls()))
     agent = next(
         s for s in otel_spans.get_finished_spans() if s.name == "invoke_agent Bot"
     )
     attrs = _attrs(agent)
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
-    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == captured["trace_id"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id

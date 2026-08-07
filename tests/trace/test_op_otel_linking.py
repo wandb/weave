@@ -31,9 +31,7 @@ def otel_setup(monkeypatch: pytest.MonkeyPatch):
 
     OTel allows set_tracer_provider once per process, so we build the same
     processor stack weave.init() builds onto a temporary provider instead of
-    mutating whatever provider is already active. Registering
-    OpLinkSpanProcessor by hand is also the supported path for a user who
-    configured OTel before weave.init().
+    mutating whatever provider is already active.
     """
     exporter = InMemorySpanExporter()
 
@@ -61,36 +59,28 @@ def _emit_wide_span(name: str, extra_attributes: int) -> None:
     span.end()
 
 
-def _current_call_ids() -> dict[str, str]:
-    """Read the running call's ids from inside an op."""
-    call = weave.get_current_call()
-    assert call is not None
-    assert call.id is not None
-    return {"id": call.id, "trace_id": call.trace_id}
-
-
 def _attrs_by_span_name(exporter: InMemorySpanExporter) -> dict[str, dict]:
     return {span.name: dict(span.attributes) for span in exporter.get_finished_spans()}
 
 
-def test_span_started_inside_an_op_carries_the_call(client, otel_setup):
+def test_span_inside_op_carries_call_ids(client, otel_setup):
     """The core of the feature: a span emitted under an op gets both ids."""
-    captured: dict[str, str] = {}
 
     @weave.op
     def orchestrate() -> str:
-        captured.update(_current_call_ids())
         _emit_span("agent_work")
         return "done"
 
     orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)["agent_work"]
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
-    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == captured["trace_id"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
 
 
-def test_span_started_outside_any_op_carries_nothing(client, otel_setup):
+def test_span_outside_op_carries_no_link(client, otel_setup):
     """No call on the stack means no link, not an empty-string link."""
     _emit_span("standalone")
 
@@ -99,44 +89,41 @@ def test_span_started_outside_any_op_carries_nothing(client, otel_setup):
     assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs
 
 
-def test_every_span_of_a_subtree_carries_the_innermost_call(client, otel_setup):
+def test_subtree_spans_carry_innermost_call(client, otel_setup):
     """Each span links to the call that was innermost when it started.
 
     The whole subtree is stamped, matching the eval processor; a nested op
     takes over the spans started inside it.
     """
-    outer: dict[str, str] = {}
-    inner: dict[str, str] = {}
 
     @weave.op
     def inner_op() -> None:
-        inner.update(_current_call_ids())
         _emit_span("grandchild")
 
     @weave.op
     def outer_op() -> None:
-        outer.update(_current_call_ids())
         tracer = otel_trace.get_tracer("test")
         with tracer.start_as_current_span("root"):
             with tracer.start_as_current_span("child"):
                 inner_op()
 
     outer_op()
+    client.flush()
+    outer = next(iter(outer_op.calls()))
+    inner = next(iter(inner_op.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
-    assert attrs["root"][PARENT_CALL_ID_SPAN_ATTR] == outer["id"]
-    assert attrs["child"][PARENT_CALL_ID_SPAN_ATTR] == outer["id"]
-    assert attrs["grandchild"][PARENT_CALL_ID_SPAN_ATTR] == inner["id"]
-    assert inner["id"] != outer["id"]
+    assert attrs["root"][PARENT_CALL_ID_SPAN_ATTR] == outer.id
+    assert attrs["child"][PARENT_CALL_ID_SPAN_ATTR] == outer.id
+    assert attrs["grandchild"][PARENT_CALL_ID_SPAN_ATTR] == inner.id
+    assert inner.id != outer.id
 
 
-def test_conversation_sdk_spans_carry_the_call(client, otel_setup):
+def test_conversation_sdk_spans_carry_call(client, otel_setup):
     """The Conversation SDK is the span source behind claude_agent_sdk too."""
-    captured: dict[str, str] = {}
 
     @weave.op
     def orchestrate() -> None:
-        captured.update(_current_call_ids())
         with start_conversation(
             agent_name="weather-bot", conversation_id="conversation-1"
         ) as conversation:
@@ -145,28 +132,28 @@ def test_conversation_sdk_spans_carry_the_call(client, otel_setup):
                     llm.output("Sunny")
 
     orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
     assert set(attrs) == {"invoke_agent weather-bot", "chat gpt-4o"}
     links = {
-        (
-            a[PARENT_CALL_ID_SPAN_ATTR],
-            a[PARENT_CALL_TRACE_ID_SPAN_ATTR],
-        )
+        (a[PARENT_CALL_ID_SPAN_ATTR], a[PARENT_CALL_TRACE_ID_SPAN_ATTR])
         for a in attrs.values()
     }
-    assert links == {(captured["id"], captured["trace_id"])}
+    assert links == {(call.id, call.trace_id)}
 
 
-def test_log_turn_links_only_when_called_inside_an_op(client, otel_setup):
-    """log_turn emits inline on the calling thread, so the link follows the
-    caller: written inside an op, absent from a queue worker outside one.
+def test_log_turn_links_only_inside_op(client, otel_setup):
+    """The batch path reads the call stack even though it never writes to it.
+
+    ``log_turn`` emits through ``_emit_span_now``, which deliberately does not
+    make its span current, so the link follows whoever called it: present
+    inside an op, absent from a queue worker outside one.
     """
-    captured: dict[str, str] = {}
 
     @weave.op
     def orchestrate() -> None:
-        captured.update(_current_call_ids())
         weave.log_turn(
             conversation_id="conversation-in-op",
             agent_name="inside",
@@ -179,41 +166,42 @@ def test_log_turn_links_only_when_called_inside_an_op(client, otel_setup):
         agent_name="outside",
         messages=[Message(role="user", content="hi")],
     )
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
     inside = attrs["invoke_agent inside"]
-    assert inside[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
-    assert inside[PARENT_CALL_TRACE_ID_SPAN_ATTR] == captured["trace_id"]
+    assert inside[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert inside[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
     assert PARENT_CALL_ID_SPAN_ATTR not in attrs["invoke_agent outside"]
 
 
 @pytest.mark.asyncio
 async def test_eval_spans_carry_both_links(client, otel_setup):
     """The two processors are independent — an eval span gets both stampings."""
-    captured: dict[str, str] = {}
 
     @weave.op
     async def model_predict(input: str) -> str:
-        captured.update(_current_call_ids())
         _emit_span("chat")
         return input
 
     evaluation = Evaluation(dataset=[{"input": "1 + 1"}], scorers=[])
     await evaluation.evaluate(model_predict)
+    client.flush()
+    call = next(iter(model_predict.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)["chat"]
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
-    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == captured["trace_id"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
     assert attrs[constants.EVAL_PROJECT_ID_SPAN_ATTR] == client.project_id
     assert attrs[constants.EVAL_KIND_SPAN_ATTR] == "standard"
 
 
-def test_link_survives_to_the_attribute_limit_and_is_dropped_past_it(
-    client, otel_setup
-):
+def test_link_survives_attribute_limit_and_drops_past_it(client, otel_setup):
     """Both ids are written at span start, so they are the first attributes
     evicted once a span exceeds OTel's count limit. Pins both sides of that
-    boundary: lossless below it, gone above it.
+    boundary, because a wide span silently losing the link is the one failure
+    mode a caller cannot see.
     """
     limit = SpanLimits().max_span_attributes
     assert limit is not None
@@ -224,26 +212,26 @@ def test_link_survives_to_the_attribute_limit_and_is_dropped_past_it(
         _emit_wide_span("over_limit", limit)
 
     orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
-    assert PARENT_CALL_ID_SPAN_ATTR in attrs["at_limit"]
-    assert PARENT_CALL_TRACE_ID_SPAN_ATTR in attrs["at_limit"]
+    assert attrs["at_limit"][PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs["at_limit"][PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
     assert PARENT_CALL_ID_SPAN_ATTR not in attrs["over_limit"]
     assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["over_limit"]
 
 
-def test_bare_thread_loses_the_link_but_the_weave_pool_keeps_it(client, otel_setup):
+def test_bare_thread_drops_link_weave_pool_keeps_it(client, otel_setup):
     """The call stack is a ContextVar, so a bare thread starts without it.
 
-    This is the mechanism behind every "no" row of the coverage matrix: a span
+    This is the mechanism behind every source that cannot be linked: a span
     created on a library-owned thread (ADK's sync Runner.run, the realtime
     FIFO timer) cannot see the call.
     """
-    captured: dict[str, str] = {}
 
     @weave.op
     def orchestrate() -> None:
-        captured.update(_current_call_ids())
         thread = threading.Thread(target=_emit_span, args=("bare_thread",))
         thread.start()
         thread.join()
@@ -251,38 +239,39 @@ def test_bare_thread_loses_the_link_but_the_weave_pool_keeps_it(client, otel_set
             pool.submit(_emit_span, "weave_pool").result()
 
     orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
     assert PARENT_CALL_ID_SPAN_ATTR not in attrs["bare_thread"]
-    assert attrs["weave_pool"][PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
+    assert attrs["weave_pool"][PARENT_CALL_ID_SPAN_ATTR] == call.id
 
 
 @pytest.mark.asyncio
-async def test_asyncio_task_started_inside_an_op_carries_the_call(client, otel_setup):
+async def test_asyncio_task_carries_call(client, otel_setup):
     """asyncio.Task copies the context, unlike a bare thread."""
-    captured: dict[str, str] = {}
 
     async def emit() -> None:
         _emit_span("task")
 
     @weave.op
     async def orchestrate() -> None:
-        captured.update(_current_call_ids())
         await asyncio.create_task(emit())
 
     await orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)["task"]
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
 
 
 @pytest.mark.asyncio
-async def test_task_outliving_its_op_links_to_the_finished_call(client, otel_setup):
+async def test_task_outliving_op_links_finished_call(client, otel_setup):
     """A task holds a copy of the call stack, so it can stamp a call that has
     already finished. The link is correct; readers must tolerate it pointing
     at a completed call.
     """
-    captured: dict[str, str] = {}
     tasks: list[asyncio.Task] = []
     released = asyncio.Event()
 
@@ -292,12 +281,13 @@ async def test_task_outliving_its_op_links_to_the_finished_call(client, otel_set
 
     @weave.op
     async def orchestrate() -> None:
-        captured.update(_current_call_ids())
         tasks.append(asyncio.create_task(emit_when_released()))
 
     await orchestrate()
     released.set()
     await tasks[0]
+    client.flush()
+    call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)["after_op"]
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == captured["id"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id

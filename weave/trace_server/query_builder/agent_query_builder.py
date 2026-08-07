@@ -91,6 +91,8 @@ SPAN_FILTERABLE_COLS: frozenset[str] = frozenset(
         "eval_example_id",
         "eval_trial_index",
         "eval_evaluation_name",
+        "parent_call_id",
+        "parent_call_trace_id",
     }
 )
 
