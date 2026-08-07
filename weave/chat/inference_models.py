@@ -36,7 +36,7 @@ class InferenceModels:
         }
         url = f"https://{INFERENCE_HOST}/v1/models"
         with httpx.Client(timeout=http_timeout()) as client:
-            response = client.post(url, headers=headers)
+            response = client.get(url, headers=headers)
         if response.status_code == 401:
             raise httpx.HTTPStatusError(
                 f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
