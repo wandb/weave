@@ -14,7 +14,14 @@ const AUDIO_DIGEST = 'test-audio-digest';
 const AUDIO_REF = new ObjectRef('other-entity/other-project', 'my-audio', 'v1');
 const AUDIO_REF_URI = 'weave:///other-entity/other-project/object/my-audio:v1';
 
-function objReadBody(weaveType: string, files: Record<string, string> | null) {
+const DATE_REF = new ObjectRef('other-entity/other-project', 'my-date', 'v1');
+
+// An image or audio stores a file; a datetime stores its value inline in `val`.
+function objReadBody(
+  weaveType: string,
+  files?: Record<string, string> | null,
+  val?: string
+) {
   return JSON.stringify({
     obj: {
       val: {
@@ -22,6 +29,7 @@ function objReadBody(weaveType: string, files: Record<string, string> | null) {
         weave_type: {type: weaveType},
         files,
         load_op: 'NO_LOAD_OP',
+        val,
       },
     },
   });
@@ -31,10 +39,9 @@ function objReadBody(weaveType: string, files: Record<string, string> | null) {
 const respondWithImageBytes = async () => new Response(IMAGE_BYTES);
 const respondWithAudioBytes = async () => new Response(AUDIO_BYTES);
 
-function clientServingFileContent(
-  fileContent: () => Promise<Response>,
-  files: Record<string, string> | null = {'image.png': IMAGE_DIGEST},
-  weaveType = 'PIL.Image.Image'
+function clientServingObjBody(
+  objBody: string,
+  fileContent: () => Promise<Response>
 ) {
   const fileRequests: unknown[] = [];
   const traceServerApi = new TraceServerApi({
@@ -42,7 +49,7 @@ function clientServingFileContent(
     customFetch: async (input, init) => {
       const url = input.toString();
       if (url.endsWith('/obj/read')) {
-        return new Response(objReadBody(weaveType, files), {
+        return new Response(objBody, {
           headers: {'content-type': 'application/json'},
         });
       }
@@ -58,6 +65,23 @@ function clientServingFileContent(
     projectId: 'this-entity/this-project',
   });
   return {client, fileRequests};
+}
+
+function clientServingFileContent(
+  fileContent: () => Promise<Response>,
+  files: Record<string, string> | null = {'image.png': IMAGE_DIGEST},
+  weaveType = 'PIL.Image.Image'
+) {
+  return clientServingObjBody(objReadBody(weaveType, files), fileContent);
+}
+
+function clientServingDatetime(val: string) {
+  return clientServingObjBody(
+    objReadBody('datetime.datetime', undefined, val),
+    () => {
+      throw new Error('Unexpected file request for a datetime');
+    }
+  );
 }
 
 describe('WeaveClient.get on a published image', () => {
@@ -155,6 +179,34 @@ describe('WeaveClient.get on published audio', () => {
 
     await expect(client.get(AUDIO_REF)).rejects.toThrow(
       `No audio file stored for ref uri: ${AUDIO_REF_URI}`
+    );
+  });
+});
+
+describe('WeaveClient.get on a published datetime', () => {
+  it('returns a Date without downloading a file', async () => {
+    const {client, fileRequests} = clientServingDatetime(
+      '2025-01-01T00:00:00+00:00'
+    );
+
+    expect(await client.get(DATE_REF)).toEqual(new Date(Date.UTC(2025, 0, 1)));
+    expect(fileRequests).toEqual([]);
+  });
+
+  it('keeps the instant a non-UTC offset points at', async () => {
+    const {client} = clientServingDatetime('2026-03-01T10:15:30+05:30');
+
+    expect(await client.get(DATE_REF)).toEqual(
+      new Date(Date.UTC(2026, 2, 1, 4, 45, 30))
+    );
+  });
+
+  // Python keeps microseconds, a Date only holds milliseconds.
+  it('truncates microseconds to milliseconds', async () => {
+    const {client} = clientServingDatetime('2026-08-05T12:34:56.999999+00:00');
+
+    expect(await client.get(DATE_REF)).toEqual(
+      new Date(Date.UTC(2026, 7, 5, 12, 34, 56, 999))
     );
   });
 });
