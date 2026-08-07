@@ -1085,6 +1085,151 @@ async def test_async_iterable_query_multi_turn_otel(
 
 
 @pytest.mark.asyncio
+async def test_delayed_async_iterable_prompt_after_system_message_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_prompt = asyncio.Event()
+
+    async def delayed_prompt() -> AsyncIterator[dict[str, Any]]:
+        await release_prompt.wait()
+        yield user_prompt("Hello")
+
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        wait_for_user_messages_after={0: 1},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    first_message = await anext(message_iterator)
+    assert type(first_message).__name__ == "SystemMessage"
+    release_prompt.set()
+    messages = [first_message, *[message async for message in message_iterator]]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_attrs(agent_spans[0])["gen_ai.conversation.id"] == "s-abc123"
+
+
+@pytest.mark.asyncio
+async def test_delayed_async_iterable_prompt_failure_after_system_message_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_prompt = asyncio.Event()
+
+    async def delayed_prompt() -> AsyncIterator[dict[str, Any]]:
+        await release_prompt.wait()
+        yield user_prompt("Hello")
+
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=1,
+        wait_for_user_messages_after={0: 1},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    first_message = await anext(message_iterator)
+    assert type(first_message).__name__ == "SystemMessage"
+    release_prompt.set()
+    with pytest.raises(Exception, match="replay transport failed"):
+        await anext(message_iterator)
+
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.ERROR
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_attrs(agent_spans[0])["gen_ai.conversation.id"] == "s-abc123"
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_does_not_trace_stale_task_output_in_next_turn(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_second_prompt = asyncio.Event()
+
+    async def delayed_second_prompt() -> AsyncIterator[dict[str, Any]]:
+        yield user_prompt("Hello")
+        await release_second_prompt.wait()
+        yield user_prompt("What is the capital of France?")
+
+    messages = load_cassette("multi_turn_response")
+    stale_task_messages = load_cassette("background_subagent_response")[8:10]
+    stale_task_messages[0]["session_id"] = "s-mt001"
+    messages[3:3] = stale_task_messages
+    transport = ReplayTransport(
+        messages,
+        wait_for_user_messages_after={4: 2},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_second_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    messages_before_second_prompt = [await anext(message_iterator) for _ in range(5)]
+    assert [type(message).__name__ for message in messages_before_second_prompt] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+        "TaskNotificationMessage",
+        "AssistantMessage",
+    ]
+    release_second_prompt.set()
+    remaining_messages = [message async for message in message_iterator]
+    assert [type(message).__name__ for message in remaining_messages] == [
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = sorted(
+        get_spans_by_op(spans, "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(agent_span, "gen_ai.input.messages"))
+        for agent_span in agent_spans
+    ] == [
+        "Hello",
+        "What is the capital of France?",
+    ]
+    chat_spans = sorted(
+        get_spans_by_op(spans, "chat"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(chat_span, "gen_ai.output.messages"))
+        for chat_span in chat_spans
+    ] == [
+        "Hello! How can I help you?",
+        "The capital of France is Paris.",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_async_iterable_query_buffers_non_query_inputs_otel(
     otel_spans: InMemorySpanExporter,
 ) -> None:
