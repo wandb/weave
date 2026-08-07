@@ -341,14 +341,14 @@ def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
     spans = [
         _make_span(
             project_id,
-            agent_name="from-call-1",
+            agent_name="from-call-1-first",
             parent_call_id="call-1",
             parent_call_trace_id="weave-trace-1",
             started_at=now,
         ),
         _make_span(
             project_id,
-            agent_name="from-call-1",
+            agent_name="from-call-1-second",
             parent_call_id="call-1",
             parent_call_trace_id="weave-trace-1",
             started_at=now + datetime.timedelta(seconds=1),
@@ -385,9 +385,12 @@ def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
         )
     )
     assert by_call.total_count == 2
-    assert {
+    assert sorted(
         (s.agent_name, s.parent_call_id, s.parent_call_trace_id) for s in by_call.spans
-    } == {("from-call-1", "call-1", "weave-trace-1")}
+    ) == [
+        ("from-call-1-first", "call-1", "weave-trace-1"),
+        ("from-call-1-second", "call-1", "weave-trace-1"),
+    ]
 
     by_weave_trace = ch_server.agent_spans_query(
         AgentSpansQueryReq(

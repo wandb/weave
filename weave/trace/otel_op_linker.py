@@ -13,6 +13,11 @@ The link needs the weave call stack to be visible where the span starts. That
 stack is a ``ContextVar``, so a span emitted from a bare thread carries none —
 and neither does one from a provider weave did not install. An empty column is
 a normal state, and so is a link to a call that has already finished.
+
+Register this processor before the eval linker, and write the trace id before
+the call id: a span that overflows OTel's attribute limit evicts oldest first,
+so this order spends the least useful attribute first and leaves the eval
+linkage untouched.
 """
 
 from __future__ import annotations
@@ -40,5 +45,5 @@ class OpLinkSpanProcessor(SpanProcessor):
         if call is None or call.id is None:
             return
 
-        span.set_attribute(PARENT_CALL_ID_SPAN_ATTR, call.id)
         span.set_attribute(PARENT_CALL_TRACE_ID_SPAN_ATTR, call.trace_id)
+        span.set_attribute(PARENT_CALL_ID_SPAN_ATTR, call.id)

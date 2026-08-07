@@ -37,8 +37,8 @@ def otel_setup(monkeypatch: pytest.MonkeyPatch):
 
     provider = SDKTracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    provider.add_span_processor(EvalLinkSpanProcessor())
     provider.add_span_processor(OpLinkSpanProcessor())
+    provider.add_span_processor(EvalLinkSpanProcessor())
     monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
 
     yield exporter
@@ -197,29 +197,41 @@ async def test_eval_spans_carry_both_links(client, otel_setup):
     assert attrs[constants.EVAL_KIND_SPAN_ATTR] == "standard"
 
 
-def test_link_survives_attribute_limit_and_drops_past_it(client, otel_setup):
-    """Both ids are written at span start, so they are the first attributes
-    evicted once a span exceeds OTel's count limit. Pins both sides of that
-    boundary, because a wide span silently losing the link is the one failure
-    mode a caller cannot see.
+def test_crowded_span_gives_up_trace_id_before_call_id(client, monkeypatch):
+    """A span past OTel's attribute limit evicts oldest-first, so the write
+    order in ``on_start`` decides which half of the link survives. Writing the
+    trace id first spends it first and keeps the call id, which is the one the
+    read path filters on.
+
+    The limit is set here rather than read from the ambient default, which
+    ``OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`` can move out from under the test.
     """
-    limit = SpanLimits().max_span_attributes
-    assert limit is not None
+    limit = 4
+    exporter = InMemorySpanExporter()
+    provider = SDKTracerProvider(span_limits=SpanLimits(max_span_attributes=limit))
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    provider.add_span_processor(OpLinkSpanProcessor())
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
 
     @weave.op
     def orchestrate() -> None:
         _emit_wide_span("at_limit", limit - 2)
-        _emit_wide_span("over_limit", limit)
+        _emit_wide_span("one_over", limit - 1)
+        _emit_wide_span("well_over", limit)
 
     orchestrate()
     client.flush()
     call = next(iter(orchestrate.calls()))
 
-    attrs = _attrs_by_span_name(otel_setup)
+    attrs = _attrs_by_span_name(exporter)
     assert attrs["at_limit"][PARENT_CALL_ID_SPAN_ATTR] == call.id
     assert attrs["at_limit"][PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
-    assert PARENT_CALL_ID_SPAN_ATTR not in attrs["over_limit"]
-    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["over_limit"]
+    assert attrs["one_over"][PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["one_over"]
+    assert PARENT_CALL_ID_SPAN_ATTR not in attrs["well_over"]
+    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["well_over"]
+
+    provider.shutdown()
 
 
 def test_bare_thread_drops_link_weave_pool_keeps_it(client, otel_setup):

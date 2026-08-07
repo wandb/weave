@@ -172,7 +172,10 @@ def test_conversation_tracing_installs_both_link_processors(
     """The eval and op link processors ride the provider weave installs.
 
     Every linking test builds its own provider by hand, so this is the only
-    place that proves the processors are attached in production.
+    place that proves the processors are attached in production. The order is
+    load-bearing: processors write attributes in registration order and OTel
+    evicts the oldest first, so the op link must precede the eval link to keep
+    a crowded span from dropping eval metadata.
     """
     weave_init._setup_conversation_tracing("ent", "proj-a", "sekret")
 
@@ -181,6 +184,6 @@ def test_conversation_tracing_installs_both_link_processors(
     processors = provider._active_span_processor._span_processors
     assert [type(p) for p in processors] == [
         BatchSpanProcessor,
-        EvalLinkSpanProcessor,
         OpLinkSpanProcessor,
+        EvalLinkSpanProcessor,
     ]
