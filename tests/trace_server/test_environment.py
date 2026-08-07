@@ -238,16 +238,52 @@ def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
 
 
 @pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs(monkeypatch):
-    """Allowed private CIDRs are comma-separated network strings, empty by default."""
-    key = REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV
-    monkeypatch.delenv(key, raising=False)
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_defaults_to_empty(
+    monkeypatch,
+):
+    monkeypatch.delenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raising=False)
     assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == []
 
-    monkeypatch.setenv(key, "")
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_treats_empty_as_unset(
+    monkeypatch,
+):
+    monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "")
     assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == []
 
-    monkeypatch.setenv(key, " 10.0.0.0/8 , ,fd00::/8 ")
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_splits_on_commas(
+    monkeypatch,
+):
+    monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "10.0.0.0/8,fd00::/8")
+    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
+        "10.0.0.0/8",
+        "fd00::/8",
+    ]
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_strips_whitespace(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, " 10.0.0.0/8 ,\tfd00::/8 "
+    )
+    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
+        "10.0.0.0/8",
+        "fd00::/8",
+    ]
+
+
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_skips_empty_entries(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "10.0.0.0/8,,  ,fd00::/8"
+    )
     assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
         "10.0.0.0/8",
         "fd00::/8",
