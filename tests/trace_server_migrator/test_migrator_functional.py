@@ -3,6 +3,7 @@
 Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
+import datetime
 import os
 import re
 import uuid
@@ -792,6 +793,276 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         "ORDER BY partition"
     ).result_rows
     assert active_partitions == [("202605",)]
+
+
+def test_intent_cluster_tables_lifecycle(ch_client):
+    """A run's children are immutable, so a retry is a new run, not a rewrite."""
+    mgmt_db = _unique_name("db_mgmt_intent_clusters")
+    target_db = _unique_name("intent_clusters_db")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+    migrator.apply_migrations(target_db)
+
+    # Only the runs table keeps a lifecycle. Its children are immutable, and all
+    # four expire together so a cluster cannot outlive its own membership.
+    assert ch_client.query(
+        "SELECT name, engine, sorting_key, "
+        "extract(create_table_query, 'TTL (.+) SETTINGS') "
+        "FROM system.tables "
+        f"WHERE database = '{target_db}' AND name LIKE 'intent_cluster%' "
+        "ORDER BY name"
+    ).result_rows == [
+        (
+            "intent_cluster_assignments",
+            "MergeTree",
+            "project_id, cluster_run_id, signature_id",
+            "expire_at",
+        ),
+        (
+            "intent_cluster_daily",
+            "MergeTree",
+            "project_id, cluster_run_id, day, cluster_id",
+            "expire_at",
+        ),
+        (
+            "intent_cluster_runs",
+            "ReplacingMergeTree",
+            "project_id, cluster_run_id",
+            "expire_at",
+        ),
+        (
+            "intent_clusters",
+            "MergeTree",
+            "project_id, cluster_run_id, cluster_id",
+            "expire_at",
+        ),
+    ]
+
+    # Immutability is what buys the reverse lookup: ClickHouse rejects
+    # projections on ReplacingMergeTree outright.
+    assert ch_client.query(
+        "SELECT name, sorting_key FROM system.projections "
+        f"WHERE database = '{target_db}' AND table = 'intent_cluster_assignments'"
+    ).result_rows == [
+        (
+            "proj_by_cluster",
+            ["project_id", "cluster_run_id", "cluster_id", "signature_id"],
+        )
+    ]
+
+    sig_a = "00112233445566778899aabbccddeeff"
+    sig_b = "ffeeddccbbaa99887766554433221100"
+    # A failure-lens occurrence of the same text hashes to its own signature_id,
+    # since 040 folds lens into that hash.
+    sig_fail = "aabbccddeeff00112233445566778899"
+
+    def insert_occurrence(
+        occ_id: str,
+        sig: str,
+        day: str,
+        user: str,
+        pipeline_version: int = 1,
+        lens: str = "intent",
+        record_version: int = 1,
+    ) -> None:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_records (project_id, id, signature_id, "
+            "lens, pipeline_version, record_version, category, signature, "
+            "embedding_model, vector, source, source_id, trace_id, span_id, "
+            "conversation_id, turn_index, user_id, source_started_at, "
+            "intent_extracted_at, attributes) "
+            f"SELECT 'project-1', '{occ_id}', unhex('{sig}'), '{lens}', "
+            f"{pipeline_version}, {record_version}, "
+            "'action_request', 'Add Stripe checkout', 'text-embedding-3-large', "
+            "arrayResize([toFloat32(1)], 1024, toFloat32(0)), 'weave', "
+            f"'source-{occ_id}', 'trace-{occ_id}', 'span-{occ_id}', 'conv-{occ_id}', "
+            f"7, '{user}', toDateTime64('{day} 09:15:00', 6, 'UTC'), "
+            f"toDateTime64('{day} 09:20:00', 6, 'UTC'), map('env', 'test')"
+        )
+
+    insert_occurrence("occ-1", sig_a, "2026-05-30", "user-1")
+    insert_occurrence("occ-2", sig_a, "2026-05-30", "user-2")
+    insert_occurrence("occ-3", sig_b, "2026-05-31", "user-1")
+    # sig_a again on a second day, by a user who was already seen on the first.
+    # A multi-day read must count one signature and two users, not two and three.
+    insert_occurrence("occ-5", sig_a, "2026-05-31", "user-1")
+
+    # Negative controls for the rollup. Each shares a clustered signature or its
+    # text, so anything the fold fails to exclude shows up as an inflated count.
+    insert_occurrence("occ-1", sig_a, "2026-05-30", "user-1", record_version=2)
+    insert_occurrence("occ-v2", sig_a, "2026-05-30", "user-7", pipeline_version=2)
+    insert_occurrence("occ-fail", sig_fail, "2026-05-30", "user-8", lens="failure")
+    insert_occurrence("occ-late", sig_a, "2026-07-15", "user-9")
+
+    def insert_run(
+        run_id: str, promoted_at: str, record_version: int, status: str = "complete"
+    ) -> None:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_cluster_runs (project_id, "
+            "cluster_run_id, lens, pipeline_version, embedding_model, algorithm, "
+            "window_start, window_end, status, signature_count, cluster_count, "
+            "started_at, promoted_at, record_version) "
+            f"SELECT 'project-1', '{run_id}', 'intent', 1, "
+            "'text-embedding-3-large', 'hdbscan', "
+            "toDateTime64('2026-05-01 00:00:00', 6, 'UTC'), "
+            "toDateTime64('2026-06-01 00:00:00', 6, 'UTC'), "
+            f"'{status}', 2, 2, toDateTime64('2026-06-01 00:00:00', 3, 'UTC'), "
+            f"toDateTime64('{promoted_at}', 3, 'UTC'), {record_version}"
+        )
+
+    def insert_assignment(
+        run_id: str, sig: str, cluster_id: int, confidence: float, umap: tuple
+    ) -> None:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_cluster_assignments (project_id, "
+            "cluster_run_id, signature_id, cluster_id, cluster_confidence, "
+            "umap_x, umap_y) "
+            f"SELECT 'project-1', '{run_id}', unhex('{sig}'), {cluster_id}, "
+            f"toFloat32({confidence}), toFloat32({umap[0]}), toFloat32({umap[1]})"
+        )
+
+    insert_run("run-1", "2026-06-01 01:00:00", record_version=1)
+    insert_assignment("run-1", sig_a, 3, 0.9, (1.5, 2.5))
+    insert_assignment("run-1", sig_b, 7, 0.9, (-3.0, 4.0))
+
+    # A retry is a new run id, so both attempts coexist and neither is rewritten.
+    # run-2 moves sig_a and reprojects it into different axes.
+    insert_run("run-2", "1970-01-01 00:00:00", record_version=1)
+    insert_assignment("run-2", sig_a, 5, 0.4, (0.5, -0.25))
+    assert ch_client.query(
+        "SELECT cluster_run_id, cluster_id, round(toFloat64(cluster_confidence), 2), "
+        "toFloat64(umap_x), toFloat64(umap_y) "
+        f"FROM {target_db}.intent_cluster_assignments "
+        f"WHERE project_id = 'project-1' AND signature_id = unhex('{sig_a}') "
+        "ORDER BY cluster_run_id"
+    ).result_rows == [
+        ("run-1", 3, 0.9, 1.5, 2.5),
+        ("run-2", 5, 0.4, 0.5, -0.25),
+    ]
+
+    # The reverse lookup the projection exists for, read without FINAL.
+    assert ch_client.query(
+        "SELECT hex(signature_id) "
+        f"FROM {target_db}.intent_cluster_assignments "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "AND cluster_id = 3"
+    ).result_rows == [(sig_a.upper(),)]
+
+    current_run_sql = (
+        "SELECT cluster_run_id FROM ("
+        "SELECT cluster_run_id, "
+        "argMax(status, record_version) AS status, "
+        "argMax(promoted_at, record_version) AS promoted_at "
+        f"FROM {target_db}.intent_cluster_runs "
+        "WHERE project_id = 'project-1' AND lens = 'intent' "
+        "GROUP BY cluster_run_id"
+        ") WHERE status = 'complete' AND promoted_at > toDateTime64(0, 3, 'UTC') "
+        "ORDER BY promoted_at DESC LIMIT 1"
+    )
+    # run-2 is newer and complete, but never promoted, so it cannot go live.
+    assert ch_client.query(current_run_sql).result_rows == [("run-1",)]
+    insert_run("run-2", "2026-06-08 01:00:00", record_version=2)
+    assert ch_client.query(current_run_sql).result_rows == [("run-2",)]
+
+    # The run's last step folds occurrence counts through its own assignments.
+    # The worker already holds these bounds; re-reading them here keeps the
+    # reference SQL honest about what every term is scoped to.
+    lens, pipeline_version, window_start, window_end = ch_client.query(
+        "SELECT argMax(lens, record_version), "
+        "argMax(pipeline_version, record_version), "
+        "argMax(window_start, record_version), "
+        "argMax(window_end, record_version) "
+        f"FROM {target_db}.intent_cluster_runs "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1'"
+    ).result_rows[0]
+    # Scoped to the run's project, lens, pipeline version, and source-time
+    # window, and deduplicated per occurrence first. A rollup row is persisted,
+    # so a duplicate counted here is never corrected by a later merge.
+    fold_sql = (
+        f"INSERT INTO {target_db}.intent_cluster_daily (project_id, cluster_run_id, "
+        "day, cluster_id, occurrences, signatures, users, conversations) "
+        "SELECT 'project-1', 'run-1', toDate(o.source_started_at), a.cluster_id, "
+        "count(), uniqHLL12State(o.signature_id), uniqHLL12State(o.user_id), "
+        "uniqHLL12State(o.conversation_id) "
+        "FROM ("
+        # Raw column references are table-qualified so the output aliases cannot
+        # shadow them inside the aggregates or the WHERE (ILLEGAL_AGGREGATION).
+        "SELECT id, "
+        "argMax(intent_records.signature_id, intent_records.record_version) AS signature_id, "
+        "argMax(intent_records.source_started_at, intent_records.record_version) "
+        "AS source_started_at, "
+        "argMax(intent_records.user_id, intent_records.record_version) AS user_id, "
+        "argMax(intent_records.conversation_id, intent_records.record_version) "
+        "AS conversation_id "
+        f"FROM {target_db}.intent_records "
+        "WHERE intent_records.project_id = 'project-1' "
+        f"AND intent_records.lens = '{lens}' "
+        f"AND intent_records.pipeline_version = {pipeline_version} "
+        f"AND intent_records.source_started_at >= toDateTime64('{window_start}', 6, 'UTC') "
+        f"AND intent_records.source_started_at < toDateTime64('{window_end}', 6, 'UTC') "
+        "GROUP BY id"
+        ") AS o "
+        "INNER JOIN ("
+        # No argMax: a run's assignments are written once and never rewritten.
+        "SELECT signature_id, cluster_id "
+        f"FROM {target_db}.intent_cluster_assignments "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1'"
+        ") AS a ON a.signature_id = o.signature_id "
+        "GROUP BY toDate(o.source_started_at), a.cluster_id"
+    )
+    fold_settings = {"insert_deduplication_token": "run-1:intent_cluster_daily:0"}
+    ch_client.command(fold_sql, settings=fold_settings)
+    daily_sql = (
+        "SELECT day, cluster_id, occurrences "
+        f"FROM {target_db}.intent_cluster_daily "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "ORDER BY day, cluster_id"
+    )
+    expected_daily = [
+        (datetime.date(2026, 5, 30), 3, 2),
+        (datetime.date(2026, 5, 31), 3, 1),
+        (datetime.date(2026, 5, 31), 7, 1),
+    ]
+    assert ch_client.query(daily_sql).result_rows == expected_daily
+
+    # Immutability took replacement away, so the insert token is the only thing
+    # standing between a retried fold and a permanently doubled occurrence count.
+    # Replaying the same batch under the same token is a no-op.
+    ch_client.command(fold_sql, settings=fold_settings)
+    assert ch_client.query(daily_sql).result_rows == expected_daily
+
+    # Across a day range every distinct-entity column merges instead of summing.
+    # sig_a spans both days under one user who also spans both, so a per-day
+    # integer would report two signatures and three users for cluster 3.
+    assert ch_client.query(
+        "SELECT cluster_id, sum(occurrences), uniqHLL12Merge(signatures), "
+        "uniqHLL12Merge(users), uniqHLL12Merge(conversations) "
+        f"FROM {target_db}.intent_cluster_daily "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "AND day BETWEEN toDate('2026-05-30') AND toDate('2026-05-31') "
+        "GROUP BY cluster_id ORDER BY cluster_id"
+    ).result_rows == [(3, 3, 1, 2, 3), (7, 1, 1, 1, 1)]
+
+    # An occurrence arriving after the run resolves to its signature's cluster
+    # with no backfill, which is the point of keying on the signature.
+    insert_occurrence("occ-4", sig_a, "2026-06-01", "user-9")
+    assert ch_client.query(
+        "SELECT o.id, a.cluster_id "
+        f"FROM {target_db}.intent_records AS o "
+        f"INNER JOIN {target_db}.intent_cluster_assignments AS a "
+        "ON a.project_id = o.project_id AND a.signature_id = o.signature_id "
+        "WHERE o.project_id = 'project-1' AND o.id = 'occ-4' "
+        "AND a.cluster_run_id = 'run-1'"
+    ).result_rows == [("occ-4", 3)]
 
 
 def test_all_production_down_migrations_replicated(ch_client):
