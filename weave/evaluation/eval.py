@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import traceback
+from collections import defaultdict
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -260,8 +261,8 @@ class Evaluation(Object):
             eval_op = as_op(self.evaluate)
             eval_op.call_display_name = self.evaluation_name
 
-        if self.name is None and self.dataset.name is not None:
-            self.name = self.dataset.name + "-evaluation"  # type: ignore
+        if self.name is None and (dataset_name := self.dataset.name) is not None:
+            self.name = f"{dataset_name}-evaluation"
 
     @op
     async def predict_and_score(self, model: Op | Model, example: dict) -> dict:
@@ -453,16 +454,16 @@ class Evaluation(Object):
         d = {}
         client = require_weave_client()
         for evaluate_call in self.get_evaluate_calls():
-            descendents = list(
+            descendants = list(
                 client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
             )
-            summary_call = list(descendents)[-1]
+            summary_call = descendants[-1]
             scorer_names = {
                 k for k in summary_call.output if k not in {"output", "model_latency"}
             }
             score_calls = [
                 call
-                for call in descendents
+                for call in descendants
                 if call.summary.get("weave", {}).get("trace_name") in scorer_names
             ]
             d[evaluate_call.trace_id] = score_calls
@@ -504,14 +505,12 @@ class Evaluation(Object):
         score_calls = self.get_score_calls()
         d: dict[str, dict[str, list[Any]]] = {}
         for trace_id, calls in score_calls.items():
-            d[trace_id] = {}
+            scorer_outputs: dict[str, list[Any]] = defaultdict(list)
             for call in calls:
-                if call.summary is None:
-                    continue
-                scorer_name = call.summary.get("weave", {}).get("trace_name")
-                if scorer_name not in d[trace_id]:
-                    d[trace_id][scorer_name] = []
-                d[trace_id][scorer_name].append(call.output)
+                if call.summary is not None:
+                    scorer_name = call.summary.get("weave", {}).get("trace_name")
+                    scorer_outputs[scorer_name].append(call.output)
+            d[trace_id] = dict(scorer_outputs)
         return d
 
 
@@ -533,10 +532,10 @@ def evaluate(
     scorers: list[Callable | Scorer] | None = None,
     preprocess_model_input: PreprocessModelInput | None = None,
 ) -> dict:
-    eval = Evaluation(
+    evaluation = Evaluation(
         dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(evaluation.evaluate(model))
 
 
 def is_valid_model(model: Any) -> bool:

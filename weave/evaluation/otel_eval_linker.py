@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 
 def _get_evaluation_name(call: Call | None) -> str | None:
-    """Find the parent evaluate call and return the eval display name."""
+    """Return the evaluate call's display name, or None if unset or not a string."""
     if call is None:
         return None
     name = call.display_name

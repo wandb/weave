@@ -8,7 +8,12 @@ from typing import TypedDict
 import pytest
 
 import weave
-from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import (
+    EvaluationLogger,
+    Model,
+    Scorer,
+    _cleanup_all_evaluations,
+)
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
@@ -553,6 +558,19 @@ def test_evaluation_fail_with_exception(client):
     assert finish_call.exception == json.dumps(
         {"type": "ValueError", "message": "test"}
     )
+
+
+def test_cleanup_all_evaluations_finalizes_all_loggers(client):
+    """finish() removes each logger from the registry, so the atexit hook must
+    iterate a copy to avoid skipping every other unfinished logger.
+    """
+    ev1 = EvaluationLogger()
+    ev2 = EvaluationLogger()
+
+    _cleanup_all_evaluations()
+
+    assert ev1._is_finalized
+    assert ev2._is_finalized
 
 
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
