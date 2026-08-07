@@ -374,6 +374,45 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     )
 
 
+def test_otel_export_resource_attribute_collision_is_soft_rejected(
+    client: weave_client.WeaveClient,
+):
+    """Colliding resource attributes (e.g. deployment.environment=<str> and
+    deployment.environment.name=<str> from an OTel Collector that emits both
+    the deprecated and new semconv) used to escape as 500. Every span in the
+    affected resource is now soft-rejected and reported via partial_success,
+    matching the OTLP contract. Regression test for WB-38308.
+    """
+    export_req = create_test_export_request()
+    project_id = client._project_id()
+    export_req.project_id = project_id
+    export_req.wb_user_id = "abcd123"
+
+    # Materialize to avoid iterator exhaustion, then add the collision.
+    processed_spans_list = export_req.processed_spans
+    resource = processed_spans_list[0].resource_spans.resource
+    scalar = KeyValue()
+    scalar.key = "deployment.environment"
+    scalar.value.string_value = "prod"
+    resource.attributes.append(scalar)
+    nested = KeyValue()
+    nested.key = "deployment.environment.name"
+    nested.value.string_value = "prod"
+    resource.attributes.append(nested)
+    export_req.processed_spans = processed_spans_list
+
+    response = client.server.otel_export(export_req)
+
+    assert isinstance(response, tsi.OTelExportRes)
+    assert response.partial_success is not None
+    assert response.partial_success.rejected_spans == 1
+    assert "deployment.environment" in response.partial_success.error_message
+
+    # No calls should have landed.
+    res = client.server.calls_query(tsi.CallsQueryReq(project_id=project_id))
+    assert len(res.calls) == 0
+
+
 class TestPythonSpans:
     def test_span_from_proto(self):
         """Test converting a protobuf Span to a Python Span."""

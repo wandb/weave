@@ -813,7 +813,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
 
             proto_resource_spans = processed_span.resource_spans
-            resource = Resource.from_proto(proto_resource_spans.resource)
+            try:
+                resource = Resource.from_proto(proto_resource_spans.resource)
+            except AttributePathConflictError as e:
+                # The whole resource is unusable, so soft-reject every span it
+                # carries instead of failing the batch with a 5xx. Mirrors the
+                # per-span reject pattern below.
+                span_count = sum(
+                    len(s.spans) for s in proto_resource_spans.scope_spans
+                )
+                rejected_spans += span_count
+                error_messages.append(
+                    f"Rejected {span_count} span(s) from resource with conflicting attributes: {e!s}"
+                )
+                continue
             for proto_scope_spans in proto_resource_spans.scope_spans:
                 for proto_span in proto_scope_spans.spans:
                     try:
