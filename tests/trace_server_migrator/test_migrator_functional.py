@@ -885,3 +885,61 @@ def test_migrations_refuse_populated_db_without_history(
         f"SELECT count() FROM {mgmt_b}.migrations WHERE db_name = '{target_db}'"
     ).result_rows[0][0]
     assert orphan_rows == 0
+
+
+def _system_cost_row_count(ch_client, target_db: str, llm_id: str) -> int:
+    result = ch_client.query(
+        f"SELECT count() FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = %(llm_id)s AND created_by = 'system'",
+        parameters={"llm_id": llm_id},
+    )
+    return int(result.result_rows[0][0])
+
+
+def test_apply_migrations_backfills_costs_on_an_already_current_schema(ch_client):
+    """Regression: a checkpoint-only cost change lands without a schema migration.
+
+    `apply_migrations` used to lock-free pre-check purely on schema version and
+    return before the post-migration hook ever ran, so once a database reached
+    the latest migration, new/changed rows in `cost_checkpoint.json` were never
+    inserted again. This reproduces that by migrating to latest (inserting
+    costs once), deleting one model's seeded rows to simulate a checkpoint
+    addition made after the schema was already current, then calling
+    `apply_migrations` again with no version bump and asserting the row comes
+    back.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_backfill")
+    target_db = _unique_name("cost_backfill")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+    llm_id = "gpt-4"
+
+    # Uses the factory's real default hook + work-check (not disabled), since
+    # this test is exercising exactly that wiring.
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db)
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+    # Migration 006 also seeds a `gpt-4` row with a different effective_date,
+    # so a fresh migrate can leave more than one `system` row for this llm_id.
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+
+    # Simulate the checkpoint gaining this model's price after the schema was
+    # already at `latest`: no migration to apply, only a pending cost row.
+    ch_client.command(
+        f"DELETE FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = '{llm_id}' AND created_by = 'system'",
+        settings={"mutations_sync": 2},
+    )
+    assert _system_cost_row_count(ch_client, target_db, llm_id) == 0
+
+    migrator.apply_migrations(target_db)
+
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest

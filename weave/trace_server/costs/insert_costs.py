@@ -173,28 +173,36 @@ def sum_costs(data: dict[str, list[CostDetails]]) -> float:
     return total_costs
 
 
-def insert_costs(client: Client, target_db: str) -> None:
+def pending_costs(client: Client, target_db: str) -> dict[str, list[CostDetails]]:
+    """Costs from `cost_checkpoint.json` not yet present in `target_db`.
+
+    Defensive by design: a failure loading or diffing the checkpoint logs and
+    returns no pending costs rather than raising, since both callers below
+    (the migration hook and the lock-free pre-check) must never crash on it.
+    Silent otherwise: this also runs from the read-only pre-check on every
+    boot once the schema is caught up, so summary logging belongs to
+    `insert_costs`, the one caller that actually inserts.
+    """
     client.database = target_db
-    # Get costs from json
     try:
         new_costs = load_costs_from_json()
     except Exception as e:
         logger.exception("Failed to load costs from json")
-        return
-    logger.info("Loaded %d costs from json", sum_costs(new_costs))
+        return {}
 
-    # filter out current costs
     try:
-        new_costs = filter_out_current_costs(client, new_costs)
+        return filter_out_current_costs(client, new_costs)
     except Exception as e:
         logger.exception("Failed to filter out current costs")
-        return
+        return {}
 
+
+def insert_costs(client: Client, target_db: str) -> None:
+    new_costs = pending_costs(client, target_db)
     logger.info(
         "There are %d costs to insert, after filtering out existing costs",
         sum_costs(new_costs),
     )
-
     if len(new_costs) == 0:
         return
 
@@ -207,11 +215,32 @@ def insert_costs(client: Client, target_db: str) -> None:
     logger.info("Inserted %d costs", sum_costs(new_costs))
 
 
-# We only want to insert costs if the target db version is 5 or higher
-# because the costs table was added in migration 5
+def has_pending_costs(client: Client, target_db: str) -> bool:
+    """Read-only check for whether any checkpoint costs are missing from `target_db`.
+
+    Runs on the shared migrator client outside the normal migration flow (the
+    lock-free pre-check in apply_migrations), so it saves and restores the
+    caller's `client.database` instead of leaving it pointed at `target_db`.
+    Never raises: a broken check must not break server startup.
+    """
+    prev_database = client.database
+    try:
+        return len(pending_costs(client, target_db)) > 0
+    except Exception:
+        logger.exception("Failed to check for pending costs")
+        return False
+    finally:
+        client.database = prev_database
+
+
 def should_insert_costs(
     db_curr_version: int, db_target_version: int | None = None
 ) -> bool:
-    return db_target_version is None or (
-        db_target_version >= 5 and db_curr_version < db_target_version
+    """Costs are insertable once `llm_token_prices` exists (migration 5)."""
+    effective_version = (
+        db_target_version if db_target_version is not None else db_curr_version
     )
+    return effective_version >= COSTS_TABLE_MIGRATION_VERSION
+
+
+COSTS_TABLE_MIGRATION_VERSION = 5
