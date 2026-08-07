@@ -390,6 +390,10 @@ deterministic.
   not agent spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
+- `Tool` accepts JSON-compatible arguments and results. It records strings
+  as-is and serializes structured values for OTel attributes. Prefer
+  `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
+  backward compatibility.
 - Agent span list queries omit heavy message, tool-payload, and raw-span fields;
   use an `AgentSpansQueryReq` with `include_details=True` when validating stored
   span details.
@@ -529,6 +533,12 @@ deterministic.
 - Keep its output adapters split by SDK contract: string `query()` and each
   `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
   only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Standalone async-iterable queries can emit bootstrap `system/init` before the
+  first prompt is consumed. Defer only that init for trace attribution; forward
+  other output received without a pending query-triggering input without
+  attaching it to the next turn, especially late background-task notifications.
+  Correctly completing background subagents across results requires separate
+  conversation-scoped task ownership.
 - Name the corresponding test cases "string prompt" and "async-iterable
   prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
   one-input success and pre/post-result failure assertions paired across them.
