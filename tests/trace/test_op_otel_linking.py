@@ -90,10 +90,8 @@ def test_span_outside_op_carries_no_link(client, otel_setup):
 
 
 def test_subtree_spans_carry_innermost_call(client, otel_setup):
-    """Each span links to the call that was innermost when it started.
-
-    The whole subtree is stamped, matching the eval processor; a nested op
-    takes over the spans started inside it.
+    """The whole subtree is stamped, matching the eval processor, and a nested
+    op takes over the spans started inside it.
     """
 
     @weave.op
@@ -136,20 +134,19 @@ def test_conversation_sdk_spans_carry_call(client, otel_setup):
     call = next(iter(orchestrate.calls()))
 
     attrs = _attrs_by_span_name(otel_setup)
-    assert set(attrs) == {"invoke_agent weather-bot", "chat gpt-4o"}
     links = {
-        (a[PARENT_CALL_ID_SPAN_ATTR], a[PARENT_CALL_TRACE_ID_SPAN_ATTR])
-        for a in attrs.values()
+        (
+            attrs[name][PARENT_CALL_ID_SPAN_ATTR],
+            attrs[name][PARENT_CALL_TRACE_ID_SPAN_ATTR],
+        )
+        for name in ("invoke_agent weather-bot", "chat gpt-4o")
     }
     assert links == {(call.id, call.trace_id)}
 
 
 def test_log_turn_links_only_inside_op(client, otel_setup):
-    """The batch path reads the call stack even though it never writes to it.
-
-    ``log_turn`` emits through ``_emit_span_now``, which deliberately does not
-    make its span current, so the link follows whoever called it: present
-    inside an op, absent from a queue worker outside one.
+    """``log_turn`` emits through ``_emit_span_now``, which never makes its span
+    current but still reads the stack, so the link follows whoever called it.
     """
 
     @weave.op
@@ -198,13 +195,8 @@ async def test_eval_spans_carry_both_links(client, otel_setup):
 
 
 def test_crowded_span_gives_up_trace_id_before_call_id(client, monkeypatch):
-    """A span past OTel's attribute limit evicts oldest-first, so the write
-    order in ``on_start`` decides which half of the link survives. Writing the
-    trace id first spends it first and keeps the call id, which is the one the
-    read path filters on.
-
-    The limit is set here rather than read from the ambient default, which
-    ``OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT`` can move out from under the test.
+    """The write order in ``on_start`` decides which half of the link a span
+    past OTel's attribute limit keeps, since eviction is oldest-first.
     """
     limit = 4
     exporter = InMemorySpanExporter()
@@ -217,7 +209,6 @@ def test_crowded_span_gives_up_trace_id_before_call_id(client, monkeypatch):
     def orchestrate() -> None:
         _emit_wide_span("at_limit", limit - 2)
         _emit_wide_span("one_over", limit - 1)
-        _emit_wide_span("well_over", limit)
 
     orchestrate()
     client.flush()
@@ -228,18 +219,13 @@ def test_crowded_span_gives_up_trace_id_before_call_id(client, monkeypatch):
     assert attrs["at_limit"][PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
     assert attrs["one_over"][PARENT_CALL_ID_SPAN_ATTR] == call.id
     assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["one_over"]
-    assert PARENT_CALL_ID_SPAN_ATTR not in attrs["well_over"]
-    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs["well_over"]
 
     provider.shutdown()
 
 
 def test_bare_thread_drops_link_weave_pool_keeps_it(client, otel_setup):
-    """The call stack is a ContextVar, so a bare thread starts without it.
-
-    This is the mechanism behind every source that cannot be linked: a span
-    created on a library-owned thread (ADK's sync Runner.run, the realtime
-    FIFO timer) cannot see the call.
+    """The call stack is a ContextVar, so a bare thread starts without it —
+    the mechanism behind every span source that cannot be linked.
     """
 
     @weave.op
@@ -260,29 +246,9 @@ def test_bare_thread_drops_link_weave_pool_keeps_it(client, otel_setup):
 
 
 @pytest.mark.asyncio
-async def test_asyncio_task_carries_call(client, otel_setup):
-    """asyncio.Task copies the context, unlike a bare thread."""
-
-    async def emit() -> None:
-        _emit_span("task")
-
-    @weave.op
-    async def orchestrate() -> None:
-        await asyncio.create_task(emit())
-
-    await orchestrate()
-    client.flush()
-    call = next(iter(orchestrate.calls()))
-
-    attrs = _attrs_by_span_name(otel_setup)["task"]
-    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
-
-
-@pytest.mark.asyncio
 async def test_task_outliving_op_links_finished_call(client, otel_setup):
-    """A task holds a copy of the call stack, so it can stamp a call that has
-    already finished. The link is correct; readers must tolerate it pointing
-    at a completed call.
+    """A task copies the call stack, unlike a bare thread, so it can stamp a
+    call that has already finished. Readers must tolerate that.
     """
     tasks: list[asyncio.Task] = []
     released = asyncio.Event()

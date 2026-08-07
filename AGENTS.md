@@ -116,17 +116,6 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
-Two span processors stamp linkage attributes on every span weave's provider
-sees: `OpLinkSpanProcessor` (the enclosing `@weave.op` call) and
-`EvalLinkSpanProcessor` (the eval trial). Processors write in registration
-order and OTel evicts the oldest attribute first, so registration order sets
-which linkage a crowded span gives up — the op link is registered first
-because it is the newer, less established of the two. The op link's keys live
-in `weave/shared/otel_span_attrs.py` rather than
-`weave/trace_server/constants.py` because `weave.trace` may not import the
-trace server; `tests/trace_server/test_genai_semconv.py` pins them against the
-server-side semconv entry.
-
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines

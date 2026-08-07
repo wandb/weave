@@ -411,20 +411,17 @@ def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
     assert by_weave_trace.spans[0].agent_name == "from-call-2"
     assert by_weave_trace.spans[0].parent_call_id == "call-2"
 
-    unlinked = ch_server.agent_spans_query(
+    # Grouping puts every span under its producing call, and the span with no
+    # enclosing op under the empty string -- unset reads back as "", not null.
+    grouped = ch_server.agent_spans_query(
         AgentSpansQueryReq(
             project_id=project_id,
-            query=Query.model_validate(
-                {
-                    "$expr": {
-                        "$eq": [{"$getField": "agent.name"}, {"$literal": "no-call"}]
-                    }
-                }
-            ),
+            group_by=[AgentGroupByRef(source="field", key="parent_call.id")],
         )
     )
-    assert unlinked.spans[0].parent_call_id == ""
-    assert unlinked.spans[0].parent_call_trace_id == ""
+    assert {
+        group.group_keys["parent_call_id"]: group.span_count for group in grouped.groups
+    } == {"call-1": 2, "call-2": 1, "": 1}
 
 
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):

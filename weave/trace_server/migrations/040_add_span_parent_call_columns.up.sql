@@ -8,6 +8,11 @@
 -- itself the same way it does on calls_complete.trace_id in 036. On the
 -- linkage benchmark 0.001 costs 22 granules against a 19-granule baseline,
 -- where 0.01 costs ~41.
+--
+-- Both indexes ship here rather than one now and one later: ADD INDEX covers
+-- only parts written or merged afterwards, so a later index would miss exactly
+-- the rows this feature links. Both columns are empty on every existing part
+-- today, so creating them now is free.
 ALTER TABLE spans
     ADD COLUMN IF NOT EXISTS parent_call_id       String DEFAULT '',
     ADD COLUMN IF NOT EXISTS parent_call_trace_id String DEFAULT '';

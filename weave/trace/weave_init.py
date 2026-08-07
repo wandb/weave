@@ -210,9 +210,7 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
-    # Link spans back to the @weave.op call that was running when they started.
-    # Ordered before the eval linker so that a span overflowing OTel's
-    # attribute limit spends these two before the eval metadata.
+    # Before the eval linker: a crowded span evicts oldest first, so ours go first.
     provider.add_span_processor(OpLinkSpanProcessor())
     # Auto-link GenAI OTel spans to eval predictions and inject eval
     # metadata (call ID, project, evaluation name) onto spans for
