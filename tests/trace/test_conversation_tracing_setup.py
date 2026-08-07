@@ -166,9 +166,7 @@ def test_conversation_tracing_leaves_foreign_provider_untouched(
     assert weave_init._conversation_tracer_provider is None
 
 
-def test_conversation_tracing_installs_both_link_processors(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_conversation_tracing_installs_both_link_processors():
     """The eval and op link processors ride the provider weave installs.
 
     Every linking test builds its own provider by hand, so this is the only

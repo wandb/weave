@@ -80,7 +80,7 @@ def test_span_inside_op_carries_call_ids(client, otel_setup):
     assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
 
 
-def test_span_outside_op_carries_no_link(client, otel_setup):
+def test_span_outside_op_carries_no_link(otel_setup):
     """No call on the stack means no link, not an empty-string link."""
     _emit_span("standalone")
 

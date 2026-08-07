@@ -36,7 +36,7 @@ class OpLinkSpanProcessor(SpanProcessor):
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         call = call_context.get_current_call()
-        # set_attribute(key, None) is dropped silently, reading back as "no op".
+        # A call that has not been created yet has no id to stamp.
         if call is None or call.id is None:
             return
 
