@@ -598,6 +598,202 @@ def test_all_production_migrations_distributed(ch_client):
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
 
 
+def test_intent_records_schema_and_replacement_lifecycle(ch_client):
+    """Intent records retain pipeline history while replacing row versions."""
+    mgmt_db = _unique_name("db_mgmt_intents")
+    target_db = _unique_name("intents")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+        post_migration_hook=None,
+    )
+    migrator.apply_migrations(target_db)
+
+    table_metadata = ch_client.query(
+        "SELECT engine, partition_key, sorting_key, primary_key, "
+        "extract(create_table_query, 'TTL (.+) SETTINGS') "
+        "FROM system.tables "
+        f"WHERE database = '{target_db}' AND name = 'intent_records'"
+    ).result_rows
+    assert table_metadata == [
+        (
+            "ReplacingMergeTree",
+            "toYYYYMM(source_started_at)",
+            "project_id, pipeline_version, lens, toDate(source_started_at), id",
+            "project_id, pipeline_version, lens, toDate(source_started_at), id",
+            "expire_at",
+        )
+    ]
+
+    columns = ch_client.query(
+        "SELECT name, type FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "ORDER BY position"
+    ).result_rows
+    assert columns == [
+        ("project_id", "String"),
+        ("id", "String"),
+        ("signature_id", "FixedString(16)"),
+        ("lens", "LowCardinality(String)"),
+        ("pipeline_version", "UInt32"),
+        ("record_version", "UInt64"),
+        ("category", "String"),
+        ("signature", "String"),
+        ("language", "LowCardinality(String)"),
+        ("sentiment", "LowCardinality(String)"),
+        ("sentiment_confidence", "Float32"),
+        ("sentiment_score", "Float32"),
+        ("embedding_model", "LowCardinality(String)"),
+        ("vector", "Array(Float32)"),
+        ("judge_model", "LowCardinality(String)"),
+        ("prompt_version", "LowCardinality(String)"),
+        ("pipeline_recipe_sha256", "String"),
+        ("trace_id", "String"),
+        ("span_id", "String"),
+        ("conversation_id", "String"),
+        ("turn_index", "UInt16"),
+        ("user_id", "String"),
+        ("agent_name", "LowCardinality(String)"),
+        ("agent_version", "String"),
+        ("provider", "LowCardinality(String)"),
+        ("request_model", "LowCardinality(String)"),
+        ("surface", "LowCardinality(String)"),
+        ("status_code", "Enum8('UNSET' = 0, 'OK' = 1, 'ERROR' = 2)"),
+        ("turn_duration_ms", "UInt32"),
+        ("turn_cost_usd", "Float64"),
+        ("turn_summary", "String"),
+        ("source_started_at", "DateTime64(6, 'UTC')"),
+        ("intent_extracted_at", "DateTime64(6, 'UTC')"),
+        ("inserted_at", "DateTime64(3, 'UTC')"),
+        ("expire_at", "DateTime"),
+    ]
+
+    # 'und' is the DEFAULT as well as the indeterminate sentinel, so an omitted
+    # language has one unknown value rather than two.
+    assert ch_client.query(
+        "SELECT default_expression FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "AND name = 'language'"
+    ).result_rows == [("'und'",)]
+
+    indexes = ch_client.query(
+        "SELECT name, expr, type_full, granularity "
+        "FROM system.data_skipping_indices "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' "
+        "ORDER BY name"
+    ).result_rows
+    assert indexes == [
+        ("idx_conversation_id", "conversation_id", "bloom_filter(0.01)", 1),
+        ("idx_signature_id", "signature_id", "bloom_filter(0.01)", 1),
+        ("idx_span_id", "span_id", "bloom_filter(0.01)", 1),
+        ("idx_trace_id", "trace_id", "bloom_filter(0.01)", 1),
+    ]
+
+    insert_columns = """
+        project_id, id, signature_id, lens, pipeline_version,
+        record_version, category, signature, language,
+        sentiment, sentiment_confidence,
+        embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
+        trace_id, span_id, conversation_id, turn_index, user_id,
+        agent_name, agent_version, provider, request_model, surface, status_code,
+        turn_duration_ms, turn_cost_usd, turn_summary,
+        source_started_at, intent_extracted_at
+    """
+    # source_started_at is deliberately a month before intent_extracted_at: the
+    # partition must follow source time, which is what a backfill depends on.
+    row_template = """
+        SELECT
+            'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
+            'intent', {pipeline_version}, {record_version}, '{category}',
+            'Add Stripe checkout', 'es',
+            'frustrated', toFloat32(0.75),
+            'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
+            'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
+            'trace-1', 'span-1', 'conversation-1', 7, 'user-1',
+            'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', 'OK',
+            4200, toFloat64(0.0123), 'Wired up a Stripe checkout endpoint.',
+            toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
+            toDateTime64('2026-06-20 14:32:00', 6, 'UTC')
+    """
+    for pipeline_version, record_version, category in [
+        (1, 1, "action_request"),
+        (1, 2, "payments"),
+        (2, 1, "action_request"),
+    ]:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_records ({insert_columns}) "
+            + row_template.format(
+                pipeline_version=pipeline_version,
+                record_version=record_version,
+                category=category,
+            )
+        )
+
+    # Highest record_version wins within a pipeline_version, and each
+    # pipeline_version is retained as its own row.
+    current_rows = ch_client.query(
+        "SELECT pipeline_version, record_version, category, "
+        "formatDateTime(expire_at, '%F %T'), length(vector) "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' ORDER BY pipeline_version"
+    ).result_rows
+    assert current_rows == [
+        (1, 2, "payments", "2100-01-01 00:00:00", 1024),
+        (2, 1, "action_request", "2100-01-01 00:00:00", 1024),
+    ]
+
+    # The promoted columns round-trip as typed values rather than Map strings.
+    promoted = ch_client.query(
+        "SELECT lens, language, "
+        "sentiment, sentiment_confidence, sentiment_score, judge_model, "
+        "prompt_version, length(pipeline_recipe_sha256), turn_index, "
+        "agent_name, agent_version, provider, request_model, surface, status_code, "
+        "turn_duration_ms, turn_cost_usd, turn_summary, "
+        "formatDateTime(source_started_at, '%F %T'), "
+        "formatDateTime(intent_extracted_at, '%F %T') "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' AND pipeline_version = 2"
+    ).result_rows
+    assert promoted == [
+        (
+            "intent",
+            "es",
+            "frustrated",
+            0.75,
+            -1.0,
+            "gemma-4-31b-it",
+            "intent-v1",
+            64,
+            7,
+            "checkout-agent",
+            "1.4.2",
+            "anthropic",
+            "claude-sonnet-5",
+            "cli",
+            "OK",
+            4200,
+            0.0123,
+            "Wired up a Stripe checkout endpoint.",
+            "2026-05-30 09:15:00",
+            "2026-06-20 14:32:00",
+        )
+    ]
+
+    active_partitions = ch_client.query(
+        "SELECT DISTINCT partition "
+        "FROM system.parts "
+        f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
+        "ORDER BY partition"
+    ).result_rows
+    assert active_partitions == [("202605",)]
+
+
 def test_all_production_down_migrations_replicated(ch_client):
     """All production down migrations apply cleanly in replicated mode."""
     mgmt_db = _unique_name("db_mgmt_down_repl")
