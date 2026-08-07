@@ -330,6 +330,11 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+Pure ESM auto-instrumentation requires the `weave/instrument` loader. For
+one-off `tsx` live validation scripts where that loader is not installed, call
+`wrapClaudeAgentSdk()` and consume the returned module view so tracing is
+deterministic.
+
 ### TypeScript integration metadata
 
 - `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
@@ -377,14 +382,47 @@ pnpm exec tsx examples/claudeAgents.ts
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
+  `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
+  belongs on child model spans.
+- Record `invoke_agent` inputs and outputs through `Turn.record()` or
+  `SubAgent.record()`. Keep `gen_ai.tool.*` attributes on `execute_tool` spans,
+  not agent spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
 - `Tool` accepts JSON-compatible arguments and results. It records strings
   as-is and serializes structured values for OTel attributes. Prefer
   `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
   backward compatibility.
+- Agent span list queries omit heavy message, tool-payload, and raw-span fields;
+  use an `AgentSpansQueryReq` with `include_details=True` when validating stored
+  span details.
+- Parallel/background Claude Agent SDK `Agent` calls can emit an
+  `async_launched` or `remote_launched` tool result before forwarded child
+  messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
+  tool-use ID across turn boundaries until that notification arrives.
+- Route a forwarded assistant message to an already-open `SubAgent` before
+  creating a `Turn`; background messages can arrive after the root result and
+  must not create an empty root turn or consume the next pending input.
+- For synchronous `Agent`/`Task` completion, read terminal output from the
+  structured `SDKUserMessage.tool_use_result.content`; use the model-facing
+  `tool_result` block content only as a compatibility fallback. Background
+  completion output continues to come from `task_notification.summary`.
+- Read a subagent's lifetime from the launch request (`run_in_background`, or
+  `isolation: 'remote'`, which is always backgrounded) rather than inferring it
+  from the result status — an unrecognized status must not downgrade it.
+- Surviving a turn boundary is transitive: a background `SubAgent`'s open
+  `Tool`s and nested `SubAgent`s survive with it. Closing a descendant early
+  also drops it from the open map, so the next forwarded message re-creates it
+  under the wrong `Turn`.
+- Buffer a subagent's terminal state (and the timestamp it was observed) instead
+  of ending the span on the spot: `SpanBase` only records an error through
+  `end()`, and the span must close after its children. Pass the timestamp as
+  `endTime` so the deferral doesn't inflate the duration.
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
+  and preserve the caller's `forwardSubagentText` option.
 
 ### Claude Agent SDK streamed images
 
@@ -507,6 +545,14 @@ pnpm exec tsx examples/claudeAgents.ts
 - SDK output can fail before the first message or between completed turns. Keep
   the submitted/pending input observable by ending its `Turn` through the
   exception path so the span records the error before the exception propagates.
+- The Agents conversation tree renders recognized GenAI operations. Generic
+  OTel spans with an empty `gen_ai.operation.name` remain stored and queryable
+  through `agent_spans_query`, but are omitted from that visual tree; use a
+  semantic marker span when a UI-visible trace regression is required.
+- Use the Trace tree view for parentage comparisons. The default flamegraph
+  collapses overlapping siblings into synthetic groups, which can make flat
+  and nested traces look deceptively similar; give live-example spans realistic
+  duration and verify their stored parent IDs with `agent_spans_query`.
 
 ### Claude Agent SDK token accounting
 
@@ -651,4 +697,8 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
       OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
       `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
+- [ ] Isolate Node GenAI test exit hooks: a full in-band Jest run can register
+      more than ten `beforeExit` listeners and flush queued test calls to the
+      real trace server after teardown when developer W&B credentials are
+      present, turning an otherwise-green run into a post-test failure.
 - [ ] ...

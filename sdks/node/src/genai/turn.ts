@@ -146,7 +146,7 @@ export class Turn extends SpanBase {
     // library's active span as a parent.
     const span = tracer.startSpan(
       'invoke_agent',
-      {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
+      {kind: SpanKind.INTERNAL, attributes, startTime: opts.startTime},
       ROOT_CONTEXT
     );
     const turn = new Turn({
