@@ -241,20 +241,24 @@ def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
     ("raw", "expected"),
     [
         # None means the variable is absent rather than set to a value.
-        (None, []),
-        ("", []),
-        ("10.0.0.0/8", ["10.0.0.0/8"]),
-        ("10.0.0.0/8,fd00::/8", ["10.0.0.0/8", "fd00::/8"]),
-        (" 10.0.0.0/8 ,\tfd00::/8 ", ["10.0.0.0/8", "fd00::/8"]),
-        ("10.0.0.0/8,,  ,fd00::/8", ["10.0.0.0/8", "fd00::/8"]),
-    ],
-    ids=[
-        "unset",
-        "empty",
-        "single_network",
-        "comma_separated",
-        "surrounding_whitespace",
-        "empty_entries",
+        pytest.param(None, [], id="unset"),
+        pytest.param("", [], id="empty"),
+        pytest.param("10.0.0.0/8", ["10.0.0.0/8"], id="single_network"),
+        pytest.param(
+            "10.0.0.0/8,fd00::/8",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="comma_separated",
+        ),
+        pytest.param(
+            " 10.0.0.0/8 ,\tfd00::/8 ",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="surrounding_whitespace",
+        ),
+        pytest.param(
+            "10.0.0.0/8,,  ,fd00::/8",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="empty_entries",
+        ),
     ],
 )
 @pytest.mark.disable_logging_error_check
