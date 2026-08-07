@@ -344,11 +344,18 @@ deterministic.
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
-### TypeScript media round trip
+### TypeScript custom type round trip
 
 - `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
   `WeaveAudio` from a `wave.Wave_read` one, downloading the stored file from
   `ref.projectId`, not the client's project.
+- It also rebuilds a `Date` from a `datetime.datetime` payload, which stores no
+  file: Python writes the ISO string inline into the record's `val`. A `Date`
+  is a UTC instant with millisecond resolution, so the round trip keeps the
+  moment but loses the original offset and truncates Python's microseconds. It
+  reads whole-minute offsets only, so a timestamp from before its zone adopted
+  one comes back as an `Invalid Date` (`Africa/Monrovia` ran on `-00:44:30`
+  until 1972).
 - `wave.Wave_read` is what this SDK writes, and what Python wrote until May
   2025. Both store one `audio.wav` and no metadata file.
 - Python now records every `Audio` and `wave.Wave_read` object as
