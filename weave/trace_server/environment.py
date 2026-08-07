@@ -174,6 +174,9 @@ REMOTE_SCORER_VALIDATE_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_VALIDATE_HOS
 REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_ALLOW_INSECURE_HTTP"
 )
+REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV = (
+    "WF_SCORING_WORKER_REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS"
+)
 REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA"
 )
@@ -231,14 +234,28 @@ def wf_scoring_worker_remote_scorer_validate_hosts() -> bool:
 
 
 def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
-    """Whether remote scorer URLs may use insecure http.
+    """Whether remote scorer URLs may use the http scheme instead of https.
 
-    This is intended as an explicit operator waiver for local/dev testing. The
-    worker still applies the host allowlist when this is enabled.
+    The host allowlist still applies when it is enabled, and private IP
+    addresses are governed independently by
+    wf_scoring_worker_remote_scorer_allowed_private_cidrs.
     """
     return (
         os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
     )
+
+
+def wf_scoring_worker_remote_scorer_allowed_private_cidrs() -> list[str]:
+    """Networks exempt from the remote scorer private IP address deny.
+
+    Values are comma-separated CIDR networks, for example "10.0.0.0/8". Empty
+    and whitespace-only entries are ignored, and the default empty list keeps
+    every private IP address denied.
+    """
+    raw = os.environ.get(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV)
+    if raw is None:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
 
 
 def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
