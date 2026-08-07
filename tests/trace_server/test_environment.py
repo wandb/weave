@@ -237,57 +237,36 @@ def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
     ]
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # None means the variable is absent rather than set to a value.
+        (None, []),
+        ("", []),
+        ("10.0.0.0/8", ["10.0.0.0/8"]),
+        ("10.0.0.0/8,fd00::/8", ["10.0.0.0/8", "fd00::/8"]),
+        (" 10.0.0.0/8 ,\tfd00::/8 ", ["10.0.0.0/8", "fd00::/8"]),
+        ("10.0.0.0/8,,  ,fd00::/8", ["10.0.0.0/8", "fd00::/8"]),
+    ],
+    ids=[
+        "unset",
+        "empty",
+        "single_network",
+        "comma_separated",
+        "surrounding_whitespace",
+        "empty_entries",
+    ],
+)
 @pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_defaults_to_empty(
-    monkeypatch,
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs(
+    raw, expected, monkeypatch
 ):
-    monkeypatch.delenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raising=False)
-    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == []
+    if raw is None:
+        monkeypatch.delenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raising=False)
+    else:
+        monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raw)
 
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_treats_empty_as_unset(
-    monkeypatch,
-):
-    monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "")
-    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == []
-
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_splits_on_commas(
-    monkeypatch,
-):
-    monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "10.0.0.0/8,fd00::/8")
-    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
-        "10.0.0.0/8",
-        "fd00::/8",
-    ]
-
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_strips_whitespace(
-    monkeypatch,
-):
-    monkeypatch.setenv(
-        REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, " 10.0.0.0/8 ,\tfd00::/8 "
-    )
-    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
-        "10.0.0.0/8",
-        "fd00::/8",
-    ]
-
-
-@pytest.mark.disable_logging_error_check
-def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs_skips_empty_entries(
-    monkeypatch,
-):
-    monkeypatch.setenv(
-        REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, "10.0.0.0/8,,  ,fd00::/8"
-    )
-    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == [
-        "10.0.0.0/8",
-        "fd00::/8",
-    ]
+    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == expected
 
 
 @pytest.mark.disable_logging_error_check
