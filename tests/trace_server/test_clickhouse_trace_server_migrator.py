@@ -113,7 +113,7 @@ def mock_migration_lock():
 def mock_costs():
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs",
+            "weave.trace_server.clickhouse_trace_server_migrator.costs_schema_is_ready",
             return_value=False,
         ),
         patch("weave.trace_server.clickhouse_trace_server_migrator.insert_costs"),
@@ -454,16 +454,42 @@ def test_apply_migrations_costs_disabled_does_not_call_costs(mock_migration_lock
 
     with (
         patch(
-            "weave.trace_server.clickhouse_trace_server_migrator.should_insert_costs"
-        ) as mock_should_insert_costs,
+            "weave.trace_server.clickhouse_trace_server_migrator.costs_schema_is_ready"
+        ) as mock_costs_schema_is_ready,
         patch(
             "weave.trace_server.clickhouse_trace_server_migrator.insert_costs"
         ) as mock_insert_costs,
     ):
         migrator.apply_migrations("test_db")
 
-    mock_should_insert_costs.assert_not_called()
+    mock_costs_schema_is_ready.assert_not_called()
     mock_insert_costs.assert_not_called()
+
+
+def test_apply_migrations_work_check_inert_without_a_hook():
+    """A work check is meaningless without a hook to act on it.
+
+    A caller that opts out of the hook (post_migration_hook=None) but leaves a
+    work check configured must not have that check invoked by the lock-free
+    pre-check, even at a schema version where it would otherwise fire.
+    """
+    ch_client = _make_ch_client()
+    work_check = Mock(return_value=True)
+    migrator = trace_server_migrator.get_clickhouse_trace_server_migrator(
+        ch_client, post_migration_hook=None, post_migration_work_check=work_check
+    )
+    migrator._has_migrations_to_apply = Mock(return_value=False)
+    migrator._read_migration_status = Mock(
+        return_value={"curr_version": 10, "partially_applied_version": None}
+    )
+
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_migrator.migration_lock"
+    ) as mock_lock:
+        migrator.apply_migrations("test_db")
+
+    work_check.assert_not_called()
+    mock_lock.assert_not_called()
 
 
 def test_apply_migrations_skips_lock_when_nothing_pending():
@@ -475,6 +501,7 @@ def test_apply_migrations_skips_lock_when_nothing_pending():
         ch_client, post_migration_hook=None
     )
     migrator._has_migrations_to_apply = Mock(return_value=False)
+    migrator._has_post_migration_work = Mock(return_value=False)
     migrator._apply_migrations_locked = Mock()
 
     with patch(
