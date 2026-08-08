@@ -212,6 +212,75 @@ def postprocess_output_invoke(
     return outputs
 
 
+def bedrock_on_finish_invoke_stream(
+    call: Call, output: Any, exception: BaseException | None
+) -> None:
+    model_name = str(call.inputs["modelId"])
+    usage = {model_name: {"requests": 1}}
+    summary_update = {"usage": usage}
+
+    if output and "ResponseMetadata" in output:
+        headers = output["ResponseMetadata"]["HTTPHeaders"]
+        prompt_tokens = int(headers.get("x-amzn-bedrock-input-token-count", 0))
+        completion_tokens = int(headers.get("x-amzn-bedrock-output-token-count", 0))
+        tokens_metrics = {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        }
+        usage[model_name].update(tokens_metrics)
+    if call.summary is not None:
+        call.summary.update(summary_update)
+
+
+def postprocess_output_invoke_stream(
+    outputs: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Process invoke_model_with_response_stream outputs for logging.
+
+    Buffers the EventStream body so weave can log content while still providing
+    callers with an iterable over the original events via a reconstructed generator.
+    ResponseMetadata is preserved on the original outputs dict so the on_finish
+    handler can read token counts from HTTP headers.
+    """
+    if outputs is None:
+        return None
+    if "body" not in outputs:
+        return outputs
+
+    outputs_copy = {k: copy.deepcopy(v) for k, v in outputs.items() if k != "body"}
+
+    all_events: list[dict] = []
+    all_bytes = b""
+
+    try:
+        body_stream = outputs["body"]
+        for event in body_stream:
+            all_events.append(event)
+            chunk = event.get("chunk", {})
+            if isinstance(chunk, dict) and "bytes" in chunk:
+                all_bytes += chunk["bytes"]
+
+        def recreate_stream() -> Any:
+            yield from all_events
+
+        outputs["body"] = recreate_stream()
+
+        try:
+            body_text = all_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            body_text = repr(all_bytes)
+
+        outputs_copy["body"] = {
+            "content": body_text,
+            "event_count": len(all_events),
+        }
+    except Exception as e:
+        outputs_copy["body"] = {"_stream_error": str(e)}
+
+    return outputs_copy
+
+
 def postprocess_output_invoke_agent(
     outputs: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
@@ -473,6 +542,19 @@ def create_stream_wrapper(
     return wrapper
 
 
+def _patch_invoke_model_stream(bedrock_client: "BaseClient") -> None:
+    op = weave.op(
+        bedrock_client.invoke_model_with_response_stream,
+        name="BedrockRuntime.invoke_stream",
+        postprocess_inputs=postprocess_inputs_invoke,
+        postprocess_output=postprocess_output_invoke_stream,
+        kind="llm",
+        attributes=BEDROCK_INTEGRATION.as_attributes(),
+    )
+    op._set_on_finish_handler(bedrock_on_finish_invoke_stream)
+    bedrock_client.invoke_model_with_response_stream = op
+
+
 def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
     """Patches the converse_stream method to handle streaming."""
     op = create_stream_wrapper("BedrockRuntime.converse_stream")(
@@ -490,6 +572,8 @@ def patch_client(bedrock_client: "BaseClient") -> None:
         _patch_converse(bedrock_client)
         _patch_converse_stream(bedrock_client)
         _patch_invoke(bedrock_client)
+        if hasattr(bedrock_client, "invoke_model_with_response_stream"):
+            _patch_invoke_model_stream(bedrock_client)
     elif hasattr(bedrock_client, "apply_guardrail"):
         # This is a standard bedrock-runtime client
         _patch_apply_guardrail(bedrock_client)
