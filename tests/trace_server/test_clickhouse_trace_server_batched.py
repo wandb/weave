@@ -566,10 +566,11 @@ def test_completions_create_stream_custom_provider():
         stream = server.completions_create_stream(req)
         chunks = list(stream)
 
-        assert len(chunks) == 2
-        assert chunks[0]["choices"][0]["delta"]["content"] == "Streamed"
-        assert chunks[1]["choices"][0]["finish_reason"] == "stop"
-        assert "usage" in chunks[1]
+        assert req.conversation_id
+        assert chunks[0] == {"_meta": {"conversation_id": req.conversation_id}}
+        assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
+        assert chunks[2]["choices"][0]["finish_reason"] == "stop"
+        assert "usage" in chunks[2]
 
         # Verify litellm was called with correct parameters
         mock_litellm.assert_called_once()
@@ -578,7 +579,10 @@ def test_completions_create_stream_custom_provider():
             call_args.get("api_base")
             or call_args.get("base_url") == "https://api.custom.com"
         )
-        assert call_args["extra_headers"] == {"X-Custom": "value"}
+        assert call_args["extra_headers"] == {
+            "X-Custom": "value",
+            "X-Weave-Conversation-Id": req.conversation_id,
+        }
 
 
 def test_completions_create_stream_custom_provider_with_tracking():
@@ -709,6 +713,8 @@ def test_completions_create_stream_custom_provider_with_tracking():
         assert len(chunks) == 3  # Meta chunk + 2 content chunks
         assert "_meta" in chunks[0]
         assert "weave_call_id" in chunks[0]["_meta"]
+        assert req.track_llm_call is True
+        assert chunks[0]["_meta"]["conversation_id"] == req.conversation_id
         assert chunks[1]["choices"][0]["delta"]["content"] == "Streamed"
         assert chunks[2]["choices"][0]["finish_reason"] == "stop"
         assert "usage" in chunks[2]
@@ -724,7 +730,10 @@ def test_completions_create_stream_custom_provider_with_tracking():
             call_args.get("api_base")
             or call_args.get("base_url") == "https://api.custom.com"
         )
-        assert call_args["extra_headers"] == {"X-Custom": "value"}
+        assert call_args["extra_headers"] == {
+            "X-Custom": "value",
+            "X-Weave-Conversation-Id": req.conversation_id,
+        }
 
 
 def test_completions_create_stream_multiple_choices():

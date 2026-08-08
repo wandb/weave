@@ -24,6 +24,7 @@ from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
+from weave.trace_server.llm_completion import CustomProviderInfo
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
@@ -112,6 +113,42 @@ async def test_tracking_routes_through_log_completion_call(
     assert log_mock.call_count == 1
     forwarded_res = log_mock.call_args.args[2]
     assert forwarded_res is llm_res
+
+
+@pytest.mark.asyncio
+async def test_async_custom_runtime_preserves_tracking_and_forwards_context(
+    server: AsyncClickHouseTraceServer,
+) -> None:
+    llm_res = tsi.CompletionsCreateRes(response={"choices": [{"x": 1}]})
+    completion = AsyncMock(return_value=llm_res)
+    req = _make_req(track_llm_call=True, model="custom::runtime::model")
+    with (
+        patch(
+            "weave.trace_server.clickhouse_trace_server_batched.get_custom_provider_info",
+            return_value=CustomProviderInfo(
+                base_url="https://runtime.example.com/v1",
+                api_key="runtime-key",
+                extra_headers={"X-Tenant": "customer"},
+                return_type="openai",
+                actual_model_name="model",
+            ),
+        ),
+        patch(LITELLM_ACOMPLETION_PATCH, new=completion),
+        patch.object(
+            server,
+            "_log_completion_call",
+            return_value=tsi.CompletionsCreateRes(response=llm_res.response),
+        ) as log_completion,
+    ):
+        await server.acompletions_create(req)
+
+    assert req.conversation_id
+    assert req.track_llm_call is True
+    log_completion.assert_called_once()
+    assert completion.await_args.kwargs["extra_headers"] == {
+        "X-Tenant": "customer",
+        "X-Weave-Conversation-Id": req.conversation_id,
+    }
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from functools import partial
 from typing import Any, NamedTuple, TypeVar, cast
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -175,7 +176,10 @@ from weave.trace_server.common_interface import AnnotationQueueItemsFilter
 from weave.trace_server.constants import (
     IMAGE_GENERATION_CREATE_OP_NAME,
 )
-from weave.trace_server.custom_runtime import apply_custom_runtime
+from weave.trace_server.custom_runtime import (
+    apply_custom_runtime,
+    is_custom_runtime_model,
+)
 from weave.trace_server.datadog import (
     record_db_insert,
     set_current_span_dd_tags,
@@ -373,6 +377,8 @@ CALLS_STREAM_GROWTH_FACTOR = 10
 
 # Retry attempts when reading back a newly-created object (eventual consistency)
 OBJ_READ_RETRY_ATTEMPTS = 3
+
+CUSTOM_RUNTIME_CONVERSATION_ID_HEADER = "X-Weave-Conversation-Id"
 
 # Create a shared connection pool manager for all ClickHouse connections
 _CH_POOL_MANAGER = get_pool_manager(
@@ -6917,6 +6923,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
 
+        _ensure_custom_runtime_conversation_id(req)
+
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -6988,7 +6996,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.CompletionsCreateRes:
         """Post-LLM-call CH insert. Called via `run_in_executor` from the async path."""
         if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+            return tsi.CompletionsCreateRes(
+                response=res.response,
+                conversation_id=(
+                    req.conversation_id
+                    if prep.completion_model_info.is_custom_runtime
+                    else None
+                ),
+            )
 
         built = self._build_completion_call_span(req, prep, res, start_time, end_time)
         AgentWriteHandler(self.ch_client, self._async_insert_settings()).insert_span(
@@ -7033,6 +7048,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 yield {"error": f"Failed to resolve and apply prompt: {err!s}"}
 
             return _single_error_iter(e)
+
+        _ensure_custom_runtime_conversation_id(req)
 
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
@@ -7106,6 +7123,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         if not req.track_llm_call or span_id is None:
+            if completion_model_info.is_custom_runtime and req.conversation_id:
+                return _prepend_completion_conversation_context(
+                    chunk_iter, req.conversation_id
+                )
             return chunk_iter
 
         assert retention_days is not None
@@ -8261,6 +8282,14 @@ def _create_tracked_span_stream_wrapper(
     return _stream_wrapper()
 
 
+def _prepend_completion_conversation_context(
+    chunk_iter: Iterator[dict[str, Any]], conversation_id: str
+) -> Iterator[dict[str, Any]]:
+    """Prepend server-owned conversation context to an untracked stream."""
+    yield {"_meta": {"conversation_id": conversation_id}}
+    yield from chunk_iter
+
+
 @dataclasses.dataclass(frozen=True)
 class CompletionModelInfo:
     model_name: str
@@ -8270,6 +8299,7 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+    is_custom_runtime: bool = False
 
 
 class CompletionPrepResult(NamedTuple):
@@ -8290,6 +8320,28 @@ class BuiltCompletionSpan(NamedTuple):
 
     span: AgentSpanCHInsertable
     result: tsi.CompletionsCreateRes
+
+
+def _ensure_custom_runtime_conversation_id(
+    req: tsi.CompletionsCreateReq,
+) -> str | None:
+    if not req.conversation_id and is_custom_runtime_model(req.inputs.model):
+        req.conversation_id = generate_id()
+    return req.conversation_id or None
+
+
+def _custom_runtime_headers(
+    configured_headers: dict[str, str], conversation_id: str | None
+) -> dict[str, str]:
+    context_header = CUSTOM_RUNTIME_CONVERSATION_ID_HEADER.lower()
+    headers = {
+        key: value
+        for key, value in configured_headers.items()
+        if key.lower() != context_header
+    }
+    if conversation_id:
+        headers[CUSTOM_RUNTIME_CONVERSATION_ID_HEADER] = quote(conversation_id, safe="")
+    return headers
 
 
 def _setup_completion_model_info(
@@ -8314,7 +8366,7 @@ def _setup_completion_model_info(
     vertex_credentials: str | None = getattr(req.inputs, "vertex_credentials", None)
 
     # Check for explicit custom provider prefix
-    is_explicit_custom = model_name.startswith("custom::")
+    is_explicit_custom = is_custom_runtime_model(model_name)
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"
@@ -8395,9 +8447,12 @@ def _setup_completion_model_info(
             api_key=custom_provider_info.api_key,
             provider="custom",
             base_url=base_url,
-            extra_headers=custom_provider_info.extra_headers,
+            extra_headers=_custom_runtime_headers(
+                custom_provider_info.extra_headers, req.conversation_id
+            ),
             return_type=custom_provider_info.return_type,
             vertex_credentials=None,
+            is_custom_runtime=True,
         )
     elif model_info:
         secret_name = model_info.get("api_key_name")

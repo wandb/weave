@@ -29,8 +29,14 @@ if TYPE_CHECKING:
 Endpoint = Literal["playground", "inference"]
 
 
+class _PlaygroundChatCompletion(ChatCompletion):
+    """OpenAI-compatible completion with W&B Playground conversation context."""
+
+    conversation_id: str
+
+
 # TODO: We remove these to align with OpenAI's API, but maybe they would be useful to keep?
-IGNORE_ARGS = ("self", "endpoint", "track_llm_call")
+IGNORE_ARGS = ("self", "endpoint", "track_llm_call", "conversation_id")
 
 
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -50,6 +56,7 @@ class Completions:
         *,
         endpoint: Endpoint = "playground",
         track_llm_call: bool = True,
+        conversation_id: str | NotGiven | None = NOT_GIVEN,
         messages: Iterable,
         model: str,
         frequency_penalty: float | NotGiven | None = NOT_GIVEN,
@@ -99,6 +106,8 @@ class Completions:
 
           track_llm_call: Whether to track the LLM call.
 
+          conversation_id: Conversation context to reuse for a Playground request.
+
           messages: A list of messages comprising the conversation so far.
 
           model: ID of the model to use.
@@ -147,6 +156,7 @@ class Completions:
         """
         kwargs = {
             "endpoint": endpoint,
+            "conversation_id": conversation_id,
             "messages": messages,
             "model": model,
             "frequency_penalty": frequency_penalty,
@@ -178,6 +188,10 @@ class Completions:
 
         messages = kwargs["messages"]
         model = kwargs["model"]
+        conversation_id = kwargs.get("conversation_id", NOT_GIVEN)
+        initial_conversation_id = (
+            conversation_id if isinstance(conversation_id, str) else None
+        )
         frequency_penalty = kwargs.get("frequency_penalty", NOT_GIVEN)
         max_tokens = kwargs.get("max_tokens", NOT_GIVEN)
         n = kwargs.get("n", NOT_GIVEN)
@@ -225,6 +239,8 @@ class Completions:
                 "project_id": project_id,
                 "track_llm_call": False,
             }
+            if initial_conversation_id is not None:
+                data["conversation_id"] = initial_conversation_id
         elif endpoint == "inference":
             url = f"https://{INFERENCE_HOST}/v1/chat/completions"
             headers["Authorization"] = f"Bearer {api_key}"
@@ -264,7 +280,11 @@ class Completions:
                 check_response(response)
 
                 # Transfer ownership so the returned stream controls cleanup.
-                return ChatCompletionChunkStream(response, stack.pop_all())
+                return ChatCompletionChunkStream(
+                    response,
+                    exit_stack=stack.pop_all(),
+                    initial_conversation_id=initial_conversation_id,
+                )
         else:
             with httpx.Client(timeout=timeout) as client:
                 response = client.post(
@@ -278,8 +298,13 @@ class Completions:
         # Non-streaming case
         d = response.json()
         if endpoint == "playground":
+            conversation_id = d.get("conversation_id") or initial_conversation_id
             d = d["response"]
         try:
+            if endpoint == "playground" and conversation_id:
+                return _PlaygroundChatCompletion.model_validate(
+                    {**d, "conversation_id": conversation_id}
+                )
             return ChatCompletion.model_validate(d)
         except ValidationError:
             print(d)
