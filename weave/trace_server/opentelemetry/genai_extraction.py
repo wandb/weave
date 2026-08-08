@@ -648,6 +648,8 @@ def extract_genai_span(
             attrs, *semconv.EVAL_TRIAL_INDEX.lookup_keys, default=-1
         ),
         eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
+        parent_call_id=_get_str(attrs, *semconv.PARENT_CALL_ID.lookup_keys),
+        parent_call_trace_id=_get_str(attrs, *semconv.PARENT_CALL_TRACE_ID.lookup_keys),
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),

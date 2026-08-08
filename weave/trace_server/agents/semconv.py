@@ -353,6 +353,16 @@ EVAL_EVALUATION_NAME = Attribute(
     "string",
     "Evaluation display name associated with this span",
 )
+PARENT_CALL_ID = Attribute(
+    "weave.parent_call.id",
+    "string",
+    "Weave call ID of the @weave.op call that was running when this span started",
+)
+PARENT_CALL_TRACE_ID = Attribute(
+    "weave.parent_call.trace_id",
+    "string",
+    "Weave trace ID of the @weave.op call that was running when this span started",
+)
 
 _DEFS: list[Attribute] = [
     # Keep this registry in sync with Attribute constants. The unit tests
@@ -413,6 +423,8 @@ _DEFS: list[Attribute] = [
     EVAL_EXAMPLE_ID,
     EVAL_TRIAL_INDEX,
     EVAL_EVALUATION_NAME,
+    PARENT_CALL_ID,
+    PARENT_CALL_TRACE_ID,
 ]
 
 
@@ -492,6 +504,8 @@ CANONICAL_KEY_TO_COLUMN: dict[str, str] = {
     EVAL_ROW_DIGEST.key: "eval_row_digest",
     EVAL_EXAMPLE_ID.key: "eval_example_id",
     EVAL_EVALUATION_NAME.key: "eval_evaluation_name",
+    PARENT_CALL_ID.key: "parent_call_id",
+    PARENT_CALL_TRACE_ID.key: "parent_call_trace_id",
     # int scalars
     USAGE_INPUT_TOKENS.key: "input_tokens",
     USAGE_OUTPUT_TOKENS.key: "output_tokens",

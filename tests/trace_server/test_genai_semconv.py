@@ -1,5 +1,6 @@
 """Unit tests for GenAI semantic convention definitions."""
 
+from weave.shared import otel_span_attrs
 from weave.trace_server.agents import semconv
 
 
@@ -18,6 +19,19 @@ def test_all_attribute_constants_are_registered() -> None:
 
 def test_filterable_columns_reference_registered_attributes() -> None:
     assert set(semconv.CANONICAL_KEY_TO_COLUMN).issubset(set(semconv.ATTRIBUTES))
+
+
+def test_parent_call_keys_match_the_client_side_constants() -> None:
+    """The SDK writes these keys from its own copy of the constant, since the
+    client cannot import the trace server. If the two spellings drift, the
+    attributes land in the custom-attribute overflow map instead of the
+    promoted columns, and every query returns zero rows without an error.
+    """
+    assert semconv.PARENT_CALL_ID.key == otel_span_attrs.PARENT_CALL_ID_SPAN_ATTR
+    assert (
+        semconv.PARENT_CALL_TRACE_ID.key
+        == otel_span_attrs.PARENT_CALL_TRACE_ID_SPAN_ATTR
+    )
 
 
 def test_multi_alias_lookup_keys_priority_order() -> None:

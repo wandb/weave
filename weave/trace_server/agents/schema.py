@@ -110,6 +110,10 @@ class AgentSpanCHInsertable(BaseModel):
     eval_trial_index: int = -1
     eval_evaluation_name: str = ""
 
+    # [Weave] enclosing @weave.op call — weave.parent_call.*
+    parent_call_id: str = ""
+    parent_call_trace_id: str = ""
+
     # [OTel GenAI] model info — gen_ai.request.model, gen_ai.response.*
     request_model: str = ""
     response_model: str = ""
