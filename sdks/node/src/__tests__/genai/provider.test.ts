@@ -108,8 +108,8 @@ describe('otel/provider', () => {
     // internals — better replaced by an integration test that asserts the
     // header on a captured export once we have that harness.
     function exporterProjectId(provider: BasicTracerProvider): string {
-      const processor = (provider as any)._registeredSpanProcessors?.[0];
-      const exporter = processor?._exporter;
+      const processors = (provider as any)._registeredSpanProcessors ?? [];
+      const exporter = processors.find((p: any) => p._exporter)?._exporter;
       const headers = exporter?._transport?._transport?._parameters?.headers;
       return headers?.project_id;
     }

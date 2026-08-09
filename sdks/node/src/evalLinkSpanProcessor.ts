@@ -1,9 +1,4 @@
-import {
-  isSpanContextValid,
-  trace,
-  type Context,
-  type TracerProvider,
-} from '@opentelemetry/api';
+import {isSpanContextValid, type Context} from '@opentelemetry/api';
 import type {
   ReadableSpan,
   Span,
@@ -14,6 +9,7 @@ import {
   EVAL_EVALUATION_NAME_SPAN_ATTR,
   EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR,
   EVAL_PROJECT_ID_SPAN_ATTR,
+  EVAL_RUN_ID_SPAN_ATTR,
   EVALUATION_RUN_OP_NAME,
   EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES,
   GENAI_SPAN_REF_ATTR_KEY,
@@ -21,23 +17,6 @@ import {
 } from './constants';
 import {ATTR_GEN_AI_OPERATION_NAME} from './genai/semconv';
 import type {CallStackEntry, WeaveClient} from './weaveClient';
-import state from './state';
-
-// The API TracerProvider type only exposes getTracer. addSpanProcessor is an
-// SDK-specific, deprecated late-registration hook, so we feature-detect it and
-// no-op for API-only or newer providers that do not support it.
-type SpanProcessorProvider = TracerProvider & {
-  addSpanProcessor: (processor: SpanProcessor) => void;
-};
-
-function isSpanProcessorProvider(
-  provider: TracerProvider
-): provider is SpanProcessorProvider {
-  return (
-    'addSpanProcessor' in provider &&
-    typeof provider.addSpanProcessor === 'function'
-  );
-}
 
 type ClientGetter = () => WeaveClient | null;
 
@@ -114,13 +93,22 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
     if (!client || !call) {
       return;
     }
+    const evaluateCall = findEvaluateCall(this.getClient);
 
+    // A span already at its attribute limit drops whatever arrives next, and
+    // eval results only recognize a span carrying both the run ID and the
+    // predict-and-score call ID, so write that pair before the rest.
+    if (evaluateCall) {
+      span.setAttribute(EVAL_RUN_ID_SPAN_ATTR, evaluateCall.callId);
+    }
     span.setAttribute(EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR, call.callId);
     span.setAttribute(EVAL_PROJECT_ID_SPAN_ATTR, client.projectId);
 
-    const evalName = findEvaluateCall(this.getClient)?.displayName;
-    if (evalName) {
-      span.setAttribute(EVAL_EVALUATION_NAME_SPAN_ATTR, evalName);
+    if (evaluateCall?.displayName) {
+      span.setAttribute(
+        EVAL_EVALUATION_NAME_SPAN_ATTR,
+        evaluateCall.displayName
+      );
     }
   }
 
@@ -153,29 +141,4 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
   shutdown(): Promise<void> {
     return Promise.resolve();
   }
-}
-
-/**
- * Register EvalLinkSpanProcessor on a TracerProvider when the provider exposes
- * the SDK addSpanProcessor API.
- *
- * Returns true when the processor is installed or was already installed.
- * Returns false for API-only proxy providers or other custom providers that do
- * not expose addSpanProcessor.
- */
-export function registerEvalLinkSpanProcessor(
-  getClient: ClientGetter,
-  provider: TracerProvider = trace.getTracerProvider()
-): boolean {
-  if (state.evalLink.registeredProviders.has(provider)) {
-    return true;
-  }
-
-  if (!isSpanProcessorProvider(provider)) {
-    return false;
-  }
-
-  provider.addSpanProcessor(new EvalLinkSpanProcessor(getClient));
-  state.evalLink.registeredProviders.add(provider);
-  return true;
 }

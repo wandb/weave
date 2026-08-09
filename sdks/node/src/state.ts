@@ -5,7 +5,6 @@ import {globalSingleton} from './utils/globalSingleton';
 import {type GenAIState} from './genai/context';
 import {type WeaveAdkPlugin} from './integrations/googleAdk';
 import {type WeaveClient} from './weaveClient';
-import {type TracerProvider} from '@opentelemetry/api';
 
 /**
  * Holds all SDK-wide mutable state.
@@ -109,10 +108,6 @@ type State = {
       plugin: WeaveAdkPlugin | null;
     };
   };
-
-  evalLink: {
-    registeredProviders: WeakSet<TracerProvider>;
-  };
 };
 
 function defaultState(): State {
@@ -125,10 +120,6 @@ function defaultState(): State {
       providerRegistered: false,
       state: new AsyncLocalStorage<GenAIState>(),
       defaultState: {conversation: null, turn: null, llm: null},
-    },
-
-    evalLink: {
-      registeredProviders: new WeakSet(),
     },
 
     integrations: {

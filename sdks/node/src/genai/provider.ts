@@ -10,6 +10,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
+import {EvalLinkSpanProcessor} from '../evalLinkSpanProcessor';
 import {packageVersion} from '../utils/packageVersion';
 import type {WeaveClient} from '../weaveClient';
 import {getWandbConfigs} from '../wandb/settings';
@@ -95,9 +96,15 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
+  // The eval linker is installed here, not once in init(), because this
+  // provider is built lazily and rebuilt on a project switch — a one-time
+  // registration would miss both.
   const tracerProvider = new BasicTracerProvider({
     resource,
-    spanProcessors: [buildSpanProcessor(client)],
+    spanProcessors: [
+      new EvalLinkSpanProcessor(getGlobalClient),
+      buildSpanProcessor(client),
+    ],
   });
   state.genAi.provider = {tracerProvider, projectId: client.projectId};
   registerBeforeExitHookOnce();
