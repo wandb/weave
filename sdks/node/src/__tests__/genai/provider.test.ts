@@ -17,9 +17,8 @@ import {packageVersion} from '../../utils/packageVersion';
 
 import {installFakeClient, setupGenAITestEnvironment} from './common';
 
-// Same private-field caveat as exporterProjectId below: no public API lists a
-// provider's processors, and being in that list is the eval linker's whole
-// contract, so read the SDK's own array.
+// No public API lists a provider's processors, and being in that list is the
+// eval linker's whole contract, so read the SDK's own array.
 function evalLinkProcessorCount(provider: BasicTracerProvider): number {
   const registered = (provider as any)._registeredSpanProcessors ?? [];
   return registered.filter((p: unknown) => p instanceof EvalLinkSpanProcessor)

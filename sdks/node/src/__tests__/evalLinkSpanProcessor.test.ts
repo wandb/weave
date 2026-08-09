@@ -11,6 +11,8 @@ import {
   EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR,
   EVAL_PROJECT_ID_SPAN_ATTR,
   EVAL_RUN_ID_SPAN_ATTR,
+  EVALUATION_RUN_OP_NAME,
+  EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
 } from '../constants';
 import {Dataset} from '../dataset';
 import {Evaluation} from '../evaluation';
@@ -53,8 +55,7 @@ describe('EvalLinkSpanProcessor', () => {
       () => processor.onStart(span, ROOT_CONTEXT)
     );
 
-    // Ordered: a span at its attribute limit drops whatever arrives next, so the
-    // pair eval results match on has to be written before the display-only ones.
+    // Ordered on purpose — see the comment on onStart.
     expect((span.setAttribute as jest.Mock).mock.calls).toEqual([
       ['weave.eval.run_id', 'eval-call'],
       ['weave.eval.predict_and_score_call_id', 'predict-and-score-call'],
@@ -83,7 +84,8 @@ describe('EvalLinkSpanProcessor - declarative Evaluation', () => {
     });
   });
 
-  async function evaluateOnce(emitSpan: () => void): Promise<void> {
+  /** Evaluate one row, emitting `emitSpan()` inside the prediction. */
+  async function evaluateOnce(emitSpan: () => void) {
     const dataset = new Dataset({rows: [{question: 'hello'}]});
     const model = op(async function model({
       datasetRow,
@@ -97,54 +99,51 @@ describe('EvalLinkSpanProcessor - declarative Evaluation', () => {
       model,
       maxConcurrency: 1,
     });
+
+    const calls = await traceServer.getCalls(projectId);
+    return {
+      evaluateCall: calls.find(c =>
+        c.op_name.includes(EVALUATION_RUN_OP_NAME)
+      )!,
+      predictAndScoreCall: calls.find(c =>
+        c.op_name.includes(EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS)
+      )!,
+    };
   }
 
   test('stamps eval metadata on the spans a declarative evaluation emits', async () => {
-    await evaluateOnce(() => {
+    const {evaluateCall, predictAndScoreCall} = await evaluateOnce(() => {
       const turn = Turn.create({});
       turn.startLLM({model: 'gpt-4o'}).end();
       turn.end();
     });
 
-    const calls = await traceServer.getCalls(projectId);
-    const evaluateCall = calls.find(c =>
-      c.op_name.includes('Evaluation.evaluate')
-    );
-    const predictAndScoreCall = calls.find(c =>
-      c.op_name.includes('Evaluation.predictAndScore')
-    );
     const spans = exporter.getFinishedSpans();
     const rootSpan = findSpan(spans, 'invoke_agent');
     const childSpan = findSpan(spans, 'chat');
 
     // Eval results match a span on the pair, so assert it, not either half.
-    expect(rootSpan.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall!.id);
+    expect(rootSpan.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall.id);
     expect(rootSpan.attributes[EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR]).toBe(
-      predictAndScoreCall!.id
+      predictAndScoreCall.id
     );
     expect(rootSpan.attributes[EVAL_PROJECT_ID_SPAN_ATTR]).toBe(projectId);
     expect(rootSpan.attributes[EVAL_EVALUATION_NAME_SPAN_ATTR]).toBe(
-      evaluateCall!.display_name
+      evaluateCall.display_name
     );
     // Every span the prediction emits is stamped, not just the root.
-    expect(childSpan.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall!.id);
+    expect(childSpan.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall.id);
   });
 
   test('stamps a span emitted inside runIsolated', async () => {
-    await evaluateOnce(() => runIsolated(() => Turn.create({}).end()));
-
-    const calls = await traceServer.getCalls(projectId);
-    const evaluateCall = calls.find(c =>
-      c.op_name.includes('Evaluation.evaluate')
-    );
-    const predictAndScoreCall = calls.find(c =>
-      c.op_name.includes('Evaluation.predictAndScore')
+    const {evaluateCall, predictAndScoreCall} = await evaluateOnce(() =>
+      runIsolated(() => Turn.create({}).end())
     );
     const span = findSpan(exporter.getFinishedSpans(), 'invoke_agent');
 
-    expect(span.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall!.id);
+    expect(span.attributes[EVAL_RUN_ID_SPAN_ATTR]).toBe(evaluateCall.id);
     expect(span.attributes[EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR]).toBe(
-      predictAndScoreCall!.id
+      predictAndScoreCall.id
     );
   });
 });

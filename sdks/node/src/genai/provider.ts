@@ -96,9 +96,6 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
     [WEAVE_RESOURCE_ATTR.WEAVE_SDK_LANGUAGE]: SDK_LANGUAGE,
   });
 
-  // The eval linker is installed here, not once in init(), because this
-  // provider is built lazily and rebuilt on a project switch — a one-time
-  // registration would miss both.
   const tracerProvider = new BasicTracerProvider({
     resource,
     spanProcessors: [

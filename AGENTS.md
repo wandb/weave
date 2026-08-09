@@ -381,10 +381,10 @@ deterministic.
   builds, never the OTel global registry. A processor that must see them belongs
   in that provider's `spanProcessors`, which is built lazily on the first span
   and rebuilt on a project switch — registering once from `init()` misses both.
-- OTel JS drops the *incoming* attribute once a span is at its attribute limit,
-  the opposite of Python's evict-the-oldest `BoundedAttributes`. Write order is
-  therefore load-bearing and inverted between the two SDKs: whatever a
-  processor sets first is what survives.
+- At a span's attribute limit OTel JS drops the *incoming* attribute, where
+  Python's `BoundedAttributes` evicts the oldest. A processor writing several
+  attributes therefore keeps its most important one first in JS and last in
+  Python.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.
