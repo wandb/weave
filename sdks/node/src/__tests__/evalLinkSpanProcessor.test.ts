@@ -32,7 +32,7 @@ describe('EvalLinkSpanProcessor', () => {
     initWithCustomTraceServer(projectId, new InMemoryTraceServer());
   });
 
-  test('injects eval metadata on span start', () => {
+  test('writes eval metadata in overflow-safe order', () => {
     const client = requireGlobalClient();
     const processor = new EvalLinkSpanProcessor(() => requireGlobalClient());
     const evaluateEntry: CallStackEntry = {

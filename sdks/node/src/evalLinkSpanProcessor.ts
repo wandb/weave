@@ -54,7 +54,7 @@ export class EvalLinkSpanProcessor implements SpanProcessor {
     const evaluateCall = findEvaluateCall(this.getClient);
 
     // A span already at its attribute limit drops whatever arrives next, so the
-    // pair eval results match on goes on before the two display-only ones.
+    // pair eval results match on is written before the two display-only ones.
     if (evaluateCall) {
       span.setAttribute(EVAL_RUN_ID_SPAN_ATTR, evaluateCall.callId);
     }

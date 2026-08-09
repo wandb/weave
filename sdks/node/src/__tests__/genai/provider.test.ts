@@ -18,7 +18,8 @@ import {packageVersion} from '../../utils/packageVersion';
 import {installFakeClient, setupGenAITestEnvironment} from './common';
 
 // No public API lists a provider's processors, and being in that list is the
-// eval linker's whole contract, so read the SDK's own array.
+// eval linker's whole contract, so read the SDK's own array — same internals
+// coupling as exporterProjectId below, and the same TODO applies.
 function evalLinkProcessorCount(provider: BasicTracerProvider): number {
   const registered = (provider as any)._registeredSpanProcessors ?? [];
   return registered.filter((p: unknown) => p instanceof EvalLinkSpanProcessor)
@@ -65,7 +66,7 @@ describe('otel/provider', () => {
     });
   });
 
-  it('installs the eval link processor on every provider it builds', () => {
+  it('installs the eval link processor on a default-settings provider', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     expect(evalLinkProcessorCount(getWeaveTracerProvider()!)).toBe(1);

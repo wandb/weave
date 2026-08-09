@@ -382,9 +382,9 @@ deterministic.
   in that provider's `spanProcessors`, which is built lazily on the first span
   and rebuilt on a project switch — registering once from `init()` misses both.
 - At a span's attribute limit OTel JS drops the *incoming* attribute, where
-  Python's `BoundedAttributes` evicts the oldest. A processor writing several
-  attributes therefore keeps its most important one first in JS and last in
-  Python.
+  Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
+  halves of an overflowing set. The eval linker writes the pair eval results
+  match on before its display-only attributes for that reason.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.
