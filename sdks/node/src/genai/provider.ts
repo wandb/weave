@@ -102,8 +102,8 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
   const tracerProvider = new BasicTracerProvider({
     resource,
     spanProcessors: [
-      new EvalLinkSpanProcessor(getGlobalClient),
       buildSpanProcessor(client),
+      new EvalLinkSpanProcessor(getGlobalClient),
     ],
   });
   state.genAi.provider = {tracerProvider, projectId: client.projectId};
