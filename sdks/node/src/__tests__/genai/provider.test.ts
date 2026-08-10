@@ -25,11 +25,12 @@ import {installFakeClient, setupGenAITestEnvironment} from './common';
 // applies.
 const LINK_PROCESSORS = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
 
-function linkProcessors(provider: BasicTracerProvider): unknown[] {
-  const registered = (provider as any)._registeredSpanProcessors ?? [];
+function linkProcessors(provider: BasicTracerProvider): Function[] {
+  const registered: object[] =
+    (provider as any)._registeredSpanProcessors ?? [];
   return registered
-    .filter((p: object) => LINK_PROCESSORS.some(cls => p instanceof cls))
-    .map((p: object) => p.constructor);
+    .filter(p => LINK_PROCESSORS.some(cls => p instanceof cls))
+    .map(p => p.constructor);
 }
 
 describe('otel/provider', () => {
