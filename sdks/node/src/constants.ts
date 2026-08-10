@@ -29,8 +29,8 @@ export const EVAL_EVALUATION_NAME_SPAN_ATTR = 'weave.eval.evaluation_name';
 
 /**
  * Span-attribute keys carrying the enclosing op call. Spelled the same as
- * `weave/shared/otel_span_attrs.py`, which the server's semconv promotes into
- * the `parent_call_id` / `parent_call_trace_id` span columns.
+ * `weave/shared/otel_span_attrs.py`; the server's semconv promotes these keys
+ * into the `parent_call_id` / `parent_call_trace_id` span columns.
  */
 export const PARENT_CALL_ID_SPAN_ATTR = 'weave.parent_call.id';
 export const PARENT_CALL_TRACE_ID_SPAN_ATTR = 'weave.parent_call.trace_id';

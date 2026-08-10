@@ -23,13 +23,13 @@ import {installFakeClient, setupGenAITestEnvironment} from './common';
 // contract. No public API lists a provider's processors, so read the SDK's own
 // array — same internals coupling as exporterProjectId below, and the same TODO
 // applies.
-const LINK_PROCESSORS = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
+const LINK_PROCESSOR_CLASSES = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
 
 function linkProcessorClasses(provider: BasicTracerProvider): Function[] {
   const registered: object[] =
     (provider as any)._registeredSpanProcessors ?? [];
   return registered
-    .filter(p => LINK_PROCESSORS.some(cls => p instanceof cls))
+    .filter(p => LINK_PROCESSOR_CLASSES.some(cls => p instanceof cls))
     .map(p => p.constructor);
 }
 
@@ -77,7 +77,7 @@ describe('otel/provider', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
     expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
-      LINK_PROCESSORS
+      LINK_PROCESSOR_CLASSES
     );
   });
 
@@ -189,7 +189,7 @@ describe('otel/provider', () => {
       // pick them up again — registering them once from init() would not.
       reinit('ent/B');
       expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
-        LINK_PROCESSORS
+        LINK_PROCESSOR_CLASSES
       );
     });
   });

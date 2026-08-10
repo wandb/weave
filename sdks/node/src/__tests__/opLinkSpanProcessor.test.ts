@@ -163,6 +163,9 @@ describe('OpLinkSpanProcessor', () => {
 
     // A same-project init() swaps the client but keeps the cached provider, so a
     // processor holding the first client would read a stack nothing pushes to.
+    // No processor is passed here on purpose: if the provider ever started
+    // rebuilding per init, the span would leave for the real exporter and this
+    // would fail rather than quietly stop testing anything.
     const reinitialized = new InMemoryTraceServer();
     initWithCustomTraceServer(TEST_PROJECT, reinitialized);
     await op(() => emitSpan('after'), {name: 'after'})();
