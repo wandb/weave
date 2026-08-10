@@ -408,9 +408,7 @@ deterministic.
 - At a span's attribute limit OTel JS drops the *incoming* attribute, where
   Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
   halves of an overflowing set. The eval linker writes the pair eval results
-  match on before its display-only attributes for that reason, and the same rule
-  orders the provider's array: the shipped eval link, then the op link that
-  stamps `weave.parent_call.id` and `weave.parent_call.trace_id`.
+  match on before its display-only attributes for that reason.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.

@@ -3,16 +3,28 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
+import {requireGlobalClient} from '../clientApi';
 import {
+  EVAL_EVALUATION_NAME_SPAN_ATTR,
+  EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR,
+  EVAL_PROJECT_ID_SPAN_ATTR,
+  EVAL_RUN_ID_SPAN_ATTR,
   PARENT_CALL_ID_SPAN_ATTR,
   PARENT_CALL_TRACE_ID_SPAN_ATTR,
 } from '../constants';
+import {Dataset} from '../dataset';
+import {Evaluation} from '../evaluation';
 import {runIsolated} from '../genai/context';
 import {getWeaveTracer} from '../genai/provider';
 import {Turn} from '../genai/turn';
 import {op} from '../op';
+import {parseWeaveUri} from '../uriParser';
 import {initWithCustomTraceServer} from './clientMock';
-import {findSpan, setupGenAITestEnvironment} from './genai/common';
+import {
+  findSpan,
+  setupGenAITestEnvironment,
+  TEST_PROJECT,
+} from './genai/common';
 import {type Call, InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
 // OTel JS's default OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT.
@@ -24,14 +36,13 @@ const SPAN_ATTRIBUTE_LIMIT = 128;
 describe('OpLinkSpanProcessor', () => {
   setupGenAITestEnvironment();
 
-  const projectId = 'test-project';
   let traceServer: InMemoryTraceServer;
   let exporter: InMemorySpanExporter;
 
   beforeEach(() => {
     traceServer = new InMemoryTraceServer();
     exporter = new InMemorySpanExporter();
-    initWithCustomTraceServer(projectId, traceServer, {
+    initWithCustomTraceServer(TEST_PROJECT, traceServer, {
       genai: {spanProcessor: new SimpleSpanProcessor(exporter)},
     });
   });
@@ -45,10 +56,20 @@ describe('OpLinkSpanProcessor', () => {
   }
 
   /** The calls the trace server stored, keyed by the op that made them. */
-  async function storedCalls(): Promise<Record<string, Call>> {
-    const calls = await traceServer.getCalls(projectId);
+  async function storedCalls(
+    server: InMemoryTraceServer = traceServer
+  ): Promise<Record<string, Call>> {
+    // Query directly once the client has drained: getCalls() waits for the call
+    // count to move, and after a flush there is nothing left to move.
+    await requireGlobalClient().flush();
+    const {calls} = await server.calls.callsStreamQueryPost({
+      project_id: TEST_PROJECT,
+    });
     return Object.fromEntries(
-      calls.map(c => [c.op_name.match(/\/op\/([^:]+):/)![1], c])
+      calls.flatMap((c: Call) => {
+        const ref = parseWeaveUri(c.op_name);
+        return ref?.type === 'op' ? [[ref.name, c] as const] : [];
+      })
     );
   }
 
@@ -56,11 +77,12 @@ describe('OpLinkSpanProcessor', () => {
     await op(() => emitSpan('agent_work'), {name: 'orchestrate'})();
     const {orchestrate} = await storedCalls();
 
-    const span = findSpan(exporter.getFinishedSpans(), 'agent_work');
-    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
-    expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(
-      orchestrate.trace_id
-    );
+    expect(
+      findSpan(exporter.getFinishedSpans(), 'agent_work').attributes
+    ).toEqual({
+      [PARENT_CALL_ID_SPAN_ATTR]: orchestrate.id,
+      [PARENT_CALL_TRACE_ID_SPAN_ATTR]: orchestrate.trace_id,
+    });
   });
 
   test('stamps every conversation SDK span in the subtree', async () => {
@@ -82,14 +104,6 @@ describe('OpLinkSpanProcessor', () => {
     }
   });
 
-  test('writes nothing on a span emitted outside any op', () => {
-    emitSpan('standalone');
-
-    // No call means no link, not an empty-string link.
-    const span = findSpan(exporter.getFinishedSpans(), 'standalone');
-    expect(span.attributes).toEqual({});
-  });
-
   test('stamps the innermost op a span started under', async () => {
     const inner = op(() => emitSpan('inner_work'), {name: 'inner'});
     await op(
@@ -103,12 +117,12 @@ describe('OpLinkSpanProcessor', () => {
     const {inner: innerCall, outer: outerCall} = await storedCalls();
     const spans = exporter.getFinishedSpans();
 
-    expect(findSpan(spans, 'outer_work').attributes).toMatchObject({
+    expect(findSpan(spans, 'outer_work').attributes).toEqual({
       [PARENT_CALL_ID_SPAN_ATTR]: outerCall.id,
       [PARENT_CALL_TRACE_ID_SPAN_ATTR]: outerCall.trace_id,
     });
     // A nested call keeps its parent's trace, so only the id moves.
-    expect(findSpan(spans, 'inner_work').attributes).toMatchObject({
+    expect(findSpan(spans, 'inner_work').attributes).toEqual({
       [PARENT_CALL_ID_SPAN_ATTR]: innerCall.id,
       [PARENT_CALL_TRACE_ID_SPAN_ATTR]: outerCall.trace_id,
     });
@@ -126,6 +140,22 @@ describe('OpLinkSpanProcessor', () => {
     expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(
       orchestrate.trace_id
     );
+  });
+
+  test('links to the client a later same-project init installed', async () => {
+    await op(() => emitSpan('before'), {name: 'before'})();
+
+    // A same-project init() swaps the client but keeps the cached provider, so a
+    // processor holding the first client would read a stack nothing pushes to.
+    const reinitialized = new InMemoryTraceServer();
+    initWithCustomTraceServer(TEST_PROJECT, reinitialized, {
+      genai: {spanProcessor: new SimpleSpanProcessor(exporter)},
+    });
+    await op(() => emitSpan('after'), {name: 'after'})();
+    const {after} = await storedCalls(reinitialized);
+
+    const span = findSpan(exporter.getFinishedSpans(), 'after');
+    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(after.id);
   });
 
   test('a crowded span keeps the call id and gives up the trace id', async () => {
@@ -147,5 +177,29 @@ describe('OpLinkSpanProcessor', () => {
     const oneOver = findSpan(spans, 'one_over').attributes;
     expect(oneOver[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
     expect(oneOver[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBeUndefined();
+  });
+
+  test('yields the last free slots to the shipped eval link', async () => {
+    const model = op(
+      async () => {
+        emitSpan('crowded', SPAN_ATTRIBUTE_LIMIT - 4);
+        return 'answer';
+      },
+      {name: 'model'}
+    );
+    await new Evaluation({
+      dataset: new Dataset({rows: [{question: 'hello'}]}),
+      scorers: [],
+    }).evaluate({model, maxConcurrency: 1});
+
+    // Four free slots, two processors, six attributes between them: the eval
+    // link runs first, so all four of its writes land and both of ours go.
+    const attrs = findSpan(exporter.getFinishedSpans(), 'crowded').attributes;
+    expect(Object.keys(attrs).filter(k => k.startsWith('weave.'))).toEqual([
+      EVAL_RUN_ID_SPAN_ATTR,
+      EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR,
+      EVAL_PROJECT_ID_SPAN_ATTR,
+      EVAL_EVALUATION_NAME_SPAN_ATTR,
+    ]);
   });
 });

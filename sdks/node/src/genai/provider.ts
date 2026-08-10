@@ -99,8 +99,6 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
 
   const tracerProvider = new BasicTracerProvider({
     resource,
-    // Processors write attributes in array order and a full span drops the
-    // incoming one, so the op link goes after the shipped eval link.
     spanProcessors: [
       buildSpanProcessor(client),
       new EvalLinkSpanProcessor(getGlobalClient),

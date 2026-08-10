@@ -15,12 +15,8 @@ type ClientGetter = () => WeaveClient | null;
 
 /**
  * OpenTelemetry SpanProcessor that stamps the enclosing weave op call onto the
- * spans started inside it. The server promotes the two attributes into the
- * `parent_call_id` and `parent_call_trace_id` span columns, so "which agent
- * spans did this call produce" becomes an ordinary filter.
- *
- * The call stack lives in an `AsyncLocalStorage`, so a span started outside the
- * op's async chain carries no link. An empty column is a normal state.
+ * spans started inside it. A span started outside that call's async chain
+ * carries no link, and a link to a call that has already finished is normal too.
  */
 export class OpLinkSpanProcessor implements SpanProcessor {
   constructor(private readonly getClient: ClientGetter) {}
