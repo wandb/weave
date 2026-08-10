@@ -500,7 +500,9 @@ deterministic.
   so the standard cost registry prices writes separately from uncached input.
   Because OpenAI's `input_tokens` is inclusive, an unmapped write is otherwise
   billed at the ordinary prompt rate; the missing amount is the cache-write
-  premium, not the write's entire input cost.
+  premium, not the write's entire input cost. Cost calculations split cache
+  writes from ordinary input only when the matched registry row has a positive
+  cache-creation rate; otherwise writes retain the ordinary prompt rate.
 
 ### Integration Testing
 

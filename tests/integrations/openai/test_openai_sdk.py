@@ -67,10 +67,25 @@ def test_normalize_openai_responses_cache_tokens() -> None:
     }
 
 
-def test_openai_responses_cache_write_tokens_are_priced(
+@pytest.mark.parametrize(
+    (
+        "cache_creation_rate",
+        "expected_prompt_cost",
+        "expected_cache_creation_cost",
+    ),
+    [
+        (6.25e-6, 0.00025, 0.0001875),
+        (0.0, 0.0004, 0.0),
+    ],
+    ids=["cache-write-rate", "ordinary-input-fallback"],
+)
+def test_openai_responses_cache_write_tokens_use_available_price(
     client: WeaveClient,
+    cache_creation_rate: float,
+    expected_prompt_cost: float,
+    expected_cache_creation_cost: float,
 ) -> None:
-    model = "gpt-5.6-cache-write-repro"
+    model = f"gpt-5.6-cache-write-repro-{cache_creation_rate}"
     client.server.cost_create(
         CostCreateReq(
             project_id=client.project_id,
@@ -79,7 +94,7 @@ def test_openai_responses_cache_write_tokens_are_priced(
                     "prompt_token_cost": 5e-6,
                     "completion_token_cost": 30e-6,
                     "cache_read_input_token_cost": 0.5e-6,
-                    "cache_creation_input_token_cost": 6.25e-6,
+                    "cache_creation_input_token_cost": cache_creation_rate,
                     "provider_id": "openai",
                 }
             },
@@ -148,10 +163,12 @@ def test_openai_responses_cache_write_tokens_are_priced(
         "completion_tokens": 10,
         "cache_read_input_tokens": 20,
         "cache_creation_input_tokens": 30,
-        "prompt_tokens_total_cost": pytest.approx(0.00025),
+        "prompt_tokens_total_cost": pytest.approx(expected_prompt_cost),
         "completion_tokens_total_cost": pytest.approx(0.0003),
         "cache_read_input_tokens_total_cost": pytest.approx(0.00001),
-        "cache_creation_input_tokens_total_cost": pytest.approx(0.0001875),
+        "cache_creation_input_tokens_total_cost": pytest.approx(
+            expected_cache_creation_cost
+        ),
     }
 
 

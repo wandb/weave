@@ -170,7 +170,8 @@ def cost_select_exprs(
     p = price_alias
     input_cost_usd = (
         f"({s}.input_tokens - {s}.cache_read_input_tokens "
-        f"- {s}.cache_creation_input_tokens) * {p}.prompt_token_cost"
+        f"- if({p}.cache_creation_input_token_cost > 0, "
+        f"{s}.cache_creation_input_tokens, 0)) * {p}.prompt_token_cost"
     )
     output_cost_usd = f"{s}.output_tokens * {p}.completion_token_cost"
     cache_read_cost_usd = (

@@ -1569,6 +1569,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 cache_creation_input_tokens = usage.get(
                     "cache_creation_input_tokens", 0
                 )
+                separately_priced_cache_creation_tokens = (
+                    cache_creation_input_tokens if cache_creation_cost > 0 else 0
+                )
 
                 call_costs[llm_id] = {
                     "prompt_tokens": prompt_tokens,
@@ -1577,12 +1580,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     "cache_creation_input_tokens": cache_creation_input_tokens,
                     "requests": usage["requests"],
                     "total_tokens": usage["total_tokens"],
-                    # Subtract cached tokens: they are billed at the cache
-                    # rate, not the regular input rate.
+                    # A zero cache-creation rate means writes remain ordinary input.
                     "prompt_tokens_total_cost": (
                         prompt_tokens
                         - cache_read_input_tokens
-                        - cache_creation_input_tokens
+                        - separately_priced_cache_creation_tokens
                     )
                     * prompt_cost,
                     "completion_tokens_total_cost": completion_tokens * completion_cost,
