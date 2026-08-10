@@ -6,6 +6,7 @@ import pytest
 
 import weave
 from weave.integrations.openai.openai_sdk import (
+    _normalize_openai_cache_tokens,
     create_wrapper_async,
     create_wrapper_sync,
     openai_on_input_handler,
@@ -35,6 +36,32 @@ class NonCompletion:
 
     def __init__(self):
         self.data = "not a completion"
+
+
+def test_normalize_openai_responses_cache_tokens() -> None:
+    usage = {
+        "input_tokens": 100,
+        "input_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "output_tokens": 10,
+        "total_tokens": 110,
+    }
+
+    _normalize_openai_cache_tokens(usage)
+
+    assert usage == {
+        "input_tokens": 100,
+        "input_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "output_tokens": 10,
+        "total_tokens": 110,
+        "cache_read_input_tokens": 20,
+        "cache_creation_input_tokens": 30,
+    }
 
 
 def test_serverless_inference_call_display_name():

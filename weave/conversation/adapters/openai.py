@@ -153,6 +153,10 @@ def usage_from_openai_responses(response: Response) -> Usage:
         output_tokens=usage.output_tokens,
         reasoning_tokens=(out_details and out_details.reasoning_tokens) or 0,
         cache_read_input_tokens=(in_details and in_details.cached_tokens) or 0,
+        cache_creation_input_tokens=(
+            in_details and getattr(in_details, "cache_write_tokens", 0)
+        )
+        or 0,
     )
 
 

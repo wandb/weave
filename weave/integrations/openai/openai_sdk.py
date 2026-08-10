@@ -435,8 +435,8 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
     """Flatten OpenAI's nested cache token fields to canonical names.
 
     OpenAI Chat Completions nests cached tokens under prompt_tokens_details,
-    and the Responses API nests them under input_tokens_details. This extracts
-    them to the top-level canonical field `cache_read_input_tokens`.
+    and the Responses API nests cache reads and writes under input_tokens_details.
+    This extracts them to the top-level canonical cache usage fields.
     """
     prompt_tokens_details = usage.get("prompt_tokens_details")
     if (
@@ -453,6 +453,14 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
     ):
         usage.setdefault(
             "cache_read_input_tokens", input_tokens_details["cached_tokens"]
+        )
+    if (
+        isinstance(input_tokens_details, dict)
+        and input_tokens_details.get("cache_write_tokens") is not None
+    ):
+        usage.setdefault(
+            "cache_creation_input_tokens",
+            input_tokens_details["cache_write_tokens"],
         )
 
 

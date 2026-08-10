@@ -493,6 +493,11 @@ deterministic.
 - Built-in and API-key-authenticated custom providers use LiteLLM.
 - Custom runtimes without an API key use the OpenAI client directly so configured
   headers and unauthenticated endpoints do not receive a bearer header.
+- OpenAI Responses reports explicit prompt-cache writes at
+  `usage.input_tokens_details.cache_write_tokens`. Normalize that field to
+  `summary.usage[model].cache_creation_input_tokens` in the OpenAI integration,
+  alongside the existing `cached_tokens` to `cache_read_input_tokens` mapping,
+  so the standard cost registry prices writes separately from uncached input.
 
 ### Integration Testing
 
