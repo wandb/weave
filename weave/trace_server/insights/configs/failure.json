@@ -1,0 +1,24 @@
+{
+  "config_schema_version": 1,
+  "space": "failure",
+  "extraction": {
+    "taxonomy": {
+      "path": "taxonomies/failure_categories.json",
+      "sha256": ""
+    },
+    "severity": {
+      "path": "taxonomies/severity.json",
+      "sha256": ""
+    },
+    "normalization_version": 1
+  },
+  "embedding": {
+    "provider": "openai",
+    "model": "text-embedding-3-large",
+    "dimensions": 1024,
+    "output_normalization": "l2"
+  },
+  "digests": {
+    "config_sha256": "6964a31a1003b7583e40d47f9696764d85f9119b45e9d4bf484bc9730bb50021"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Sentiment labels an intent signature may carry. Ordered worst to best, but deliberately not scored: averaging a numeric encoding of ordinal labels asserts distances this taxonomy does not define. Aggregate the distribution instead.",
+  "labels": [
+    "frustrated",
+    "dissatisfied",
+    "neutral",
+    "satisfied",
+    "delighted"
+  ]
+}

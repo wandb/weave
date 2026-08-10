@@ -1,0 +1,15 @@
+{
+  "description": "Categories an intent signature may carry. Carried forward verbatim from the category Enum this schema replaced.",
+  "labels": [
+    "action_request",
+    "information_request",
+    "problem_report",
+    "feedback",
+    "approval",
+    "rejection",
+    "correction",
+    "clarification",
+    "bad_faith",
+    "other"
+  ]
+}

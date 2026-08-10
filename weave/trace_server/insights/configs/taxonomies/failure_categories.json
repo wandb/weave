@@ -1,0 +1,17 @@
+{
+  "description": "Categories a failure signature may carry. Carried forward verbatim from the category Enum this schema replaced.",
+  "labels": [
+    "task_misunderstanding",
+    "context_loss",
+    "wrong_output",
+    "requirement_violation",
+    "tool_misuse",
+    "tool_failure",
+    "system_error",
+    "unproductive_loop",
+    "capability_gap",
+    "improper_refusal",
+    "safety_violation",
+    "other"
+  ]
+}

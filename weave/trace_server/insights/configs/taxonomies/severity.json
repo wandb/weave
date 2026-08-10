@@ -1,0 +1,8 @@
+{
+  "description": "Severity labels a failure signature may carry. The one vocabulary here with no predecessor in the schema it replaced, so it is a starting point rather than a carried-forward contract.",
+  "labels": [
+    "low",
+    "medium",
+    "high"
+  ]
+}

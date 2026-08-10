@@ -1,0 +1,24 @@
+{
+  "config_schema_version": 1,
+  "space": "intent",
+  "extraction": {
+    "taxonomy": {
+      "path": "taxonomies/intent_categories.json",
+      "sha256": ""
+    },
+    "sentiment": {
+      "path": "taxonomies/sentiment.json",
+      "sha256": ""
+    },
+    "normalization_version": 1
+  },
+  "embedding": {
+    "provider": "openai",
+    "model": "text-embedding-3-large",
+    "dimensions": 1024,
+    "output_normalization": "l2"
+  },
+  "digests": {
+    "config_sha256": "07903750daef4dd41359349217e993e402aaeb59cd5da37c146e4129d104febf"
+  }
+}

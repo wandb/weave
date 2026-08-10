@@ -28,8 +28,11 @@
 --   turn one bad candidate into a failed batch of 256. The writer drops the
 --   candidate, counts it, and inserts the rest.
 --
--- PIPELINE PROVENANCE. config_sha256 resolves to a checked-in config file that
---   names the prompt, taxonomy, context builder, judge, and embedding model.
+-- PIPELINE PROVENANCE. config_sha256 is the digest of
+--   weave/trace_server/insights/configs/intent.json, which today names the
+--   taxonomy, the sentiment labels, and the embedding model. The prompt, judge,
+--   and context builder join it when the writer lands; the digest resolves
+--   every declared file reference, so adding one needs no schema change.
 --   Nothing about the pipeline is in the sorting key, so re-embedding produces
 --   the same id and replaces in place. Two embedding generations coexist via a
 --   shadow table and EXCHANGE TABLES, never in one table, which is what keeps
@@ -38,6 +41,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
 (
     project_id String,
     id String,
+    -- Digest of insights/configs/<space>.json; see insights/config.py.
     config_sha256 LowCardinality(String),
 
     -- Canonical form, canonicalized before insert, so grouping by it is
@@ -123,6 +127,7 @@ CREATE TABLE IF NOT EXISTS failure_signatures
 (
     project_id String,
     id String,
+    -- Digest of insights/configs/<space>.json; see insights/config.py.
     config_sha256 LowCardinality(String),
 
     -- The short canonical claim; this is what is embedded.
