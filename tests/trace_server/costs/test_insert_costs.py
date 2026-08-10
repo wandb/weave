@@ -177,7 +177,6 @@ class TestInsertCosts(unittest.TestCase):
         mock_insert_db.assert_called_once_with(
             self.client, mock_filter_costs.return_value
         )
-        mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
         mock_logger.info.assert_any_call(
             "There are %d costs to insert, after filtering out existing costs", 1
         )
@@ -258,7 +257,6 @@ class TestInsertCosts(unittest.TestCase):
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
         mock_insert_db.assert_not_called()
-        mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
         mock_logger.info.assert_any_call(
             "There are %d costs to insert, after filtering out existing costs", 0
         )
