@@ -1016,7 +1016,8 @@ def test_create_distributed_table_sql_id_sharded():
         ("messages", "sipHash64(trace_id)"),
         ("agents", "sipHash64(project_id, agent_name)"),
         ("agent_versions", "sipHash64(project_id, agent_name)"),
-        ("intent_records", "sipHash64(project_id)"),
+        ("intent_signatures", "sipHash64(project_id)"),
+        ("failure_signatures", "sipHash64(project_id)"),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):

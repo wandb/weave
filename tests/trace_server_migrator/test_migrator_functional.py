@@ -604,15 +604,75 @@ def test_all_production_migrations_distributed(ch_client):
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
 
 
-def test_intent_records_schema_and_replacement_lifecycle(ch_client):
-    """Intent records isolate embedding versions and replace everything else.
+_INTENT_COLUMNS = [
+    ("project_id", "String"),
+    ("id", "String"),
+    ("config_sha256", "LowCardinality(String)"),
+    ("signature", "String"),
+    ("category", "LowCardinality(String)"),
+    ("language", "LowCardinality(String)"),
+    ("sentiment", "LowCardinality(String)"),
+    ("vector", "Array(Float32)"),
+    ("conversation_id", "String"),
+    ("trace_id", "String"),
+    ("user_id", "String"),
+    ("agent_name", "LowCardinality(String)"),
+    ("duration_ms", "UInt32"),
+    ("cost_usd", "Float64"),
+    ("source_started_at", "DateTime64(6, 'UTC')"),
+    ("extracted_at", "DateTime64(6, 'UTC')"),
+    ("inserted_at", "DateTime64(6, 'UTC')"),
+    ("expire_at", "DateTime"),
+]
 
-    Pins the contract the schema exists to express: a changed embedding version
-    coexists so an old one stays serveable and can be retired by DROP PARTITION,
-    while a changed judge or prompt replaces its predecessor in place.
-    """
-    mgmt_db = _unique_name("db_mgmt_intents")
-    target_db = _unique_name("intents")
+_FAILURE_COLUMNS = [
+    ("project_id", "String"),
+    ("id", "String"),
+    ("config_sha256", "LowCardinality(String)"),
+    ("signature", "String"),
+    ("failure_reason", "String"),
+    ("category", "LowCardinality(String)"),
+    ("severity", "LowCardinality(String)"),
+    ("vector", "Array(Float32)"),
+    ("conversation_id", "String"),
+    ("onset_trace_id", "String"),
+    ("trace_ids", "Array(String)"),
+    ("user_id", "String"),
+    ("agent_name", "LowCardinality(String)"),
+    ("duration_ms", "UInt32"),
+    ("cost_usd", "Float64"),
+    ("source_started_at", "DateTime64(6, 'UTC')"),
+    ("extracted_at", "DateTime64(6, 'UTC')"),
+    ("inserted_at", "DateTime64(6, 'UTC')"),
+    ("expire_at", "DateTime"),
+]
+
+# Every column that must stay identical in name and type across both tables.
+# Drift here is the standing cost of splitting one table into two, so it is
+# asserted rather than trusted.
+_SHARED_COLUMNS = [
+    ("agent_name", "LowCardinality(String)"),
+    ("category", "LowCardinality(String)"),
+    ("config_sha256", "LowCardinality(String)"),
+    ("conversation_id", "String"),
+    ("cost_usd", "Float64"),
+    ("duration_ms", "UInt32"),
+    ("expire_at", "DateTime"),
+    ("extracted_at", "DateTime64(6, 'UTC')"),
+    ("id", "String"),
+    ("inserted_at", "DateTime64(6, 'UTC')"),
+    ("project_id", "String"),
+    ("signature", "String"),
+    ("source_started_at", "DateTime64(6, 'UTC')"),
+    ("user_id", "String"),
+    ("vector", "Array(Float32)"),
+]
+
+
+def _migrate_signatures_db(ch_client, name: str) -> str:
+    """Apply production migrations to a fresh db and return its name."""
+    mgmt_db = _unique_name(f"db_mgmt_{name}")
+    target_db = _unique_name(name)
     ch_client.track_db(mgmt_db)
     ch_client.track_db(target_db)
 
@@ -625,290 +685,211 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         post_migration_hook=None,
     )
     migrator.apply_migrations(target_db)
+    return target_db
 
-    table_metadata = ch_client.query(
+
+@pytest.mark.parametrize(
+    ("table_name", "expected_columns", "expected_indexes"),
+    [
+        (
+            "intent_signatures",
+            _INTENT_COLUMNS,
+            [
+                ("idx_conversation_id", "conversation_id"),
+                ("idx_signature", "signature"),
+                ("idx_trace_id", "trace_id"),
+            ],
+        ),
+        (
+            "failure_signatures",
+            _FAILURE_COLUMNS,
+            [
+                ("idx_conversation_id", "conversation_id"),
+                ("idx_signature", "signature"),
+                ("idx_trace_ids", "trace_ids"),
+            ],
+        ),
+    ],
+)
+def test_signature_tables_schema(
+    ch_client, table_name, expected_columns, expected_indexes
+):
+    """Both signature tables pin the same key, and neither carries a constraint.
+
+    The key is the one-way door: PARTITION BY and ORDER BY cannot be altered on
+    a populated table, so nothing about the pipeline is allowed in either. Every
+    other column is a metadata-only ALTER away from returning.
+    """
+    target_db = _migrate_signatures_db(ch_client, "signatures")
+
+    assert ch_client.query(
         "SELECT engine, partition_key, sorting_key, primary_key, "
         "extract(create_table_query, 'TTL (.+) SETTINGS') "
-        "FROM system.tables "
-        f"WHERE database = '{target_db}' AND name = 'intent_records'"
-    ).result_rows
-    assert table_metadata == [
+        f"FROM system.tables WHERE database = '{target_db}' AND name = '{table_name}'"
+    ).result_rows == [
         (
             "ReplacingMergeTree",
-            "(toYYYYMM(source_started_at), embedding_version)",
-            "project_id, embedding_version, lens, toDate(source_started_at), id",
-            "project_id, embedding_version, lens, toDate(source_started_at), id",
+            "toYYYYMM(source_started_at)",
+            "project_id, toDate(source_started_at), id",
+            "project_id, toDate(source_started_at), id",
             "expire_at",
         )
     ]
 
-    columns = ch_client.query(
-        "SELECT name, type FROM system.columns "
-        f"WHERE database = '{target_db}' AND table = 'intent_records' "
-        "ORDER BY position"
-    ).result_rows
-    assert columns == [
-        ("project_id", "String"),
-        ("id", "String"),
-        ("signature_id", "FixedString(16)"),
-        ("lens", "LowCardinality(String)"),
-        ("embedding_version", "UInt32"),
-        ("record_version", "UInt64"),
-        (
-            "category",
-            "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
-            "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, "
-            "'rejection' = 6, 'correction' = 7, 'clarification' = 8, "
-            "'bad_faith' = 9, 'other' = 10, 'task_misunderstanding' = 21, "
-            "'context_loss' = 22, 'wrong_output' = 23, "
-            "'requirement_violation' = 24, 'tool_misuse' = 25, "
-            "'tool_failure' = 26, 'system_error' = 27, "
-            "'unproductive_loop' = 28, 'capability_gap' = 29, "
-            "'improper_refusal' = 30, 'safety_violation' = 31)",
-        ),
-        ("signature", "String"),
-        ("language", "LowCardinality(String)"),
-        ("sentiment", "LowCardinality(String)"),
-        ("sentiment_confidence", "Float32"),
-        ("sentiment_score", "Float32"),
-        ("embedding_model", "LowCardinality(String)"),
-        ("vector", "Array(Float32)"),
-        ("judge_model", "LowCardinality(String)"),
-        ("prompt_version", "LowCardinality(String)"),
-        ("pipeline_recipe_sha256", "String"),
-        ("trace_id", "String"),
-        ("span_id", "String"),
-        ("conversation_id", "String"),
-        ("turn_index", "UInt16"),
-        ("user_id", "String"),
-        ("agent_name", "LowCardinality(String)"),
-        ("agent_version", "String"),
-        ("provider", "LowCardinality(String)"),
-        ("request_model", "LowCardinality(String)"),
-        ("surface", "LowCardinality(String)"),
-        ("status_code", "Enum8('UNSET' = 0, 'OK' = 1, 'ERROR' = 2)"),
-        ("turn_duration_ms", "UInt32"),
-        ("turn_cost_usd", "Float64"),
-        ("turn_summary", "String"),
-        ("source_started_at", "DateTime64(6, 'UTC')"),
-        ("intent_extracted_at", "DateTime64(6, 'UTC')"),
-        ("inserted_at", "DateTime64(3, 'UTC')"),
-        ("expire_at", "DateTime"),
-    ]
+    assert (
+        ch_client.query(
+            "SELECT name, type FROM system.columns "
+            f"WHERE database = '{target_db}' AND table = '{table_name}' "
+            "ORDER BY position"
+        ).result_rows
+        == expected_columns
+    )
 
-    # 'und' is the DEFAULT as well as the indeterminate sentinel, so an omitted
-    # language has one unknown value rather than two.
+    # An insert is batched at 256 rows, so a CHECK or an Enum would let one bad
+    # candidate reject 255 good ones. The writer gates instead, dropping the
+    # candidate and counting it.
+    create_sql = ch_client.query(
+        "SELECT create_table_query FROM system.tables "
+        f"WHERE database = '{target_db}' AND name = '{table_name}'"
+    ).result_rows[0][0]
+    assert "CONSTRAINT" not in create_sql
+    assert "Enum" not in create_sql
+    # No ANN index: measured on this schema, HNSW cost 126-196x on inserts.
+    assert "vector_similarity" not in create_sql
+
+    assert ch_client.query(
+        "SELECT name, expr FROM system.data_skipping_indices "
+        f"WHERE database = '{target_db}' AND table = '{table_name}' ORDER BY name"
+    ).result_rows == [(name, expr) for name, expr in expected_indexes]
+
+    # The version is the insert clock, so the writer passes nothing and a retry
+    # gets a later version for free.
     assert ch_client.query(
         "SELECT default_expression FROM system.columns "
-        f"WHERE database = '{target_db}' AND table = 'intent_records' "
-        "AND name = 'language'"
-    ).result_rows == [("'und'",)]
+        f"WHERE database = '{target_db}' AND table = '{table_name}' "
+        "AND name = 'inserted_at'"
+    ).result_rows == [("now64(6)",)]
 
-    indexes = ch_client.query(
-        "SELECT name, expr, type_full, granularity "
-        "FROM system.data_skipping_indices "
-        f"WHERE database = '{target_db}' AND table = 'intent_records' "
-        "ORDER BY name"
-    ).result_rows
-    assert indexes == [
-        ("idx_conversation_id", "conversation_id", "bloom_filter(0.01)", 1),
-        ("idx_signature_id", "signature_id", "bloom_filter(0.01)", 1),
-        ("idx_span_id", "span_id", "bloom_filter(0.01)", 1),
-        ("idx_trace_id", "trace_id", "bloom_filter(0.01)", 1),
-    ]
 
-    insert_columns = """
-        project_id, id, signature_id, lens, embedding_version,
-        record_version, category, signature, language,
-        sentiment, sentiment_confidence,
-        embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
-        trace_id, span_id, conversation_id, turn_index, user_id,
-        agent_name, agent_version, provider, request_model, surface, status_code,
-        turn_duration_ms, turn_cost_usd, turn_summary,
-        source_started_at, intent_extracted_at
+def test_signature_tables_share_columns(ch_client):
+    """The 15 shared columns are identical in name and type across both tables.
+
+    Splitting intents from failures buys grain-correct schemas and costs schema
+    drift. This is the guard that turns drift into a failing test rather than a
+    query that silently means two things.
     """
-    # source_started_at is deliberately a month before intent_extracted_at: the
-    # partition must follow source time, which is what a backfill depends on.
-    row_template = """
-        SELECT
-            'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
-            'intent', {embedding_version}, {record_version}, '{category}',
-            'Add Stripe checkout', 'es',
-            'frustrated', toFloat32(0.75),
-            'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
-            '{judge_model}', '{prompt_version}', repeat('ab', 32),
-            'trace-1', 'span-1', 'conversation-1', 7, 'user-1',
-            'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', 'OK',
-            4200, toFloat64(0.0123), 'Wired up a Stripe checkout endpoint.',
-            toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
-            toDateTime64('2026-06-20 14:32:00', 6, 'UTC')
+    target_db = _migrate_signatures_db(ch_client, "shared")
+
+    assert (
+        ch_client.query(
+            "SELECT name, type FROM system.columns "
+            f"WHERE database = '{target_db}' "
+            "AND table IN ('intent_signatures', 'failure_signatures') "
+            "GROUP BY name, type HAVING count() = 2 ORDER BY name"
+        ).result_rows
+        == _SHARED_COLUMNS
+    )
+
+
+def test_signature_replacement_and_turn_attribution(ch_client):
+    """Last write wins with no version supplied, and a failure spans many turns.
+
+    Pins the two contracts the schema exists to express: a re-extraction of the
+    same occurrence replaces its predecessor because the writer supplies no
+    version, and a failure's attributed turns can widen without minting a second
+    row, because only onset_trace_id is in the id.
     """
-    for embedding_version, record_version, category, judge, prompt in [
-        (1, 1, "action_request", "gemma-4-31b-it", "intent-v1"),
-        (1, 2, "information_request", "gemma-4-31b-it", "intent-v1"),
-        # A new judge and prompt for the same occurrence: payload, so it must
-        # replace rather than coexist.
-        (1, 3, "information_request", "gemma-5-31b-it", "intent-v2"),
-        (2, 1, "action_request", "gemma-4-31b-it", "intent-v1"),
-    ]:
+    target_db = _migrate_signatures_db(ch_client, "lifecycle")
+
+    # Source month is a month before extraction: the partition must follow
+    # source time, which is what a backfill depends on.
+    def insert_intent(category: str, cost: float) -> None:
         ch_client.command(
-            f"INSERT INTO {target_db}.intent_records ({insert_columns}) "
-            + row_template.format(
-                embedding_version=embedding_version,
-                record_version=record_version,
-                category=category,
-                judge_model=judge,
-                prompt_version=prompt,
-            )
+            f"INSERT INTO {target_db}.intent_signatures "
+            "(project_id, id, config_sha256, signature, category, language, "
+            "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
+            "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
+            "('project-1', 'intent-1', 'cfg-a', 'add stripe checkout', "
+            f"'{category}', 'es', 'frustrated', "
+            "arrayResize([toFloat32(1)], 1024, toFloat32(0)), "
+            f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
+            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'), "
+            "toDateTime64('2026-06-20 14:32:00', 6, 'UTC'))"
         )
 
-    # Highest record_version wins within an embedding_version, a changed
-    # extraction recipe leaves no second row, and each embedding_version is
-    # retained so an old space stays serveable until its cutover.
-    current_rows = ch_client.query(
-        "SELECT embedding_version, record_version, category, judge_model, "
-        "prompt_version, formatDateTime(expire_at, '%F %T'), length(vector) "
-        f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' ORDER BY embedding_version"
-    ).result_rows
-    assert current_rows == [
-        (
-            1,
-            3,
-            "information_request",
-            "gemma-5-31b-it",
-            "intent-v2",
-            "2100-01-01 00:00:00",
-            1024,
-        ),
-        (
-            2,
-            1,
-            "action_request",
-            "gemma-4-31b-it",
-            "intent-v1",
-            "2100-01-01 00:00:00",
-            1024,
-        ),
+    # Separate inserts, because now64() is evaluated once per block: two rows
+    # sharing an id inside one block tie, and the writer deduplicates per batch
+    # rather than relying on the version to break it.
+    insert_intent("action_request", 0.21)
+    insert_intent("information_request", 0.34)
+
+    assert ch_client.query(
+        "SELECT category, cost_usd, duration_ms, language, "
+        "formatDateTime(expire_at, '%F %T'), length(vector) "
+        f"FROM {target_db}.intent_signatures FINAL WHERE project_id = 'project-1'"
+    ).result_rows == [
+        ("information_request", 0.34, 9000, "es", "2100-01-01 00:00:00", 1024)
     ]
 
-    # The promoted columns round-trip as typed values rather than Map strings.
-    promoted = ch_client.query(
-        "SELECT lens, language, "
-        "sentiment, sentiment_confidence, sentiment_score, judge_model, "
-        "prompt_version, length(pipeline_recipe_sha256), turn_index, "
-        "agent_name, agent_version, provider, request_model, surface, status_code, "
-        "turn_duration_ms, turn_cost_usd, turn_summary, "
-        "formatDateTime(source_started_at, '%F %T'), "
-        "formatDateTime(intent_extracted_at, '%F %T') "
-        f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' AND embedding_version = 2"
-    ).result_rows
-    assert promoted == [
-        (
-            "intent",
-            "es",
-            "frustrated",
-            0.75,
-            -1.0,
-            "gemma-4-31b-it",
-            "intent-v1",
-            64,
-            7,
-            "checkout-agent",
-            "1.4.2",
-            "anthropic",
-            "claude-sonnet-5",
-            "cli",
-            "OK",
-            4200,
-            0.0123,
-            "Wired up a Stripe checkout endpoint.",
-            "2026-05-30 09:15:00",
-            "2026-06-20 14:32:00",
+    # Source month, not extraction month, and one term: retention follows user
+    # activity and no pipeline metadata is baked into the partition.
+    assert ch_client.query(
+        "SELECT DISTINCT partition FROM system.parts "
+        f"WHERE database = '{target_db}' AND table = 'intent_signatures' AND active"
+    ).result_rows == [("202605",)]
+
+    def insert_failure(row_id: str, onset: str, turns: str, cost: float) -> None:
+        ch_client.command(
+            f"INSERT INTO {target_db}.failure_signatures "
+            "(project_id, id, config_sha256, signature, failure_reason, category, "
+            "severity, vector, conversation_id, onset_trace_id, trace_ids, "
+            "user_id, agent_name, duration_ms, cost_usd, source_started_at, "
+            f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
+            "'ignored the stated output path', 'The user specified /tmp/out.json.', "
+            "'requirement_violation', 'medium', "
+            "arrayResize([toFloat32(1)], 1024, toFloat32(0)), 'conversation-1', "
+            f"'{onset}', {turns}, 'user-1', 'checkout-agent', 16000, {cost}, "
+            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'), "
+            "toDateTime64('2026-06-20 14:32:00', 6, 'UTC'))"
         )
+
+    insert_failure("failure-1", "trace-4", "['trace-4', 'trace-6']", 0.31)
+    # A re-extraction that widens the attributed span by one turn is the SAME
+    # failure: trace_ids is not in the id, so this must replace, not coexist.
+    insert_failure("failure-1", "trace-4", "['trace-4', 'trace-6', 'trace-9']", 0.41)
+    # A different onset is a different failure, sharing turn trace-6.
+    insert_failure("failure-2", "trace-6", "['trace-6']", 0.32)
+
+    assert ch_client.query(
+        "SELECT id, onset_trace_id, trace_ids, cost_usd "
+        f"FROM {target_db}.failure_signatures FINAL WHERE project_id = 'project-1' "
+        "ORDER BY id"
+    ).result_rows == [
+        ("failure-1", "trace-4", ["trace-4", "trace-6", "trace-9"], 0.41),
+        ("failure-2", "trace-6", ["trace-6"], 0.32),
     ]
 
-    # Source month, not extraction month, and one partition per embedding
-    # version. Both halves matter: the month makes retention follow user
-    # activity, the version makes a cutover a metadata operation.
-    def active_partitions() -> list[tuple]:
-        return ch_client.query(
-            "SELECT DISTINCT partition "
-            "FROM system.parts "
-            f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
-            "ORDER BY partition"
-        ).result_rows
-
-    assert active_partitions() == [("(202605,1)",), ("(202605,2)",)]
-
-    # The cutover this partition key exists for: retiring the superseded
-    # embedding version drops its vectors without rewriting the surviving parts.
-    ch_client.command(
-        f"ALTER TABLE {target_db}.intent_records DROP PARTITION (202605, 1)"
-    )
-    assert active_partitions() == [("(202605,2)",)]
+    # The drilldown from a turn to the failures touching it. trace-6 is a member
+    # of both, and of failure-1 only through trace_ids, not through its onset.
     assert ch_client.query(
-        "SELECT embedding_version, count() "
-        f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' GROUP BY embedding_version"
-    ).result_rows == [(2, 1)]
+        f"SELECT id FROM {target_db}.failure_signatures FINAL "
+        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') ORDER BY id"
+    ).result_rows == [("failure-1",), ("failure-2",)]
 
-    # The taxonomy is enforced at write time, so a mislabeled row cannot land:
-    # the Enum rejects a label that is in neither taxonomy, and the constraint
-    # rejects one belonging to the other lens.
-    def insert_labeled(row_id: str, lens: str, category: str) -> None:
-        ch_client.command(
-            f"INSERT INTO {target_db}.intent_records "
-            "(project_id, id, lens, category, embedding_version, record_version, "
-            "source_started_at) VALUES "
-            f"('project-2', '{row_id}', '{lens}', '{category}', 2, 1, "
-            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'))"
-        )
-
-    for lens, category, expected_error in [
-        ("intent", "totally_new", "UNKNOWN_ELEMENT_OF_ENUM"),
-        ("intent", "tool_misuse", "VIOLATED_CONSTRAINT"),
-        ("failure", "action_request", "VIOLATED_CONSTRAINT"),
-    ]:
-        with pytest.raises(
-            clickhouse_connect.driver.exceptions.DatabaseError, match=expected_error
-        ):
-            insert_labeled("rejected", lens, category)
-
-    # 'other' is the shared escape hatch, so it is valid under either lens.
-    insert_labeled("escape-hatch", "failure", "other")
+    # cost_usd and duration_ms are per-row, not additive: the two failures
+    # overlap on trace-6, so summing them counts that turn twice. Three distinct
+    # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
-        f"SELECT lens, category FROM {target_db}.intent_records "
-        "WHERE project_id = 'project-2'"
-    ).result_rows == [("failure", "other")]
+        "SELECT sum(cost_usd), length(arrayDistinct(arrayFlatten(groupArray(trace_ids)))) "
+        f"FROM {target_db}.failure_signatures FINAL WHERE project_id = 'project-1'"
+    ).result_rows == [(0.73, 3)]
 
-    # Growing the taxonomy must stay metadata-only, which is what makes a closed
-    # Enum affordable here. Appending a label creates no mutation and leaves the
-    # existing parts untouched.
-    def part_names() -> list[tuple]:
-        return ch_client.query(
-            "SELECT name FROM system.parts "
-            f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
-            "ORDER BY name"
-        ).result_rows
-
-    parts_before = part_names()
-    ch_client.command(
-        f"ALTER TABLE {target_db}.intent_records MODIFY COLUMN category "
-        "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
-        "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, 'rejection' = 6, "
-        "'correction' = 7, 'clarification' = 8, 'bad_faith' = 9, 'other' = 10, "
-        "'newly_added_intent' = 11, "
-        "'task_misunderstanding' = 21, 'context_loss' = 22, 'wrong_output' = 23, "
-        "'requirement_violation' = 24, 'tool_misuse' = 25, 'tool_failure' = 26, "
-        "'system_error' = 27, 'unproductive_loop' = 28, 'capability_gap' = 29, "
-        "'improper_refusal' = 30, 'safety_violation' = 31)"
-    )
-    assert part_names() == parts_before
+    # The writer gate the database deliberately does not enforce. This assertion
+    # query is the off-path mitigation, and it must find nothing.
     assert ch_client.query(
-        "SELECT count() FROM system.mutations "
-        f"WHERE database = '{target_db}' AND table = 'intent_records'"
+        f"SELECT count() FROM {target_db}.failure_signatures FINAL "
+        "WHERE project_id = 'project-1' "
+        "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
     ).result_rows == [(0,)]
 
 
