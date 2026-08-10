@@ -241,9 +241,11 @@ def tests(session: nox.Session, shard: str):
         if not os.path.exists(test_dir):
             raise ValueError(f"Test directory {test_dir} does not exist")
 
-    # Each worker gets its own isolated database namespace
-    # Only use parallel workers for the trace shard if we have more than 1 CPU core
-    if shard in {"trace", "trace_calls_merged_only"}:
+    # Each worker gets its own isolated database namespace, so these shards are
+    # safe to run in parallel when we have more than 1 CPU core. The migrator
+    # shard is dominated by round-trip DDL latency rather than CPU, so it gains
+    # the most: every test builds its own uniquely-named databases.
+    if shard in {"trace", "trace_calls_merged_only", "trace_server_migrator"}:
         cpu_count = os.cpu_count()
         if cpu_count is not None and cpu_count > 1:
             session.posargs.insert(0, f"-n{cpu_count}")
