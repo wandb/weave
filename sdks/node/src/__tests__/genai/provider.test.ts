@@ -25,7 +25,7 @@ import {installFakeClient, setupGenAITestEnvironment} from './common';
 // applies.
 const LINK_PROCESSORS = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
 
-function linkProcessors(provider: BasicTracerProvider): Function[] {
+function linkProcessorClasses(provider: BasicTracerProvider): Function[] {
   const registered: object[] =
     (provider as any)._registeredSpanProcessors ?? [];
   return registered
@@ -76,7 +76,9 @@ describe('otel/provider', () => {
   it('installs the link processors, in order, on a default-settings provider', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
-    expect(linkProcessors(getWeaveTracerProvider()!)).toEqual(LINK_PROCESSORS);
+    expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
+      LINK_PROCESSORS
+    );
   });
 
   it('honors a user-supplied SpanProcessor and routes spans through it', async () => {
@@ -186,7 +188,7 @@ describe('otel/provider', () => {
       // The linkers are added where the provider is built, so a rebuild has to
       // pick them up again — registering them once from init() would not.
       reinit('ent/B');
-      expect(linkProcessors(getWeaveTracerProvider()!)).toEqual(
+      expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
         LINK_PROCESSORS
       );
     });

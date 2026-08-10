@@ -409,8 +409,8 @@ deterministic.
   Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
   halves of an overflowing set. The eval linker writes the pair eval results
   match on before its display-only attributes for that reason, and the op linker
-  sits after it in the provider's array for the same reason — which is why the
-  two SDKs register the pair in opposite order.
+  sits after it in the Node provider's array for the same reason — which is why
+  the two SDKs register the two linkers in opposite order.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.

@@ -90,11 +90,13 @@ describe('OpLinkSpanProcessor', () => {
     await op(() => emitSpan('agent_work'), {name: 'orchestrate'})();
     const {orchestrate} = await storedCalls();
 
+    // Spelled out, not via the constants: the server matches on these strings,
+    // so a typo has to fail here rather than pass every test that imports it.
     expect(
       findSpan(exporter.getFinishedSpans(), 'agent_work').attributes
     ).toEqual({
-      [PARENT_CALL_ID_SPAN_ATTR]: orchestrate.id,
-      [PARENT_CALL_TRACE_ID_SPAN_ATTR]: orchestrate.trace_id,
+      'weave.parent_call.id': orchestrate.id,
+      'weave.parent_call.trace_id': orchestrate.trace_id,
     });
   });
 
@@ -162,9 +164,7 @@ describe('OpLinkSpanProcessor', () => {
     // A same-project init() swaps the client but keeps the cached provider, so a
     // processor holding the first client would read a stack nothing pushes to.
     const reinitialized = new InMemoryTraceServer();
-    initWithCustomTraceServer(TEST_PROJECT, reinitialized, {
-      genai: {spanProcessor: new SimpleSpanProcessor(exporter)},
-    });
+    initWithCustomTraceServer(TEST_PROJECT, reinitialized);
     await op(() => emitSpan('after'), {name: 'after'})();
     const {after} = await storedCalls(reinitialized);
 
