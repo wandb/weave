@@ -24,6 +24,7 @@ export type {
   AgentSpan,
   AgentTurn,
   AgentVersion,
+  CustomRuntimeId,
   GetAgentsOptions,
   GetAgentsResult,
   GetAgentSpansOptions,
@@ -35,6 +36,8 @@ export type {
   GetAgentVersionsOptions,
   GetAgentVersionsResult,
   GetCallsOptions,
+  RegisterCustomRuntimeOptions,
+  RegisterCustomRuntimeResult,
   Response,
   WeaveClient,
 } from './weaveClient';
@@ -74,6 +77,8 @@ export {
 export type {
   Conversation,
   ConversationInit,
+  JsonObject,
+  JsonValue,
   LLM,
   LLMInit,
   Message,
@@ -84,6 +89,7 @@ export type {
   SubAgent,
   SubAgentInit,
   Tool,
+  ToolEndOptions,
   ToolInit,
   Turn,
   TurnInit,

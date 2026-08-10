@@ -15,6 +15,7 @@ from weave.trace_server.errors import InvalidFieldError
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
+_SQL_IDENTIFIER_RE = re.compile(r"^(?!$)[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class ParamBuilder:
@@ -761,18 +762,11 @@ def _transform_external_field_to_internal_field(
     unprefixed_field = field
     if "." in field:
         table_prefix, field = field.split(".", 1)
+        if _SQL_IDENTIFIER_RE.fullmatch(table_prefix) is None:
+            raise ValueError(f"Invalid table prefix: {table_prefix}")
 
     # validate field
-    if (
-        field not in all_columns
-        and field != "*"
-        and field.lower() != "count(*)"
-        and not any(
-            # Check if field starts with a valid column name as prefix
-            unprefixed_field.lower().startswith(col_name.lower() + ".")
-            for col_name in all_columns
-        )
-    ):
+    if field not in all_columns and field != "*" and field.lower() != "count(*)":
         # add back table prefix when erroring
         if table_prefix:
             field = f"{table_prefix}.{field}"

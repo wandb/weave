@@ -1,4 +1,4 @@
-import {SpanStatusCode} from '@opentelemetry/api';
+import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -27,6 +27,7 @@ describe('Turn', () => {
     turn.end();
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.kind).toBe(SpanKind.INTERNAL);
     expect(spanSnapshot(span)).toMatchInlineSnapshot(`
       {
         "attributes": {
@@ -65,6 +66,7 @@ describe('Turn', () => {
   it('record() updates fields, which are emitted at end()', () => {
     const turn = Turn.create({agentName: 'weather-bot'});
     turn.record({
+      outputMessages: [{role: 'assistant', content: 'It is sunny.'}],
       agentId: 'weather-bot-prod',
       agentDescription: 'Looks up the weather',
       agentVersion: '1.4.2',
@@ -81,6 +83,7 @@ describe('Turn', () => {
           "gen_ai.agent.name": "weather-bot",
           "gen_ai.agent.version": "1.4.2",
           "gen_ai.operation.name": "invoke_agent",
+          "gen_ai.output.messages": "[{"role":"assistant","content":"It is sunny."}]",
           "gen_ai.system_instructions": "[{"type":"text","content":"Be helpful"}]",
         },
         "endTime": "<timestamp>",

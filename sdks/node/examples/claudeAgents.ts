@@ -1,29 +1,44 @@
 /**
- * Example: Claude Agent SDK integration with Weave — one multi-turn session.
+ * Example: Claude Agent SDK integration with Weave — text and images.
  *
  * Demonstrates tracing the Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`)
  * with Weave. The SDK's `query()` is automatically instrumented via module
  * loader hooks when you import Weave — no manual setup required.
  *
- * This runs a single conversation as a sequence of follow-up turns. Each turn
- * is its own `query()` call (and its own `invoke_agent` root span), but the
- * follow-ups pass `options.resume` with the first turn's `session_id`, so the
- * SDK continues the same session and the integration stamps the same
- * `gen_ai.conversation.id` on every span. The result: the turns group as one
- * session in the Weave Agents tab, each turn expandable into its
- * `chat` / `execute_tool` children.
+ * This runs two independent conversations. The first preserves the original
+ * text-only follow-up example. The second sends Claude a base64-encoded image
+ * as a native SDK content block and follows up within the same Claude session.
+ *
+ * Within each conversation, every turn is its own `query()` call (and its own
+ * `invoke_agent` root span), while follow-ups pass `options.resume` with the
+ * first turn's `session_id`. The integration therefore stamps one shared
+ * `gen_ai.conversation.id` on that conversation's spans.
  *
  * Requires `@anthropic-ai/claude-agent-sdk` to be installed and a Claude Code
- * auth setup (e.g. `ANTHROPIC_API_KEY`).
+ * auth setup (e.g. `ANTHROPIC_API_KEY`). Run from `sdks/node` to use the
+ * bundled `logs.png`.
  */
 
+import fs from 'fs';
 import * as weave from 'weave';
-import {query, type Options} from '@anthropic-ai/claude-agent-sdk';
+import {
+  query,
+  type Options,
+  type SDKUserMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 
 // Set your own entity/project name here
 const WANDB_PROJECT = process.env.WANDB_PROJECT || 'example';
 // Override with e.g. ANTHROPIC_MODEL=claude-opus-4-6
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+const IMAGE_PATH = 'logs.png';
+
+type ClaudePrompt = Parameters<typeof query>[0]['prompt'];
+
+type TurnSpec = {
+  label: string;
+  prompt: ClaudePrompt;
+};
 
 /** Collapse whitespace and clip long strings so the transcript stays readable. */
 function clip(text: string, max = 120): string {
@@ -37,6 +52,33 @@ function stringifyToolResult(content: string | object | undefined): string {
   return typeof content === 'string' ? content : JSON.stringify(content);
 }
 
+/** Build the streaming prompt shape required for a native image content block. */
+async function* imagePrompt(
+  imageBase64: string
+): AsyncGenerator<SDKUserMessage> {
+  yield {
+    type: 'user',
+    parent_tool_use_id: null,
+    message: {
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: 'image/png',
+            data: imageBase64,
+          },
+        },
+        {
+          type: 'text',
+          text: 'Describe this image and call out the most important visual details.',
+        },
+      ],
+    },
+  };
+}
+
 type TurnResult = {
   sessionId?: string;
   costUsd: number;
@@ -45,8 +87,12 @@ type TurnResult = {
 };
 
 /** Run one conversation turn, printing each streamed message, and return its stats. */
-async function runTurn(prompt: string, options: Options): Promise<TurnResult> {
-  console.log(`\n=== Turn: ${clip(prompt, 80)} ===`);
+async function runTurn(
+  label: string,
+  prompt: ClaudePrompt,
+  options: Options
+): Promise<TurnResult> {
+  console.log(`\n=== Turn: ${clip(label, 80)} ===`);
   const result: TurnResult = {costUsd: 0, turns: 0, toolCalls: 0};
 
   for await (const message of query({prompt, options})) {
@@ -108,40 +154,25 @@ async function runTurn(prompt: string, options: Options): Promise<TurnResult> {
   return result;
 }
 
-async function main() {
-  await weave.init(WANDB_PROJECT);
-
-  // The Claude Agent SDK is automatically instrumented via module loader hooks
-  // when you import Weave — no manual setup required.
-
-  // Restrict the toolset to read-only commands so the example is safe to run
-  // anywhere; pin the model and cap each turn's agent loop.
-  const baseOptions: Options = {
-    model: MODEL,
-    maxTurns: 8,
-    allowedTools: ['Bash', 'Read', 'Glob', 'Grep'],
-    cwd: process.cwd(),
-  };
-
-  // A single conversation: an initial ask followed by questions that only make
-  // sense given the earlier turns ("those", "what you found").
-  const turns = [
-    'List the TypeScript files in the current directory.',
-    'Of those, which file is the largest, and what is it responsible for?',
-    'Summarize what you learned about this project in one sentence.',
-  ];
+/** Run a sequence of resumed queries as one Weave Agents conversation. */
+async function runConversation(
+  label: string,
+  turns: readonly TurnSpec[],
+  baseOptions: Options
+): Promise<void> {
+  console.log(`\n##### ${label} #####`);
 
   let sessionId: string | undefined;
   const totals = {costUsd: 0, turns: 0, toolCalls: 0};
 
-  for (const prompt of turns) {
+  for (const turnSpec of turns) {
     // First turn starts the session; later turns resume it (same session_id →
     // same gen_ai.conversation.id) so they form one session in the Agents tab.
     const options: Options = sessionId
       ? {...baseOptions, resume: sessionId}
       : baseOptions;
 
-    const turn = await runTurn(prompt, options);
+    const turn = await runTurn(turnSpec.label, turnSpec.prompt, options);
     sessionId ??= turn.sessionId;
     totals.costUsd += turn.costUsd;
     totals.turns += turn.turns;
@@ -149,12 +180,60 @@ async function main() {
   }
 
   console.log(
-    `\n=== session ${sessionId}: ${turns.length} turns, ` +
+    `\n=== ${label}: session ${sessionId}, ${turns.length} turns, ` +
       `$${totals.costUsd.toFixed(4)}, ${totals.turns} model turns, ` +
       `${totals.toolCalls} tool calls ===`
   );
+}
+
+async function main() {
+  await weave.init(WANDB_PROJECT);
+
+  // The Claude Agent SDK is automatically instrumented via module loader hooks
+  // when you import Weave — no manual setup required.
+
+  // Restrict the toolset to read-only commands so the example is safe to run
+  // anywhere; allowedTools auto-approves that same set. Pin the model and cap
+  // each turn's agent loop.
+  const readOnlyTools = ['Bash', 'Read', 'Glob', 'Grep'];
+  const baseOptions: Options = {
+    model: MODEL,
+    maxTurns: 8,
+    tools: readOnlyTools,
+    allowedTools: readOnlyTools,
+    cwd: process.cwd(),
+  };
+
+  // The original text-only example remains useful as the minimal multi-turn
+  // path: each follow-up relies on the preceding response.
+  const turns = [
+    'List the TypeScript files in the current directory.',
+    'Of those, which file is the largest, and what is it responsible for?',
+    'Summarize what you learned about this project in one sentence.',
+  ];
+  await runConversation(
+    'Original text-only conversation',
+    turns.map(prompt => ({label: prompt, prompt})),
+    baseOptions
+  );
+
+  const imageBase64 = fs.readFileSync(IMAGE_PATH, 'base64');
+  const imageSummaryPrompt =
+    'Summarize the most important visual detail in one sentence.';
+  const imageTurns: TurnSpec[] = [
+    {
+      label: `Analyze image: ${IMAGE_PATH}`,
+      prompt: imagePrompt(imageBase64),
+    },
+    {
+      label: imageSummaryPrompt,
+      prompt: imageSummaryPrompt,
+    },
+  ];
+  await runConversation('Image conversation', imageTurns, baseOptions);
+
   console.log(
-    'View the full session (all turns grouped) in the Weave Agents tab.'
+    '\nView both sessions (with their turns grouped) in the Weave Agents tab.'
   );
 }
 

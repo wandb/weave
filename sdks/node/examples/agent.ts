@@ -94,10 +94,13 @@ async function executeToolCalls(
       toolCallId: tc.id,
     });
     try {
-      tool.result = await wikipediaSearch(JSON.parse(tc.function.arguments));
-      history.push({role: 'tool', tool_call_id: tc.id, content: tool.result!});
-    } finally {
-      tool.end();
+      const result = await wikipediaSearch(JSON.parse(tc.function.arguments));
+      history.push({role: 'tool', tool_call_id: tc.id, content: result});
+      tool.end({result});
+    } catch (error) {
+      const cause = error instanceof Error ? error : new Error(String(error));
+      tool.end({error: cause, errorType: cause.name});
+      throw error;
     }
   }
 }

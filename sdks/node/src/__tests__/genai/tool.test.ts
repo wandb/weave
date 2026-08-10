@@ -1,6 +1,7 @@
-import {SpanKind} from '@opentelemetry/api';
+import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
 
 import {
+  ATTR_ERROR_TYPE,
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_OPERATION_NAME,
   ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
@@ -9,6 +10,7 @@ import {
   ATTR_GEN_AI_TOOL_NAME,
 } from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
+import type {JsonObject} from '../../genai/types';
 
 import {
   expectSpanTimesToMatch,
@@ -62,6 +64,63 @@ describe('Tool', () => {
     const toolSpan = findSpan(spans, 'execute_tool');
     const llmSpan = findSpan(spans, 'chat');
     expect(toolSpan.parentSpanId).toBe(llmSpan.spanContext().spanId);
+  });
+
+  it('serializes structured arguments and a result passed to end()', () => {
+    const turn = Turn.create({});
+    const tool = turn.startTool({
+      name: 'get_weather',
+      args: {city: 'Tokyo', units: ['celsius', 'fahrenheit'] as const},
+    });
+    tool.end({result: {temperature: 24, raining: false}});
+    tool.end({result: {temperature: 99}});
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
+      '{"city":"Tokyo","units":["celsius","fahrenheit"]}'
+    );
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
+      '{"temperature":24,"raining":false}'
+    );
+  });
+
+  it('records result, error type, and failure status together at end()', () => {
+    const turn = Turn.create({});
+    const tool = turn.startTool({name: 'get_weather'});
+    tool.end({
+      result: {message: 'weather service unavailable'},
+      error: new Error('request failed'),
+      errorType: 'weather_service_error',
+    });
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
+      '{"message":"weather service unavailable"}'
+    );
+    expect(toolSpan.attributes[ATTR_ERROR_TYPE]).toBe('weather_service_error');
+    expect(toolSpan.status).toEqual({
+      code: SpanStatusCode.ERROR,
+      message: 'request failed',
+    });
+  });
+
+  it('does not throw when a typed tool value contains a cycle', () => {
+    const cyclic: JsonObject = {};
+    cyclic.self = cyclic;
+    const turn = Turn.create({});
+    const tool = turn.startTool({name: 'cyclic_value', args: cyclic});
+    tool.end({result: cyclic});
+    turn.end();
+
+    const toolSpan = findSpan(getExporter().getFinishedSpans(), 'execute_tool');
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]).toBe(
+      '[unserializable]'
+    );
+    expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
+      '[unserializable]'
+    );
   });
 
   it('setAttributes records attributes on the tool span; warns + no-op after end()', () => {

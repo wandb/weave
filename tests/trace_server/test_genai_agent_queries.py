@@ -47,6 +47,7 @@ from weave.trace_server.agents.types import (
     RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
@@ -3258,6 +3259,149 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
         )
     )
     assert obj.obj.wb_user_id == internal_user_id
+
+
+# ---------------------------------------------------------------------------
+# Test: credential redaction on the GenAI OTel agents ingest path
+# ---------------------------------------------------------------------------
+
+_REDACTED_SPAN_ATTRS = {
+    "http": {"request": {"header": {"authorization": REDACTED_VALUE}}},
+    "openai_api_key": REDACTED_VALUE,
+}
+
+
+def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
+    """A ``chat`` span whose attributes and resource carry credential-shaped names.
+
+    The api-key value is a data-URI past ``AUTO_CONVERSION_MIN_SIZE``.
+    """
+    span = Span()
+    span.name = "chat gpt-4o"
+    span.trace_id = uuid.uuid4().bytes
+    span.span_id = uuid.uuid4().bytes[:8]
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    span.start_time_unix_nano = now_ns
+    span.end_time_unix_nano = now_ns + 1_000_000_000
+    span.kind = 1  # INTERNAL
+
+    header_kv = KeyValue()
+    header_kv.key = "http.request.header.authorization"
+    header_kv.value.string_value = "value-to-redact"
+    span.attributes.append(header_kv)
+
+    blob_kv = KeyValue()
+    blob_kv.key = "openai_api_key"
+    blob_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    blob_kv.value.string_value = (
+        f"data:image/png;base64,{base64.b64encode(blob_bytes).decode('ascii')}"
+    )
+    span.attributes.append(blob_kv)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+
+    resource = Resource()
+    resource_kv = KeyValue()
+    resource_kv.key = "aws_access_key_id"
+    resource_kv.value.string_value = "value-to-redact"
+    resource.attributes.append(resource_kv)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(resource)
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+
+
+def _assert_stored_span_is_redacted(raw_span_dump: str) -> None:
+    raw_span = json.loads(raw_span_dump)
+    assert raw_span["attributes"] == _REDACTED_SPAN_ATTRS
+    assert raw_span["resource"]["attributes"] == {"aws_access_key_id": REDACTED_VALUE}
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_server):
+    """A span ingested through the external adapter is stored with values replaced."""
+    external_project_id = _ref_safe_external_project_id("genai_otel_redaction")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
+
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=external_project_id,
+            wb_user_id="user-42",
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
+
+    # Redaction ran before the blob strip, so nothing was uploaded.
+    assert (
+        ch_server.project_stats(
+            tsi.ProjectStatsReq(project_id=internal_project_id)
+        ).files_storage_size_bytes
+        == 0
+    )
+
+    # Read the stored columns directly.
+    row = ch_server.ch_client.query(
+        "SELECT attributes_dump, resource_dump, custom_attrs_string FROM spans "
+        "WHERE project_id = {project_id:String}",
+        parameters={"project_id": internal_project_id},
+    ).result_rows
+    assert len(row) == 1
+    attributes_dump, resource_dump, custom_attrs_string = row[0]
+    assert json.loads(attributes_dump) == _REDACTED_SPAN_ATTRS
+    assert json.loads(resource_dump)["attributes"] == {
+        "aws_access_key_id": REDACTED_VALUE
+    }
+    assert custom_attrs_string == {
+        "http.request.header.authorization": REDACTED_VALUE,
+        "openai_api_key": REDACTED_VALUE,
+    }
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_redacts_without_file_storage(ch_server):
+    """Redaction must not depend on a trace server being wired for file storage.
+
+    The blob strip needs one and is skipped without it; redaction does not.
+    """
+    project_id = _make_project_id("genai_otel_redaction_no_fs")
+
+    res, _ = AgentWriteHandler(ch_server.ch_client).insert_otel_spans(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=project_id,
+            wb_user_id="u-1",
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
 
 
 # ---------------------------------------------------------------------------

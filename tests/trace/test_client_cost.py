@@ -44,6 +44,39 @@ def test_cost_apis(client):
     cost_ids = res.ids
     assert len(cost_ids) == 4
 
+    # A matching cost in another project must never be returned.
+    other_project_id = f"{project_id}_{uuid.uuid4().hex}"
+    res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=other_project_id,
+            costs={
+                "foreign_project_model": {
+                    "prompt_token_cost": 50,
+                    "completion_token_cost": 100,
+                }
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    assert len(res.ids) == 1
+
+    res = client.server.cost_query(
+        tsi.CostQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": other_project_id},
+                        ],
+                    }
+                }
+            ),
+        )
+    )
+    assert res.results == []
+
     # query costs by project
     req = tsi.CostQueryReq(
         project_id=project_id,

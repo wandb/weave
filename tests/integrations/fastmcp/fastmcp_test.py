@@ -17,6 +17,7 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
+from weave.trace.op import OpCallError
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
@@ -169,6 +170,13 @@ def test_fastmcp_client(client: WeaveClient) -> None:
     assert "Please review this code" in prompt_text, (
         "Expected prompt to contain 'Please review this code'"
     )
+
+
+@pytest.mark.asyncio
+async def test_fastmcp_client_read_resource_without_uri(weave_active) -> None:
+    # `None` is a safe stand-in for `self`: argument binding fails before it is used.
+    with pytest.raises(OpCallError, match="missing a required argument: 'uri'"):
+        await ClientSession.read_resource(None)
 
 
 @pytest.mark.vcr(

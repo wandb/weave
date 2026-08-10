@@ -1,61 +1,17 @@
-/**
- * OpenTelemetry (GenAI) tracer for the Claude Agent SDK.
- *
- * Emits GenAI-semconv agent spans through the shared Weave GenAI tracer, which
- * targets `/agents/otel/v1/traces` on the trace server (the Agents tab) — the
- * same substrate the pi-coding-agent and OpenAI-Agents OTel integrations use.
- * This is the integration's sole emission path; `wrapQuery` drives it for every
- * `query()` call.
- *
- * Span shape, mapped from one `query()` message stream:
- *
- *   invoke_agent claude_agent_sdk            (root, ROOT_CONTEXT)
- *   ├─ chat <model>                          (one per assistant message)
- *   └─ execute_tool <name>                   (one per tool_use → tool_result)
- *
- * Every span carries `gen_ai.conversation.id` (the SDK `session_id`) so the
- * turns of a multi-prompt session group together — the "session" link. Tokens
- * and cost from the result message are lifted onto the root span.
- *
- * Like the pi integration we hold explicit OTel `Span`/`Context` references
- * rather than using the high-level `startTurn`/`startLLM` API: that API tracks
- * the active turn/LLM in AsyncLocalStorage, which does not survive being driven
- * across an async generator's yields by an external consumer.
- */
 import {
-  type Attributes,
-  type Context,
-  type Span,
-  type Tracer,
-  ROOT_CONTEXT,
-  SpanKind,
-  SpanStatusCode,
-  trace,
-} from '@opentelemetry/api';
-
-import {getWeaveTracer} from '../../genai/provider';
+  Conversation,
+  runIsolated,
+  type Message,
+  type MessagePart,
+  type SubAgent,
+  type Tool,
+  type Turn,
+  type Usage,
+} from '../../genai';
 import {
   ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_AGENT_NAME,
-  ATTR_GEN_AI_CONVERSATION_ID,
-  ATTR_GEN_AI_INPUT_MESSAGES,
-  ATTR_GEN_AI_OPERATION_NAME,
-  ATTR_GEN_AI_OUTPUT_MESSAGES,
-  ATTR_GEN_AI_PROVIDER_NAME,
-  ATTR_GEN_AI_REQUEST_MODEL,
-  ATTR_GEN_AI_RESPONSE_FINISH_REASONS,
-  ATTR_GEN_AI_RESPONSE_MODEL,
-  ATTR_GEN_AI_TOOL_CALL_ARGUMENTS,
-  ATTR_GEN_AI_TOOL_CALL_ID,
-  ATTR_GEN_AI_TOOL_CALL_RESULT,
-  ATTR_GEN_AI_TOOL_NAME,
-  ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-  ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-  ATTR_GEN_AI_USAGE_INPUT_TOKENS,
-  ATTR_GEN_AI_USAGE_OUTPUT_TOKENS,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
-import type {Message, MessagePart} from '../../genai';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 import type {
   ModelUsage,
@@ -63,29 +19,23 @@ import type {
   SDKAssistantMessage,
   SDKMessage,
   SDKResultMessage,
+  SDKTaskNotificationMessage,
   SDKUserMessage,
   SDKUserMessageReplay,
 } from '@anthropic-ai/claude-agent-sdk';
 import {toWeaveUsage} from './messages';
 
-const TRACER_NAME = 'claude-agent-sdk';
 const AGENT_NAME = 'claude_agent_sdk';
-// The Claude Agent SDK runs Anthropic models exclusively.
 const PROVIDER_NAME = 'anthropic';
 
-// Total cost is provider-reported, not a GenAI-semconv field, so it rides on a
-// namespaced attribute (mirrors pi's `pi.usage.cost_usd`).
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
-const ATTR_NUM_TURNS = 'claude_agent_sdk.num_turns';
 
-// Flattened integration provenance (scalars only) for OTel span attributes.
-const CLAUDE_AGENT_SDK_OTEL_ATTRS = asOtelAttributes(
+const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
     packageName: '@anthropic-ai/claude-agent-sdk',
   })
 );
 
-/** Map an assistant message's content blocks to GenAI message parts. */
 function assistantParts(
   blocks: SDKAssistantMessage['message']['content']
 ): MessagePart[] {
@@ -113,13 +63,16 @@ function assistantParts(
   return parts;
 }
 
-/** The `tool_result` block carried on a user message, taken from the SDK type. */
 type ToolResultBlock = Extract<
   SDKUserMessage['message']['content'][number],
   {type: 'tool_result'}
 >;
 
-/** Stringify tool-result content (string or content-block array). */
+type ToolUseBlock = Extract<
+  SDKAssistantMessage['message']['content'][number],
+  {type: 'tool_use'}
+>;
+
 function toolResultText(content: ToolResultBlock['content']): string {
   if (!content) {
     return '';
@@ -127,7 +80,6 @@ function toolResultText(content: ToolResultBlock['content']): string {
   if (typeof content === 'string') {
     return content;
   }
-  // `content` is an array of content blocks here; keep the text parts.
   const text = content
     .map((block: any) => (block.type === 'text' ? block.text : ''))
     .filter(Boolean)
@@ -135,54 +87,167 @@ function toolResultText(content: ToolResultBlock['content']): string {
   return text || JSON.stringify(content);
 }
 
-/**
- * Map one model's SDK usage object to the scalar `gen_ai.usage.*` span
- * attributes. {@link toWeaveUsage} normalizes both the camelCase per-model
- * `modelUsage` values and the snake_case aggregate `usage`.
- *
- * `input_tokens` is emitted as the FULL prompt — fresh + cache-read +
- * cache-creation — see the folding note below.
- */
-function usageAttributes(
-  rawUsage: ModelUsage | NonNullableUsage
-): Record<string, number> {
-  // toWeaveUsage returns the typed WeaveUsage shape, where every token field is
-  // a required number on both SDK casings — no nullish guards needed.
-  const usage = toWeaveUsage(rawUsage);
+function userInputMessage(msg: SDKUserMessage): Message {
+  const content = msg.message.content;
+  if (typeof content === 'string') {
+    return {role: 'user', content};
+  }
 
-  // Anthropic reports `input_tokens` disjoint from the cache counts (fresh,
-  // uncached tokens only). Weave's canonical convention — matching OpenAI and
-  // the trace server's cost formula
-  // `(input_tokens - cache_read - cache_creation) * prompt_cost` — is that
-  // `input_tokens` is the FULL prompt, with cache_read/cache_creation as subsets
-  // of it. Fold the cache counts in so this integration's usage is comparable
-  // across providers: per-token cost stays correct and the cache-hit-rate
-  // denominator (`cache_read / input_tokens`) lands in [0, 1] instead of blowing
-  // up when the cached share dwarfs the fresh tokens.
-  const input =
-    usage.input_tokens +
-    usage.cache_read_input_tokens +
-    usage.cache_creation_input_tokens;
-  const output = usage.output_tokens;
+  const parts: MessagePart[] = [];
+  for (const block of content) {
+    switch (block.type) {
+      case 'text':
+        parts.push({type: 'text', content: block.text});
+        break;
+      case 'image':
+        if (block.source.type === 'base64') {
+          parts.push({
+            type: 'blob',
+            content: block.source.data,
+            mimeType: block.source.media_type,
+            modality: 'image',
+          });
+        } else {
+          parts.push({
+            type: 'uri',
+            uri: block.source.url,
+            modality: 'image',
+          });
+        }
+        break;
+      case 'tool_result':
+        parts.push({
+          type: 'tool_result',
+          toolCallId: block.tool_use_id,
+          result: toolResultText(block.content),
+        });
+        break;
+      default:
+        break;
+    }
+  }
 
-  return {
-    [ATTR_GEN_AI_USAGE_INPUT_TOKENS]: input,
-    [ATTR_GEN_AI_USAGE_OUTPUT_TOKENS]: output,
-    [ATTR_GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: usage.cache_read_input_tokens,
-    [ATTR_GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]:
-      usage.cache_creation_input_tokens,
-    [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: input + output,
-  };
+  if (parts.length === 1 && parts[0].type === 'text') {
+    return {role: 'user', content: parts[0].content};
+  }
+  return {role: 'user', parts};
+}
+
+function recordOf(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value != null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringField(
+  value: Record<string, unknown>,
+  key: string
+): string | undefined {
+  return typeof value[key] === 'string' ? value[key] : undefined;
+}
+
+function completedSubagentOutputText(
+  value: Record<string, unknown>
+): string | undefined {
+  if (value.status !== 'completed' || !Array.isArray(value.content)) {
+    return undefined;
+  }
+
+  const text: string[] = [];
+  for (const item of value.content) {
+    const block = recordOf(item);
+    const blockText = stringField(block, 'text');
+    if (block.type !== 'text' || blockText == null) {
+      return undefined;
+    }
+    text.push(blockText);
+  }
+  return text.join('\n');
+}
+
+// `Task` is the pre-rename name for `Agent`; older SDK versions still emit it.
+const SUBAGENT_TOOL_NAMES = new Set(['Agent', 'Task']);
+
+function isSubagentTool(name: string): boolean {
+  return SUBAGENT_TOOL_NAMES.has(name);
+}
+
+function booleanField(value: Record<string, unknown>, key: string): boolean {
+  return value[key] === true;
 }
 
 /**
- * The error message for a finished run, or undefined if it succeeded. A thrown
- * stream error wins; then a non-success terminal subtype surfaces its `errors`,
- * then a result flagged `is_error` surfaces its text. Returns a string (possibly
- * empty) exactly when the run errored, so callers branch on `!= null`. This
- * broadens the Python integration's `is_error`-only check so failed runs
- * (error_max_turns, error_during_execution, …) also surface as errors.
+ * `run_in_background` and `isolation: 'remote'` (which the SDK documents as
+ * always backgrounded) are declared on the `Agent` input, so read the lifetime
+ * from the caller's request rather than inferring it from the result shape —
+ * an unrecognized result status must not silently downgrade it.
  */
+function subagentLifetime(
+  input: Record<string, unknown>
+): 'turn-scoped' | 'background' {
+  return booleanField(input, 'run_in_background') ||
+    stringField(input, 'isolation') === 'remote'
+    ? 'background'
+    : 'turn-scoped';
+}
+
+type SubagentIdentity = {
+  agentId?: string;
+  model?: string;
+  taskId?: string;
+};
+
+/**
+ * Reads an `Agent`/`Task` tool result. `async_launched` and `remote_launched`
+ * only acknowledge the launch — the real outcome arrives later as a
+ * `task_notification` — so neither is terminal.
+ */
+function subagentResult(value: unknown): {
+  acknowledgesLaunch: boolean;
+  identity: SubagentIdentity;
+  outputText: string | undefined;
+} {
+  const raw = recordOf(value);
+  return {
+    acknowledgesLaunch:
+      raw.status === 'async_launched' || raw.status === 'remote_launched',
+    identity: {
+      agentId: stringField(raw, 'agentId'),
+      model: stringField(raw, 'resolvedModel'),
+      // A remote launch names its handle `taskId`; the others use `agentId`.
+      taskId: stringField(raw, 'taskId'),
+    },
+    outputText: completedSubagentOutputText(raw),
+  };
+}
+
+type NormalizedUsage = {
+  usage: Usage;
+  totalTokens: number;
+};
+
+function normalizeUsage(
+  rawUsage: ModelUsage | NonNullableUsage
+): NormalizedUsage {
+  const usage = toWeaveUsage(rawUsage);
+  // Anthropic excludes cache tokens from input tokens; Weave includes them.
+  const inputTokens =
+    usage.input_tokens +
+    usage.cache_read_input_tokens +
+    usage.cache_creation_input_tokens;
+  const outputTokens = usage.output_tokens;
+
+  return {
+    usage: {
+      inputTokens,
+      outputTokens,
+      cacheReadInputTokens: usage.cache_read_input_tokens,
+      cacheCreationInputTokens: usage.cache_creation_input_tokens,
+    },
+    totalTokens: inputTokens + outputTokens,
+  };
+}
+
 function runErrorMessage(
   error: unknown,
   result?: SDKResultMessage
@@ -193,8 +258,6 @@ function runErrorMessage(
   if (error != null) {
     return String(error);
   }
-  // `result` and `errors` live on opposite members of the union; narrow on
-  // `subtype` to read either.
   if (result && result.subtype !== 'success') {
     return result.errors.join('; ');
   }
@@ -205,71 +268,101 @@ function runErrorMessage(
 }
 
 type ClaudeAgentOtelTracerOptions = {
-  /** The user prompt, when invoked as a string (recorded as input on the root). */
   prompt?: string;
-  /**
-   * The main-thread agent name (`options.agent`), used as `gen_ai.agent.name` —
-   * the key the Agents-tab usage rollup groups on. Falls back to the integration
-   * name `claude_agent_sdk` when the caller didn't name an agent.
-   */
   agent?: string;
 };
 
+type PendingTurn = {
+  inputMessages: Message[];
+  startedAt: Date;
+};
+
+/**
+ * A subagent's terminal state. Buffered rather than applied on the spot because
+ * `SpanBase` only exposes error recording through `end()`, so deferring the
+ * close (to keep child spans closing before their parent) also defers the
+ * `Error`. `endedAt` preserves the real duration across that deferral.
+ */
+type SubagentOutcome =
+  | {status: 'ok'; endedAt: Date}
+  | {
+      status: 'error';
+      errorType: 'aborted' | 'subagent_error';
+      error: Error;
+      endedAt: Date;
+    };
+
+type OpenSubagent = {
+  /** `AgentOutput.agentId` — the subagent's own identity. */
+  agentId?: string;
+  /** `background` subagents outlive the turn that launched them. */
+  lifetime: 'turn-scoped' | 'background';
+  /** Owning subagent's tool-use ID; undefined when the parent is the Turn. */
+  parentToolUseId?: string;
+  span: SubAgent;
+  /** `task_notification.task_id` — the task-registry handle, not assumed equal to `agentId`. */
+  taskId?: string;
+  outcome?: SubagentOutcome;
+};
+
+type OpenTool = {
+  /** Owning subagent's tool-use ID; undefined when the parent is the Turn. */
+  ownerToolUseId?: string;
+  tool: Tool;
+};
+
+/** Emits Claude Agent SDK traces through Weave GenAI handles. */
 export class ClaudeAgentOtelTracer {
-  private readonly tracer: Tracer;
   private readonly agentName: string;
-  private readonly invokeAgentSpan: Span;
-  private readonly invokeAgentCtx: Context;
-  private readonly openToolSpans = new Map<string, Span>();
-  private conversationId: string | null = null;
+  private readonly startedAt = new Date();
+  private readonly openSubagents = new Map<string, OpenSubagent>();
+  private readonly openTools = new Map<string, OpenTool>();
+  private readonly pendingTurns: PendingTurn[] = [];
+
+  private conversation: Conversation | null = null;
+  private conversationId: string | undefined;
+  private activeTurn: Turn | null = null;
+  private bufferedInputMessages: Message[] = [];
+  private bufferedTurnStartedAt: Date | null = null;
+  private completedTurns = 0;
   private rootModel: string | null = null;
   private finished = false;
 
   constructor(opts: ClaudeAgentOtelTracerOptions = {}) {
-    // The shared Weave GenAI tracer targets /agents/otel/v1/traces and owns
-    // auth, resource attrs, batching, and beforeExit flush. A no-op tracer is
-    // returned when weave.init() hasn't run, so every span call stays safe.
-    this.tracer = getWeaveTracer(TRACER_NAME);
-
-    // gen_ai.agent.name follows the caller's main-thread `options.agent` when
-    // set (the Agents-tab usage rollup groups on it), falling back to the
-    // integration name. The span name and integration.name stay the constant.
     this.agentName = opts.agent || AGENT_NAME;
-
-    // Root span under ROOT_CONTEXT so each query() is its own trace; sibling
-    // prompts in one session are linked via gen_ai.conversation.id, not a
-    // shared parent.
-    this.invokeAgentSpan = this.tracer.startSpan(
-      `invoke_agent ${AGENT_NAME}`,
-      {
-        kind: SpanKind.INTERNAL,
-        attributes: {
-          ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
-          [ATTR_GEN_AI_OPERATION_NAME]: 'invoke_agent',
-          [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
-          [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
-        },
-      },
-      ROOT_CONTEXT
-    );
-    this.invokeAgentCtx = trace.setSpan(ROOT_CONTEXT, this.invokeAgentSpan);
-
     if (opts.prompt != null) {
-      this.invokeAgentSpan.setAttribute(
-        ATTR_GEN_AI_INPUT_MESSAGES,
-        JSON.stringify([{role: 'user', content: opts.prompt}])
-      );
+      this.pendingTurns.push({
+        inputMessages: [{role: 'user', content: opts.prompt}],
+        startedAt: this.startedAt,
+      });
+    }
+  }
+
+  processInput(msg: SDKUserMessage): void {
+    if (this.finished) {
+      return;
+    }
+    this.rememberConversationId(msg.session_id);
+    if (this.bufferedTurnStartedAt == null) {
+      this.bufferedTurnStartedAt = new Date();
+    }
+    this.bufferedInputMessages.push(userInputMessage(msg));
+
+    if (msg.shouldQuery !== false) {
+      this.pendingTurns.push({
+        inputMessages: this.bufferedInputMessages,
+        startedAt: this.bufferedTurnStartedAt,
+      });
+      this.bufferedInputMessages = [];
+      this.bufferedTurnStartedAt = null;
     }
   }
 
   processMessage(msg: SDKMessage): void {
-    // The SDK stamps session_id on every message; capture it once as the
-    // conversation id so the root and its children all carry it.
-    const sessionId = msg.session_id;
-    if (this.conversationId == null && sessionId) {
-      this.conversationId = sessionId;
-      this.invokeAgentSpan.setAttribute(ATTR_GEN_AI_CONVERSATION_ID, sessionId);
+    if (this.finished) {
+      return;
     }
+    this.rememberConversationId(msg.session_id);
 
     switch (msg.type) {
       case 'assistant':
@@ -277,6 +370,14 @@ export class ClaudeAgentOtelTracer {
         break;
       case 'user':
         this.processUser(msg);
+        break;
+      case 'result':
+        this.endTurn(msg);
+        break;
+      case 'system':
+        if (msg.subtype === 'task_notification') {
+          this.processTaskNotification(msg);
+        }
         break;
       default:
         break;
@@ -287,139 +388,121 @@ export class ClaudeAgentOtelTracer {
     if (this.finished) {
       return;
     }
-    this.finished = true;
-
-    // Late-bind the conversation id from the result if no earlier message
-    // carried a session_id (e.g. a result-only stream), so the turn still
-    // groups into its session.
-    if (this.conversationId == null && result?.session_id) {
-      this.conversationId = result.session_id;
-      this.invokeAgentSpan.setAttribute(
-        ATTR_GEN_AI_CONVERSATION_ID,
-        result.session_id
-      );
-    }
-
-    // Sweep tool calls left open (interrupted stream or missing tool_result).
-    for (const span of this.openToolSpans.values()) {
-      span.setAttribute(ATTR_ERROR_TYPE, 'aborted');
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: 'Agent ended with open tool span',
-      });
-      span.end();
-    }
-    this.openToolSpans.clear();
-
-    if (this.rootModel) {
-      this.invokeAgentSpan.setAttribute(
-        ATTR_GEN_AI_RESPONSE_MODEL,
-        this.rootModel
-      );
-    }
 
     if (result) {
-      // Emit per-model usage on child spans and let the trace server cost and
-      // roll it up, rather than summing on the client. See
-      // {@link emitModelUsageSpans}.
-      this.emitModelUsageSpans(result);
+      this.processMessage(result);
+    }
+    this.finished = true;
 
-      // Both result members carry these as required numbers.
-      this.invokeAgentSpan.setAttribute(ATTR_COST_USD, result.total_cost_usd);
-      this.invokeAgentSpan.setAttribute(ATTR_NUM_TURNS, result.num_turns);
-      // `result` is the final assistant text, present only on the success member.
+    if (
+      this.activeTurn ||
+      this.pendingTurns.length > 0 ||
+      this.bufferedInputMessages.length > 0 ||
+      this.completedTurns === 0
+    ) {
+      this.endTurn(undefined, error);
+    }
+    this.finishOpenTools('shutdown');
+    this.finishOpenSubagents('shutdown');
+  }
+
+  private endTurn(result?: SDKResultMessage, error?: unknown): void {
+    const turn = this.getOrCreateTurn();
+    // Sweep children before their parents, and spare anything owned by a
+    // background subagent that is still running past this turn boundary.
+    this.finishOpenTools('turn-boundary');
+    this.finishOpenSubagents('turn-boundary');
+
+    if (result) {
+      this.emitModelUsageSpans(result, turn);
+
+      turn.setAttributes({
+        [ATTR_COST_USD]: result.total_cost_usd,
+      });
       if (result.subtype === 'success') {
-        const output: Message[] = [{role: 'assistant', content: result.result}];
-        this.invokeAgentSpan.setAttribute(
-          ATTR_GEN_AI_OUTPUT_MESSAGES,
-          JSON.stringify(output)
-        );
+        turn.record({
+          outputMessages: [{role: 'assistant', content: result.result}],
+        });
       }
     }
 
-    // Mark the root failed on a thrown stream error, a non-success terminal
-    // subtype, or an is_error result. runErrorMessage returns a string exactly
-    // when the run errored.
     const errorMessage = runErrorMessage(error, result);
     if (errorMessage != null) {
-      this.invokeAgentSpan.setAttribute(ATTR_ERROR_TYPE, 'agent_error');
-      this.invokeAgentSpan.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: errorMessage || 'Conversation ended with error',
+      turn.setAttributes({[ATTR_ERROR_TYPE]: 'agent_error'});
+      turn.end({
+        error: new Error(errorMessage || 'Conversation ended with error'),
       });
+    } else {
+      turn.end();
     }
 
-    this.invokeAgentSpan.end();
+    this.activeTurn = null;
+    this.rootModel = null;
+    this.completedTurns += 1;
   }
 
-  // The conversation/session id, attached to child spans only once it's known.
-  private conversationAttrs(): Attributes {
-    return this.conversationId
-      ? {[ATTR_GEN_AI_CONVERSATION_ID]: this.conversationId}
-      : {};
+  private rememberConversationId(conversationId: string | undefined): void {
+    if (this.conversationId == null && conversationId) {
+      this.conversationId = conversationId;
+    }
   }
 
-  // A `chat` span (CLIENT, child of the root) keyed by model. `extraAttrs`
-  // carries the per-model usage from emitModelUsageSpans; processAssistant
-  // passes none and sets the response on the returned span directly.
-  private startChatSpan(
-    model: string | undefined,
-    extraAttrs: Attributes = {}
-  ): Span {
-    return this.tracer.startSpan(
-      `chat ${model ?? ''}`.trimEnd(),
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
-          [ATTR_GEN_AI_OPERATION_NAME]: 'chat',
-          // Stamp the agent name on children, not just the root: the per-agent
-          // usage rollup groups by `gen_ai.agent.name`, so a usage-bearing
-          // `chat` span without it would drop out of the agent's token totals.
-          [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
-          [ATTR_GEN_AI_PROVIDER_NAME]: PROVIDER_NAME,
-          ...(model
-            ? {
-                [ATTR_GEN_AI_REQUEST_MODEL]: model,
-                [ATTR_GEN_AI_RESPONSE_MODEL]: model,
-              }
-            : {}),
-          ...this.conversationAttrs(),
-          ...extraAttrs,
-        },
-      },
-      this.invokeAgentCtx
+  private getOrCreateConversation(): Conversation {
+    if (this.conversation) {
+      return this.conversation;
+    }
+
+    this.conversation = runIsolated(() =>
+      Conversation.create({
+        agentName: this.agentName,
+        conversationId: this.conversationId ?? '',
+        attributes: CLAUDE_AGENT_SDK_ATTRIBUTES,
+      })
     );
+    return this.conversation;
   }
 
-  /**
-   * Emit one `chat` span per model carrying that model's token usage, keyed by
-   * `gen_ai.response.model`, as children of the root. The trace server keys
-   * `summary.usage` on each span's model, costs every model from its own price,
-   * and rolls the per-model totals up into the root `invoke_agent` span — so we
-   * hand it the SDK's per-model `modelUsage` breakdown verbatim instead of
-   * summing on the client, which would collapse a multi-model session onto one
-   * model's price and discard the per-model split the server's cost rollup needs.
-   *
-   * The root carries no token usage of its own, so it isn't double-counted in
-   * that descendant rollup; the SDK's authoritative `total_cost_usd` still rides
-   * on the root as a reference attribute. Sourcing usage from the result's
-   * `modelUsage` (rather than per-assistant-message usage) also captures models
-   * the SDK used without emitting an assistant message — e.g. a fast model for
-   * an internal step.
-   *
-   * These usage spans intentionally reuse the `chat <model>` name of the
-   * per-message content spans from {@link processAssistant}: the SDK reports
-   * usage only in the aggregate result, never per message, so a model that also
-   * emitted content ends up with two same-named siblings (one with content and
-   * no tokens, one with tokens and no content). They don't double-count — only
-   * the usage span carries tokens — but name-based span lookup sees duplicates,
-   * so distinguish them by attribute (`gen_ai.output.messages` vs
-   * `gen_ai.usage.*`).
-   */
-  private emitModelUsageSpans(result: SDKResultMessage): void {
-    // Prefer the per-model breakdown; fall back to the flat aggregate keyed by
-    // the session's primary model when the SDK reports no `modelUsage`.
+  private nextPendingTurn(): PendingTurn {
+    const pending = this.pendingTurns.shift();
+    if (pending) {
+      return pending;
+    }
+    if (this.bufferedTurnStartedAt) {
+      const buffered = {
+        inputMessages: this.bufferedInputMessages,
+        startedAt: this.bufferedTurnStartedAt,
+      };
+      this.bufferedInputMessages = [];
+      this.bufferedTurnStartedAt = null;
+      return buffered;
+    }
+    return {
+      inputMessages: [],
+      startedAt: this.completedTurns === 0 ? this.startedAt : new Date(),
+    };
+  }
+
+  private getOrCreateTurn(): Turn {
+    if (this.activeTurn) {
+      return this.activeTurn;
+    }
+
+    const pending = this.nextPendingTurn();
+    const conversation = this.getOrCreateConversation();
+    this.activeTurn = runIsolated(() =>
+      conversation.startTurn({
+        startTime: pending.startedAt,
+      })
+    );
+    if (pending.inputMessages.length > 0) {
+      this.activeTurn.record({
+        messages: pending.inputMessages,
+      });
+    }
+    return this.activeTurn;
+  }
+
+  private emitModelUsageSpans(result: SDKResultMessage, turn: Turn): void {
     const perModel: Array<[string | undefined, ModelUsage | NonNullableUsage]> =
       result.modelUsage && Object.keys(result.modelUsage).length > 0
         ? Object.entries(result.modelUsage)
@@ -427,68 +510,127 @@ export class ClaudeAgentOtelTracer {
           ? [[this.rootModel ?? undefined, result.usage]]
           : [];
 
+    // Keep usage per model so the server can price each model independently.
     for (const [model, rawUsage] of perModel) {
-      this.startChatSpan(model, usageAttributes(rawUsage)).end();
+      const normalized = normalizeUsage(rawUsage);
+      runIsolated(() => {
+        const llm = turn.startLLM({
+          model: model ?? '',
+          providerName: PROVIDER_NAME,
+        });
+        llm.setAttributes({
+          [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: normalized.totalTokens,
+        });
+        llm.record({
+          usage: normalized.usage,
+          ...(model ? {responseModel: model} : {}),
+        });
+        llm.end();
+      });
     }
   }
 
   private processAssistant(msg: SDKAssistantMessage): void {
     const model = msg.message.model;
-    if (this.rootModel == null && model) {
+    if (msg.parent_tool_use_id == null && this.rootModel == null && model) {
       this.rootModel = model;
     }
 
+    const parent = this.getOrCreateMessageParent(msg);
     const content = msg.message.content;
-
-    // Per-chat usage and input messages are intentionally omitted: the SDK only
-    // reports aggregate usage in the terminal result (lifted onto the root), and
-    // the stream doesn't expose the per-turn input context.
-    //
-    // One `chat` span per assistant message, carrying the full response
-    // (text + reasoning + tool_call parts) as gen_ai.output.messages.
-    const chatSpan = this.startChatSpan(model);
     const parts = assistantParts(content);
-    if (parts.length > 0) {
-      const outputMessage: Message = {role: 'assistant', parts};
-      chatSpan.setAttribute(
-        ATTR_GEN_AI_OUTPUT_MESSAGES,
-        JSON.stringify([outputMessage])
-      );
-    }
-    if (msg.message.stop_reason) {
-      chatSpan.setAttribute(ATTR_GEN_AI_RESPONSE_FINISH_REASONS, [
-        msg.message.stop_reason,
-      ]);
-    }
-    chatSpan.end();
 
-    // Open an execute_tool span per tool use; closed by its tool_result.
+    runIsolated(() => {
+      const llm = parent.startLLM({
+        model: model ?? '',
+        providerName: PROVIDER_NAME,
+      });
+      llm.record({
+        ...(parts.length > 0
+          ? {outputMessages: [{role: 'assistant', parts}]}
+          : {}),
+        ...(model ? {responseModel: model} : {}),
+        ...(msg.message.stop_reason
+          ? {finishReasons: [msg.message.stop_reason]}
+          : {}),
+      });
+      llm.end();
+    });
+
+    // Tool spans stay open until the matching tool_result arrives. Record the
+    // owning subagent so a turn boundary can tell whose children these are.
+    const ownerToolUseId = msg.parent_tool_use_id ?? undefined;
     for (const block of content) {
       if (block.type !== 'tool_use') {
         continue;
       }
-      const toolSpan = this.tracer.startSpan(
-        `execute_tool ${block.name}`,
-        {
-          kind: SpanKind.INTERNAL,
-          attributes: {
-            ...CLAUDE_AGENT_SDK_OTEL_ATTRS,
-            [ATTR_GEN_AI_OPERATION_NAME]: 'execute_tool',
-            // Carry the agent name too (see startChatSpan) so tool spans group
-            // with their agent in the per-agent rollups.
-            [ATTR_GEN_AI_AGENT_NAME]: this.agentName,
-            [ATTR_GEN_AI_TOOL_NAME]: block.name,
-            [ATTR_GEN_AI_TOOL_CALL_ID]: block.id,
-            [ATTR_GEN_AI_TOOL_CALL_ARGUMENTS]: JSON.stringify(
-              block.input ?? {}
-            ),
-            ...this.conversationAttrs(),
-          },
-        },
-        this.invokeAgentCtx
-      );
-      this.openToolSpans.set(block.id, toolSpan);
+      if (isSubagentTool(block.name)) {
+        this.startSubagent(block, parent, ownerToolUseId);
+        continue;
+      }
+      const tool = parent.startTool({
+        name: block.name,
+        toolCallId: block.id,
+        args: JSON.stringify(block.input ?? {}),
+      });
+      this.openTools.set(block.id, {ownerToolUseId, tool});
     }
+  }
+
+  private getOrCreateMessageParent(msg: SDKAssistantMessage): Turn | SubAgent {
+    const parentToolUseId = msg.parent_tool_use_id;
+    if (parentToolUseId == null) {
+      return this.getOrCreateTurn();
+    }
+
+    let openSubagent = this.openSubagents.get(parentToolUseId);
+    if (!openSubagent) {
+      const turn = this.getOrCreateTurn();
+      const span = turn.startSubagent({
+        name: msg.subagent_type ?? 'subagent',
+        model: msg.message.model,
+        agentDescription: msg.task_description,
+      });
+      // Reached only when the `Agent` tool_use block was never observed, so
+      // the launch options are unknown and the parent is this Turn.
+      openSubagent = {lifetime: 'turn-scoped', span};
+      this.openSubagents.set(parentToolUseId, openSubagent);
+    } else {
+      openSubagent.span.record({
+        ...(msg.subagent_type ? {name: msg.subagent_type} : {}),
+        ...(msg.message.model ? {model: msg.message.model} : {}),
+        ...(msg.task_description
+          ? {agentDescription: msg.task_description}
+          : {}),
+      });
+    }
+    return openSubagent.span;
+  }
+
+  private startSubagent(
+    block: ToolUseBlock,
+    parent: Turn | SubAgent,
+    parentToolUseId: string | undefined
+  ): void {
+    const input = recordOf(block.input);
+    const name =
+      stringField(input, 'subagent_type') ??
+      stringField(input, 'name') ??
+      'subagent';
+    const prompt = stringField(input, 'prompt');
+    const subagent = parent.startSubagent({
+      name,
+      model: stringField(input, 'model'),
+      agentDescription: stringField(input, 'description'),
+    });
+    subagent.record({
+      messages: prompt ? [{role: 'user', content: prompt}] : [],
+    });
+    this.openSubagents.set(block.id, {
+      lifetime: subagentLifetime(input),
+      parentToolUseId,
+      span: subagent,
+    });
   }
 
   private processUser(msg: SDKUserMessage | SDKUserMessageReplay): void {
@@ -499,21 +641,180 @@ export class ClaudeAgentOtelTracer {
       if (block.type !== 'tool_result') {
         continue;
       }
-      const span = this.openToolSpans.get(block.tool_use_id);
-      if (!span) {
+      const openSubagent = this.openSubagents.get(block.tool_use_id);
+      if (openSubagent) {
+        this.processSubagentResult(openSubagent, block, msg);
         continue;
       }
-      this.openToolSpans.delete(block.tool_use_id);
+      const openTool = this.openTools.get(block.tool_use_id);
+      if (!openTool) {
+        continue;
+      }
       const resultText = toolResultText(block.content);
-      span.setAttribute(ATTR_GEN_AI_TOOL_CALL_RESULT, resultText);
+      this.openTools.delete(block.tool_use_id);
+      const tool = openTool.tool;
+      tool.result = resultText;
       if (block.is_error) {
-        span.setAttribute(ATTR_ERROR_TYPE, 'tool_error');
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: resultText,
+        tool.setAttributes({[ATTR_ERROR_TYPE]: 'tool_error'});
+        tool.end({error: new Error(resultText || 'Tool execution failed')});
+      } else {
+        tool.end();
+      }
+    }
+  }
+
+  private processSubagentResult(
+    openSubagent: OpenSubagent,
+    block: ToolResultBlock,
+    msg: SDKUserMessage | SDKUserMessageReplay
+  ): void {
+    const {acknowledgesLaunch, identity, outputText} = subagentResult(
+      msg.tool_use_result
+    );
+    // The identity fields ride on every `Agent` result shape, launch or not.
+    openSubagent.agentId = identity.agentId ?? openSubagent.agentId;
+    openSubagent.taskId = identity.taskId ?? openSubagent.taskId;
+    openSubagent.span.record({
+      ...(identity.model ? {model: identity.model} : {}),
+      ...(identity.agentId ? {agentId: identity.agentId} : {}),
+    });
+
+    if (acknowledgesLaunch && !block.is_error) {
+      // Only an acknowledgement — the outcome arrives as a task_notification.
+      openSubagent.lifetime = 'background';
+      return;
+    }
+
+    let terminalOutputText = outputText;
+    if (block.is_error || terminalOutputText === undefined) {
+      const fallbackText = toolResultText(block.content);
+      terminalOutputText = fallbackText;
+    }
+    openSubagent.span.record({
+      outputMessages: terminalOutputText
+        ? [{role: 'assistant', content: terminalOutputText}]
+        : [],
+    });
+    openSubagent.outcome = block.is_error
+      ? {
+          status: 'error',
+          errorType: 'subagent_error',
+          error: new Error(terminalOutputText || 'Subagent execution failed'),
+          endedAt: new Date(),
+        }
+      : {status: 'ok', endedAt: new Date()};
+  }
+
+  private processTaskNotification(msg: SDKTaskNotificationMessage): void {
+    // `task_id` and the launch result's `agentId` are not documented as the
+    // same value, so match either before giving up.
+    const toolUseId =
+      msg.tool_use_id ??
+      [...this.openSubagents.entries()].find(
+        ([, openSubagent]) =>
+          openSubagent.taskId === msg.task_id ||
+          openSubagent.agentId === msg.task_id
+      )?.[0];
+    if (!toolUseId) {
+      return;
+    }
+
+    const openSubagent = this.openSubagents.get(toolUseId);
+    if (!openSubagent) {
+      return;
+    }
+    openSubagent.taskId = msg.task_id;
+    if (openSubagent.agentId == null) {
+      openSubagent.agentId = msg.task_id;
+      openSubagent.span.record({agentId: msg.task_id});
+    }
+    if (msg.usage) {
+      openSubagent.span.setAttributes({
+        [ATTR_GEN_AI_USAGE_TOTAL_TOKENS]: msg.usage.total_tokens,
+      });
+    }
+    const endedAt = new Date();
+    if (msg.status === 'completed') {
+      // The summary is the only result text a background subagent ever reports.
+      if (msg.summary) {
+        openSubagent.span.record({
+          outputMessages: [{role: 'assistant', content: msg.summary}],
         });
       }
-      span.end();
+      openSubagent.outcome = {status: 'ok', endedAt};
+      return;
+    }
+
+    openSubagent.outcome = {
+      status: 'error',
+      errorType: msg.status === 'stopped' ? 'aborted' : 'subagent_error',
+      error: new Error(msg.summary || `Background subagent ${msg.status}`),
+      endedAt,
+    };
+  }
+
+  /**
+   * True when `toolUseId` is a background subagent, or a descendant of one, so
+   * it must outlive the turn that launched it. Terminates because a parent is
+   * always registered before its children.
+   */
+  private outlivesTurn(toolUseId: string | undefined): boolean {
+    let cursor = toolUseId;
+    while (cursor) {
+      const openSubagent = this.openSubagents.get(cursor);
+      if (!openSubagent) {
+        return false;
+      }
+      if (openSubagent.lifetime === 'background') {
+        return true;
+      }
+      cursor = openSubagent.parentToolUseId;
+    }
+    return false;
+  }
+
+  private finishOpenTools(reason: 'turn-boundary' | 'shutdown'): void {
+    for (const [toolUseId, openTool] of [...this.openTools.entries()]) {
+      if (
+        reason === 'turn-boundary' &&
+        this.outlivesTurn(openTool.ownerToolUseId)
+      ) {
+        continue;
+      }
+      openTool.tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
+      openTool.tool.end({error: new Error('Agent ended with open tool span')});
+      this.openTools.delete(toolUseId);
+    }
+  }
+
+  private finishOpenSubagents(reason: 'turn-boundary' | 'shutdown'): void {
+    // Newest-first so a nested subagent closes before the parent it hangs off.
+    const openSubagents = [...this.openSubagents.entries()].reverse();
+    for (const [toolUseId, openSubagent] of openSubagents) {
+      const outcome = openSubagent.outcome;
+      if (outcome) {
+        if (outcome.status === 'error') {
+          openSubagent.span.setAttributes({
+            [ATTR_ERROR_TYPE]: outcome.errorType,
+          });
+          openSubagent.span.end({
+            error: outcome.error,
+            endTime: outcome.endedAt,
+          });
+        } else {
+          openSubagent.span.end({endTime: outcome.endedAt});
+        }
+        this.openSubagents.delete(toolUseId);
+        continue;
+      }
+      if (reason === 'turn-boundary' && this.outlivesTurn(toolUseId)) {
+        continue;
+      }
+      openSubagent.span.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
+      openSubagent.span.end({
+        error: new Error('Agent ended with open subagent span'),
+      });
+      this.openSubagents.delete(toolUseId);
     }
   }
 }

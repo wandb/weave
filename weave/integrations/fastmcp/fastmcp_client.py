@@ -65,6 +65,7 @@ def fastmcp_client_wrapper(settings: OpSettings) -> Callable:
 
             def wrapped_read_resource(*args: Any, **kwargs: Any) -> Any:
                 display_uri = None
+                uri = None
 
                 # uri is an object of pydantic `AnyUrl`
                 if len(args) >= 2:

@@ -8,15 +8,15 @@
  * hook callback only sees tool name/input/session_id — never the assistant
  * message content, model, token usage, or total_cost_usd. We therefore wrap the
  * SDK's exported `query()` and emit GenAI agent spans from the streamed messages
- * through the shared Weave GenAI tracer — `invoke_agent`/`chat`/`execute_tool`
+ * through the high-level Weave GenAI SDK — `invoke_agent`/`chat`/`execute_tool`
  * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
+ *
+ * Agent/Task tool calls become nested `invoke_agent` spans. The SDK forwards
+ * nested tool blocks by default; callers that set `forwardSubagentText: true`
+ * also get the subagent's text and thinking recorded on nested `chat` spans.
  *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
- *
- * Out of scope for now (tracked as a follow-up): multi-turn / streaming-input
- * sessions (`query({prompt: <AsyncIterable>})` / `Query.streamInput`) get a
- * single root turn rather than one per turn.
  */
 import {getGlobalClient} from '../clientApi';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
@@ -41,6 +41,20 @@ const GENERATOR_MEMBERS = new Set<PropertyKey>([
   'throw',
 ]);
 
+async function* tracedInput(
+  stream: AsyncIterable<ClaudeAgentSdk.SDKUserMessage>,
+  tracer: ClaudeAgentOtelTracer
+): AsyncGenerator<ClaudeAgentSdk.SDKUserMessage> {
+  for await (const message of stream) {
+    try {
+      tracer.processInput(message);
+    } catch (err) {
+      console.warn('weave: claude_agent_sdk tracing error (ignored)', err);
+    }
+    yield message;
+  }
+}
+
 /**
  * Wrap a `query()` so that iterating its result drives a {@link ClaudeAgentOtelTracer}.
  * The returned object preserves the full `Query` interface: iteration is traced,
@@ -49,35 +63,37 @@ const GENERATOR_MEMBERS = new Set<PropertyKey>([
  */
 function wrapQuery(originalQuery: QueryFn): QueryFn {
   return function patchedQuery(args) {
-    const realQuery = originalQuery(args);
     const client = getGlobalClient();
-    if (!client || realQuery == null) {
-      return realQuery;
+    if (!client) {
+      return originalQuery(args);
     }
 
     const prompt = typeof args?.prompt === 'string' ? args.prompt : undefined;
     // gen_ai.agent.name follows the caller's main-thread agent when named.
     const agent = args?.options?.agent;
     const tracer = new ClaudeAgentOtelTracer({prompt, agent});
+    const tracedArgs =
+      typeof args.prompt === 'string'
+        ? args
+        : {...args, prompt: tracedInput(args.prompt, tracer)};
+    const realQuery = originalQuery(tracedArgs);
+    if (realQuery == null) {
+      return realQuery;
+    }
 
     async function* traced(): AsyncGenerator<unknown, void> {
-      let result: ClaudeAgentSdk.SDKResultMessage | undefined;
       let streamError: unknown;
       try {
         for await (const msg of realQuery) {
-          if (msg && msg.type === 'result') {
-            result = msg;
-          } else {
-            // Tracing must never break the caller's stream: swallow any
-            // mapping error (the message is still yielded below).
-            try {
-              tracer.processMessage(msg);
-            } catch (err) {
-              console.warn(
-                'weave: claude_agent_sdk tracing error (ignored)',
-                err
-              );
-            }
+          // Tracing must never break the caller's stream: swallow any
+          // mapping error (the message is still yielded below).
+          try {
+            tracer.processMessage(msg);
+          } catch (err) {
+            console.warn(
+              'weave: claude_agent_sdk tracing error (ignored)',
+              err
+            );
           }
           yield msg;
         }
@@ -91,7 +107,7 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
         // Guard finalize too, so a tracing failure can't mask the real stream
         // error being re-thrown from the catch above.
         try {
-          tracer.finalize(result, streamError);
+          tracer.finalize(undefined, streamError);
         } catch (err) {
           console.warn('weave: claude_agent_sdk finalize error (ignored)', err);
         }
@@ -101,6 +117,13 @@ function wrapQuery(originalQuery: QueryFn): QueryFn {
     const wrapped = traced();
     return new Proxy(wrapped, {
       get(target, prop, receiver) {
+        if (prop === 'streamInput') {
+          const value = Reflect.get(realQuery, prop, realQuery);
+          return typeof value === 'function'
+            ? (stream: AsyncIterable<ClaudeAgentSdk.SDKUserMessage>) =>
+                value.call(realQuery, tracedInput(stream, tracer))
+            : value;
+        }
         if (GENERATOR_MEMBERS.has(prop)) {
           const value = Reflect.get(target, prop, receiver);
           return typeof value === 'function' ? value.bind(target) : value;
