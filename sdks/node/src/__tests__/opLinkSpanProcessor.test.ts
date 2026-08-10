@@ -3,7 +3,6 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-base';
 
-import {requireGlobalClient} from '../clientApi';
 import {
   PARENT_CALL_ID_SPAN_ATTR,
   PARENT_CALL_TRACE_ID_SPAN_ATTR,
@@ -14,7 +13,7 @@ import {Turn} from '../genai/turn';
 import {op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {findSpan, setupGenAITestEnvironment} from './genai/common';
-import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
+import {type Call, InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
 // OTel JS's default OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT.
 const SPAN_ATTRIBUTE_LIMIT = 128;
@@ -45,24 +44,23 @@ describe('OpLinkSpanProcessor', () => {
     getWeaveTracer('test').startSpan(name, {attributes}).end();
   }
 
-  /** The call the named op recorded, as the trace server stored it. */
-  async function storedCall(opName: string) {
-    await requireGlobalClient().flush();
+  /** The calls the trace server stored, keyed by the op that made them. */
+  async function storedCalls(): Promise<Record<string, Call>> {
     const calls = await traceServer.getCalls(projectId);
-    const call = calls.find(c => c.op_name.includes(opName));
-    if (!call) {
-      throw new Error(`no call for op '${opName}'`);
-    }
-    return call;
+    return Object.fromEntries(
+      calls.map(c => [c.op_name.match(/\/op\/([^:]+):/)![1], c])
+    );
   }
 
   test('stamps the enclosing call onto a span an op emits', async () => {
     await op(() => emitSpan('agent_work'), {name: 'orchestrate'})();
-    const call = await storedCall('orchestrate');
+    const {orchestrate} = await storedCalls();
 
     const span = findSpan(exporter.getFinishedSpans(), 'agent_work');
-    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(call.id);
-    expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(call.trace_id);
+    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
+    expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(
+      orchestrate.trace_id
+    );
   });
 
   test('stamps every conversation SDK span in the subtree', async () => {
@@ -74,13 +72,13 @@ describe('OpLinkSpanProcessor', () => {
       },
       {name: 'converse'}
     )();
-    const call = await storedCall('converse');
+    const {converse} = await storedCalls();
 
     const spans = exporter.getFinishedSpans();
     for (const name of ['invoke_agent', 'chat']) {
       const attrs = findSpan(spans, name).attributes;
-      expect(attrs[PARENT_CALL_ID_SPAN_ATTR]).toBe(call.id);
-      expect(attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(call.trace_id);
+      expect(attrs[PARENT_CALL_ID_SPAN_ATTR]).toBe(converse.id);
+      expect(attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(converse.trace_id);
     }
   });
 
@@ -102,8 +100,7 @@ describe('OpLinkSpanProcessor', () => {
       {name: 'outer'}
     )();
 
-    const outerCall = await storedCall('outer');
-    const innerCall = await storedCall('inner');
+    const {inner: innerCall, outer: outerCall} = await storedCalls();
     const spans = exporter.getFinishedSpans();
 
     expect(findSpan(spans, 'outer_work').attributes).toMatchObject({
@@ -121,12 +118,14 @@ describe('OpLinkSpanProcessor', () => {
     await op(() => runIsolated(() => emitSpan('isolated_work')), {
       name: 'orchestrate',
     })();
-    const call = await storedCall('orchestrate');
+    const {orchestrate} = await storedCalls();
 
     // runIsolated swaps the GenAI state, not the call stack the link reads.
     const span = findSpan(exporter.getFinishedSpans(), 'isolated_work');
-    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(call.id);
-    expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(call.trace_id);
+    expect(span.attributes[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
+    expect(span.attributes[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(
+      orchestrate.trace_id
+    );
   });
 
   test('a crowded span keeps the call id and gives up the trace id', async () => {
@@ -137,16 +136,16 @@ describe('OpLinkSpanProcessor', () => {
       },
       {name: 'orchestrate'}
     )();
-    const call = await storedCall('orchestrate');
+    const {orchestrate} = await storedCalls();
     const spans = exporter.getFinishedSpans();
 
     const atLimit = findSpan(spans, 'at_limit').attributes;
-    expect(atLimit[PARENT_CALL_ID_SPAN_ATTR]).toBe(call.id);
-    expect(atLimit[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(call.trace_id);
+    expect(atLimit[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
+    expect(atLimit[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBe(orchestrate.trace_id);
 
     // The write order in onStart decides which half of the link survives.
     const oneOver = findSpan(spans, 'one_over').attributes;
-    expect(oneOver[PARENT_CALL_ID_SPAN_ATTR]).toBe(call.id);
+    expect(oneOver[PARENT_CALL_ID_SPAN_ATTR]).toBe(orchestrate.id);
     expect(oneOver[PARENT_CALL_TRACE_ID_SPAN_ATTR]).toBeUndefined();
   });
 });
