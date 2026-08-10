@@ -432,11 +432,12 @@ def openai_on_input_handler(
 
 
 def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
-    """Flatten OpenAI's nested cache token fields to canonical names.
+    """Copy OpenAI's nested cache token fields to Weave usage fields.
 
     OpenAI Chat Completions nests cached tokens under prompt_tokens_details,
     and the Responses API nests cache reads and writes under input_tokens_details.
-    This extracts them to the top-level canonical cache usage fields.
+    This copies them to `cache_read_input_tokens` and
+    `cache_creation_input_tokens`.
     """
     prompt_tokens_details = usage.get("prompt_tokens_details")
     if (
