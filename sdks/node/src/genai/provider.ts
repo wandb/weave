@@ -11,6 +11,7 @@ import {
 
 import {getGlobalClient} from '../clientApi';
 import {EvalLinkSpanProcessor} from '../evalLinkSpanProcessor';
+import {OpLinkSpanProcessor} from '../opLinkSpanProcessor';
 import {packageVersion} from '../utils/packageVersion';
 import type {WeaveClient} from '../weaveClient';
 import {getWandbConfigs} from '../wandb/settings';
@@ -98,9 +99,12 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
 
   const tracerProvider = new BasicTracerProvider({
     resource,
+    // Processors write attributes in array order and a full span drops the
+    // incoming one, so the op link goes after the shipped eval link.
     spanProcessors: [
       buildSpanProcessor(client),
       new EvalLinkSpanProcessor(getGlobalClient),
+      new OpLinkSpanProcessor(getGlobalClient),
     ],
   });
   state.genAi.provider = {tracerProvider, projectId: client.projectId};
