@@ -493,14 +493,12 @@ deterministic.
 - Built-in and API-key-authenticated custom providers use LiteLLM.
 - Custom runtimes without an API key use the OpenAI client directly so configured
   headers and unauthenticated endpoints do not receive a bearer header.
-- OpenAI Responses reports explicit prompt-cache writes at
-  `usage.input_tokens_details.cache_write_tokens`. Normalize that field to
-  `summary.usage[model].cache_creation_input_tokens` in the OpenAI integration,
-  alongside the existing `cached_tokens` to `cache_read_input_tokens` mapping,
-  so the standard cost registry prices writes separately from uncached input.
-  Because OpenAI's `input_tokens` is inclusive, an unmapped write is otherwise
-  billed at the ordinary prompt rate; the missing amount is the cache-write
-  premium, not the write's entire input cost.
+- OpenAI Responses reports billable prompt-cache writes for GPT-5.6 and later at
+  `usage.input_tokens_details.cache_write_tokens`. Normalize the field when
+  present instead of parsing model names, and leave responses without it
+  unchanged. The standard cost registry supplies each model's cache-write rate.
+  Because `input_tokens` is inclusive, an unmapped write is billed at the
+  ordinary prompt rate; the missing amount is the cache-write premium.
 
 ### Integration Testing
 

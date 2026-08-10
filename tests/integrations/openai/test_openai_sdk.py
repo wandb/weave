@@ -67,10 +67,44 @@ def test_normalize_openai_responses_cache_tokens() -> None:
     }
 
 
-def test_openai_responses_cache_write_tokens_are_priced(
+@pytest.mark.parametrize(
+    (
+        "model",
+        "cache_write_tokens",
+        "cache_creation_rate",
+        "ordinary_input_tokens",
+    ),
+    [
+        pytest.param(
+            "gpt-5.5-cache-write-repro",
+            None,
+            0.0,
+            800_000,
+            id="pre-5.6-no-write-field",
+        ),
+        pytest.param(
+            "gpt-5.6-cache-write-repro",
+            300_000,
+            6.25e-6,
+            500_000,
+            id="gpt-5.6",
+        ),
+        pytest.param(
+            "future-openai-cache-write-repro",
+            300_000,
+            6.25e-6,
+            500_000,
+            id="post-5.6-with-registry-rate",
+        ),
+    ],
+)
+def test_openai_responses_cache_write_tokens_follow_model_pricing(
     client: WeaveClient,
+    model: str,
+    cache_write_tokens: int | None,
+    cache_creation_rate: float,
+    ordinary_input_tokens: int,
 ) -> None:
-    model = "gpt-5.6-cache-write-repro"
     client.server.cost_create(
         CostCreateReq(
             project_id=client.project_id,
@@ -79,23 +113,23 @@ def test_openai_responses_cache_write_tokens_are_priced(
                     "prompt_token_cost": 5e-6,
                     "completion_token_cost": 30e-6,
                     "cache_read_input_token_cost": 0.5e-6,
-                    "cache_creation_input_token_cost": 6.25e-6,
+                    "cache_creation_input_token_cost": cache_creation_rate,
                     "provider_id": "openai",
                 }
             },
         )
     )
+    input_tokens_details = {"cached_tokens": 200_000}
+    if cache_write_tokens is not None:
+        input_tokens_details["cache_write_tokens"] = cache_write_tokens
     response = {
-        "id": "resp_cache_write_repro",
+        "id": f"resp_{model}",
         "model": model,
         "usage": {
-            "input_tokens": 100,
-            "input_tokens_details": {
-                "cached_tokens": 20,
-                "cache_write_tokens": 30,
-            },
-            "output_tokens": 10,
-            "total_tokens": 110,
+            "input_tokens": 1_000_000,
+            "input_tokens_details": input_tokens_details,
+            "output_tokens": 100_000,
+            "total_tokens": 1_100_000,
         },
     }
 
@@ -107,20 +141,17 @@ def test_openai_responses_cache_write_tokens_are_priced(
     assert create_response() == response
 
     call = next(iter(create_response.calls()))
-    assert call.summary["usage"] == {
-        model: {
-            "requests": 1,
-            "input_tokens": 100,
-            "input_tokens_details": {
-                "cached_tokens": 20,
-                "cache_write_tokens": 30,
-            },
-            "output_tokens": 10,
-            "total_tokens": 110,
-            "cache_read_input_tokens": 20,
-            "cache_creation_input_tokens": 30,
-        }
+    expected_usage = {
+        "requests": 1,
+        "input_tokens": 1_000_000,
+        "input_tokens_details": input_tokens_details,
+        "output_tokens": 100_000,
+        "total_tokens": 1_100_000,
+        "cache_read_input_tokens": 200_000,
     }
+    if cache_write_tokens is not None:
+        expected_usage["cache_creation_input_tokens"] = cache_write_tokens
+    assert call.summary["usage"] == {model: expected_usage}
 
     priced_calls = list(
         client.get_calls(
@@ -144,14 +175,16 @@ def test_openai_responses_cache_write_tokens_are_priced(
             "cache_creation_input_tokens_total_cost"
         ],
     } == {
-        "prompt_tokens": 100,
-        "completion_tokens": 10,
-        "cache_read_input_tokens": 20,
-        "cache_creation_input_tokens": 30,
-        "prompt_tokens_total_cost": pytest.approx(0.00025),
-        "completion_tokens_total_cost": pytest.approx(0.0003),
-        "cache_read_input_tokens_total_cost": pytest.approx(0.00001),
-        "cache_creation_input_tokens_total_cost": pytest.approx(0.0001875),
+        "prompt_tokens": 1_000_000,
+        "completion_tokens": 100_000,
+        "cache_read_input_tokens": 200_000,
+        "cache_creation_input_tokens": cache_write_tokens or 0,
+        "prompt_tokens_total_cost": pytest.approx(ordinary_input_tokens * 5e-6),
+        "completion_tokens_total_cost": pytest.approx(3.0),
+        "cache_read_input_tokens_total_cost": pytest.approx(0.1),
+        "cache_creation_input_tokens_total_cost": pytest.approx(
+            (cache_write_tokens or 0) * cache_creation_rate
+        ),
     }
 
 
