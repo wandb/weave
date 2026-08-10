@@ -11,6 +11,7 @@ import clickhouse_connect
 import pytest
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import intent_records_taxonomy
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _NON_RECOVERABLE_MIGRATION_VERSIONS,
     MigrationError,
@@ -648,18 +649,10 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("lens", "LowCardinality(String)"),
         ("embedding_version", "UInt32"),
         ("record_version", "UInt64"),
-        (
-            "category",
-            "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
-            "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, "
-            "'rejection' = 6, 'correction' = 7, 'clarification' = 8, "
-            "'bad_faith' = 9, 'other' = 10, 'task_misunderstanding' = 21, "
-            "'context_loss' = 22, 'wrong_output' = 23, "
-            "'requirement_violation' = 24, 'tool_misuse' = 25, "
-            "'tool_failure' = 26, 'system_error' = 27, "
-            "'unproductive_loop' = 28, 'capability_gap' = 29, "
-            "'improper_refusal' = 30, 'safety_violation' = 31)",
-        ),
+        # Derived, not literal: this is the assertion that stops the writer's
+        # taxonomy and the DDL's Enum from drifting apart. Editing either one
+        # alone fails here.
+        ("category", intent_records_taxonomy.clickhouse_enum_type()),
         ("signature", "String"),
         ("language", "LowCardinality(String)"),
         ("sentiment", "LowCardinality(String)"),
@@ -848,9 +841,10 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         "WHERE project_id = 'project-1' GROUP BY embedding_version"
     ).result_rows == [(2, 1)]
 
-    # The taxonomy is enforced at write time, so a mislabeled row cannot land:
-    # the Enum rejects a label that is in neither taxonomy, and the constraint
-    # rejects one belonging to the other lens.
+    # Every (lens, category) pair the taxonomy module declares must be
+    # insertable, so a label the writer knows about but the DDL does not fails
+    # here rather than in production. 'other' is in both lenses, so it is
+    # covered twice.
     def insert_labeled(row_id: str, lens: str, category: str) -> None:
         ch_client.command(
             f"INSERT INTO {target_db}.intent_records "
@@ -860,22 +854,53 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
             "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'))"
         )
 
-    for lens, category, expected_error in [
-        ("intent", "totally_new", "UNKNOWN_ELEMENT_OF_ENUM"),
-        ("intent", "tool_misuse", "VIOLATED_CONSTRAINT"),
-        ("failure", "action_request", "VIOLATED_CONSTRAINT"),
-    ]:
-        with pytest.raises(
-            clickhouse_connect.driver.exceptions.DatabaseError, match=expected_error
-        ):
-            insert_labeled("rejected", lens, category)
+    for lens, categories in intent_records_taxonomy.CATEGORIES_BY_LENS.items():
+        for category in categories:
+            insert_labeled(f"{lens}-{category}", lens, category)
 
-    # 'other' is the shared escape hatch, so it is valid under either lens.
-    insert_labeled("escape-hatch", "failure", "other")
     assert ch_client.query(
-        f"SELECT lens, category FROM {target_db}.intent_records "
-        "WHERE project_id = 'project-2'"
-    ).result_rows == [("failure", "other")]
+        f"SELECT lens, count() FROM {target_db}.intent_records "
+        "WHERE project_id = 'project-2' GROUP BY lens ORDER BY lens"
+    ).result_rows == [
+        ("failure", len(intent_records_taxonomy.FAILURE_CATEGORIES)),
+        ("intent", len(intent_records_taxonomy.INTENT_CATEGORIES)),
+    ]
+
+    # Conversely every lens-exclusive label must be rejected under the other
+    # lens, which pins the constraint to the module's partition instead of to a
+    # hand-picked sample. Shared labels are excluded from both directions.
+    shared_categories = set(intent_records_taxonomy.SHARED_CATEGORIES)
+    for lens, opposite_lens in [("intent", "failure"), ("failure", "intent")]:
+        exclusive = (
+            set(intent_records_taxonomy.CATEGORIES_BY_LENS[lens]) - shared_categories
+        )
+        for category in sorted(exclusive):
+            with pytest.raises(
+                clickhouse_connect.driver.exceptions.DatabaseError,
+                match="VIOLATED_CONSTRAINT",
+            ):
+                insert_labeled("rejected", opposite_lens, category)
+
+    # A label in neither taxonomy is rejected by the Enum before the constraint
+    # is consulted.
+    with pytest.raises(
+        clickhouse_connect.driver.exceptions.DatabaseError,
+        match="UNKNOWN_ELEMENT_OF_ENUM",
+    ):
+        insert_labeled("rejected", "intent", "totally_new")
+
+    # An omitted category lands empty rather than as the first label, which is
+    # the reason '' carries no DEFAULT.
+    ch_client.command(
+        f"INSERT INTO {target_db}.intent_records "
+        "(project_id, id, lens, embedding_version, record_version, source_started_at) "
+        "VALUES ('project-3', 'unlabeled', 'failure', 2, 1, "
+        "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'))"
+    )
+    assert ch_client.query(
+        f"SELECT category FROM {target_db}.intent_records "
+        "WHERE project_id = 'project-3'"
+    ).result_rows == [(intent_records_taxonomy.UNSET_CATEGORY,)]
 
     # Growing the taxonomy must stay metadata-only, which is what makes a closed
     # Enum affordable here. Appending a label creates no mutation and leaves the
@@ -888,16 +913,17 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ).result_rows
 
     parts_before = part_names()
+    appended = {
+        **intent_records_taxonomy.ALL_CATEGORIES,
+        "newly_added_intent": 11,  # a free slot in the intent block
+    }
+    appended_members = ", ".join(
+        f"'{name}' = {value}"
+        for name, value in sorted(appended.items(), key=lambda item: item[1])
+    )
     ch_client.command(
         f"ALTER TABLE {target_db}.intent_records MODIFY COLUMN category "
-        "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
-        "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, 'rejection' = 6, "
-        "'correction' = 7, 'clarification' = 8, 'bad_faith' = 9, 'other' = 10, "
-        "'newly_added_intent' = 11, "
-        "'task_misunderstanding' = 21, 'context_loss' = 22, 'wrong_output' = 23, "
-        "'requirement_violation' = 24, 'tool_misuse' = 25, 'tool_failure' = 26, "
-        "'system_error' = 27, 'unproductive_loop' = 28, 'capability_gap' = 29, "
-        "'improper_refusal' = 30, 'safety_violation' = 31)"
+        f"Enum8({appended_members})"
     )
     assert part_names() == parts_before
     assert ch_client.query(
