@@ -599,7 +599,12 @@ def test_all_production_migrations_distributed(ch_client):
 
 
 def test_intent_records_schema_and_replacement_lifecycle(ch_client):
-    """Intent records retain pipeline history while replacing row versions."""
+    """Intent records isolate embedding versions and replace everything else.
+
+    Pins the contract the schema exists to express: a changed embedding version
+    coexists so an old one stays serveable and can be retired by DROP PARTITION,
+    while a changed judge or prompt replaces its predecessor in place.
+    """
     mgmt_db = _unique_name("db_mgmt_intents")
     target_db = _unique_name("intents")
     ch_client.track_db(mgmt_db)
@@ -624,9 +629,9 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     assert table_metadata == [
         (
             "ReplacingMergeTree",
-            "toYYYYMM(source_started_at)",
-            "project_id, pipeline_version, lens, toDate(source_started_at), id",
-            "project_id, pipeline_version, lens, toDate(source_started_at), id",
+            "(toYYYYMM(source_started_at), embedding_version)",
+            "project_id, embedding_version, lens, toDate(source_started_at), id",
+            "project_id, embedding_version, lens, toDate(source_started_at), id",
             "expire_at",
         )
     ]
@@ -641,9 +646,20 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         ("id", "String"),
         ("signature_id", "FixedString(16)"),
         ("lens", "LowCardinality(String)"),
-        ("pipeline_version", "UInt32"),
+        ("embedding_version", "UInt32"),
         ("record_version", "UInt64"),
-        ("category", "String"),
+        (
+            "category",
+            "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
+            "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, "
+            "'rejection' = 6, 'correction' = 7, 'clarification' = 8, "
+            "'bad_faith' = 9, 'other' = 10, 'task_misunderstanding' = 21, "
+            "'context_loss' = 22, 'wrong_output' = 23, "
+            "'requirement_violation' = 24, 'tool_misuse' = 25, "
+            "'tool_failure' = 26, 'system_error' = 27, "
+            "'unproductive_loop' = 28, 'capability_gap' = 29, "
+            "'improper_refusal' = 30, 'safety_violation' = 31)",
+        ),
         ("signature", "String"),
         ("language", "LowCardinality(String)"),
         ("sentiment", "LowCardinality(String)"),
@@ -696,7 +712,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     ]
 
     insert_columns = """
-        project_id, id, signature_id, lens, pipeline_version,
+        project_id, id, signature_id, lens, embedding_version,
         record_version, category, signature, language,
         sentiment, sentiment_confidence,
         embedding_model, vector, judge_model, prompt_version, pipeline_recipe_sha256,
@@ -710,42 +726,64 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
     row_template = """
         SELECT
             'project-1', 'intent-1', unhex('00112233445566778899aabbccddeeff'),
-            'intent', {pipeline_version}, {record_version}, '{category}',
+            'intent', {embedding_version}, {record_version}, '{category}',
             'Add Stripe checkout', 'es',
             'frustrated', toFloat32(0.75),
             'text-embedding-3-large', arrayResize([toFloat32(1)], 1024, toFloat32(0)),
-            'gemma-4-31b-it', 'intent-v1', repeat('ab', 32),
+            '{judge_model}', '{prompt_version}', repeat('ab', 32),
             'trace-1', 'span-1', 'conversation-1', 7, 'user-1',
             'checkout-agent', '1.4.2', 'anthropic', 'claude-sonnet-5', 'cli', 'OK',
             4200, toFloat64(0.0123), 'Wired up a Stripe checkout endpoint.',
             toDateTime64('2026-05-30 09:15:00', 6, 'UTC'),
             toDateTime64('2026-06-20 14:32:00', 6, 'UTC')
     """
-    for pipeline_version, record_version, category in [
-        (1, 1, "action_request"),
-        (1, 2, "payments"),
-        (2, 1, "action_request"),
+    for embedding_version, record_version, category, judge, prompt in [
+        (1, 1, "action_request", "gemma-4-31b-it", "intent-v1"),
+        (1, 2, "information_request", "gemma-4-31b-it", "intent-v1"),
+        # A new judge and prompt for the same occurrence: payload, so it must
+        # replace rather than coexist.
+        (1, 3, "information_request", "gemma-5-31b-it", "intent-v2"),
+        (2, 1, "action_request", "gemma-4-31b-it", "intent-v1"),
     ]:
         ch_client.command(
             f"INSERT INTO {target_db}.intent_records ({insert_columns}) "
             + row_template.format(
-                pipeline_version=pipeline_version,
+                embedding_version=embedding_version,
                 record_version=record_version,
                 category=category,
+                judge_model=judge,
+                prompt_version=prompt,
             )
         )
 
-    # Highest record_version wins within a pipeline_version, and each
-    # pipeline_version is retained as its own row.
+    # Highest record_version wins within an embedding_version, a changed
+    # extraction recipe leaves no second row, and each embedding_version is
+    # retained so an old space stays serveable until its cutover.
     current_rows = ch_client.query(
-        "SELECT pipeline_version, record_version, category, "
-        "formatDateTime(expire_at, '%F %T'), length(vector) "
+        "SELECT embedding_version, record_version, category, judge_model, "
+        "prompt_version, formatDateTime(expire_at, '%F %T'), length(vector) "
         f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' ORDER BY pipeline_version"
+        "WHERE project_id = 'project-1' ORDER BY embedding_version"
     ).result_rows
     assert current_rows == [
-        (1, 2, "payments", "2100-01-01 00:00:00", 1024),
-        (2, 1, "action_request", "2100-01-01 00:00:00", 1024),
+        (
+            1,
+            3,
+            "information_request",
+            "gemma-5-31b-it",
+            "intent-v2",
+            "2100-01-01 00:00:00",
+            1024,
+        ),
+        (
+            2,
+            1,
+            "action_request",
+            "gemma-4-31b-it",
+            "intent-v1",
+            "2100-01-01 00:00:00",
+            1024,
+        ),
     ]
 
     # The promoted columns round-trip as typed values rather than Map strings.
@@ -758,7 +796,7 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         "formatDateTime(source_started_at, '%F %T'), "
         "formatDateTime(intent_extracted_at, '%F %T') "
         f"FROM {target_db}.intent_records FINAL "
-        "WHERE project_id = 'project-1' AND pipeline_version = 2"
+        "WHERE project_id = 'project-1' AND embedding_version = 2"
     ).result_rows
     assert promoted == [
         (
@@ -785,13 +823,87 @@ def test_intent_records_schema_and_replacement_lifecycle(ch_client):
         )
     ]
 
-    active_partitions = ch_client.query(
-        "SELECT DISTINCT partition "
-        "FROM system.parts "
-        f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
-        "ORDER BY partition"
-    ).result_rows
-    assert active_partitions == [("202605",)]
+    # Source month, not extraction month, and one partition per embedding
+    # version. Both halves matter: the month makes retention follow user
+    # activity, the version makes a cutover a metadata operation.
+    def active_partitions() -> list[tuple]:
+        return ch_client.query(
+            "SELECT DISTINCT partition "
+            "FROM system.parts "
+            f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
+            "ORDER BY partition"
+        ).result_rows
+
+    assert active_partitions() == [("(202605,1)",), ("(202605,2)",)]
+
+    # The cutover this partition key exists for: retiring the superseded
+    # embedding version drops its vectors without rewriting the surviving parts.
+    ch_client.command(
+        f"ALTER TABLE {target_db}.intent_records DROP PARTITION (202605, 1)"
+    )
+    assert active_partitions() == [("(202605,2)",)]
+    assert ch_client.query(
+        "SELECT embedding_version, count() "
+        f"FROM {target_db}.intent_records FINAL "
+        "WHERE project_id = 'project-1' GROUP BY embedding_version"
+    ).result_rows == [(2, 1)]
+
+    # The taxonomy is enforced at write time, so a mislabeled row cannot land:
+    # the Enum rejects a label that is in neither taxonomy, and the constraint
+    # rejects one belonging to the other lens.
+    def insert_labeled(row_id: str, lens: str, category: str) -> None:
+        ch_client.command(
+            f"INSERT INTO {target_db}.intent_records "
+            "(project_id, id, lens, category, embedding_version, record_version, "
+            "source_started_at) VALUES "
+            f"('project-2', '{row_id}', '{lens}', '{category}', 2, 1, "
+            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'))"
+        )
+
+    for lens, category, expected_error in [
+        ("intent", "totally_new", "UNKNOWN_ELEMENT_OF_ENUM"),
+        ("intent", "tool_misuse", "VIOLATED_CONSTRAINT"),
+        ("failure", "action_request", "VIOLATED_CONSTRAINT"),
+    ]:
+        with pytest.raises(
+            clickhouse_connect.driver.exceptions.DatabaseError, match=expected_error
+        ):
+            insert_labeled("rejected", lens, category)
+
+    # 'other' is the shared escape hatch, so it is valid under either lens.
+    insert_labeled("escape-hatch", "failure", "other")
+    assert ch_client.query(
+        f"SELECT lens, category FROM {target_db}.intent_records "
+        "WHERE project_id = 'project-2'"
+    ).result_rows == [("failure", "other")]
+
+    # Growing the taxonomy must stay metadata-only, which is what makes a closed
+    # Enum affordable here. Appending a label creates no mutation and leaves the
+    # existing parts untouched.
+    def part_names() -> list[tuple]:
+        return ch_client.query(
+            "SELECT name FROM system.parts "
+            f"WHERE database = '{target_db}' AND table = 'intent_records' AND active "
+            "ORDER BY name"
+        ).result_rows
+
+    parts_before = part_names()
+    ch_client.command(
+        f"ALTER TABLE {target_db}.intent_records MODIFY COLUMN category "
+        "Enum8('' = 0, 'action_request' = 1, 'information_request' = 2, "
+        "'problem_report' = 3, 'feedback' = 4, 'approval' = 5, 'rejection' = 6, "
+        "'correction' = 7, 'clarification' = 8, 'bad_faith' = 9, 'other' = 10, "
+        "'newly_added_intent' = 11, "
+        "'task_misunderstanding' = 21, 'context_loss' = 22, 'wrong_output' = 23, "
+        "'requirement_violation' = 24, 'tool_misuse' = 25, 'tool_failure' = 26, "
+        "'system_error' = 27, 'unproductive_loop' = 28, 'capability_gap' = 29, "
+        "'improper_refusal' = 30, 'safety_violation' = 31)"
+    )
+    assert part_names() == parts_before
+    assert ch_client.query(
+        "SELECT count() FROM system.mutations "
+        f"WHERE database = '{target_db}' AND table = 'intent_records'"
+    ).result_rows == [(0,)]
 
 
 def test_all_production_down_migrations_replicated(ch_client):
