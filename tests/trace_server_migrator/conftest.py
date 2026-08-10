@@ -15,10 +15,6 @@ _KEEPER_CONFIG_PATH = os.path.join(
     "clickhouse_keeper_config.xml",
 )
 _DEFAULT_PORT = 8130
-# Pinned to the version CI runs (see .github/scripts/ch-image.sh). Following
-# `latest` locally drifts off CI and breaks engine_full assertions, which
-# reformat between releases.
-_CH_IMAGE = "clickhouse/clickhouse-server:26.4"
 
 
 @pytest.fixture(scope="session")
@@ -117,7 +113,7 @@ def _start_keeper_container(port: int) -> None:
             _CONTAINER_NAME,
             "--ulimit",
             "nofile=262144:262144",
-            _CH_IMAGE,
+            "clickhouse/clickhouse-server",
         ],
         capture_output=True,
         check=False,
