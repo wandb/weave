@@ -163,63 +163,6 @@ def test_call_stats_usage_sum_aggregation(client: weave_client.WeaveClient):
     )
 
 
-def test_call_stats_unpriced_cache_creation_stays_in_input(
-    client: weave_client.WeaveClient,
-):
-    project_id = client.project_id
-    model = f"cache-write-fallback-{uuid.uuid4().hex}"
-    op_name = f"weave:///{project_id}/op/cache_write_fallback:abc123"
-    client.server.cost_create(
-        tsi.CostCreateReq(
-            project_id=project_id,
-            costs={
-                model: {
-                    "prompt_token_cost": 5e-6,
-                    "completion_token_cost": 30e-6,
-                    "cache_read_input_token_cost": 0.5e-6,
-                    "provider_id": "openai",
-                }
-            },
-        )
-    )
-    create_call_with_usage(
-        client,
-        op_name,
-        {
-            model: {
-                "input_tokens": 100,
-                "output_tokens": 10,
-                "total_tokens": 110,
-                "cache_read_input_tokens": 20,
-                "cache_creation_input_tokens": 30,
-            }
-        },
-    )
-
-    force_merge_calls(client)
-    result = client.server.call_stats(
-        CallStatsReq(
-            project_id=project_id,
-            start=_BASE_TIME - datetime.timedelta(minutes=1),
-            end=_BASE_TIME + datetime.timedelta(minutes=1),
-            granularity=3600,
-            usage_metrics=[
-                UsageMetricSpec(metric="input_cost"),
-                UsageMetricSpec(metric="total_cost"),
-                UsageMetricSpec(metric="cache_read_input_tokens"),
-                UsageMetricSpec(metric="cache_creation_input_tokens"),
-            ],
-            filter=CallsFilter(op_names=[op_name]),
-        )
-    )
-
-    model_buckets = [b for b in result.usage_buckets if b.get("model") == model]
-    input_cost = sum(b["sum_input_cost"] for b in model_buckets)
-    total_cost = sum(b["sum_total_cost"] for b in model_buckets)
-    assert input_cost == pytest.approx(80 * 5e-6)
-    assert total_cost == pytest.approx(80 * 5e-6 + 10 * 30e-6 + 20 * 0.5e-6)
-
-
 def test_call_stats_date_range_limit_validation():
     """Reject CallStatsReq with a date range exceeding 31 days."""
     end_time = _BASE_TIME

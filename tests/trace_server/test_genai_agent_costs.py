@@ -36,12 +36,7 @@ _CACHE_READ_COST = 0.000005
 _CACHE_CREATION_COST = 0.0000125
 
 
-def _insert_project_price(
-    ch_client,
-    project_id: str,
-    llm_id: str,
-    cache_creation_cost: float = _CACHE_CREATION_COST,
-) -> None:
+def _insert_project_price(ch_client, project_id: str, llm_id: str) -> None:
     """Insert a project-level price row for `llm_id`."""
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     ch_client.insert(
@@ -59,7 +54,7 @@ def _insert_project_price(
                 _COMPLETION_COST,
                 "USD",
                 _CACHE_READ_COST,
-                cache_creation_cost,
+                _CACHE_CREATION_COST,
                 "system",
                 now,
             )
@@ -172,41 +167,6 @@ def test_spans_query_cost_subtracts_cache_tokens(ch_server):
     assert span.input_cost_usd == pytest.approx(expected_input)
     assert span.cache_read_cost_usd == pytest.approx(200 * _CACHE_READ_COST)
     assert span.cache_creation_cost_usd == pytest.approx(100 * _CACHE_CREATION_COST)
-    assert span.total_cost_usd == pytest.approx(expected_total)
-
-
-def test_spans_query_unpriced_cache_creation_stays_in_input(ch_server):
-    project_id = _make_project_id("span-costs-cache-fallback")
-    model = f"test-cost-model-{uuid.uuid4().hex}"
-    _insert_project_price(
-        ch_server.ch_client,
-        project_id,
-        model,
-        cache_creation_cost=0,
-    )
-    _insert_spans(
-        ch_server.ch_client,
-        [
-            _make_span(
-                project_id,
-                request_model=model,
-                input_tokens=1000,
-                output_tokens=500,
-                cache_read_input_tokens=200,
-                cache_creation_input_tokens=100,
-            )
-        ],
-    )
-
-    res = ch_server.agent_spans_query(
-        AgentSpansQueryReq(project_id=project_id, include_costs=True)
-    )
-    span = res.spans[0]
-    expected_input = (1000 - 200) * _PROMPT_COST
-    expected_total = expected_input + 500 * _COMPLETION_COST + 200 * _CACHE_READ_COST
-    assert span.input_cost_usd == pytest.approx(expected_input)
-    assert span.cache_read_cost_usd == pytest.approx(200 * _CACHE_READ_COST)
-    assert span.cache_creation_cost_usd == 0
     assert span.total_cost_usd == pytest.approx(expected_total)
 
 

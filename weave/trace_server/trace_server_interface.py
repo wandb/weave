@@ -3923,10 +3923,9 @@ Token metrics are extracted from summary.usage[model]:
 - cache_creation_input_tokens: Tokens used to create prompt cache (all providers)
 
 Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices.
-Cache-read tokens are subtracted from input before applying the prompt rate. Cache-creation
-tokens are subtracted only when their matched price is positive; otherwise they remain
-ordinary input:
-- input_cost: (input_tokens - cache_read_input_tokens - separately_priced_cache_creation_input_tokens) * prompt_token_cost
+Cache tokens are subtracted from input before applying the prompt rate (they are billed
+at their own cache rates instead):
+- input_cost: (input_tokens - cache_read_input_tokens - cache_creation_input_tokens) * prompt_token_cost
 - output_cost: output_tokens * completion_token_cost
 - total_cost: input_cost + output_cost + cache_read_cost + cache_creation_cost
 """
