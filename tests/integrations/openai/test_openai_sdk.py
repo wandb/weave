@@ -9,10 +9,13 @@ from weave.integrations.openai.openai_sdk import (
     _normalize_openai_cache_tokens,
     create_wrapper_async,
     create_wrapper_sync,
+    openai_on_finish,
     openai_on_input_handler,
     serverless_inference_call_display_name,
 )
 from weave.trace.autopatch import OpSettings
+from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import CallsFilter, CostCreateReq
 
 
 @dataclass
@@ -61,6 +64,94 @@ def test_normalize_openai_responses_cache_tokens() -> None:
         "total_tokens": 110,
         "cache_read_input_tokens": 20,
         "cache_creation_input_tokens": 30,
+    }
+
+
+def test_openai_responses_cache_write_tokens_are_priced(
+    client: WeaveClient,
+) -> None:
+    model = "gpt-5.6-cache-write-repro"
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=client.project_id,
+            costs={
+                model: {
+                    "prompt_token_cost": 5e-6,
+                    "completion_token_cost": 30e-6,
+                    "cache_read_input_token_cost": 0.5e-6,
+                    "cache_creation_input_token_cost": 6.25e-6,
+                    "provider_id": "openai",
+                }
+            },
+        )
+    )
+    response = {
+        "id": "resp_cache_write_repro",
+        "model": model,
+        "usage": {
+            "input_tokens": 100,
+            "input_tokens_details": {
+                "cached_tokens": 20,
+                "cache_write_tokens": 30,
+            },
+            "output_tokens": 10,
+            "total_tokens": 110,
+        },
+    }
+
+    @weave.op(name="openai.responses.create")
+    def create_response() -> dict:
+        return response
+
+    create_response._set_on_finish_handler(openai_on_finish)
+    assert create_response() == response
+
+    call = next(iter(create_response.calls()))
+    assert call.summary["usage"] == {
+        model: {
+            "requests": 1,
+            "input_tokens": 100,
+            "input_tokens_details": {
+                "cached_tokens": 20,
+                "cache_write_tokens": 30,
+            },
+            "output_tokens": 10,
+            "total_tokens": 110,
+            "cache_read_input_tokens": 20,
+            "cache_creation_input_tokens": 30,
+        }
+    }
+
+    priced_calls = list(
+        client.get_calls(
+            filter=CallsFilter(call_ids=[call.id]),
+            include_costs=True,
+        )
+    )
+    assert len(priced_calls) == 1
+    cost = priced_calls[0].summary["weave"]["costs"][model]
+    assert {
+        "prompt_tokens": cost["prompt_tokens"],
+        "completion_tokens": cost["completion_tokens"],
+        "cache_read_input_tokens": cost["cache_read_input_tokens"],
+        "cache_creation_input_tokens": cost["cache_creation_input_tokens"],
+        "prompt_tokens_total_cost": cost["prompt_tokens_total_cost"],
+        "completion_tokens_total_cost": cost["completion_tokens_total_cost"],
+        "cache_read_input_tokens_total_cost": cost[
+            "cache_read_input_tokens_total_cost"
+        ],
+        "cache_creation_input_tokens_total_cost": cost[
+            "cache_creation_input_tokens_total_cost"
+        ],
+    } == {
+        "prompt_tokens": 100,
+        "completion_tokens": 10,
+        "cache_read_input_tokens": 20,
+        "cache_creation_input_tokens": 30,
+        "prompt_tokens_total_cost": pytest.approx(0.00025),
+        "completion_tokens_total_cost": pytest.approx(0.0003),
+        "cache_read_input_tokens_total_cost": pytest.approx(0.00001),
+        "cache_creation_input_tokens_total_cost": pytest.approx(0.0001875),
     }
 
 

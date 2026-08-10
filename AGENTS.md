@@ -498,6 +498,9 @@ deterministic.
   `summary.usage[model].cache_creation_input_tokens` in the OpenAI integration,
   alongside the existing `cached_tokens` to `cache_read_input_tokens` mapping,
   so the standard cost registry prices writes separately from uncached input.
+  Because OpenAI's `input_tokens` is inclusive, an unmapped write is otherwise
+  billed at the ordinary prompt rate; the missing amount is the cache-write
+  premium, not the write's entire input cost.
 
 ### Integration Testing
 
