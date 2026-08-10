@@ -52,10 +52,12 @@ CREATE TABLE IF NOT EXISTS intent_records
     -- the embedding. Numbers are permanent: never renumber or reuse one, and
     -- append new labels inside that lens's block (11-20 intent, 32+ failure).
     -- Appending to an Enum is metadata-only, so growing this costs no rewrite.
-    -- 'other' is the escape hatch, valid under either lens, and the writer maps
-    -- an unrecognized judge label to it rather than failing the batch. '' = 0
-    -- has no DEFAULT for the same reason as lens: an omitted category reads
-    -- back empty instead of silently claiming to be the first label.
+    -- 'other' is a member of BOTH taxonomies, and the writer maps an
+    -- unrecognized judge label to it rather than failing the batch. '' = 0 has
+    -- no DEFAULT for the same reason as lens: an omitted category reads back
+    -- empty instead of silently claiming to be the first label.
+    -- weave/trace_server/intent_records_taxonomy.py is the writer's copy of this
+    -- list, and the migrator functional test asserts the two match.
     category Enum8(
         '' = 0,
         'action_request' = 1, 'information_request' = 2, 'problem_report' = 3,
@@ -118,19 +120,21 @@ CREATE TABLE IF NOT EXISTS intent_records
     -- The Enum alone cannot stop a failure label landing on an intent row, so
     -- state the pairing. Listed explicitly rather than keyed off the number
     -- blocks, so a new label omitted here is rejected loudly instead of being
-    -- silently gated to the wrong lens. ADD/DROP CONSTRAINT does not validate
-    -- existing rows, so amending this later is also metadata-only.
+    -- silently gated to the wrong lens. 'other' appears under both lenses
+    -- because it belongs to both taxonomies, not as an exception to them.
+    -- ADD/DROP CONSTRAINT does not validate existing rows, so amending this
+    -- later is metadata-only too.
     CONSTRAINT category_matches_lens CHECK
-        category = '' OR category = 'other'
+        category = ''
         OR (lens = 'intent' AND category IN (
             'action_request', 'information_request', 'problem_report',
             'feedback', 'approval', 'rejection', 'correction',
-            'clarification', 'bad_faith'))
+            'clarification', 'bad_faith', 'other'))
         OR (lens = 'failure' AND category IN (
             'task_misunderstanding', 'context_loss', 'wrong_output',
             'requirement_violation', 'tool_misuse', 'tool_failure',
             'system_error', 'unproductive_loop', 'capability_gap',
-            'improper_refusal', 'safety_violation')),
+            'improper_refusal', 'safety_violation', 'other')),
 
     INDEX idx_signature_id signature_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
