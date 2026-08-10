@@ -30,8 +30,6 @@ _PATCHED_INTEGRATIONS: set[str] = set()
 # Membership semantics:
 # - in ``_PATCHED_INTEGRATIONS`` → the patcher ran
 # - in ``_SUPPRESSED_INTEGRATIONS`` → the patcher must not run
-# - in both → impossible by construction (suppression guards run before
-#   patcher attempts)
 _SUPPRESSED_INTEGRATIONS: set[str] = set()
 
 # Global reference to the import hook, so we can unregister it if needed
@@ -101,21 +99,6 @@ def patch_openai(settings: IntegrationSettings | None = None) -> None:
         triggering_symbols=["openai"],
         settings=settings,
     )
-
-
-def _dispatch_openai() -> None:
-    """Implicit/import-hook entry for ``openai``.
-
-    ``agents`` imports ``openai`` internally, so under the import hook openai's
-    patcher can fire before the agents patcher (dict order only governs
-    ``implicit_patch``). When the Agents SDK is present under otel_v2, patch it
-    first so it can claim (suppress) openai before we'd patch openai directly
-    and double-log every in-agent LLM call.
-    """
-    if should_use_otel_v2() and "agents" in sys.modules:
-        _dispatch_openai_agents()
-    if "openai" not in _SUPPRESSED_INTEGRATIONS:
-        patch_openai()
 
 
 def patch_anthropic(settings: IntegrationSettings | None = None) -> None:
@@ -349,10 +332,9 @@ def patch_openai_agents(settings: IntegrationSettings | None = None) -> None:
 def patch_openai_agents_otel(settings: IntegrationSettings | None = None) -> None:
     """Enable Weave OTel tracing for OpenAI Agents (Agents-tab destination).
 
-    The OTel agents processor already exposes each in-agent LLM call via
-    ``ResponseSpanData`` / ``GenerationSpanData``, so once it is installed we
-    suppress the direct ``openai`` integration to avoid double-logging those
-    calls (same pattern as ``patch_google_adk`` suppressing google-genai).
+    The OTel processor coexists with direct OpenAI patching. A private model-span
+    context guard prevents supported Agents requests from also creating a direct
+    OpenAI Weave call.
     """
     _patch_integration(
         module_path="weave.integrations.openai_agents.patcher",
@@ -360,10 +342,6 @@ def patch_openai_agents_otel(settings: IntegrationSettings | None = None) -> Non
         triggering_symbols=["openai_agents_otel"],
         settings=settings,
     )
-    # Only suppress openai if the agents processor actually patched (i.e.
-    # ``settings.enabled`` wasn't False).
-    if "openai_agents_otel" in _PATCHED_INTEGRATIONS:
-        _SUPPRESSED_INTEGRATIONS.add("openai")
 
 
 def _dispatch_openai_agents() -> None:
@@ -495,12 +473,8 @@ def patch_openai_realtime(settings: IntegrationSettings | None = None) -> None:
 # When a module is already imported, we'll automatically call its patch function
 
 INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
-    # The Agents SDK must come before ``openai``: patching the OTel agents
-    # processor suppresses direct openai patching (see
-    # ``patch_openai_agents_otel``), but the suppression only takes effect
-    # if agents is patched first.
     "agents": _dispatch_openai_agents,
-    "openai": _dispatch_openai,
+    "openai": patch_openai,
     "anthropic": patch_anthropic,
     "mistralai": patch_mistral,
     "groq": patch_groq,
@@ -634,8 +608,8 @@ def _patch_if_needed(module_name: str) -> None:
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
             patch_func()
-            # ``patch_func`` may suppress this module instead of patching it
-            # (e.g. ``_dispatch_openai`` deferring to the agents processor).
+            # ``patch_func`` may suppress this module while it runs (for
+            # example, Google ADK can claim google.genai during nested imports).
             if module_name not in _SUPPRESSED_INTEGRATIONS:
                 _PATCHED_INTEGRATIONS.add(module_name)
         except Exception:

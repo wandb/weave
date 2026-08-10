@@ -30,6 +30,9 @@ from weave.integrations.integration_metadata import (
     library_integration,
     with_integration_metadata,
 )
+from weave.integrations.openai_agents._otel_context import (
+    has_active_sampled_model_span,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.call import Call
@@ -518,7 +521,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
-def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+def create_wrapper_async(
+    settings: OpSettings, *, bypass_for_agents_model_span: bool = False
+) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
 
@@ -545,7 +550,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        traced = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
                 lambda acc, value: openai_accumulator(
@@ -558,6 +563,16 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
+        if not bypass_for_agents_model_span:
+            return traced
+
+        @wraps(fn)
+        async def _dispatch(self: Any, *args: Any, **kwargs: Any) -> Any:
+            if has_active_sampled_model_span():
+                return await fn(self, *args, **kwargs)
+            return await traced(self, *args, **kwargs)
+
+        return _dispatch
 
     return wrapper
 
@@ -791,7 +806,7 @@ def create_wrapper_responses_sync(
 
 
 def create_wrapper_responses_async(
-    settings: OpSettings,
+    settings: OpSettings, *, bypass_for_agents_model_span: bool = False
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
@@ -803,12 +818,22 @@ def create_wrapper_responses_async(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        traced = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )
+        if not bypass_for_agents_model_span:
+            return traced
+
+        @wraps(fn)
+        async def _dispatch(*args: Any, **kwargs: Any) -> Any:
+            if has_active_sampled_model_span():
+                return await fn(*args, **kwargs)
+            return await traced(*args, **kwargs)
+
+        return _dispatch
 
     return wrapper
 
@@ -921,7 +946,10 @@ def get_openai_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.chat.completions"),
                 "AsyncCompletions.create",
-                create_wrapper_async(settings=async_completions_create_settings),
+                create_wrapper_async(
+                    settings=async_completions_create_settings,
+                    bypass_for_agents_model_span=True,
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.chat.completions"),
@@ -977,7 +1005,8 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.responses"),
                 "AsyncResponses.create",
                 create_wrapper_responses_async(
-                    settings=async_responses_create_settings
+                    settings=async_responses_create_settings,
+                    bypass_for_agents_model_span=True,
                 ),
             ),
             SymbolPatcher(
