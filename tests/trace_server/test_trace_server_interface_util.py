@@ -8,6 +8,7 @@ import pytest
 from pydantic import Field, ValidationError
 
 from weave.shared.trace_server_interface_util import extract_refs_from_values
+from weave.trace_server import common_interface
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server.errors import NotFoundError
@@ -23,6 +24,21 @@ REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
 class _BaseModelStrictTestModel(BaseModelStrict):
     required_field: str
     aliased_field: str = Field(alias="aliasedField")
+
+
+class _SecondBaseModelStrictTestModel(BaseModelStrict):
+    required_field: str
+
+
+def _validate_with_extra_field(extra_field: str) -> None:
+    """Validate `_BaseModelStrictTestModel` with one unknown field attached."""
+    _BaseModelStrictTestModel.model_validate(
+        {
+            "required_field": "required",
+            "aliasedField": "aliased",
+            extra_field: "value",
+        }
+    )
 
 
 def test_base_model_strict_ignores_and_warns_on_unknown_fields(
@@ -49,6 +65,127 @@ def test_base_model_strict_ignores_and_warns_on_unknown_fields(
 def test_base_model_strict_preserves_required_field_validation() -> None:
     with pytest.raises(ValidationError, match="required_field"):
         _BaseModelStrictTestModel.model_validate({"aliasedField": "aliased"})
+
+
+def test_base_model_strict_warns_once_for_a_repeated_field_set(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        for _ in range(3):
+            _validate_with_extra_field("future_sdk_field")
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field"
+    ]
+
+
+def test_base_model_strict_warns_again_for_a_different_field_set(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        _validate_with_extra_field("future_sdk_field")
+        _validate_with_extra_field("another_sdk_field")
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field",
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "another_sdk_field",
+    ]
+
+
+def test_base_model_strict_warns_again_for_a_different_model(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        _validate_with_extra_field("future_sdk_field")
+        _SecondBaseModelStrictTestModel.model_validate(
+            {"required_field": "required", "future_sdk_field": "value"}
+        )
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field",
+        "Ignoring unexpected fields while validating _SecondBaseModelStrictTestModel: "
+        "future_sdk_field",
+    ]
+
+
+def test_base_model_strict_warns_for_a_field_name_utf8_cannot_encode(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A JSON body can carry a lone surrogate as a key, and keying the memo on one
+    must not raise where warning on every request did not.
+    """
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        _validate_with_extra_field("\ud800")
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: \ud800"
+    ]
+
+
+def test_base_model_strict_keeps_raising_on_unformattable_field_names(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The message is built before anything is remembered or skipped, so a payload the
+    warning cannot render fails the same way every time and at any log level.
+    """
+    logger_name = "weave.trace_server.common_interface"
+    payload = {"required_field": "required", "aliasedField": "aliased", 7: "value"}
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        with pytest.raises(TypeError, match="expected str instance"):
+            _BaseModelStrictTestModel.model_validate(payload)
+
+    with caplog.at_level("ERROR", logger=logger_name):
+        with pytest.raises(TypeError, match="expected str instance"):
+            _BaseModelStrictTestModel.model_validate(payload)
+
+
+def test_base_model_strict_warns_after_the_log_level_is_raised(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A discrepancy nobody could see is not remembered, so turning warnings back
+    on still reports it.
+    """
+    logger_name = "weave.trace_server.common_interface"
+    with caplog.at_level("ERROR", logger=logger_name):
+        _validate_with_extra_field("future_sdk_field")
+    assert caplog.messages == []
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        _validate_with_extra_field("future_sdk_field")
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "future_sdk_field"
+    ]
+
+
+def test_base_model_strict_stops_warning_once_the_memo_is_full(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A memo that fills up says so once and then stays quiet. Evicting instead would
+    let the next request for an evicted field set warn all over again.
+    """
+    monkeypatch.setattr(common_interface, "MAX_WARNED_FIELD_SETS", 2)
+
+    with caplog.at_level("WARNING", logger="weave.trace_server.common_interface"):
+        _validate_with_extra_field("first_sdk_field")
+        _validate_with_extra_field("second_sdk_field")
+        _validate_with_extra_field("third_sdk_field")
+        _validate_with_extra_field("fourth_sdk_field")
+
+    assert caplog.messages == [
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "first_sdk_field",
+        "Ignoring unexpected fields while validating _BaseModelStrictTestModel: "
+        "second_sdk_field",
+        "Reached 2 distinct ignored-field sets; further sets will not be reported",
+    ]
 
 
 def test_extract_refs_from_values_deduplicates():
