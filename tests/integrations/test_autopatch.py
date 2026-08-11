@@ -23,6 +23,7 @@ from weave.integrations.patch import (
     unregister_import_hook,
 )
 from weave.trace import weave_init
+from weave.wandb_interface.auth import ApiKeyCredentials
 
 
 def _reset_import(monkeypatch, module: str):
@@ -231,18 +232,14 @@ def test_init_weave_calls_patching(setup_env, monkeypatch):
         patch_calls["register_import_hook"] += 1
 
     with (
-        patch("weave.integrations.patch.implicit_patch", mock_implicit_patch),
-        patch(
-            "weave.integrations.patch.register_import_hook", mock_register_import_hook
-        ),
+        patch.object(weave_init, "implicit_patch", mock_implicit_patch),
+        patch.object(weave_init, "register_import_hook", mock_register_import_hook),
         patch.object(weave_init, "init_weave_get_server") as mock_get_server,
-        patch(
-            "weave.wandb_interface.context.get_wandb_api_context"
-        ) as mock_get_context,
+        patch.object(weave_init, "get_wandb_auth_context") as mock_get_context,
         patch.object(weave_init, "get_username") as mock_get_username,
         patch("weave.trace.init_message.print_init_message") as mock_print_message,
     ):
-        mock_get_context.return_value = MagicMock(api_key="test_key")
+        mock_get_context.return_value = ApiKeyCredentials("test_key")
         mock_server = MagicMock()
         mock_server.server_info.return_value.min_required_weave_python_version = "0.0.0"
         mock_get_server.return_value = mock_server

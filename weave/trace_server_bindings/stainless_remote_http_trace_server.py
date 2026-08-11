@@ -32,6 +32,10 @@ from weave.trace_server_bindings.models import (
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
+from weave.wandb_interface.auth import (
+    ApiKeyCredentials,
+    WandbCredentials,
+)
 
 TReq = TypeVar("TReq", bound=BaseModel)
 TRes = TypeVar("TRes", bound=BaseModel)
@@ -66,6 +70,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self._extra_headers: dict[str, str] = extra_headers or {}
         self._username: str = username
         self._password: str = password
+        self._credentials: WandbCredentials | None = None
 
         # Initialize stainless client
         default_headers = self._extra_headers.copy()
@@ -105,15 +110,26 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def from_env(cls, should_batch: bool = False) -> Self:
         return cls(weave_trace_server_url(), should_batch)
 
-    def set_auth(self, auth: tuple[str, str]) -> None:
+    def set_auth(self, auth: tuple[str, str] | WandbCredentials) -> None:
         """Set authentication credentials.
 
         Args:
             auth: Tuple of (username, password) for authentication.
         """
-        self._username, self._password = auth
+        self._credentials = None
+        if isinstance(auth, ApiKeyCredentials):
+            self._username = "api"
+            self._password = auth.api_key
+        elif isinstance(auth, WandbCredentials):
+            self._username = ""
+            self._password = ""
+            self._credentials = auth
+        else:
+            self._username, self._password = auth
         # Recreate stainless client with new credentials
         default_headers = self._extra_headers.copy()
+        if self._credentials is not None:
+            default_headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
             default_headers["X-Weave-Retry-Id"] = retry_id
 
@@ -128,6 +144,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
     def _update_client_headers(self) -> None:
         """Update client headers with current retry ID and extra headers."""
         headers = self._extra_headers.copy()
+        if self._credentials is not None:
+            headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
         if headers:

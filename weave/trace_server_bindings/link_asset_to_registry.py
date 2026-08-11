@@ -6,7 +6,7 @@ from weave.trace.env import weave_trace_server_url
 from weave.trace_server.common_interface import BaseModelStrict
 from weave.trace_server_bindings.http_utils import handle_response_error
 from weave.utils import http_requests
-from weave.wandb_interface.context import get_wandb_api_context
+from weave.wandb_interface.context import get_wandb_auth_context
 
 LINK_TO_REGISTRY_PATH = "/link_to_registry"
 
@@ -45,15 +45,15 @@ def link_asset_to_registry(
     Raises:
         ValueError: If no authenticated API key is available.
     """
-    api_key = get_wandb_api_context()
-    if api_key is None:
+    credentials = get_wandb_auth_context()
+    if credentials is None:
         raise ValueError("No API key found")
 
     url = f"{weave_trace_server_url()}{LINK_TO_REGISTRY_PATH}"
     response = http_requests.post(
         url,
         json=req.model_dump(mode="json"),
-        auth=("api", api_key),
+        auth=credentials.httpx_auth(),
     )
     handle_response_error(response, url)
 
