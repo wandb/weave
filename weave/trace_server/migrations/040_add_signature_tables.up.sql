@@ -1,5 +1,6 @@
--- Two tables for distilled conversation insights, split by grain: an intent is one
--- turn, a failure is one whole conversation. Both are ReplacingMergeTree on
+-- Two tables for distilled conversation insights, split by what a judge claims:
+-- an intent is what the user wanted, a failure is what the assistant got wrong.
+-- Both hold one row per claim about one turn, and both are ReplacingMergeTree on
 -- inserted_at, which collapses exactly one thing: a writer retrying the same row
 -- id. Re-extracting a turn is a new row.
 
@@ -64,8 +65,9 @@ TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
 
 
--- One detected failure per row: one conversation, one claim, one embedding, and
--- every turn the failure is attributed to.
+-- One detected failure per row: one claim about one turn, one embedding, and the
+-- turns that claim is attributed to. A turn can carry several failures, and every
+-- turn of a conversation is judged, so a conversation can produce many rows.
 CREATE TABLE IF NOT EXISTS failure_signatures
 (
     project_id String,
@@ -83,10 +85,11 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     vector Array(Float32),
 
     conversation_id String,
-    -- First turn where it went wrong: the single anchor for ranking and drilldown.
+    -- The turn this failure was detected in, and the turn the row id anchors on,
+    -- so re-judging that turn replaces the failure rather than adding one.
     onset_trace_id String,
-    -- Every turn the failure is attributed to, sorted and deduplicated by the
-    -- writer, each joinable to spans.trace_id. Always contains onset_trace_id.
+    -- Turns the failure is attributed to, sorted, deduplicated, and always
+    -- containing onset_trace_id. A judged turn contributes exactly itself.
     trace_ids Array(String),
     -- The spans the judge cited as evidence, resolved by the writer from the
     -- message indices it returned. A drilldown target, so it carries no index.
