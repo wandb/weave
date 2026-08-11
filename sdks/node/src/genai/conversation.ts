@@ -201,5 +201,3 @@ export type Session = Conversation;
  * @hidden
  */
 export const Session = Conversation;
-
-export const Session = Conversation;
