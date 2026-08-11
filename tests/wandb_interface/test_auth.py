@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -61,7 +62,8 @@ def test_identity_credentials_exchange_once_and_reuse_cache(
     assert credentials.authorization_header() == "Bearer access-token"
     assert credentials.authorization_header() == "Bearer access-token"
     assert len(requests) == 1
-    assert credentials_file.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert credentials_file.stat().st_mode & 0o777 == 0o600
 
 
 def test_identity_credentials_refresh_expiring_token(
