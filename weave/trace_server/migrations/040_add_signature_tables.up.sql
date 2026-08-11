@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- The label the model emitted. No numeric encoding: averaging ordinal
     -- labels asserts distances the taxonomy does not define.
     sentiment LowCardinality(String) DEFAULT '',
+    -- Why the judge picked that label, in its words, and how sure it was. Never
+    -- embedded and never in the id hash, so a reworded rationale keeps the row.
+    sentiment_rationale String DEFAULT '',
+    sentiment_confidence Float32 DEFAULT 0,
     -- Exact cosine, intentionally no ANN index. Measured on this schema, HNSW
     -- cost 126-196x on inserts and 4.3-7.2x on reads.
     vector Array(Float32),
