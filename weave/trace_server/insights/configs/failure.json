@@ -15,7 +15,6 @@
     "max_failures_per_turn": 2,
     "current_turn_tokens": 12000,
     "history_assistant_tokens": 200,
-    "max_standing_constraints": 20,
     "normalization_version": 1
   },
   "judge": {
@@ -29,6 +28,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "edb7af2ac7d78685ab8a03c2a2f51235a8d07631ddfe7f79b57b61b087f09dbf"
+    "config_sha256": "b76a419caba2706ffa69e5dd60d019ffe3b805e397ad5c7bb8a77d9f84e35753"
   }
 }

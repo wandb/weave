@@ -647,24 +647,6 @@ _FAILURE_COLUMNS = [
 # Every column that must stay identical in name and type across both tables.
 # Drift here is the standing cost of splitting one table into two, so it is
 # asserted rather than trusted.
-_TURN_CONTEXT_COLUMNS = [
-    ("project_id", "String"),
-    ("conversation_id", "String"),
-    ("trace_id", "String"),
-    ("turn_index", "UInt16"),
-    ("intent_config_sha256", "Nullable(String)"),
-    ("failure_config_sha256", "Nullable(String)"),
-    ("assistant_summary", "Nullable(String)"),
-    ("constraints_json", "Nullable(String)"),
-    ("source_started_at", "DateTime64(6, 'UTC')"),
-    ("extracted_at", "DateTime64(6, 'UTC')"),
-    ("inserted_at", "DateTime64(6, 'UTC')"),
-    ("expire_at", "DateTime"),
-]
-
-# Every column that must stay identical in name and type across both
-# SIGNATURE tables. turn_context is deliberately excluded: it is a different
-# grain, a different engine, and shares none of this contract.
 _SHARED_COLUMNS = [
     ("agent_name", "LowCardinality(String)"),
     ("category", "LowCardinality(String)"),
@@ -748,19 +730,13 @@ def _insert_failure(
 
 
 _SIGNATURE_KEY = "project_id, toDate(source_started_at), id"
-# turn_context keys on the trace, never on a turn ordinal: an ordinal is derived
-# by ordering a conversation's traces by start time, so a late-arriving trace
-# renumbers every later turn inside a key that cannot be altered.
-_TURN_CONTEXT_KEY = "project_id, conversation_id, source_started_at, trace_id"
 
 
 @pytest.mark.parametrize(
-    ("table_name", "engine", "sorting_key", "expected_columns", "expected_indexes"),
+    ("table_name", "expected_columns", "expected_indexes"),
     [
         (
             "intent_signatures",
-            "ReplacingMergeTree",
-            _SIGNATURE_KEY,
             _INTENT_COLUMNS,
             [
                 ("idx_conversation_id", "conversation_id"),
@@ -770,8 +746,6 @@ _TURN_CONTEXT_KEY = "project_id, conversation_id, source_started_at, trace_id"
         ),
         (
             "failure_signatures",
-            "ReplacingMergeTree",
-            _SIGNATURE_KEY,
             _FAILURE_COLUMNS,
             [
                 ("idx_conversation_id", "conversation_id"),
@@ -779,19 +753,12 @@ _TURN_CONTEXT_KEY = "project_id, conversation_id, source_started_at, trace_id"
                 ("idx_trace_ids", "trace_ids"),
             ],
         ),
-        (
-            "turn_context",
-            "CoalescingMergeTree",
-            _TURN_CONTEXT_KEY,
-            _TURN_CONTEXT_COLUMNS,
-            [("idx_trace_id", "trace_id")],
-        ),
     ],
 )
-def test_insights_tables_schema(
-    ch_client, table_name, engine, sorting_key, expected_columns, expected_indexes
+def test_signature_tables_schema(
+    ch_client, table_name, expected_columns, expected_indexes
 ):
-    """Every insights table pins its key and engine, and none carries a constraint.
+    """Both signature tables pin their key and engine, and neither carries a constraint.
 
     Engine, PARTITION BY and ORDER BY are the one-way doors: none can be altered
     on a populated table, so nothing speculative is allowed in any of them. Every
@@ -805,10 +772,10 @@ def test_insights_tables_schema(
         f"FROM system.tables WHERE database = '{target_db}' AND name = '{table_name}'"
     ).result_rows == [
         (
-            engine,
+            "ReplacingMergeTree",
             "toYYYYMM(source_started_at)",
-            sorting_key,
-            sorting_key,
+            _SIGNATURE_KEY,
+            _SIGNATURE_KEY,
             "expire_at",
         )
     ]
@@ -839,96 +806,13 @@ def test_insights_tables_schema(
         f"WHERE database = '{target_db}' AND table = '{table_name}' ORDER BY name"
     ).result_rows == [(name, expr) for name, expr in expected_indexes]
 
-    # Every table stamps its own clock, so the writer passes nothing and a retry
-    # sorts later for free. On the signature tables this is the
-    # ReplacingMergeTree version; on turn_context it is what orders the
-    # read-time coalesce, which is why both need it and neither supplies it.
+    # Both tables stamp their own clock, so the writer passes no version and a
+    # retry sorts later for free.
     assert ch_client.query(
         "SELECT default_expression FROM system.columns "
         f"WHERE database = '{target_db}' AND table = '{table_name}' "
         "AND name = 'inserted_at'"
     ).result_rows == [("now64(6)",)]
-
-
-def test_turn_context_coalesces_two_producers(ch_client):
-    """Each judge writes only its own columns, and neither erases the other's.
-
-    This is the reason turn_context is a CoalescingMergeTree rather than a
-    ReplacingMergeTree, and the reason its payload columns are Nullable. A
-    Replacing row replaces wholesale, so the second producer to write would drop
-    the first producer's column. The read is spelled the way the reader must
-    spell it, because no read here uses FINAL: `argMaxIf` over `inserted_at`
-    ignoring NULLs is the engine's own "newest non-NULL wins" rule as SQL.
-    """
-    target_db = _migrate_signatures_db(ch_client, "turnctx")
-    agreed = (
-        "project_id, conversation_id, trace_id, turn_index, "
-        "source_started_at, extracted_at, inserted_at"
-    )
-    started = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
-
-    # The intent judge lands constraints. Separate statements, because two rows
-    # in one block share a now64() and the collapse must be able to order them.
-    ch_client.command(
-        f"INSERT INTO {target_db}.turn_context "
-        f"({agreed}, intent_config_sha256, constraints_json) VALUES "
-        f"('project-1', 'conversation-1', 'trace-4', 2, {started}, {started}, "
-        f"{started}, 'cfg-intent', '[\"use staging, never production\"]')"
-    )
-    # The failure judge lands a summary for the same turn, saying nothing about
-    # constraints. Under ReplacingMergeTree this write is what destroyed them.
-    ch_client.command(
-        f"INSERT INTO {target_db}.turn_context "
-        f"({agreed}, failure_config_sha256, assistant_summary) VALUES "
-        f"('project-1', 'conversation-1', 'trace-4', 2, {started}, {started}, "
-        f"{started} + toIntervalSecond(1), 'cfg-failure', 'ran the migration')"
-    )
-
-    collapse = f"""
-        SELECT
-            argMaxIf(assistant_summary, inserted_at, assistant_summary IS NOT NULL),
-            argMaxIf(constraints_json, inserted_at, constraints_json IS NOT NULL),
-            argMaxIf(failure_config_sha256, inserted_at, failure_config_sha256 IS NOT NULL),
-            argMaxIf(intent_config_sha256, inserted_at, intent_config_sha256 IS NOT NULL)
-        FROM {target_db}.turn_context
-        WHERE project_id = 'project-1' AND conversation_id = 'conversation-1'
-        GROUP BY {_TURN_CONTEXT_KEY}
-    """
-    both_producers = [
-        (
-            "ran the migration",
-            '["use staging, never production"]',
-            "cfg-failure",
-            "cfg-intent",
-        )
-    ]
-    # Unmerged: two physical rows, one correct answer, no FINAL.
-    assert ch_client.query(collapse).result_rows == both_producers
-
-    # And the same answer once the engine has actually merged them, so the
-    # reader cannot tell whether a merge has happened yet.
-    ch_client.command(f"OPTIMIZE TABLE {target_db}.turn_context FINAL")
-    assert ch_client.query(collapse).result_rows == both_producers
-    assert ch_client.query(
-        f"SELECT count() FROM {target_db}.turn_context"
-    ).result_rows == [(1,)]
-
-    # A re-judgment landing on the merged row restates only the summary. The
-    # intent judge's constraints must survive a write it had no part in.
-    ch_client.command(
-        f"INSERT INTO {target_db}.turn_context "
-        f"({agreed}, failure_config_sha256, assistant_summary) VALUES "
-        f"('project-1', 'conversation-1', 'trace-4', 2, {started}, {started}, "
-        f"{started} + toIntervalSecond(2), 'cfg-failure-2', 're-judged the migration')"
-    )
-    assert ch_client.query(collapse).result_rows == [
-        (
-            "re-judged the migration",
-            '["use staging, never production"]',
-            "cfg-failure-2",
-            "cfg-intent",
-        )
-    ]
 
 
 def test_signature_tables_share_columns(ch_client):

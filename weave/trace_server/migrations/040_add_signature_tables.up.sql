@@ -18,6 +18,13 @@
 -- An aggregate that cannot be expressed that way (avg, quantile, topK) must run
 -- over a collapsed subquery, not over the raw rows, or a re-extracted row is
 -- counted twice.
+--
+-- NO PER-TURN CONTEXT TABLE, deliberately. A judge assembles one turn's context
+-- from these two tables plus `messages`, which measured 30 ms and 63k rows at 1M
+-- turns against a judge completion of 1-3 s. A table denormalizing that per turn
+-- measured 3.3x faster, but it holds nothing these three do not already hold, so
+-- it is a read model addable by backfill whenever the read stops being 2% of the
+-- pipeline's wall clock. Adding it later costs a migration and no data.
 
 -- One distilled user intent per row: one turn, one claim, one embedding.
 --
@@ -213,90 +220,3 @@ PARTITION BY toYYYYMM(source_started_at)
 ORDER BY (project_id, toDate(source_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
-
--- One row per turn, holding the derived context both judges need on the turns
--- that follow. Not a signature table: nothing here is embedded or clustered,
--- which is why it carries no vector, category, or signature, and why the drift
--- guard over the two signature tables deliberately does not cover it.
---
--- TWO PRODUCERS, ONE ROW. `assistant_summary` comes from the failure judge and
---   `constraints_json` from the intent judge. They emit together today, but
---   nothing about the pipeline requires that, and the engine is the one thing
---   ALTER cannot change later. ReplacingMergeTree replaces a whole row, so the
---   moment either judge writes alone it erases the other's column: measured over
---   14,909 turns carrying constraints, a summary-only re-judgment left 0 of them
---   intact under ReplacingMergeTree and all 14,909 under CoalescingMergeTree.
---
--- IDENTITY. The sorting key is (project_id, conversation_id, source_started_at,
---   trace_id). `turn_index` is deliberately NOT in it: there is no turn ordinal
---   in the agent-spans world, so an index is derived by ordering a conversation's
---   traces by start time, and a late-arriving trace renumbers every later turn.
---   That would re-attach context to the wrong turn inside a key that cannot be
---   altered. `source_started_at` before `trace_id` keeps "the prior N turns" a
---   contiguous descending range, which is what `turn_index` was buying.
---
--- NULLABILITY IS THE CONTRACT. A column Nullable here is owned by exactly one
---   producer, and NULL means "this producer has nothing to say", which is what
---   the engine coalesces on. A column NOT Nullable is one every producer must
---   supply on every write, because a non-Nullable column in a
---   CoalescingMergeTree follows last-write-wins exactly like Replacing: omit it
---   and its DEFAULT silently wins. That is also why `expire_at` stays
---   non-Nullable, so the TTL expression has a real value to read.
---
--- READ. No FINAL, matching every other table here. The collapse is
---   `argMaxIf(col, inserted_at, col IS NOT NULL)`, which is the engine's own
---   "newest non-NULL wins" rule spelled as SQL. Verified equal to FINAL while
---   fully unmerged, partly merged, fully merged, and with a re-judgment landing
---   on top of an already-merged row. A bare GROUP BY with any() is NOT
---   equivalent: the engine has no version column of its own, so `inserted_at`
---   is what makes the manual collapse well defined.
-CREATE TABLE IF NOT EXISTS turn_context
-(
-    project_id String,
-    conversation_id String,
-    -- The turn's trace, joinable to spans.trace_id. Weave defines one turn as
-    -- one trace, so this is the turn identity.
-    trace_id String,
-    -- Display position of the turn in its conversation. Payload, not identity:
-    -- see the note above on why it cannot be in the sorting key.
-    turn_index UInt16,
-
-    -- Each judge stamps only its own digest, so a row's provenance stays correct
-    -- per column instead of taking whichever judge wrote last.
-    intent_config_sha256 Nullable(String),
-    failure_config_sha256 Nullable(String),
-
-    -- One sentence describing the assistant response, from the failure judge.
-    -- Written for every turn, including turns with no failure and no intent,
-    -- which is the reason it cannot live on either signature table.
-    assistant_summary Nullable(String),
-    -- Constraints the user established, changed, or retracted on this turn, from
-    -- the intent judge. NULL on most turns. The standing set handed to the
-    -- failure judge is the accumulation of these, assembled at read time.
-    --
-    -- JSON rather than Array(String) because Nullable(Array(...)) is not a legal
-    -- ClickHouse type, and a non-Nullable Array cannot coalesce: measured, the
-    -- array form is clobbered by a summary-only write while the JSON form
-    -- survives. The array shape is restored by the reader, not by the schema.
-    constraints_json Nullable(String),
-
-    source_started_at DateTime64(6, 'UTC'),
-    extracted_at DateTime64(6, 'UTC'),
-    -- Not a ReplacingMergeTree version. This orders the read-time collapse, so
-    -- every producer must supply it or omit its own columns entirely.
-    inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
-    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
-
-    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
-)
-ENGINE = CoalescingMergeTree
-PARTITION BY toYYYYMM(source_started_at)
--- Ordered for the one read that runs on every judged turn: the prior N turns of
--- a single conversation. conversation_id sits in the sorting key rather than in
--- a bloom filter, so that read is a contiguous range instead of a scatter.
-ORDER BY (project_id, conversation_id, source_started_at, trace_id)
-TTL expire_at DELETE
--- These rows are small enough that index_granularity_bytes never binds, so the
--- default 8192-row granule would serve an 8-row answer. 1024 cuts that over-read
--- roughly 8x for an 8x larger primary index on a table measured at ~104 bytes/row.
-SETTINGS min_bytes_for_wide_part = 0, index_granularity = 1024;
