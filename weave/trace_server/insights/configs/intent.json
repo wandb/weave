@@ -16,6 +16,9 @@
     },
     "history_turns": 8,
     "max_items_per_turn": 8,
+    "current_user_tokens": 6000,
+    "history_user_tokens": 400,
+    "history_assistant_tokens": 200,
     "normalization_version": 1
   },
   "judge": {
@@ -29,6 +32,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "607805aa7a88316b030ce43f482475ec98b94aa5f6ff44af83ba4bab429d0749"
+    "config_sha256": "e09286aadcf870462d4148337b6ffed642f74606675ce36b9d1f940c03e7312b"
   }
 }
