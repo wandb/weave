@@ -2,6 +2,10 @@
   "config_schema_version": 1,
   "space": "failure",
   "extraction": {
+    "prompt": {
+      "path": "prompts/failure.txt",
+      "sha256": ""
+    },
     "taxonomy": {
       "path": "taxonomies/failure_categories.json",
       "sha256": ""
@@ -10,6 +14,8 @@
       "path": "taxonomies/severity.json",
       "sha256": ""
     },
+    "history_turns": 8,
+    "max_failures_per_turn": 2,
     "normalization_version": 1
   },
   "embedding": {
@@ -19,6 +25,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "be7dbaab2a7981ef9896463db66b24e9b93c17d53048edfc26f8a20668eebfbb"
+    "config_sha256": "385b8127a8b2f835543a7759de6c766437979f0567de4387d6dd9b5cf62e425a"
   }
 }

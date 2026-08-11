@@ -2,6 +2,10 @@
   "config_schema_version": 1,
   "space": "intent",
   "extraction": {
+    "prompt": {
+      "path": "prompts/intent.txt",
+      "sha256": ""
+    },
     "taxonomy": {
       "path": "taxonomies/intent_categories.json",
       "sha256": ""
@@ -10,6 +14,8 @@
       "path": "taxonomies/sentiment.json",
       "sha256": ""
     },
+    "history_turns": 8,
+    "max_items_per_turn": 8,
     "normalization_version": 1
   },
   "embedding": {
@@ -19,6 +25,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "6ad44743c6487e088b7457618598e0bb3c3b365c72d2dde2d61fd32d12db3a44"
+    "config_sha256": "2c6059ea3c8df80e9258c5ee9f267d53be011d4ccedde22d206c5c7d858c9cab"
   }
 }

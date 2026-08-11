@@ -6,7 +6,7 @@ import shutil
 
 import pytest
 
-from weave.trace_server.insights import config
+from weave.trace_server.insights import config, prompt
 
 # The exact label sets the `category` Enum carried before the signature tables
 # replaced it. Dropping the Enum moved enforcement to the writer; it must not
@@ -95,6 +95,48 @@ def test_checked_in_configs_are_current(space, retired, moves):
             "config_sha256"
         ]
     )
+
+
+@pytest.mark.parametrize("space", ["intent", "failure"])
+def test_prompt_renders_and_cannot_drift_from_its_taxonomy(space):
+    """Every token resolves, and the prose describes exactly the declared labels.
+
+    The label list reaches the judge twice: as the alternation it must choose
+    from, and as the descriptions it reasons with. Only the first is generated,
+    so this is what stops the second from describing a retired label.
+    """
+    rendered = prompt.render_prompt(space)
+    assert "%%" not in rendered
+
+    labels = config.load_taxonomy(space, "taxonomy")
+    assert "|".join(labels) in rendered
+    assert all(f"`{label}`" in rendered for label in labels)
+
+    extraction = config.load_extraction(space)
+    assert f"up to {extraction['history_turns']} " in rendered
+
+
+def test_editing_the_prompt_moves_the_digest(config_dir):
+    """A reworded prompt is a pipeline change, so rows must stop claiming the old one."""
+    before = config.compute_config_sha256(config.load_config("intent"))
+    prompt_path = os.path.join(config_dir, "prompts", "intent.txt")
+    with open(prompt_path, "a", encoding="utf-8") as handle:
+        handle.write("\nJudge nothing on Tuesdays.\n")
+
+    assert config.compute_config_sha256(config._read_config("intent")) != before
+    with pytest.raises(ValueError, match="digest is stale"):
+        config.load_config("intent")
+
+
+def test_a_prompt_token_the_config_does_not_supply_is_an_error(config_dir):
+    """An unsubstituted token would otherwise reach the judge as literal text."""
+    prompt_path = os.path.join(config_dir, "prompts", "intent.txt")
+    with open(prompt_path, "a", encoding="utf-8") as handle:
+        handle.write("\nEmit at most %%MAX_JOKES%% jokes.\n")
+    config.regenerate_digests()
+
+    with pytest.raises(ValueError, match="MAX_JOKES"):
+        prompt.render_prompt("intent")
 
 
 def test_digest_follows_referenced_files_not_the_config_text(config_dir):
