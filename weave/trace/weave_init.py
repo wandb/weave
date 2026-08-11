@@ -144,15 +144,15 @@ def _setup_conversation_tracing(
     a warning and returns early if opentelemetry is unavailable. Other errors
     propagate so misconfiguration is visible to the user.
     """
-    global _conversation_span_exporter  # noqa: PLW0603
-    global _conversation_tracer_provider  # noqa: PLW0603
+    global _conversation_tracer_provider, _conversation_span_exporter  # noqa: PLW0603
     try:
         from opentelemetry import trace
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
         from opentelemetry.sdk.resources import Resource
-        from opentelemetry.sdk.trace import TracerProvider, export
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
     except ImportError as e:
@@ -222,7 +222,7 @@ def _setup_conversation_tracing(
     if not env.ssl_verify():
         exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
-    provider.add_span_processor(export.BatchSpanProcessor(exporter))
+    provider.add_span_processor(BatchSpanProcessor(exporter))
     # Auto-link GenAI OTel spans to eval predictions and inject eval
     # metadata (call ID, project, evaluation name) onto spans for
     # deep-linking in the agent traces UI.
