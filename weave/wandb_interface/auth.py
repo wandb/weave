@@ -6,7 +6,8 @@ import json
 import os
 import threading
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime, timedelta
+from collections.abc import Generator
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -105,11 +106,11 @@ class IdentityTokenCredentials(WandbCredentials):
             return None
         try:
             expires_at = datetime.strptime(expires_at_value, EXPIRES_AT_FORMAT).replace(
-                tzinfo=UTC
+                tzinfo=timezone.utc
             )
         except ValueError:
             return None
-        if expires_at - TOKEN_REFRESH_SKEW <= datetime.now(UTC):
+        if expires_at - TOKEN_REFRESH_SKEW <= datetime.now(timezone.utc):
             return None
         return token
 
@@ -156,7 +157,7 @@ class IdentityTokenCredentials(WandbCredentials):
             raise AuthenticationError(
                 "Identity token exchange returned an invalid access token"
             )
-        return token, datetime.now(UTC) + timedelta(seconds=expires_in)
+        return token, datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
     def _write_cached_token(self, token: str, expires_at: datetime) -> None:
         data: dict[str, Any] = {"credentials": {}}
@@ -173,7 +174,9 @@ class IdentityTokenCredentials(WandbCredentials):
             data["credentials"] = credentials
         credentials[self.base_url] = {
             "access_token": token,
-            "expires_at": expires_at.astimezone(UTC).strftime(EXPIRES_AT_FORMAT),
+            "expires_at": expires_at.astimezone(timezone.utc).strftime(
+                EXPIRES_AT_FORMAT
+            ),
         }
 
         self.credentials_file.parent.mkdir(parents=True, exist_ok=True)
@@ -195,7 +198,9 @@ class _WandbHttpxAuth(httpx.Auth):
     def __init__(self, credentials: WandbCredentials) -> None:
         self._credentials = credentials
 
-    def auth_flow(self, request: httpx.Request):
+    def auth_flow(
+        self, request: httpx.Request
+    ) -> Generator[httpx.Request, httpx.Response, None]:
         request.headers["Authorization"] = self._credentials.authorization_header()
         yield request
 

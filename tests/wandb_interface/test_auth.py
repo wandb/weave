@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -77,7 +77,7 @@ def test_identity_credentials_refresh_expiring_token(
                     "https://api.wandb.test": {
                         "access_token": "expiring-token",
                         "expires_at": (
-                            datetime.now(UTC) + timedelta(minutes=1)
+                            datetime.now(timezone.utc) + timedelta(minutes=1)
                         ).strftime(auth.EXPIRES_AT_FORMAT),
                     }
                 }
