@@ -193,5 +193,11 @@ export class Conversation {
 export type SessionInit = ConversationInit;
 /** @deprecated Use {@link Conversation} instead. */
 export type Session = Conversation;
-/** @deprecated Use {@link Conversation} instead. */
+/**
+* Hidden to keep TypeDoc from emitting a duplicate `Session` docs page for
+* the constructor type.
+* @deprecated Use {@link Conversation} instead. 
+* @hidden
+*/
+
 export const Session = Conversation;
