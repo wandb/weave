@@ -112,7 +112,7 @@ def test_prompt_renders_and_cannot_drift_from_its_taxonomy(space):
     assert "|".join(labels) in rendered
     assert all(f"`{label}`" in rendered for label in labels)
 
-    extraction = config.load_extraction(space)
+    extraction = config.load_section(space, "extraction")
     assert f"up to {extraction['history_turns']} " in rendered
 
 

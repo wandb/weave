@@ -18,6 +18,10 @@
     "max_failures_per_turn": 2,
     "normalization_version": 1
   },
+  "judge": {
+    "model": "coreweave/google/gemma-4-31B-it",
+    "temperature": 0
+  },
   "embedding": {
     "provider": "openai",
     "model": "text-embedding-3-large",
@@ -25,6 +29,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "385b8127a8b2f835543a7759de6c766437979f0567de4387d6dd9b5cf62e425a"
+    "config_sha256": "0c9901c4674348f6b92ae39fb4ca0c4bc7fc5730c7a84270cec78bacf3110c7c"
   }
 }

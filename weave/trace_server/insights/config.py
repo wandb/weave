@@ -54,14 +54,14 @@ def compute_config_sha256(config: Config) -> str:
 
 def load_taxonomy(space: str, key: str) -> list[str]:
     """Return the label list a writer validates `category` or `severity` against."""
-    reference = _object(load_extraction(space), key)
+    reference = _object(load_section(space, "extraction"), key)
     taxonomy = _read_json(os.path.join(CONFIG_DIR, _string(reference, "path")))
     return _string_list(taxonomy, "labels")
 
 
-def load_extraction(space: str) -> Config:
-    """The `extraction` block: every knob that decides what a judge is shown."""
-    return _object(load_config(space), "extraction")
+def load_section(space: str, name: str) -> Config:
+    """One top-level block of a space's config, such as `extraction` or `judge`."""
+    return _object(load_config(space), name)
 
 
 def read_reference(relative_path: str) -> str:

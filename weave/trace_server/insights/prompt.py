@@ -20,7 +20,7 @@ _TOKEN_PATTERN = re.compile(r"%%\w+%%")
 
 def render_prompt(space: str) -> str:
     """The space's judge prompt with every config-supplied token substituted."""
-    extraction = config.load_extraction(space)
+    extraction = config.load_section(space, "extraction")
     text = config.read_reference(_prompt_path(space, extraction)).strip()
     for token, value in _tokens(space, extraction).items():
         text = text.replace(token, value)
