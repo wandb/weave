@@ -1308,15 +1308,16 @@ def _emit_assistant_message(
 
     A span that produced reasoning but no assistant text (e.g. an LLM step that
     only emitted a tool call) still yields a message carrying that reasoning, so
-    thinking interleaved between tool calls is surfaced rather than dropped.
-    Returns None only when there is neither output text nor reasoning content.
+    thinking interleaved between tool calls is surfaced rather than dropped. An
+    errored span also yields a message without content so its failure remains
+    visible in the conversation projection. Successful empty spans are omitted.
     """
     text = (
         _extract_non_user_output_text(span.output_messages)
         if span.output_messages
         else ""
     )
-    if not text and not span.reasoning_content:
+    if not text and not span.reasoning_content and span.status_code != "ERROR":
         return None
 
     if aggregate_node:
