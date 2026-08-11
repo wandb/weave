@@ -21,6 +21,8 @@ from weave.shared.otel_span_attrs import (
     PARENT_CALL_ID_SPAN_ATTR,
     PARENT_CALL_TRACE_ID_SPAN_ATTR,
 )
+from weave.trace.call import Call, NoOpCall
+from weave.trace.context import call_context
 from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace_server import constants
 
@@ -269,3 +271,67 @@ async def test_task_outliving_op_links_finished_call(client, otel_setup):
 
     attrs = _attrs_by_span_name(otel_setup)["after_op"]
     assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+
+
+@pytest.mark.parametrize(
+    ("call_id", "trace_id"),
+    [(None, "trace-1"), ("", "trace-1"), ("call-1", "")],
+    ids=["no_id", "empty_id", "empty_trace_id"],
+)
+def test_call_missing_either_id_stamps_neither(otel_setup, call_id, trace_id):
+    """The two ids are one relation. Stamping only the half that is present
+    would store an empty string, which reads back as unset while the other
+    half looks resolvable.
+    """
+    incomplete = Call(
+        _op_name="incomplete",
+        trace_id=trace_id,
+        project_id="entity/project",
+        parent_id=None,
+        inputs={},
+        id=call_id,
+    )
+
+    with call_context.set_call_stack([incomplete]):
+        _emit_span("incomplete")
+
+    attrs = _attrs_by_span_name(otel_setup)["incomplete"]
+    assert PARENT_CALL_ID_SPAN_ATTR not in attrs
+    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs
+
+
+def test_placeholder_call_carries_no_link(otel_setup):
+    """`NoOpCall` is the degenerate call that actually reaches the stack —
+    tracing disabled — and it holds an empty trace id, not a missing one.
+    """
+    with call_context.set_call_stack([NoOpCall()]):
+        _emit_span("placeholder")
+
+    attrs = _attrs_by_span_name(otel_setup)["placeholder"]
+    assert PARENT_CALL_ID_SPAN_ATTR not in attrs
+    assert PARENT_CALL_TRACE_ID_SPAN_ATTR not in attrs
+
+
+def test_processor_links_spans_on_a_user_owned_provider(client):
+    """When weave.init() finds a provider it did not install it registers
+    nothing, and the remedy is for the user to register the public processor on
+    their own provider. This exercises that path, and the public name with it.
+    """
+    exporter = InMemorySpanExporter()
+    provider = SDKTracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    provider.add_span_processor(weave.OpLinkSpanProcessor())
+
+    @weave.op
+    def orchestrate() -> None:
+        provider.get_tracer("test").start_span("user_provider_work").end()
+
+    orchestrate()
+    client.flush()
+    call = next(iter(orchestrate.calls()))
+
+    attrs = _attrs_by_span_name(exporter)["user_provider_work"]
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id
+
+    provider.shutdown()

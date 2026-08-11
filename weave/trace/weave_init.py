@@ -210,7 +210,9 @@ def _setup_conversation_tracing(entity: str, project: str, api_key: str | None) 
         exporter._certificate_file = False
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(exporter))
-    # Before the eval linker: a crowded span evicts oldest first, so ours go first.
+    # Registered ahead of the eval linker so that a span past the attribute
+    # limit, which evicts oldest first, gives up the op link and keeps eval
+    # metadata — eval has readers today and this does not.
     provider.add_span_processor(OpLinkSpanProcessor())
     # Auto-link GenAI OTel spans to eval predictions and inject eval
     # metadata (call ID, project, evaluation name) onto spans for

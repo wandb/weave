@@ -11,8 +11,15 @@ Register this processor alongside the ``BatchSpanProcessor`` during
 
 The link needs the weave call stack to be visible where the span starts. That
 stack is a ``ContextVar``, so a span emitted from a bare thread carries none —
-and neither does one from a provider weave did not install. An empty column is
-a normal state, and so is a link to a call that has already finished.
+and neither does one from a provider weave did not install. Google ADK's
+synchronous ``Runner.run()`` and the realtime integration both emit off the
+caller's thread and so carry no link at all. An empty column is a normal
+state, and so is a link to a call that has already finished, and so is one
+evicted from a span that was already at its attribute limit.
+
+A user who configured their own ``TracerProvider`` before ``weave.init()``
+gets no processor, and can register this one themselves: it is exported as
+``weave.OpLinkSpanProcessor``.
 """
 
 from __future__ import annotations
@@ -36,8 +43,9 @@ class OpLinkSpanProcessor(SpanProcessor):
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         call = call_context.get_current_call()
-        # A call that has not been created yet has no ids to stamp.
-        if call is None or call.id is None or call.trace_id is None:
+        # A placeholder call carries an empty trace id and no id at all, and
+        # half a link is worse than none: the empty half reads back as unset.
+        if call is None or not call.id or not call.trace_id:
             return
 
         # A crowded span evicts oldest first, so spend the trace id before the id.
