@@ -688,6 +688,48 @@ def _migrate_signatures_db(ch_client, name: str) -> str:
     return target_db
 
 
+# Source month is a month before extraction: the partition must follow source
+# time, which is what a backfill depends on.
+_SOURCE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
+_EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
+_UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
+
+# The dedup key is the sorting key, so every collapsing read groups by all three
+# terms. This is the shape the reader must use, because FINAL never is.
+_SIGNATURE_DEDUP_KEY = "project_id, toDate(source_started_at), id"
+
+
+def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> None:
+    """Insert one intent_signatures row for 'intent-1' in 'project-1'."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.intent_signatures "
+        "(project_id, id, config_sha256, signature, category, language, "
+        "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
+        "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
+        "('project-1', 'intent-1', 'cfg-a', 'add stripe checkout', "
+        f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
+        f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
+        f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
+    )
+
+
+def _insert_failure(
+    ch_client, target_db: str, row_id: str, onset: str, turns: str, cost: float
+) -> None:
+    """Insert one failure_signatures row in 'project-1'."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.failure_signatures "
+        "(project_id, id, config_sha256, signature, failure_reason, category, "
+        "severity, vector, conversation_id, onset_trace_id, trace_ids, "
+        "user_id, agent_name, duration_ms, cost_usd, source_started_at, "
+        f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
+        "'ignored the stated output path', 'The user specified /tmp/out.json.', "
+        f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
+        f"'{onset}', {turns}, 'user-1', 'checkout-agent', 16000, {cost}, "
+        f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
+    )
+
+
 @pytest.mark.parametrize(
     ("table_name", "expected_columns", "expected_indexes"),
     [
@@ -791,42 +833,31 @@ def test_signature_tables_share_columns(ch_client):
     )
 
 
-def test_signature_replacement_and_turn_attribution(ch_client):
-    """Last write wins with no version supplied, and a failure spans many turns.
+def test_signature_versions_collapse_on_read(ch_client):
+    """A re-extraction replaces its predecessor under GROUP BY + argMax, no FINAL.
 
-    Pins the two contracts the schema exists to express: a re-extraction of the
-    same occurrence replaces its predecessor because the writer supplies no
-    version, and a failure's attributed turns can widen without minting a second
-    row, because only onset_trace_id is in the id.
+    The writer supplies no version, so `inserted_at DEFAULT now64(6)` orders the
+    versions. The read is spelled the way the reader has to spell it: this path
+    never uses FINAL, so the collapse must fall out of the sorting key, and a key
+    that cannot express it is a one-way door.
     """
     target_db = _migrate_signatures_db(ch_client, "lifecycle")
-
-    # Source month is a month before extraction: the partition must follow
-    # source time, which is what a backfill depends on.
-    def insert_intent(category: str, cost: float) -> None:
-        ch_client.command(
-            f"INSERT INTO {target_db}.intent_signatures "
-            "(project_id, id, config_sha256, signature, category, language, "
-            "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
-            "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
-            "('project-1', 'intent-1', 'cfg-a', 'add stripe checkout', "
-            f"'{category}', 'es', 'frustrated', "
-            "arrayResize([toFloat32(1)], 1024, toFloat32(0)), "
-            f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
-            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'), "
-            "toDateTime64('2026-06-20 14:32:00', 6, 'UTC'))"
-        )
 
     # Separate inserts, because now64() is evaluated once per block: two rows
     # sharing an id inside one block tie, and the writer deduplicates per batch
     # rather than relying on the version to break it.
-    insert_intent("action_request", 0.21)
-    insert_intent("information_request", 0.34)
+    _insert_intent(ch_client, target_db, "action_request", 0.21)
+    _insert_intent(ch_client, target_db, "information_request", 0.34)
 
+    # Distinct blocks form distinct parts, so both versions are still on disk
+    # here and the single row below is this query's work, not a merge's.
     assert ch_client.query(
-        "SELECT category, cost_usd, duration_ms, language, "
-        "formatDateTime(expire_at, '%F %T'), length(vector) "
-        f"FROM {target_db}.intent_signatures FINAL WHERE project_id = 'project-1'"
+        "SELECT argMax(category, inserted_at), argMax(cost_usd, inserted_at), "
+        "argMax(duration_ms, inserted_at), argMax(language, inserted_at), "
+        "formatDateTime(argMax(expire_at, inserted_at), '%F %T'), "
+        "length(argMax(vector, inserted_at)) "
+        f"FROM {target_db}.intent_signatures WHERE project_id = 'project-1' "
+        f"GROUP BY {_SIGNATURE_DEDUP_KEY}"
     ).result_rows == [
         ("information_request", 0.34, 9000, "es", "2100-01-01 00:00:00", 1024)
     ]
@@ -838,41 +869,44 @@ def test_signature_replacement_and_turn_attribution(ch_client):
         f"WHERE database = '{target_db}' AND table = 'intent_signatures' AND active"
     ).result_rows == [("202605",)]
 
-    def insert_failure(row_id: str, onset: str, turns: str, cost: float) -> None:
-        ch_client.command(
-            f"INSERT INTO {target_db}.failure_signatures "
-            "(project_id, id, config_sha256, signature, failure_reason, category, "
-            "severity, vector, conversation_id, onset_trace_id, trace_ids, "
-            "user_id, agent_name, duration_ms, cost_usd, source_started_at, "
-            f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
-            "'ignored the stated output path', 'The user specified /tmp/out.json.', "
-            "'requirement_violation', 'medium', "
-            "arrayResize([toFloat32(1)], 1024, toFloat32(0)), 'conversation-1', "
-            f"'{onset}', {turns}, 'user-1', 'checkout-agent', 16000, {cost}, "
-            "toDateTime64('2026-05-30 09:15:00', 6, 'UTC'), "
-            "toDateTime64('2026-06-20 14:32:00', 6, 'UTC'))"
-        )
-
-    insert_failure("failure-1", "trace-4", "['trace-4', 'trace-6']", 0.31)
-    # A re-extraction that widens the attributed span by one turn is the SAME
+    _insert_failure(ch_client, target_db, "failure-1", "trace-4", "['trace-4']", 0.31)
+    # A re-extraction that widens the attributed span by two turns is the SAME
     # failure: trace_ids is not in the id, so this must replace, not coexist.
-    insert_failure("failure-1", "trace-4", "['trace-4', 'trace-6', 'trace-9']", 0.41)
-    # A different onset is a different failure, sharing turn trace-6.
-    insert_failure("failure-2", "trace-6", "['trace-6']", 0.32)
+    _insert_failure(
+        ch_client, target_db, "failure-1", "trace-4", "['trace-4', 'trace-6']", 0.41
+    )
 
     assert ch_client.query(
-        "SELECT id, onset_trace_id, trace_ids, cost_usd "
-        f"FROM {target_db}.failure_signatures FINAL WHERE project_id = 'project-1' "
-        "ORDER BY id"
-    ).result_rows == [
-        ("failure-1", "trace-4", ["trace-4", "trace-6", "trace-9"], 0.41),
-        ("failure-2", "trace-6", ["trace-6"], 0.32),
-    ]
+        "SELECT id, argMax(onset_trace_id, inserted_at), "
+        "argMax(trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
+        f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
+        f"GROUP BY {_SIGNATURE_DEDUP_KEY}"
+    ).result_rows == [("failure-1", "trace-4", ["trace-4", "trace-6"], 0.41)]
+
+
+def test_failure_turn_attribution(ch_client):
+    """A failure attributes many turns, and its per-row totals do not sum.
+
+    Two distinct occurrences, so nothing collapses and these reads need no dedup;
+    replacement is covered by test_signature_versions_collapse_on_read.
+    """
+    target_db = _migrate_signatures_db(ch_client, "attribution")
+
+    _insert_failure(
+        ch_client,
+        target_db,
+        "failure-1",
+        "trace-4",
+        "['trace-4', 'trace-6', 'trace-9']",
+        0.41,
+    )
+    # A different onset is a different failure, sharing turn trace-6.
+    _insert_failure(ch_client, target_db, "failure-2", "trace-6", "['trace-6']", 0.32)
 
     # The drilldown from a turn to the failures touching it. trace-6 is a member
     # of both, and of failure-1 only through trace_ids, not through its onset.
     assert ch_client.query(
-        f"SELECT id FROM {target_db}.failure_signatures FINAL "
+        f"SELECT id FROM {target_db}.failure_signatures "
         "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') ORDER BY id"
     ).result_rows == [("failure-1",), ("failure-2",)]
 
@@ -881,13 +915,13 @@ def test_signature_replacement_and_turn_attribution(ch_client):
     # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
         "SELECT sum(cost_usd), length(arrayDistinct(arrayFlatten(groupArray(trace_ids)))) "
-        f"FROM {target_db}.failure_signatures FINAL WHERE project_id = 'project-1'"
+        f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
     ).result_rows == [(0.73, 3)]
 
     # The writer gate the database deliberately does not enforce. This assertion
     # query is the off-path mitigation, and it must find nothing.
     assert ch_client.query(
-        f"SELECT count() FROM {target_db}.failure_signatures FINAL "
+        f"SELECT count() FROM {target_db}.failure_signatures "
         "WHERE project_id = 'project-1' "
         "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
     ).result_rows == [(0,)]
