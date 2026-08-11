@@ -597,11 +597,10 @@ def test_all_production_migrations_round_trip(ch_client, use_distributed: bool):
 
 _INTENT_COLUMNS = [
     ("project_id", "String"),
-    ("id", "String"),
+    ("id", "UUID"),
     ("config_sha256", "LowCardinality(String)"),
     ("signature", "String"),
     ("signature_display", "String"),
-    ("signature_id", "FixedString(16)"),
     ("category", "LowCardinality(String)"),
     ("language", "LowCardinality(String)"),
     ("sentiment", "LowCardinality(String)"),
@@ -622,11 +621,10 @@ _INTENT_COLUMNS = [
 
 _FAILURE_COLUMNS = [
     ("project_id", "String"),
-    ("id", "String"),
+    ("id", "UUID"),
     ("config_sha256", "LowCardinality(String)"),
     ("signature", "String"),
     ("signature_display", "String"),
-    ("signature_id", "FixedString(16)"),
     ("failure_reason", "String"),
     ("category", "LowCardinality(String)"),
     ("severity", "LowCardinality(String)"),
@@ -656,12 +654,11 @@ _SHARED_COLUMNS = [
     ("duration_ms", "UInt32"),
     ("expire_at", "DateTime"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
-    ("id", "String"),
+    ("id", "UUID"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
     ("project_id", "String"),
     ("signature", "String"),
     ("signature_display", "String"),
-    ("signature_id", "FixedString(16)"),
     ("source_started_at", "DateTime64(6, 'UTC')"),
     ("user_id", "String"),
     ("vector", "Array(Float32)"),
@@ -687,25 +684,31 @@ def _migrate_signatures_db(ch_client, name: str) -> str:
     return target_db
 
 
-# Source month is a month before extraction: the partition must follow source
-# time, which is what a backfill depends on.
+# Source month is a month before extraction, so a partition that followed
+# extraction time would file the row under the wrong month.
 _SOURCE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
 _EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
 _UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
-# The sorting key, which is therefore also the dedup key: every collapsing read
+# The sorting key, and therefore the dedup key: a read that collapses a retry
 # groups by all three terms, because no read here uses FINAL.
 _SIGNATURE_KEY = "project_id, toDate(source_started_at), id"
 
+# Writer-minted uuidv7 values. Reused verbatim to stand for a retry of the same
+# row, which is the only thing ReplacingMergeTree collapses here.
+_INTENT_ID = "019ff277-bba3-7232-aeb3-0632fd183e1e"
+_FAILURE_ID_1 = "019ff277-bba3-7232-aeb3-0632fd183e2f"
+_FAILURE_ID_2 = "019ff288-c1d4-7333-bfc4-1743fe294f3a"
+
 
 def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> None:
-    """Insert one intent_signatures row for 'intent-1' in 'project-1'."""
+    """Insert one intent_signatures row for _INTENT_ID in 'project-1'."""
     ch_client.command(
         f"INSERT INTO {target_db}.intent_signatures "
         "(project_id, id, config_sha256, signature, category, language, "
         "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
         "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
-        "('project-1', 'intent-1', 'cfg-a', 'add stripe checkout', "
+        f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
         f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
         f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
@@ -737,7 +740,6 @@ def _insert_failure(
             _INTENT_COLUMNS,
             [
                 ("idx_conversation_id", "conversation_id"),
-                ("idx_signature_id", "signature_id"),
                 ("idx_trace_id", "trace_id"),
             ],
         ),
@@ -746,7 +748,6 @@ def _insert_failure(
             _FAILURE_COLUMNS,
             [
                 ("idx_conversation_id", "conversation_id"),
-                ("idx_signature_id", "signature_id"),
                 ("idx_trace_ids", "trace_ids"),
             ],
         ),
@@ -803,13 +804,20 @@ def test_signature_tables_schema(
         f"WHERE database = '{target_db}' AND table = '{table_name}' ORDER BY name"
     ).result_rows == [(name, expr) for name, expr in expected_indexes]
 
-    # Both tables stamp their own clock, so the writer passes no version and a
-    # retry sorts later for free.
+    # MATERIALIZED, not DEFAULT: the writer cannot supply a version even by
+    # accident, so there is one clock and a retry sorts later for free.
     assert ch_client.query(
-        "SELECT default_expression FROM system.columns "
+        "SELECT default_kind, default_expression FROM system.columns "
         f"WHERE database = '{target_db}' AND table = '{table_name}' "
         "AND name = 'inserted_at'"
-    ).result_rows == [("now64(6)",)]
+    ).result_rows == [("MATERIALIZED", "now64(6)")]
+
+    # The id is minted by the writer; the default only stops a row landing without
+    # one, so it must never be MATERIALIZED.
+    assert ch_client.query(
+        "SELECT default_kind, default_expression FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = '{table_name}' AND name = 'id'"
+    ).result_rows == [("DEFAULT", "generateUUIDv7()")]
 
 
 def test_signature_tables_share_columns(ch_client):
@@ -832,19 +840,18 @@ def test_signature_tables_share_columns(ch_client):
     )
 
 
-def test_signature_versions_collapse_on_read(ch_client):
-    """A re-extraction replaces its predecessor under GROUP BY + argMax, no FINAL.
+def test_signature_retry_collapses_on_read(ch_client):
+    """A retry of the same row id replaces its predecessor under GROUP BY + argMax.
 
-    The writer supplies no version, so `inserted_at DEFAULT now64(6)` orders the
-    versions. The read is spelled the way the reader has to spell it: this path
+    The writer cannot supply a version, so MATERIALIZED `now64(6)` orders the
+    attempts. The read is spelled the way the reader has to spell it: this path
     never uses FINAL, so the collapse must fall out of the sorting key, and a key
     that cannot express it is a one-way door.
     """
     target_db = _migrate_signatures_db(ch_client, "lifecycle")
 
     # Separate inserts, because now64() is evaluated once per block: two rows
-    # sharing an id inside one block tie, and the writer deduplicates per batch
-    # rather than relying on the version to break it.
+    # sharing an id inside one block would tie on the version.
     _insert_intent(ch_client, target_db, "action_request", 0.21)
     _insert_intent(ch_client, target_db, "information_request", 0.34)
 
@@ -868,19 +875,19 @@ def test_signature_versions_collapse_on_read(ch_client):
         f"WHERE database = '{target_db}' AND table = 'intent_signatures' AND active"
     ).result_rows == [("202605",)]
 
-    _insert_failure(ch_client, target_db, "failure-1", "trace-4", "['trace-4']", 0.31)
-    # A re-extraction that widens the attributed span by two turns is the SAME
-    # failure: trace_ids is not in the id, so this must replace, not coexist.
+    _insert_failure(ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4']", 0.31)
+    # The writer retrying the same id with a wider attributed span: trace_ids is not
+    # part of the identity, so the later attempt replaces rather than coexists.
     _insert_failure(
-        ch_client, target_db, "failure-1", "trace-4", "['trace-4', 'trace-6']", 0.41
+        ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4', 'trace-6']", 0.41
     )
 
     assert ch_client.query(
-        "SELECT id, argMax(onset_trace_id, inserted_at), "
+        "SELECT toString(id), argMax(onset_trace_id, inserted_at), "
         "argMax(trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
         f"GROUP BY {_SIGNATURE_KEY}"
-    ).result_rows == [("failure-1", "trace-4", ["trace-4", "trace-6"], 0.41)]
+    ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
 
 
 def test_failure_turn_attribution(ch_client):
@@ -894,20 +901,21 @@ def test_failure_turn_attribution(ch_client):
     _insert_failure(
         ch_client,
         target_db,
-        "failure-1",
+        _FAILURE_ID_1,
         "trace-4",
         "['trace-4', 'trace-6', 'trace-9']",
         0.41,
     )
     # A different onset is a different failure, sharing turn trace-6.
-    _insert_failure(ch_client, target_db, "failure-2", "trace-6", "['trace-6']", 0.32)
+    _insert_failure(ch_client, target_db, _FAILURE_ID_2, "trace-6", "['trace-6']", 0.32)
 
-    # The drilldown from a turn to the failures touching it. trace-6 is a member
-    # of both, and of failure-1 only through trace_ids, not through its onset.
+    # The drilldown from a turn to the failures touching it. trace-6 is a member of
+    # both, and of the first only through trace_ids, not through its onset.
     assert ch_client.query(
-        f"SELECT id FROM {target_db}.failure_signatures "
-        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') ORDER BY id"
-    ).result_rows == [("failure-1",), ("failure-2",)]
+        f"SELECT toString(id) FROM {target_db}.failure_signatures "
+        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') "
+        "ORDER BY toString(id)"
+    ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
     # cost_usd and duration_ms are per-row, not additive: the two failures
     # overlap on trace-6, so summing them counts that turn twice. Three distinct
