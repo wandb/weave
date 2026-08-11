@@ -1,7 +1,7 @@
 -- Two tables for distilled conversation insights, split by grain: an intent is
 -- one turn, a failure is one whole conversation. A single table would need a
--- lens discriminator that defaults every grain-specific column on the wrong
--- half of the rows, plus a cross-lens CHECK to police it.
+-- kind discriminator that defaults every grain-specific column on the wrong
+-- half of the rows, plus a CHECK across both halves to police it.
 --
 -- They share 15 columns, identical in name and type, asserted by a test.
 

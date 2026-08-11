@@ -2,10 +2,8 @@
 
 Every knob that changes what gets written into `intent_signatures` or
 `failure_signatures` lives in one checked-in config file per space. A row stores
-only the digest of that file, so the pipeline state is one column instead of the
-five (`pipeline_version`, `embedding_version`, `judge_model`, `prompt_version`,
-`embedding_model`) an earlier revision carried, and none of it is in the sorting
-key.
+only the digest of that file, so the whole pipeline state is one column, and
+none of it is in the sorting key.
 
 The digest resolves every declared file reference to that file's own sha256, so
 editing a taxonomy changes the config digest without anyone touching the config.
