@@ -36,8 +36,8 @@ class OpLinkSpanProcessor(SpanProcessor):
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
         call = call_context.get_current_call()
-        # A call that has not been created yet has no id to stamp.
-        if call is None or call.id is None:
+        # A call that has not been created yet has no ids to stamp.
+        if call is None or call.id is None or call.trace_id is None:
             return
 
         # A crowded span evicts oldest first, so spend the trace id before the id.
