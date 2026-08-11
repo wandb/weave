@@ -15,7 +15,7 @@ from weave.chat.types.chat_completion import ChatCompletion
 from weave.chat.types.chat_completion_stream_options_param import (
     ChatCompletionStreamOptionsParam,
 )
-from weave.trace.env import weave_trace_server_url
+from weave.trace.env import ssl_verify, weave_trace_server_url
 from weave.trace.op import op
 from weave.trace.settings import http_timeout
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
@@ -250,7 +250,7 @@ class Completions:
 
         if request_stream:
             # For streaming, we need to keep the client and response context
-            client = httpx.Client(timeout=timeout)
+            client = httpx.Client(timeout=timeout, verify=ssl_verify())
             with client.stream(
                 "POST",
                 url,
@@ -261,7 +261,7 @@ class Completions:
                 check_response(response)
                 return ChatCompletionChunkStream(response)
         else:
-            with httpx.Client(timeout=timeout) as client:
+            with httpx.Client(timeout=timeout, verify=ssl_verify()) as client:
                 response = client.post(
                     url,
                     auth=auth,

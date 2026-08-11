@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+import requests
 
 from weave.compat.wandb.wandb_thin.errors import AuthenticationError
 from weave.wandb_interface import auth
@@ -183,3 +184,30 @@ def test_httpx_auth_refreshes_authorization_for_each_request() -> None:
         client.get("https://trace.wandb.test/server_info")
 
     assert received == ["Bearer token-1", "Bearer token-2"]
+
+
+def test_requests_auth_refreshes_authorization_for_each_request() -> None:
+    class RotatingCredentials(auth.WandbCredentials):
+        def __init__(self) -> None:
+            self.request_count = 0
+
+        def authorization_header(self) -> str:
+            self.request_count += 1
+            return f"Bearer token-{self.request_count}"
+
+        def bearer_token(self) -> str:
+            return "unused"
+
+        def wal_seed(self) -> str:
+            return "stable"
+
+    credentials = RotatingCredentials()
+    requests_auth = credentials.requests_auth()
+    first = requests.Request("GET", "https://trace.wandb.test/server_info").prepare()
+    second = requests.Request("GET", "https://trace.wandb.test/server_info").prepare()
+
+    requests_auth(first)
+    requests_auth(second)
+
+    assert first.headers["Authorization"] == "Bearer token-1"
+    assert second.headers["Authorization"] == "Bearer token-2"

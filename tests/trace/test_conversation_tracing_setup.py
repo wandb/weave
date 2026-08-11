@@ -12,11 +12,13 @@ import base64
 import logging
 
 import pytest
+import requests
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.util._once import Once
 
 from weave.trace import weave_init
+from weave.wandb_interface import auth as wandb_auth
 
 
 @pytest.fixture(autouse=True)
@@ -87,6 +89,37 @@ def test_conversation_tracing_reroutes_credentials_on_reinit(
     weave_init._setup_conversation_tracing("ent", "proj-c", None)
     assert exporter._session.headers["project_id"] == "ent/proj-c"
     assert "Authorization" not in exporter._session.headers
+
+
+def test_conversation_tracing_refreshes_bearer_auth() -> None:
+    class RotatingCredentials(wandb_auth.WandbCredentials):
+        def __init__(self) -> None:
+            self.request_count = 0
+
+        def authorization_header(self) -> str:
+            self.request_count += 1
+            return f"Bearer token-{self.request_count}"
+
+        def bearer_token(self) -> str:
+            return "unused"
+
+        def wal_seed(self) -> str:
+            return "stable"
+
+    credentials = RotatingCredentials()
+    weave_init._setup_conversation_tracing("ent", "proj", credentials)
+    exporter = weave_init._conversation_span_exporter
+    assert exporter is not None
+    assert exporter._session.headers["Authorization"] == "Bearer token-1"
+    assert exporter._session.auth is not None
+
+    request = requests.Request(
+        "POST",
+        "https://trace.wandb.test/otel/v1/traces",
+    ).prepare()
+    exporter._session.auth(request)
+
+    assert request.headers["Authorization"] == "Bearer token-2"
 
 
 def test_conversation_tracing_flush_semantics_on_reinit(
