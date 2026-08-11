@@ -339,6 +339,11 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+Pure ESM auto-instrumentation requires the `weave/instrument` loader. For
+one-off `tsx` live validation scripts where that loader is not installed, call
+`wrapClaudeAgentSdk()` and consume the returned module view so tracing is
+deterministic.
+
 ### TypeScript integration metadata
 
 - `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
@@ -347,6 +352,40 @@ pnpm exec tsx examples/claudeAgents.ts
   `weave.integration.version` identity to OTel integrations and preserves
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
+
+### TypeScript Anthropic message batches
+
+- A batch result is a discriminated union and only its `succeeded` variant
+  carries a `message`; a batch ends when every request has succeeded, errored,
+  been canceled or expired. Read `message` without checking the discriminator
+  and the reducer stores `undefined`, which the usage summarizer then throws on,
+  out of the stream iterator's `finally`.
+- `patchAnthropicMessagesCreate` wraps `Messages.prototype.create` in a `Proxy`,
+  so property reads still reach the mock behind it and a test can reconfigure it
+  through the patched prototype. `patchBatchApi` assigns `op()`'s plain wrapper
+  to `Batches` `create`, `retrieve` and `results` instead, so for those a test
+  reconfigures the mock it captured before patching, or reaches it through
+  `__wrappedFunction`.
+
+### TypeScript custom type round trip
+
+- `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
+  `WeaveAudio` from a `wave.Wave_read` one, downloading the stored file from
+  `ref.projectId`, not the client's project.
+- It also rebuilds a `Date` from a `datetime.datetime` payload, which stores no
+  file: Python writes the ISO string inline into the record's `val`. A `Date`
+  is a UTC instant with millisecond resolution, so the round trip keeps the
+  moment but loses the original offset and truncates Python's microseconds. It
+  reads whole-minute offsets only, so a timestamp from before its zone adopted
+  one comes back as an `Invalid Date` (`Africa/Monrovia` ran on `-00:44:30`
+  until 1972).
+- `wave.Wave_read` is what this SDK writes, and what Python wrote until May
+  2025. Both store one `audio.wav` and no metadata file.
+- Python now records every `Audio` and `wave.Wave_read` object as
+  `weave.type_handlers.Audio.audio.Audio` with an extra `_metadata.json`,
+  because `register()` in `weave/type_handlers/Audio/audio.py` puts the `Audio`
+  serializer first and its `is_audio_instance` predicate also accepts
+  `wave.Wave_read`.
 
 ### TypeScript GenAI Turn output
 
@@ -361,15 +400,60 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
   `invoke_agent`, `chat`, and `execute_tool` spans through
   `/agents/otel/v1/traces`.
+- These spans go through the `BasicTracerProvider` that `genai/provider.ts`
+  builds, never the OTel global registry. A processor that must see them belongs
+  in that provider's `spanProcessors`, which is built lazily on the first span
+  and rebuilt on a project switch — registering once from `init()` misses both.
+- At a span's attribute limit OTel JS drops the *incoming* attribute, where
+  Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
+  halves of an overflowing set. The eval linker writes the pair eval results
+  match on before its display-only attributes for that reason.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
+  `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
+  belongs on child model spans.
+- Record `invoke_agent` inputs and outputs through `Turn.record()` or
+  `SubAgent.record()`. Keep `gen_ai.tool.*` attributes on `execute_tool` spans,
+  not agent spans.
 - The Claude Agent SDK integration keeps each `Tool` open until its matching
   `tool_result`.
+- `Tool` accepts JSON-compatible arguments and results. It records strings
+  as-is and serializes structured values for OTel attributes. Prefer
+  `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
+  backward compatibility.
+- Agent span list queries omit heavy message, tool-payload, and raw-span fields;
+  use an `AgentSpansQueryReq` with `include_details=True` when validating stored
+  span details.
+- Parallel/background Claude Agent SDK `Agent` calls can emit an
+  `async_launched` or `remote_launched` tool result before forwarded child
+  messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
+  tool-use ID across turn boundaries until that notification arrives.
+- Route a forwarded assistant message to an already-open `SubAgent` before
+  creating a `Turn`; background messages can arrive after the root result and
+  must not create an empty root turn or consume the next pending input.
+- For synchronous `Agent`/`Task` completion, read terminal output from the
+  structured `SDKUserMessage.tool_use_result.content`; use the model-facing
+  `tool_result` block content only as a compatibility fallback. Background
+  completion output continues to come from `task_notification.summary`.
+- Read a subagent's lifetime from the launch request (`run_in_background`, or
+  `isolation: 'remote'`, which is always backgrounded) rather than inferring it
+  from the result status — an unrecognized status must not downgrade it.
+- Surviving a turn boundary is transitive: a background `SubAgent`'s open
+  `Tool`s and nested `SubAgent`s survive with it. Closing a descendant early
+  also drops it from the open map, so the next forwarded message re-creates it
+  under the wrong `Turn`.
+- Buffer a subagent's terminal state (and the timestamp it was observed) instead
+  of ending the span on the spot: `SpanBase` only records an error through
+  `end()`, and the span must close after its children. Pass the timestamp as
+  `endTime` so the deferral doesn't inflate the duration.
 - For streamed sessions, queue observed user inputs in FIFO order and close one
   `Turn` for each matching SDK `result`.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
+  and preserve the caller's `forwardSubagentText` option.
 
 ### Claude Agent SDK streamed images
 
@@ -461,6 +545,10 @@ pnpm exec tsx examples/claudeAgents.ts
 - `Turn.messages` stores input messages, while `Turn.output_messages` stores
   the terminal agent response. `Turn.record(messages=..., output_messages=...)`
   replaces the two lists independently.
+- `SubAgent` owns its input/output messages and originating tool-call
+  arguments/result. Integrations populate them through `SubAgent.record()` so
+  `_build_attrs()` applies `include_content` and PII redaction; do not write
+  those content attributes directly with `set_attributes()`.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.
@@ -471,6 +559,35 @@ pnpm exec tsx examples/claudeAgents.ts
 - Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
   content gating and PII redaction to both lists before passing them to
   `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+- The Python Claude Agent SDK integration taps async prompt iterables, queues
+  user inputs in FIFO order, and closes one `Turn` for each `ResultMessage`.
+- Keep its output adapters split by SDK contract: string `query()` and each
+  `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
+  only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Standalone async-iterable queries can emit bootstrap `system/init` before the
+  first prompt is consumed. Defer only that init for trace attribution; forward
+  other output received without a pending query-triggering input without
+  attaching it to the next turn, especially late background-task notifications.
+  Correctly completing background subagents across results requires separate
+  conversation-scoped task ownership.
+- Name the corresponding test cases "string prompt" and "async-iterable
+  prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
+  one-input success and pre/post-result failure assertions paired across them.
+- SDK output can fail before the first message or between completed turns. Keep
+  the submitted/pending input observable by ending its `Turn` through the
+  exception path so the span records the error before the exception propagates.
+- The Agents conversation tree renders recognized GenAI operations. Generic
+  OTel spans with an empty `gen_ai.operation.name` remain stored and queryable
+  through `agent_spans_query`, but are omitted from that visual tree; use a
+  semantic marker span when a UI-visible trace regression is required.
+- For spans with `ERROR` status, missing `error_type` and `status_message`
+  fall back to the latest OTel `exception` event. Explicit `error.type` and
+  status-message values take precedence, and handled exception events on
+  non-error spans remain raw-only.
+- Use the Trace tree view for parentage comparisons. The default flamegraph
+  collapses overlapping siblings into synthetic groups, which can make flat
+  and nested traces look deceptively similar; give live-example spans realistic
+  duration and verify their stored parent IDs with `agent_spans_query`.
 
 ### Claude Agent SDK token accounting
 
@@ -487,13 +604,26 @@ pnpm exec tsx examples/claudeAgents.ts
 - Regression coverage must exercise both the calls-based and OTel integrations
   with nonzero cache-read and cache-creation counts.
 - The OTel-selected Claude Agent SDK path composes the Python GenAI
-  `Conversation`, `Turn`, `LLM`, and `Tool` handles; it must not create raw
-  OTel spans or call the low-level GenAI attribute builders itself. Use
-  `set_attributes()` only for semantic fields the typed handles do not expose.
-  The legacy calls-based path remains separate.
+  `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` handles; it must not
+  create raw OTel spans or call the low-level GenAI attribute builders itself.
+  Use `set_attributes()` only for semantic fields the typed handles do not
+  expose. The legacy calls-based path remains separate.
 - Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
   Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
   parts; media payloads remain data for `content_refs`, not chat prose.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
+  Route nested assistant messages and tools through `parent_tool_use_id`.
+  Synchronous calls close on their matching tool result; background launch
+  acknowledgements stay open until `task_notification`. Dispatch task events
+  through `SystemMessage.subtype` and `data`, map `task_id` to tool-use ID from
+  `task_started` / `task_progress`, and do not import typed task messages that
+  are absent from older supported Claude Agent SDK versions.
+- Start those subagents with `SubAgent.start(set_current=False)`, never
+  `__enter__`. Parallel delegations close in completion order, and `end()`
+  detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the
+  ambient OTel context pointing at an ended span — user code running between
+  streamed messages would nest under it. Children nest either way, because
+  `start_llm` / `start_tool` / `start_subagent` thread an explicit parent.
 - Stream adapters can create child handles when work starts, then enter them
   with a normal `with` when the completion message arrives. Preserve logical
   timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
@@ -602,4 +732,8 @@ Think of this as the reverse-task assignment - a place where you can communicate
 - [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
       OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
       `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
+- [ ] Isolate Node GenAI test exit hooks: a full in-band Jest run can register
+      more than ten `beforeExit` listeners and flush queued test calls to the
+      real trace server after teardown when developer W&B credentials are
+      present, turning an otherwise-green run into a post-test failure.
 - [ ] ...

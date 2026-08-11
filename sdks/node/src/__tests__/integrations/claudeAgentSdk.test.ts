@@ -133,6 +133,7 @@ describe('Claude Agent SDK — query() patch', () => {
   });
 
   test('streaming input emits one root per user turn', async () => {
+    let receivedOptions: Record<string, unknown> | undefined;
     async function* prompts() {
       yield {
         type: 'user',
@@ -147,7 +148,14 @@ describe('Claude Agent SDK — query() patch', () => {
     }
 
     const sdk = {
-      query: ({prompt}: {prompt: AsyncIterable<any>}) => {
+      query: ({
+        prompt,
+        options,
+      }: {
+        prompt: AsyncIterable<any>;
+        options?: Record<string, unknown>;
+      }) => {
+        receivedOptions = options;
         async function* gen() {
           let turn = 0;
           for await (const _input of prompt) {
@@ -183,7 +191,10 @@ describe('Claude Agent SDK — query() patch', () => {
     };
     patchClaudeAgentSdk(sdk);
 
-    const query = sdk.query({prompt: prompts()});
+    const query = sdk.query({
+      prompt: prompts(),
+      options: {forwardSubagentText: true},
+    });
     await expect(query.next()).resolves.toMatchObject({
       value: {type: 'assistant'},
       done: false,
@@ -206,6 +217,7 @@ describe('Claude Agent SDK — query() patch', () => {
       .getFinishedSpans()
       .filter(span => span.name === INVOKE);
     expect(roots).toHaveLength(2);
+    expect(receivedOptions).toEqual({forwardSubagentText: true});
     expect(
       roots.map(root => ({
         conversationId: root.attributes[ATTR_GEN_AI_CONVERSATION_ID],

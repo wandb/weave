@@ -1,7 +1,9 @@
 import json
 from collections.abc import Iterator
+from contextlib import ExitStack
 
 import httpx
+from typing_extensions import Self
 
 from weave.chat.types.chat_completion_chunk import ChatCompletionChunk
 
@@ -14,6 +16,7 @@ class ChatCompletionChunkStream:
 
     Args:
         response: The httpx.Response object from a streaming API call.
+        exit_stack: Optional owned contexts for the response and its client.
 
     Yields:
         ChatCompletionChunk: Parsed chat completion chunks from the stream.
@@ -29,20 +32,36 @@ class ChatCompletionChunkStream:
         ...             print(chunk.choices[0].delta.content)
     """
 
-    def __init__(self, response: httpx.Response) -> None:
+    def __init__(
+        self, response: httpx.Response, exit_stack: ExitStack | None = None
+    ) -> None:
         self.response = response
+        self._exit_stack = exit_stack
+
+    def close(self) -> None:
+        if self._exit_stack is None:
+            self.response.close()
+        else:
+            self._exit_stack.close()
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
     def __iter__(self) -> Iterator[ChatCompletionChunk]:
-        for raw_line in self.response.iter_lines():
-            if raw_line:  # skip keep-alive lines
-                line = raw_line
-                if raw_line.startswith("data: "):
-                    # This is how OpenAI streams things back
-                    line = raw_line[6:]
-                if line == "[DONE]":
-                    continue
-                try:
-                    yield ChatCompletionChunk.model_validate_json(line)
-                except json.JSONDecodeError:
-                    print(f"Error parsing line as JSON: {line}")
-                    raise
+        with self:
+            for raw_line in self.response.iter_lines():
+                if raw_line:  # skip keep-alive lines
+                    line = raw_line
+                    if raw_line.startswith("data: "):
+                        # This is how OpenAI streams things back
+                        line = raw_line[6:]
+                    if line == "[DONE]":
+                        continue
+                    try:
+                        yield ChatCompletionChunk.model_validate_json(line)
+                    except json.JSONDecodeError:
+                        print(f"Error parsing line as JSON: {line}")
+                        raise

@@ -18,6 +18,7 @@ from __future__ import annotations
 import threading
 
 import pytest
+from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from weave.conversation.conversation import (
@@ -333,3 +334,59 @@ class TestCrossThread:
         llm_span = _by_prefix(spans, "chat")
         assert llm_span.parent is not None
         assert llm_span.parent.span_id == sa_span.context.span_id
+
+
+# ---------------------------------------------------------------------------
+# Concurrent sub-agents: SubAgent.start(set_current=False)
+# ---------------------------------------------------------------------------
+
+
+class TestConcurrentSubagents:
+    """``end()`` detaches via ``ContextVar.reset``, so overlapping sub-agents
+    that finish out of LIFO order corrupt the ambient OTel context. Adapters
+    that run sub-agents concurrently start them with ``set_current=False``.
+    """
+
+    @pytest.mark.parametrize("close_order", [("a", "b"), ("b", "a")])
+    def test_ambient_context_survives_any_close_order(
+        self, otel_spans: InMemorySpanExporter, close_order: tuple[str, str]
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            subagents = {
+                "a": turn.start_subagent(name="alpha").start(set_current=False),
+                "b": turn.start_subagent(name="beta").start(set_current=False),
+            }
+            for key in close_order:
+                subagents[key].end()
+            assert (
+                otel_trace.get_current_span().get_span_context().span_id
+                == turn._otel_span.get_span_context().span_id
+            )
+
+        spans = otel_spans.get_finished_spans()
+        turn_span = _by_agent_name(spans, "bot")
+        for name in ("alpha", "beta"):
+            assert _by_agent_name(spans, name).parent.span_id == (
+                turn_span.context.span_id
+            )
+
+    def test_children_still_nest_under_a_non_current_subagent(
+        self, otel_spans: InMemorySpanExporter
+    ) -> None:
+        with Conversation(conversation_id="s"), Turn(agent_name="bot") as turn:
+            first = turn.start_subagent(name="alpha").start(set_current=False)
+            second = turn.start_subagent(name="beta").start(set_current=False)
+            with first.start_llm(model="gpt-4o"):
+                pass
+            with second.start_tool(name="grep"):
+                pass
+            first.end()
+            second.end()
+
+        spans = otel_spans.get_finished_spans()
+        assert _by_prefix(spans, "chat").parent.span_id == (
+            _by_agent_name(spans, "alpha").context.span_id
+        )
+        assert _by_prefix(spans, "execute_tool").parent.span_id == (
+            _by_agent_name(spans, "beta").context.span_id
+        )

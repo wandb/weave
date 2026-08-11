@@ -1,0 +1,122 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-parallel001"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I will delegate both questions."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_agent_a",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "geographer",
+            "description": "Answer geography questions",
+            "prompt": "Find the capital of France."
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_agent_b",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "astronomer",
+            "description": "Answer astronomy questions",
+            "prompt": "Find the largest planet."
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The capital of France is Paris."
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_agent_a"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The largest planet is Jupiter."
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_agent_b"
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_agent_a",
+          "content": "The capital of France is Paris.",
+          "is_error": false
+        }
+      ]
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_agent_b",
+          "content": "The largest planet is Jupiter.",
+          "is_error": false
+        }
+      ]
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Paris and Jupiter."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "result",
+    "subtype": "success",
+    "duration_ms": 12,
+    "duration_api_ms": 10,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-parallel001",
+    "total_cost_usd": 0.001,
+    "usage": {
+      "input_tokens": 20,
+      "output_tokens": 10
+    },
+    "result": "Paris and Jupiter."
+  }
+]

@@ -9,6 +9,11 @@
             <operation_timeout_ms>10000</operation_timeout_ms>
             <session_timeout_ms>30000</session_timeout_ms>
             <raft_logs_level>warning</raft_logs_level>
+            <!-- Every ON CLUSTER statement writes to the Keeper DDL queue, and
+                 force_sync fsyncs the raft log on each append. This is a
+                 throwaway single-node Keeper whose state never needs to
+                 survive a crash, so the durability buys nothing. -->
+            <force_sync>false</force_sync>
         </coordination_settings>
         <raft_configuration>
             <server>

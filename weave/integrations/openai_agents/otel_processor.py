@@ -7,7 +7,7 @@ conventions where they apply:
   triggers an ``agent_start`` event in the timeline so handoff / multi-agent
   flows show which agent acted when.
 - ``chat`` for ResponseSpan / GenerationSpan, extracted directly from the
-  ``ResponseSpanData.response`` openai object — no separate openai patcher.
+  ``ResponseSpanData.response`` openai object.
 - ``execute_tool`` for Function.
 
 TaskSpan and TurnSpan are emitted as *structural* spans (no
@@ -23,12 +23,10 @@ Span types without a clean semconv mapping (Handoff, Guardrail, Transcription,
 Speech, SpeechGroup, MCPListTools, Custom) emit with a descriptive span name
 and ``weave.openai_agents.*`` attributes.
 
-The system under observation is the OpenAI Agents SDK itself. We don't
-instrument raw ``openai.*`` calls separately — when the Agents SDK invokes
-the LLM, the SDK's own ``ResponseSpanData`` exposes the request, response,
-and usage data, which we lift into the GenAI chat span attributes. Direct
-``openai.*`` calls outside of an agent run are out of scope for this
-integration (use the calls-mode ``patch_openai`` for those).
+The direct ``openai.*`` patch remains installed for calls outside Agents model
+spans. While this processor has a live, sampled ResponseSpan or GenerationSpan,
+a private OTel context guard lets the matching async OpenAI wrapper call its
+original method without creating a duplicate Weave call.
 
 OpenAI trace/span IDs are preserved as ``weave.openai_agents.trace_id`` /
 ``weave.openai_agents.span_id`` attributes so they remain cross-referenceable
@@ -73,6 +71,9 @@ from weave.conversation.conversation_otel import (
     llm_attributes,
 )
 from weave.conversation.types import Message, Reasoning, Usage
+from weave.integrations.openai_agents._otel_context import (
+    set_model_span_in_context,
+)
 from weave.integrations.openai_agents.openai_agents import (
     OPENAI_AGENTS_INTEGRATION,
     _call_name,
@@ -468,10 +469,10 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
     parent_id strings; OTel parent-child propagation is reconstructed by
     setting ``context=`` on ``Tracer.start_span``).
 
-    ``ResponseSpanData`` / ``GenerationSpanData`` are turned into ``chat``
-    spans by lifting the request, response, usage, and reasoning data directly
-    off the SpanData — the Agents SDK already serializes the full openai
-    request/response, so no separate openai-side patch is needed.
+    ``ResponseSpanData`` / ``GenerationSpanData`` become ``chat`` spans by
+    lifting request and response data from the Agents span. A private OTel
+    context guard lets the direct OpenAI patch coexist without duplicating
+    supported model requests.
 
     No synthetic OTel "trace root" is emitted on ``on_trace_start``: OpenAI's
     ``TaskSpanData`` already represents the workflow with strictly more detail
@@ -546,11 +547,12 @@ class WeaveOtelTracingProcessor(TracingProcessor):  # pyright: ignore[reportGene
         _set_attrs(otel_span, OPENAI_AGENTS_INTEGRATION.as_otel_attributes())
         self._span_otel[span.span_id] = otel_span
         self._trace_spans.setdefault(span.trace_id, {})[span.span_id] = None
-        # Attach so any span the user creates inside an Agents-SDK span nests
-        # under this one. Detached in on_span_end.
-        self._span_tokens[span.span_id] = otel_context.attach(
-            otel_trace.set_span_in_context(otel_span)
-        )
+        # Attach so spans created inside an Agents-SDK span nest under it.
+        # Model spans also publish the routing guard consumed by OpenAI wrappers.
+        current_context = otel_trace.set_span_in_context(otel_span)
+        if isinstance(span.span_data, (ResponseSpanData, GenerationSpanData)):
+            current_context = set_model_span_in_context(otel_span, current_context)
+        self._span_tokens[span.span_id] = otel_context.attach(current_context)
 
     def on_span_end(self, span: Span) -> None:
         otel_span = self._span_otel.pop(span.span_id, None)

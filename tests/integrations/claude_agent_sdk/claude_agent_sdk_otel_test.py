@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterable, AsyncIterator, Generator
 from typing import Any
 
 import pytest
@@ -21,12 +21,17 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind, StatusCode
 
+import weave.integrations.claude_agent_sdk.otel_integration as claude_agent_sdk_otel_integration
 from tests.integrations.claude_agent_sdk.conftest import ReplayTransport, load_cassette
 from weave.conversation import agent_name_override
 from weave.integrations.claude_agent_sdk.otel_integration import (
     get_claude_agent_sdk_otel_patcher,
 )
 from weave.trace.settings import override_settings
+from weave.utils import pii_redaction
+
+_PII_EMAIL = "alice@example.com"
+_REDACTED_EMAIL = "<EMAIL>"
 
 
 @pytest.fixture
@@ -47,9 +52,7 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch) -> Generator[InMemorySpanExporte
 
 @pytest.fixture(autouse=True)
 def patch_claude_agent_sdk_otel() -> Generator[None]:
-    import weave.integrations.claude_agent_sdk.otel_integration as mod
-
-    mod._claude_agent_sdk_otel_patcher = None
+    claude_agent_sdk_otel_integration._claude_agent_sdk_otel_patcher = None
     patcher = get_claude_agent_sdk_otel_patcher()
     patcher.attempt_patch()
     yield
@@ -111,7 +114,36 @@ def get_part_types(messages: list[dict[str, Any]]) -> set[str]:
     }
 
 
-async def run_query(cassette: str, prompt: str) -> None:
+def user_prompt(text: str, *, should_query: bool | None = None) -> dict[str, Any]:
+    prompt: dict[str, Any] = {
+        "type": "user",
+        "message": {"role": "user", "content": text},
+        "parent_tool_use_id": None,
+    }
+    if should_query is not None:
+        prompt["shouldQuery"] = should_query
+    return prompt
+
+
+async def async_prompt_messages(
+    *messages: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
+    for message in messages:
+        yield message
+
+
+def text_query_prompt(
+    text: str, *, as_async_iterable: bool
+) -> str | AsyncIterable[dict[str, Any]]:
+    if as_async_iterable:
+        return async_prompt_messages(user_prompt(text))
+    return text
+
+
+async def run_query(
+    cassette: str,
+    prompt: str | AsyncIterable[dict[str, Any]],
+) -> None:
     async for _ in query(
         prompt=prompt,
         options=ClaudeAgentOptions(),
@@ -120,12 +152,23 @@ async def run_query(cassette: str, prompt: str) -> None:
         pass
 
 
-# --- query(): simple text ---------------------------------------------------
+# --- query(): string and single-input async-iterable parity -----------------
 
 
 @pytest.mark.asyncio
-async def test_simple_text_query_otel(otel_spans: InMemorySpanExporter) -> None:
-    await run_query("simple_text_response", "What is 2+2?")
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_single_text_query_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    await run_query(
+        "simple_text_response",
+        text_query_prompt("What is 2+2?", as_async_iterable=as_async_iterable),
+    )
     spans = otel_spans.get_finished_spans()
     assert {span.instrumentation_scope.name for span in spans} == {"weave.conversation"}
 
@@ -211,6 +254,507 @@ async def test_tool_use_query_otel(otel_spans: InMemorySpanExporter) -> None:
         in get_part_types(get_messages(chat_span, "gen_ai.output.messages"))
     ]
     assert len(tool_call_chats) == 1
+
+
+# --- query(): subagent delegation -------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_subagent_query_otel(otel_spans: InMemorySpanExporter) -> None:
+    await run_query("subagent_response", "Find the capital of France")
+    spans = otel_spans.get_finished_spans()
+
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 2
+    root_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "claude_agent_sdk"
+    )
+    subagent_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert subagent_span.name == "invoke_agent researcher"
+    assert subagent_span.parent.span_id == root_span.context.span_id
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.description": "Research factual questions",
+        "gen_ai.tool.call.id": "toolu_agent_01",
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research factual questions",
+                "prompt": "Find the capital of France.",
+            }
+        ),
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Find the capital of France.",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.tool.call.result": "The capital of France is Paris.",
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "The capital of France is Paris.",
+                        }
+                    ],
+                }
+            ]
+        ),
+    }
+
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert len(chat_spans) == 4
+    assert [
+        span.parent.span_id == subagent_span.context.span_id for span in chat_spans
+    ].count(True) == 2
+    assert [
+        span.parent.span_id == root_span.context.span_id for span in chat_spans
+    ].count(True) == 2
+
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert len(tool_spans) == 1
+    tool_span = tool_spans[0]
+    assert tool_span.name == "execute_tool Bash"
+    assert tool_span.parent.span_id == subagent_span.context.span_id
+    assert check_integration_and_strip(get_attrs(tool_span)) == {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.call.id": "toolu_bash_01",
+        "gen_ai.tool.call.arguments": '{"command": "printf Paris"}',
+        "gen_ai.tool.call.result": "Paris",
+        "gen_ai.conversation.id": "s-subagent001",
+    }
+
+
+@pytest.mark.asyncio
+async def test_subagent_query_content_is_pii_redacted_otel(
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = load_cassette("subagent_response")
+    messages[1]["message"]["content"][1]["input"]["prompt"] = f"Research {_PII_EMAIL}"
+    messages[5]["message"]["content"][0]["content"][0]["text"] = f"Found {_PII_EMAIL}"
+
+    def redact_messages(messages: list[Any]) -> list[Any]:
+        return [
+            message.model_copy(
+                update={"content": message.content.replace(_PII_EMAIL, _REDACTED_EMAIL)}
+            )
+            for message in messages
+        ]
+
+    monkeypatch.setattr(pii_redaction, "redact_messages", redact_messages)
+    monkeypatch.setattr(
+        pii_redaction,
+        "redact_pii_string",
+        lambda value: value.replace(_PII_EMAIL, _REDACTED_EMAIL),
+    )
+
+    with override_settings(redact_pii=True):
+        async for _ in query(
+            prompt="Delegate sensitive research",
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(messages),
+        ):
+            pass
+
+    subagent_span = next(
+        span
+        for span in get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.description": "Research factual questions",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"type": "text", "content": f"Research {_REDACTED_EMAIL}"}
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": f"Found {_REDACTED_EMAIL}"}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research factual questions",
+                "prompt": f"Research {_REDACTED_EMAIL}",
+            }
+        ),
+        "gen_ai.tool.call.result": f"Found {_REDACTED_EMAIL}",
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "status",
+        "summary",
+        "tool_name",
+        "notification_has_tool_use_id",
+        "launch_has_task_id",
+        "expected_status_code",
+        "expected_status_description",
+        "expected_error_type",
+    ),
+    [
+        pytest.param(
+            "completed",
+            "The capital of France is Paris.",
+            "Agent",
+            False,
+            True,
+            StatusCode.UNSET,
+            None,
+            None,
+            id="completed-agent-task-id-fallback",
+        ),
+        pytest.param(
+            "failed",
+            "The background researcher failed.",
+            "Agent",
+            True,
+            True,
+            StatusCode.ERROR,
+            "background subagent failed",
+            "claude_agent_sdk.task_failed",
+            id="failed-agent-direct-tool-use-id",
+        ),
+        pytest.param(
+            "stopped",
+            "The background researcher was stopped.",
+            "Task",
+            False,
+            False,
+            StatusCode.ERROR,
+            "background subagent stopped",
+            "claude_agent_sdk.task_stopped",
+            id="stopped-legacy-task-task-id-fallback",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_background_subagent_closes_on_task_notification_otel(
+    status: str,
+    summary: str,
+    tool_name: str,
+    notification_has_tool_use_id: bool,
+    launch_has_task_id: bool,
+    expected_status_code: StatusCode,
+    expected_status_description: str | None,
+    expected_error_type: str | None,
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = load_cassette("background_subagent_response")
+    messages[1]["message"]["content"][1]["name"] = tool_name
+
+    launch_text = messages[2]["message"]["content"][0]["content"][0]["text"]
+    launch_payload = json.loads(launch_text)
+    if not launch_has_task_id:
+        del launch_payload["agentId"]
+    messages[2]["message"]["content"][0]["content"][0]["text"] = json.dumps(
+        launch_payload
+    )
+
+    notification = messages[8]
+    notification["status"] = status
+    notification["summary"] = summary
+    if notification_has_tool_use_id:
+        notification["tool_use_id"] = "toolu_background_agent_01"
+
+    async for _ in query(
+        prompt="Research in the background",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(messages),
+    ):
+        pass
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 2
+    root_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "claude_agent_sdk"
+    )
+    subagent_span = next(
+        span
+        for span in agent_spans
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+
+    expected_subagent_attrs = {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-background-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.id": "task-background-01",
+        "gen_ai.agent.description": "Research while the root agent continues",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": "Find the capital of France.",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": summary}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": tool_name,
+        "gen_ai.tool.call.id": "toolu_background_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research while the root agent continues",
+                "prompt": "Find the capital of France.",
+                "model": "claude-haiku-4-5",
+                "run_in_background": True,
+            }
+        ),
+        "gen_ai.tool.call.result": summary,
+        "claude_agent_sdk.task.status": status,
+    }
+    if expected_error_type is not None:
+        expected_subagent_attrs["error.type"] = expected_error_type
+    assert check_integration_and_strip(get_attrs(subagent_span)) == (
+        expected_subagent_attrs
+    )
+    assert subagent_span.name == "invoke_agent researcher"
+    assert subagent_span.parent.span_id == root_span.context.span_id
+    assert subagent_span.status.status_code == expected_status_code
+    assert subagent_span.status.description == expected_status_description
+
+    chat_spans = get_spans_by_op(spans, "chat")
+    assert [
+        (
+            span.parent.span_id,
+            get_all_text(get_messages(span, "gen_ai.output.messages")),
+        )
+        for span in chat_spans
+    ] == [
+        (root_span.context.span_id, "I will launch a background researcher."),
+        (root_span.context.span_id, "While that runs, I will prepare the response."),
+        (subagent_span.context.span_id, "I will verify the capital."),
+        (subagent_span.context.span_id, "The delegated research is complete."),
+        (root_span.context.span_id, "The background researcher confirmed Paris."),
+    ]
+    child_chat_spans = [
+        span
+        for span in chat_spans
+        if span.parent.span_id == subagent_span.context.span_id
+    ]
+    assert [span.end_time <= subagent_span.end_time for span in child_chat_spans] == [
+        True,
+        True,
+    ]
+
+    tool_spans = get_spans_by_op(spans, "execute_tool")
+    assert len(tool_spans) == 1
+    assert tool_spans[0].parent.span_id == subagent_span.context.span_id
+    assert check_integration_and_strip(get_attrs(tool_spans[0])) == {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.call.id": "toolu_background_bash_01",
+        "gen_ai.tool.call.arguments": '{"command": "printf Paris"}',
+        "gen_ai.tool.call.result": "Paris",
+        "gen_ai.conversation.id": "s-background-subagent001",
+    }
+
+
+@pytest.mark.asyncio
+async def test_background_subagent_summary_is_pii_redacted_otel(
+    otel_spans: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    messages = load_cassette("background_subagent_response")
+    messages[1]["message"]["content"][1]["input"]["prompt"] = f"Research {_PII_EMAIL}"
+    messages[8]["summary"] = f"Found {_PII_EMAIL}"
+
+    def redact_messages(messages: list[Any]) -> list[Any]:
+        return [
+            message.model_copy(
+                update={"content": message.content.replace(_PII_EMAIL, _REDACTED_EMAIL)}
+            )
+            for message in messages
+        ]
+
+    monkeypatch.setattr(pii_redaction, "redact_messages", redact_messages)
+    monkeypatch.setattr(
+        pii_redaction,
+        "redact_pii_string",
+        lambda value: value.replace(_PII_EMAIL, _REDACTED_EMAIL),
+    )
+
+    with override_settings(redact_pii=True):
+        async for _ in query(
+            prompt="Delegate sensitive background research",
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(messages),
+        ):
+            pass
+
+    subagent_span = next(
+        span
+        for span in get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+        if get_attrs(span)["gen_ai.agent.name"] == "researcher"
+    )
+    assert check_integration_and_strip(get_attrs(subagent_span)) == {
+        "gen_ai.operation.name": "invoke_agent",
+        "gen_ai.agent.name": "researcher",
+        "gen_ai.conversation.id": "s-background-subagent001",
+        "gen_ai.request.model": "claude-haiku-4-5",
+        "gen_ai.agent.id": "task-background-01",
+        "gen_ai.agent.description": "Research while the root agent continues",
+        "gen_ai.input.messages": json.dumps(
+            [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "type": "text",
+                            "content": f"Research {_REDACTED_EMAIL}",
+                        }
+                    ],
+                }
+            ]
+        ),
+        "gen_ai.output.messages": json.dumps(
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": f"Found {_REDACTED_EMAIL}"}],
+                }
+            ]
+        ),
+        "gen_ai.tool.name": "Agent",
+        "gen_ai.tool.call.id": "toolu_background_agent_01",
+        "gen_ai.tool.call.arguments": json.dumps(
+            {
+                "subagent_type": "researcher",
+                "description": "Research while the root agent continues",
+                "prompt": f"Research {_REDACTED_EMAIL}",
+                "model": "claude-haiku-4-5",
+                "run_in_background": True,
+            }
+        ),
+        "gen_ai.tool.call.result": f"Found {_REDACTED_EMAIL}",
+        "claude_agent_sdk.task.status": "completed",
+    }
+
+
+@pytest.mark.asyncio
+async def test_parallel_subagents_close_out_of_order_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Two delegations open A, B and close A, B — completion, not LIFO, order.
+
+    Spans the integration creates itself are pinned to an explicit parent, so
+    the risk is to the ambient OTel context that surrounds user code running
+    between streamed messages. ``user_code`` stands in for that.
+    """
+    tracer = otel_trace.get_tracer("test.user_code")
+    async for _ in query(
+        prompt="Find the capital of France and the largest planet",
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("parallel_subagent_response")),
+    ):
+        tracer.start_span("user_code").end()
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = get_spans_by_op(spans, "invoke_agent")
+    assert len(agent_spans) == 3
+    by_name = {get_attrs(span)["gen_ai.agent.name"]: span for span in agent_spans}
+    root = by_name["claude_agent_sdk"]
+    geographer = by_name["geographer"]
+    astronomer = by_name["astronomer"]
+
+    assert geographer.parent.span_id == root.context.span_id
+    assert astronomer.parent.span_id == root.context.span_id
+    assert get_attrs(geographer)["gen_ai.tool.call.result"] == (
+        "The capital of France is Paris."
+    )
+    assert get_attrs(astronomer)["gen_ai.tool.call.result"] == (
+        "The largest planet is Jupiter."
+    )
+
+    # Each delegation's own chat nests under it, not under its sibling.
+    chats_by_parent: dict[int, list[Any]] = {}
+    for chat in get_spans_by_op(spans, "chat"):
+        chats_by_parent.setdefault(chat.parent.span_id, []).append(chat)
+    assert (
+        get_all_text(
+            get_messages(
+                chats_by_parent[geographer.context.span_id][0], "gen_ai.output.messages"
+            )
+        )
+        == "The capital of France is Paris."
+    )
+    assert (
+        get_all_text(
+            get_messages(
+                chats_by_parent[astronomer.context.span_id][0], "gen_ai.output.messages"
+            )
+        )
+        == "The largest planet is Jupiter."
+    )
+
+    # The ambient context must never hand user code an ended span as its
+    # parent: detaching out of LIFO order restores whichever span was current
+    # when the later token was attached, and that sibling has already ended.
+    ended_subagents = {geographer.context.span_id, astronomer.context.span_id}
+    orphaned = [
+        span
+        for span in spans
+        if span.name == "user_code"
+        and span.parent is not None
+        and span.parent.span_id in ended_subagents
+    ]
+    assert orphaned == []
 
 
 # --- query(): prompt caching ------------------------------------------------
@@ -319,11 +863,13 @@ async def test_ambient_trace_nesting_otel(otel_spans: InMemorySpanExporter) -> N
     assert agent_span.context.trace_id == outer_context.trace_id
 
 
-# --- ClaudeSDKClient: multi-turn --------------------------------------------
+# --- ClaudeSDKClient: one turn per receive_response() ------------------------
 
 
 @pytest.mark.asyncio
-async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
+async def test_string_client_queries_use_one_turn_per_response_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
     sdk_client = ClaudeSDKClient(
         options=ClaudeAgentOptions(),
         transport=ReplayTransport(load_cassette("multi_turn_response")),
@@ -357,11 +903,51 @@ async def test_multi_turn_client_otel(otel_spans: InMemorySpanExporter) -> None:
     assert prompts == {"Hello", "What is the capital of France?"}
 
 
-# --- query(): streamed image prompt -----------------------------------------
+@pytest.mark.asyncio
+async def test_async_iterable_client_query_uses_one_turn_per_response_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """Each receive_response() remains a single turn for async client input."""
+    sdk_client = ClaudeSDKClient(
+        options=ClaudeAgentOptions(),
+        transport=ReplayTransport(load_cassette("multi_turn_response")),
+    )
+    await sdk_client.connect()
+    await sdk_client.query(
+        async_prompt_messages(
+            user_prompt("Hello"),
+            user_prompt("What is the capital of France?"),
+        )
+    )
+
+    responses = [
+        [type(message).__name__ async for message in sdk_client.receive_response()],
+        [type(message).__name__ async for message in sdk_client.receive_response()],
+    ]
+    await sdk_client.disconnect()
+
+    assert responses == [
+        ["SystemMessage", "AssistantMessage", "ResultMessage"],
+        ["AssistantMessage", "ResultMessage"],
+    ]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(agent_span, "gen_ai.input.messages"))
+        for agent_span in agent_spans
+    ] == [
+        "Hello",
+        "What is the capital of France?",
+    ]
+
+
+# --- query(): async-iterable image prompt -----------------------------------
 
 
 @pytest.mark.asyncio
-async def test_streamed_image_prompt_otel(
+async def test_async_iterable_image_prompt_otel(
     otel_spans: InMemorySpanExporter,
 ) -> None:
     image_base64 = (
@@ -420,6 +1006,397 @@ async def test_streamed_image_prompt_otel(
                 },
                 {"type": "text", "content": "Describe this image."},
             ],
+        }
+    ]
+
+
+# --- query(): async-iterable multi-turn prompts ------------------------------
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_multi_turn_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = [
+        message
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Hello"),
+                user_prompt("What is the capital of France?"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(load_cassette("multi_turn_response")),
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert len(agent_spans) == 2
+    assert [
+        get_messages(agent_span, "gen_ai.input.messages") for agent_span in agent_spans
+    ] == [
+        [{"role": "user", "parts": [{"type": "text", "content": "Hello"}]}],
+        [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": "What is the capital of France?",
+                    }
+                ],
+            }
+        ],
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.output.messages") for agent_span in agent_spans
+    ] == [
+        [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hello! How can I help you?"}],
+            }
+        ],
+        [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "text",
+                        "content": "The capital of France is Paris.",
+                    }
+                ],
+            }
+        ],
+    ]
+    assert {
+        get_attrs(agent_span)["gen_ai.conversation.id"] for agent_span in agent_spans
+    } == {"s-mt001"}
+    assert len({agent_span.context.trace_id for agent_span in agent_spans}) == 2
+
+
+@pytest.mark.asyncio
+async def test_delayed_async_iterable_prompt_after_system_message_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_prompt = asyncio.Event()
+
+    async def delayed_prompt() -> AsyncIterator[dict[str, Any]]:
+        await release_prompt.wait()
+        yield user_prompt("Hello")
+
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        wait_for_user_messages_after={0: 1},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    first_message = await anext(message_iterator)
+    assert type(first_message).__name__ == "SystemMessage"
+    release_prompt.set()
+    messages = [first_message, *[message async for message in message_iterator]]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_attrs(agent_spans[0])["gen_ai.conversation.id"] == "s-abc123"
+
+
+@pytest.mark.asyncio
+async def test_delayed_async_iterable_prompt_failure_after_system_message_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_prompt = asyncio.Event()
+
+    async def delayed_prompt() -> AsyncIterator[dict[str, Any]]:
+        await release_prompt.wait()
+        yield user_prompt("Hello")
+
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=1,
+        wait_for_user_messages_after={0: 1},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    first_message = await anext(message_iterator)
+    assert type(first_message).__name__ == "SystemMessage"
+    release_prompt.set()
+    with pytest.raises(Exception, match="replay transport failed"):
+        await anext(message_iterator)
+
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.ERROR
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_attrs(agent_spans[0])["gen_ai.conversation.id"] == "s-abc123"
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_does_not_trace_stale_task_output_in_next_turn(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    release_second_prompt = asyncio.Event()
+
+    async def delayed_second_prompt() -> AsyncIterator[dict[str, Any]]:
+        yield user_prompt("Hello")
+        await release_second_prompt.wait()
+        yield user_prompt("What is the capital of France?")
+
+    messages = load_cassette("multi_turn_response")
+    stale_task_messages = load_cassette("background_subagent_response")[8:10]
+    stale_task_messages[0]["session_id"] = "s-mt001"
+    messages[3:3] = stale_task_messages
+    transport = ReplayTransport(
+        messages,
+        wait_for_user_messages_after={4: 2},
+    )
+    message_iterator = aiter(
+        query(
+            prompt=delayed_second_prompt(),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        )
+    )
+
+    messages_before_second_prompt = [await anext(message_iterator) for _ in range(5)]
+    assert [type(message).__name__ for message in messages_before_second_prompt] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+        "TaskNotificationMessage",
+        "AssistantMessage",
+    ]
+    release_second_prompt.set()
+    remaining_messages = [message async for message in message_iterator]
+    assert [type(message).__name__ for message in remaining_messages] == [
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+
+    spans = otel_spans.get_finished_spans()
+    agent_spans = sorted(
+        get_spans_by_op(spans, "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(agent_span, "gen_ai.input.messages"))
+        for agent_span in agent_spans
+    ] == [
+        "Hello",
+        "What is the capital of France?",
+    ]
+    chat_spans = sorted(
+        get_spans_by_op(spans, "chat"),
+        key=lambda span: span.start_time,
+    )
+    assert [
+        get_all_text(get_messages(chat_span, "gen_ai.output.messages"))
+        for chat_span in chat_spans
+    ] == [
+        "Hello! How can I help you?",
+        "The capital of France is Paris.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_buffers_non_query_inputs_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    messages = [
+        message
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Background context", should_query=False),
+                user_prompt("Answer using that context"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=ReplayTransport(load_cassette("simple_text_response")),
+        )
+    ]
+
+    assert [type(message).__name__ for message in messages] == [
+        "SystemMessage",
+        "AssistantMessage",
+        "ResultMessage",
+    ]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "Background context"}],
+        },
+        {
+            "role": "user",
+            "parts": [{"type": "text", "content": "Answer using that context"}],
+        },
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_query_failure_before_first_response_records_error_turn_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=0,
+    )
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        _ = [
+            message
+            async for message in query(
+                prompt=text_query_prompt("Hello", as_async_iterable=as_async_iterable),
+                options=ClaudeAgentOptions(),
+                transport=transport,
+            )
+        ]
+
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.ERROR
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_messages(agent_spans[0], "gen_ai.output.messages") == []
+
+
+@pytest.mark.asyncio
+async def test_async_iterable_query_failure_between_turns_records_error_turn_otel(
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("multi_turn_response"),
+        fail_after_messages=3,
+    )
+    seen_messages: list[str] = []
+
+    async def consume_query() -> None:
+        async for message in query(
+            prompt=async_prompt_messages(
+                user_prompt("Hello"),
+                user_prompt("Second prompt"),
+            ),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        ):
+            seen_messages.append(type(message).__name__)
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        await consume_query()
+
+    assert seen_messages == ["SystemMessage", "AssistantMessage", "ResultMessage"]
+    agent_spans = sorted(
+        get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent"),
+        key=lambda span: span.start_time,
+    )
+    assert len(agent_spans) == 2
+    assert [span.status.status_code for span in agent_spans] == [
+        StatusCode.UNSET,
+        StatusCode.ERROR,
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.input.messages") for agent_span in agent_spans
+    ] == [
+        [{"role": "user", "parts": [{"type": "text", "content": "Hello"}]}],
+        [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "Second prompt"}],
+            }
+        ],
+    ]
+    assert [
+        get_messages(agent_span, "gen_ai.output.messages") for agent_span in agent_spans
+    ] == [
+        [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "Hello! How can I help you?"}],
+            }
+        ],
+        [],
+    ]
+    assert {
+        get_attrs(agent_span)["gen_ai.conversation.id"] for agent_span in agent_spans
+    } == {"s-mt001"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "as_async_iterable",
+    [False, True],
+    ids=["string-prompt", "async-iterable-prompt"],
+)
+async def test_query_failure_after_final_result_does_not_add_turn_otel(
+    otel_spans: InMemorySpanExporter,
+    as_async_iterable: bool,
+) -> None:
+    transport = ReplayTransport(
+        load_cassette("simple_text_response"),
+        fail_after_messages=3,
+    )
+    seen_messages: list[str] = []
+
+    async def consume_query() -> None:
+        async for message in query(
+            prompt=text_query_prompt("Hello", as_async_iterable=as_async_iterable),
+            options=ClaudeAgentOptions(),
+            transport=transport,
+        ):
+            seen_messages.append(type(message).__name__)
+
+    with pytest.raises(Exception, match="replay transport failed"):
+        await consume_query()
+
+    assert seen_messages == ["SystemMessage", "AssistantMessage", "ResultMessage"]
+    agent_spans = get_spans_by_op(otel_spans.get_finished_spans(), "invoke_agent")
+    assert len(agent_spans) == 1
+    assert agent_spans[0].status.status_code == StatusCode.UNSET
+    assert get_messages(agent_spans[0], "gen_ai.input.messages") == [
+        {"role": "user", "parts": [{"type": "text", "content": "Hello"}]}
+    ]
+    assert get_messages(agent_spans[0], "gen_ai.output.messages") == [
+        {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": "The answer is 4."}],
         }
     ]
 
