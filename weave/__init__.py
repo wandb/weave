@@ -129,7 +129,7 @@ __all__ = [
     "Monitor",
     "Object",
     "ObjectRef",
-    "OpLinkSpanProcessor",
+    "OpLinkSpanProcessor",  # noqa: F822  # resolved lazily by __getattr__ below
     "Prompt",
     "SavedView",
     "Scorer",
