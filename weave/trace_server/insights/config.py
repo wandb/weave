@@ -81,6 +81,7 @@ class IntentExtraction(Extraction):
 class FailureExtraction(Extraction):
     severity: TaxonomyRef
     max_failures_per_turn: int
+    max_evidence_spans: int
     current_turn_tokens: int
 
 

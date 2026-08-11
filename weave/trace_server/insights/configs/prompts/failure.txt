@@ -8,7 +8,8 @@ The input is JSON with:
   contain raw prior user messages or tool results. Distilled intents are the evidence for
   `context_loss`: a `refinement` in a prior turn is a requirement the assistant was told to keep.
 - `current_turn`: the current turn's ordered user messages, assistant messages, tool calls,
-  arguments, results, and statuses.
+  arguments, results, and statuses. Each message carries an `index`, its position in the turn.
+  Indices are not contiguous: messages dropped to fit the token budget are absent.
 - `next_turn`: the user's following turn, when one exists. Usually absent.
 
 Use prior turns to recover referents, standing requirements, prior answers, and repeated behavior.
@@ -21,7 +22,8 @@ Return exactly one JSON object and no markdown or commentary:
   {"category":"$taxonomy_labels",
    "severity":"$severity_labels",
    "reason":"grounded prose citing the observable evidence for this failure",
-   "signature":"one sentence describing the observable assistant failure"}
+   "signature":"one sentence describing the observable assistant failure",
+   "evidence":[current_turn message indices where this failure is visible]}
 ]}
 Emit an empty `failures` array when no failure is supported. Emit at most
 $max_failures_per_turn failures, ordered root cause first.
@@ -30,6 +32,14 @@ $max_failures_per_turn failures, ordered root cause first.
 turn's specifics. `signature` is the reusable pattern with those specifics removed. Write `reason`
 first, then compress it into `signature`. Only `signature` is embedded and only it enters the row
 id, so rewording a `reason` never moves a cluster.
+
+`evidence` says where the failure is visible: copy the `index` of each `current_turn` message that
+shows it, most important first, at most $max_evidence_spans. Cite the failing call itself rather
+than the assistant text reporting it. Use only indices the input contains; never invent one and
+never cite a prior turn. An empty array is correct when the failure is an absence with nothing to
+point at, such as a standing requirement the assistant never acted on. Like `reason`, `evidence` is
+not embedded and does not enter the row id. The short boundary examples below omit it for brevity;
+it is still expected.
 
 Failure categories:
 
@@ -129,8 +139,8 @@ Signature style:
 
 Worked example:
 {"failures":[
-   {"category":"tool_failure","severity":"minor","reason":"The edit tool returned an error and the file was left unchanged.","signature":"A well-formed code edit failed with a tool error."},
-   {"category":"tool_misuse","severity":"major","reason":"The reply stated the change was complete although the edit had errored.","signature":"The assistant ignored the failed edit and reported success."}
+   {"category":"tool_failure","severity":"minor","reason":"The edit tool returned an error and the file was left unchanged.","signature":"A well-formed code edit failed with a tool error.","evidence":[4]},
+   {"category":"tool_misuse","severity":"major","reason":"The reply stated the change was complete although the edit had errored.","signature":"The assistant ignored the failed edit and reported success.","evidence":[4,6]}
  ]}
 
 Boundary examples. Each note describes the observable turn, followed by the required output.

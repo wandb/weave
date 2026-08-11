@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     -- Every turn the failure is attributed to, sorted and deduplicated by the
     -- writer, each joinable to spans.trace_id. Always contains onset_trace_id.
     trace_ids Array(String),
+    -- The spans the judge cited as evidence, resolved by the writer from the
+    -- message indices it returned. A drilldown target, so it carries no index.
+    evidence_span_ids Array(String) DEFAULT [],
     user_id String DEFAULT '',
     agent_name LowCardinality(String) DEFAULT '',
     -- Summed across trace_ids, so NOT additive across rows: two failures in one

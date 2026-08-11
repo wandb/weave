@@ -13,6 +13,7 @@
     },
     "history_turns": 8,
     "max_failures_per_turn": 2,
+    "max_evidence_spans": 3,
     "current_turn_tokens": 12000,
     "history_assistant_tokens": 200,
     "normalization_version": 1
