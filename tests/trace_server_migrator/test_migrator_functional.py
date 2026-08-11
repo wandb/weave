@@ -693,9 +693,9 @@ _SOURCE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
 _EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
 _UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
-# The dedup key is the sorting key, so every collapsing read groups by all three
-# terms. This is the shape the reader must use, because FINAL never is.
-_SIGNATURE_DEDUP_KEY = "project_id, toDate(source_started_at), id"
+# The sorting key, which is therefore also the dedup key: every collapsing read
+# groups by all three terms, because no read here uses FINAL.
+_SIGNATURE_KEY = "project_id, toDate(source_started_at), id"
 
 
 def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> None:
@@ -727,9 +727,6 @@ def _insert_failure(
         f"'{onset}', {turns}, 'user-1', 'checkout-agent', 16000, {cost}, "
         f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
     )
-
-
-_SIGNATURE_KEY = "project_id, toDate(source_started_at), id"
 
 
 @pytest.mark.parametrize(
@@ -816,7 +813,7 @@ def test_signature_tables_schema(
 
 
 def test_signature_tables_share_columns(ch_client):
-    """The 17 shared columns are identical in name and type across both tables.
+    """Every shared column is identical in name and type across both tables.
 
     Splitting intents from failures buys grain-correct schemas and costs schema
     drift. This is the guard that turns drift into a failing test rather than a
@@ -859,7 +856,7 @@ def test_signature_versions_collapse_on_read(ch_client):
         "formatDateTime(argMax(expire_at, inserted_at), '%F %T'), "
         "length(argMax(vector, inserted_at)) "
         f"FROM {target_db}.intent_signatures WHERE project_id = 'project-1' "
-        f"GROUP BY {_SIGNATURE_DEDUP_KEY}"
+        f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [
         ("information_request", 0.34, 9000, "es", "2100-01-01 00:00:00", 1024)
     ]
@@ -882,7 +879,7 @@ def test_signature_versions_collapse_on_read(ch_client):
         "SELECT id, argMax(onset_trace_id, inserted_at), "
         "argMax(trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
-        f"GROUP BY {_SIGNATURE_DEDUP_KEY}"
+        f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [("failure-1", "trace-4", ["trace-4", "trace-6"], 0.41)]
 
 

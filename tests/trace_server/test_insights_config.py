@@ -139,6 +139,24 @@ def test_a_prompt_token_the_config_does_not_supply_is_an_error(config_dir):
         prompt.render_prompt("intent")
 
 
+def test_an_extraction_key_with_no_token_rule_is_an_error(config_dir):
+    """The reverse drift: a knob the prompt cannot be told about.
+
+    Skipping it would surface later as "prompt has tokens the config does not
+    supply", naming the asset rather than the knob that has no token rule.
+    """
+    config_path = os.path.join(config_dir, "intent.json")
+    with open(config_path, encoding="utf-8") as handle:
+        raw = json.load(handle)
+    raw["extraction"]["stop_sequences"] = ["\n\n"]
+    with open(config_path, "w", encoding="utf-8") as handle:
+        json.dump(raw, handle, indent=2)
+    config.regenerate_digests()
+
+    with pytest.raises(TypeError, match="stop_sequences"):
+        prompt.render_prompt("intent")
+
+
 def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     """Editing a taxonomy moves the digest; reordering the config does not.
 
@@ -172,8 +190,8 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     assert config.load_config("intent")["digests"]["config_sha256"] == after
 
 
-def test_unknown_space_and_schema_version_are_rejected(config_dir):
-    """Both failure modes name what went wrong instead of returning a partial config."""
+def test_unloadable_configs_are_rejected_by_name(config_dir):
+    """Every failure mode names what went wrong instead of returning a partial config."""
     with pytest.raises(ValueError, match="unknown insights space"):
         config.load_config("sentiment")
 
@@ -185,4 +203,14 @@ def test_unknown_space_and_schema_version_are_rejected(config_dir):
         json.dump(raw, handle, indent=2)
 
     with pytest.raises(ValueError, match="declares schema version"):
+        config.load_config("failure")
+
+    # The filename decides which space a caller asked for, so a file whose own
+    # `space` disagrees would serve one space's taxonomy under another's digest.
+    raw["config_schema_version"] = config.CONFIG_SCHEMA_VERSION
+    raw["space"] = "intent"
+    with open(config_path, "w", encoding="utf-8") as handle:
+        json.dump(raw, handle, indent=2)
+
+    with pytest.raises(ValueError, match="declares space 'intent'"):
         config.load_config("failure")
