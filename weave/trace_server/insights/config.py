@@ -22,14 +22,16 @@ CONFIG_SCHEMA_VERSION = 1
 # retroactively change what an existing row claims. A new run writes a new file.
 SPACES = ("intent", "failure")
 
-ConfigValue = str | int | float | bool | None | dict | list
+ConfigValue = (
+    str | int | float | bool | dict[str, "ConfigValue"] | list["ConfigValue"] | None
+)
 Config = dict[str, ConfigValue]
 
 
 def load_config(space: str) -> Config:
     """Load the checked-in config for `space` and verify its recorded digest."""
     config = _read_config(space)
-    recorded = config["digests"]["config_sha256"]
+    recorded = _string(_object(config, "digests"), "config_sha256")
     actual = compute_config_sha256(config)
     if recorded != actual:
         raise ValueError(
@@ -53,9 +55,9 @@ def compute_config_sha256(config: Config) -> str:
 def load_taxonomy(space: str, key: str) -> list[str]:
     """Return the label list a writer validates `category` or `severity` against."""
     config = load_config(space)
-    reference = config["extraction"][key]
-    labels = _read_json(os.path.join(CONFIG_DIR, reference["path"]))["labels"]
-    return list(labels)
+    reference = _object(_object(config, "extraction"), key)
+    taxonomy = _read_json(os.path.join(CONFIG_DIR, _string(reference, "path")))
+    return _string_list(taxonomy, "labels")
 
 
 def regenerate_digests() -> list[str]:
@@ -64,9 +66,10 @@ def regenerate_digests() -> list[str]:
     for space in SPACES:
         config = _read_config(space)
         digest = compute_config_sha256(config)
-        if config["digests"]["config_sha256"] == digest:
+        digests = _object(config, "digests")
+        if digests["config_sha256"] == digest:
             continue
-        config["digests"]["config_sha256"] = digest
+        digests["config_sha256"] = digest
         path = os.path.join(CONFIG_DIR, f"{space}.json")
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(config, handle, indent=2)
@@ -97,7 +100,8 @@ def _resolve_references(node: ConfigValue) -> ConfigValue:
     """Replace every {"path": ...} reference with the referenced file's sha256."""
     if isinstance(node, dict):
         if "path" in node:
-            return {"path": node["path"], "sha256": _file_sha256(node["path"])}
+            path = _string(node, "path")
+            return {"path": path, "sha256": _file_sha256(path)}
         return {key: _resolve_references(value) for key, value in node.items()}
     if isinstance(node, list):
         return [_resolve_references(item) for item in node]
@@ -107,6 +111,32 @@ def _resolve_references(node: ConfigValue) -> ConfigValue:
 def _file_sha256(relative_path: str) -> str:
     with open(os.path.join(CONFIG_DIR, relative_path), "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest()
+
+
+# A config is arbitrary JSON so the digest can hash whatever a space declares.
+# These readers narrow the one field they touch and name the file that is wrong.
+def _object(config: Config, key: str) -> Config:
+    value = config.get(key)
+    if not isinstance(value, dict):
+        raise TypeError(f"config field {key!r} must be an object, got {type(value)}")
+    return value
+
+
+def _string(config: Config, key: str) -> str:
+    value = config.get(key)
+    if not isinstance(value, str):
+        raise TypeError(f"config field {key!r} must be a string, got {type(value)}")
+    return value
+
+
+def _string_list(config: Config, key: str) -> list[str]:
+    value = config.get(key)
+    if not isinstance(value, list):
+        raise TypeError(f"config field {key!r} must be a list, got {type(value)}")
+    labels = [item for item in value if isinstance(item, str)]
+    if len(labels) != len(value):
+        raise TypeError(f"config field {key!r} must hold only strings")
+    return labels
 
 
 if __name__ == "__main__":

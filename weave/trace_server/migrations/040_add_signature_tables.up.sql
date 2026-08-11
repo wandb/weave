@@ -17,7 +17,7 @@
 --   duplicate.
 --
 -- VERSION. inserted_at is the ReplacingMergeTree version. The writer supplies
---   nothing; the server stamps it, so there is one clock rather than one per
+--   nothing: the server stamps it, so there is one clock rather than one per
 --   writer pod and a retry wins automatically. now64() is evaluated once per
 --   insert block, so rows sharing an id inside one block tie and the writer
 --   must deduplicate by id per batch.
@@ -31,7 +31,7 @@
 -- PIPELINE PROVENANCE. config_sha256 is the digest of
 --   weave/trace_server/insights/configs/intent.json, which today names the
 --   taxonomy, the sentiment labels, and the embedding model. The prompt, judge,
---   and context builder join it when the writer lands; the digest resolves
+--   and context builder join it when the writer lands. The digest resolves
 --   every declared file reference, so adding one needs no schema change.
 --   Nothing about the pipeline is in the sorting key, so re-embedding produces
 --   the same id and replaces in place. Two embedding generations coexist via a
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
 (
     project_id String,
     id String,
-    -- Digest of insights/configs/<space>.json; see insights/config.py.
+    -- Digest of insights/configs/<space>.json (see insights/config.py).
     config_sha256 LowCardinality(String),
 
     -- Canonical form, canonicalized before insert, so grouping by it is
@@ -60,12 +60,12 @@ CREATE TABLE IF NOT EXISTS intent_signatures
 
     conversation_id String DEFAULT '',
     -- The turn this intent came from, joinable to spans.trace_id. Weave defines
-    -- one turn as one trace, so this is the turn key; there is no turn_id in
+    -- one turn as one trace, so this is the turn key. There is no turn_id in
     -- the agent-spans world. Exactly one.
     trace_id String,
     -- Pseudonymous source subject, not the authenticated writer.
     user_id String DEFAULT '',
-    -- The one denormalized facet; everything else joins `spans`.
+    -- The one denormalized facet. Everything else joins `spans`.
     agent_name LowCardinality(String) DEFAULT '',
     -- The turn's own totals, copied from the agents API's total_duration_ms and
     -- total_cost_usd. Denormalized because they are sums over every span in the
@@ -94,7 +94,7 @@ ENGINE = ReplacingMergeTree(inserted_at)
 -- populated table, so they carry only what is certain.
 PARTITION BY toYYYYMM(source_started_at)
 -- Tenancy, time, identity. toDate(source_started_at) precedes id so a sub-month
--- read prunes granules; day rather than the raw timestamp keeps the replacement
+-- read prunes granules. Day rather than the raw timestamp keeps the replacement
 -- identity as coarse as it can be while still pruning.
 ORDER BY (project_id, toDate(source_started_at), id)
 TTL expire_at DELETE
@@ -114,7 +114,7 @@ SETTINGS min_bytes_for_wide_part = 0;
 -- GROUNDING, enforced by the writer and not the database. trace_ids is sorted,
 --   deduplicated, non-empty, and contains onset_trace_id. These are writer
 --   gates so one bad candidate is dropped and counted instead of failing its
---   256-row batch; a periodic off-path assertion query catches a writer bug:
+--   256-row batch. A periodic off-path assertion query catches a writer bug:
 --
 --     SELECT count() FROM failure_signatures
 --     WHERE project_id = {project_id:String}
@@ -127,10 +127,10 @@ CREATE TABLE IF NOT EXISTS failure_signatures
 (
     project_id String,
     id String,
-    -- Digest of insights/configs/<space>.json; see insights/config.py.
+    -- Digest of insights/configs/<space>.json (see insights/config.py).
     config_sha256 LowCardinality(String),
 
-    -- The short canonical claim; this is what is embedded.
+    -- The short canonical claim. This is what is embedded.
     signature String,
     -- Grounded prose explaining the claim. Never embedded, never in the id
     -- hash, freely regenerable, which is why a rephrased rationale does not
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     vector Array(Float32),
 
     conversation_id String,
-    -- First turn where it went wrong; the single anchor for ranking and
+    -- First turn where it went wrong. The single anchor for ranking and
     -- drilldown, and the only turn in the id hash.
     onset_trace_id String,
     -- Every turn the failure is attributed to, each joinable to spans.trace_id.
