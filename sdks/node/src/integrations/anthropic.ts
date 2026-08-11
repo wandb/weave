@@ -1,3 +1,4 @@
+import {totalInputTokens} from './anthropicUsage';
 import {addCJSInstrumentation, addESMInstrumentation} from './instrumentations';
 import {asAttributes, libraryIntegration} from './integrationMetadata';
 import {op} from '../op';
@@ -24,7 +25,12 @@ type StreamChunk =
   | {
       type: 'message_delta';
       delta: {stop_reason: string; stop_sequence: any};
-      usage: {output_tokens: number};
+      usage: {
+        input_tokens?: number | null;
+        output_tokens: number;
+        cache_read_input_tokens?: number | null;
+        cache_creation_input_tokens?: number | null;
+      };
     }
   | {type: 'message_stop'}
   | {
@@ -56,7 +62,13 @@ const streamReducer: StreamReducer<StreamChunk, ResultState> = {
       case 'message_delta':
         lastMessage = state.messages[state.messages.length - 1];
         Object.assign(lastMessage, chunk.delta);
-        Object.assign(lastMessage.usage ?? {}, chunk.usage);
+        // Delta usage is cumulative; skip nulls so earlier counts survive.
+        lastMessage.usage = {...lastMessage.usage};
+        for (const [field, value] of Object.entries(chunk.usage ?? {})) {
+          if (value != null) {
+            lastMessage.usage[field] = value;
+          }
+        }
         break;
       case 'content_block_start':
         lastMessage = state.messages[state.messages.length - 1];
@@ -79,14 +91,24 @@ function summarizer(result: any) {
   if (result.usage != null && result.usage != null) {
     return {
       usage: {
-        [result.model]: result.usage,
+        [result.model]: {
+          ...result.usage,
+          input_tokens: totalInputTokens(result.usage),
+        },
       },
     };
   }
   // Streaming mode
   if (result.messages != null && result.messages.length > 0) {
-    const usage: Record<string, {input_tokens: number; output_tokens: number}> =
-      {};
+    const usage: Record<
+      string,
+      {
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_input_tokens: number;
+        cache_creation_input_tokens: number;
+      }
+    > = {};
     for (const message of result.messages) {
       const {usage: messageUsage, model} = message;
       if (model == undefined || usage == undefined) {
@@ -96,10 +118,16 @@ function summarizer(result: any) {
         usage[model] = {
           input_tokens: 0,
           output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
         };
       }
-      usage[model].input_tokens += messageUsage?.input_tokens ?? 0;
+      usage[model].input_tokens += totalInputTokens(messageUsage);
       usage[model].output_tokens += messageUsage?.output_tokens ?? 0;
+      usage[model].cache_read_input_tokens +=
+        messageUsage?.cache_read_input_tokens ?? 0;
+      usage[model].cache_creation_input_tokens +=
+        messageUsage?.cache_creation_input_tokens ?? 0;
     }
 
     return {
