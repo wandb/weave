@@ -21,6 +21,7 @@ def test_api_key_credentials_support_basic_and_bearer_auth() -> None:
         "Basic " + base64.b64encode(b"api:secret").decode()
     )
     assert credentials.bearer_token() == "secret"
+    assert credentials.wal_seed() == "secret"
 
 
 def test_identity_credentials_exchange_once_and_reuse_cache(
@@ -61,6 +62,9 @@ def test_identity_credentials_exchange_once_and_reuse_cache(
 
     assert credentials.authorization_header() == "Bearer access-token"
     assert credentials.authorization_header() == "Bearer access-token"
+    assert credentials.wal_seed() == (
+        f"https://api.wandb.test\0{token_file.resolve()}"
+    )
     assert len(requests) == 1
     if os.name != "nt":
         assert credentials_file.stat().st_mode & 0o777 == 0o600
@@ -131,6 +135,155 @@ def test_identity_credentials_reject_invalid_exchange_response(
         credentials.access_token()
 
 
+def test_identity_credentials_reject_missing_identity_file(tmp_path: Path) -> None:
+    token_file = tmp_path / "missing.jwt"
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        credentials.access_token()
+
+    assert str(exc_info.value) == f"Identity token file not found: {token_file}"
+
+
+def test_identity_credentials_reject_empty_identity_file(tmp_path: Path) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("", encoding="utf-8")
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        credentials.access_token()
+
+    assert str(exc_info.value) == f"Identity token file is empty: {token_file}"
+
+
+def test_identity_credentials_reject_failed_exchange(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+    request = httpx.Request("POST", "https://api.wandb.test/oidc/token")
+    monkeypatch.setattr(
+        auth.httpx,
+        "post",
+        lambda *args, **kwargs: httpx.Response(
+            401,
+            text="invalid assertion",
+            request=request,
+        ),
+    )
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        credentials.access_token()
+
+    assert str(exc_info.value) == (
+        "Failed to exchange identity token: 401, invalid assertion"
+    )
+
+
+def test_identity_credentials_wrap_transport_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+
+    def raise_connect_error(*args, **kwargs):
+        raise httpx.ConnectError("network unavailable")
+
+    monkeypatch.setattr(auth.httpx, "post", raise_connect_error)
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        credentials.access_token()
+
+    assert str(exc_info.value) == (
+        "Failed to exchange identity token: network unavailable"
+    )
+
+
+def test_identity_credentials_reject_empty_access_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+    request = httpx.Request("POST", "https://api.wandb.test/oidc/token")
+    monkeypatch.setattr(
+        auth.httpx,
+        "post",
+        lambda *args, **kwargs: httpx.Response(
+            200,
+            json={"access_token": "", "expires_in": 3600},
+            request=request,
+        ),
+    )
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        credentials.access_token()
+
+    assert str(exc_info.value) == (
+        "Identity token exchange returned an invalid access token"
+    )
+
+
+@pytest.mark.parametrize(
+    "cache",
+    [
+        [],
+        {},
+        {"credentials": {}},
+        {
+            "credentials": {
+                "https://api.wandb.test": {
+                    "access_token": 123,
+                    "expires_at": "invalid",
+                }
+            }
+        },
+        {
+            "credentials": {
+                "https://api.wandb.test": {
+                    "access_token": "token",
+                    "expires_at": "invalid",
+                }
+            }
+        },
+    ],
+)
+def test_identity_credentials_ignore_invalid_cache(
+    tmp_path: Path, cache: object
+) -> None:
+    credentials_file = tmp_path / "credentials.json"
+    credentials_file.write_text(json.dumps(cache), encoding="utf-8")
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        tmp_path / "identity.jwt",
+        credentials_file,
+    )
+
+    assert credentials._read_cached_token() is None
+
+
 def test_resolve_identity_credentials_ignores_netrc_api_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -154,6 +307,22 @@ def test_resolve_credentials_rejects_conflicting_environment(
 
     with pytest.raises(AuthenticationError, match="Both WANDB_API_KEY"):
         auth.get_wandb_credentials()
+
+
+def test_resolve_api_key_and_missing_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("WANDB_API_KEY", raising=False)
+    monkeypatch.delenv("WANDB_IDENTITY_TOKEN_FILE", raising=False)
+    monkeypatch.setattr(auth.env, "weave_wandb_api_key", lambda: "api-key")
+
+    credentials = auth.get_wandb_credentials()
+
+    assert isinstance(credentials, auth.ApiKeyCredentials)
+    assert credentials.api_key == "api-key"
+
+    monkeypatch.setattr(auth.env, "weave_wandb_api_key", lambda: None)
+    assert auth.get_wandb_credentials() is None
 
 
 def test_httpx_auth_refreshes_authorization_for_each_request() -> None:
