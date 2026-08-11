@@ -545,48 +545,27 @@ def test_recent_production_upgrade_path(
     )
 
 
-def test_all_production_migrations_replicated(ch_client):
-    """All production migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_repl")
-    target_db = _unique_name("prod_repl")
+@pytest.mark.parametrize(
+    "use_distributed", [False, True], ids=["replicated", "distributed"]
+)
+def test_all_production_migrations_round_trip(ch_client, use_distributed: bool):
+    """Every production migration applies cleanly, then reverses cleanly.
+
+    Up and down live in one test because a completed up is the only valid
+    starting point for a down. Running them as separate tests replayed the same
+    full migration set twice per mode, and each statement carries a fixed
+    round-trip cost against Keeper.
+    """
+    suffix = "dist" if use_distributed else "repl"
+    mgmt_db = _unique_name(f"db_mgmt_prod_{suffix}")
+    target_db = _unique_name(f"prod_{suffix}")
     ch_client.track_db(mgmt_db)
     ch_client.track_db(target_db)
 
     migrator = get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
-        use_distributed=False,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-    migrator.apply_migrations(target_db)
-
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-    # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
-    # every replica with a consistent engine. Historical failure modes this
-    # assertion guards against:
-    #   * `ON CLUSTER` combined with `ENGINE = Replicated` (silent plain
-    #     MergeTree on CH <= 25.3, deadlock on CH >= 25.10).
-    #   * `ENGINE = Replicated` with `ON CLUSTER` stripped (split-brain:
-    #     only the migrator's entrypoint pod gets the DB, sibling replicas
-    #     never join the ZK path).
-    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
-
-
-def test_all_production_migrations_distributed(ch_client):
-    """All production migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_dist")
-    target_db = _unique_name("prod_dist")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=True,
+        use_distributed=use_distributed,
         replicated_cluster=_CLUSTER,
         replicated_path=_REPLICATED_PATH,
         management_db=mgmt_db,
@@ -597,11 +576,23 @@ def test_all_production_migrations_distributed(ch_client):
 
     assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Atomic"
-    # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
-    # If the fan-out is broken (e.g. the `ON CLUSTER + ENGINE = Replicated`
-    # collision), peer replicas never receive the CREATE DATABASE.
-    _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
+    # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
+    # every replica with a consistent engine. Historical failure modes this
+    # assertion guards against:
+    #   * `ON CLUSTER` combined with `ENGINE = Replicated` (silent plain
+    #     MergeTree on CH <= 25.3, deadlock on CH >= 25.10).
+    #   * `ENGINE = Replicated` with `ON CLUSTER` stripped (split-brain:
+    #     only the migrator's entrypoint pod gets the DB, sibling replicas
+    #     never join the ZK path).
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
+    if use_distributed:
+        # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
+        # If the fan-out is broken, peer replicas never receive the management
+        # DB either.
+        _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
+
+    # Migrate all the way back down
+    migrator.apply_migrations(target_db, target_version=0)
 
 
 _INTENT_COLUMNS = [
@@ -927,59 +918,6 @@ def test_failure_turn_attribution(ch_client):
         "WHERE project_id = 'project-1' "
         "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
     ).result_rows == [(0,)]
-
-
-def test_all_production_down_migrations_replicated(ch_client):
-    """All production down migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_down_repl")
-    target_db = _unique_name("down_repl")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=False,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-
-    # Migrate up to latest
-    migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-
-    # Migrate all the way back down
-    migrator.apply_migrations(target_db, target_version=0)
-
-
-def test_all_production_down_migrations_distributed(ch_client):
-    """All production down migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_down_dist")
-    target_db = _unique_name("down_dist")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=True,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-
-    # Migrate up to latest
-    migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-
-    # Migrate all the way back down
-    migrator.apply_migrations(target_db, target_version=0)
 
 
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
