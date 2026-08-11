@@ -2448,7 +2448,9 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     model_name = "gpt-4o-complete-test"
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    start_time = now - datetime.timedelta(minutes=30)
+    start_time = (now - datetime.timedelta(hours=2)).replace(
+        minute=10, second=0, microsecond=0
+    )
 
     # Insert calls directly into calls_complete with usage data
     call_id_1 = str(uuid.uuid4())
@@ -2477,7 +2479,7 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
             '{call_id_1}',
             'test_op',
             '{start_time.strftime("%Y-%m-%d %H:%M:%S")}',
-            '{(start_time + datetime.timedelta(milliseconds=100)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")}',
             '{trace_id_1}',
             '',
             '{{}}',
@@ -2515,7 +2517,7 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
             '{call_id_2}',
             'test_op',
             '{(start_time + datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M:%S")}',
-            '{(start_time + datetime.timedelta(minutes=1, milliseconds=200)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(minutes=1, seconds=3)).strftime("%Y-%m-%d %H:%M:%S")}',
             '{trace_id_2}',
             '',
             '{{}}',
@@ -2523,6 +2525,51 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
             'null',
             '{usage_data_2}',
             'Test error'
+        )
+        """
+    )
+
+    # Exercise the epoch sentinel and a valid zero-duration call in one bucket.
+    clickhouse_trace_server.ch_client.command(
+        f"""
+        INSERT INTO calls_complete (
+            project_id,
+            id,
+            op_name,
+            started_at,
+            ended_at,
+            trace_id,
+            parent_id,
+            attributes_dump,
+            inputs_dump,
+            output_dump,
+            summary_dump
+        )
+        VALUES (
+            '{internal_project_id}',
+            '{uuid.uuid4()}',
+            'test_op',
+            '{(start_time + datetime.timedelta(minutes=2)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{SENTINEL_EPOCH.strftime("%Y-%m-%d %H:%M:%S")}',
+            '{uuid.uuid4()}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{{}}'
+        ),
+        (
+            '{internal_project_id}',
+            '{uuid.uuid4()}',
+            'test_op',
+            '{(start_time + datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{(start_time + datetime.timedelta(minutes=3)).strftime("%Y-%m-%d %H:%M:%S")}',
+            '{uuid.uuid4()}',
+            '',
+            '{{}}',
+            '{{}}',
+            'null',
+            '{{}}'
         )
         """
     )
@@ -2556,6 +2603,14 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
                     metric="error_count",
                     aggregations=[tsi.AggregationType.SUM],
                 ),
+                tsi.CallMetricSpec(
+                    metric="latency_ms",
+                    aggregations=[
+                        tsi.AggregationType.AVG,
+                        tsi.AggregationType.MAX,
+                    ],
+                    percentiles=[50, 95, 99],
+                ),
             ],
         )
     )
@@ -2572,8 +2627,15 @@ def test_call_stats_with_calls_complete(trace_server, clickhouse_trace_server):
     assert len(result.call_buckets) > 0, "Expected call buckets"
     total_call_count = sum(b.get("sum_call_count", 0) for b in result.call_buckets)
     total_error_count = sum(b.get("sum_error_count", 0) for b in result.call_buckets)
-    assert total_call_count == 2, f"Expected 2 calls, got {total_call_count}"
+    assert total_call_count == 4, f"Expected 4 calls, got {total_call_count}"
     assert total_error_count == 1, f"Expected 1 error, got {total_error_count}"
+
+    latency_bucket = next(b for b in result.call_buckets if b.get("count") == 4)
+    assert latency_bucket["avg_latency_ms"] == pytest.approx(4000 / 3)
+    assert latency_bucket["max_latency_ms"] == 3000
+    assert latency_bucket["p50_latency_ms"] >= 0
+    assert latency_bucket["p95_latency_ms"] >= 0
+    assert latency_bucket["p99_latency_ms"] >= 0
 
 
 def test_calls_complete_converts_wb_metadata(trace_server, clickhouse_trace_server):
