@@ -173,3 +173,51 @@ PARTITION BY toYYYYMM(source_started_at)
 ORDER BY (project_id, toDate(source_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
+
+-- One row per turn, holding the derived context both judges need on the turns
+-- that follow. Not a signature table: nothing here is embedded or clustered,
+-- which is why it carries no vector, category, or signature, and why the drift
+-- guard over the two signature tables deliberately does not cover it.
+CREATE TABLE IF NOT EXISTS turn_context
+(
+    project_id String,
+    conversation_id String,
+    -- Position of the turn in its conversation. With conversation_id this is the
+    -- turn identity, so there is no hashed id and no version column: the sorting
+    -- key already names the row a re-judgment should replace.
+    turn_index UInt16,
+    -- The turn's trace, joinable to spans.trace_id. Weave defines one turn as one
+    -- trace, so this is a second name for the same identity, carried for the
+    -- drilldown from a trace back to its context.
+    trace_id String,
+    config_sha256 LowCardinality(String),
+
+    -- One sentence describing the assistant response, from the failure judge.
+    -- Written for every turn, including turns with no failure and no intent,
+    -- which is the reason it cannot live on either signature table.
+    assistant_summary String DEFAULT '',
+    -- Constraints the user established, changed, or retracted on this turn, from
+    -- the intent judge. Empty on most turns. The standing set handed to the
+    -- failure judge is the accumulation of these, assembled at read time.
+    constraints Array(String),
+
+    source_started_at DateTime64(6, 'UTC'),
+    extracted_at DateTime64(6, 'UTC'),
+    inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
+    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
+
+    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
+)
+ENGINE = ReplacingMergeTree(inserted_at)
+PARTITION BY toYYYYMM(source_started_at)
+-- Ordered for the one read that runs on every judged turn: the prior N turns of a
+-- single conversation. conversation_id sits in the sorting key rather than in a
+-- bloom filter, so that read is a contiguous range instead of a scatter. No time
+-- term, because this table is read by conversation rather than by window, and the
+-- month partition is enough pruning for retention.
+ORDER BY (project_id, conversation_id, turn_index)
+TTL expire_at DELETE
+-- These rows are small enough that index_granularity_bytes never binds, so the
+-- default 8192-row granule would serve an 8-row answer. 1024 cuts that over-read
+-- roughly 8x for an 8x larger primary index on a table measured at ~104 bytes/row.
+SETTINGS min_bytes_for_wide_part = 0, index_granularity = 1024;

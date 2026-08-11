@@ -10,8 +10,10 @@ from weave.trace_server.insights import config
 
 # The exact label sets the `category` Enum carried before the signature tables
 # replaced it. Dropping the Enum moved enforcement to the writer; it must not
-# also have quietly dropped labels.
-_ENUM_INTENT_LABELS = {
+# also have quietly dropped labels. A retired label may leave the taxonomy, but
+# only by being named in the moves below, so a vocabulary change stays a decision
+# rather than becoming a silent drop.
+_RETIRED_INTENT_LABELS = {
     "action_request",
     "information_request",
     "problem_report",
@@ -23,7 +25,7 @@ _ENUM_INTENT_LABELS = {
     "bad_faith",
     "other",
 }
-_ENUM_FAILURE_LABELS = {
+_RETIRED_FAILURE_LABELS = {
     "task_misunderstanding",
     "context_loss",
     "wrong_output",
@@ -38,6 +40,21 @@ _ENUM_FAILURE_LABELS = {
     "other",
 }
 
+# Retired label -> the labels that carry it now. `feedback` splits because the two
+# polarities cluster separately; `correction` and `clarification` merge because the
+# boundary between contradiction and added detail was label noise. The two failure
+# renames drop a propriety claim the judge cannot make without seeing the customer's
+# capability limits or safety policy.
+_INTENT_MOVES = {
+    "feedback": ("positive_feedback", "negative_feedback"),
+    "correction": ("refinement",),
+    "clarification": ("refinement",),
+}
+_FAILURE_MOVES = {
+    "improper_refusal": ("refusal",),
+    "safety_violation": ("unsafe_behavior",),
+}
+
 
 @pytest.fixture
 def config_dir(tmp_path, monkeypatch) -> str:
@@ -49,18 +66,27 @@ def config_dir(tmp_path, monkeypatch) -> str:
 
 
 @pytest.mark.parametrize(
-    ("space", "expected_labels"),
-    [("intent", _ENUM_INTENT_LABELS), ("failure", _ENUM_FAILURE_LABELS)],
+    ("space", "retired", "moves"),
+    [
+        ("intent", _RETIRED_INTENT_LABELS, _INTENT_MOVES),
+        ("failure", _RETIRED_FAILURE_LABELS, _FAILURE_MOVES),
+    ],
 )
-def test_checked_in_configs_are_current(space, expected_labels):
-    """Recorded digests match, and the taxonomy still covers every retired Enum label.
+def test_checked_in_configs_are_current(space, retired, moves):
+    """Recorded digests match, and every retired Enum label is still accounted for.
 
     This is the CI gate as a test: a config whose digest was not regenerated
     fails here rather than shipping rows that point at a value nothing produces.
     """
     loaded = config.load_config(space)
     assert loaded["digests"]["config_sha256"] == config.compute_config_sha256(loaded)
-    assert set(config.load_taxonomy(space, "taxonomy")) == expected_labels
+
+    labels = set(config.load_taxonomy(space, "taxonomy"))
+    # Exactly the documented moves may leave the taxonomy: an undocumented drop
+    # fails here, and so does a move entry for a label that is still present.
+    assert retired - labels == set(moves)
+    for replacements in moves.values():
+        assert set(replacements) <= labels
     # Distinct spaces must never collide, or a contamination check reading
     # topK(config_sha256) cannot tell two pipelines apart.
     assert (

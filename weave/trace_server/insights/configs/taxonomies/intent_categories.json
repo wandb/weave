@@ -1,14 +1,14 @@
 {
-  "description": "Categories an intent signature may carry. Carried forward verbatim from the category Enum this schema replaced.",
+  "description": "Categories an intent signature may carry. `feedback` is split on polarity because the two halves cluster separately, and `correction` plus `clarification` are merged into `refinement` because the contradiction-versus-added-detail boundary produced label noise that a join against the failure space recovers anyway.",
   "labels": [
     "action_request",
     "information_request",
     "problem_report",
-    "feedback",
+    "positive_feedback",
+    "negative_feedback",
     "approval",
     "rejection",
-    "correction",
-    "clarification",
+    "refinement",
     "bad_faith",
     "other"
   ]

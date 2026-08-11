@@ -1,8 +1,8 @@
 {
-  "description": "Severity labels a failure signature may carry. The one vocabulary here with no predecessor in the schema it replaced, so it is a starting point rather than a carried-forward contract.",
+  "description": "Severity labels a failure signature may carry, ordered least to most impactful. `info` is the bottom rung rather than `low` because two categories, `refusal` and `capability_gap`, record behavior that is not necessarily wrong; a ladder whose floor still reads as a problem would misreport them.",
   "labels": [
-    "low",
-    "medium",
-    "high"
+    "info",
+    "minor",
+    "major"
   ]
 }
