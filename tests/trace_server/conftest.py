@@ -18,6 +18,7 @@ from tests.trace_server.workers.evaluate_model_test_worker import (
 from weave.trace_server import (
     base64_content_conversion,
     clickhouse_trace_server_batched,
+    common_interface,
 )
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import (
@@ -118,6 +119,14 @@ def reset_content_ref_cache():
     yield
     base64_content_conversion._content_ref_cache.clear()
     base64_content_conversion._rejected_blob_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_extra_field_warnings():
+    """The memo of reported ignored-field sets would silence later tests."""
+    common_interface._warned_field_sets.clear()
+    yield
+    common_interface._warned_field_sets.clear()
 
 
 def _get_worker_db_suffix(request, default: str = "_test") -> str:

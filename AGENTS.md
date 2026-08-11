@@ -344,6 +344,20 @@ deterministic.
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript Anthropic message batches
+
+- A batch result is a discriminated union and only its `succeeded` variant
+  carries a `message`; a batch ends when every request has succeeded, errored,
+  been canceled or expired. Read `message` without checking the discriminator
+  and the reducer stores `undefined`, which the usage summarizer then throws on,
+  out of the stream iterator's `finally`.
+- `patchAnthropicMessagesCreate` wraps `Messages.prototype.create` in a `Proxy`,
+  so property reads still reach the mock behind it and a test can reconfigure it
+  through the patched prototype. `patchBatchApi` assigns `op()`'s plain wrapper
+  to `Batches` `create`, `retrieve` and `results` instead, so for those a test
+  reconfigures the mock it captured before patching, or reaches it through
+  `__wrappedFunction`.
+
 ### TypeScript custom type round trip
 
 - `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
@@ -377,6 +391,14 @@ deterministic.
 - `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
   `invoke_agent`, `chat`, and `execute_tool` spans through
   `/agents/otel/v1/traces`.
+- These spans go through the `BasicTracerProvider` that `genai/provider.ts`
+  builds, never the OTel global registry. A processor that must see them belongs
+  in that provider's `spanProcessors`, which is built lazily on the first span
+  and rebuilt on a project switch — registering once from `init()` misses both.
+- At a span's attribute limit OTel JS drops the *incoming* attribute, where
+  Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
+  halves of an overflowing set. The eval linker writes the pair eval results
+  match on before its display-only attributes for that reason.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.
@@ -549,6 +571,10 @@ deterministic.
   OTel spans with an empty `gen_ai.operation.name` remain stored and queryable
   through `agent_spans_query`, but are omitted from that visual tree; use a
   semantic marker span when a UI-visible trace regression is required.
+- For spans with `ERROR` status, missing `error_type` and `status_message`
+  fall back to the latest OTel `exception` event. Explicit `error.type` and
+  status-message values take precedence, and handled exception events on
+  non-error spans remain raw-only.
 - Use the Trace tree view for parentage comparisons. The default flamegraph
   collapses overlapping siblings into synthetic groups, which can make flat
   and nested traces look deceptively similar; give live-example spans realistic
