@@ -62,9 +62,7 @@ def test_identity_credentials_exchange_once_and_reuse_cache(
 
     assert credentials.authorization_header() == "Bearer access-token"
     assert credentials.authorization_header() == "Bearer access-token"
-    assert credentials.wal_seed() == (
-        f"https://api.wandb.test\0{token_file.resolve()}"
-    )
+    assert credentials.wal_seed() == (f"https://api.wandb.test\0{token_file.resolve()}")
     assert len(requests) == 1
     if os.name != "nt":
         assert credentials_file.stat().st_mode & 0o777 == 0o600
