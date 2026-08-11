@@ -2,21 +2,19 @@
 
 Every knob that changes what gets written into `intent_signatures` or
 `failure_signatures` lives in one checked-in config file per space, so the whole
-pipeline state is one column and none of it is in the sorting key.
-
-The digest resolves every declared file reference to that file's own sha256, so
-editing a taxonomy moves the digest without anyone touching the config.
+pipeline state is one column and none of it is in the sorting key. A reference
+serializes as its own content hash, so editing a taxonomy or a prompt moves the
+digest without anyone touching the config.
 """
 
 import hashlib
 import json
 import os
-from typing import Literal
+from typing import Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "configs")
-SPACES = ("intent", "failure")
 
 
 class _Strict(BaseModel):
@@ -30,41 +28,60 @@ class Reference(_Strict):
 
     path: str
 
-    def read(self) -> str:
-        with open(os.path.join(CONFIG_DIR, self.path), encoding="utf-8") as handle:
+    def read_bytes(self) -> bytes:
+        with open(os.path.join(CONFIG_DIR, self.path), "rb") as handle:
             return handle.read()
 
+    def read(self) -> str:
+        return self.read_bytes().decode("utf-8")
+
     def sha256(self) -> str:
-        with open(os.path.join(CONFIG_DIR, self.path), "rb") as handle:
-            return hashlib.sha256(handle.read()).hexdigest()
+        return hashlib.sha256(self.read_bytes()).hexdigest()
+
+    @model_serializer
+    def _serialize(self) -> dict[str, str]:
+        """Carries the content hash, which is what makes a digest follow the file."""
+        return {"path": self.path, "sha256": self.sha256()}
 
 
-class Taxonomy(_Strict):
+class _Taxonomy(_Strict):
     description: str
     labels: list[str]
 
 
-class IntentExtraction(_Strict):
+class TaxonomyRef(Reference):
+    """The label list a writer validates a categorical column against.
+
+    Its own type because taxonomies are the references that render into a prompt.
+    """
+
+    def labels(self) -> list[str]:
+        return _Taxonomy.model_validate_json(self.read()).labels
+
+
+class Extraction(_Strict):
+    """What both spaces declare. A shared knob must mean the same thing in each."""
+
     prompt: Reference
-    taxonomy: Reference
-    sentiment: Reference
+    taxonomy: TaxonomyRef
     history_turns: int
+    history_assistant_tokens: int
+    normalization_version: int
+
+
+class IntentExtraction(Extraction):
+    sentiment: TaxonomyRef
     max_items_per_turn: int
+    # The intent judge distills the user's own message, so it budgets that turn's
+    # user text; the failure judge reads the whole turn instead.
     current_user_tokens: int
     history_user_tokens: int
-    history_assistant_tokens: int
-    normalization_version: int
 
 
-class FailureExtraction(_Strict):
-    prompt: Reference
-    taxonomy: Reference
-    severity: Reference
-    history_turns: int
+class FailureExtraction(Extraction):
+    severity: TaxonomyRef
     max_failures_per_turn: int
     current_turn_tokens: int
-    history_assistant_tokens: int
-    normalization_version: int
 
 
 class Judge(_Strict):
@@ -79,24 +96,35 @@ class Embedding(_Strict):
     output_normalization: str
 
 
-class IntentConfig(_Strict):
+_E = TypeVar("_E", bound=Extraction)
+
+
+class _SpaceConfig(_Strict, Generic[_E]):
+    """What every space declares. `space` itself is declared per subclass."""
+
     config_schema_version: Literal[1]
+    extraction: _E
+    judge: Judge
+    embedding: Embedding
+
+
+# Each subclass pins `space` to a Literal, so a file whose own field disagrees
+# fails to validate rather than serving one space's taxonomy under another's digest.
+class IntentConfig(_SpaceConfig[IntentExtraction]):
     space: Literal["intent"]
-    extraction: IntentExtraction
-    judge: Judge
-    embedding: Embedding
 
 
-class FailureConfig(_Strict):
-    config_schema_version: Literal[1]
+class FailureConfig(_SpaceConfig[FailureExtraction]):
     space: Literal["failure"]
-    extraction: FailureExtraction
-    judge: Judge
-    embedding: Embedding
 
 
 SpaceConfig = IntentConfig | FailureConfig
-Extraction = IntentExtraction | FailureExtraction
+
+_CONFIG_MODELS: dict[str, type[SpaceConfig]] = {
+    "intent": IntentConfig,
+    "failure": FailureConfig,
+}
+SPACES = tuple(_CONFIG_MODELS)
 
 
 def load_config(space: str) -> SpaceConfig:
@@ -114,30 +142,5 @@ def config_sha256(config: SpaceConfig) -> str:
     Keys are sorted, so reordering a config file leaves the digest alone while
     editing any file it references moves it.
     """
-    canonical = json.dumps(_digestible(config), sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(config.model_dump(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def load_taxonomy(reference: Reference) -> list[str]:
-    """The label list a writer validates a categorical column against."""
-    return Taxonomy.model_validate_json(reference.read()).labels
-
-
-# The filename decides which space a caller asked for, and `space` is a Literal,
-# so a file whose own field disagrees fails to validate rather than serving one
-# space's taxonomy under another's digest.
-_CONFIG_MODELS: dict[str, type[SpaceConfig]] = {
-    "intent": IntentConfig,
-    "failure": FailureConfig,
-}
-
-
-def _digestible(value: object) -> object:
-    """The config as plain JSON, with each reference replaced by its content hash."""
-    if isinstance(value, Reference):
-        return {"path": value.path, "sha256": value.sha256()}
-    if isinstance(value, BaseModel):
-        return {
-            name: _digestible(getattr(value, name)) for name in type(value).model_fields
-        }
-    return value

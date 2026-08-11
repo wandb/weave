@@ -2,8 +2,7 @@
 
 The asset holds the wording and the config holds every value the wording shares
 with the pipeline, written as a `$name`. Both are inside `config_sha256`, so a
-reworded prompt and a retuned history window are equally visible: neither can
-change what the judge sees without moving the digest a row records.
+reworded prompt and a retuned history window are equally visible.
 """
 
 from string import Template
@@ -18,31 +17,21 @@ def render_prompt(space: str) -> str:
     beats sending a judge a literal `$name`.
     """
     extraction = config.load_config(space).extraction
-    template = Template(extraction.prompt.read().strip())
-    return template.substitute(_tokens(extraction))
+    return Template(extraction.prompt.read().strip()).substitute(_tokens(extraction))
 
 
 def _tokens(extraction: config.Extraction) -> dict[str, str]:
-    """The `$name` substitutions each space's prompt asset declares."""
-    if isinstance(extraction, config.IntentExtraction):
-        return {
-            "history_turns": str(extraction.history_turns),
-            "history_assistant_tokens": str(extraction.history_assistant_tokens),
-            "max_items_per_turn": str(extraction.max_items_per_turn),
-            "taxonomy_labels": _labels(extraction.taxonomy),
-            "sentiment_labels": _labels(extraction.sentiment),
-        }
-    if isinstance(extraction, config.FailureExtraction):
-        return {
-            "history_turns": str(extraction.history_turns),
-            "history_assistant_tokens": str(extraction.history_assistant_tokens),
-            "max_failures_per_turn": str(extraction.max_failures_per_turn),
-            "taxonomy_labels": _labels(extraction.taxonomy),
-            "severity_labels": _labels(extraction.severity),
-        }
-    raise TypeError(f"no prompt token rule for {type(extraction).__name__}")
+    """Every numeric knob as `$name`, every taxonomy as `$name_labels`.
 
-
-def _labels(reference: config.Reference) -> str:
-    """A taxonomy rendered as the alternation the judge must choose from."""
-    return "|".join(config.load_taxonomy(reference))
+    Derived from the declared fields rather than listed, so reaching a new knob
+    from an asset is a config edit and a token. An asset is free to ignore any of
+    them: `substitute` only cares about the tokens it actually contains.
+    """
+    tokens: dict[str, str] = {}
+    for name in type(extraction).model_fields:
+        value = getattr(extraction, name)
+        if isinstance(value, config.TaxonomyRef):
+            tokens[f"{name}_labels"] = "|".join(value.labels())
+        elif isinstance(value, int):
+            tokens[name] = str(value)
+    return tokens

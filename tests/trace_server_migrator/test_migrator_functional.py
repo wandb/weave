@@ -642,6 +642,12 @@ _FAILURE_COLUMNS = [
     ("expire_at", "DateTime"),
 ]
 
+# The column lists below are deliberately spelled out twice rather than composed
+# from a shared block: the assert is ORDER BY position, and shared columns
+# interleave with grain-specific ones differently in each table. Growing this
+# count is a decision, not a side effect.
+_EXPECTED_SHARED_COLUMNS = 16
+
 _SIGNATURE_TABLES = [
     (
         "intent_signatures",
@@ -802,7 +808,7 @@ def test_signature_tables_share_column_types():
     intent, failure = dict(_INTENT_COLUMNS), dict(_FAILURE_COLUMNS)
     shared = intent.keys() & failure.keys()
 
-    assert len(shared) == 16
+    assert len(shared) == _EXPECTED_SHARED_COLUMNS
     assert {name: intent[name] for name in shared} == {
         name: failure[name] for name in shared
     }
