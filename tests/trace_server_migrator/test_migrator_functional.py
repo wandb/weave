@@ -9,12 +9,18 @@ import uuid
 
 import clickhouse_connect
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _NON_RECOVERABLE_MIGRATION_VERSIONS,
     MigrationError,
     get_clickhouse_trace_server_migrator,
+)
+from weave.trace_server.costs.insert_costs import (
+    COSTS_TABLE,
+    costs_schema_is_ready,
+    get_current_costs,
 )
 
 _TEST_MIGRATION_DIR = os.path.abspath(
@@ -539,17 +545,27 @@ def test_recent_production_upgrade_path(
     )
 
 
-def test_all_production_migrations_replicated(ch_client):
-    """All production migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_repl")
-    target_db = _unique_name("prod_repl")
+@pytest.mark.parametrize(
+    "use_distributed", [False, True], ids=["replicated", "distributed"]
+)
+def test_all_production_migrations_round_trip(ch_client, use_distributed: bool):
+    """Every production migration applies cleanly, then reverses cleanly.
+
+    Up and down live in one test because a completed up is the only valid
+    starting point for a down. Running them as separate tests replayed the same
+    full migration set twice per mode, and each statement carries a fixed
+    round-trip cost against Keeper.
+    """
+    suffix = "dist" if use_distributed else "repl"
+    mgmt_db = _unique_name(f"db_mgmt_prod_{suffix}")
+    target_db = _unique_name(f"prod_{suffix}")
     ch_client.track_db(mgmt_db)
     ch_client.track_db(target_db)
 
     migrator = get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
-        use_distributed=False,
+        use_distributed=use_distributed,
         replicated_cluster=_CLUSTER,
         replicated_path=_REPLICATED_PATH,
         management_db=mgmt_db,
@@ -558,6 +574,7 @@ def test_all_production_migrations_replicated(ch_client):
     )
     migrator.apply_migrations(target_db)
 
+    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Atomic"
     # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
     # every replica with a consistent engine. Historical failure modes this
@@ -568,84 +585,11 @@ def test_all_production_migrations_replicated(ch_client):
     #     only the migrator's entrypoint pod gets the DB, sibling replicas
     #     never join the ZK path).
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
-
-
-def test_all_production_migrations_distributed(ch_client):
-    """All production migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_dist")
-    target_db = _unique_name("prod_dist")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=True,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-    migrator.apply_migrations(target_db)
-
-    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-    # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
-    # If the fan-out is broken (e.g. the `ON CLUSTER + ENGINE = Replicated`
-    # collision), peer replicas never receive the CREATE DATABASE.
-    _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
-    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
-
-
-def test_all_production_down_migrations_replicated(ch_client):
-    """All production down migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_down_repl")
-    target_db = _unique_name("down_repl")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=False,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-
-    # Migrate up to latest
-    migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-
-    # Migrate all the way back down
-    migrator.apply_migrations(target_db, target_version=0)
-
-
-def test_all_production_down_migrations_distributed(ch_client):
-    """All production down migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_down_dist")
-    target_db = _unique_name("down_dist")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
-        use_distributed=True,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-
-    # Migrate up to latest
-    migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
+    if use_distributed:
+        # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
+        # If the fan-out is broken, peer replicas never receive the management
+        # DB either.
+        _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
 
     # Migrate all the way back down
     migrator.apply_migrations(target_db, target_version=0)
@@ -885,3 +829,112 @@ def test_migrations_refuse_populated_db_without_history(
         f"SELECT count() FROM {mgmt_b}.migrations WHERE db_name = '{target_db}'"
     ).result_rows[0][0]
     assert orphan_rows == 0
+
+
+def _system_cost_row_count(ch_client, target_db: str, llm_id: str) -> int:
+    result = ch_client.query(
+        f"SELECT count() FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = %(llm_id)s AND created_by = 'system'",
+        parameters={"llm_id": llm_id},
+    )
+    return int(result.result_rows[0][0])
+
+
+def test_apply_migrations_backfills_costs_on_an_already_current_schema(ch_client):
+    """Regression: a checkpoint-only cost change lands without a schema migration.
+
+    `apply_migrations` used to lock-free pre-check purely on schema version and
+    return before the post-migration hook ever ran, so once a database reached
+    the latest migration, new/changed rows in `cost_checkpoint.json` were never
+    inserted again. This reproduces that by migrating to latest (inserting
+    costs once), deleting one model's seeded rows to simulate a checkpoint
+    addition made after the schema was already current, then calling
+    `apply_migrations` again with no version bump and asserting the row comes
+    back.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_backfill")
+    target_db = _unique_name("cost_backfill")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+    llm_id = "gpt-4"
+
+    # Uses the factory's real default hook + work-check (not disabled), since
+    # this test is exercising exactly that wiring.
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db)
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+    # Migration 006 also seeds a `gpt-4` row with a different effective_date,
+    # so a fresh migrate can leave more than one `system` row for this llm_id.
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+
+    # Simulate the checkpoint gaining this model's price after the schema was
+    # already at `latest`: no migration to apply, only a pending cost row.
+    ch_client.command(
+        f"DELETE FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = '{llm_id}' AND created_by = 'system'",
+        settings={"mutations_sync": 2},
+    )
+    assert _system_cost_row_count(ch_client, target_db, llm_id) == 0
+
+    migrator.apply_migrations(target_db)
+
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+
+
+@pytest.mark.parametrize(
+    ("target_version", "expect_table", "expect_ready"),
+    [(4, False, False), (26, True, False), (None, True, True)],
+)
+def test_costs_schema_gate_tracks_the_columns_the_cost_code_reads(
+    ch_client, target_version, expect_table, expect_ready
+):
+    """The costs gate approves a database exactly when the cost read works there.
+
+    Migration 5 creates `llm_token_prices`, but 27 adds the two cache cost
+    columns that `get_current_costs` selects, so a gate hardcoded to version 5
+    approved versions 5 through 26, where that read fails. Version 4 has no
+    table at all, 26 has the table without the cache columns, and latest has
+    every column.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_gate")
+    target_db = _unique_name(f"cost_gate_{target_version or 'latest'}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db, target_version=target_version)
+
+    # `expect_table and not expect_ready` is the case a version-5 gate got wrong:
+    # the table is there, so it approved a database the cost read cannot use.
+    table_rows = ch_client.query(
+        "SELECT count() FROM system.tables "
+        "WHERE database = %(database)s AND name = %(table)s",
+        parameters={"database": target_db, "table": COSTS_TABLE},
+    ).result_rows[0][0]
+    assert bool(table_rows) is expect_table
+    assert costs_schema_is_ready(ch_client, target_db) is expect_ready
+
+    prev_database = ch_client.database
+    ch_client.database = target_db
+    try:
+        if expect_ready:
+            get_current_costs(ch_client)
+        else:
+            with pytest.raises(DatabaseError):
+                get_current_costs(ch_client)
+    finally:
+        ch_client.database = prev_database

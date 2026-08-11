@@ -77,6 +77,8 @@ export {
 export type {
   Conversation,
   ConversationInit,
+  JsonObject,
+  JsonValue,
   LLM,
   LLMInit,
   Message,
@@ -87,6 +89,7 @@ export type {
   SubAgent,
   SubAgentInit,
   Tool,
+  ToolEndOptions,
   ToolInit,
   Turn,
   TurnInit,

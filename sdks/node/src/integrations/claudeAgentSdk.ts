@@ -11,6 +11,10 @@
  * through the high-level Weave GenAI SDK — `invoke_agent`/`chat`/`execute_tool`
  * spans to the `/agents/otel` endpoints (the Agents tab). See {@link ClaudeAgentOtelTracer}.
  *
+ * Agent/Task tool calls become nested `invoke_agent` spans. The SDK forwards
+ * nested tool blocks by default; callers that set `forwardSubagentText: true`
+ * also get the subagent's text and thinking recorded on nested `chat` spans.
+ *
  * Instrumentation is automatic via the CJS/ESM module hooks (registered from
  * `integrations/hooks.ts`), the same mechanism used by the other integrations.
  */

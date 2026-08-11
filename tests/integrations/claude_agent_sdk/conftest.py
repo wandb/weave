@@ -31,12 +31,15 @@ class ReplayTransport(Transport):
         messages: list[dict[str, Any]],
         *,
         fail_after_messages: int | None = None,
+        wait_for_user_messages_after: dict[int, int] | None = None,
     ) -> None:
         self._messages = messages
         self._fail_after_messages = fail_after_messages
+        self._wait_for_user_messages_after = wait_for_user_messages_after or {}
         self._connected = False
         self._pending_control_ids: list[str] = []
         self._control_event = anyio.Event()
+        self._user_message_event = anyio.Event()
         self.user_messages: list[dict[str, Any]] = []
 
     async def connect(self) -> None:
@@ -46,6 +49,7 @@ class ReplayTransport(Transport):
         parsed = json.loads(data.strip())
         if parsed.get("type") == "user":
             self.user_messages.append(parsed)
+            self._user_message_event.set()
         if parsed.get("type") == "control_request":
             self._pending_control_ids.append(parsed["request_id"])
             self._control_event.set()
@@ -76,6 +80,13 @@ class ReplayTransport(Transport):
             if self._fail_after_messages == index:
                 raise RuntimeError("replay transport failed")
             yield msg
+            required_user_messages = self._wait_for_user_messages_after.get(index)
+            while (
+                required_user_messages is not None
+                and len(self.user_messages) < required_user_messages
+            ):
+                await self._user_message_event.wait()
+                self._user_message_event = anyio.Event()
         if self._fail_after_messages == len(self._messages):
             raise RuntimeError("replay transport failed")
 

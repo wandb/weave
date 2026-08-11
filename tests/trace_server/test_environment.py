@@ -6,6 +6,7 @@ from weave.trace_server.environment import (
     DEFAULT_REMOTE_SCORER_HTTP_TIMEOUT_SECONDS,
     REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV,
     REMOTE_SCORER_ALLOWED_HOSTS_ENV,
+    REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV,
     REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV,
     REMOTE_SCORER_VALIDATE_HOSTS_ENV,
     VALID_CALLS_SHARD_KEYS,
@@ -19,6 +20,7 @@ from weave.trace_server.environment import (
     wf_scoring_worker_kafka_consumer_group_id_override,
     wf_scoring_worker_remote_scorer_allow_insecure_http,
     wf_scoring_worker_remote_scorer_allowed_hosts,
+    wf_scoring_worker_remote_scorer_allowed_private_cidrs,
     wf_scoring_worker_remote_scorer_bearer_token,
     wf_scoring_worker_remote_scorer_enabled,
     wf_scoring_worker_remote_scorer_http_timeout_seconds,
@@ -233,6 +235,42 @@ def test_wf_scoring_worker_remote_scorer_allowed_hosts(monkeypatch):
         "api.example.com:8443",
         "localhost",
     ]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # None means the variable is absent rather than set to a value.
+        pytest.param(None, [], id="unset"),
+        pytest.param("", [], id="empty"),
+        pytest.param("10.0.0.0/8", ["10.0.0.0/8"], id="single_network"),
+        pytest.param(
+            "10.0.0.0/8,fd00::/8",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="comma_separated",
+        ),
+        pytest.param(
+            " 10.0.0.0/8 ,\tfd00::/8 ",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="surrounding_whitespace",
+        ),
+        pytest.param(
+            "10.0.0.0/8,,  ,fd00::/8",
+            ["10.0.0.0/8", "fd00::/8"],
+            id="empty_entries",
+        ),
+    ],
+)
+@pytest.mark.disable_logging_error_check
+def test_wf_scoring_worker_remote_scorer_allowed_private_cidrs(
+    raw, expected, monkeypatch
+):
+    if raw is None:
+        monkeypatch.delenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raising=False)
+    else:
+        monkeypatch.setenv(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV, raw)
+
+    assert wf_scoring_worker_remote_scorer_allowed_private_cidrs() == expected
 
 
 @pytest.mark.disable_logging_error_check

@@ -246,6 +246,76 @@ def test_extract_genai_span_error_status() -> None:
     assert result.error_type == "RateLimitError"
 
 
+def test_extract_genai_span_error_details_fall_back_to_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "asyncio.exceptions.CancelledError",
+                        "message": "stream cancelled",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "asyncio.exceptions.CancelledError"
+    assert result.status_message == "stream cancelled"
+
+
+def test_extract_genai_span_error_details_prefer_explicit_fields() -> None:
+    span = _make_span(
+        attrs={"error.type": "RateLimitError"},
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "FallbackError",
+                        "message": "fallback message",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR, message="rate limited"),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "RateLimitError"
+    assert result.status_message == "rate limited"
+
+
+def test_extract_genai_span_does_not_promote_handled_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "HandledError",
+                        "message": "recovered",
+                    }
+                },
+            )
+        ]
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.status_code == "OK"
+    assert result.error_type == ""
+    assert result.status_message == ""
+
+
 def test_extract_genai_span_preserves_unset_status() -> None:
     span = _make_span(status=Status(code=StatusCode.UNSET))
     result = extract_genai_span(span, project_id="p1")

@@ -1,6 +1,5 @@
 import {Api as TraceServerApi} from './generated/traceServerApi';
 import {CLIENT_CAPABILITIES, CLIENT_CAPABILITIES_HEADER} from './constants';
-import {registerEvalLinkSpanProcessor} from './evalLinkSpanProcessor';
 import {
   getWeaveTracerProviderProjectId,
   shutdownWeaveTracerProvider,
@@ -151,7 +150,6 @@ export async function init(
     }
     setGlobalClient(client);
     setGlobalDomain(domain);
-    registerEvalLinkSpanProcessor(getGlobalClient);
     registerExitFlush();
     console.log(`View Weave data at https://${domain}/${projectId}/weave`);
     return client;
