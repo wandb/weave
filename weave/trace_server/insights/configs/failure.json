@@ -2,6 +2,10 @@
   "config_schema_version": 1,
   "space": "failure",
   "extraction": {
+    "prompt": {
+      "path": "prompts/failure.txt",
+      "sha256": ""
+    },
     "taxonomy": {
       "path": "taxonomies/failure_categories.json",
       "sha256": ""
@@ -10,7 +14,16 @@
       "path": "taxonomies/severity.json",
       "sha256": ""
     },
+    "history_turns": 8,
+    "max_failures_per_turn": 2,
+    "current_turn_tokens": 12000,
+    "history_assistant_tokens": 200,
+    "max_standing_constraints": 20,
     "normalization_version": 1
+  },
+  "judge": {
+    "model": "coreweave/google/gemma-4-31B-it",
+    "temperature": 0
   },
   "embedding": {
     "provider": "openai",
@@ -19,6 +32,6 @@
     "output_normalization": "l2"
   },
   "digests": {
-    "config_sha256": "be7dbaab2a7981ef9896463db66b24e9b93c17d53048edfc26f8a20668eebfbb"
+    "config_sha256": "edb7af2ac7d78685ab8a03c2a2f51235a8d07631ddfe7f79b57b61b087f09dbf"
   }
 }
