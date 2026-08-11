@@ -1,6 +1,7 @@
 """Unit tests for GenAI agent helper functions."""
 
 import datetime
+import json
 
 import pytest
 
@@ -41,6 +42,62 @@ def test_normalize_span_row_returns_new_dict() -> None:
     assert normalized["input_messages"] == [
         {"role": "user", "content": "hi", "finish_reason": ""}
     ]
+
+
+def test_normalize_span_row_fills_error_details_from_raw_span_dump() -> None:
+    normalized = normalize_span_row(
+        {
+            "status_code": "ERROR",
+            "status_message": "",
+            "error_type": "",
+            "raw_span_dump": json.dumps(
+                {
+                    "events": [
+                        {
+                            "name": "exception",
+                            "attributes": {
+                                "exception": {
+                                    "type": "asyncio.exceptions.CancelledError",
+                                    "message": "stream cancelled",
+                                }
+                            },
+                        }
+                    ]
+                }
+            ),
+        }
+    )
+
+    assert normalized["error_type"] == "asyncio.exceptions.CancelledError"
+    assert normalized["status_message"] == "stream cancelled"
+
+
+def test_normalize_span_row_preserves_explicit_error_details() -> None:
+    normalized = normalize_span_row(
+        {
+            "status_code": "ERROR",
+            "status_message": "rate limited",
+            "error_type": "RateLimitError",
+            "raw_span_dump": json.dumps(
+                {
+                    "events": [
+                        {
+                            "name": "exception",
+                            "attributes": {
+                                "exception": {
+                                    "type": "FallbackError",
+                                    "message": "fallback message",
+                                }
+                            },
+                        }
+                    ]
+                }
+            ),
+        }
+    )
+
+    assert normalized["error_type"] == "RateLimitError"
+    assert normalized["status_message"] == "rate limited"
 
 
 def test_normalize_span_row_rejects_invalid_message_shape() -> None:
