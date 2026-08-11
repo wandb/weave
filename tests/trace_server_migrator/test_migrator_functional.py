@@ -642,26 +642,17 @@ _FAILURE_COLUMNS = [
     ("expire_at", "DateTime"),
 ]
 
-# Every column that must stay identical in name and type across both tables.
-# Drift here is the standing cost of splitting one table into two, so it is
-# asserted rather than trusted.
-_SHARED_COLUMNS = [
-    ("agent_name", "LowCardinality(String)"),
-    ("category", "LowCardinality(String)"),
-    ("config_sha256", "LowCardinality(String)"),
-    ("conversation_id", "String"),
-    ("cost_usd", "Float64"),
-    ("duration_ms", "UInt32"),
-    ("expire_at", "DateTime"),
-    ("extracted_at", "DateTime64(6, 'UTC')"),
-    ("id", "UUID"),
-    ("inserted_at", "DateTime64(6, 'UTC')"),
-    ("project_id", "String"),
-    ("signature", "String"),
-    ("signature_display", "String"),
-    ("source_started_at", "DateTime64(6, 'UTC')"),
-    ("user_id", "String"),
-    ("vector", "Array(Float32)"),
+_SIGNATURE_TABLES = [
+    (
+        "intent_signatures",
+        _INTENT_COLUMNS,
+        [("idx_conversation_id", "conversation_id"), ("idx_trace_id", "trace_id")],
+    ),
+    (
+        "failure_signatures",
+        _FAILURE_COLUMNS,
+        [("idx_conversation_id", "conversation_id"), ("idx_trace_ids", "trace_ids")],
+    ),
 ]
 
 
@@ -732,121 +723,96 @@ def _insert_failure(
     )
 
 
-@pytest.mark.parametrize(
-    ("table_name", "expected_columns", "expected_indexes"),
-    [
-        (
-            "intent_signatures",
-            _INTENT_COLUMNS,
-            [
-                ("idx_conversation_id", "conversation_id"),
-                ("idx_trace_id", "trace_id"),
-            ],
-        ),
-        (
-            "failure_signatures",
-            _FAILURE_COLUMNS,
-            [
-                ("idx_conversation_id", "conversation_id"),
-                ("idx_trace_ids", "trace_ids"),
-            ],
-        ),
-    ],
-)
-def test_signature_tables_schema(
-    ch_client, table_name, expected_columns, expected_indexes
-):
+def test_signature_tables_schema(ch_client):
     """Both signature tables pin their key and engine, and neither carries a constraint.
 
     Engine, PARTITION BY and ORDER BY are the one-way doors: none can be altered
-    on a populated table, so nothing speculative is allowed in any of them. Every
-    other column is a metadata-only ALTER away from returning.
+    on a populated table. Both tables come from one migration, so they share the
+    one migrated database rather than paying for a chain each.
     """
     target_db = _migrate_signatures_db(ch_client, "signatures")
 
-    assert ch_client.query(
-        "SELECT engine, partition_key, sorting_key, primary_key, "
-        "extract(create_table_query, 'TTL (.+) SETTINGS') "
-        f"FROM system.tables WHERE database = '{target_db}' AND name = '{table_name}'"
-    ).result_rows == [
-        (
-            "ReplacingMergeTree",
-            "toYYYYMM(source_started_at)",
-            _SIGNATURE_KEY,
-            _SIGNATURE_KEY,
-            "expire_at",
+    for table_name, expected_columns, expected_indexes in _SIGNATURE_TABLES:
+        assert ch_client.query(
+            "SELECT engine, partition_key, sorting_key, primary_key, "
+            "extract(create_table_query, 'TTL (.+) SETTINGS') "
+            f"FROM system.tables WHERE database = '{target_db}' "
+            f"AND name = '{table_name}'"
+        ).result_rows == [
+            (
+                "ReplacingMergeTree",
+                "toYYYYMM(source_started_at)",
+                _SIGNATURE_KEY,
+                _SIGNATURE_KEY,
+                "expire_at",
+            )
+        ]
+
+        # Pins the column list, which is also what rules out an Enum: the writer
+        # gates the vocabulary, because an insert is batched at 256 rows and one
+        # bad candidate must not reject 255 good ones.
+        assert (
+            ch_client.query(
+                "SELECT name, type FROM system.columns "
+                f"WHERE database = '{target_db}' AND table = '{table_name}' "
+                "ORDER BY position"
+            ).result_rows
+            == expected_columns
         )
-    ]
 
-    assert (
-        ch_client.query(
-            "SELECT name, type FROM system.columns "
+        # A CONSTRAINT is the same 256-row problem and shows up nowhere else.
+        assert (
+            "CONSTRAINT"
+            not in ch_client.query(
+                "SELECT create_table_query FROM system.tables "
+                f"WHERE database = '{target_db}' AND name = '{table_name}'"
+            ).result_rows[0][0]
+        )
+
+        # Bloom filters only. No ANN index: measured on this schema, HNSW cost
+        # 126-196x on inserts.
+        assert (
+            ch_client.query(
+                "SELECT name, expr FROM system.data_skipping_indices "
+                f"WHERE database = '{target_db}' AND table = '{table_name}' "
+                "ORDER BY name"
+            ).result_rows
+            == expected_indexes
+        )
+
+        # inserted_at is MATERIALIZED so no writer can supply a version, and id is
+        # only DEFAULTed so a row cannot land without the one the writer minted.
+        assert ch_client.query(
+            "SELECT name, default_kind, default_expression FROM system.columns "
             f"WHERE database = '{target_db}' AND table = '{table_name}' "
-            "ORDER BY position"
-        ).result_rows
-        == expected_columns
-    )
-
-    # An insert is batched at 256 rows, so a CHECK or an Enum would let one bad
-    # candidate reject 255 good ones. The writer gates instead, dropping the
-    # candidate and counting it.
-    create_sql = ch_client.query(
-        "SELECT create_table_query FROM system.tables "
-        f"WHERE database = '{target_db}' AND name = '{table_name}'"
-    ).result_rows[0][0]
-    assert "CONSTRAINT" not in create_sql
-    assert "Enum" not in create_sql
-    # No ANN index: measured on this schema, HNSW cost 126-196x on inserts.
-    assert "vector_similarity" not in create_sql
-
-    assert ch_client.query(
-        "SELECT name, expr FROM system.data_skipping_indices "
-        f"WHERE database = '{target_db}' AND table = '{table_name}' ORDER BY name"
-    ).result_rows == [(name, expr) for name, expr in expected_indexes]
-
-    # MATERIALIZED, not DEFAULT: the writer cannot supply a version even by
-    # accident, so there is one clock and a retry sorts later for free.
-    assert ch_client.query(
-        "SELECT default_kind, default_expression FROM system.columns "
-        f"WHERE database = '{target_db}' AND table = '{table_name}' "
-        "AND name = 'inserted_at'"
-    ).result_rows == [("MATERIALIZED", "now64(6)")]
-
-    # The id is minted by the writer; the default only stops a row landing without
-    # one, so it must never be MATERIALIZED.
-    assert ch_client.query(
-        "SELECT default_kind, default_expression FROM system.columns "
-        f"WHERE database = '{target_db}' AND table = '{table_name}' AND name = 'id'"
-    ).result_rows == [("DEFAULT", "generateUUIDv7()")]
+            "AND name IN ('id', 'inserted_at') ORDER BY name"
+        ).result_rows == [
+            ("id", "DEFAULT", "generateUUIDv7()"),
+            ("inserted_at", "MATERIALIZED", "now64(6)"),
+        ]
 
 
-def test_signature_tables_share_columns(ch_client):
-    """Every shared column is identical in name and type across both tables.
+def test_signature_tables_share_column_types():
+    """A column in both tables must mean the same thing in both.
 
     Splitting intents from failures buys grain-correct schemas and costs schema
-    drift. This is the guard that turns drift into a failing test rather than a
-    query that silently means two things.
+    drift. A type that diverges makes one query silently mean two things, so it
+    is caught here against the pinned column lists, before ClickHouse is asked.
     """
-    target_db = _migrate_signatures_db(ch_client, "shared")
+    intent, failure = dict(_INTENT_COLUMNS), dict(_FAILURE_COLUMNS)
+    shared = intent.keys() & failure.keys()
 
-    assert (
-        ch_client.query(
-            "SELECT name, type FROM system.columns "
-            f"WHERE database = '{target_db}' "
-            "AND table IN ('intent_signatures', 'failure_signatures') "
-            "GROUP BY name, type HAVING count() = 2 ORDER BY name"
-        ).result_rows
-        == _SHARED_COLUMNS
-    )
+    assert len(shared) == 16
+    assert {name: intent[name] for name in shared} == {
+        name: failure[name] for name in shared
+    }
 
 
 def test_signature_retry_collapses_on_read(ch_client):
     """A retry of the same row id replaces its predecessor under GROUP BY + argMax.
 
-    The writer cannot supply a version, so MATERIALIZED `now64(6)` orders the
-    attempts. The read is spelled the way the reader has to spell it: this path
-    never uses FINAL, so the collapse must fall out of the sorting key, and a key
-    that cannot express it is a one-way door.
+    Spelled the way the reader has to spell it: this path never uses FINAL, so the
+    collapse must fall out of the sorting key.
     """
     target_db = _migrate_signatures_db(ch_client, "lifecycle")
 
@@ -894,7 +860,7 @@ def test_failure_turn_attribution(ch_client):
     """A failure attributes many turns, and its per-row totals do not sum.
 
     Two distinct occurrences, so nothing collapses and these reads need no dedup;
-    replacement is covered by test_signature_versions_collapse_on_read.
+    replacement is covered by test_signature_retry_collapses_on_read.
     """
     target_db = _migrate_signatures_db(ch_client, "attribution")
 

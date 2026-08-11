@@ -5,6 +5,7 @@ import os
 import shutil
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace_server.insights import config, prompt
 
@@ -65,6 +66,14 @@ def config_dir(tmp_path, monkeypatch) -> str:
     return target
 
 
+def _taxonomy(space: str) -> list[str]:
+    return config.load_taxonomy(config.load_config(space).extraction.taxonomy)
+
+
+def _digest(space: str) -> str:
+    return config.config_sha256(config.load_config(space))
+
+
 @pytest.mark.parametrize(
     ("space", "retired", "moves"),
     [
@@ -72,29 +81,20 @@ def config_dir(tmp_path, monkeypatch) -> str:
         ("failure", _RETIRED_FAILURE_LABELS, _FAILURE_MOVES),
     ],
 )
-def test_checked_in_configs_are_current(space, retired, moves):
-    """Recorded digests match, and every retired Enum label is still accounted for.
+def test_taxonomies_account_for_every_retired_enum_label(space, retired, moves):
+    """Exactly the documented moves may leave the taxonomy.
 
-    This is the CI gate as a test: a config whose digest was not regenerated
-    fails here rather than shipping rows that point at a value nothing produces.
+    An undocumented drop fails here, and so does a move entry for a label that is
+    still present.
     """
-    loaded = config.load_config(space)
-    assert loaded["digests"]["config_sha256"] == config.compute_config_sha256(loaded)
-
-    labels = set(config.load_taxonomy(space, "taxonomy"))
-    # Exactly the documented moves may leave the taxonomy: an undocumented drop
-    # fails here, and so does a move entry for a label that is still present.
+    labels = set(_taxonomy(space))
     assert retired - labels == set(moves)
     for replacements in moves.values():
         assert set(replacements) <= labels
+
     # Distinct spaces must never collide, or a contamination check reading
     # topK(config_sha256) cannot tell two pipelines apart.
-    assert (
-        loaded["digests"]["config_sha256"]
-        != config.load_config("failure" if space == "intent" else "intent")["digests"][
-            "config_sha256"
-        ]
-    )
+    assert _digest("intent") != _digest("failure")
 
 
 @pytest.mark.parametrize("space", ["intent", "failure"])
@@ -106,54 +106,35 @@ def test_prompt_renders_and_cannot_drift_from_its_taxonomy(space):
     so this is what stops the second from describing a retired label.
     """
     rendered = prompt.render_prompt(space)
-    assert "%%" not in rendered
+    assert "$" not in rendered
 
-    labels = config.load_taxonomy(space, "taxonomy")
+    labels = _taxonomy(space)
     assert "|".join(labels) in rendered
     assert all(f"`{label}`" in rendered for label in labels)
 
-    extraction = config.load_section(space, "extraction")
-    assert f"up to {extraction['history_turns']} " in rendered
+    extraction = config.load_config(space).extraction
+    assert f"up to {extraction.history_turns} " in rendered
 
 
 def test_editing_the_prompt_moves_the_digest(config_dir):
     """A reworded prompt is a pipeline change, so rows must stop claiming the old one."""
-    before = config.compute_config_sha256(config.load_config("intent"))
-    prompt_path = os.path.join(config_dir, "prompts", "intent.txt")
-    with open(prompt_path, "a", encoding="utf-8") as handle:
+    before = _digest("intent")
+    with open(
+        os.path.join(config_dir, "prompts", "intent.txt"), "a", encoding="utf-8"
+    ) as handle:
         handle.write("\nJudge nothing on Tuesdays.\n")
 
-    assert config.compute_config_sha256(config._read_config("intent")) != before
-    with pytest.raises(ValueError, match="digest is stale"):
-        config.load_config("intent")
+    assert _digest("intent") != before
 
 
 def test_a_prompt_token_the_config_does_not_supply_is_an_error(config_dir):
     """An unsubstituted token would otherwise reach the judge as literal text."""
-    prompt_path = os.path.join(config_dir, "prompts", "intent.txt")
-    with open(prompt_path, "a", encoding="utf-8") as handle:
-        handle.write("\nEmit at most %%MAX_JOKES%% jokes.\n")
-    config.regenerate_digests()
+    with open(
+        os.path.join(config_dir, "prompts", "intent.txt"), "a", encoding="utf-8"
+    ) as handle:
+        handle.write("\nEmit at most $max_jokes jokes.\n")
 
-    with pytest.raises(ValueError, match="MAX_JOKES"):
-        prompt.render_prompt("intent")
-
-
-def test_an_extraction_key_with_no_token_rule_is_an_error(config_dir):
-    """The reverse drift: a knob the prompt cannot be told about.
-
-    Skipping it would surface later as "prompt has tokens the config does not
-    supply", naming the asset rather than the knob that has no token rule.
-    """
-    config_path = os.path.join(config_dir, "intent.json")
-    with open(config_path, encoding="utf-8") as handle:
-        raw = json.load(handle)
-    raw["extraction"]["stop_sequences"] = ["\n\n"]
-    with open(config_path, "w", encoding="utf-8") as handle:
-        json.dump(raw, handle, indent=2)
-    config.regenerate_digests()
-
-    with pytest.raises(TypeError, match="stop_sequences"):
+    with pytest.raises(KeyError, match="max_jokes"):
         prompt.render_prompt("intent")
 
 
@@ -164,14 +145,14 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     hashing the config bytes: a prompt or taxonomy edit is a pipeline change even
     though no config file was touched. The second half is why it canonicalizes.
     """
-    before = config.compute_config_sha256(config.load_config("intent"))
+    before = _digest("intent")
 
     config_path = os.path.join(config_dir, "intent.json")
     with open(config_path, encoding="utf-8") as handle:
         original = json.load(handle)
     with open(config_path, "w", encoding="utf-8") as handle:
         json.dump(dict(reversed(list(original.items()))), handle, indent=2)
-    assert config.compute_config_sha256(config.load_config("intent")) == before
+    assert _digest("intent") == before
 
     taxonomy_path = os.path.join(config_dir, "taxonomies", "intent_categories.json")
     with open(taxonomy_path, encoding="utf-8") as handle:
@@ -180,37 +161,38 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     with open(taxonomy_path, "w", encoding="utf-8") as handle:
         json.dump(taxonomy, handle, indent=2)
 
-    after = config.compute_config_sha256(config._read_config("intent"))
-    assert after != before
-    # And the stale recorded digest is now loudly wrong rather than silently
-    # describing a taxonomy that no longer exists.
-    with pytest.raises(ValueError, match="digest is stale"):
-        config.load_config("intent")
-    assert config.regenerate_digests() == ["intent"]
-    assert config.load_config("intent")["digests"]["config_sha256"] == after
+    assert _digest("intent") != before
 
 
-def test_unloadable_configs_are_rejected_by_name(config_dir):
-    """Every failure mode names what went wrong instead of returning a partial config."""
-    with pytest.raises(ValueError, match="unknown insights space"):
-        config.load_config("sentiment")
-
+@pytest.mark.parametrize(
+    ("edit", "match"),
+    [
+        ({"config_schema_version": 2}, "config_schema_version"),
+        # The filename decides which space a caller asked for, so a file whose own
+        # `space` disagrees would serve one space's taxonomy under another's digest.
+        ({"space": "intent"}, "space"),
+        # An undeclared knob is rejected at load rather than reaching a judge that
+        # has no token for it, or a writer that never reads it.
+        ({"extraction": {"stop_sequences": ["\n\n"]}}, "stop_sequences"),
+    ],
+)
+def test_unloadable_configs_are_rejected_by_field(config_dir, edit, match):
+    """Every failure mode names the field that is wrong, not a partial config."""
     config_path = os.path.join(config_dir, "failure.json")
     with open(config_path, encoding="utf-8") as handle:
         raw = json.load(handle)
-    raw["config_schema_version"] = config.CONFIG_SCHEMA_VERSION + 1
+    for key, value in edit.items():
+        if isinstance(value, dict):
+            raw[key].update(value)
+        else:
+            raw[key] = value
     with open(config_path, "w", encoding="utf-8") as handle:
         json.dump(raw, handle, indent=2)
 
-    with pytest.raises(ValueError, match="declares schema version"):
+    with pytest.raises(ValidationError, match=match):
         config.load_config("failure")
 
-    # The filename decides which space a caller asked for, so a file whose own
-    # `space` disagrees would serve one space's taxonomy under another's digest.
-    raw["config_schema_version"] = config.CONFIG_SCHEMA_VERSION
-    raw["space"] = "intent"
-    with open(config_path, "w", encoding="utf-8") as handle:
-        json.dump(raw, handle, indent=2)
 
-    with pytest.raises(ValueError, match="declares space 'intent'"):
-        config.load_config("failure")
+def test_an_unknown_space_is_rejected():
+    with pytest.raises(ValueError, match="unknown insights space"):
+        config.load_config("sentiment")

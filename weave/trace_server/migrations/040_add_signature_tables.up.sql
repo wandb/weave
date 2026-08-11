@@ -1,38 +1,30 @@
 -- Two tables for distilled conversation insights, split by grain: an intent is one
--- turn, a failure is one whole conversation. One table would need a kind
--- discriminator that defaults every grain-specific column on the wrong half of the
--- rows. The columns they share are asserted identical in name and type by a test.
---
--- Both are ReplacingMergeTree on inserted_at, which collapses exactly one thing: a
--- writer retrying the same row id. Re-extracting a turn is a new row.
+-- turn, a failure is one whole conversation. Both are ReplacingMergeTree on
+-- inserted_at, which collapses exactly one thing: a writer retrying the same row
+-- id. Re-extracting a turn is a new row.
 
 -- One distilled user intent per row: one turn, one claim, one embedding.
 CREATE TABLE IF NOT EXISTS intent_signatures
 (
     project_id String,
-    -- Minted by the writer before its first attempt so a retry carries the same id
-    -- and collapses. Defaulted here only so a row can never land without one.
+    -- Minted by the writer before its first attempt so a retry carries the same
+    -- id. Defaulted here only so a row can never land without one.
     id UUID DEFAULT generateUUIDv7(),
     -- Digest of insights/configs/<space>.json (see insights/config.py).
     config_sha256 LowCardinality(String),
 
     -- Canonicalized before insert, so grouping by it is grouping by identity.
-    -- Canonicalization casefolds and is lossy, so this is never the string to
-    -- render: signature_display holds the judge's wording verbatim.
+    -- Lossy, so never render it: signature_display holds the judge's wording.
     signature String,
     signature_display String DEFAULT '',
     category LowCardinality(String),
     -- ISO 639-1, or the ISO 639-2 'und' sentinel. Signatures are
     -- English-normalized, so this is the only record of the source language.
     language LowCardinality(String) DEFAULT 'und',
-    -- The label the model emitted. No numeric encoding: averaging ordinal labels
-    -- asserts distances the taxonomy does not define.
     sentiment LowCardinality(String) DEFAULT '',
     sentiment_rationale String DEFAULT '',
     -- -1 rather than 0, which would collide "not reported" with "certainly not".
     sentiment_confidence Float32 DEFAULT -1,
-    -- Exact cosine, no ANN index: measured on this schema, HNSW cost 126-196x on
-    -- inserts, and an exact scan is inside budget at this volume.
     vector Array(Float32),
 
     -- Required, not defaulted: an empty value would bucket every rollup under ''.
@@ -42,9 +34,8 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     trace_id String,
     -- Pseudonymous source subject, not the authenticated writer.
     user_id String DEFAULT '',
-    -- The three denormalized facets, so a ranked view needs no join: the agent, and
-    -- the turn's own totals from the agents API, which are sums over every span in
-    -- the turn rather than a per-span lookup. Everything else joins `spans`.
+    -- Denormalized so a ranked view needs no join. The totals are the turn's own,
+    -- from the agents API, summed over every span in it. Everything else joins `spans`.
     agent_name LowCardinality(String) DEFAULT '',
     duration_ms UInt32 DEFAULT 0,
     cost_usd Float64 DEFAULT 0,
@@ -54,8 +45,8 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     source_started_at DateTime64(6, 'UTC'),
     -- When the judge ran, which batching separates from when the row landed.
     extracted_at DateTime64(6, 'UTC'),
-    -- The version. MATERIALIZED so no writer can supply one: there is a single
-    -- clock, and a retry sorts later than the attempt it replaces.
+    -- The version. MATERIALIZED so no writer can supply one and a retry always
+    -- sorts later than the attempt it replaces.
     inserted_at DateTime64(6, 'UTC') MATERIALIZED now64(6),
     -- Retention only. Retraction uses a lightweight DELETE, because TTL is
     -- asynchronous and a row awaiting its merge still answers reads.
@@ -65,9 +56,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
--- Source month so retention and range reads follow user activity. PARTITION BY and
--- ORDER BY cannot be altered on a populated table, so they carry only what is
--- certain: tenancy, time, identity, and nothing about the pipeline.
+-- Source month, so retention and range reads follow user activity.
 PARTITION BY toYYYYMM(source_started_at)
 -- toDate(source_started_at) precedes id so a sub-month read prunes granules.
 ORDER BY (project_id, toDate(source_started_at), id)
@@ -83,12 +72,11 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     id UUID DEFAULT generateUUIDv7(),
     config_sha256 LowCardinality(String),
 
-    -- The short canonical claim, and the judge's verbatim wording. See
-    -- intent_signatures.signature.
+    -- See intent_signatures.signature.
     signature String,
     signature_display String DEFAULT '',
-    -- Grounded prose explaining the claim. Never embedded, freely regenerable,
-    -- which is why a rephrased rationale does not move a cluster.
+    -- Grounded prose explaining the claim. Never embedded, so a rephrased
+    -- rationale does not move a cluster.
     failure_reason String DEFAULT '',
     category LowCardinality(String),
     severity LowCardinality(String) DEFAULT '',
@@ -102,9 +90,8 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     trace_ids Array(String),
     user_id String DEFAULT '',
     agent_name LowCardinality(String) DEFAULT '',
-    -- Summed across trace_ids. Per-row only: two failures in one conversation can
-    -- share a turn, so these are NOT additive across rows. A true total comes from
-    -- the distinct union of trace_ids against `spans`.
+    -- Summed across trace_ids, so NOT additive across rows: two failures in one
+    -- conversation can share a turn. A true total unions trace_ids against `spans`.
     duration_ms UInt32 DEFAULT 0,
     cost_usd Float64 DEFAULT 0,
 

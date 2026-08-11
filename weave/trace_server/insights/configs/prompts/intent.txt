@@ -3,8 +3,8 @@ zero or more atomic, normalized intent signatures for embedding, clustering, rep
 trace drilldown. Judge only what the user is trying to accomplish in the current turn.
 
 The input is JSON with:
-- `conversation_history`: up to %%HISTORY_TURNS%% prior turns containing distilled user intents, the
-  assistant response truncated to %%HISTORY_ASSISTANT_TOKENS%% tokens, and detected assistant
+- `conversation_history`: up to $history_turns prior turns containing distilled user intents, the
+  assistant response truncated to $history_assistant_tokens tokens, and detected assistant
   failures.
 - `user_message`: the raw user message for the current turn.
 
@@ -17,12 +17,12 @@ Return exactly one JSON object and no markdown or commentary:
 {"status":"ok|needs_context|no_intent",
  "language":"en",
  "intents":[
-  {"category":"%%TAXONOMY_LABELS%%",
+  {"category":"$taxonomy_labels",
    "signature":"one sentence describing the current user intent"}
  ],
- "sentiment":{"rationale":"at most twelve words citing the deciding wording","label":"%%SENTIMENT_LABELS%%","confidence":0.0}}
+ "sentiment":{"rationale":"at most twelve words citing the deciding wording","label":"$sentiment_labels","confidence":0.0}}
 `intents` must be nonempty only when status is `ok`, and must never hold more than
-%%MAX_ITEMS_PER_TURN%% entries.
+$max_items_per_turn entries.
 
 Always emit `language`: the ISO 639-1 code of the user's own prose in this turn, or the ISO 639-2
 sentinel `und` when the turn carries no prose or the language is indeterminate. Judge it from the raw

@@ -26,8 +26,5 @@
     "model": "text-embedding-3-large",
     "dimensions": 1024,
     "output_normalization": "l2"
-  },
-  "digests": {
-    "config_sha256": "b76a419caba2706ffa69e5dd60d019ffe3b805e397ad5c7bb8a77d9f84e35753"
   }
 }
