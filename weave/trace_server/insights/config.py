@@ -16,8 +16,14 @@ import os
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "configs")
 CONFIG_SCHEMA_VERSION = 1
 
-# Configs are append-only: rows point at them by digest, so an edit would
-# retroactively change what an existing row claims. A new run writes a new file.
+# Each space has exactly ONE config file, edited in place, and rows point at it
+# by digest. So a digest is NOT resolvable from the working tree: it names the
+# content of this file as of some commit. That is a deliberate trade. Writes are
+# pinned to the deployed digest by `validate_config_sha256`, and configs only
+# deploy from merged commits, so every digest that ever reached production maps
+# to a commit on master and is recoverable with git. What it does not give you is
+# machine resolution at read time, which is what a digest-to-content table would
+# buy if a product surface ever needs to render "extracted under taxonomy v3".
 SPACES = ("intent", "failure")
 
 ConfigValue = (
@@ -96,6 +102,15 @@ def _read_config(space: str) -> Config:
             f"{space} config declares schema version {version}, this code reads "
             f"{CONFIG_SCHEMA_VERSION}"
         )
+    # The filename decides which space a caller asked for, so a file whose own
+    # `space` disagrees would silently serve one space's taxonomy under another's
+    # digest.
+    declared = _string(config, "space")
+    if declared != space:
+        raise ValueError(
+            f"{space}.json declares space {declared!r}; the filename and the "
+            "field must agree"
+        )
     return config
 
 
@@ -105,7 +120,12 @@ def _read_json(path: str) -> Config:
 
 
 def _resolve_references(node: ConfigValue) -> ConfigValue:
-    """Replace every {"path": ...} reference with the referenced file's sha256."""
+    """Replace every {"path": ...} reference with the referenced file's sha256.
+
+    Any `sha256` already written next to a `path` is ignored and recomputed, so
+    the checked-in files carry the path alone rather than a value that looks
+    authoritative and is not.
+    """
     if isinstance(node, dict):
         if "path" in node:
             path = _string(node, "path")

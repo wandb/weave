@@ -3,16 +3,13 @@
   "space": "failure",
   "extraction": {
     "prompt": {
-      "path": "prompts/failure.txt",
-      "sha256": ""
+      "path": "prompts/failure.txt"
     },
     "taxonomy": {
-      "path": "taxonomies/failure_categories.json",
-      "sha256": ""
+      "path": "taxonomies/failure_categories.json"
     },
     "severity": {
-      "path": "taxonomies/severity.json",
-      "sha256": ""
+      "path": "taxonomies/severity.json"
     },
     "history_turns": 8,
     "max_failures_per_turn": 2,

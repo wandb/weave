@@ -1018,6 +1018,10 @@ def test_create_distributed_table_sql_id_sharded():
         ("agent_versions", "sipHash64(project_id, agent_name)"),
         ("intent_signatures", "sipHash64(project_id)"),
         ("failure_signatures", "sipHash64(project_id)"),
+        # turn_context must not fall through to rand(): a CoalescingMergeTree
+        # only merges columns between rows on the same shard, so a random key
+        # would strand each judge's column on a different shard forever.
+        ("turn_context", "sipHash64(project_id, conversation_id)"),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):

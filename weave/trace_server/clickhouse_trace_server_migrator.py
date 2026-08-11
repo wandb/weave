@@ -191,6 +191,12 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",
     "failure_signatures": "project_id",
+    # turn_context is read one conversation at a time, and it is the one
+    # CoalescingMergeTree here: its column-wise merge only happens between rows
+    # on the same shard, so rand() would leave each judge's column stranded on a
+    # different shard and never collapsing. Sharding by the read's own key makes
+    # the per-conversation read a single-shard range instead of a scatter.
+    "turn_context": "project_id, conversation_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",

@@ -3,14 +3,29 @@
 -- kind discriminator that defaults every grain-specific column on the wrong
 -- half of the rows, plus a CHECK across both halves to police it.
 --
--- They share 15 columns, identical in name and type, asserted by a test.
+-- They share 17 columns, identical in name and type, asserted by a test.
+--
+-- READING EITHER SIGNATURE TABLE. Both are ReplacingMergeTree and no read here
+-- uses FINAL, so a re-extraction leaves two physical rows until a merge and every
+-- reader must collapse them itself. The canonical shape, cheaper than argMax over
+-- a wide projection because it never materializes the 4 KB vector per group:
+--
+--   SELECT ... FROM intent_signatures
+--   WHERE project_id = {project_id:String} AND ...
+--   ORDER BY inserted_at DESC
+--   LIMIT 1 BY project_id, toDate(source_started_at), id
+--
+-- An aggregate that cannot be expressed that way (avg, quantile, topK) must run
+-- over a collapsed subquery, not over the raw rows, or a re-extracted row is
+-- counted twice.
 
 -- One distilled user intent per row: one turn, one claim, one embedding.
 --
 -- IDENTITY. id = hex(hash(project_id, conversation_id, trace_id,
 --                         canonical_signature, toDate(source_started_at)))
---   The canonical signature is hashed directly. There is no stored
---   signature_id, so nothing can disagree with the text it came from.
+--   The canonical signature is hashed directly, so no writer-supplied id can
+--   disagree with the text it came from. `signature_id` below is a different
+--   thing: MATERIALIZED, computed by ClickHouse, and used only to join clusters.
 --   toDate(source_started_at) is folded in because it is in the sorting key and
 --   therefore in the replacement identity: a re-extraction whose snapshot
 --   drifted across midnight must produce a visibly new id, not a silent
@@ -45,8 +60,20 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     config_sha256 LowCardinality(String),
 
     -- Canonical form, canonicalized before insert, so grouping by it is
-    -- grouping by identity.
+    -- grouping by identity. Canonicalization casefolds, so this is not the
+    -- string to render.
     signature String,
+    -- The judge's wording, verbatim. Never hashed, never embedded, never grouped:
+    -- it exists because canonicalization is lossy and the original casing cannot
+    -- be recovered later without paying for a re-judge.
+    signature_display String DEFAULT '',
+    -- The cluster-table join key, computed by ClickHouse rather than supplied, so
+    -- the writer cannot disagree with the function the join uses. Stored and
+    -- indexed because the product read is "every occurrence in this cluster",
+    -- which arrives holding hashes: without a column, that filter is
+    -- sipHash128(signature) evaluated per row over the whole window with no
+    -- pruning possible.
+    signature_id FixedString(16) MATERIALIZED sipHash128(signature),
     category LowCardinality(String),
     -- ISO 639-1, or the ISO 639-2 'und' sentinel. Signatures are
     -- English-normalized, so this is the only record of the source language.
@@ -57,12 +84,17 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- Why the judge picked that label, in its words, and how sure it was. Never
     -- embedded and never in the id hash, so a reworded rationale keeps the row.
     sentiment_rationale String DEFAULT '',
-    sentiment_confidence Float32 DEFAULT 0,
-    -- Exact cosine, intentionally no ANN index. Measured on this schema, HNSW
-    -- cost 126-196x on inserts and 4.3-7.2x on reads.
+    -- -1 rather than 0, which would collide "not reported" with "certainly not".
+    sentiment_confidence Float32 DEFAULT -1,
+    -- Exact cosine, intentionally no ANN index: measured on this schema, HNSW
+    -- cost 126-196x on inserts, and an exact scan is inside budget at this
+    -- volume. The earlier claim that HNSW also cost 4.3-7.2x on reads is not
+    -- cited here, because a build that loses to a brute-force scan is more
+    -- likely to have gone unused than to be that slow.
     vector Array(Float32),
 
-    conversation_id String DEFAULT '',
+    -- Required, not defaulted: an empty value would bucket every rollup under ''.
+    conversation_id String,
     -- The turn this intent came from, joinable to spans.trace_id. Weave defines
     -- one turn as one trace, so this is the turn key. There is no turn_id in
     -- the agent-spans world. Exactly one.
@@ -88,7 +120,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- asynchronous and a row awaiting its merge still answers reads.
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
-    INDEX idx_signature signature TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_signature_id signature_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
@@ -136,6 +168,10 @@ CREATE TABLE IF NOT EXISTS failure_signatures
 
     -- The short canonical claim. This is what is embedded.
     signature String,
+    -- The judge's wording, verbatim. See intent_signatures.signature_display.
+    signature_display String DEFAULT '',
+    -- See intent_signatures.signature_id.
+    signature_id FixedString(16) MATERIALIZED sipHash128(signature),
     -- Grounded prose explaining the claim. Never embedded, never in the id
     -- hash, freely regenerable, which is why a rephrased rationale does not
     -- move a cluster.
@@ -166,7 +202,7 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
-    INDEX idx_signature signature TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_signature_id signature_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1,
     -- Serves has(trace_ids, {trace_id}), the drilldown from a turn to the
     -- failures touching it. Also covers onset_trace_id, always a member.
@@ -182,44 +218,83 @@ SETTINGS min_bytes_for_wide_part = 0;
 -- that follow. Not a signature table: nothing here is embedded or clustered,
 -- which is why it carries no vector, category, or signature, and why the drift
 -- guard over the two signature tables deliberately does not cover it.
+--
+-- TWO PRODUCERS, ONE ROW. `assistant_summary` comes from the failure judge and
+--   `constraints_json` from the intent judge. They emit together today, but
+--   nothing about the pipeline requires that, and the engine is the one thing
+--   ALTER cannot change later. ReplacingMergeTree replaces a whole row, so the
+--   moment either judge writes alone it erases the other's column: measured over
+--   14,909 turns carrying constraints, a summary-only re-judgment left 0 of them
+--   intact under ReplacingMergeTree and all 14,909 under CoalescingMergeTree.
+--
+-- IDENTITY. The sorting key is (project_id, conversation_id, source_started_at,
+--   trace_id). `turn_index` is deliberately NOT in it: there is no turn ordinal
+--   in the agent-spans world, so an index is derived by ordering a conversation's
+--   traces by start time, and a late-arriving trace renumbers every later turn.
+--   That would re-attach context to the wrong turn inside a key that cannot be
+--   altered. `source_started_at` before `trace_id` keeps "the prior N turns" a
+--   contiguous descending range, which is what `turn_index` was buying.
+--
+-- NULLABILITY IS THE CONTRACT. A column Nullable here is owned by exactly one
+--   producer, and NULL means "this producer has nothing to say", which is what
+--   the engine coalesces on. A column NOT Nullable is one every producer must
+--   supply on every write, because a non-Nullable column in a
+--   CoalescingMergeTree follows last-write-wins exactly like Replacing: omit it
+--   and its DEFAULT silently wins. That is also why `expire_at` stays
+--   non-Nullable, so the TTL expression has a real value to read.
+--
+-- READ. No FINAL, matching every other table here. The collapse is
+--   `argMaxIf(col, inserted_at, col IS NOT NULL)`, which is the engine's own
+--   "newest non-NULL wins" rule spelled as SQL. Verified equal to FINAL while
+--   fully unmerged, partly merged, fully merged, and with a re-judgment landing
+--   on top of an already-merged row. A bare GROUP BY with any() is NOT
+--   equivalent: the engine has no version column of its own, so `inserted_at`
+--   is what makes the manual collapse well defined.
 CREATE TABLE IF NOT EXISTS turn_context
 (
     project_id String,
     conversation_id String,
-    -- Position of the turn in its conversation. With conversation_id this is the
-    -- turn identity, so there is no hashed id and no version column: the sorting
-    -- key already names the row a re-judgment should replace.
-    turn_index UInt16,
-    -- The turn's trace, joinable to spans.trace_id. Weave defines one turn as one
-    -- trace, so this is a second name for the same identity, carried for the
-    -- drilldown from a trace back to its context.
+    -- The turn's trace, joinable to spans.trace_id. Weave defines one turn as
+    -- one trace, so this is the turn identity.
     trace_id String,
-    config_sha256 LowCardinality(String),
+    -- Display position of the turn in its conversation. Payload, not identity:
+    -- see the note above on why it cannot be in the sorting key.
+    turn_index UInt16,
+
+    -- Each judge stamps only its own digest, so a row's provenance stays correct
+    -- per column instead of taking whichever judge wrote last.
+    intent_config_sha256 Nullable(String),
+    failure_config_sha256 Nullable(String),
 
     -- One sentence describing the assistant response, from the failure judge.
     -- Written for every turn, including turns with no failure and no intent,
     -- which is the reason it cannot live on either signature table.
-    assistant_summary String DEFAULT '',
+    assistant_summary Nullable(String),
     -- Constraints the user established, changed, or retracted on this turn, from
-    -- the intent judge. Empty on most turns. The standing set handed to the
+    -- the intent judge. NULL on most turns. The standing set handed to the
     -- failure judge is the accumulation of these, assembled at read time.
-    constraints Array(String),
+    --
+    -- JSON rather than Array(String) because Nullable(Array(...)) is not a legal
+    -- ClickHouse type, and a non-Nullable Array cannot coalesce: measured, the
+    -- array form is clobbered by a summary-only write while the JSON form
+    -- survives. The array shape is restored by the reader, not by the schema.
+    constraints_json Nullable(String),
 
     source_started_at DateTime64(6, 'UTC'),
     extracted_at DateTime64(6, 'UTC'),
+    -- Not a ReplacingMergeTree version. This orders the read-time collapse, so
+    -- every producer must supply it or omit its own columns entirely.
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
-ENGINE = ReplacingMergeTree(inserted_at)
+ENGINE = CoalescingMergeTree
 PARTITION BY toYYYYMM(source_started_at)
--- Ordered for the one read that runs on every judged turn: the prior N turns of a
--- single conversation. conversation_id sits in the sorting key rather than in a
--- bloom filter, so that read is a contiguous range instead of a scatter. No time
--- term, because this table is read by conversation rather than by window, and the
--- month partition is enough pruning for retention.
-ORDER BY (project_id, conversation_id, turn_index)
+-- Ordered for the one read that runs on every judged turn: the prior N turns of
+-- a single conversation. conversation_id sits in the sorting key rather than in
+-- a bloom filter, so that read is a contiguous range instead of a scatter.
+ORDER BY (project_id, conversation_id, source_started_at, trace_id)
 TTL expire_at DELETE
 -- These rows are small enough that index_granularity_bytes never binds, so the
 -- default 8192-row granule would serve an 8-row answer. 1024 cuts that over-read

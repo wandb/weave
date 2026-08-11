@@ -35,9 +35,12 @@ def render_prompt(space: str) -> str:
 
 def _prompt_path(space: str, extraction: config.Config) -> str:
     prompt = extraction.get("prompt")
-    if not isinstance(prompt, dict) or not isinstance(prompt.get("path"), str):
+    # Bound to a local so the narrowing survives into the return: the subscript
+    # is typed as the whole ConfigValue union, the local is not.
+    path = prompt.get("path") if isinstance(prompt, dict) else None
+    if not isinstance(path, str):
         raise TypeError(f"{space} config declares no prompt file reference")
-    return prompt["path"]
+    return path
 
 
 def _tokens(space: str, extraction: config.Config) -> dict[str, str]:
@@ -51,5 +54,14 @@ def _tokens(space: str, extraction: config.Config) -> dict[str, str]:
         elif isinstance(value, dict) and "path" in value:
             tokens[f"%%{key.upper()}_LABELS%%"] = "|".join(
                 config.load_taxonomy(space, key)
+            )
+        else:
+            # Silently skipping would surface later as the misleading "prompt has
+            # tokens the config does not supply", naming the asset rather than
+            # the knob that has no token rule.
+            raise TypeError(
+                f"{space} config key {key!r} has type {type(value).__name__}, which "
+                "has no prompt token rule; add one here or move the key out of "
+                "`extraction`"
             )
     return tokens

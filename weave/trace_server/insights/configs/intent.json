@@ -3,16 +3,13 @@
   "space": "intent",
   "extraction": {
     "prompt": {
-      "path": "prompts/intent.txt",
-      "sha256": ""
+      "path": "prompts/intent.txt"
     },
     "taxonomy": {
-      "path": "taxonomies/intent_categories.json",
-      "sha256": ""
+      "path": "taxonomies/intent_categories.json"
     },
     "sentiment": {
-      "path": "taxonomies/sentiment.json",
-      "sha256": ""
+      "path": "taxonomies/sentiment.json"
     },
     "history_turns": 8,
     "max_items_per_turn": 8,
