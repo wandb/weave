@@ -31,21 +31,7 @@ traces are not prose; a turn that is only pasted material is `und`. When a turn 
 the one the user's own instruction is written in. Every example below emits it.
 
 Intent categories:
-- `action_request`: asks the agent to do, create, change, remove, or execute something, including a
-  requested capability that does not exist yet.
-- `information_request`: asks for information, explanation, instructions, comparison, or analysis.
-- `problem_report`: reports broken or incorrect behavior without requesting a remedy.
-- `positive_feedback`: praises or expresses satisfaction with behavior working as designed, without
-  requesting action.
-- `negative_feedback`: complains about or expresses dissatisfaction with behavior working as
-  designed, including naming a capability the product lacks, without requesting action.
-- `approval`: authorizes or agrees to a proposed action.
-- `rejection`: declines, cancels, stops, or aborts a proposed or in-flight action.
-- `refinement`: redirects the agent, either by contradicting its output, its understanding, or an
-  earlier user request, or by supplying requested or additional detail.
-- `bad_faith`: intentional misuse of the agent, including jailbreak or prompt-injection attempts,
-  attempts to extract system instructions or another user's data, or sandbox escape.
-- `other`: a meaningful intent that fits none of the above.
+$taxonomy_definitions
 
 Boundary rules:
 - Broken behavior is `problem_report`; opinion about behavior working as designed is
@@ -76,11 +62,7 @@ Sentiment is independent of category. It measures affect, while `positive_feedba
 `negative_feedback` at `neutral`; a delighted "omg finally" approving a plan is `approval` at
 `delighted`. Never infer one from the other.
 
-- `frustrated`: explicit exasperation, a repetition callout, profanity, or emphatic insistence.
-- `dissatisfied`: reports something broken, wrong, or unwanted, without explicit heat.
-- `neutral`: task-focused with no affect. Plain corrections, approvals, and cancellations are neutral.
-- `satisfied`: brief thanks, warm agreement, or a short positive acknowledgement.
-- `delighted`: emphatic or unprompted praise.
+$sentiment_definitions
 
 Sentiment boundary rules:
 - Judge affect from the user's wording, not from the act. Rejecting, correcting, or cancelling is

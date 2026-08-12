@@ -44,9 +44,20 @@ class Reference(_Strict):
         return {"path": self.path, "sha256": self.sha256()}
 
 
+class Label(_Strict):
+    """One categorical value, carrying the prose a judge needs to apply it.
+
+    The definition lives here rather than in the prompt so that adding a label is
+    one config edit, which is what a customer-supplied taxonomy will be.
+    """
+
+    name: str
+    definition: str
+
+
 class _Taxonomy(_Strict):
     description: str
-    labels: list[str]
+    labels: list[Label]
 
 
 class TaxonomyRef(Reference):
@@ -55,7 +66,7 @@ class TaxonomyRef(Reference):
     Its own type because taxonomies are the references that render into a prompt.
     """
 
-    def labels(self) -> list[str]:
+    def labels(self) -> list[Label]:
         return _Taxonomy.model_validate_json(self.read()).labels
 
 

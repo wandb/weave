@@ -21,7 +21,8 @@ def render_prompt(space: str) -> str:
 
 
 def _tokens(extraction: config.Extraction) -> dict[str, str]:
-    """Every numeric knob as `$name`, every taxonomy as `$name_labels`.
+    """Every numeric knob as `$name`, every taxonomy as `$name_labels` and
+    `$name_definitions`.
 
     Derived from the declared fields rather than listed, so reaching a new knob
     from an asset is a config edit and a token. An asset is free to ignore any of
@@ -31,7 +32,11 @@ def _tokens(extraction: config.Extraction) -> dict[str, str]:
     for name in type(extraction).model_fields:
         value = getattr(extraction, name)
         if isinstance(value, config.TaxonomyRef):
-            tokens[f"{name}_labels"] = "|".join(value.labels())
+            labels = value.labels()
+            tokens[f"{name}_labels"] = "|".join(label.name for label in labels)
+            tokens[f"{name}_definitions"] = "\n".join(
+                f"- `{label.name}`: {label.definition}" for label in labels
+            )
         elif isinstance(value, int):
             tokens[name] = str(value)
     return tokens
