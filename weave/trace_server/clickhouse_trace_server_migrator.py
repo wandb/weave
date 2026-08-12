@@ -202,8 +202,8 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # Keep every audit version for one trace tag on the same shard so current-state
     # argMax queries can resolve the tag locally. The tag-centric copy preserves the
     # same logical key even though its ORDER BY puts tag before conversation_id.
-    "trace_tags": "project_id, conversation_id, trace_id, tag",
-    "trace_tags_by_tag": "project_id, conversation_id, trace_id, tag",
+    "conversation_tags": "project_id, conversation_id, trace_id, tag",
+    "conversation_tags_by_tag": "project_id, conversation_id, trace_id, tag",
     # Files are chunked: `_file_content_read_once` selects all rows for a
     # (project_id, digest) and checks the count against `n_chunks`. With
     # rand() sharding chunks land on different shards, so any per-shard

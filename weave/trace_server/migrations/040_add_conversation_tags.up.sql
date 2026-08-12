@@ -1,5 +1,5 @@
--- Source of truth and full audit history for trace tags. Rows are append-only.
-CREATE TABLE IF NOT EXISTS trace_tags
+-- Source of truth and full audit history for conversation tags. Rows are append-only.
+CREATE TABLE IF NOT EXISTS conversation_tags
 (
     project_id      String,
     conversation_id String,
@@ -20,8 +20,8 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(trace_ts)
 ORDER BY (project_id, conversation_id, trace_id, tag);
 
--- Tag-centric copy for querying recent traces with a given tag.
-CREATE TABLE IF NOT EXISTS trace_tags_by_tag
+-- Tag-centric copy for querying recent conversations with a given tag.
+CREATE TABLE IF NOT EXISTS conversation_tags_by_tag
 (
     project_id      String,
     tag             LowCardinality(String),
@@ -39,8 +39,8 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(trace_ts)
 ORDER BY (project_id, tag, trace_ts, conversation_id, trace_id);
 
-CREATE MATERIALIZED VIEW IF NOT EXISTS trace_tags_by_tag_mv
-TO trace_tags_by_tag AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS conversation_tags_by_tag_mv
+TO conversation_tags_by_tag AS
 SELECT
     project_id,
     tag,
@@ -53,4 +53,4 @@ SELECT
     rationale,
     inserted_at,
     is_removed
-FROM trace_tags;
+FROM conversation_tags;
