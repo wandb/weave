@@ -26,6 +26,35 @@ def test_signature_types_have_distinct_digests():
     assert _digest("intent") != _digest("failure")
 
 
+def test_clustering_config_is_typed_and_content_addressed(config_dir):
+    clustering = config.load_clustering_config()
+    assert clustering.model_dump() == {
+        "config_schema_version": 1,
+        "algorithm": "hdbscan",
+        "min_cluster_size": 3,
+        "min_samples": 3,
+        "metric": "euclidean",
+        "cluster_selection_method": "eom",
+        "allow_single_cluster": False,
+    }
+
+    before = config.config_sha(clustering)
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["min_cluster_size"] = 5
+    assert config.config_sha(config.load_clustering_config()) != before
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["untracked_parameter"] = True
+    with pytest.raises(ValidationError, match="untracked_parameter"):
+        config.load_clustering_config()
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw.pop("untracked_parameter")
+        raw["min_cluster_size"] = 1
+    with pytest.raises(ValidationError, match="min_cluster_size"):
+        config.load_clustering_config()
+
+
 @pytest.mark.parametrize("signature_type", config.SIGNATURE_TYPES)
 def test_prompt_renders_every_declared_label_and_its_definition(signature_type):
     """Every token resolves, and the taxonomy supplies both halves of a label.
