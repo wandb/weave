@@ -56,6 +56,14 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
+### PyPI release publishing
+
+`uv build` resolves the unconstrained `hatchling` build requirement in an
+isolated environment. Keep the pinned `pypa/gh-action-pypi-publish` action new
+enough to validate the Core Metadata version emitted by current Hatchling; for
+example, Hatchling 1.32 emits Metadata 2.5, which requires the action's Twine 7
+and Packaging 26 stack rather than Twine 6.1 and Packaging 25.
+
 ### Codex Development (nox)
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`
