@@ -156,3 +156,27 @@ def config_sha(config: SpaceConfig) -> str:
     """
     canonical = json.dumps(config.model_dump(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# `load_config` returns the union, so a caller reaching a space-only field needs it
+# narrowed. These live here rather than at each call site so there is one place
+# that turns "the config validated" into "this is the intent config".
+def intent_config() -> IntentConfig:
+    """The intent config, narrowed to the model that declares `sentiment`."""
+    loaded = load_config("intent")
+    if not isinstance(loaded, IntentConfig):
+        raise TypeError("intent config did not validate as an intent config")
+    return loaded
+
+
+def failure_config() -> FailureConfig:
+    """The failure config, narrowed to the model that declares `severity`."""
+    loaded = load_config("failure")
+    if not isinstance(loaded, FailureConfig):
+        raise TypeError("failure config did not validate as a failure config")
+    return loaded
+
+
+def space_sha(space: str) -> str:
+    """The digest of one space's config, by space name."""
+    return config_sha(load_config(space))

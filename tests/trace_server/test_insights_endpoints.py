@@ -35,7 +35,7 @@ def _vector(seed: float = 0.5) -> list[float]:
 
 
 def _digest(space: str) -> str:
-    return config.config_sha(config.load_config(space))
+    return config.space_sha(space)
 
 
 def _intent(turn: int, signature: str, **overrides: object) -> IntentSignatureCandidate:
@@ -282,7 +282,7 @@ def test_writer_gates_drop_candidates_and_count_them(ch_server):
 
     # Evidence over the config's `max_evidence_spans` is truncated, not dropped:
     # the failure is still real and the config owns the bound.
-    cap = writer.failure_config().extraction.max_evidence_spans
+    cap = config.failure_config().extraction.max_evidence_spans
     truncated = _write_failures(
         ch_server,
         project_id,

@@ -42,31 +42,13 @@ class InsightWriteRejected(Exception):
     """The request as a whole is unusable, as opposed to one bad candidate."""
 
 
-def intent_config() -> config.IntentConfig:
-    """The intent space's config, narrowed to the model that declares sentiment."""
-    loaded = config.load_config("intent")
-    if not isinstance(loaded, config.IntentConfig):
-        raise InsightWriteRejected("intent config did not validate as an intent config")
-    return loaded
-
-
-def failure_config() -> config.FailureConfig:
-    """The failure space's config, narrowed to the model that declares severity."""
-    loaded = config.load_config("failure")
-    if not isinstance(loaded, config.FailureConfig):
-        raise InsightWriteRejected(
-            "failure config did not validate as a failure config"
-        )
-    return loaded
-
-
 def validate_config_sha(space: str, claimed: str) -> None:
     """Require the caller to agree with the deployed config.
 
     A row points at its config by digest, so a digest this deployment cannot
     resolve would be an unreadable provenance pointer.
     """
-    actual = config.config_sha(config.load_config(space))
+    actual = config.space_sha(space)
     if claimed != actual:
         raise InsightWriteRejected(
             f"{space} config_sha {claimed!r} does not match the deployed "
@@ -125,7 +107,7 @@ def prepare_intents(
     config_sha: str,
     candidates: list[IntentSignatureCandidate],
 ) -> tuple[list[Row], Dropped]:
-    cfg = intent_config()
+    cfg = config.intent_config()
     categories = set(cfg.extraction.taxonomy.labels())
     sentiments = set(cfg.extraction.sentiment.labels())
     dimensions = cfg.embedding.dimensions
@@ -180,7 +162,7 @@ def prepare_failures(
     config_sha: str,
     candidates: list[FailureSignatureCandidate],
 ) -> tuple[list[Row], Dropped]:
-    cfg = failure_config()
+    cfg = config.failure_config()
     categories = set(cfg.extraction.taxonomy.labels())
     severities = set(cfg.extraction.severity.labels())
     dimensions = cfg.embedding.dimensions
