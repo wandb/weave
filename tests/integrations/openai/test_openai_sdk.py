@@ -67,6 +67,56 @@ def test_normalize_openai_responses_cache_tokens() -> None:
     }
 
 
+def test_normalize_openai_chat_completions_cache_tokens() -> None:
+    usage = {
+        "prompt_tokens": 100,
+        "prompt_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "completion_tokens": 10,
+        "total_tokens": 110,
+    }
+
+    _normalize_openai_cache_tokens(usage)
+
+    assert usage == {
+        "prompt_tokens": 100,
+        "prompt_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "completion_tokens": 10,
+        "total_tokens": 110,
+        "cache_read_input_tokens": 20,
+        "cache_creation_input_tokens": 30,
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "op_name",
+        "input_tokens_key",
+        "input_tokens_details_key",
+        "output_tokens_key",
+    ),
+    [
+        pytest.param(
+            "openai.responses.create",
+            "input_tokens",
+            "input_tokens_details",
+            "output_tokens",
+            id="responses",
+        ),
+        pytest.param(
+            "openai.chat.completions.create",
+            "prompt_tokens",
+            "prompt_tokens_details",
+            "completion_tokens",
+            id="chat-completions",
+        ),
+    ],
+)
 @pytest.mark.parametrize(
     (
         "model",
@@ -94,8 +144,12 @@ def test_normalize_openai_responses_cache_tokens() -> None:
         ),
     ],
 )
-def test_openai_responses_cache_write_tokens_follow_model_pricing(
+def test_openai_cache_write_tokens_follow_model_pricing(
     client: WeaveClient,
+    op_name: str,
+    input_tokens_key: str,
+    input_tokens_details_key: str,
+    output_tokens_key: str,
     model: str,
     cache_write_tokens: int | None,
     cache_creation_input_token_cost: float,
@@ -127,14 +181,14 @@ def test_openai_responses_cache_write_tokens_follow_model_pricing(
         "id": f"resp_{model}",
         "model": model,
         "usage": {
-            "input_tokens": input_tokens,
-            "input_tokens_details": input_tokens_details,
-            "output_tokens": output_tokens,
+            input_tokens_key: input_tokens,
+            input_tokens_details_key: input_tokens_details,
+            output_tokens_key: output_tokens,
             "total_tokens": input_tokens + output_tokens,
         },
     }
 
-    @weave.op(name="openai.responses.create")
+    @weave.op(name=op_name)
     def create_response() -> dict:
         return response
 
@@ -144,9 +198,9 @@ def test_openai_responses_cache_write_tokens_follow_model_pricing(
     call = next(iter(create_response.calls()))
     expected_usage = {
         "requests": 1,
-        "input_tokens": input_tokens,
-        "input_tokens_details": input_tokens_details,
-        "output_tokens": output_tokens,
+        input_tokens_key: input_tokens,
+        input_tokens_details_key: input_tokens_details,
+        output_tokens_key: output_tokens,
         "total_tokens": input_tokens + output_tokens,
         "cache_read_input_tokens": cached_tokens,
     }

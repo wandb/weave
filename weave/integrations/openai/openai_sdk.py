@@ -434,35 +434,21 @@ def openai_on_input_handler(
 def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
     """Copy OpenAI's nested cache token fields to Weave usage fields.
 
-    OpenAI Chat Completions nests cached tokens under prompt_tokens_details,
-    and the Responses API nests cache reads and writes under input_tokens_details.
-    This copies them to `cache_read_input_tokens` and
-    `cache_creation_input_tokens`.
+    Chat Completions nests cache reads and writes under prompt_tokens_details,
+    and Responses nests them under input_tokens_details. This copies them to
+    `cache_read_input_tokens` and `cache_creation_input_tokens`.
     """
-    prompt_tokens_details = usage.get("prompt_tokens_details")
-    if (
-        isinstance(prompt_tokens_details, dict)
-        and prompt_tokens_details.get("cached_tokens") is not None
-    ):
-        usage.setdefault(
-            "cache_read_input_tokens", prompt_tokens_details["cached_tokens"]
-        )
-    input_tokens_details = usage.get("input_tokens_details")
-    if (
-        isinstance(input_tokens_details, dict)
-        and input_tokens_details.get("cached_tokens") is not None
-    ):
-        usage.setdefault(
-            "cache_read_input_tokens", input_tokens_details["cached_tokens"]
-        )
-    if (
-        isinstance(input_tokens_details, dict)
-        and input_tokens_details.get("cache_write_tokens") is not None
-    ):
-        usage.setdefault(
-            "cache_creation_input_tokens",
-            input_tokens_details["cache_write_tokens"],
-        )
+    for details_key in ("prompt_tokens_details", "input_tokens_details"):
+        details = usage.get(details_key)
+        if not isinstance(details, dict):
+            continue
+        if details.get("cached_tokens") is not None:
+            usage.setdefault("cache_read_input_tokens", details["cached_tokens"])
+        if details.get("cache_write_tokens") is not None:
+            usage.setdefault(
+                "cache_creation_input_tokens",
+                details["cache_write_tokens"],
+            )
 
 
 def openai_on_finish(
