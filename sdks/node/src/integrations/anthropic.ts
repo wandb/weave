@@ -188,16 +188,17 @@ function patchStreamHelper(exports: any) {
 }
 
 type BatchChunk = {
-  type: undefined;
   custom_id: string;
-  result: {type: string; message: Message};
+  result:
+    | {type: 'succeeded'; message: Message}
+    | {type: 'errored' | 'canceled' | 'expired'};
 };
 
 const batchStreamReducer: StreamReducer<BatchChunk, ResultState> = {
   initialStateFn: streamReducer.initialStateFn,
   reduceFn: (state, chunk) => {
-    // batch message type
-    if (typeof chunk.result == 'object' && chunk.result != null) {
+    // Chunks arrive as untyped JSON; only a succeeded result carries a message.
+    if (chunk.result?.type === 'succeeded' && chunk.result.message != null) {
       state.messages.push(chunk.result.message);
     }
     return state;

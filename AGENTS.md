@@ -344,6 +344,20 @@ deterministic.
   flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
   typed; non-scalar values are stringified.
 
+### TypeScript Anthropic message batches
+
+- A batch result is a discriminated union and only its `succeeded` variant
+  carries a `message`; a batch ends when every request has succeeded, errored,
+  been canceled or expired. Read `message` without checking the discriminator
+  and the reducer stores `undefined`, which the usage summarizer then throws on,
+  out of the stream iterator's `finally`.
+- `patchAnthropicMessagesCreate` wraps `Messages.prototype.create` in a `Proxy`,
+  so property reads still reach the mock behind it and a test can reconfigure it
+  through the patched prototype. `patchBatchApi` assigns `op()`'s plain wrapper
+  to `Batches` `create`, `retrieve` and `results` instead, so for those a test
+  reconfigures the mock it captured before patching, or reaches it through
+  `__wrappedFunction`.
+
 ### TypeScript custom type round trip
 
 - `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
@@ -561,6 +575,9 @@ deterministic.
   fall back to the latest OTel `exception` event. Explicit `error.type` and
   status-message values take precedence, and handled exception events on
   non-error spans remain raw-only.
+- Content spans with `ERROR` status emit a chat message even without text or
+  reasoning so the conversation timeline retains the failure. Successful empty
+  tool-calling steps remain omitted.
 - Use the Trace tree view for parentage comparisons. The default flamegraph
   collapses overlapping siblings into synthetic groups, which can make flat
   and nested traces look deceptively similar; give live-example spans realistic
