@@ -1,0 +1,8 @@
+config_schema_version: 1
+algorithm: hdbscan
+
+min_cluster_size: 3
+min_samples: 3
+metric: euclidean
+cluster_selection_method: eom
+allow_single_cluster: false

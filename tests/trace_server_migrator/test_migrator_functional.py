@@ -911,6 +911,167 @@ def test_failure_turn_attribution(ch_client):
     ).result_rows == [(0,)]
 
 
+def test_signature_cluster_tables_schema_and_retry(ch_client):
+    """Cluster storage follows signature-row identity and collapses writer retries."""
+    target_db = _migrate_signatures_db(ch_client, "signature_clusters")
+
+    expected_tables = {
+        "signature_cluster_assignments": (
+            "project_id, cluster_run_id, signature_record_id",
+            [
+                ("project_id", "String"),
+                ("cluster_run_id", "UUID"),
+                ("signature_record_id", "UUID"),
+                ("cluster_id", "Int32"),
+                ("cluster_confidence", "Float32"),
+                ("inserted_at", "DateTime64(6, 'UTC')"),
+                ("expire_at", "DateTime"),
+            ],
+        ),
+        "signature_cluster_runs": (
+            "project_id, id",
+            [
+                ("project_id", "String"),
+                ("id", "UUID"),
+                ("signature_type", "LowCardinality(String)"),
+                ("signature_config_sha", "LowCardinality(String)"),
+                ("cluster_config_sha", "LowCardinality(String)"),
+                ("window_start", "DateTime64(6, 'UTC')"),
+                ("window_end", "DateTime64(6, 'UTC')"),
+                ("status", "LowCardinality(String)"),
+                ("started_at", "DateTime64(6, 'UTC')"),
+                ("completed_at", "Nullable(DateTime64(6, 'UTC'))"),
+                ("inserted_at", "DateTime64(6, 'UTC')"),
+                ("expire_at", "DateTime"),
+            ],
+        ),
+        "signature_clusters": (
+            "project_id, cluster_run_id, cluster_id",
+            [
+                ("project_id", "String"),
+                ("cluster_run_id", "UUID"),
+                ("cluster_id", "Int32"),
+                ("label", "String"),
+                ("occurrence_count", "UInt64"),
+                ("inserted_at", "DateTime64(6, 'UTC')"),
+                ("expire_at", "DateTime"),
+            ],
+        ),
+    }
+    assert ch_client.query(
+        "SELECT name, engine, sorting_key "
+        "FROM system.tables "
+        f"WHERE database = '{target_db}' AND name LIKE 'signature_cluster%' "
+        "ORDER BY name"
+    ).result_rows == [
+        (name, "ReplacingMergeTree", sorting_key)
+        for name, (sorting_key, _) in expected_tables.items()
+    ]
+    for table_name, (_, expected_columns) in expected_tables.items():
+        assert (
+            ch_client.query(
+                "SELECT name, type FROM system.columns "
+                f"WHERE database = '{target_db}' AND table = '{table_name}' "
+                "ORDER BY position"
+            ).result_rows
+            == expected_columns
+        )
+
+    # No speculative read model or index ships with the base storage contract.
+    assert (
+        ch_client.query(
+            "SELECT name FROM system.tables "
+            f"WHERE database = '{target_db}' AND name = 'signature_cluster_daily'"
+        ).result_rows
+        == []
+    )
+    assert (
+        ch_client.query(
+            "SELECT name FROM system.projections "
+            f"WHERE database = '{target_db}' AND table LIKE 'signature_cluster%'"
+        ).result_rows
+        == []
+    )
+
+    _insert_intent(ch_client, target_db, "action_request", 0.21)
+    run_id = "019ff4bc-2ae1-744d-ae3a-285998a90519"
+    for inserted_at, status, completed_at in [
+        ("2026-06-20 15:00:00", "running", "NULL"),
+        (
+            "2026-06-20 15:05:00",
+            "complete",
+            "toDateTime64('2026-06-20 15:04:00', 6, 'UTC')",
+        ),
+    ]:
+        ch_client.command(
+            f"INSERT INTO {target_db}.signature_cluster_runs "
+            "(project_id, id, signature_type, signature_config_sha, "
+            "cluster_config_sha, window_start, window_end, status, started_at, "
+            "completed_at, inserted_at) VALUES "
+            f"('project-1', '{run_id}', 'intent', 'signature-cfg-a', "
+            "'cluster-cfg-a', toDateTime64('2026-05-01', 6, 'UTC'), "
+            "toDateTime64('2026-06-01', 6, 'UTC'), "
+            f"'{status}', toDateTime64('2026-06-20 14:59:00', 6, 'UTC'), "
+            f"{completed_at}, toDateTime64('{inserted_at}', 6, 'UTC'))"
+        )
+
+    for inserted_at, label, count, cluster_id, confidence in [
+        ("2026-06-20 15:00:00", "draft", 1, -1, 0.0),
+        ("2026-06-20 15:05:00", "checkout", 2, 7, 0.875),
+    ]:
+        ch_client.command(
+            f"INSERT INTO {target_db}.signature_clusters "
+            "(project_id, cluster_run_id, cluster_id, label, occurrence_count, inserted_at) "
+            f"VALUES ('project-1', '{run_id}', 7, '{label}', {count}, "
+            f"toDateTime64('{inserted_at}', 6, 'UTC'))"
+        )
+        ch_client.command(
+            f"INSERT INTO {target_db}.signature_cluster_assignments "
+            "(project_id, cluster_run_id, signature_record_id, cluster_id, "
+            "cluster_confidence, inserted_at) "
+            f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', {cluster_id}, "
+            f"toFloat32({confidence}), toDateTime64('{inserted_at}', 6, 'UTC'))"
+        )
+
+    assert ch_client.query(
+        "SELECT argMax(status, inserted_at), argMax(signature_type, inserted_at), "
+        "argMax(signature_config_sha, inserted_at), "
+        "argMax(cluster_config_sha, inserted_at), "
+        "isNull(argMax(completed_at, inserted_at)) "
+        f"FROM {target_db}.signature_cluster_runs "
+        "WHERE project_id = 'project-1' GROUP BY project_id, id"
+    ).result_rows == [("complete", "intent", "signature-cfg-a", "cluster-cfg-a", 0)]
+    assert ch_client.query(
+        "SELECT argMax(label, inserted_at), argMax(occurrence_count, inserted_at) "
+        f"FROM {target_db}.signature_clusters "
+        "WHERE project_id = 'project-1' GROUP BY project_id, cluster_run_id, cluster_id"
+    ).result_rows == [("checkout", 2)]
+    assert ch_client.query(
+        "SELECT argMax(cluster_id, inserted_at), "
+        "round(toFloat64(argMax(cluster_confidence, inserted_at)), 3) "
+        f"FROM {target_db}.signature_cluster_assignments "
+        "WHERE project_id = 'project-1' "
+        "GROUP BY project_id, cluster_run_id, signature_record_id"
+    ).result_rows == [(7, 0.875)]
+
+    # The assignment references the upstream signature row UUID directly.
+    assert ch_client.query(
+        "SELECT count() "
+        f"FROM {target_db}.signature_cluster_assignments AS a "
+        f"INNER JOIN {target_db}.intent_signatures AS s "
+        "ON a.project_id = s.project_id AND a.signature_record_id = s.id "
+        f"WHERE a.cluster_run_id = toUUID('{run_id}')"
+    ).result_rows == [(2,)]
+
+    for table_name in expected_tables:
+        ch_client.command(f"OPTIMIZE TABLE {target_db}.{table_name} FINAL")
+    assert ch_client.query(
+        "SELECT sum(rows) FROM system.parts "
+        f"WHERE database = '{target_db}' AND active "
+        "AND table LIKE 'signature_cluster%'"
+    ).result_rows == [(3,)]
+
+
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
     """A client minted with the production migration timeout runs a full
     replicated migration and carries the incident-fixing HTTP read timeout.
