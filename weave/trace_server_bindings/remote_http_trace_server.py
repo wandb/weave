@@ -21,7 +21,7 @@ from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
-from weave.trace_server.trace_server_interface import agent_types
+from weave.trace_server.trace_server_interface import agent_types, insights_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -627,6 +627,41 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
+
+    # === Insights API ===
+
+    @validate_call
+    def insights_signatures_write(
+        self, req: insights_types.InsightSignaturesWriteReq
+    ) -> insights_types.InsightSignaturesWriteRes:
+        return self._generic_request(
+            "/insights/signatures/write",
+            req,
+            insights_types.InsightSignaturesWriteReq,
+            insights_types.InsightSignaturesWriteRes,
+        )
+
+    @validate_call
+    def insights_context_query(
+        self, req: insights_types.InsightContextQueryReq
+    ) -> insights_types.InsightContextQueryRes:
+        return self._generic_request(
+            "/insights/context/query",
+            req,
+            insights_types.InsightContextQueryReq,
+            insights_types.InsightContextQueryRes,
+        )
+
+    @validate_call
+    def insights_signatures_query(
+        self, req: insights_types.InsightSignaturesQueryReq
+    ) -> insights_types.InsightSignaturesQueryRes:
+        return self._generic_request(
+            "/insights/signatures/query",
+            req,
+            insights_types.InsightSignaturesQueryReq,
+            insights_types.InsightSignaturesQueryRes,
+        )
 
     # === GenAI / Agent Observability API (read) ===
 
