@@ -114,7 +114,7 @@ sentence = "There are many fruits that were found on the recently discovered pla
 extract_fruit(sentence)
 ```
 
-> **Tip:** The same OpenAI client works with OpenAI-compatible multi-model gateways via `base_url` — for example [DaoXE](https://daoxe.com/?utm_source=github&utm_medium=organic&utm_campaign=weave&utm_content=openai_example) at `https://api.daoxe.com/v1` (`OpenAI(base_url="https://api.daoxe.com/v1", api_key="...")`).
+> **Tip:** The same OpenAI client works with OpenAI-compatible multi-model gateways via `base_url` — for example [DaoXE](https://daoxe.com/) at `https://api.daoxe.com/v1` (`OpenAI(base_url="https://api.daoxe.com/v1", api_key="...")`).
 
 ## Contributing
 
