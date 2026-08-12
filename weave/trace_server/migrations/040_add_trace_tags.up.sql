@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS trace_tags
     -- Removal and re-add rows for a (trace_id, tag) must preserve trace_ts.
     trace_ts        DateTime64(3),
     rationale       String DEFAULT '' CODEC(ZSTD(3)),
-    inserted_at     DateTime64(6),
+    inserted_at     DateTime64(6) DEFAULT now64(6),
     is_removed      UInt8 DEFAULT 0
 )
 ENGINE = MergeTree
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS trace_tags_by_tag
     source_version  LowCardinality(String),
     wb_user_id      String,
     rationale       String DEFAULT '' CODEC(ZSTD(3)),
-    inserted_at     DateTime64(6),
+    inserted_at     DateTime64(6) DEFAULT now64(6),
     is_removed      UInt8 DEFAULT 0
 )
 ENGINE = MergeTree
