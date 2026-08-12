@@ -27,21 +27,38 @@ def test_spaces_have_distinct_digests():
 
 
 @pytest.mark.parametrize("space", config.SPACES)
-def test_prompt_renders_and_cannot_drift_from_its_taxonomy(space):
-    """Every token resolves, and the prose describes exactly the declared labels.
+def test_prompt_renders_every_declared_label_and_its_definition(space):
+    """Every token resolves, and the taxonomy supplies both halves of a label.
 
     The label list reaches the judge twice: as the alternation it must choose
-    from, and as the descriptions it reasons with. Only the first is generated,
-    so this is what stops the second from describing a retired label.
+    from, and as the definition it reasons with. Both are generated from the one
+    file, so the two cannot describe different vocabularies.
     """
     rendered = prompt.render_prompt(space)
     assert "$" not in rendered
 
     extraction = config.load_config(space).extraction
     labels = extraction.taxonomy.labels()
-    assert "|".join(labels) in rendered
-    assert all(f"`{label}`" in rendered for label in labels)
+    assert "|".join(label.name for label in labels) in rendered
+    assert all(f"- `{label.name}`: {label.definition}" in rendered for label in labels)
     assert f"up to {extraction.history_turns} " in rendered
+
+
+def test_a_new_label_reaches_the_judge_without_touching_the_prompt(config_dir):
+    """A label carries its own meaning, so adding one is a taxonomy edit alone.
+
+    This is what a customer-supplied taxonomy needs: the new category reaches the
+    judge as both a choosable value and a definition, and no prompt text is
+    editable to get there.
+    """
+    with _edit_json(_taxonomy_path(config_dir)) as raw:
+        raw["labels"].append(
+            {"name": "billing_dispute", "definition": "disputes a charge."}
+        )
+
+    rendered = prompt.render_prompt("intent")
+    assert "|billing_dispute" in rendered
+    assert "- `billing_dispute`: disputes a charge." in rendered
 
 
 def test_editing_the_prompt_moves_the_digest(config_dir):
@@ -75,9 +92,8 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
         raw.update(reordered)
     assert _digest("intent") == before
 
-    taxonomy = os.path.join(config_dir, "taxonomies", "intent_categories.json")
-    with _edit_json(taxonomy) as raw:
-        raw["labels"].append("newly_added_intent")
+    with _edit_json(_taxonomy_path(config_dir)) as raw:
+        raw["labels"].append({"name": "newly_added_intent", "definition": "a new ask."})
     assert _digest("intent") != before
 
 
@@ -106,6 +122,10 @@ def test_an_unknown_space_is_rejected():
 
 def _digest(space: str) -> str:
     return config.config_sha(config.load_config(space))
+
+
+def _taxonomy_path(config_dir: str) -> str:
+    return os.path.join(config_dir, "taxonomies", "intent_categories.json")
 
 
 def _append(path: str, text: str) -> None:

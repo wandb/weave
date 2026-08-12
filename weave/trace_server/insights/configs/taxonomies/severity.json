@@ -1,8 +1,17 @@
 {
   "description": "Severity labels a failure signature may carry, ordered least to most impactful. `info` is the bottom rung rather than `low` because two categories, `refusal` and `capability_gap`, record behavior that is not necessarily wrong; a ladder whose floor still reads as a problem would misreport them.",
   "labels": [
-    "info",
-    "minor",
-    "major"
+    {
+      "name": "info",
+      "definition": "notable behavior that is not necessarily wrong. Default for `refusal` and `capability_gap`."
+    },
+    {
+      "name": "minor",
+      "definition": "degraded the turn, but the user still got what they asked for."
+    },
+    {
+      "name": "major",
+      "definition": "the user did not get what they asked for, or was harmed."
+    }
   ]
 }

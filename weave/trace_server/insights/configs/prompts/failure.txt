@@ -42,38 +42,10 @@ not embedded and does not enter the row id. The short boundary examples below om
 it is still expected.
 
 Failure categories:
-
-Comprehension
-- `task_misunderstanding`: misread the current request and solved the wrong problem.
-- `context_loss`: forgot or contradicted an established referent, constraint, answer, or instruction.
-
-Output
-- `wrong_output`: produced incorrect content, including factual errors, fabricated APIs/data/
-  capabilities, or code that does not work.
-- `requirement_violation`: produced otherwise plausible content but dropped a stated or standing
-  requirement, format, scope, language, or required piece.
-
-Execution
-- `tool_misuse`: selected the wrong tool, sent malformed arguments, failed to use an available tool,
-  or ignored/misread a tool result.
-- `tool_failure`: a well-formed tool call failed inside the tool through an error, timeout, or rate
-  limit that the assistant could observe.
-- `system_error`: infrastructure outside the assistant failed, such as a crash, model timeout,
-  truncated response, or raw platform error exposed to the user.
-- `unproductive_loop`: repeated calls, retries, or approaches without meaningful progress.
-
-Scope and behavior
-- `capability_gap`: the request exceeds what the product can do, even if declined correctly.
-- `refusal`: declined, hedged, or evaded a request, whether or not the decline was correct.
-- `unsafe_behavior`: took a destructive or unauthorized action or disclosed sensitive information,
-  including credentials, PII, or another user's data.
-- `other`: a real, observable failure that fits none of the above. Use it sparingly. A growing
-  `other` cluster is a missing category, not a durable label.
+$taxonomy_definitions
 
 Severity, judged per failure:
-- `info`: notable behavior that is not necessarily wrong. Default for `refusal` and `capability_gap`.
-- `minor`: degraded the turn, but the user still got what they asked for.
-- `major`: the user did not get what they asked for, or was harmed.
+$severity_definitions
 - You cannot see the product's capability limits or its safety policy. Never decide whether a refusal
   was proper or whether a policy was violated. Record the observable behavior, set severity from
   observable impact, and leave propriety to the reviewer.
