@@ -501,6 +501,9 @@ deterministic.
   include `cached_tokens` and `cache_write_tokens`, an unmapped
   `cache_write_tokens` value is billed at the Input rate instead of the rate for
   cache writes.
+- The OpenAI CI shard runs with `-m trace_server`; usage-normalization coverage
+  must therefore come from client-backed pricing cases, not only standalone
+  unit tests in `tests/integrations/openai/test_openai_sdk.py`.
 
 ### Integration Testing
 

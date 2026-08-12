@@ -442,13 +442,13 @@ def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
         details = usage.get(details_key)
         if not isinstance(details, dict):
             continue
-        if details.get("cached_tokens") is not None:
-            usage.setdefault("cache_read_input_tokens", details["cached_tokens"])
-        if details.get("cache_write_tokens") is not None:
-            usage.setdefault(
-                "cache_creation_input_tokens",
-                details["cache_write_tokens"],
-            )
+        for source_key, target_key in (
+            ("cached_tokens", "cache_read_input_tokens"),
+            ("cache_write_tokens", "cache_creation_input_tokens"),
+        ):
+            value = details.get(source_key)
+            if value is not None:
+                usage.setdefault(target_key, value)
 
 
 def openai_on_finish(
