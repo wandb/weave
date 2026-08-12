@@ -11,10 +11,14 @@ Organised by the layer each class exercises:
   ``BaseLlm`` so ADK itself opens every span, tees an
   ``InMemorySpanExporter`` onto the global ``TracerProvider``, and asserts
   the patched attributes land where they should.
+- :class:`TestSpanToCallLinkage` runs the same stub agent with a ``@weave.op``
+  tool and asserts the call records the ``execute_tool`` span ADK opened
+  around it, through both the async and the sync entry point.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator, Generator
 from dataclasses import dataclass, field
@@ -26,6 +30,7 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.adk.runners import InMemoryRunner
+from google.adk.telemetry import tracing as adk_tracing
 from google.adk.tools import FunctionTool
 from google.genai import types
 from opentelemetry import trace as otel_trace
@@ -36,6 +41,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
     InMemorySpanExporter,
 )
 
+import weave
 from weave.integrations.google_adk import _semconv
 from weave.integrations.google_adk.extractors import (
     _provider_name,
@@ -47,7 +53,9 @@ from weave.integrations.google_adk.google_adk_sdk import (
     _wrap_trace_tool_call,
     get_google_adk_patcher,
 )
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.agents import semconv as server_semconv
+from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 # The mocks below mirror the duck-typed surface our extractors inspect on
 # ``google.genai.types.*`` objects and ADK's ``LlmRequest`` / ``LlmResponse``
@@ -753,3 +761,103 @@ class TestVendoredSemconv:
             assert _semconv.PROVIDER_GEMINI == system_values.GEMINI.value
         if output_values is not None:
             assert _semconv.OUTPUT_TYPE_TEXT == output_values.TEXT.value
+
+
+@pytest.fixture
+def adk_own_spans(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[InMemorySpanExporter, None, None]:
+    """Route the spans ADK opens itself into an in-memory exporter.
+
+    ``set_tracer_provider`` only takes effect once per process, so overriding
+    ``_TRACER_PROVIDER`` is the mechanism, as elsewhere in the repo. That alone
+    is not enough here: ADK resolves its tracer once and caches it, then
+    re-exports it *by value* into the modules that open spans, so mutating the
+    shared ``ProxyTracer`` is the only seam that reaches
+    ``flows/llm_flows/functions.py``.
+    """
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
+    monkeypatch.setattr(adk_tracing.tracer, "_real_tracer", None)
+    try:
+        yield exporter
+    finally:
+        provider.shutdown()
+
+
+class TestSpanToCallLinkage:
+    """A ``@weave.op`` tool records the ADK ``execute_tool`` span that ran it.
+
+    ADK opens that span itself via ``record_tool_execution``, so this holds
+    with or without the Weave patcher installed.
+    """
+
+    @staticmethod
+    def _runner() -> InMemoryRunner:
+        # ``weave.op`` keeps ``__name__``, so the tool is still called
+        # ``_get_weather`` and ``_StubLlm``'s scripted function call matches.
+        agent = LlmAgent(
+            name="trip_planner",
+            description="Tests span-to-call linkage end-to-end.",
+            model=_StubLlm(model="stub-llm"),
+            tools=[FunctionTool(weave.op(_get_weather))],
+        )
+        return InMemoryRunner(agent=agent, app_name="adk-link-app")
+
+    @staticmethod
+    def _assert_tool_call_points_at_the_tool_span(
+        client: WeaveClient, exporter: InMemorySpanExporter
+    ) -> None:
+        tool_span = next(
+            span
+            for span in exporter.get_finished_spans()
+            if span.name == "execute_tool _get_weather"
+        )
+        span_ctx = tool_span.get_span_context()
+        # The tool is the only op in the run — the stub LLM is not patched.
+        calls = client.get_calls()
+
+        assert len(calls) == 1
+        assert calls[0].attributes["weave"][INVOKING_SPAN_ATTR_KEY] == {
+            "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
+            "span_id": otel_trace.format_span_id(span_ctx.span_id),
+        }
+
+    @pytest.mark.asyncio
+    async def test_recorded_via_run_async(
+        self, client: WeaveClient, adk_own_spans: InMemorySpanExporter
+    ) -> None:
+        """The production entry point, where the tool runs on the calling thread."""
+        runner = self._runner()
+        await runner.session_service.create_session(
+            app_name="adk-link-app", user_id="u1", session_id="s1"
+        )
+        msg = types.Content(role="user", parts=[types.Part(text="Weather in Paris?")])
+        async for _ in runner.run_async(user_id="u1", session_id="s1", new_message=msg):
+            pass
+
+        self._assert_tool_call_points_at_the_tool_span(client, adk_own_spans)
+
+    def test_recorded_via_sync_run(
+        self, client: WeaveClient, adk_own_spans: InMemorySpanExporter
+    ) -> None:
+        """The sync entry point runs the agent in a fresh thread.
+
+        Weave's own call stack is a contextvar and does not cross that
+        boundary, so this is the case the call-to-spans direction misses. The
+        OTel context does not have to cross it: ADK opens the tool span inside
+        the same new thread that then runs the tool.
+        """
+        runner = self._runner()
+        asyncio.run(
+            runner.session_service.create_session(
+                app_name="adk-link-app", user_id="u1", session_id="s1"
+            )
+        )
+        msg = types.Content(role="user", parts=[types.Part(text="Weather in Paris?")])
+        for _ in runner.run(user_id="u1", session_id="s1", new_message=msg):
+            pass
+
+        self._assert_tool_call_points_at_the_tool_span(client, adk_own_spans)

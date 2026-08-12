@@ -15,7 +15,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from agents import Agent, Runner
+from agents import Agent, Runner, function_tool
 from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tracing import (
     AgentSpanData,
@@ -45,6 +45,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.sampling import Decision, StaticSampler
 
+import weave
 from weave.conversation import agent_name_override
 from weave.integrations.integration_utilities import op_name_from_ref
 from weave.integrations.openai.openai_sdk import get_openai_patcher
@@ -53,6 +54,7 @@ from weave.integrations.openai_agents.otel_processor import (
     _iso_to_ns,
 )
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 
 @pytest.fixture
@@ -219,6 +221,24 @@ def _chat_completion_payload(response_id: str) -> dict[str, Any]:
             "total_tokens": 3,
         },
     }
+
+
+def _tool_call_payload(
+    response_id: str, tool_name: str, arguments: str
+) -> dict[str, Any]:
+    """A Responses payload whose only output item calls ``tool_name``."""
+    payload = _response_payload(response_id, "")
+    payload["output"] = [
+        {
+            "type": "function_call",
+            "id": f"fc_{response_id}",
+            "call_id": f"call_{response_id}",
+            "name": tool_name,
+            "arguments": arguments,
+            "status": "completed",
+        }
+    ]
+    return payload
 
 
 def _mock_transport(
@@ -1351,3 +1371,49 @@ async def test_model_span_context_is_isolated_between_asyncio_tasks(
     assert len(model_chats) == 1
     assert len(openai_calls) == 1
     assert openai_calls[0].output["id"] == "resp_direct_task"
+
+
+@pytest.mark.asyncio
+async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A ``@weave.op`` tool records the span the agent opened around its call.
+
+    The assertion names the ``execute_tool`` span rather than "some span": the
+    agent span is current further up the stack too, and a reference to that one
+    would point at the wrong level of the tree.
+    """
+    transport, _ = _mock_transport(
+        _tool_call_payload("resp_tool", "lookup", '{"query": "papers"}'),
+        _response_payload("resp_final", "done"),
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+
+    @function_tool
+    @weave.op
+    def lookup(query: str) -> str:
+        return "ok"
+
+    try:
+        model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
+        agent = Agent(name="researcher", model=model, tools=[lookup])
+        await Runner.run(agent, "find papers")
+    finally:
+        await openai_client.close()
+
+    tool_span = next(
+        s for s in otel_spans.get_finished_spans() if s.name == "execute_tool lookup"
+    )
+    span_ctx = tool_span.get_span_context()
+    lookup_calls = _calls_named(client, "lookup")
+
+    assert len(lookup_calls) == 1
+    assert lookup_calls[0].attributes["weave"][INVOKING_SPAN_ATTR_KEY] == {
+        "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
+        "span_id": otel_trace.format_span_id(span_ctx.span_id),
+    }
