@@ -47,7 +47,7 @@ def test_latency_basic():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
                         anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
@@ -192,7 +192,7 @@ def test_all_aggregation_types():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
                         anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
@@ -273,7 +273,7 @@ def test_latency_percentiles():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 300 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
                         anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
@@ -407,7 +407,7 @@ def test_trace_roots_only_filter():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
                         anyIf(cm.started_at, cm.started_at IS NOT NULL) AS started_at,
@@ -544,7 +544,7 @@ def test_combined_metrics():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(sortable_datetime, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms,
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms,
                      1 AS m_call_count,
                      if(
                         exception IS NOT NULL, 1, 0) AS m_error_count
@@ -752,7 +752,7 @@ def test_calls_complete_latency_basic():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT cm.started_at AS started_at,
                         cm.started_at AS started_at,
@@ -887,7 +887,7 @@ def test_calls_complete_trace_roots_only_filter():
                   count() AS count
            FROM
              (SELECT toStartOfInterval(started_at, INTERVAL 3600 SECOND, {pb_3:String}) AS bucket,
-                     dateDiff('millisecond', started_at, ended_at) AS m_latency_ms
+                     if(ended_at >= started_at, dateDiff('millisecond', started_at, ended_at), NULL) AS m_latency_ms
               FROM
                 (SELECT cm.started_at AS started_at,
                         cm.started_at AS started_at,
