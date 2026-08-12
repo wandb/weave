@@ -1,4 +1,4 @@
-"""The `config_sha256` contract: one digest that moves when anything upstream moves."""
+"""The `config_sha` contract: one digest that moves when anything upstream moves."""
 
 import contextlib
 import json
@@ -22,7 +22,7 @@ def config_dir(tmp_path, monkeypatch) -> str:
 
 
 def test_spaces_have_distinct_digests():
-    """A contamination check reading topK(config_sha256) must tell them apart."""
+    """A contamination check reading topK(config_sha) must tell them apart."""
     assert _digest("intent") != _digest("failure")
 
 
@@ -105,7 +105,7 @@ def test_an_unknown_space_is_rejected():
 
 
 def _digest(space: str) -> str:
-    return config.config_sha256(config.load_config(space))
+    return config.config_sha(config.load_config(space))
 
 
 def _append(path: str, text: str) -> None:

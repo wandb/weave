@@ -598,7 +598,7 @@ def test_all_production_migrations_round_trip(ch_client, use_distributed: bool):
 _INTENT_COLUMNS = [
     ("project_id", "String"),
     ("id", "UUID"),
-    ("config_sha256", "LowCardinality(String)"),
+    ("config_sha", "LowCardinality(String)"),
     ("signature", "String"),
     ("signature_display", "String"),
     ("category", "LowCardinality(String)"),
@@ -608,7 +608,7 @@ _INTENT_COLUMNS = [
     ("sentiment_confidence", "Float32"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
-    ("trace_id", "String"),
+    ("turn_trace_id", "String"),
     ("user_id", "String"),
     ("agent_name", "LowCardinality(String)"),
     ("duration_ms", "UInt32"),
@@ -622,7 +622,7 @@ _INTENT_COLUMNS = [
 _FAILURE_COLUMNS = [
     ("project_id", "String"),
     ("id", "UUID"),
-    ("config_sha256", "LowCardinality(String)"),
+    ("config_sha", "LowCardinality(String)"),
     ("signature", "String"),
     ("signature_display", "String"),
     ("failure_reason", "String"),
@@ -630,8 +630,9 @@ _FAILURE_COLUMNS = [
     ("severity", "LowCardinality(String)"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
-    ("onset_trace_id", "String"),
-    ("trace_ids", "Array(String)"),
+    ("onset_turn_trace_id", "String"),
+    ("turn_trace_ids", "Array(String)"),
+    ("evidence_span_ids", "Array(String)"),
     ("user_id", "String"),
     ("agent_name", "LowCardinality(String)"),
     ("duration_ms", "UInt32"),
@@ -652,12 +653,18 @@ _SIGNATURE_TABLES = [
     (
         "intent_signatures",
         _INTENT_COLUMNS,
-        [("idx_conversation_id", "conversation_id"), ("idx_trace_id", "trace_id")],
+        [
+            ("idx_conversation_id", "conversation_id"),
+            ("idx_turn_trace_id", "turn_trace_id"),
+        ],
     ),
     (
         "failure_signatures",
         _FAILURE_COLUMNS,
-        [("idx_conversation_id", "conversation_id"), ("idx_trace_ids", "trace_ids")],
+        [
+            ("idx_conversation_id", "conversation_id"),
+            ("idx_turn_trace_ids", "turn_trace_ids"),
+        ],
     ),
 ]
 
@@ -702,8 +709,8 @@ def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> Non
     """Insert one intent_signatures row for _INTENT_ID in 'project-1'."""
     ch_client.command(
         f"INSERT INTO {target_db}.intent_signatures "
-        "(project_id, id, config_sha256, signature, category, language, "
-        "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
+        "(project_id, id, config_sha, signature, category, language, "
+        "sentiment, vector, conversation_id, turn_trace_id, user_id, agent_name, "
         "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
         f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
@@ -718,8 +725,8 @@ def _insert_failure(
     """Insert one failure_signatures row in 'project-1'."""
     ch_client.command(
         f"INSERT INTO {target_db}.failure_signatures "
-        "(project_id, id, config_sha256, signature, failure_reason, category, "
-        "severity, vector, conversation_id, onset_trace_id, trace_ids, "
+        "(project_id, id, config_sha, signature, failure_reason, category, "
+        "severity, vector, conversation_id, onset_turn_trace_id, turn_trace_ids, "
         "user_id, agent_name, duration_ms, cost_usd, source_started_at, "
         f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
         "'ignored the stated output path', 'The user specified /tmp/out.json.', "
@@ -848,15 +855,15 @@ def test_signature_retry_collapses_on_read(ch_client):
     ).result_rows == [("202605",)]
 
     _insert_failure(ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4']", 0.31)
-    # The writer retrying the same id with a wider attributed span: trace_ids is not
+    # The writer retrying the same id with a wider attributed span: turn_trace_ids is not
     # part of the identity, so the later attempt replaces rather than coexists.
     _insert_failure(
         ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4', 'trace-6']", 0.41
     )
 
     assert ch_client.query(
-        "SELECT toString(id), argMax(onset_trace_id, inserted_at), "
-        "argMax(trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
+        "SELECT toString(id), argMax(onset_turn_trace_id, inserted_at), "
+        "argMax(turn_trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
         f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
@@ -882,10 +889,10 @@ def test_failure_turn_attribution(ch_client):
     _insert_failure(ch_client, target_db, _FAILURE_ID_2, "trace-6", "['trace-6']", 0.32)
 
     # The drilldown from a turn to the failures touching it. trace-6 is a member of
-    # both, and of the first only through trace_ids, not through its onset.
+    # both, and of the first only through turn_trace_ids, not through its onset.
     assert ch_client.query(
         f"SELECT toString(id) FROM {target_db}.failure_signatures "
-        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') "
+        "WHERE project_id = 'project-1' AND has(turn_trace_ids, 'trace-6') "
         "ORDER BY toString(id)"
     ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
@@ -893,7 +900,7 @@ def test_failure_turn_attribution(ch_client):
     # overlap on trace-6, so summing them counts that turn twice. Three distinct
     # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
-        "SELECT sum(cost_usd), length(arrayDistinct(arrayFlatten(groupArray(trace_ids)))) "
+        "SELECT sum(cost_usd), length(arrayDistinct(arrayFlatten(groupArray(turn_trace_ids)))) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
     ).result_rows == [(0.73, 3)]
 
@@ -902,7 +909,7 @@ def test_failure_turn_attribution(ch_client):
     assert ch_client.query(
         f"SELECT count() FROM {target_db}.failure_signatures "
         "WHERE project_id = 'project-1' "
-        "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
+        "AND (empty(turn_trace_ids) OR NOT has(turn_trace_ids, onset_turn_trace_id))"
     ).result_rows == [(0,)]
 
 

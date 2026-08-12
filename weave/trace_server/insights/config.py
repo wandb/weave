@@ -1,4 +1,4 @@
-"""Insights extraction config: the thing `config_sha256` on the signature tables names.
+"""Insights extraction config: the thing `config_sha` on the signature tables names.
 
 Every knob that changes what gets written into `intent_signatures` or
 `failure_signatures` lives in one checked-in config file per space, so the whole
@@ -137,7 +137,7 @@ def load_config(space: str) -> SpaceConfig:
         return _CONFIG_MODELS[space].model_validate_json(handle.read())
 
 
-def config_sha256(config: SpaceConfig) -> str:
+def config_sha(config: SpaceConfig) -> str:
     """Digest the config with every file reference resolved to its own sha256.
 
     Keys are sorted, so reordering a config file leaves the digest alone while

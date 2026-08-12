@@ -1,7 +1,7 @@
 """Render a space's judge prompt from its config.
 
 The asset holds the wording and the config holds every value the wording shares
-with the pipeline, written as a `$name`. Both are inside `config_sha256`, so a
+with the pipeline, written as a `$name`. Both are inside `config_sha`, so a
 reworded prompt and a retuned history window are equally visible.
 """
 
