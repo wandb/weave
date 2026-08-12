@@ -108,8 +108,8 @@ def prepare_intents(
     candidates: list[IntentSignatureCandidate],
 ) -> tuple[list[Row], Dropped]:
     cfg = config.intent_config()
-    categories = set(cfg.extraction.taxonomy.labels())
-    sentiments = set(cfg.extraction.sentiment.labels())
+    categories = _label_names(cfg.extraction.taxonomy)
+    sentiments = _label_names(cfg.extraction.sentiment)
     dimensions = cfg.embedding.dimensions
     normalization = cfg.extraction.normalization_version
     dropped: Dropped = {}
@@ -163,8 +163,8 @@ def prepare_failures(
     candidates: list[FailureSignatureCandidate],
 ) -> tuple[list[Row], Dropped]:
     cfg = config.failure_config()
-    categories = set(cfg.extraction.taxonomy.labels())
-    severities = set(cfg.extraction.severity.labels())
+    categories = _label_names(cfg.extraction.taxonomy)
+    severities = _label_names(cfg.extraction.severity)
     dimensions = cfg.embedding.dimensions
     normalization = cfg.extraction.normalization_version
     max_evidence = cfg.extraction.max_evidence_spans
@@ -219,6 +219,16 @@ def prepare_failures(
             "extracted_at": candidate.extracted_at,
         }
     return list(rows.values()), dropped
+
+
+def _label_names(taxonomy: config.TaxonomyRef) -> set[str]:
+    """The values a column is validated against, without their definitions.
+
+    A taxonomy label is a `name` plus the prose the prompt renders, so comparing
+    a candidate's category against the labels themselves would never match and
+    would relabel every row to the fallback.
+    """
+    return {label.name for label in taxonomy.labels()}
 
 
 def _accepts(
