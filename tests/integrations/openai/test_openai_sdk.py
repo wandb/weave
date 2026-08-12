@@ -71,7 +71,6 @@ def test_normalize_openai_chat_completions_cache_tokens() -> None:
     usage = {
         "prompt_tokens": 100,
         "prompt_tokens_details": {
-            "cached_tokens": 20,
             "cache_write_tokens": 30,
         },
         "completion_tokens": 10,
@@ -83,12 +82,10 @@ def test_normalize_openai_chat_completions_cache_tokens() -> None:
     assert usage == {
         "prompt_tokens": 100,
         "prompt_tokens_details": {
-            "cached_tokens": 20,
             "cache_write_tokens": 30,
         },
         "completion_tokens": 10,
         "total_tokens": 110,
-        "cache_read_input_tokens": 20,
         "cache_creation_input_tokens": 30,
     }
 
