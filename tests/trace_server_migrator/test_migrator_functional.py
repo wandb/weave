@@ -793,15 +793,16 @@ def test_signature_tables_schema(ch_client):
             == expected_indexes
         )
 
-        # inserted_at is MATERIALIZED so no writer can supply a version, and id is
-        # only DEFAULTed so a row cannot land without the one the writer minted.
+        # inserted_at is only DEFAULTed so a writer can override it (e.g. for a
+        # backfill), and id is only DEFAULTed so a row cannot land without the
+        # one the writer minted.
         assert ch_client.query(
             "SELECT name, default_kind, default_expression FROM system.columns "
             f"WHERE database = '{target_db}' AND table = '{table_name}' "
             "AND name IN ('id', 'inserted_at') ORDER BY name"
         ).result_rows == [
             ("id", "DEFAULT", "generateUUIDv7()"),
-            ("inserted_at", "MATERIALIZED", "now64(6)"),
+            ("inserted_at", "DEFAULT", "now()"),
         ]
 
 
