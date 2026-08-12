@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     source_started_at DateTime64(6, 'UTC'),
 
     extracted_at DateTime64(6, 'UTC'),
-    inserted_at DateTime64(6, 'UTC') MATERIALIZED now64(6),
+    inserted_at DateTime64(6, 'UTC') DEFAULT now(),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_turn_trace_id turn_trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     source_started_at DateTime64(6, 'UTC'),
 
     extracted_at DateTime64(6, 'UTC'),
-    inserted_at DateTime64(6, 'UTC') MATERIALIZED now64(6),
+    inserted_at DateTime64(6, 'UTC') DEFAULT now(),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_turn_trace_ids turn_trace_ids TYPE bloom_filter(0.01) GRANULARITY 1,
