@@ -16,7 +16,7 @@ from weave.chat.types.chat_completion import ChatCompletion
 from weave.chat.types.chat_completion_stream_options_param import (
     ChatCompletionStreamOptionsParam,
 )
-from weave.trace.env import ssl_verify, weave_trace_server_url
+from weave.trace.env import weave_trace_server_url
 from weave.trace.op import op
 from weave.trace.settings import http_timeout
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
@@ -251,9 +251,7 @@ class Completions:
 
         if request_stream:
             with ExitStack() as stack:
-                client = stack.enter_context(
-                    httpx.Client(timeout=timeout, verify=ssl_verify())
-                )
+                client = stack.enter_context(httpx.Client(timeout=timeout))
                 response = stack.enter_context(
                     client.stream(
                         "POST",
@@ -268,7 +266,7 @@ class Completions:
                 # Transfer ownership so the returned stream controls cleanup.
                 return ChatCompletionChunkStream(response, stack.pop_all())
         else:
-            with httpx.Client(timeout=timeout, verify=ssl_verify()) as client:
+            with httpx.Client(timeout=timeout) as client:
                 response = client.post(
                     url,
                     auth=auth,
