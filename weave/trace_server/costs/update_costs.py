@@ -3,7 +3,7 @@
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TypedDict
 
@@ -69,7 +69,7 @@ def fetch_new_costs() -> dict[str, CostDetails]:
         raise
 
     costs: dict[str, CostDetails] = {}
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     for k in raw_costs:
         if (
             "input_cost_per_token" not in raw_costs[k]
@@ -125,7 +125,7 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
         sys.exit(1)
 
     costs: dict[str, CostDetails] = {}
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     for model in models_data:
         if not isinstance(model, dict):
@@ -208,7 +208,7 @@ def fetch_manual_costs() -> dict[str, CostDetails]:
         print(f"Failed to read {MANUAL_COSTS_FILE}: {e}")
         return {}
 
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     costs: dict[str, CostDetails] = {}
     for llm_id, entries in raw.items():
         if not isinstance(entries, list) or not entries:
