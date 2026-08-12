@@ -188,9 +188,16 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "spans": "trace_id",
     "messages": "trace_id",
     # All insights APIs are project-scoped. Co-locate a project's vectors so
-    # nearest-neighbor search and clustering do not fan out across shards.
+    # nearest-neighbor search and clustering do not fan out across shards. Every
+    # insights table shares this key, so the cluster job's fold of signature rows
+    # through its own assignments stays shard-local and plain IN is correct
+    # without GLOBAL IN.
     "intent_signatures": "project_id",
     "failure_signatures": "project_id",
+    "signature_cluster_runs": "project_id",
+    "signature_clusters": "project_id",
+    "signature_cluster_assignments": "project_id",
+    "signature_cluster_daily": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",

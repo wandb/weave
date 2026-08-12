@@ -3,6 +3,7 @@
 Runs actual SQL against a single-node ClickHouse with embedded Keeper.
 """
 
+import datetime
 import os
 import re
 import uuid
@@ -911,6 +912,354 @@ def test_failure_turn_attribution(ch_client):
         "WHERE project_id = 'project-1' "
         "AND (empty(turn_trace_ids) OR NOT has(turn_trace_ids, onset_turn_trace_id))"
     ).result_rows == [(0,)]
+
+
+# Two signature texts, so a cluster can hold one of them across several rows and
+# the rollup's distinct-text count has something to be wrong about.
+_SIG_A = "add stripe checkout"
+_SIG_B = "rotate the signing key"
+
+# Writer-minted uuidv7 row ids in intent_signatures. A_1 and A_3 share a user
+# across two days, which is what a per-day integer would double count.
+_ROW_A_1 = "019ff300-0000-7000-8000-0000000000a1"
+_ROW_A_2 = "019ff300-0000-7000-8000-0000000000a2"
+_ROW_A_3 = "019ff300-0000-7000-8000-0000000000a3"
+_ROW_B_1 = "019ff300-0000-7000-8000-0000000000b1"
+# Negative controls, each sharing a clustered signature's text so that anything
+# the fold fails to exclude lands in a real cluster's counts.
+_ROW_OUT_OF_WINDOW = "019ff300-0000-7000-8000-0000000000c1"
+_ROW_OTHER_CONFIG = "019ff300-0000-7000-8000-0000000000c2"
+_ROW_AFTER_RUN = "019ff300-0000-7000-8000-0000000000c3"
+
+_RUN_WINDOW_START = "2026-05-01 00:00:00"
+_RUN_WINDOW_END = "2026-06-01 00:00:00"
+
+
+def _insert_clustered_intent(
+    ch_client,
+    target_db: str,
+    row_id: str,
+    signature: str,
+    day: str,
+    user: str,
+    conversation: str,
+    config_sha: str = "cfg-a",
+    category: str = "action_request",
+) -> None:
+    """Insert one intent_signatures row carrying the fields the fold reads."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.intent_signatures "
+        "(project_id, id, config_sha, signature, category, vector, "
+        "conversation_id, turn_trace_id, user_id, source_started_at, extracted_at) "
+        f"VALUES ('project-1', '{row_id}', '{config_sha}', '{signature}', "
+        f"'{category}', {_UNIT_VECTOR}, '{conversation}', 'trace-{user}', "
+        f"'{user}', toDateTime64('{day} 09:15:00', 6, 'UTC'), {_EXTRACTED_AT})"
+    )
+
+
+def _insert_cluster_run(
+    ch_client,
+    target_db: str,
+    run_id: str,
+    promoted_at: str,
+    record_version: int,
+    status: str = "complete",
+) -> None:
+    """Insert one signature_cluster_runs version for 'project-1'."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.signature_cluster_runs (project_id, "
+        "cluster_run_id, lens, config_sha, algorithm, window_start, window_end, "
+        "status, signature_count, cluster_count, started_at, promoted_at, "
+        f"record_version) VALUES ('project-1', '{run_id}', 'intent', 'cfg-a', "
+        f"'hdbscan', toDateTime64('{_RUN_WINDOW_START}', 6, 'UTC'), "
+        f"toDateTime64('{_RUN_WINDOW_END}', 6, 'UTC'), '{status}', 2, 2, "
+        "toDateTime64('2026-06-01 00:00:00', 3, 'UTC'), "
+        f"toDateTime64('{promoted_at}', 3, 'UTC'), {record_version})"
+    )
+
+
+def _insert_assignment(
+    ch_client,
+    target_db: str,
+    run_id: str,
+    row_id: str,
+    cluster_id: int,
+    confidence: float,
+    umap: tuple[float, float],
+) -> None:
+    """Assign one signature row to a cluster within one run."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.signature_cluster_assignments (project_id, "
+        "cluster_run_id, signature_row_id, cluster_id, cluster_confidence, "
+        f"umap_x, umap_y) VALUES ('project-1', '{run_id}', '{row_id}', "
+        f"{cluster_id}, toFloat32({confidence}), toFloat32({umap[0]}), "
+        f"toFloat32({umap[1]}))"
+    )
+
+
+def test_signature_cluster_tables_lifecycle(ch_client):
+    """A run's children are immutable, so a retry is a new run, not a rewrite."""
+    target_db = _migrate_signatures_db(ch_client, "clusters")
+    # A background merge collapses a ReplacingMergeTree retry on its own
+    # schedule, which would let the fold's GROUP BY look correct while doing
+    # nothing. Holding merges off pins the retry on disk so the fold has to
+    # collapse it, which is the state a reader actually faces.
+    ch_client.command(f"SYSTEM STOP MERGES {target_db}.intent_signatures")
+
+    # Only the runs table keeps a lifecycle. Its children are immutable, and all
+    # four expire together so a cluster cannot outlive its own membership. Only
+    # the rollup partitions, and on its own day rather than on source month: it
+    # is written once per run and read by day range.
+    assert ch_client.query(
+        "SELECT name, engine, sorting_key, partition_key, "
+        "extract(create_table_query, 'TTL (.+) SETTINGS') "
+        "FROM system.tables "
+        f"WHERE database = '{target_db}' AND name LIKE 'signature_cluster%' "
+        "ORDER BY name"
+    ).result_rows == [
+        (
+            "signature_cluster_assignments",
+            "MergeTree",
+            "project_id, cluster_run_id, signature_row_id",
+            "",
+            "expire_at",
+        ),
+        (
+            "signature_cluster_daily",
+            "MergeTree",
+            "project_id, cluster_run_id, day, cluster_id",
+            "toYYYYMM(day)",
+            "expire_at",
+        ),
+        (
+            "signature_cluster_runs",
+            "ReplacingMergeTree",
+            "project_id, cluster_run_id",
+            "",
+            "expire_at",
+        ),
+        (
+            "signature_clusters",
+            "MergeTree",
+            "project_id, cluster_run_id, cluster_id",
+            "",
+            "expire_at",
+        ),
+    ]
+
+    # Immutability is what buys the reverse lookup: ClickHouse rejects
+    # projections on ReplacingMergeTree outright.
+    assert ch_client.query(
+        "SELECT name, sorting_key FROM system.projections "
+        f"WHERE database = '{target_db}' AND table = 'signature_cluster_assignments'"
+    ).result_rows == [
+        (
+            "proj_by_cluster",
+            ["project_id", "cluster_run_id", "cluster_id", "signature_row_id"],
+        )
+    ]
+
+    _insert_clustered_intent(
+        ch_client, target_db, _ROW_A_1, _SIG_A, "2026-05-30", "user-1", "conv-1"
+    )
+    _insert_clustered_intent(
+        ch_client, target_db, _ROW_A_2, _SIG_A, "2026-05-30", "user-2", "conv-2"
+    )
+    _insert_clustered_intent(
+        ch_client, target_db, _ROW_B_1, _SIG_B, "2026-05-31", "user-1", "conv-3"
+    )
+    # The same user on a second day, so a day-range read must merge to two users
+    # for cluster 3 rather than summing three.
+    _insert_clustered_intent(
+        ch_client, target_db, _ROW_A_3, _SIG_A, "2026-05-31", "user-1", "conv-4"
+    )
+
+    # A retry of A_1, which IS assigned, so nothing but the fold's own GROUP BY
+    # keeps it from doubling cluster 3's count for 2026-05-30.
+    _insert_clustered_intent(
+        ch_client,
+        target_db,
+        _ROW_A_1,
+        _SIG_A,
+        "2026-05-30",
+        "user-1",
+        "conv-1",
+        category="information_request",
+    )
+    # Out of window and under another config. Neither is assigned, so the join
+    # alone already excludes them: keying assignments on the row id makes the
+    # assignment set the scope, and the fold's window and config predicates are
+    # there to prune the scan rather than to decide membership. They are inserted
+    # so that dropping either predicate is a visible performance change against a
+    # populated table rather than a silently untested path.
+    _insert_clustered_intent(
+        ch_client,
+        target_db,
+        _ROW_OUT_OF_WINDOW,
+        _SIG_A,
+        "2026-07-15",
+        "user-7",
+        "conv-7",
+    )
+    _insert_clustered_intent(
+        ch_client,
+        target_db,
+        _ROW_OTHER_CONFIG,
+        _SIG_A,
+        "2026-05-30",
+        "user-8",
+        "conv-8",
+        config_sha="cfg-b",
+    )
+
+    _insert_cluster_run(ch_client, target_db, "run-1", "2026-06-01 01:00:00", 1)
+    _insert_assignment(ch_client, target_db, "run-1", _ROW_A_1, 3, 0.9, (1.5, 2.5))
+    _insert_assignment(ch_client, target_db, "run-1", _ROW_A_2, 3, 0.9, (1.6, 2.4))
+    _insert_assignment(ch_client, target_db, "run-1", _ROW_A_3, 3, 0.8, (1.4, 2.6))
+    _insert_assignment(ch_client, target_db, "run-1", _ROW_B_1, 7, 0.9, (-3.0, 4.0))
+
+    # A retry is a new run id, so both attempts coexist and neither is rewritten.
+    # run-2 moves A_1 and reprojects it into different axes.
+    _insert_cluster_run(ch_client, target_db, "run-2", "1970-01-01 00:00:00", 1)
+    _insert_assignment(ch_client, target_db, "run-2", _ROW_A_1, 5, 0.4, (0.5, -0.25))
+    assert ch_client.query(
+        "SELECT cluster_run_id, cluster_id, round(toFloat64(cluster_confidence), 2), "
+        "toFloat64(umap_x), toFloat64(umap_y) "
+        f"FROM {target_db}.signature_cluster_assignments "
+        f"WHERE project_id = 'project-1' AND signature_row_id = '{_ROW_A_1}' "
+        "ORDER BY cluster_run_id"
+    ).result_rows == [
+        ("run-1", 3, 0.9, 1.5, 2.5),
+        ("run-2", 5, 0.4, 0.5, -0.25),
+    ]
+
+    # The reverse lookup the projection exists for, read without FINAL.
+    assert ch_client.query(
+        "SELECT toString(signature_row_id) "
+        f"FROM {target_db}.signature_cluster_assignments "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "AND cluster_id = 7"
+    ).result_rows == [(_ROW_B_1,)]
+
+    current_run_sql = (
+        "SELECT cluster_run_id FROM ("
+        "SELECT cluster_run_id, "
+        "argMax(status, record_version) AS status, "
+        "argMax(promoted_at, record_version) AS promoted_at "
+        f"FROM {target_db}.signature_cluster_runs "
+        "WHERE project_id = 'project-1' AND lens = 'intent' "
+        "GROUP BY cluster_run_id"
+        ") WHERE status = 'complete' AND promoted_at > toDateTime64(0, 3, 'UTC') "
+        "ORDER BY promoted_at DESC LIMIT 1"
+    )
+    # run-2 is newer and complete, but never promoted, so it cannot go live.
+    assert ch_client.query(current_run_sql).result_rows == [("run-1",)]
+    _insert_cluster_run(ch_client, target_db, "run-2", "2026-06-08 01:00:00", 2)
+    assert ch_client.query(current_run_sql).result_rows == [("run-2",)]
+
+    # Both versions of A_1 are on disk, and the later one wins under argMax, so
+    # the fold's GROUP BY below is doing real work rather than reading a table a
+    # merge already collapsed.
+    assert ch_client.query(
+        "SELECT count(), argMax(category, inserted_at) "
+        f"FROM {target_db}.intent_signatures "
+        f"WHERE project_id = 'project-1' AND id = '{_ROW_A_1}'"
+    ).result_rows == [(2, "information_request")]
+
+    # The run's last step folds its signature rows through its own assignments.
+    # The worker already holds these bounds; re-reading them here keeps the
+    # reference SQL honest about what every term is scoped to.
+    config_sha, window_start, window_end = ch_client.query(
+        "SELECT argMax(config_sha, record_version), "
+        "argMax(window_start, record_version), "
+        "argMax(window_end, record_version) "
+        f"FROM {target_db}.signature_cluster_runs "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1'"
+    ).result_rows[0]
+    # Scoped to the run's project, config, and source-time window, and collapsed
+    # per row first: the signature tables are read without FINAL, so a retried
+    # insert is still on disk. A rollup row is persisted, so a duplicate counted
+    # here is never corrected by a later merge.
+    fold_sql = (
+        f"INSERT INTO {target_db}.signature_cluster_daily (project_id, "
+        "cluster_run_id, day, cluster_id, occurrences, signatures, users, "
+        "conversations) "
+        "SELECT 'project-1', 'run-1', o.day, a.cluster_id, count(), "
+        "uniqHLL12State(o.signature), uniqHLL12State(o.user_id), "
+        "uniqHLL12State(o.conversation_id) "
+        "FROM ("
+        # Raw column references are table-qualified so the output aliases cannot
+        # shadow them inside the aggregates (ILLEGAL_AGGREGATION). The grouping
+        # is the sorting key exactly, which is what makes it the dedup key.
+        "SELECT id, toDate(intent_signatures.source_started_at) AS day, "
+        "argMax(intent_signatures.signature, intent_signatures.inserted_at) AS signature, "
+        "argMax(intent_signatures.user_id, intent_signatures.inserted_at) AS user_id, "
+        "argMax(intent_signatures.conversation_id, intent_signatures.inserted_at) "
+        "AS conversation_id "
+        f"FROM {target_db}.intent_signatures "
+        "WHERE intent_signatures.project_id = 'project-1' "
+        f"AND intent_signatures.config_sha = '{config_sha}' "
+        f"AND intent_signatures.source_started_at >= toDateTime64('{window_start}', 6, 'UTC') "
+        f"AND intent_signatures.source_started_at < toDateTime64('{window_end}', 6, 'UTC') "
+        "GROUP BY intent_signatures.project_id, day, id"
+        ") AS o "
+        "INNER JOIN ("
+        # No argMax: a run's assignments are written once and never rewritten.
+        "SELECT signature_row_id, cluster_id "
+        f"FROM {target_db}.signature_cluster_assignments "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1'"
+        ") AS a ON a.signature_row_id = o.id "
+        "GROUP BY o.day, a.cluster_id"
+    )
+    fold_settings = {"insert_deduplication_token": "run-1:signature_cluster_daily:0"}
+    ch_client.command(fold_sql, settings=fold_settings)
+    daily_sql = (
+        "SELECT day, cluster_id, occurrences "
+        f"FROM {target_db}.signature_cluster_daily "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "ORDER BY day, cluster_id"
+    )
+    expected_daily = [
+        (datetime.date(2026, 5, 30), 3, 2),
+        (datetime.date(2026, 5, 31), 3, 1),
+        (datetime.date(2026, 5, 31), 7, 1),
+    ]
+    assert ch_client.query(daily_sql).result_rows == expected_daily
+
+    # Immutability took replacement away, so the insert token is the only thing
+    # standing between a retried fold and a permanently doubled occurrence count.
+    # Replaying the same batch under the same token is a no-op.
+    ch_client.command(fold_sql, settings=fold_settings)
+    assert ch_client.query(daily_sql).result_rows == expected_daily
+
+    # Across a day range every distinct-entity column merges instead of summing.
+    # Cluster 3 holds one signature text over three rows, and user-1 spans both
+    # days, so a per-day integer would report three texts and three users.
+    assert ch_client.query(
+        "SELECT cluster_id, sum(occurrences), uniqHLL12Merge(signatures), "
+        "uniqHLL12Merge(users), uniqHLL12Merge(conversations) "
+        f"FROM {target_db}.signature_cluster_daily "
+        "WHERE project_id = 'project-1' AND cluster_run_id = 'run-1' "
+        "AND day BETWEEN toDate('2026-05-30') AND toDate('2026-05-31') "
+        "GROUP BY cluster_id ORDER BY cluster_id"
+    ).result_rows == [(3, 3, 1, 2, 3), (7, 1, 1, 1, 1)]
+
+    # The cost of keying assignments on the row id: a row written after the run,
+    # even one repeating text the run already clustered, has no assignment and
+    # waits for the next run. Keying on a hash of the text would resolve it here.
+    _insert_clustered_intent(
+        ch_client, target_db, _ROW_AFTER_RUN, _SIG_A, "2026-05-31", "user-9", "conv-9"
+    )
+    assert ch_client.query(
+        "SELECT count() "
+        f"FROM {target_db}.intent_signatures AS o "
+        f"INNER JOIN {target_db}.signature_cluster_assignments AS a "
+        "ON a.project_id = o.project_id AND a.signature_row_id = o.id "
+        f"WHERE o.project_id = 'project-1' AND o.id = '{_ROW_AFTER_RUN}' "
+        "AND a.cluster_run_id = 'run-1'"
+    ).result_rows == [(0,)]
+    # And the rollup it missed is unchanged, because the fold already ran.
+    assert ch_client.query(daily_sql).result_rows == expected_daily
 
 
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):

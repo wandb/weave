@@ -1018,6 +1018,10 @@ def test_create_distributed_table_sql_id_sharded():
         ("agent_versions", "sipHash64(project_id, agent_name)"),
         ("intent_signatures", "sipHash64(project_id)"),
         ("failure_signatures", "sipHash64(project_id)"),
+        ("signature_cluster_runs", "sipHash64(project_id)"),
+        ("signature_clusters", "sipHash64(project_id)"),
+        ("signature_cluster_assignments", "sipHash64(project_id)"),
+        ("signature_cluster_daily", "sipHash64(project_id)"),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
