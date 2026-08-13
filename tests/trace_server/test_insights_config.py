@@ -120,6 +120,23 @@ def test_an_unknown_space_is_rejected():
         config.load_config("sentiment")
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["../../../../etc/passwd", "/etc/passwd", "taxonomies/../../__init__.py"],
+    ids=["traversal", "absolute", "escapes-after-descending"],
+)
+def test_a_reference_may_not_read_outside_the_config_dir(path):
+    """A reference names checked-in content, so an escaping path is refused.
+
+    Checked at read time rather than at validation, so a digest can never be taken
+    over a file the config package does not own.
+    """
+    reference = config.Reference(path=path)
+
+    with pytest.raises(ValueError, match="escapes"):
+        reference.read_bytes()
+
+
 def _digest(space: str) -> str:
     return config.config_sha(config.load_config(space))
 

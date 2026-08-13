@@ -405,7 +405,7 @@ fasion = "fasion" # Wandb lore
 [tool.typos.default.extend-identifiers]
 alog_score = "alog_score"
 BoxedNDArray = "BoxedNDArray"
-AKS = "AKS"
+AKS = "AKS" # Azure Kubernetes Service, in AGENTS.md
 
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]

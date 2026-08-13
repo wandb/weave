@@ -29,7 +29,7 @@ class Reference(_Strict):
     path: str
 
     def read_bytes(self) -> bytes:
-        with open(os.path.join(CONFIG_DIR, self.path), "rb") as handle:
+        with open(_resolve_in_config_dir(self.path), "rb") as handle:
             return handle.read()
 
     def read(self) -> str:
@@ -156,3 +156,15 @@ def config_sha(config: SpaceConfig) -> str:
     """
     canonical = json.dumps(config.model_dump(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _resolve_in_config_dir(path: str) -> str:
+    """Absolute path to a config asset, rejecting any path that escapes `CONFIG_DIR`.
+
+    A reference names checked-in content, so it may not reach the wider filesystem.
+    """
+    root = os.path.realpath(CONFIG_DIR)
+    resolved = os.path.realpath(os.path.join(root, path))
+    if os.path.commonpath([root, resolved]) != root:
+        raise ValueError(f"config reference escapes {CONFIG_DIR}: {path!r}")
+    return resolved
