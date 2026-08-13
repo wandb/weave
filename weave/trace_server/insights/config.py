@@ -114,6 +114,18 @@ class Embedding(_Strict):
     output_normalization: str
 
 
+class UmapProjection(_Strict):
+    """Knobs for the 2-D projection persisted on every cluster assignment.
+
+    It carries no metric of its own: on l2-normalized vectors cosine and euclidean
+    rank neighbors identically, so the clustering `metric` describes both.
+    """
+
+    n_neighbors: Annotated[int, Field(ge=2)]
+    min_dist: Annotated[float, Field(ge=0, lt=1)]
+    random_state: int
+
+
 class ClusteringConfig(_Strict):
     """Every parameter that changes a clustering run's output."""
 
@@ -124,6 +136,7 @@ class ClusteringConfig(_Strict):
     metric: Literal["euclidean"]
     cluster_selection_method: Literal["eom"]
     allow_single_cluster: bool
+    umap: UmapProjection
 
 
 _E = TypeVar("_E", bound=Extraction)

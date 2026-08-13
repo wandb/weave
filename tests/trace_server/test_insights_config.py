@@ -36,12 +36,22 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
         "metric": "euclidean",
         "cluster_selection_method": "eom",
         "allow_single_cluster": False,
+        "umap": {"n_neighbors": 15, "min_dist": 0.0, "random_state": 0},
     }
 
     before = config.config_sha(clustering)
     with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
         raw["min_cluster_size"] = 5
-    assert config.config_sha(config.load_clustering_config()) != before
+    after_flat_edit = config.config_sha(config.load_clustering_config())
+    assert after_flat_edit != before
+
+    # A nested knob reaches the digest too, so reprojecting declares a new run.
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["umap"]["random_state"] = 7
+    assert config.config_sha(config.load_clustering_config()) not in {
+        before,
+        after_flat_edit,
+    }
 
     with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
         raw["untracked_parameter"] = True
