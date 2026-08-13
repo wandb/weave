@@ -112,6 +112,9 @@ class LLMModelDetails(TypedDict):
     label: str
     # The "name" of the model for OR, it is not necessary that the model exist in OR
     labelOpenRouter: str
+    # Stable OpenRouter join key (their "permaslug"), used to match this model to
+    # OpenRouter-reported stats (endpoints, uptime, effective pricing, error rates).
+    openRouterPermaslug: NotRequired[str]
     status: str
     lifecycleStage: LifecycleStage
     availableIn: list[InferenceEnvironment]
