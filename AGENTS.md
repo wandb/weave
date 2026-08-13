@@ -94,6 +94,8 @@ for workload identity.
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
 
+Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
+
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
