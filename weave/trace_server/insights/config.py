@@ -61,7 +61,8 @@ class Label(_Strict):
 
 
 class _Taxonomy(_Strict):
-    description: str
+    """A taxonomy file's whole contents. Prose about the label set is a YAML comment."""
+
     labels: list[Label]
 
 

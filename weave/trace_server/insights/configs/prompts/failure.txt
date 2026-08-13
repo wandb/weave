@@ -35,7 +35,10 @@ never moves a cluster.
 
 `evidence` says where the failure is visible: copy the `index` of each `current_turn` message that
 shows it, most important first, at most $max_evidence_spans. Cite the failing call itself rather
-than the assistant text reporting it. Use only indices the input contains; never invent one and
+than the assistant text reporting it. Copy the `index` value verbatim off the message; never count
+messages or work out a position yourself, because dropped messages leave gaps. If `current_turn`
+holds messages with `index` 2, 5, and 9, a failure visible in the tool call at `index` 5 is
+`"evidence":[5]`, never `[1]`. Use only indices the input contains; never invent one and
 never cite a prior turn. An empty array is correct when the failure is an absence with nothing to
 point at, such as a standing requirement the assistant never acted on. Like `reason`, `evidence` is
 not embedded. The short boundary examples below omit it for brevity; it is still expected.

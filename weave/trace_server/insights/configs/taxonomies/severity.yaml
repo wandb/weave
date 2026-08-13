@@ -1,10 +1,11 @@
+# Severity labels a failure signature may carry, ordered least to most impactful.
+#
 # `info` is the bottom rung rather than `low` because two categories, `refusal`
 # and `capability_gap`, record behavior that is not necessarily wrong; a ladder
 # whose floor still reads as a problem would misreport them.
 #
 # The ladder is deliberately bottom-weighted: `major` is meant to be the rare
 # label, so a failure that sits between two rungs takes the lower one.
-description: Severity labels a failure signature may carry, ordered least to most impactful.
 
 labels:
   - name: info
