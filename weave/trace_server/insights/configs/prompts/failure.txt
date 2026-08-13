@@ -87,7 +87,7 @@ Using next_turn:
   under-specified. Require that it contradicts something the assistant was already told, or that the
   next turn is a `problem_report` or `negative_feedback`, or carries negative sentiment.
 - A failure found through `next_turn` belongs to the turn that caused it, not the turn that revealed
-  it. Name the causing turn in `reason`; the writer sets `onset_turn_trace_id` and `turn_trace_ids`,
+  it. Name the causing turn in `reason`; the writer sets `onset_trace_id` and `trace_ids`,
   and you never emit either field. Emit only categories not already recorded for that
   onset turn, so a later pass cannot double-count a failure the live pass already caught.
 - Classify flawed plans by observable outcome, not hidden reasoning; describe the flawed approach in

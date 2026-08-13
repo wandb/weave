@@ -600,19 +600,18 @@ _INTENT_COLUMNS = [
     ("id", "UUID"),
     ("config_sha", "LowCardinality(String)"),
     ("signature", "String"),
-    ("signature_display", "String"),
     ("category", "String"),
     ("language", "LowCardinality(String)"),
     ("sentiment", "LowCardinality(String)"),
     ("sentiment_rationale", "String"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
-    ("turn_trace_id", "String"),
+    ("trace_id", "String"),
     ("user_id", "String"),
-    ("agent_name", "LowCardinality(String)"),
+    ("agent_name", "String"),
     ("turn_duration_ms", "UInt32"),
     ("turn_cost_usd", "Float64"),
-    ("source_started_at", "DateTime64(6, 'UTC')"),
+    ("trace_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
     ("expire_at", "DateTime"),
@@ -623,20 +622,19 @@ _FAILURE_COLUMNS = [
     ("id", "UUID"),
     ("config_sha", "LowCardinality(String)"),
     ("signature", "String"),
-    ("signature_display", "String"),
     ("failure_reason", "String"),
     ("category", "String"),
     ("severity", "LowCardinality(String)"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
-    ("onset_turn_trace_id", "String"),
-    ("turn_trace_ids", "Array(String)"),
+    ("onset_trace_id", "String"),
+    ("trace_ids", "Array(String)"),
     ("evidence_span_ids", "Array(String)"),
     ("user_id", "String"),
-    ("agent_name", "LowCardinality(String)"),
+    ("agent_name", "String"),
     ("turn_duration_ms", "UInt32"),
     ("turn_cost_usd", "Float64"),
-    ("source_started_at", "DateTime64(6, 'UTC')"),
+    ("trace_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
     ("expire_at", "DateTime"),
@@ -646,7 +644,7 @@ _FAILURE_COLUMNS = [
 # from a shared block: the assert is ORDER BY position, and shared columns
 # interleave with grain-specific ones differently in each table. Growing this
 # count is a decision, not a side effect.
-_EXPECTED_SHARED_COLUMNS = 16
+_EXPECTED_SHARED_COLUMNS = 15
 
 _SIGNATURE_TABLES = [
     (
@@ -654,7 +652,7 @@ _SIGNATURE_TABLES = [
         _INTENT_COLUMNS,
         [
             ("idx_conversation_id", "conversation_id"),
-            ("idx_turn_trace_id", "turn_trace_id"),
+            ("idx_trace_id", "trace_id"),
         ],
     ),
     (
@@ -662,7 +660,7 @@ _SIGNATURE_TABLES = [
         _FAILURE_COLUMNS,
         [
             ("idx_conversation_id", "conversation_id"),
-            ("idx_turn_trace_ids", "turn_trace_ids"),
+            ("idx_trace_ids", "trace_ids"),
         ],
     ),
 ]
@@ -695,7 +693,7 @@ _UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
 # The sorting key, and therefore the dedup key: a read that collapses a retry
 # groups by all three terms, because no read here uses FINAL.
-_SIGNATURE_KEY = "project_id, toDate(source_started_at), id"
+_SIGNATURE_KEY = "project_id, toDate(trace_started_at), id"
 
 # Writer-minted uuidv7 values. Reused verbatim to stand for a retry of the same
 # row, which is the only thing ReplacingMergeTree collapses here.
@@ -709,8 +707,8 @@ def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> Non
     ch_client.command(
         f"INSERT INTO {target_db}.intent_signatures "
         "(project_id, id, config_sha, signature, category, language, "
-        "sentiment, vector, conversation_id, turn_trace_id, user_id, agent_name, "
-        "turn_duration_ms, turn_cost_usd, source_started_at, extracted_at) VALUES "
+        "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
+        "turn_duration_ms, turn_cost_usd, trace_started_at, extracted_at) VALUES "
         f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
         f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
@@ -725,8 +723,8 @@ def _insert_failure(
     ch_client.command(
         f"INSERT INTO {target_db}.failure_signatures "
         "(project_id, id, config_sha, signature, failure_reason, category, "
-        "severity, vector, conversation_id, onset_turn_trace_id, turn_trace_ids, "
-        "user_id, agent_name, turn_duration_ms, turn_cost_usd, source_started_at, "
+        "severity, vector, conversation_id, onset_trace_id, trace_ids, "
+        "user_id, agent_name, turn_duration_ms, turn_cost_usd, trace_started_at, "
         f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
         "'ignored the stated output path', 'The user specified /tmp/out.json.', "
         f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
@@ -753,7 +751,7 @@ def test_signature_tables_schema(ch_client):
         ).result_rows == [
             (
                 "ReplacingMergeTree",
-                "toYYYYMM(source_started_at)",
+                "toYYYYMM(trace_started_at)",
                 _SIGNATURE_KEY,
                 _SIGNATURE_KEY,
                 "expire_at",
@@ -855,15 +853,15 @@ def test_signature_retry_collapses_on_read(ch_client):
     ).result_rows == [("202605",)]
 
     _insert_failure(ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4']", 0.31)
-    # The writer retrying the same id with a wider attributed span: turn_trace_ids is not
+    # The writer retrying the same id with a wider attributed span: trace_ids is not
     # part of the identity, so the later attempt replaces rather than coexists.
     _insert_failure(
         ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4', 'trace-6']", 0.41
     )
 
     assert ch_client.query(
-        "SELECT toString(id), argMax(onset_turn_trace_id, inserted_at), "
-        "argMax(turn_trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
+        "SELECT toString(id), argMax(onset_trace_id, inserted_at), "
+        "argMax(trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
         f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
@@ -889,10 +887,10 @@ def test_failure_turn_attribution(ch_client):
     _insert_failure(ch_client, target_db, _FAILURE_ID_2, "trace-6", "['trace-6']", 0.32)
 
     # The drilldown from a turn to the failures touching it. trace-6 is a member of
-    # both, and of the first only through turn_trace_ids, not through its onset.
+    # both, and of the first only through trace_ids, not through its onset.
     assert ch_client.query(
         f"SELECT toString(id) FROM {target_db}.failure_signatures "
-        "WHERE project_id = 'project-1' AND has(turn_trace_ids, 'trace-6') "
+        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') "
         "ORDER BY toString(id)"
     ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
@@ -900,7 +898,7 @@ def test_failure_turn_attribution(ch_client):
     # overlap on trace-6, so summing them counts that turn twice. Three distinct
     # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
-        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(turn_trace_ids)))) "
+        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(trace_ids)))) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
     ).result_rows == [(0.73, 3)]
 
@@ -909,7 +907,7 @@ def test_failure_turn_attribution(ch_client):
     assert ch_client.query(
         f"SELECT count() FROM {target_db}.failure_signatures "
         "WHERE project_id = 'project-1' "
-        "AND (empty(turn_trace_ids) OR NOT has(turn_trace_ids, onset_turn_trace_id))"
+        "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
     ).result_rows == [(0,)]
 
 

@@ -8,9 +8,8 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- Digest of insights/configs/intent.yaml
     config_sha LowCardinality(String),
 
-    -- Canonicalized before insert, lossy, use signature_display for exact judge wording.
+    -- Canonicalized before insert, so it is lossy against the judge's exact wording.
     signature String,
-    signature_display String DEFAULT '',
     category String,
     -- ISO 639-1 two-letter ('en', 'es'), or the ISO 639-2 'und' sentinel.
     language LowCardinality(String) DEFAULT 'und',
@@ -20,25 +19,25 @@ CREATE TABLE IF NOT EXISTS intent_signatures
 
     -- Denormalized span data
     conversation_id String,
-    turn_trace_id String,
+    trace_id String,
     user_id String DEFAULT '',
-    agent_name LowCardinality(String) DEFAULT '',
+    agent_name String DEFAULT '',
     -- Whole-turn values copied onto every row of the turn's fan-out, so summing
     -- them across rows multiplies by the fan-out.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
-    source_started_at DateTime64(6, 'UTC'),
+    trace_started_at DateTime64(6, 'UTC'),
 
     extracted_at DateTime64(6, 'UTC'),
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
-    INDEX idx_turn_trace_id turn_trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
-PARTITION BY toYYYYMM(source_started_at)
-ORDER BY (project_id, toDate(source_started_at), id)
+PARTITION BY toYYYYMM(trace_started_at)
+ORDER BY (project_id, toDate(trace_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
 
@@ -53,9 +52,8 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     -- Digest of insights/configs/failure.yaml
     config_sha LowCardinality(String),
 
-    -- Canonicalized before insert, lossy, use signature_display for exact judge wording.
+    -- Canonicalized before insert, so it is lossy against the judge's exact wording.
     signature String,
-    signature_display String DEFAULT '',
     -- Grounded prose explaining the claim, never embedded.
     failure_reason String DEFAULT '',
     category String,
@@ -66,27 +64,27 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     -- Denormalized span data
     conversation_id String,
     -- The turn the failure was detected in.
-    onset_turn_trace_id String,
+    onset_trace_id String,
     -- Turns the failure is attributed to, sorted, deduplicated, always contains the onset.
-    turn_trace_ids Array(String),
+    trace_ids Array(String),
     -- Spans the judge cited as evidence, resolved by the writer from message indices.
     evidence_span_ids Array(String) DEFAULT [],
     user_id String DEFAULT '',
-    agent_name LowCardinality(String) DEFAULT '',
-    -- Summed across turn_trace_ids, not additive across rows, two failures can share a turn.
+    agent_name String DEFAULT '',
+    -- Summed across trace_ids, not additive across rows, two failures can share a turn.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
-    source_started_at DateTime64(6, 'UTC'),
+    trace_started_at DateTime64(6, 'UTC'),
 
     extracted_at DateTime64(6, 'UTC'),
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
-    INDEX idx_turn_trace_ids turn_trace_ids TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_trace_ids trace_ids TYPE bloom_filter(0.01) GRANULARITY 1,
     INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
-PARTITION BY toYYYYMM(source_started_at)
-ORDER BY (project_id, toDate(source_started_at), id)
+PARTITION BY toYYYYMM(trace_started_at)
+ORDER BY (project_id, toDate(trace_started_at), id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
