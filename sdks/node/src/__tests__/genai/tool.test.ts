@@ -85,13 +85,14 @@ describe('Tool', () => {
     );
   });
 
-  it('records result, error type, and failure status together at end()', () => {
+  it('derives error type and records the failure with the result', () => {
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'get_weather'});
+    const error = new Error('request failed');
+    error.name = 'weather_service_error';
     tool.end({
       result: {message: 'weather service unavailable'},
-      error: new Error('request failed'),
-      errorType: 'weather_service_error',
+      error,
     });
     turn.end();
 

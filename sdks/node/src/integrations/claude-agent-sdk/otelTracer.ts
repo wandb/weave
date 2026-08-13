@@ -27,6 +27,12 @@ const PROVIDER_NAME = 'anthropic';
 
 const ATTR_COST_USD = 'claude_agent_sdk.usage.cost_usd';
 
+function namedError(name: string, message: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
 const CLAUDE_AGENT_SDK_ATTRIBUTES = asOtelAttributes(
   libraryIntegration(AGENT_NAME, {
     packageName: '@anthropic-ai/claude-agent-sdk',
@@ -420,8 +426,10 @@ export class ClaudeAgentOtelTracer {
     const errorMessage = runErrorMessage(error, result);
     if (errorMessage != null) {
       turn.end({
-        error: new Error(errorMessage || 'Conversation ended with error'),
-        errorType: 'agent_error',
+        error: namedError(
+          'agent_error',
+          errorMessage || 'Conversation ended with error'
+        ),
       });
     } else {
       turn.end();
@@ -647,8 +655,10 @@ export class ClaudeAgentOtelTracer {
       tool.result = resultText;
       if (block.is_error) {
         tool.end({
-          error: new Error(resultText || 'Tool execution failed'),
-          errorType: 'tool_error',
+          error: namedError(
+            'tool_error',
+            resultText || 'Tool execution failed'
+          ),
         });
       } else {
         tool.end();
@@ -691,8 +701,10 @@ export class ClaudeAgentOtelTracer {
     const endedAt = new Date();
     if (block.is_error) {
       openSubagent.span.recordError(
-        new Error(terminalOutputText || 'Subagent execution failed'),
-        {errorType: 'subagent_error'}
+        namedError(
+          'subagent_error',
+          terminalOutputText || 'Subagent execution failed'
+        )
       );
       openSubagent.outcome = {status: 'error', endedAt};
     } else {
@@ -741,8 +753,10 @@ export class ClaudeAgentOtelTracer {
     }
 
     openSubagent.span.recordError(
-      new Error(msg.summary || `Background subagent ${msg.status}`),
-      {errorType: msg.status === 'stopped' ? 'aborted' : 'subagent_error'}
+      namedError(
+        msg.status === 'stopped' ? 'aborted' : 'subagent_error',
+        msg.summary || `Background subagent ${msg.status}`
+      )
     );
     openSubagent.outcome = {status: 'error', endedAt};
   }
@@ -776,8 +790,7 @@ export class ClaudeAgentOtelTracer {
         continue;
       }
       openTool.tool.end({
-        error: new Error('Agent ended with open tool span'),
-        errorType: 'aborted',
+        error: namedError('aborted', 'Agent ended with open tool span'),
       });
       this.openTools.delete(toolUseId);
     }
@@ -797,8 +810,7 @@ export class ClaudeAgentOtelTracer {
         continue;
       }
       openSubagent.span.end({
-        error: new Error('Agent ended with open subagent span'),
-        errorType: 'aborted',
+        error: namedError('aborted', 'Agent ended with open subagent span'),
       });
       this.openSubagents.delete(toolUseId);
     }
