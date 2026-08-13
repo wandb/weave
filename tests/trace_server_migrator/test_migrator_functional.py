@@ -601,7 +601,7 @@ _INTENT_COLUMNS = [
     ("config_sha", "LowCardinality(String)"),
     ("signature", "String"),
     ("signature_display", "String"),
-    ("category", "LowCardinality(String)"),
+    ("category", "String"),
     ("language", "LowCardinality(String)"),
     ("sentiment", "LowCardinality(String)"),
     ("sentiment_rationale", "String"),
@@ -611,8 +611,8 @@ _INTENT_COLUMNS = [
     ("turn_trace_id", "String"),
     ("user_id", "String"),
     ("agent_name", "LowCardinality(String)"),
-    ("duration_ms", "UInt32"),
-    ("cost_usd", "Float64"),
+    ("turn_duration_ms", "UInt32"),
+    ("turn_cost_usd", "Float64"),
     ("source_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -626,7 +626,7 @@ _FAILURE_COLUMNS = [
     ("signature", "String"),
     ("signature_display", "String"),
     ("failure_reason", "String"),
-    ("category", "LowCardinality(String)"),
+    ("category", "String"),
     ("severity", "LowCardinality(String)"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
@@ -635,8 +635,8 @@ _FAILURE_COLUMNS = [
     ("evidence_span_ids", "Array(String)"),
     ("user_id", "String"),
     ("agent_name", "LowCardinality(String)"),
-    ("duration_ms", "UInt32"),
-    ("cost_usd", "Float64"),
+    ("turn_duration_ms", "UInt32"),
+    ("turn_cost_usd", "Float64"),
     ("source_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -711,7 +711,7 @@ def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> Non
         f"INSERT INTO {target_db}.intent_signatures "
         "(project_id, id, config_sha, signature, category, language, "
         "sentiment, vector, conversation_id, turn_trace_id, user_id, agent_name, "
-        "duration_ms, cost_usd, source_started_at, extracted_at) VALUES "
+        "turn_duration_ms, turn_cost_usd, source_started_at, extracted_at) VALUES "
         f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
         f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
@@ -727,7 +727,7 @@ def _insert_failure(
         f"INSERT INTO {target_db}.failure_signatures "
         "(project_id, id, config_sha, signature, failure_reason, category, "
         "severity, vector, conversation_id, onset_turn_trace_id, turn_trace_ids, "
-        "user_id, agent_name, duration_ms, cost_usd, source_started_at, "
+        "user_id, agent_name, turn_duration_ms, turn_cost_usd, source_started_at, "
         f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
         "'ignored the stated output path', 'The user specified /tmp/out.json.', "
         f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
@@ -802,7 +802,7 @@ def test_signature_tables_schema(ch_client):
             "AND name IN ('id', 'inserted_at') ORDER BY name"
         ).result_rows == [
             ("id", "DEFAULT", "generateUUIDv7()"),
-            ("inserted_at", "DEFAULT", "now()"),
+            ("inserted_at", "DEFAULT", "now64(6)"),
         ]
 
 
@@ -838,8 +838,8 @@ def test_signature_retry_collapses_on_read(ch_client):
     # Distinct blocks form distinct parts, so both versions are still on disk
     # here and the single row below is this query's work, not a merge's.
     assert ch_client.query(
-        "SELECT argMax(category, inserted_at), argMax(cost_usd, inserted_at), "
-        "argMax(duration_ms, inserted_at), argMax(language, inserted_at), "
+        "SELECT argMax(category, inserted_at), argMax(turn_cost_usd, inserted_at), "
+        "argMax(turn_duration_ms, inserted_at), argMax(language, inserted_at), "
         "formatDateTime(argMax(expire_at, inserted_at), '%F %T'), "
         "length(argMax(vector, inserted_at)) "
         f"FROM {target_db}.intent_signatures WHERE project_id = 'project-1' "
@@ -864,7 +864,7 @@ def test_signature_retry_collapses_on_read(ch_client):
 
     assert ch_client.query(
         "SELECT toString(id), argMax(onset_turn_trace_id, inserted_at), "
-        "argMax(turn_trace_ids, inserted_at), argMax(cost_usd, inserted_at) "
+        "argMax(turn_trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
         f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
@@ -897,11 +897,11 @@ def test_failure_turn_attribution(ch_client):
         "ORDER BY toString(id)"
     ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
-    # cost_usd and duration_ms are per-row, not additive: the two failures
+    # turn_cost_usd and turn_duration_ms are per-row, not additive: the two failures
     # overlap on trace-6, so summing them counts that turn twice. Three distinct
     # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
-        "SELECT sum(cost_usd), length(arrayDistinct(arrayFlatten(groupArray(turn_trace_ids)))) "
+        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(turn_trace_ids)))) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
     ).result_rows == [(0.73, 3)]
 
