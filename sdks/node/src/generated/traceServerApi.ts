@@ -246,11 +246,8 @@ export interface AgentConversationChatRes {
  * chat view; `text` is the trimmed, length-capped preview content.
  */
 export interface AgentConversationMessagePreview {
-  /**
-   * Role
-   * @default ""
-   */
-  role?: string;
+  /** Role */
+  role: 'user_message' | 'assistant_message';
   /**
    * Text
    * @default ""
@@ -530,7 +527,8 @@ export interface AgentSearchMatchedMessage {
     | 'system'
     | 'tool'
     | 'tool_call'
-    | 'tool_result';
+    | 'tool_result'
+    | string;
   /** Content Preview */
   content_preview: string;
   /** Content Digest */
@@ -912,6 +910,24 @@ export interface AgentSpanSchema {
   agent_description?: string | null;
   /** Agent Version */
   agent_version?: string | null;
+  /** Eval Run Id */
+  eval_run_id?: string | null;
+  /** Eval Predict And Score Call Id */
+  eval_predict_and_score_call_id?: string | null;
+  /** Eval Kind */
+  eval_kind?: string | null;
+  /** Eval Row Digest */
+  eval_row_digest?: string | null;
+  /** Eval Example Id */
+  eval_example_id?: string | null;
+  /** Eval Trial Index */
+  eval_trial_index?: number | null;
+  /** Eval Evaluation Name */
+  eval_evaluation_name?: string | null;
+  /** Parent Call Id */
+  parent_call_id?: string | null;
+  /** Parent Call Trace Id */
+  parent_call_trace_id?: string | null;
   /** Request Model */
   request_model?: string | null;
   /** Response Model */
@@ -1147,6 +1163,7 @@ export interface AgentSpanStatsReq {
     | null;
   /** Group Filters */
   group_filters?: AgentSpanGroupFilter[];
+  signal_filters?: AgentSignalFilter | null;
 }
 
 /**
@@ -1489,6 +1506,7 @@ export interface AndOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2471,6 +2489,7 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2486,6 +2505,7 @@ export interface ContainsSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2540,6 +2560,7 @@ export interface ConvertSpec {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -2675,6 +2696,10 @@ export interface CostQueryOutput {
   prompt_token_cost?: number | null;
   /** Completion Token Cost */
   completion_token_cost?: number | null;
+  /** Cache Read Input Token Cost */
+  cache_read_input_token_cost?: number | null;
+  /** Cache Creation Input Token Cost */
+  cache_creation_input_token_cost?: number | null;
   /** Prompt Token Cost Unit */
   prompt_token_cost_unit?: string | null;
   /** Completion Token Cost Unit */
@@ -3738,6 +3763,12 @@ export interface FeedbackCreateReq {
    */
   span_trace_id?: string;
   /**
+   * Scorer Trace Id
+   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
+   * @default ""
+   */
+  scorer_trace_id?: string;
+  /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
    */
@@ -3884,6 +3915,11 @@ export interface FeedbackQueryReq {
 export interface FeedbackQueryRes {
   /** Result */
   result: Record<string, any>[];
+  /**
+   * Total Count
+   * @min 0
+   */
+  total_count: number;
 }
 
 /** FeedbackReplaceReq */
@@ -3976,6 +4012,12 @@ export interface FeedbackReplaceReq {
    * @default ""
    */
   span_trace_id?: string;
+  /**
+   * Scorer Trace Id
+   * Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.
+   * @default ""
+   */
+  scorer_trace_id?: string;
   /**
    * Wb User Id
    * Do not set directly. Server will automatically populate this field.
@@ -5253,6 +5295,7 @@ export interface OrOperation {
     | LiteralOperation
     | GetFieldOperator
     | ConvertOperation
+    | SizeOperation
     | AndOperation
     | OrOperation
     | NotOperation
@@ -5788,6 +5831,34 @@ export interface ServerInfoRes {
   trace_server_version: string;
 }
 
+/**
+ * SizeOperation
+ * Return the number of elements in a collection or characters in a string.
+ *
+ * Example:
+ *     ```
+ *     {"$size": {"$getField": "scorer_tags"}}
+ *     ```
+ */
+export interface SizeOperation {
+  /** $Size */
+  $size:
+    | LiteralOperation
+    | GetFieldOperator
+    | ConvertOperation
+    | SizeOperation
+    | AndOperation
+    | OrOperation
+    | NotOperation
+    | EqOperation
+    | GtOperation
+    | LtOperation
+    | GteOperation
+    | LteOperation
+    | InOperation
+    | ContainsOperation;
+}
+
 /** SortBy */
 export interface SortBy {
   /** Field */
@@ -6204,6 +6275,81 @@ export interface ValidationError {
   msg: string;
   /** Error Type */
   type: string;
+}
+
+/** CustomRuntimeApplyBody */
+export interface CustomRuntimeApplyBody {
+  /**
+   * Base Url
+   * Public OpenAI-compatible endpoint base URL
+   */
+  base_url: string;
+  /**
+   * Api Key Secret
+   * Team secret name used as the endpoint API key; never the secret value
+   */
+  api_key_secret?: string | null;
+  /**
+   * Headers
+   * Literal headers forwarded to the endpoint
+   */
+  headers?: Record<string, string>;
+  /**
+   * Runtime Ids
+   * Complete desired list of IDs exposed by the endpoint
+   */
+  runtime_ids: CustomRuntimeID[];
+}
+
+/** CustomRuntimeApplyRes */
+export interface CustomRuntimeApplyRes {
+  /**
+   * Name
+   * Stable custom runtime name
+   */
+  name: string;
+  /** Base Url */
+  base_url: string;
+  /** Api Key Secret */
+  api_key_secret: string | null;
+  /** Headers */
+  headers: Record<string, string>;
+  /** Runtime Ids */
+  runtime_ids: CustomRuntimeIDRes[];
+}
+
+/** CustomRuntimeID */
+export interface CustomRuntimeID {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+}
+
+/** CustomRuntimeIDRes */
+export interface CustomRuntimeIDRes {
+  /**
+   * Id
+   * Value sent in the OpenAI-compatible request model field
+   */
+  id: string;
+  /**
+   * Max Tokens
+   * Maximum tokens supported by this runtime ID
+   * @exclusiveMin 0
+   * @default 4096
+   */
+  max_tokens?: number;
+  /** Playground Id */
+  playground_id: string;
 }
 
 export type QueryParamsType = Record<string | number, any>;
@@ -9065,6 +9211,30 @@ export class Api<
       this.request<EvalResultsQueryRes, HTTPValidationError>({
         path: `/v2/${entity}/${project}/eval_results/query`,
         method: 'POST',
+        body: data,
+        type: ContentType.Json,
+        format: 'json',
+        ...params,
+      }),
+
+    /**
+     * @description Create or replace a custom runtime configuration.
+     *
+     * @tags Custom Runtimes
+     * @name CustomRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut
+     * @summary Custom Runtime Apply
+     * @request PUT:/v2/{entity}/{project}/runtimes/{runtime_name}
+     */
+    customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: (
+      entity: string,
+      project: string,
+      runtimeName: string,
+      data: CustomRuntimeApplyBody,
+      params: RequestParams = {}
+    ) =>
+      this.request<CustomRuntimeApplyRes, HTTPValidationError>({
+        path: `/v2/${entity}/${project}/runtimes/${encodeURIComponent(runtimeName)}`,
+        method: 'PUT',
         body: data,
         type: ContentType.Json,
         format: 'json',

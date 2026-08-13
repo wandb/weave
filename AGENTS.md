@@ -6,6 +6,7 @@
 - If there is something that doesn't make sense architecturally, devex-wise, or product-wise, please update the `Requests to Humans` section below.
 - Always follow the established coding patterns and conventions in the codebase.
 - Document any significant architectural decisions or changes.
+- Prefer no code comments; when needed, use one line for a non-obvious invariant.
 
 ## Python Import Rules
 
@@ -55,6 +56,14 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
+### PyPI release publishing
+
+`uv build` resolves the unconstrained `hatchling` build requirement in an
+isolated environment. Keep the pinned `pypa/gh-action-pypi-publish` action new
+enough to validate the Core Metadata version emitted by current Hatchling; for
+example, Hatchling 1.32 emits Metadata 2.5, which requires the action's Twine 7
+and Packaging 26 stack rather than Twine 6.1 and Packaging 25.
+
 ### Codex Development (nox)
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`
@@ -73,13 +82,37 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 
+### Azure file storage authentication
+
+The trace server preserves explicit Azure connection strings and account keys
+for backward compatibility. When neither is configured, it uses
+`DefaultAzureCredential`, including AKS workload identity. Read-only export
+links use an account-key SAS for explicit credentials and a user-delegation SAS
+for workload identity.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
 
+Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
+
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core. During the submodule path migration, check wandb/core's `.gitmodules`: the path may be `services/weave-python/weave-public` or `services/weave-trace/weave-public`.
 
+Persisted `AgentDashboard` objects intentionally use a closed, discriminated
+schema. Supported panel variants and their configuration fields must be added
+to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
+with an untyped dictionary. After changing the model, run
+`make synchronize-base-object-schemas` from the repository root so the Python
+schema and the dependent Core frontend types stay aligned.
+
 ### Trace Server API / Node SDK Schema
+
+Custom Runtime registration is a desired-state facade over the existing
+`Provider` and `ProviderModel` built-in objects. Keep `ProviderModel.provider`
+as the Provider digest and preserve `custom::<provider>::<model>` selectors;
+those representations are consumed by inference and the current UI.
+Inference caches resolved custom-provider configuration per replica, so updates
+may remain stale for up to 60 seconds.
 
 When trace-server request/response models or route schemas change, refresh the API schema used by the Node SDK:
 
@@ -92,6 +125,18 @@ Evaluation result rows merge agent span links from two sources: legacy
 `eval_run_id` plus `eval_predict_and_score_call_id` columns identify the
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
+
+`weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
+call to the OTel span that was current when it started — an agent's
+`execute_tool` span in the case it is built for, but any ambient instrumentation
+qualifies. `create_call` writes it on _every_ call started inside that span, not
+just the outermost one: skipping when the parent call already carries it marks
+every other level, because the check reads the parent's recorded state and the
+parent may itself have skipped. A reader must treat a missing key and a pair
+that matches no span as normal — the write does not check that the span reaches
+our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
+they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
+off the span object, which under the OTel→DD bridge is not an SDK span.
 
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
@@ -160,6 +205,12 @@ Focus on these primary test shards:
 - `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
 
+The Claude Agent SDK shard combines ClickHouse-backed calls tests with
+no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
+without a marker filter so both tracing paths contribute coverage.
+Calls-based tests must include the integration's intentional text and thinking
+child calls in exact operation-set assertions.
+
 ### Running Tests
 
 **IMPORTANT**: Any test depending on the `client` fixture runs against ClickHouse, the only trace-server backend. Locally, the test fixtures auto-start a ClickHouse Docker container if one isn't already running, so Docker must be available. Pass `--clickhouse-process=true` to use a local `clickhouse-server` binary instead of Docker.
@@ -198,7 +249,7 @@ lives parallel to the ClickHouse implementation. It replicates **ClickHouse**
 (the production backend) at the interface level: JSON_VALUE string typing for
 dynamic fields, `to*OrNull` cast rules, NULLS-LAST ordering, DateTime64
 comparisons, and computed summary fields. Tests that assert ClickHouse
-*internals* (SQL, table routing/residence, insert batching, bucket file
+_internals_ (SQL, table routing/residence, insert batching, bucket file
 storage) are gated with `client_is_clickhouse` and skip on the fake. No
 files, no SQL, no Docker.
 
@@ -301,6 +352,134 @@ To run an example (e.g. the Claude Agent SDK demo), `dist/` must be built first
 pnpm exec tsx examples/claudeAgents.ts
 ```
 
+Pure ESM auto-instrumentation requires the `weave/instrument` loader. For
+one-off `tsx` live validation scripts where that loader is not installed, call
+`wrapClaudeAgentSdk()` and consume the returned module view so tracing is
+deterministic.
+
+### TypeScript integration metadata
+
+- `sdks/node/src/integrations/integrationMetadata.ts` remains shared:
+  `asAttributes()` supplies nested provenance to Weave-call integrations, while
+  `asOtelAttributes()` supplies canonical `weave.integration.name` and
+  `weave.integration.version` identity to OTel integrations and preserves
+  flattened `weave.integration.meta.*` provenance. OTel scalar metadata stays
+  typed; non-scalar values are stringified.
+
+### TypeScript Anthropic message batches
+
+- A batch result is a discriminated union and only its `succeeded` variant
+  carries a `message`; a batch ends when every request has succeeded, errored,
+  been canceled or expired. Read `message` without checking the discriminator
+  and the reducer stores `undefined`, which the usage summarizer then throws on,
+  out of the stream iterator's `finally`.
+- `patchAnthropicMessagesCreate` wraps `Messages.prototype.create` in a `Proxy`,
+  so property reads still reach the mock behind it and a test can reconfigure it
+  through the patched prototype. `patchBatchApi` assigns `op()`'s plain wrapper
+  to `Batches` `create`, `retrieve` and `results` instead, so for those a test
+  reconfigures the mock it captured before patching, or reaches it through
+  `__wrappedFunction`.
+
+### TypeScript custom type round trip
+
+- `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
+  `WeaveAudio` from a `wave.Wave_read` one, downloading the stored file from
+  `ref.projectId`, not the client's project.
+- It also rebuilds a `Date` from a `datetime.datetime` payload, which stores no
+  file: Python writes the ISO string inline into the record's `val`. A `Date`
+  is a UTC instant with millisecond resolution, so the round trip keeps the
+  moment but loses the original offset and truncates Python's microseconds. It
+  reads whole-minute offsets only, so a timestamp from before its zone adopted
+  one comes back as an `Invalid Date` (`Africa/Monrovia` ran on `-00:44:30`
+  until 1972).
+- `wave.Wave_read` is what this SDK writes, and what Python wrote until May 2025. Both store one `audio.wav` and no metadata file.
+- Python now records every `Audio` and `wave.Wave_read` object as
+  `weave.type_handlers.Audio.audio.Audio` with an extra `_metadata.json`,
+  because `register()` in `weave/type_handlers/Audio/audio.py` puts the `Audio`
+  serializer first and its `is_audio_instance` predicate also accepts
+  `wave.Wave_read`.
+
+### TypeScript GenAI Turn output
+
+- The existing `Turn.record({messages: [...]})` path records input messages;
+  Turn stores these separately from terminal `outputMessages`.
+- Record a terminal agent result with
+  `Turn.record({outputMessages: [...]})`; `Turn.end()` serializes it onto the
+  `invoke_agent` span as `gen_ai.output.messages`.
+
+### TypeScript GenAI span handles
+
+- `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` emit canonical
+  `invoke_agent`, `chat`, and `execute_tool` spans through
+  `/agents/otel/v1/traces`.
+- These spans go through the `BasicTracerProvider` that `genai/provider.ts`
+  builds, never the OTel global registry. A processor that must see them belongs
+  in that provider's `spanProcessors`, which is built lazily on the first span
+  and rebuilt on a project switch — registering once from `init()` misses both.
+- At a span's attribute limit OTel JS drops the _incoming_ attribute, where
+  Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
+  halves of an overflowing set. The eval linker writes the pair eval results
+  match on before its display-only attributes for that reason, and the op linker
+  sits after it in the Node provider's array for the same reason. Registering the
+  two linkers in opposite order is how both SDKs end up keeping the same half.
+- For callback or generator integrations, create `Conversation`, `Turn`, and
+  `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
+  `Tool` and `SubAgent` do not use ambient state.
+- Keep response models on child `chat` spans; use `setAttributes()` for fields
+  without typed `record()` methods.
+- `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
+  `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
+  belongs on child model spans.
+- Record `invoke_agent` inputs and outputs through `Turn.record()` or
+  `SubAgent.record()`. Keep `gen_ai.tool.*` attributes on `execute_tool` spans,
+  not agent spans.
+- The Claude Agent SDK integration keeps each `Tool` open until its matching
+  `tool_result`.
+- `Tool` accepts JSON-compatible arguments and results. It records strings
+  as-is and serializes structured values for OTel attributes. Prefer
+  `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
+  backward compatibility.
+- Agent span list queries omit heavy message, tool-payload, and raw-span fields;
+  use an `AgentSpansQueryReq` with `include_details=True` when validating stored
+  span details.
+- Parallel/background Claude Agent SDK `Agent` calls can emit an
+  `async_launched` or `remote_launched` tool result before forwarded child
+  messages, then finish via a `task_notification`. Keep one `SubAgent` keyed by
+  tool-use ID across turn boundaries until that notification arrives.
+- Route a forwarded assistant message to an already-open `SubAgent` before
+  creating a `Turn`; background messages can arrive after the root result and
+  must not create an empty root turn or consume the next pending input.
+- For synchronous `Agent`/`Task` completion, read terminal output from the
+  structured `SDKUserMessage.tool_use_result.content`; use the model-facing
+  `tool_result` block content only as a compatibility fallback. Background
+  completion output continues to come from `task_notification.summary`.
+- Read a subagent's lifetime from the launch request (`run_in_background`, or
+  `isolation: 'remote'`, which is always backgrounded) rather than inferring it
+  from the result status — an unrecognized status must not downgrade it.
+- Surviving a turn boundary is transitive: a background `SubAgent`'s open
+  `Tool`s and nested `SubAgent`s survive with it. Closing a descendant early
+  also drops it from the open map, so the next forwarded message re-creates it
+  under the wrong `Turn`.
+- Buffer a subagent's terminal state (and the timestamp it was observed) instead
+  of ending the span on the spot: `SpanBase` only records an error through
+  `end()`, and the span must close after its children. Pass the timestamp as
+  `endTime` so the deferral doesn't inflate the duration.
+- For streamed sessions, queue observed user inputs in FIFO order and close one
+  `Turn` for each matching SDK `result`.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-call ID,
+  and preserve the caller's `forwardSubagentText` option.
+
+### Claude Agent SDK streamed images
+
+- Tap `AsyncIterable<SDKUserMessage>` prompts without consuming or cloning
+  them; map text and base64/URL images to GenAI text, blob, and URI parts.
+- Each user-to-result cycle is one root turn. Resumed queries share
+  `session_id`, and long-lived streamed inputs queue turns in FIFO order.
+- Treat `blob.content` as media/ref data exposed through `content_refs`, not
+  prose.
+- Run the example from `sdks/node`, use repository-relative fixtures, keep text
+  and image sessions separate, and set both `tools` and `allowedTools`.
+
 ## Code Review & PR Guidelines
 
 ### PR Requirements
@@ -354,6 +533,23 @@ pnpm exec tsx examples/claudeAgents.ts
 - Include meaningful error messages
 - Add error handling tests
 
+### LLM Completion Routing
+
+- Built-in and API-key-authenticated custom providers use LiteLLM.
+- Custom runtimes without an API key use the OpenAI client directly so configured
+  headers and unauthenticated endpoints do not receive a bearer header.
+- OpenAI Responses and Chat Completions report `cache_write_tokens` under
+  `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
+  Normalize either field when present instead of parsing model names. The
+  standard cost registry supplies each model's
+  `cache_creation_input_token_cost`. Because `input_tokens` and `prompt_tokens`
+  include `cached_tokens` and `cache_write_tokens`, an unmapped
+  `cache_write_tokens` value is billed at the Input rate instead of the rate for
+  cache writes.
+- The OpenAI CI shard runs with `-m trace_server`; usage-normalization coverage
+  must therefore come from client-backed pricing cases, not only standalone
+  unit tests in `tests/integrations/openai/test_openai_sdk.py`.
+
 ### Integration Testing
 
 - Since autopatching was removed from `weave.init()`, integration tests must explicitly patch their integrations
@@ -368,6 +564,130 @@ pnpm exec tsx examples/claudeAgents.ts
       patcher.undo_patch()
   ```
 - Some integrations (like instructor) may need to patch multiple libraries
+
+### Python Conversation Turn messages
+
+- `Turn.messages` stores input messages, while `Turn.output_messages` stores
+  the terminal agent response. `Turn.record(messages=..., output_messages=...)`
+  replaces the two lists independently.
+- `SubAgent` owns its input/output messages and originating tool-call
+  arguments/result. Integrations populate them through `SubAgent.record()` so
+  `_build_attrs()` applies `include_content` and PII redaction; do not write
+  those content attributes directly with `set_attributes()`.
+- `Tool`, `LLM`, `SubAgent`, and `Turn` expose `record_error(error)` to mark a
+  failure without ending the span. It derives `error.type` from the exception;
+  call `end()` separately. Context managers do both for escaping exceptions.
+- Mypy requires explicit `return None` paths in functions annotated with
+  `T | None`; bare `return` and implicit fallthrough trigger return-value
+  errors.
+- Python `Turn` spans are same-process `invoke_agent` operations and use OTel's
+  default `SpanKind.INTERNAL`. Do not set `gen_ai.provider.name` on a `Turn`;
+  set it on child `LLM`/`chat` spans, because one turn can use multiple
+  providers.
+- Keep streaming and batch paths aligned: `Turn._build_attrs()` must apply
+  content gating and PII redaction to both lists before passing them to
+  `invoke_agent_attributes()`, and `log_turn()` must accept both fields.
+- The Python Claude Agent SDK integration taps async prompt iterables, queues
+  user inputs in FIFO order, and closes one `Turn` for each `ResultMessage`.
+- Keep its output adapters split by SDK contract: string `query()` and each
+  `ClaudeSDKClient.receive_response()` use the linear single-turn tracer, while
+  only standalone `query(AsyncIterable)` uses multi-result queue/lookahead logic.
+- Standalone async-iterable queries can emit bootstrap `system/init` before the
+  first prompt is consumed. Defer only that init for trace attribution; forward
+  other output received without a pending query-triggering input without
+  attaching it to the next turn, especially late background-task notifications.
+  Correctly completing background subagents across results requires separate
+  conversation-scoped task ownership.
+- Name the corresponding test cases "string prompt" and "async-iterable
+  prompt" rather than sync/async: both SDK entry points are asynchronous. Keep
+  one-input success and pre/post-result failure assertions paired across them.
+- SDK output can fail before the first message or between completed turns. Keep
+  the submitted/pending input observable by ending its `Turn` through the
+  exception path so the span records the error before the exception propagates.
+- The Agents conversation tree renders recognized GenAI operations. Generic
+  OTel spans with an empty `gen_ai.operation.name` remain stored and queryable
+  through `agent_spans_query`, but are omitted from that visual tree; use a
+  semantic marker span when a UI-visible trace regression is required.
+- For spans with `ERROR` status, missing `error_type` and `status_message`
+  fall back to the latest OTel `exception` event. Explicit `error.type` and
+  status-message values take precedence, and handled exception events on
+  non-error spans remain raw-only.
+- Content spans with `ERROR` status emit a chat message even without text or
+  reasoning so the conversation timeline retains the failure. Successful empty
+  tool-calling steps remain omitted.
+- Use the Trace tree view for parentage comparisons. The default flamegraph
+  collapses overlapping siblings into synthetic groups, which can make flat
+  and nested traces look deceptively similar; give live-example spans realistic
+  duration and verify their stored parent IDs with `agent_spans_query`.
+
+### Claude Agent SDK token accounting
+
+- Anthropic reports Claude Agent SDK `input_tokens` as fresh, uncached input
+  only. Weave usage requires an inclusive prompt total, with
+  `cache_read_input_tokens` and `cache_creation_input_tokens` represented as
+  subsets of `input_tokens`, because cost and cache-hit-rate rollups use that
+  convention.
+- Both Python tracing paths must normalize aggregate result usage through
+  `weave/integrations/claude_agent_sdk/usage.py`. Keep the SDK's yielded
+  `ResultMessage` and the calls-based root output unchanged; normalize the
+  calls-based usage summary and the OTel span attributes consumed by Weave
+  rollups.
+- Regression coverage must exercise both the calls-based and OTel integrations
+  with nonzero cache-read and cache-creation counts.
+- The OTel-selected Claude Agent SDK path composes the Python GenAI
+  `Conversation`, `Turn`, `LLM`, `Tool`, and `SubAgent` handles; it must not
+  create raw OTel spans or call the low-level GenAI attribute builders itself.
+  Use `set_attributes()` only for semantic fields the typed handles do not
+  expose. The legacy calls-based path remains separate.
+- Tap Python `AsyncIterable[dict]` prompts without consuming or cloning them.
+  Map Claude text and base64/URL image blocks to GenAI text, blob, and URI
+  parts; media payloads remain data for `content_refs`, not chat prose.
+- Treat `Agent` and legacy `Task` tool calls as subagents keyed by tool-use ID.
+  Route nested assistant messages and tools through `parent_tool_use_id`.
+  Synchronous calls close on their matching tool result; background launch
+  acknowledgements stay open until `task_notification`. Dispatch task events
+  through `SystemMessage.subtype` and `data`, map `task_id` to tool-use ID from
+  `task_started` / `task_progress`, and do not import typed task messages that
+  are absent from older supported Claude Agent SDK versions.
+- Start those subagents with `SubAgent.start(set_current=False)`, never
+  `__enter__`. Parallel delegations close in completion order, and `end()`
+  detaches through `ContextVar.reset`, so an out-of-LIFO close leaves the
+  ambient OTel context pointing at an ended span — user code running between
+  streamed messages would nest under it. Children nest either way, because
+  `start_llm` / `start_tool` / `start_subagent` thread an explicit parent.
+- Stream adapters can create child handles when work starts, then enter them
+  with a normal `with` when the completion message arrives. Preserve logical
+  timing with `LLM.started_at` and an explicit `Tool.started_at` instead of
+  keeping contexts open with `ExitStack`.
+
+### Credential-shaped fields in client-authored call columns
+
+- The three call converters in `clickhouse/schema_converters.py` run
+  `redact_sensitive_keys` over `inputs` and `attributes` before extracting refs,
+  so a field whose name matches the policy in
+  `weave/trace_server/credential_redaction.py` is stored with its string value
+  replaced. `in_memory_trace_server.py` applies the same function, so both
+  backends read back the same thing.
+- The same converters redact `otel_dump`. It is a raw copy of the client's span,
+  so it carries the attribute values that `attributes_dump` holds a second time,
+  and it is a public field on the insert schemas, so the OTel route is not its
+  only producer.
+- The walk is copy-on-write and replaces only non-empty strings. Both properties
+  are load-bearing — see the module docstring — so keep them if you touch it.
+
+### Credential-shaped fields in agent span columns
+
+- The agents OTel ingest calls `redact_credentials_from_span` before
+  `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
+  Both are load-bearing — see that function's docstring — so keep the order and
+  the placement if you touch it.
+- It redacts all four attribute containers a span carries: its own, its resource,
+  its events and its links. The output columns derive from those too, so on this
+  path a credential-shaped name inside a structured output is replaced as well.
+- The completions path builds a span row without a parsed OTel span, so it never
+  reaches that hook. `build_completion_span` redacts the request once and every
+  column that can carry a client string reads that copy; the provider response is
+  left as the provider sent it, because a response is generated content.
 
 ### Documentation
 
@@ -437,4 +757,14 @@ If there is something that doesn't make sense architecturally, devex-wise, or pr
 Think of this as the reverse-task assignment - a place where you can communicate back to us.
 
 - [ ] Add TypeScript testing guidelines
+- [ ] Add `output_messages` to Python `Turn.record()` for parity with
+      TypeScript `Turn.record({outputMessages: ...})`; the lower-level Python
+      `invoke_agent_attributes()` builder already supports agent output.
+- [ ] Repair the existing `pnpm run typecheck:examples` failures caused by
+      OpenAI type drift in `examples/agent.ts`, `classesWithOps.ts`,
+      `imageGeneration.ts`, `quickstart*.ts`, and `streamFunctionCalls.ts`.
+- [ ] Isolate Node GenAI test exit hooks: a full in-band Jest run can register
+      more than ten `beforeExit` listeners and flush queued test calls to the
+      real trace server after teardown when developer W&B credentials are
+      present, turning an otherwise-green run into a post-test failure.
 - [ ] ...

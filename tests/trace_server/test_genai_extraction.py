@@ -16,11 +16,15 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.agents import semconv
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.opentelemetry.genai_extraction import (
     extract_genai_span,
+    redact_credentials_from_span,
     strip_inline_blobs_from_span,
 )
 from weave.trace_server.opentelemetry.python_spans import (
+    Event,
+    Link,
     Resource,
     Span,
     SpanKind,
@@ -35,11 +39,13 @@ def _make_span(
     name: str = "test-span",
     events: list | None = None,
     status: Status | None = None,
+    resource_attrs: dict[str, Any] | None = None,
+    links: list | None = None,
 ) -> Span:
     """Build a minimal Span for testing."""
     now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
     return Span(
-        resource=Resource(attributes={}),
+        resource=Resource(attributes=resource_attrs or {}),
         name=name,
         trace_id="abc123",
         span_id="def456",
@@ -49,6 +55,7 @@ def _make_span(
         kind=SpanKind.CLIENT,
         status=status or Status(code=StatusCode.OK),
         events=events or [],
+        links=links or [],
     )
 
 
@@ -76,6 +83,8 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.eval.example_id": "example-001",
             "weave.eval.trial_index": 2,
             "weave.eval.evaluation_name": "travel-bot-eval",
+            "weave.parent_call.id": "01997c9d-0000-7000-8000-00000000abcd",
+            "weave.parent_call.trace_id": "01997c9d-0000-7000-8000-00000000ef01",
             "gen_ai.conversation.id": "conv-abc",
             "weave.conversation.name": "My Chat",
             # Model + tokens
@@ -150,6 +159,8 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.eval_example_id == "example-001"
     assert result.eval_trial_index == 2
     assert result.eval_evaluation_name == "travel-bot-eval"
+    assert result.parent_call_id == "01997c9d-0000-7000-8000-00000000abcd"
+    assert result.parent_call_trace_id == "01997c9d-0000-7000-8000-00000000ef01"
     assert result.conversation_id == "conv-abc"
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
@@ -200,6 +211,7 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
     assert "weave.eval.run_id" not in result.custom_attrs_string
     assert "weave.eval.trial_index" not in result.custom_attrs_int
+    assert "weave.parent_call.id" not in result.custom_attrs_string
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""
@@ -232,6 +244,76 @@ def test_extract_genai_span_error_status() -> None:
     assert result.status_code == "ERROR"
     assert result.status_message == "rate limited"
     assert result.error_type == "RateLimitError"
+
+
+def test_extract_genai_span_error_details_fall_back_to_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "asyncio.exceptions.CancelledError",
+                        "message": "stream cancelled",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "asyncio.exceptions.CancelledError"
+    assert result.status_message == "stream cancelled"
+
+
+def test_extract_genai_span_error_details_prefer_explicit_fields() -> None:
+    span = _make_span(
+        attrs={"error.type": "RateLimitError"},
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "FallbackError",
+                        "message": "fallback message",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR, message="rate limited"),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "RateLimitError"
+    assert result.status_message == "rate limited"
+
+
+def test_extract_genai_span_does_not_promote_handled_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "HandledError",
+                        "message": "recovered",
+                    }
+                },
+            )
+        ]
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.status_code == "OK"
+    assert result.error_type == ""
+    assert result.status_message == ""
 
 
 def test_extract_genai_span_preserves_unset_status() -> None:
@@ -647,6 +729,89 @@ def test_ingest_flow_strips_base64_from_span_attribute_dumps() -> None:
     assert "weave-trace-internal:///p1/object/" in result.attributes_dump
     assert "CustomWeaveType" not in result.attributes_dump
     assert trace_server.file_create.call_count == 2
+
+
+def test_redact_credentials_from_span_reaches_every_attribute_container() -> None:
+    """Every container a span carries is redacted, not only its own attributes.
+
+    ``tool_call_arguments`` is pinned alongside the dumps because it is derived
+    from an event, the container easiest to miss.
+    """
+    span = _make_span(
+        attrs={
+            "authorization": "value-to-redact",
+            "options": {"apiKey": "value-to-redact"},
+        },
+        resource_attrs={"aws_access_key_id": "value-to-redact"},
+        events=[
+            Event(
+                name="gen_ai.tool.input",
+                timestamp=0,
+                attributes={
+                    "gen_ai.tool.call.arguments": {"api_key": "value-to-redact"}
+                },
+            )
+        ],
+        links=[
+            Link(
+                trace_id="abc123",
+                span_id="fed654",
+                attributes={"api_key": "value-to-redact"},
+            )
+        ],
+    )
+
+    redact_credentials_from_span(span)
+    result = extract_genai_span(span, project_id="p1")
+
+    redacted_attrs = {
+        "authorization": REDACTED_VALUE,
+        "options": {"apiKey": REDACTED_VALUE},
+    }
+    raw_span = json.loads(result.raw_span_dump)
+    assert json.loads(result.attributes_dump) == redacted_attrs
+    assert raw_span["attributes"] == redacted_attrs
+    assert json.loads(result.resource_dump) == {
+        "attributes": {"aws_access_key_id": REDACTED_VALUE},
+        "dropped_attributes_count": 0,
+    }
+    assert json.loads(result.events_dump)[0]["attributes"] == {
+        "gen_ai.tool.call.arguments": {"api_key": REDACTED_VALUE}
+    }
+    assert raw_span["links"][0]["attributes"] == {"api_key": REDACTED_VALUE}
+    assert result.tool_call_arguments == json.dumps({"api_key": REDACTED_VALUE})
+    assert result.custom_attrs_string == {
+        "authorization": REDACTED_VALUE,
+        "options.apiKey": REDACTED_VALUE,
+    }
+
+
+def test_credential_inside_a_json_string_is_not_reached() -> None:
+    """The policy matches field names, and the walk stops at a string.
+
+    Parsing those payloads is tracked separately on WB-38040.
+    """
+    payload = '[{"openai_api_key": "value-to-redact"}]'
+    span = _make_span(attrs={"gen_ai.input.messages": payload})
+
+    redact_credentials_from_span(span)
+    result = extract_genai_span(span, project_id="p1")
+
+    assert json.loads(result.attributes_dump) == {"gen_ai.input.messages": payload}
+
+
+def test_redaction_before_the_blob_strip_uploads_nothing() -> None:
+    """A credential value big enough to look like a blob never reaches storage."""
+    b64 = base64.b64encode(b"a" * 15000).decode("ascii")
+    trace_server = _mock_trace_server()
+    span = _make_span(attrs={"openai_api_key": f"data:image/png;base64,{b64}"})
+
+    redact_credentials_from_span(span)
+    strip_inline_blobs_from_span(span, "p1", trace_server)
+    result = extract_genai_span(span, project_id="p1")
+
+    assert trace_server.file_create.call_count == 0
+    assert json.loads(result.attributes_dump) == {"openai_api_key": REDACTED_VALUE}
 
 
 def test_strip_inline_blobs_attributes_obj_create_to_wb_user_id() -> None:

@@ -67,16 +67,18 @@ def wf_kafka_project_id_bucket_count() -> int:
 
 
 def wf_enable_online_eval() -> bool:
-    """Whether to enable online evaluation."""
+    """Enable the scoring worker and emit `weave.call_ended` events."""
     return os.environ.get("WEAVE_ENABLE_ONLINE_EVAL", "false").lower() == "true"
 
 
 def wf_enable_agent_scoring() -> bool:
-    """Whether to emit ScoreAgentSpansEvent triggers from the OTel ingest path.
-
-    In addition to `wf_enable_online_eval` so agent scoring can be toggled independently.
-    """
+    """Enable the agent scoring worker and emit `weave.score_agent_spans` events."""
     return os.environ.get("WEAVE_ENABLE_AGENT_SCORING", "false").lower() == "true"
+
+
+def wf_enable_agent_insights() -> bool:
+    """Enable the insights worker to emit `weave.embed_agent_spans` events."""
+    return os.environ.get("WEAVE_ENABLE_AGENT_INSIGHTS", "false").lower() == "true"
 
 
 def wf_scoring_worker_batch_size() -> int:
@@ -172,6 +174,9 @@ REMOTE_SCORER_VALIDATE_HOSTS_ENV = "WF_SCORING_WORKER_REMOTE_SCORER_VALIDATE_HOS
 REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_ALLOW_INSECURE_HTTP"
 )
+REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV = (
+    "WF_SCORING_WORKER_REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS"
+)
 REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA_ENV = (
     "WF_SCORING_WORKER_REMOTE_SCORER_REQUIRE_STRUCTURED_RESULT_SCHEMA"
 )
@@ -229,14 +234,28 @@ def wf_scoring_worker_remote_scorer_validate_hosts() -> bool:
 
 
 def wf_scoring_worker_remote_scorer_allow_insecure_http() -> bool:
-    """Whether remote scorer URLs may use insecure http.
+    """Whether remote scorer URLs may use the http scheme instead of https.
 
-    This is intended as an explicit operator waiver for local/dev testing. The
-    worker still applies the host allowlist when this is enabled.
+    The host allowlist still applies when it is enabled, and private IP
+    addresses are governed independently by
+    wf_scoring_worker_remote_scorer_allowed_private_cidrs.
     """
     return (
         os.environ.get(REMOTE_SCORER_ALLOW_INSECURE_HTTP_ENV, "false").lower() == "true"
     )
+
+
+def wf_scoring_worker_remote_scorer_allowed_private_cidrs() -> list[str]:
+    """Networks exempt from the remote scorer private IP address deny.
+
+    Values are comma-separated CIDR networks, for example "10.0.0.0/8". Empty
+    and whitespace-only entries are ignored, and the default empty list keeps
+    every private IP address denied.
+    """
+    raw = os.environ.get(REMOTE_SCORER_ALLOWED_PRIVATE_CIDRS_ENV)
+    if raw is None:
+        return []
+    return [entry.strip() for entry in raw.split(",") if entry.strip()]
 
 
 def wf_scoring_worker_remote_scorer_require_structured_result_schema() -> bool:
@@ -291,6 +310,11 @@ def wf_ingest_sample_dry_run() -> bool:
 
 # Clickhouse Settings
 
+# ClickHouse Cloud services share the built-in `default` cluster and resolve to a
+# `*.clickhouse.cloud` host; query_log fan-out uses it without any extra config.
+CLICKHOUSE_CLOUD_HOST_SUFFIX = ".clickhouse.cloud"
+CLICKHOUSE_CLOUD_CLUSTER = "default"
+
 
 def wf_clickhouse_host() -> str:
     """The host of the clickhouse server."""
@@ -338,6 +362,18 @@ def wf_clickhouse_use_distributed_tables() -> bool:
         os.environ.get("WF_CLICKHOUSE_USE_DISTRIBUTED_TABLES", "false").lower()
         == "true"
     )
+
+
+def wf_clickhouse_query_log_cluster() -> str | None:
+    """Cluster to fan out `system.query_log` reads across replicas, or None for local-only.
+
+    ClickHouse Cloud is multi-replica with a built-in `default` cluster and no
+    `WF_CLICKHOUSE_REPLICATED_CLUSTER` set, so detect it by host and default to
+    `default`; self-managed distributed falls back to its replicated cluster.
+    """
+    if wf_clickhouse_host().endswith(CLICKHOUSE_CLOUD_HOST_SUFFIX):
+        return CLICKHOUSE_CLOUD_CLUSTER
+    return wf_clickhouse_replicated_cluster()
 
 
 VALID_CALLS_SHARD_KEYS = frozenset({"trace_id", "id", "project_id"})

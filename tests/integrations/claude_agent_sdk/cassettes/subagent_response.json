@@ -1,0 +1,123 @@
+[
+  {
+    "type": "system",
+    "subtype": "init",
+    "session_id": "s-subagent001"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I will delegate this research."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_agent_01",
+          "name": "Agent",
+          "input": {
+            "subagent_type": "researcher",
+            "description": "Research factual questions",
+            "prompt": "Find the capital of France."
+          }
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "I will verify the answer."
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_bash_01",
+          "name": "Bash",
+          "input": {
+            "command": "printf Paris"
+          }
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_agent_01"
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_bash_01",
+          "content": "Paris"
+        }
+      ]
+    },
+    "parent_tool_use_id": "toolu_agent_01"
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The capital of France is Paris."
+        }
+      ],
+      "model": "claude-haiku-4-5"
+    },
+    "parent_tool_use_id": "toolu_agent_01"
+  },
+  {
+    "type": "user",
+    "message": {
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_agent_01",
+          "content": [
+            {
+              "type": "text",
+              "text": "The capital of France is Paris."
+            }
+          ]
+        }
+      ]
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "assistant",
+    "message": {
+      "content": [
+        {
+          "type": "text",
+          "text": "The researcher confirmed that Paris is the capital of France."
+        }
+      ],
+      "model": "claude-sonnet-4-6"
+    },
+    "parent_tool_use_id": null
+  },
+  {
+    "type": "result",
+    "subtype": "result",
+    "duration_ms": 1800,
+    "duration_api_ms": 1400,
+    "is_error": false,
+    "num_turns": 1,
+    "session_id": "s-subagent001",
+    "total_cost_usd": 0.006,
+    "usage": {
+      "input_tokens": 120,
+      "output_tokens": 45
+    },
+    "result": "The researcher confirmed that Paris is the capital of France."
+  }
+]

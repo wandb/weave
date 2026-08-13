@@ -9,12 +9,18 @@ import uuid
 
 import clickhouse_connect
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _NON_RECOVERABLE_MIGRATION_VERSIONS,
     MigrationError,
     get_clickhouse_trace_server_migrator,
+)
+from weave.trace_server.costs.insert_costs import (
+    COSTS_TABLE,
+    costs_schema_is_ready,
+    get_current_costs,
 )
 
 _TEST_MIGRATION_DIR = os.path.abspath(
@@ -539,17 +545,27 @@ def test_recent_production_upgrade_path(
     )
 
 
-def test_all_production_migrations_replicated(ch_client):
-    """All production migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_repl")
-    target_db = _unique_name("prod_repl")
+@pytest.mark.parametrize(
+    "use_distributed", [False, True], ids=["replicated", "distributed"]
+)
+def test_all_production_migrations_round_trip(ch_client, use_distributed: bool):
+    """Every production migration applies cleanly, then reverses cleanly.
+
+    Up and down live in one test because a completed up is the only valid
+    starting point for a down. Running them as separate tests replayed the same
+    full migration set twice per mode, and each statement carries a fixed
+    round-trip cost against Keeper.
+    """
+    suffix = "dist" if use_distributed else "repl"
+    mgmt_db = _unique_name(f"db_mgmt_prod_{suffix}")
+    target_db = _unique_name(f"prod_{suffix}")
     ch_client.track_db(mgmt_db)
     ch_client.track_db(target_db)
 
     migrator = get_clickhouse_trace_server_migrator(
         ch_client,
         replicated=True,
-        use_distributed=False,
+        use_distributed=use_distributed,
         replicated_cluster=_CLUSTER,
         replicated_path=_REPLICATED_PATH,
         management_db=mgmt_db,
@@ -558,6 +574,7 @@ def test_all_production_migrations_replicated(ch_client):
     )
     migrator.apply_migrations(target_db)
 
+    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
     assert _get_db_engine(ch_client, target_db) == "Atomic"
     # On multi-replica topologies (1s3r / 2s2r in CI), the DB must exist on
     # every replica with a consistent engine. Historical failure modes this
@@ -568,87 +585,330 @@ def test_all_production_migrations_replicated(ch_client):
     #     only the migrator's entrypoint pod gets the DB, sibling replicas
     #     never join the ZK path).
     _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
+    if use_distributed:
+        # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
+        # If the fan-out is broken, peer replicas never receive the management
+        # DB either.
+        _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
+
+    # Migrate all the way back down
+    migrator.apply_migrations(target_db, target_version=0)
 
 
-def test_all_production_migrations_distributed(ch_client):
-    """All production migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_prod_dist")
-    target_db = _unique_name("prod_dist")
+_INTENT_COLUMNS = [
+    ("project_id", "String"),
+    ("id", "UUID"),
+    ("config_sha", "LowCardinality(String)"),
+    ("signature", "String"),
+    ("category", "String"),
+    ("language", "LowCardinality(String)"),
+    ("sentiment", "LowCardinality(String)"),
+    ("sentiment_rationale", "String"),
+    ("vector", "Array(Float32)"),
+    ("conversation_id", "String"),
+    ("trace_id", "String"),
+    ("user_id", "String"),
+    ("agent_name", "String"),
+    ("turn_duration_ms", "UInt32"),
+    ("turn_cost_usd", "Float64"),
+    ("trace_started_at", "DateTime64(6, 'UTC')"),
+    ("extracted_at", "DateTime64(6, 'UTC')"),
+    ("inserted_at", "DateTime64(6, 'UTC')"),
+    ("expire_at", "DateTime"),
+]
+
+_FAILURE_COLUMNS = [
+    ("project_id", "String"),
+    ("id", "UUID"),
+    ("config_sha", "LowCardinality(String)"),
+    ("signature", "String"),
+    ("failure_reason", "String"),
+    ("category", "String"),
+    ("severity", "LowCardinality(String)"),
+    ("vector", "Array(Float32)"),
+    ("conversation_id", "String"),
+    ("current_trace_id", "String"),
+    ("affected_trace_ids", "Array(String)"),
+    ("evidence_span_ids", "Array(String)"),
+    ("user_id", "String"),
+    ("agent_name", "String"),
+    ("turn_duration_ms", "UInt32"),
+    ("turn_cost_usd", "Float64"),
+    ("trace_started_at", "DateTime64(6, 'UTC')"),
+    ("extracted_at", "DateTime64(6, 'UTC')"),
+    ("inserted_at", "DateTime64(6, 'UTC')"),
+    ("expire_at", "DateTime"),
+]
+
+# The column lists below are deliberately spelled out twice rather than composed
+# from a shared block: the assert is ORDER BY position, and shared columns
+# interleave with grain-specific ones differently in each table. Growing this
+# count is a decision, not a side effect.
+_EXPECTED_SHARED_COLUMNS = 15
+
+_SIGNATURE_TABLES = [
+    (
+        "intent_signatures",
+        _INTENT_COLUMNS,
+        [
+            ("idx_conversation_id", "conversation_id"),
+            ("idx_trace_id", "trace_id"),
+        ],
+    ),
+    (
+        "failure_signatures",
+        _FAILURE_COLUMNS,
+        [
+            ("idx_affected_trace_ids", "affected_trace_ids"),
+            ("idx_conversation_id", "conversation_id"),
+        ],
+    ),
+]
+
+
+def _migrate_signatures_db(ch_client, name: str) -> str:
+    """Apply production migrations to a fresh db and return its name."""
+    mgmt_db = _unique_name(f"db_mgmt_{name}")
+    target_db = _unique_name(name)
     ch_client.track_db(mgmt_db)
     ch_client.track_db(target_db)
 
     migrator = get_clickhouse_trace_server_migrator(
         ch_client,
-        replicated=True,
-        use_distributed=True,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
-    )
-    migrator.apply_migrations(target_db)
-
-    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-    # Distributed mode uses ON CLUSTER to fan DBs to every shard/replica.
-    # If the fan-out is broken (e.g. the `ON CLUSTER + ENGINE = Replicated`
-    # collision), peer replicas never receive the CREATE DATABASE.
-    _assert_db_on_every_replica(ch_client, mgmt_db, expected_engine="Atomic")
-    _assert_db_on_every_replica(ch_client, target_db, expected_engine="Atomic")
-
-
-def test_all_production_down_migrations_replicated(ch_client):
-    """All production down migrations apply cleanly in replicated mode."""
-    mgmt_db = _unique_name("db_mgmt_down_repl")
-    target_db = _unique_name("down_repl")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
-
-    migrator = get_clickhouse_trace_server_migrator(
-        ch_client,
-        replicated=True,
+        replicated=False,
         use_distributed=False,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
         management_db=mgmt_db,
         migration_dir=_PROD_MIGRATION_DIR,
         post_migration_hook=None,
     )
-
-    # Migrate up to latest
     migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
-
-    # Migrate all the way back down
-    migrator.apply_migrations(target_db, target_version=0)
+    return target_db
 
 
-def test_all_production_down_migrations_distributed(ch_client):
-    """All production down migrations apply cleanly in distributed mode."""
-    mgmt_db = _unique_name("db_mgmt_down_dist")
-    target_db = _unique_name("down_dist")
-    ch_client.track_db(mgmt_db)
-    ch_client.track_db(target_db)
+# Source month is a month before extraction, so a partition that followed
+# extraction time would file the row under the wrong month.
+_TRACE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
+_EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
+_UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
-    migrator = get_clickhouse_trace_server_migrator(
+# The sorting key, and therefore the dedup key: a read that collapses a retry
+# groups by all three terms, because no read here uses FINAL.
+_SIGNATURE_KEY = "project_id, toDate(trace_started_at), id"
+
+# Writer-minted uuidv7 values. Reused verbatim to stand for a retry of the same
+# row, which is the only thing ReplacingMergeTree collapses here.
+_INTENT_ID = "019ff277-bba3-7232-aeb3-0632fd183e1e"
+_FAILURE_ID_1 = "019ff277-bba3-7232-aeb3-0632fd183e2f"
+_FAILURE_ID_2 = "019ff288-c1d4-7333-bfc4-1743fe294f3a"
+
+
+def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> None:
+    """Insert one intent_signatures row for _INTENT_ID in 'project-1'."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.intent_signatures "
+        "(project_id, id, config_sha, signature, category, language, "
+        "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
+        "turn_duration_ms, turn_cost_usd, trace_started_at, extracted_at) VALUES "
+        f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
+        f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
+        f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
+        f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
+    )
+
+
+def _insert_failure(
+    ch_client, target_db: str, row_id: str, current: str, affected: str, cost: float
+) -> None:
+    """Insert one failure_signatures row in 'project-1'."""
+    ch_client.command(
+        f"INSERT INTO {target_db}.failure_signatures "
+        "(project_id, id, config_sha, signature, failure_reason, category, "
+        "severity, vector, conversation_id, current_trace_id, affected_trace_ids, "
+        "user_id, agent_name, turn_duration_ms, turn_cost_usd, trace_started_at, "
+        f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
+        "'ignored the stated output path', 'The user specified /tmp/out.json.', "
+        f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
+        f"'{current}', {affected}, 'user-1', 'checkout-agent', 16000, {cost}, "
+        f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
+    )
+
+
+def test_signature_tables_schema(ch_client):
+    """Both signature tables pin their key and engine, and neither carries a constraint.
+
+    Engine, PARTITION BY and ORDER BY are the one-way doors: none can be altered
+    on a populated table. Both tables come from one migration, so they share the
+    one migrated database rather than paying for a chain each.
+    """
+    target_db = _migrate_signatures_db(ch_client, "signatures")
+
+    for table_name, expected_columns, expected_indexes in _SIGNATURE_TABLES:
+        assert ch_client.query(
+            "SELECT engine, partition_key, sorting_key, primary_key, "
+            "extract(create_table_query, 'TTL (.+) SETTINGS') "
+            f"FROM system.tables WHERE database = '{target_db}' "
+            f"AND name = '{table_name}'"
+        ).result_rows == [
+            (
+                "ReplacingMergeTree",
+                "toYYYYMM(trace_started_at)",
+                _SIGNATURE_KEY,
+                _SIGNATURE_KEY,
+                "expire_at",
+            )
+        ]
+
+        # Pins the column list, which is also what rules out an Enum: the writer
+        # gates the vocabulary, because an insert is batched at 256 rows and one
+        # bad candidate must not reject 255 good ones.
+        assert (
+            ch_client.query(
+                "SELECT name, type FROM system.columns "
+                f"WHERE database = '{target_db}' AND table = '{table_name}' "
+                "ORDER BY position"
+            ).result_rows
+            == expected_columns
+        )
+
+        # A CONSTRAINT is the same 256-row problem and shows up nowhere else.
+        assert (
+            "CONSTRAINT"
+            not in ch_client.query(
+                "SELECT create_table_query FROM system.tables "
+                f"WHERE database = '{target_db}' AND name = '{table_name}'"
+            ).result_rows[0][0]
+        )
+
+        # Bloom filters only. No ANN index: measured on this schema, HNSW cost
+        # 126-196x on inserts.
+        assert (
+            ch_client.query(
+                "SELECT name, expr FROM system.data_skipping_indices "
+                f"WHERE database = '{target_db}' AND table = '{table_name}' "
+                "ORDER BY name"
+            ).result_rows
+            == expected_indexes
+        )
+
+        # inserted_at is only DEFAULTed so a writer can override it (e.g. for a
+        # backfill), and id is only DEFAULTed so a row cannot land without the
+        # one the writer minted.
+        assert ch_client.query(
+            "SELECT name, default_kind, default_expression FROM system.columns "
+            f"WHERE database = '{target_db}' AND table = '{table_name}' "
+            "AND name IN ('id', 'inserted_at') ORDER BY name"
+        ).result_rows == [
+            ("id", "DEFAULT", "generateUUIDv7()"),
+            ("inserted_at", "DEFAULT", "now64(6)"),
+        ]
+
+
+def test_signature_tables_share_column_types():
+    """A column in both tables must mean the same thing in both.
+
+    Splitting intents from failures buys grain-correct schemas and costs schema
+    drift. A type that diverges makes one query silently mean two things, so it
+    is caught here against the pinned column lists, before ClickHouse is asked.
+    """
+    intent, failure = dict(_INTENT_COLUMNS), dict(_FAILURE_COLUMNS)
+    shared = intent.keys() & failure.keys()
+
+    assert len(shared) == _EXPECTED_SHARED_COLUMNS
+    assert {name: intent[name] for name in shared} == {
+        name: failure[name] for name in shared
+    }
+
+
+def test_signature_retry_collapses_on_read(ch_client):
+    """A retry of the same row id replaces its predecessor under GROUP BY + argMax.
+
+    Spelled the way the reader has to spell it: this path never uses FINAL, so the
+    collapse must fall out of the sorting key.
+    """
+    target_db = _migrate_signatures_db(ch_client, "lifecycle")
+
+    # Separate inserts, because now64() is evaluated once per block: two rows
+    # sharing an id inside one block would tie on the version.
+    _insert_intent(ch_client, target_db, "action_request", 0.21)
+    _insert_intent(ch_client, target_db, "information_request", 0.34)
+
+    # Distinct blocks form distinct parts, so both versions are still on disk
+    # here and the single row below is this query's work, not a merge's.
+    assert ch_client.query(
+        "SELECT argMax(category, inserted_at), argMax(turn_cost_usd, inserted_at), "
+        "argMax(turn_duration_ms, inserted_at), argMax(language, inserted_at), "
+        "formatDateTime(argMax(expire_at, inserted_at), '%F %T'), "
+        "length(argMax(vector, inserted_at)) "
+        f"FROM {target_db}.intent_signatures WHERE project_id = 'project-1' "
+        f"GROUP BY {_SIGNATURE_KEY}"
+    ).result_rows == [
+        ("information_request", 0.34, 9000, "es", "2100-01-01 00:00:00", 1024)
+    ]
+
+    # Source month, not extraction month, and one term: retention follows user
+    # activity and no pipeline metadata is baked into the partition.
+    assert ch_client.query(
+        "SELECT DISTINCT partition FROM system.parts "
+        f"WHERE database = '{target_db}' AND table = 'intent_signatures' AND active"
+    ).result_rows == [("202605",)]
+
+    _insert_failure(ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4']", 0.31)
+    # The writer retrying the same id with a wider attributed span: affected_trace_ids is not
+    # part of the identity, so the later attempt replaces rather than coexists.
+    _insert_failure(
+        ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4', 'trace-6']", 0.41
+    )
+
+    assert ch_client.query(
+        "SELECT toString(id), argMax(current_trace_id, inserted_at), "
+        "argMax(affected_trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
+        f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
+        f"GROUP BY {_SIGNATURE_KEY}"
+    ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
+
+
+def test_failure_turn_attribution(ch_client):
+    """A failure attributes many turns, and its per-row totals do not sum.
+
+    Two distinct occurrences, so nothing collapses and these reads need no dedup;
+    replacement is covered by test_signature_retry_collapses_on_read.
+    """
+    target_db = _migrate_signatures_db(ch_client, "attribution")
+
+    _insert_failure(
         ch_client,
-        replicated=True,
-        use_distributed=True,
-        replicated_cluster=_CLUSTER,
-        replicated_path=_REPLICATED_PATH,
-        management_db=mgmt_db,
-        migration_dir=_PROD_MIGRATION_DIR,
-        post_migration_hook=None,
+        target_db,
+        _FAILURE_ID_1,
+        "trace-4",
+        "['trace-4', 'trace-6', 'trace-9']",
+        0.41,
     )
+    # A different causing turn is a different failure, sharing turn trace-6.
+    _insert_failure(ch_client, target_db, _FAILURE_ID_2, "trace-6", "['trace-6']", 0.32)
 
-    # Migrate up to latest
-    migrator.apply_migrations(target_db)
-    assert _get_db_engine(ch_client, mgmt_db) == "Atomic"
-    assert _get_db_engine(ch_client, target_db) == "Atomic"
+    # The drilldown from a turn to the failures touching it. trace-6 is a member of
+    # both, and of the first only through affected_trace_ids, not as its causing turn.
+    assert ch_client.query(
+        f"SELECT toString(id) FROM {target_db}.failure_signatures "
+        "WHERE project_id = 'project-1' AND has(affected_trace_ids, 'trace-6') "
+        "ORDER BY toString(id)"
+    ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
-    # Migrate all the way back down
-    migrator.apply_migrations(target_db, target_version=0)
+    # turn_cost_usd and turn_duration_ms are per-row, not additive: the two failures
+    # overlap on trace-6, so summing them counts that turn twice. Three distinct
+    # turns are attributed, and the naive sum is over four memberships.
+    assert ch_client.query(
+        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(affected_trace_ids)))) "
+        f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
+    ).result_rows == [(0.73, 3)]
+
+    # The writer gate the database deliberately does not enforce. This assertion
+    # query is the off-path mitigation, and it must find nothing.
+    assert ch_client.query(
+        f"SELECT count() FROM {target_db}.failure_signatures "
+        "WHERE project_id = 'project-1' "
+        "AND (empty(affected_trace_ids) OR NOT has(affected_trace_ids, current_trace_id))"
+    ).result_rows == [(0,)]
 
 
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):
@@ -885,3 +1145,112 @@ def test_migrations_refuse_populated_db_without_history(
         f"SELECT count() FROM {mgmt_b}.migrations WHERE db_name = '{target_db}'"
     ).result_rows[0][0]
     assert orphan_rows == 0
+
+
+def _system_cost_row_count(ch_client, target_db: str, llm_id: str) -> int:
+    result = ch_client.query(
+        f"SELECT count() FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = %(llm_id)s AND created_by = 'system'",
+        parameters={"llm_id": llm_id},
+    )
+    return int(result.result_rows[0][0])
+
+
+def test_apply_migrations_backfills_costs_on_an_already_current_schema(ch_client):
+    """Regression: a checkpoint-only cost change lands without a schema migration.
+
+    `apply_migrations` used to lock-free pre-check purely on schema version and
+    return before the post-migration hook ever ran, so once a database reached
+    the latest migration, new/changed rows in `cost_checkpoint.json` were never
+    inserted again. This reproduces that by migrating to latest (inserting
+    costs once), deleting one model's seeded rows to simulate a checkpoint
+    addition made after the schema was already current, then calling
+    `apply_migrations` again with no version bump and asserting the row comes
+    back.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_backfill")
+    target_db = _unique_name("cost_backfill")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+    llm_id = "gpt-4"
+
+    # Uses the factory's real default hook + work-check (not disabled), since
+    # this test is exercising exactly that wiring.
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db)
+    latest = _get_latest_migration_version(_PROD_MIGRATION_DIR)
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+    # Migration 006 also seeds a `gpt-4` row with a different effective_date,
+    # so a fresh migrate can leave more than one `system` row for this llm_id.
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+
+    # Simulate the checkpoint gaining this model's price after the schema was
+    # already at `latest`: no migration to apply, only a pending cost row.
+    ch_client.command(
+        f"DELETE FROM {target_db}.llm_token_prices "
+        f"WHERE llm_id = '{llm_id}' AND created_by = 'system'",
+        settings={"mutations_sync": 2},
+    )
+    assert _system_cost_row_count(ch_client, target_db, llm_id) == 0
+
+    migrator.apply_migrations(target_db)
+
+    assert _system_cost_row_count(ch_client, target_db, llm_id) >= 1
+    assert _get_migration_version(ch_client, mgmt_db, target_db) == latest
+
+
+@pytest.mark.parametrize(
+    ("target_version", "expect_table", "expect_ready"),
+    [(4, False, False), (26, True, False), (None, True, True)],
+)
+def test_costs_schema_gate_tracks_the_columns_the_cost_code_reads(
+    ch_client, target_version, expect_table, expect_ready
+):
+    """The costs gate approves a database exactly when the cost read works there.
+
+    Migration 5 creates `llm_token_prices`, but 27 adds the two cache cost
+    columns that `get_current_costs` selects, so a gate hardcoded to version 5
+    approved versions 5 through 26, where that read fails. Version 4 has no
+    table at all, 26 has the table without the cache columns, and latest has
+    every column.
+    """
+    mgmt_db = _unique_name("db_mgmt_cost_gate")
+    target_db = _unique_name(f"cost_gate_{target_version or 'latest'}")
+    ch_client.track_db(mgmt_db)
+    ch_client.track_db(target_db)
+
+    migrator = get_clickhouse_trace_server_migrator(
+        ch_client,
+        replicated=False,
+        use_distributed=False,
+        management_db=mgmt_db,
+        migration_dir=_PROD_MIGRATION_DIR,
+    )
+    migrator.apply_migrations(target_db, target_version=target_version)
+
+    # `expect_table and not expect_ready` is the case a version-5 gate got wrong:
+    # the table is there, so it approved a database the cost read cannot use.
+    table_rows = ch_client.query(
+        "SELECT count() FROM system.tables "
+        "WHERE database = %(database)s AND name = %(table)s",
+        parameters={"database": target_db, "table": COSTS_TABLE},
+    ).result_rows[0][0]
+    assert bool(table_rows) is expect_table
+    assert costs_schema_is_ready(ch_client, target_db) is expect_ready
+
+    prev_database = ch_client.database
+    ch_client.database = target_db
+    try:
+        if expect_ready:
+            get_current_costs(ch_client)
+        else:
+            with pytest.raises(DatabaseError):
+                get_current_costs(ch_client)
+    finally:
+        ch_client.database = prev_database

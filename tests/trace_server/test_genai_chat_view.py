@@ -16,7 +16,9 @@ from weave.trace_server.agents.chat_view import (
     build_chat_messages,
     build_span_tree,
     build_trace_chat,
+    first_user_preview_text,
 )
+from weave.trace_server.agents.schema import NormalizedMessage
 from weave.trace_server.agents.types import (
     AgentChatAgentStart,
     AgentChatAssistantMessage,
@@ -44,6 +46,7 @@ def _span(
     compaction_summary: str = "",
     compaction_items_before: int = 0,
     compaction_items_after: int = 0,
+    status_code: str = "OK",
     started_at: datetime.datetime | None = None,
     ended_at: datetime.datetime | None = None,
     **kwargs: object,
@@ -66,7 +69,7 @@ def _span(
         compaction_summary=compaction_summary,
         compaction_items_before=compaction_items_before,
         compaction_items_after=compaction_items_after,
-        status_code="OK",
+        status_code=status_code,
         started_at=started_at
         or datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
         ended_at=ended_at
@@ -120,6 +123,64 @@ def _context_compacted_payload(
 ) -> AgentChatContextCompacted:
     assert message.context_compacted is not None
     return message.context_compacted
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        (
+            "Which settings caused the most crashes?",
+            "Which settings caused the most crashes?",
+        ),
+        (
+            json.dumps(
+                {
+                    "content": [{"type": "report", "title": "Crash report"}],
+                }
+            )
+            + "\nWhich settings caused the most crashes?",
+            "Which settings caused the most crashes?",
+        ),
+        (
+            '{"ordinary": 1}\nExplain this object',
+            "Explain this object",
+        ),
+        ("[1, 2]\nCompare these values", "Compare these values"),
+        (
+            '{"context": 1}\n{"metadata": 2}\nWhat failed?',
+            "What failed?",
+        ),
+        (
+            '{"context": 1}\nCompare {"run": "a"} with [1, 2]',
+            "Compare [JSON] with [JSON]",
+        ),
+        (
+            'Before {"first": 1} middle {"second": 2} after',
+            "Before [JSON] middle [JSON] after",
+        ),
+        ('Explain {"broken":', 'Explain {"broken":'),
+        ('{"question": "What failed?"}', ""),
+        (
+            '{"context": 1}\n{"error": "asdf"}',
+            "",
+        ),
+        ("Compare {foo} with {bar}", "Compare {foo} with {bar}"),
+        (
+            '{"complete": true}\n{"incomplete":\nWhat failed?',
+            '{"complete": true}\n{"incomplete":\nWhat failed?',
+        ),
+        (
+            '{"first": 1}, {"second": 2}\nWhat failed?',
+            '{"first": 1}, {"second": 2}\nWhat failed?',
+        ),
+    ],
+)
+def test_first_user_preview_text_handles_json_values(
+    content: str, expected: str
+) -> None:
+    messages = [NormalizedMessage(role="user", content=content)]
+
+    assert first_user_preview_text(messages) == expected
 
 
 def test_empty() -> None:
@@ -1088,6 +1149,36 @@ def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
     assert [m.type for m in messages if m.type == "assistant_message"] == []
 
 
+def test_contentless_error_span_emits_assistant_message() -> None:
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "run it"}],
+        ),
+        _span(
+            span_id="llm-error",
+            parent_span_id="agent",
+            operation_name="chat",
+            status_code="ERROR",
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [message.type for message in messages] == [
+        "user_message",
+        "agent_start",
+        "assistant_message",
+    ]
+    error_message = messages[-1]
+    assert error_message.span_id == "llm-error"
+    assert error_message.status_code == "ERROR"
+    assert _assistant_payload(error_message).text == ""
+    assert _assistant_payload(error_message).status == "ERROR"
+
+
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:
     def at(seconds: int) -> datetime.datetime:
         return datetime.datetime(
@@ -1324,6 +1415,40 @@ def test_inline_internal_ref_surfaces_without_span_content_refs() -> None:
 
     assert _user_payload(user).content_refs == [image_internal]
     assert _assistant_payload(assistant).content_refs == []
+
+
+def test_blob_content_is_media_not_user_message_text() -> None:
+    """A Weave blob's `content` is base64/ref data, not displayable prose."""
+    image_internal = "weave-trace-internal:///PID/object/Content:IMAGEDIGEST"
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="image-analyzer",
+            input_messages=[
+                {
+                    "role": "user",
+                    "content": _parts(
+                        {
+                            "type": "blob",
+                            "content": image_internal,
+                            "mimeType": "image/png",
+                            "modality": "image",
+                        },
+                        _text_part("Describe this image."),
+                    ),
+                }
+            ],
+        )
+    ]
+
+    messages = build_chat_messages(spans)
+    user = next(m for m in messages if m.type == "user_message")
+
+    assert _user_payload(user) == AgentChatUserMessage(
+        text="Describe this image.",
+        content_refs=[image_internal],
+    )
 
 
 @pytest.mark.xfail(

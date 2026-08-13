@@ -5874,6 +5874,79 @@
           }
         }
       }
+    },
+    "/v2/{entity}/{project}/runtimes/{runtime_name}": {
+      "put": {
+        "tags": [
+          "Custom Runtimes"
+        ],
+        "summary": "Custom Runtime Apply",
+        "description": "Create or replace a custom runtime configuration.",
+        "operationId": "custom_runtime_apply_v2__entity___project__runtimes__runtime_name__put",
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "runtime_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Stable name of the custom runtime to create or replace",
+              "title": "Runtime Name"
+            },
+            "description": "Stable name of the custom runtime to create or replace"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomRuntimeApplyBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomRuntimeApplyRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6479,8 +6552,11 @@
         "properties": {
           "role": {
             "type": "string",
-            "title": "Role",
-            "default": ""
+            "enum": [
+              "user_message",
+              "assistant_message"
+            ],
+            "title": "Role"
           },
           "text": {
             "type": "string",
@@ -6489,6 +6565,9 @@
           }
         },
         "type": "object",
+        "required": [
+          "role"
+        ],
         "title": "AgentConversationMessagePreview",
         "description": "A truncated first/last message snippet for a grouped conversation row.\n\n`role` is the chat-timeline message type (e.g. \"user_message\",\n\"assistant_message\") so clients can style it consistently with the full\nchat view; `text` is the trimmed, length-capped preview content."
       },
@@ -7017,15 +7096,22 @@
             "title": "Trace Id"
           },
           "role": {
-            "type": "string",
-            "enum": [
-              "",
-              "user",
-              "assistant",
-              "system",
-              "tool",
-              "tool_call",
-              "tool_result"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "",
+                  "user",
+                  "assistant",
+                  "system",
+                  "tool",
+                  "tool_call",
+                  "tool_result"
+                ]
+              },
+              {
+                "type": "string"
+              }
             ],
             "title": "Role"
           },
@@ -7930,6 +8016,105 @@
             ],
             "title": "Agent Version"
           },
+          "eval_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Run Id"
+          },
+          "eval_predict_and_score_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Predict And Score Call Id"
+          },
+          "eval_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Kind"
+          },
+          "eval_row_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Row Digest"
+          },
+          "eval_example_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Example Id"
+          },
+          "eval_trial_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Trial Index"
+          },
+          "eval_evaluation_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eval Evaluation Name"
+          },
+          "parent_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Call Id"
+          },
+          "parent_call_trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Call Trace Id"
+          },
           "request_model": {
             "anyOf": [
               {
@@ -8775,6 +8960,16 @@
             },
             "type": "array",
             "title": "Group Filters"
+          },
+          "signal_filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSignalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -9518,6 +9713,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ConvertOperation"
+                },
+                {
+                  "$ref": "#/components/schemas/SizeOperation"
                 },
                 {
                   "$ref": "#/components/schemas/AndOperation"
@@ -11947,6 +12145,9 @@
                 "$ref": "#/components/schemas/ConvertOperation"
               },
               {
+                "$ref": "#/components/schemas/SizeOperation"
+              },
+              {
                 "$ref": "#/components/schemas/AndOperation"
               },
               {
@@ -11989,6 +12190,9 @@
               },
               {
                 "$ref": "#/components/schemas/ConvertOperation"
+              },
+              {
+                "$ref": "#/components/schemas/SizeOperation"
               },
               {
                 "$ref": "#/components/schemas/AndOperation"
@@ -12069,6 +12273,9 @@
               },
               {
                 "$ref": "#/components/schemas/ConvertOperation"
+              },
+              {
+                "$ref": "#/components/schemas/SizeOperation"
               },
               {
                 "$ref": "#/components/schemas/AndOperation"
@@ -12427,6 +12634,34 @@
               }
             ],
             "title": "Completion Token Cost",
+            "examples": [
+              1.0
+            ]
+          },
+          "cache_read_input_token_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Input Token Cost",
+            "examples": [
+              1.0
+            ]
+          },
+          "cache_creation_input_token_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Creation Input Token Cost",
             "examples": [
               1.0
             ]
@@ -12968,6 +13203,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -13009,6 +13247,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -14808,6 +15049,12 @@
             "description": "Turn the feedback belongs to (from spans.trace_id)",
             "default": ""
           },
+          "scorer_trace_id": {
+            "type": "string",
+            "title": "Scorer Trace Id",
+            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
+            "default": ""
+          },
           "wb_user_id": {
             "anyOf": [
               {
@@ -15138,11 +15385,17 @@
             },
             "type": "array",
             "title": "Result"
+          },
+          "total_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total Count"
           }
         },
         "type": "object",
         "required": [
-          "result"
+          "result",
+          "total_count"
         ],
         "title": "FeedbackQueryRes"
       },
@@ -15395,6 +15648,12 @@
             "type": "string",
             "title": "Span Trace Id",
             "description": "Turn the feedback belongs to (from spans.trace_id)",
+            "default": ""
+          },
+          "scorer_trace_id": {
+            "type": "string",
+            "title": "Scorer Trace Id",
+            "description": "Trace of the scorer (judge) invocation that produced this feedback (spans.trace_id of the judge call). Distinct from span_trace_id, which is the scored turn. Lets signals price the invocation off the judge span without joining the calls model.",
             "default": ""
           },
           "wb_user_id": {
@@ -15803,6 +16062,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -15844,6 +16106,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -15907,6 +16172,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -15948,6 +16216,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -16120,6 +16391,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16162,6 +16436,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ConvertOperation"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SizeOperation"
                     },
                     {
                       "$ref": "#/components/schemas/AndOperation"
@@ -16708,6 +16985,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16749,6 +17029,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -16812,6 +17095,9 @@
                     "$ref": "#/components/schemas/ConvertOperation"
                   },
                   {
+                    "$ref": "#/components/schemas/SizeOperation"
+                  },
+                  {
                     "$ref": "#/components/schemas/AndOperation"
                   },
                   {
@@ -16853,6 +17139,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -17383,6 +17672,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConvertOperation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SizeOperation"
                   },
                   {
                     "$ref": "#/components/schemas/AndOperation"
@@ -18425,6 +18717,9 @@
                   "$ref": "#/components/schemas/ConvertOperation"
                 },
                 {
+                  "$ref": "#/components/schemas/SizeOperation"
+                },
+                {
                   "$ref": "#/components/schemas/AndOperation"
                 },
                 {
@@ -19366,6 +19661,63 @@
           "trace_server_version"
         ],
         "title": "ServerInfoRes"
+      },
+      "SizeOperation": {
+        "properties": {
+          "$size": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LiteralOperation"
+              },
+              {
+                "$ref": "#/components/schemas/GetFieldOperator"
+              },
+              {
+                "$ref": "#/components/schemas/ConvertOperation"
+              },
+              {
+                "$ref": "#/components/schemas/SizeOperation"
+              },
+              {
+                "$ref": "#/components/schemas/AndOperation"
+              },
+              {
+                "$ref": "#/components/schemas/OrOperation"
+              },
+              {
+                "$ref": "#/components/schemas/NotOperation"
+              },
+              {
+                "$ref": "#/components/schemas/EqOperation"
+              },
+              {
+                "$ref": "#/components/schemas/GtOperation"
+              },
+              {
+                "$ref": "#/components/schemas/LtOperation"
+              },
+              {
+                "$ref": "#/components/schemas/GteOperation"
+              },
+              {
+                "$ref": "#/components/schemas/LteOperation"
+              },
+              {
+                "$ref": "#/components/schemas/InOperation"
+              },
+              {
+                "$ref": "#/components/schemas/ContainsOperation"
+              }
+            ],
+            "title": "$Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "$size"
+        ],
+        "title": "SizeOperation",
+        "description": "Return the number of elements in a collection or characters in a string.\n\nExample:\n    ```\n    {\"$size\": {\"$getField\": \"scorer_tags\"}}\n    ```"
       },
       "SortBy": {
         "properties": {
@@ -20436,6 +20788,147 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "CustomRuntimeApplyBody": {
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "title": "Base Url",
+            "description": "Public OpenAI-compatible endpoint base URL"
+          },
+          "api_key_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Secret",
+            "description": "Team secret name used as the endpoint API key; never the secret value"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers",
+            "description": "Literal headers forwarded to the endpoint"
+          },
+          "runtime_ids": {
+            "items": {
+              "$ref": "#/components/schemas/CustomRuntimeID"
+            },
+            "type": "array",
+            "title": "Runtime Ids",
+            "description": "Complete desired list of IDs exposed by the endpoint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "base_url",
+          "runtime_ids"
+        ],
+        "title": "CustomRuntimeApplyBody"
+      },
+      "CustomRuntimeApplyRes": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Stable custom runtime name"
+          },
+          "base_url": {
+            "type": "string",
+            "title": "Base Url"
+          },
+          "api_key_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key Secret"
+          },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Headers"
+          },
+          "runtime_ids": {
+            "items": {
+              "$ref": "#/components/schemas/CustomRuntimeIDRes"
+            },
+            "type": "array",
+            "title": "Runtime Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "base_url",
+          "api_key_secret",
+          "headers",
+          "runtime_ids"
+        ],
+        "title": "CustomRuntimeApplyRes"
+      },
+      "CustomRuntimeID": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Value sent in the OpenAI-compatible request model field"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Tokens",
+            "description": "Maximum tokens supported by this runtime ID",
+            "default": 4096
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "CustomRuntimeID"
+      },
+      "CustomRuntimeIDRes": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Value sent in the OpenAI-compatible request model field"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Tokens",
+            "description": "Maximum tokens supported by this runtime ID",
+            "default": 4096
+          },
+          "playground_id": {
+            "type": "string",
+            "title": "Playground Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "playground_id"
+        ],
+        "title": "CustomRuntimeIDRes"
       }
     },
     "securitySchemes": {

@@ -690,9 +690,9 @@ def _display_text(content: str) -> str:
     """Extract human-readable text from a message content field.
 
     Content is either plain text (legacy) or a JSON-serialized parts array
-    (multimodal messages).  For parts arrays, concatenate the text parts;
-    reasoning parts are excluded (they surface separately via
-    `reasoning_content`).  For plain text, return as-is.
+    (multimodal messages). For parts arrays, concatenate text parts. Reasoning
+    surfaces through ``reasoning_content``; media surfaces through
+    ``content_refs``. For plain text, return as-is.
     """
     if not content or not content.startswith("["):
         return content
@@ -709,9 +709,12 @@ def _display_text(content: str) -> str:
             # concatenating it here would duplicate it in the message body.
             if p.get("type") == "reasoning":
                 continue
+            # Media belongs in content_refs, never chat text.
+            if p.get("type") in _MEDIA_PART_TYPES:
+                continue
             # Support both the weave parts model (``content``) and the
             # OpenAI-style multimodal shape (``text``). Non-text parts (e.g.
-            # images) carry neither and are skipped for display.
+            # images) are skipped for display.
             if isinstance(p.get("content"), str):
                 texts.append(p["content"])
             elif isinstance(p.get("text"), str):
@@ -788,14 +791,60 @@ def _extract_user_text(
 
 
 def first_user_preview_text(messages: list[NormalizedMessage]) -> str:
-    """Public: opening user-prompt text from a span's `input_messages`.
+    """Public: readable opening user-prompt text from `input_messages`.
 
     The opening user prompt is the first user entry of the earliest
     message-bearing span; that span's `input_messages` begins at the
     conversation opening.
     """
     texts = _user_prompt_texts(messages)
-    return texts[0] if texts else ""
+    return _json_aware_preview_text(texts[0]) if texts else ""
+
+
+def _json_aware_preview_text(text: str) -> str:
+    """Remove leading JSON and replace later values before preview truncation.
+
+    Conversation titles use prose, so JSON-only input produces no user preview.
+    Malformed leading JSON is left unchanged rather than partially stripped.
+    """
+    stripped = text.lstrip()
+    cursor = 0
+    parsed_json = False
+    decoder = json.JSONDecoder()
+    while cursor < len(stripped) and stripped[cursor] in "[{":
+        try:
+            _, cursor = decoder.raw_decode(stripped, cursor)
+        except json.JSONDecodeError:
+            return text
+        parsed_json = True
+        while cursor < len(stripped) and stripped[cursor].isspace():
+            cursor += 1
+        if cursor < len(stripped) and stripped[cursor] == ",":
+            return text
+
+    trailing = stripped[cursor:].strip() if parsed_json else text
+    return _replace_json_values(trailing)
+
+
+def _replace_json_values(text: str) -> str:
+    """Replace complete JSON objects/arrays in preview prose with `[JSON]`."""
+    parts: list[str] = []
+    cursor = 0
+    decoder = json.JSONDecoder()
+    while cursor < len(text):
+        if text[cursor] in "[{":
+            try:
+                value, end = decoder.raw_decode(text, cursor)
+            except json.JSONDecodeError:
+                pass
+            else:
+                if isinstance(value, (dict, list)):
+                    parts.append("[JSON]")
+                    cursor = end
+                    continue
+        parts.append(text[cursor])
+        cursor += 1
+    return "".join(parts).strip()
 
 
 def last_assistant_preview_text(messages: list[NormalizedMessage]) -> str:
@@ -1259,15 +1308,16 @@ def _emit_assistant_message(
 
     A span that produced reasoning but no assistant text (e.g. an LLM step that
     only emitted a tool call) still yields a message carrying that reasoning, so
-    thinking interleaved between tool calls is surfaced rather than dropped.
-    Returns None only when there is neither output text nor reasoning content.
+    thinking interleaved between tool calls is surfaced rather than dropped. An
+    errored span also yields a message without content so its failure remains
+    visible in the conversation projection. Successful empty spans are omitted.
     """
     text = (
         _extract_non_user_output_text(span.output_messages)
         if span.output_messages
         else ""
     )
-    if not text and not span.reasoning_content:
+    if not text and not span.reasoning_content and span.status_code != "ERROR":
         return None
 
     if aggregate_node:

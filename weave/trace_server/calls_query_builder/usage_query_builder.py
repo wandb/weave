@@ -17,6 +17,7 @@ from weave.trace_server.calls_query_builder.stats_query_base import (
     determine_bounds_and_bucket,
 )
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
+from weave.trace_server.ch_sentinel_values import null_check_literal_sql
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ReadTable, TableConfig
 from weave.trace_server.trace_server_interface import (
@@ -105,8 +106,14 @@ def build_usage_query(
     tz_param = pb.add_param(req.timezone or "UTC")
     bucket_interval_param = pb.add_param(granularity_seconds)
 
+    # Root-only usage keeps native root summaries plus individual OTEL span usage,
+    # so the root filter is re-applied below instead of by the shared filter builder.
+    include_otel_span_usage = bool(req.filter and req.filter.trace_roots_only)
+
     # Build filter clauses - applied directly in WHERE
-    where_filter_sql = build_calls_filter_sql(req.filter, pb, read_table)
+    where_filter_sql = build_calls_filter_sql(
+        req.filter, pb, read_table, force_all_spans=include_otel_span_usage
+    )
 
     normalized_metrics = _normalize_usage_metrics(metrics)
 
@@ -154,13 +161,23 @@ def build_usage_query(
     # Select the appropriate datetime field based on the table
     table_config = TableConfig.from_read_table(read_table)
     datetime_field = table_config.datetime_filter_field
+    select_columns = [datetime_field, "summary_dump"]
+    usage_row_filter_sql = ""
+    if include_otel_span_usage:
+        select_columns.extend(["parent_id", "otel_dump"])
+        root_check = null_check_literal_sql("parent_id", "parent_id", read_table)
+        otel_check = null_check_literal_sql(
+            "otel_dump", "otel_dump", read_table, negate=True
+        )
+        usage_row_filter_sql = f"WHERE ({root_check} OR {otel_check})"
+
     grouped_calls_sql = build_grouped_calls_subquery(
         project_param=project_param,
         start_param=start_param,
         end_param=end_param,
         tz_param=tz_param,
         where_filter_sql=where_filter_sql,
-        select_columns=[datetime_field, "summary_dump"],
+        select_columns=select_columns,
         read_table=read_table,
     )
 
@@ -202,6 +219,7 @@ def build_usage_query(
             FROM (
               {grouped_calls_sql}
             )
+            {usage_row_filter_sql}
           )
           ARRAY JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{{}}')) AS kv
         )

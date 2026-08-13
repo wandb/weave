@@ -10,6 +10,7 @@ from weave.trace_server.errors import (
     InvalidFieldError,
     InvalidRequest,
     ObjectNameTypeCollision,
+    QueryEstimatedTimeoutExceededError,
     handle_clickhouse_query_error,
     handle_server_exception,
 )
@@ -57,6 +58,33 @@ def test_clickhouse_type_mismatch_returns_400() -> None:
 
     result = handle_server_exception(InvalidRequest(error_msg))
     assert result.status_code == 400
+
+
+def test_clickhouse_estimated_too_slow_maps_to_estimated_timeout() -> None:
+    """ClickHouse rejects an over-broad query up front with code 160 (TOO_SLOW) when
+    its *estimated* execution time exceeds the limit. That is a query-guard rejection
+    of the user's unbounded query, so it must surface as
+    QueryEstimatedTimeoutExceededError (504) -- a type distinct from
+    QueryTimeoutExceededError (a query that actually ran and timed out) -- with
+    actionable "limit the scope" guidance, not fall through to a generic DatabaseError
+    ("Temporary backend error", 502) that reads as an unexpected server fault and pages
+    on-call. WB-33068.
+    """
+    error_msg = (
+        "HTTPDriver for https://example.clickhouse.cloud:8443 received ClickHouse "
+        "error code 160\n Code: 160. DB::Exception: Estimated query execution time "
+        "(30917.60248 seconds) is too long. Maximum: 3600. Estimated rows to process: "
+        "692495231 (807143 read in 36.03624 seconds): While executing "
+        "MergeTreeSelect(pool: PrefetchedReadPool, algorithm: Thread). (TOO_SLOW) "
+        "(version 26.2.1.413 (official build))"
+    )
+    exc = CHDatabaseError(error_msg)
+
+    with pytest.raises(QueryEstimatedTimeoutExceededError, match="limit the scope"):
+        handle_clickhouse_query_error(exc)
+
+    result = handle_server_exception(QueryEstimatedTimeoutExceededError(error_msg))
+    assert result.status_code == 504
 
 
 def test_clickhouse_bad_query_parameter_returns_400_with_real_detail() -> None:

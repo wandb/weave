@@ -77,6 +77,8 @@ from weave.trace_server.clickhouse_trace_server_settings import (
     MAX_DELETE_CALLS_COUNT,
 )
 from weave.trace_server.common_interface import SortBy
+from weave.trace_server.credential_redaction import redact_sensitive_keys
+from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.digest_validation import validate_expected_digest
 from weave.trace_server.errors import (
     InvalidFieldError,
@@ -253,6 +255,11 @@ def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
 def _minify_json(val: Any) -> str:
     """JSON text with minified separators, as the backends store dumps."""
     return json.dumps(val, separators=(",", ":"))
+
+
+def _otel_dump_len(otel_dump: Any) -> int | None:
+    """Stored length of an otel dump, or None when the call carries none."""
+    return len(json.dumps(otel_dump)) if otel_dump is not None else None
 
 
 def _json_extract(parsed: Any, path_parts: list[str] | None) -> tuple[Any, str | None]:
@@ -474,6 +481,15 @@ def _ch_position(haystack: Any, needle: Any, case_insensitive: bool) -> bool:
     if case_insensitive:
         return needle.lower() in haystack.lower()
     return needle in haystack
+
+
+def _ch_size(value: Any) -> int | None:
+    """Mirror ClickHouse length() for query values supported by the DSL."""
+    if value is None:
+        return None
+    if isinstance(value, (str, bytes, list, tuple, dict)):
+        return len(value)
+    raise TypeError(f"Cannot apply $size to {type(value).__name__}")
 
 
 def _ch_sorted_by_terms(
@@ -1005,6 +1021,8 @@ class _QueryFilterEvaluator:
             if operand.convert_.to == "exists":
                 return inner is not None
             return _ch_cast_json_value(_ch_to_string(inner), operand.convert_.to)
+        if isinstance(operand, tsi_query.SizeOperation):
+            return _ch_size(self._operand_value(operand.size_))
         return self._evaluate(operand)
 
     def _binary(
@@ -1077,6 +1095,7 @@ class _QueryFilterEvaluator:
                 tsi_query.LiteralOperation,
                 tsi_query.GetFieldOperator,
                 tsi_query.ConvertOperation,
+                tsi_query.SizeOperation,
             ),
         ):
             return self._operand_value(operand)
@@ -1190,8 +1209,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     parsable_output = {"output": parsable_output}
                 parsable_output = cast(dict, parsable_output)
 
-                attributes_json = json.dumps(call.attributes)
-                inputs_json = json.dumps(call.inputs)
+                attributes = redact_sensitive_keys(call.attributes)
+                inputs = redact_sensitive_keys(call.inputs)
+                otel_dump = redact_sensitive_keys(call.otel_dump)
+                attributes_json = json.dumps(attributes)
+                inputs_json = json.dumps(inputs)
                 output_json = json.dumps(call.output)
                 summary_json = json.dumps(call.summary)
                 storage_size = (
@@ -1219,7 +1241,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     exception=call.exception,
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(list(call.inputs.values())),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     output=json.loads(output_json),
                     output_refs=extract_refs_from_values(
                         list(parsable_output.values())
@@ -1229,12 +1251,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     wb_run_id=call.wb_run_id,
                     wb_run_step=call.wb_run_step,
                     wb_run_step_end=call.wb_run_step_end,
-                    otel_dump=copy.deepcopy(call.otel_dump),
-                    otel_dump_len=(
-                        len(json.dumps(call.otel_dump))
-                        if call.otel_dump is not None
-                        else None
-                    ),
+                    otel_dump=copy.deepcopy(otel_dump),
+                    otel_dump_len=_otel_dump_len(otel_dump),
                     storage_size_bytes=storage_size,
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
@@ -1279,8 +1297,11 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if req.start.id is None:
             raise ValueError("id is required")
         with self.lock:
-            attributes_json = json.dumps(req.start.attributes)
-            inputs_json = json.dumps(req.start.inputs)
+            attributes = redact_sensitive_keys(req.start.attributes)
+            inputs = redact_sensitive_keys(req.start.inputs)
+            otel_dump = redact_sensitive_keys(req.start.otel_dump)
+            attributes_json = json.dumps(attributes)
+            inputs_json = json.dumps(inputs)
             expire_at = self._compute_call_expire_at(
                 req.start.project_id, req.start.started_at
             )
@@ -1297,18 +1318,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 existing.started_at = _ensure_tz(req.start.started_at)
                 existing.attributes = json.loads(attributes_json)
                 existing.inputs = json.loads(inputs_json)
-                existing.input_refs = extract_refs_from_values(
-                    list(req.start.inputs.values())
-                )
+                existing.input_refs = extract_refs_from_values(list(inputs.values()))
                 existing.wb_user_id = req.start.wb_user_id
                 existing.wb_run_id = req.start.wb_run_id
                 existing.wb_run_step = req.start.wb_run_step
-                existing.otel_dump = copy.deepcopy(req.start.otel_dump)
-                existing.otel_dump_len = (
-                    len(json.dumps(req.start.otel_dump))
-                    if req.start.otel_dump is not None
-                    else None
-                )
+                existing.otel_dump = copy.deepcopy(otel_dump)
+                existing.otel_dump_len = _otel_dump_len(otel_dump)
                 existing.expire_at = expire_at
                 existing.attributes_len = len(attributes_json)
                 existing.inputs_len = len(inputs_json)
@@ -1325,18 +1340,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     started_at=_ensure_tz(req.start.started_at),
                     attributes=json.loads(attributes_json),
                     inputs=json.loads(inputs_json),
-                    input_refs=extract_refs_from_values(
-                        list(req.start.inputs.values())
-                    ),
+                    input_refs=extract_refs_from_values(list(inputs.values())),
                     wb_user_id=req.start.wb_user_id,
                     wb_run_id=req.start.wb_run_id,
                     wb_run_step=req.start.wb_run_step,
-                    otel_dump=copy.deepcopy(req.start.otel_dump),
-                    otel_dump_len=(
-                        len(json.dumps(req.start.otel_dump))
-                        if req.start.otel_dump is not None
-                        else None
-                    ),
+                    otel_dump=copy.deepcopy(otel_dump),
+                    otel_dump_len=_otel_dump_len(otel_dump),
                     expire_at=expire_at,
                     attributes_len=len(attributes_json),
                     inputs_len=len(inputs_json),
@@ -2059,6 +2068,9 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     else _ch_to_string(inner(rec)),
                     convert_to,
                 )
+            elif isinstance(operand, tsi_query.SizeOperation):
+                inner = compile_operand(operand.size_)
+                return lambda rec: _ch_size(inner(rec))
             elif isinstance(
                 operand,
                 (
@@ -2528,11 +2540,16 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if granularity <= 0:
             granularity = 1
 
+        calls_filter = req.filter
+        include_otel_span_usage = bool(calls_filter and calls_filter.trace_roots_only)
+        if calls_filter is not None and calls_filter.trace_roots_only:
+            calls_filter = calls_filter.model_copy(update={"trace_roots_only": None})
+
         calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=req.filter,
+                    filter=calls_filter,
                 )
             )
         )
@@ -2544,6 +2561,22 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             and c.started_at >= req.start
             and c.started_at < end
         ]
+        usage_calls = calls
+        metric_calls = calls
+        if include_otel_span_usage:
+            # Use otel_dump, not caller-supplied attributes.otel_span, as OTEL source.
+            with self.lock:
+                otel_call_ids = {
+                    rec.id
+                    for rec in self._calls.values()
+                    if rec.project_id == req.project_id and rec.otel_dump is not None
+                }
+            usage_calls = [
+                call
+                for call in calls
+                if call.parent_id is None or call.id in otel_call_ids
+            ]
+            metric_calls = [call for call in calls if call.parent_id is None]
 
         token_keys_map: dict[str, list[str]] = {
             "input_tokens": ["prompt_tokens", "input_tokens"],
@@ -2565,7 +2598,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 tuple[str, str], dict[str, list[int]]
             ] = {}  # (ts, model) -> metric -> values
 
-            for call in calls:
+            for call in usage_calls:
                 if not call.summary or not isinstance(call.summary, dict):
                     continue
                 usage = call.summary.get("usage")
@@ -2602,7 +2635,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if req.call_metrics:
             bucket_data: dict[str, dict[str, list[Any]]] = {}
 
-            for call in calls:
+            for call in metric_calls:
                 ts = _bucket_ts(call.started_at)
                 if ts not in bucket_data:
                     bucket_data[ts] = {}
@@ -3788,6 +3821,17 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         with self.lock:
             rows = list(self._feedback)
+        count_result = _orm_select(
+            TABLE_FEEDBACK,
+            rows,
+            project_id=req.project_id,
+            fields=["count(*)"],
+            query=req.query,
+            sort_by=None,
+            limit=None,
+            offset=None,
+        )
+        total_count = int(count_result[0]["count(*)"])
         result = _orm_select(
             TABLE_FEEDBACK,
             rows,
@@ -3798,7 +3842,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             limit=req.limit,
             offset=req.offset,
         )
-        return tsi.FeedbackQueryRes(result=result)
+        return tsi.FeedbackQueryRes(result=result, total_count=total_count)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         validate_feedback_purge_req(req)
@@ -4133,6 +4177,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     ),
                     "prompt_token_cost": cost.prompt_token_cost,
                     "completion_token_cost": cost.completion_token_cost,
+                    "cache_read_input_token_cost": cost.cache_read_input_token_cost,
+                    "cache_creation_input_token_cost": cost.cache_creation_input_token_cost,
                     "prompt_token_cost_unit": cost.prompt_token_cost_unit or "USD",
                     "completion_token_cost_unit": cost.completion_token_cost_unit
                     or "USD",
@@ -4146,16 +4192,13 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
     def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         expr = {
             "$and": [
-                (
-                    req.query.expr_
-                    if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
-                ),
+                *([req.query.expr_] if req.query else []),
+                {
+                    "$eq": [
+                        {"$getField": "pricing_level_id"},
+                        {"$literal": req.project_id},
+                    ],
+                },
                 {
                     "$eq": [
                         {"$getField": "pricing_level"},
@@ -5565,6 +5608,16 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         )
         result = self.obj_delete(obj_delete_req)
         return tsi.DatasetDeleteRes(num_deleted=result.num_deleted)
+
+    def custom_runtime_apply(
+        self, req: tsi.CustomRuntimeApplyReq
+    ) -> tsi.CustomRuntimeApplyRes:
+        return apply_custom_runtime(
+            req,
+            self.obj_create,
+            self.objs_query,
+            self.obj_delete,
+        )
 
     def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
         scorer_id = object_creation_utils.make_object_id(req.name, "Scorer")
@@ -7279,6 +7332,8 @@ def _orm_eval_query(table: Table, row: dict[str, Any], query: tsi.Query) -> Any:
             if convert_to == "exists":
                 return value is not None
             return _ch_cast_json_value(_ch_to_string(value), convert_to)
+        elif isinstance(operand, tsi_query.SizeOperation):
+            return _ch_size(process_operand(operand.size_))
         elif isinstance(
             operand,
             (

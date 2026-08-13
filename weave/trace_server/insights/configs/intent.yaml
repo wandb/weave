@@ -1,0 +1,26 @@
+config_schema_version: 1
+signature_type: intent
+
+extraction:
+  prompt:
+    path: prompts/intent.txt
+  taxonomy:
+    path: taxonomies/intent_categories.yaml
+  sentiment:
+    path: taxonomies/sentiment.yaml
+  history_turns: 8
+  max_items_per_turn: 8
+  current_user_tokens: 6000
+  history_user_tokens: 400
+  history_assistant_tokens: 200
+  normalization_version: 1
+
+judge:
+  model: coreweave/google/gemma-4-31B-it
+  temperature: 0
+
+embedding:
+  provider: openai
+  model: text-embedding-3-large
+  dimensions: 1024
+  output_normalization: l2

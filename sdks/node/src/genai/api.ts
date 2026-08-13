@@ -95,14 +95,14 @@ export function startLLM(opts: LLMInit): LLM {
  * @example
  * weave.startTool({
  *   name: 'get_weather',
- *   args: JSON.stringify({city: 'Tokyo'}),
+ *   args: {city: 'Tokyo'},
  *   toolCallId: 'call_t1',
  * });
  *
  * @example
  * weave.startTool({
  *   name: 'get_weather',
- *   args: JSON.stringify({city: 'Tokyo'}),
+ *   args: {city: 'Tokyo'},
  *   toolCallId: 'call_t1',
  *   startTime: new Date('2026-05-29T10:00:00.800Z'),
  * });

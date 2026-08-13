@@ -3,6 +3,7 @@ INFERENCE_HOST = "api.inference.wandb.ai"
 COMPLETIONS_CREATE_OP_NAME = "weave.completions_create"
 IMAGE_GENERATION_CREATE_OP_NAME = "weave.image_generation_create"
 
+DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS = 4096
 MAX_DISPLAY_NAME_LENGTH = 1024
 MAX_OP_NAME_LENGTH = 128
 MAX_OBJECT_NAME_LENGTH = 128
@@ -46,6 +47,9 @@ SCORE_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 
 # Weave attributes namespace
 WEAVE_ATTRIBUTES_NAMESPACE = "weave"
+
+# Identity of the OTel span a call was invoked from: {"trace_id", "span_id"} hex
+INVOKING_SPAN_ATTR_KEY = "invoking_span"
 
 # OTel span attribute keys for eval context
 EVAL_SPAN_ATTR_PREFIX = "weave.eval"

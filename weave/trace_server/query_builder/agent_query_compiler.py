@@ -219,6 +219,10 @@ def _compile_operand(
         )
         return clickhouse_cast(inner_sql, operand.convert_.to)
 
+    if isinstance(operand, tsi_query.SizeOperation):
+        inner_sql = _compile_operand(operand.size_, pb, alias)
+        return f"length({inner_sql})"
+
     if isinstance(
         operand,
         (

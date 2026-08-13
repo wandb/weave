@@ -176,10 +176,10 @@ WB_KEYS = {
     "wb_run_step": ["wandb.wb_run_step"],
     "wb_run_step_end": ["wandb.wb_run_step_end"],
     "is_turn": [
-        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv - presence implies a turn
+        "gen_ai.conversation.id",  # OpenTelemetry GenAI semconv
         "gcp.vertex.agent.session_id",
         "wandb.is_turn",
-    ],  # We just check if this is truthy so we can reuse the id
+    ],  # An explicit Boolean wandb.is_turn is authoritative; otherwise a non-empty conversation/session id infers a turn (see get_wandb_attributes)
 }
 
 # These represent fields that are set by a provider which override top level span information

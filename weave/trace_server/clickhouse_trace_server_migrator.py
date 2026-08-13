@@ -101,7 +101,11 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server.clickhouse.utilities import split_migration_sql
-from weave.trace_server.costs.insert_costs import insert_costs, should_insert_costs
+from weave.trace_server.costs.insert_costs import (
+    costs_schema_is_ready,
+    has_pending_costs,
+    insert_costs,
+)
 from weave.trace_server.database_engine import (
     ENGINE_DISCOVERY_MAX_WAIT_SECONDS,
     EngineDiscoveryError,
@@ -183,6 +187,10 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
+    # All insights APIs are project-scoped. Co-locate a project's vectors so
+    # nearest-neighbor search and clustering do not fan out across shards.
+    "intent_signatures": "project_id",
+    "failure_signatures": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
@@ -205,13 +213,27 @@ class PostMigrationHookContext:
 
 
 PostMigrationHook = Callable[[PostMigrationHookContext], None]
+PostMigrationWorkCheck = Callable[[PostMigrationHookContext], bool]
 
 
 def _default_trace_server_costs_post_migration_hook(
     ctx: PostMigrationHookContext,
 ) -> None:
-    if should_insert_costs(ctx.current_version, ctx.target_version):
+    if costs_schema_is_ready(ctx.ch_client, ctx.target_db):
         insert_costs(ctx.ch_client, ctx.target_db)
+
+
+def _default_trace_server_costs_post_migration_work_check(
+    ctx: PostMigrationHookContext,
+) -> bool:
+    """Whether the costs hook has anything to do, checked before the migration lock.
+
+    Checks the schema gate first so the checkpoint diff in `has_pending_costs`
+    only reads a table that has the columns the diff compares.
+    """
+    return costs_schema_is_ready(ctx.ch_client, ctx.target_db) and has_pending_costs(
+        ctx.ch_client, ctx.target_db
+    )
 
 
 class MigrationStatus(TypedDict):
@@ -233,6 +255,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
     management_db: str
     migration_dir: str
     post_migration_hook: PostMigrationHook | None
+    post_migration_work_check: PostMigrationWorkCheck | None
 
     def __init__(
         self,
@@ -241,6 +264,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        post_migration_work_check: PostMigrationWorkCheck | None = None,
         heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         super().__init__()
@@ -248,6 +272,7 @@ class BaseClickHouseTraceServerMigrator(ABC):
         self.management_db = management_db
         self.migration_dir = self._resolve_migration_dir(migration_dir)
         self.post_migration_hook = post_migration_hook
+        self.post_migration_work_check = post_migration_work_check
         self._heartbeat_client_factory = heartbeat_client_factory
         self._initialize_migration_db()
 
@@ -320,8 +345,15 @@ class BaseClickHouseTraceServerMigrator(ABC):
         # Lock-free pre-check: on a rolling deploy N replicas call this
         # concurrently. If there is nothing to apply, skip the lock entirely so
         # they do not serialize through it just to discover there is no work.
-        if not self._has_migrations_to_apply(target_db, target_version):
-            logger.info("No migrations to apply to `%s`; skipping lock", target_db)
+        # `_has_post_migration_work` only runs when no migration is pending, since
+        # the target db may not have the relevant tables yet otherwise.
+        if not self._has_migrations_to_apply(
+            target_db, target_version
+        ) and not self._has_post_migration_work(target_db, target_version):
+            logger.info(
+                "No migrations or pending post-migration work for `%s`; skipping lock",
+                target_db,
+            )
             return
         with migration_lock(
             self.ch_client,
@@ -349,6 +381,27 @@ class BaseClickHouseTraceServerMigrator(ABC):
                 )
             )
             > 0
+        )
+
+    def _has_post_migration_work(
+        self, target_db: str, target_version: int | None = None
+    ) -> bool:
+        """Read-only check for whether the post-migration hook has pending work.
+
+        A work check is meaningless without a hook to act on it, so both must
+        be configured. Only called when no schema migration is pending, so the
+        current version read here reflects the already-settled schema.
+        """
+        if self.post_migration_hook is None or self.post_migration_work_check is None:
+            return False
+        status = self._read_migration_status(target_db)
+        return self.post_migration_work_check(
+            PostMigrationHookContext(
+                ch_client=self.ch_client,
+                target_db=target_db,
+                current_version=status["curr_version"],
+                target_version=target_version,
+            )
         )
 
     def _migration_row_exists(self, db_name: str) -> bool:
@@ -776,6 +829,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        post_migration_work_check: PostMigrationWorkCheck | None = None,
         heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         self.replicated_path = (
@@ -808,6 +862,7 @@ class ReplicatedClickHouseTraceServerMigrator(BaseClickHouseTraceServerMigrator)
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            post_migration_work_check=post_migration_work_check,
             heartbeat_client_factory=heartbeat_client_factory,
         )
 
@@ -1066,6 +1121,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
         *,
         migration_dir: str,
         post_migration_hook: PostMigrationHook | None = None,
+        post_migration_work_check: PostMigrationWorkCheck | None = None,
         heartbeat_client_factory: Callable[[], CHClient] | None = None,
     ):
         logger.info(
@@ -1079,6 +1135,7 @@ class DistributedClickHouseTraceServerMigrator(ReplicatedClickHouseTraceServerMi
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            post_migration_work_check=post_migration_work_check,
             heartbeat_client_factory=heartbeat_client_factory,
         )
 
@@ -1607,6 +1664,8 @@ def get_clickhouse_trace_server_migrator(
     migration_dir: str | None = None,
     post_migration_hook: PostMigrationHook
     | None = _default_trace_server_costs_post_migration_hook,
+    post_migration_work_check: PostMigrationWorkCheck
+    | None = _default_trace_server_costs_post_migration_work_check,
     heartbeat_client_factory: Callable[[], CHClient] | None = None,
 ) -> BaseClickHouseTraceServerMigrator:
     """Factory function to create the appropriate migrator based on configuration.
@@ -1620,6 +1679,7 @@ def get_clickhouse_trace_server_migrator(
         management_db: Database name for migration management
         migration_dir: Absolute path to a directory containing `*.up.sql` / `*.down.sql`
         post_migration_hook: Optional callable run after migrations; defaults to the Weave costs backfill hook (pass None to disable)
+        post_migration_work_check: Optional callable checked before the lock, so the migrator does not skip the hook when it would have work to do; defaults to the costs backfill's pending-work check (pass None to disable)
 
     Returns:
         An instance of the appropriate migrator class
@@ -1668,6 +1728,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            post_migration_work_check=post_migration_work_check,
             heartbeat_client_factory=heartbeat_client_factory,
         )
     if replicated:
@@ -1678,6 +1739,7 @@ def get_clickhouse_trace_server_migrator(
             management_db,
             migration_dir=migration_dir,
             post_migration_hook=post_migration_hook,
+            post_migration_work_check=post_migration_work_check,
             heartbeat_client_factory=heartbeat_client_factory,
         )
 
@@ -1686,6 +1748,7 @@ def get_clickhouse_trace_server_migrator(
         management_db,
         migration_dir=migration_dir,
         post_migration_hook=post_migration_hook,
+        post_migration_work_check=post_migration_work_check,
         heartbeat_client_factory=heartbeat_client_factory,
     )
 

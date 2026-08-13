@@ -21,13 +21,19 @@ export const EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAMES = [
  */
 export const EVAL_META_KEY = '_weave_eval_meta';
 
-export const WEAVE_ATTRIBUTES_NAMESPACE = 'weave';
-export const GENAI_SPAN_REF_ATTR_KEY = 'genai_span_ref';
-
+export const EVAL_RUN_ID_SPAN_ATTR = 'weave.eval.run_id';
 export const EVAL_PREDICT_AND_SCORE_CALL_ID_SPAN_ATTR =
   'weave.eval.predict_and_score_call_id';
 export const EVAL_PROJECT_ID_SPAN_ATTR = 'weave.eval.project_id';
 export const EVAL_EVALUATION_NAME_SPAN_ATTR = 'weave.eval.evaluation_name';
+
+/**
+ * Span-attribute keys carrying the enclosing op call. Spelled the same as
+ * `weave/shared/otel_span_attrs.py`; the server's semconv promotes these keys
+ * into the `parent_call_id` / `parent_call_trace_id` span columns.
+ */
+export const PARENT_CALL_ID_SPAN_ATTR = 'weave.parent_call.id';
+export const PARENT_CALL_TRACE_ID_SPAN_ATTR = 'weave.parent_call.trace_id';
 
 /**
  * Request header advertising the sampling-relevant capabilities this SDK build

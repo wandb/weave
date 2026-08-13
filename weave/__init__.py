@@ -2,6 +2,7 @@
 
 import sys
 import warnings
+from typing import Any
 
 if sys.version_info < (3, 10):  # noqa: UP036
     warnings.warn(
@@ -95,6 +96,7 @@ from weave.trace.log_call import log_call
 from weave.trace.urls import otel_traces_endpoint
 from weave.trace.util import Thread as Thread
 from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
+from weave.trace_server.trace_server_interface import CustomRuntimeID
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
@@ -112,6 +114,7 @@ __all__ = [
     "ClassifierMonitor",
     "Content",
     "Conversation",
+    "CustomRuntimeID",
     "Dataset",
     "EasyPrompt",
     "Evaluation",
@@ -126,6 +129,7 @@ __all__ = [
     "Monitor",
     "Object",
     "ObjectRef",
+    "OpLinkSpanProcessor",  # noqa: F822  # resolved lazily by __getattr__ below
     "Prompt",
     "SavedView",
     "Scorer",
@@ -181,3 +185,16 @@ __all__ = [
     "thread",
     "weave_client_context",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve the few public names that must not be imported eagerly.
+
+    ``OpLinkSpanProcessor`` needs ``opentelemetry-sdk``, and importing weave
+    has to keep working without it.
+    """
+    if name == "OpLinkSpanProcessor":
+        from weave.trace.otel_op_linker import OpLinkSpanProcessor
+
+        return OpLinkSpanProcessor
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

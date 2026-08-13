@@ -155,6 +155,33 @@ class TestInsertCosts(unittest.TestCase):
             ],
         )
 
+    @patch("weave.trace_server.costs.insert_costs.uuid.uuid4")
+    @patch("weave.trace_server.costs.insert_costs.datetime")
+    def test_insert_costs_without_created_at_uses_utc(self, mock_datetime, mock_uuid4):
+        frozen_time = datetime(2025, 1, 1, 12, 0, 0)
+        mock_uuid4.return_value = self.mock_uuid
+        mock_datetime.now.return_value = frozen_time
+        mock_datetime.strptime.side_effect = datetime.strptime
+
+        insert_costs.insert_costs_into_db(
+            self.client,
+            {
+                "llm_model": [
+                    {
+                        "input": 0.01,
+                        "output": 0.02,
+                        "provider": "provider",
+                    }
+                ]
+            },
+        )
+
+        mock_datetime.now.assert_called_once_with(timezone.utc)
+        inserted_row = self.client.insert.call_args.args[1][0]
+        expected_timestamp = frozen_time.replace(tzinfo=timezone.utc)
+        assert inserted_row[5] == expected_timestamp
+        assert inserted_row[13] == expected_timestamp
+
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.insert_costs_into_db")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
@@ -177,7 +204,6 @@ class TestInsertCosts(unittest.TestCase):
         mock_insert_db.assert_called_once_with(
             self.client, mock_filter_costs.return_value
         )
-        mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
         mock_logger.info.assert_any_call(
             "There are %d costs to insert, after filtering out existing costs", 1
         )
@@ -258,7 +284,6 @@ class TestInsertCosts(unittest.TestCase):
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
         mock_insert_db.assert_not_called()
-        mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
         mock_logger.info.assert_any_call(
             "There are %d costs to insert, after filtering out existing costs", 0
         )

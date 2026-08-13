@@ -18,6 +18,7 @@ from tests.trace_server.helpers import make_project_id as _make_project_id
 from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.constants import CONVERSATION_PREVIEW_CHARS
 from weave.trace_server.agents.helpers import genai_span_to_row
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
@@ -46,6 +47,7 @@ from weave.trace_server.agents.types import (
     RatingCondition,
 )
 from weave.trace_server.base64_content_conversion import AUTO_CONVERSION_MIN_SIZE
+from weave.trace_server.credential_redaction import REDACTED_VALUE
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.feedback_types import (
     AGENT_MONITOR_FEEDBACK_TYPE,
@@ -323,6 +325,114 @@ def test_eval_spans_filter_by_kind_and_predict_and_score_call(ch_server):
     assert by_pas.total_count == 1
     assert by_pas.spans[0].eval_run_id == "run-1"
     assert by_pas.spans[0].eval_kind == "agent"
+
+
+def test_spans_are_filterable_by_the_op_call_that_produced_them(ch_server):
+    """The promoted op-linkage columns answer "which spans did this call
+    produce" through the existing spans query.
+
+    Asserts on the returned rows, not just the count: an unregistered field
+    name compiles into a custom-attribute read and returns zero rows without
+    erroring, and a column missing from the list projection comes back null.
+    """
+    project_id = _make_project_id("parent_call")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    spans = [
+        _make_span(
+            project_id,
+            agent_name="from-call-1-first",
+            parent_call_id="call-1",
+            parent_call_trace_id="weave-trace-1",
+            started_at=now,
+        ),
+        _make_span(
+            project_id,
+            agent_name="from-call-1-second",
+            parent_call_id="call-1",
+            parent_call_trace_id="weave-trace-1",
+            started_at=now + datetime.timedelta(seconds=1),
+        ),
+        _make_span(
+            project_id,
+            agent_name="from-call-2",
+            parent_call_id="call-2",
+            parent_call_trace_id="weave-trace-2",
+            started_at=now + datetime.timedelta(seconds=2),
+        ),
+        # No enclosing op: the columns stay empty, which is a normal state.
+        _make_span(
+            project_id,
+            agent_name="no-call",
+            started_at=now + datetime.timedelta(seconds=3),
+        ),
+    ]
+    _insert_spans(ch_server.ch_client, spans)
+
+    by_call = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "parent_call.id"},
+                            {"$literal": "call-1"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert by_call.total_count == 2
+    assert sorted(
+        (s.agent_name, s.parent_call_id, s.parent_call_trace_id) for s in by_call.spans
+    ) == [
+        ("from-call-1-first", "call-1", "weave-trace-1"),
+        ("from-call-1-second", "call-1", "weave-trace-1"),
+    ]
+
+    by_weave_trace = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            query=Query.model_validate(
+                {
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "parent_call.trace_id"},
+                            {"$literal": "weave-trace-2"},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert by_weave_trace.total_count == 1
+    assert by_weave_trace.spans[0].agent_name == "from-call-2"
+    assert by_weave_trace.spans[0].parent_call_id == "call-2"
+
+    # Grouping puts every span under its producing call, and the span with no
+    # enclosing op under the empty string -- unset reads back as "", not null.
+    grouped = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[
+                AgentGroupByRef(source="field", key="parent_call.id"),
+                AgentGroupByRef(source="field", key="parent_call.trace_id"),
+            ],
+        )
+    )
+    assert {
+        (
+            group.group_keys["parent_call_id"],
+            group.group_keys["parent_call_trace_id"],
+        ): group.span_count
+        for group in grouped.groups
+    } == {
+        ("call-1", "weave-trace-1"): 2,
+        ("call-2", "weave-trace-2"): 1,
+        ("", ""): 1,
+    }
 
 
 def test_insert_spans_bulk_writes_all_in_one_call(ch_server):
@@ -1166,6 +1276,76 @@ def test_group_by_conversation_id_message_previews(ch_server):
     assert row.last_message is not None
     assert row.last_message.role == "assistant_message"
     assert row.last_message.text == "final reply"
+
+
+def test_conversation_preview_strips_leading_json_before_truncation(ch_server):
+    project_id = _make_project_id("conv-preview-json")
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    conv = f"conv-{uuid.uuid4().hex[:8]}"
+    question = "Which settings caused the most crashes?"
+    context_blob = json.dumps(
+        {
+            "url": "u",
+            "content": [
+                {
+                    "type": "workspace",
+                    "description": "x" * 16,
+                    "run_sets": [
+                        {
+                            "enabled": True,
+                            "filter": "a" * 20,
+                            "name": "first",
+                        },
+                        {
+                            "enabled": True,
+                            "filter": "b" * 100,
+                            "name": "second",
+                        },
+                    ],
+                }
+            ],
+        },
+        sort_keys=True,
+    )
+    assert len(context_blob) > CONVERSATION_PREVIEW_CHARS
+    # The production preview limit cuts the outer object after one
+    # complete nested run-set and its separator. Frontend cleanup then strips
+    # the nested JSON but misclassifies the remaining comma as user prose.
+    truncated = context_blob[:CONVERSATION_PREVIEW_CHARS]
+    assert '"name": "first"}, {' in truncated
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(truncated)
+
+    _insert_spans(
+        ch_server.ch_client,
+        [
+            _make_span(
+                project_id,
+                conversation_id=conv,
+                operation_name="chat",
+                started_at=now,
+                input_messages=[
+                    NormalizedMessage(
+                        role="user",
+                        content=f'{context_blob}\n{{"request_id": "abc"}}\n{question}',
+                    )
+                ],
+            )
+        ],
+    )
+
+    res = ch_server.agent_spans_query(
+        AgentSpansQueryReq(
+            project_id=project_id,
+            group_by=[AgentGroupByRef(source="column", key="conversation_id")],
+        )
+    )
+    by_conv = {group.group_keys["conversation_id"]: group for group in res.groups}
+    row = by_conv[conv]
+
+    assert row.first_message is not None
+    assert row.first_message.role == "user_message"
+    assert row.first_message.text == question
 
 
 def _create_feedback(
@@ -3187,6 +3367,149 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
         )
     )
     assert obj.obj.wb_user_id == internal_user_id
+
+
+# ---------------------------------------------------------------------------
+# Test: credential redaction on the GenAI OTel agents ingest path
+# ---------------------------------------------------------------------------
+
+_REDACTED_SPAN_ATTRS = {
+    "http": {"request": {"header": {"authorization": REDACTED_VALUE}}},
+    "openai_api_key": REDACTED_VALUE,
+}
+
+
+def _build_credential_processed_span() -> tsi.ProcessedResourceSpans:
+    """A ``chat`` span whose attributes and resource carry credential-shaped names.
+
+    The api-key value is a data-URI past ``AUTO_CONVERSION_MIN_SIZE``.
+    """
+    span = Span()
+    span.name = "chat gpt-4o"
+    span.trace_id = uuid.uuid4().bytes
+    span.span_id = uuid.uuid4().bytes[:8]
+    now_ns = int(datetime.datetime.now().timestamp() * 1_000_000_000)
+    span.start_time_unix_nano = now_ns
+    span.end_time_unix_nano = now_ns + 1_000_000_000
+    span.kind = 1  # INTERNAL
+
+    header_kv = KeyValue()
+    header_kv.key = "http.request.header.authorization"
+    header_kv.value.string_value = "value-to-redact"
+    span.attributes.append(header_kv)
+
+    blob_kv = KeyValue()
+    blob_kv.key = "openai_api_key"
+    blob_bytes = b"a" * (AUTO_CONVERSION_MIN_SIZE + 10)
+    blob_kv.value.string_value = (
+        f"data:image/png;base64,{base64.b64encode(blob_bytes).decode('ascii')}"
+    )
+    span.attributes.append(blob_kv)
+
+    scope_spans = ScopeSpans()
+    scope_spans.spans.append(span)
+
+    resource = Resource()
+    resource_kv = KeyValue()
+    resource_kv.key = "aws_access_key_id"
+    resource_kv.value.string_value = "value-to-redact"
+    resource.attributes.append(resource_kv)
+
+    resource_spans = ResourceSpans()
+    resource_spans.resource.CopyFrom(resource)
+    resource_spans.scope_spans.append(scope_spans)
+
+    return tsi.ProcessedResourceSpans(
+        entity="test-entity",
+        project="test-project",
+        run_id=None,
+        resource_spans=resource_spans,
+    )
+
+
+def _assert_stored_span_is_redacted(raw_span_dump: str) -> None:
+    raw_span = json.loads(raw_span_dump)
+    assert raw_span["attributes"] == _REDACTED_SPAN_ATTRS
+    assert raw_span["resource"]["attributes"] == {"aws_access_key_id": REDACTED_VALUE}
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_server):
+    """A span ingested through the external adapter is stored with values replaced."""
+    external_project_id = _ref_safe_external_project_id("genai_otel_redaction")
+    internal_project_id = base64.b64encode(external_project_id.encode("ascii")).decode(
+        "ascii"
+    )
+
+    res = trace_server.genai_otel_export(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=external_project_id,
+            wb_user_id="user-42",
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=internal_project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
+
+    # Redaction ran before the blob strip, so nothing was uploaded.
+    assert (
+        ch_server.project_stats(
+            tsi.ProjectStatsReq(project_id=internal_project_id)
+        ).files_storage_size_bytes
+        == 0
+    )
+
+    # Read the stored columns directly.
+    row = ch_server.ch_client.query(
+        "SELECT attributes_dump, resource_dump, custom_attrs_string FROM spans "
+        "WHERE project_id = {project_id:String}",
+        parameters={"project_id": internal_project_id},
+    ).result_rows
+    assert len(row) == 1
+    attributes_dump, resource_dump, custom_attrs_string = row[0]
+    assert json.loads(attributes_dump) == _REDACTED_SPAN_ATTRS
+    assert json.loads(resource_dump)["attributes"] == {
+        "aws_access_key_id": REDACTED_VALUE
+    }
+    assert custom_attrs_string == {
+        "http.request.header.authorization": REDACTED_VALUE,
+        "openai_api_key": REDACTED_VALUE,
+    }
+
+
+# flaky: CI ClickHouse occasionally doesn't surface the just-inserted spans to
+# the immediate read.
+@pytest.mark.flaky(reruns=3)
+def test_genai_otel_export_redacts_without_file_storage(ch_server):
+    """Redaction must not depend on a trace server being wired for file storage.
+
+    The blob strip needs one and is skipped without it; redaction does not.
+    """
+    project_id = _make_project_id("genai_otel_redaction_no_fs")
+
+    res, _ = AgentWriteHandler(ch_server.ch_client).insert_otel_spans(
+        GenAIOTelExportReq(
+            processed_spans=[_build_credential_processed_span()],
+            project_id=project_id,
+            wb_user_id="u-1",
+        )
+    )
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+
+    stored = ch_server.agent_spans_query(
+        AgentSpansQueryReq(project_id=project_id, include_details=True)
+    )
+    assert len(stored.spans) == 1
+    _assert_stored_span_is_redacted(stored.spans[0].raw_span_dump)
 
 
 # ---------------------------------------------------------------------------

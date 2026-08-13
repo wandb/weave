@@ -971,15 +971,17 @@ def test_trace_roots_only_filter():
                         JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
                  FROM
                    (SELECT anyIf(cm.sortable_datetime, cm.sortable_datetime IS NOT NULL) AS sortable_datetime,
-                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump
+                           anyIf(cm.summary_dump, cm.summary_dump IS NOT NULL) AS summary_dump,
+                           anyIf(cm.parent_id, cm.parent_id IS NOT NULL) AS parent_id,
+                           anyIf(cm.otel_dump, cm.otel_dump IS NOT NULL) AS otel_dump
                     FROM calls_merged AS cm
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.sortable_datetime >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.sortable_datetime < toDateTime({pb_2:Float64}, {pb_3:String})
                       AND cm.deleted_at IS NULL
-                      AND parent_id IS NULL
                     GROUP BY project_id,
-                             id)) ARRAY
+                             id)
+                 WHERE (parent_id IS NULL OR otel_dump IS NOT NULL) ) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,
                     model),
@@ -1260,11 +1262,10 @@ def test_calls_complete_basic():
 
 
 def test_calls_complete_trace_roots_only_filter():
-    """Test trace_roots_only filter uses sentinel check for calls_complete.
+    """Test root-only usage includes OTEL rows for calls_complete.
 
     In calls_complete, parent_id is a non-nullable String with '' as the
-    sentinel for NULL, so trace_roots_only must check parent_id = '' instead
-    of parent_id IS NULL.
+    sentinel for NULL and otel_dump uses '' for a missing span.
     """
     start_dt = datetime.datetime(2024, 12, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
     end_dt = datetime.datetime(2024, 12, 2, 0, 0, 0, tzinfo=datetime.timezone.utc)
@@ -1298,13 +1299,15 @@ def test_calls_complete_trace_roots_only_filter():
                         JSONExtractRaw(ifNull(summary_dump, '{}'), 'usage') AS usage_raw
                  FROM
                    (SELECT cm.started_at AS started_at,
-                           cm.summary_dump AS summary_dump
+                           cm.summary_dump AS summary_dump,
+                           cm.parent_id AS parent_id,
+                           cm.otel_dump AS otel_dump
                     FROM calls_complete AS cm
                     WHERE cm.project_id = {pb_0:String}
                       AND cm.started_at >= toDateTime({pb_1:Float64}, {pb_3:String})
                       AND cm.started_at < toDateTime({pb_2:Float64}, {pb_3:String})
-                      AND cm.deleted_at = toDateTime64(0, 3)
-                      AND parent_id = {pb_5:String} )) ARRAY
+                      AND cm.deleted_at = toDateTime64(0, 3) )
+                 WHERE (parent_id = '' OR otel_dump != '') ) ARRAY
               JOIN JSONExtractKeysAndValuesRaw(ifNull(usage_raw, '{}')) AS kv)
            GROUP BY bucket,
                     model),
@@ -1328,7 +1331,6 @@ def test_calls_complete_trace_roots_only_filter():
             "pb_2": 1733097600.0,
             "pb_3": "UTC",
             "pb_4": 3600,
-            "pb_5": "",
         },
         ["timestamp", "model", "sum_total_tokens", "count"],
         3600,

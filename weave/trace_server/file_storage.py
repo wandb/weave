@@ -28,16 +28,21 @@ GCS specific configuration options:
     instance should automatically assume the role of the running user.
 
 Azure specific configuration options:
-There are two ways to authenticate with Azure Blob Storage:
+There are three ways to authenticate with Azure Blob Storage:
 1. Connection string (simple)
 2. Account and key (more complex)
+3. Azure's default credential chain, including AKS workload identity
 
-1. Connection string:
+Connection string:
     - `WF_FILE_STORAGE_AZURE_CONNECTION_STRING`: the connection string for the azure account.
 
-2. Account and key:
+Account and key:
     - `WF_FILE_STORAGE_AZURE_ACCESS_KEY`: the access key for the azure account.
     - `WF_FILE_STORAGE_AZURE_ACCOUNT_URL`: (optional) the account url for the azure account - defaults to `https://<account>.blob.core.windows.net/`
+
+Default credentials:
+    - Leave both Weave-specific credential variables unset.
+    - Configure the standard Azure workload identity environment and service account.
 """
 
 import logging
@@ -78,6 +83,7 @@ from weave.trace_server.file_storage_credentials import (
     AWSCredentials,
     AzureAccountCredentials,
     AzureConnectionCredentials,
+    AzureDefaultCredentials,
     get_aws_credentials,
     get_azure_credentials,
     get_gcp_credentials,
@@ -417,12 +423,16 @@ class GCSStorageClient(FileStorageClient):
 
 
 class AzureStorageClient(FileStorageClient):
-    """Azure Blob Storage implementation supporting both connection string and account credentials."""
+    """Azure Blob Storage using explicit credentials or Azure workload identity."""
 
     def __init__(
         self,
         base_uri: FileStorageURI,
-        credentials: AzureConnectionCredentials | AzureAccountCredentials,
+        credentials: (
+            AzureConnectionCredentials
+            | AzureAccountCredentials
+            | AzureDefaultCredentials
+        ),
     ):
         """Initialize Azure client with either connection string or account credentials."""
         assert isinstance(base_uri, AzureFileStorageURI)
@@ -438,7 +448,7 @@ class AzureStorageClient(FileStorageClient):
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
-        else:
+        elif "access_key" in self.credentials:
             account_creds = cast(AzureAccountCredentials, self.credentials)
             if account_url := account_creds.get("account_url"):
                 pass
@@ -447,6 +457,14 @@ class AzureStorageClient(FileStorageClient):
             return BlobServiceClient(
                 account_url=account_url,
                 credential=account_creds["access_key"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+        else:
+            default_creds = cast(AzureDefaultCredentials, self.credentials)
+            return BlobServiceClient(
+                account_url=f"https://{account}.blob.core.windows.net/",
+                credential=default_creds["default_credential"],
                 connection_timeout=DEFAULT_CONNECT_TIMEOUT,
                 read_timeout=DEFAULT_READ_TIMEOUT,
             )
@@ -487,14 +505,29 @@ class AzureStorageClient(FileStorageClient):
         blob_client = client.get_container_client(azure_uri.container).get_blob_client(
             azure_uri.path
         )
-        sas = generate_blob_sas(
-            account_name=client.account_name,
-            container_name=azure_uri.container,
-            blob_name=azure_uri.path,
-            account_key=client.credential.account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(seconds=ttl),
-        )
+        expiry = datetime.now(timezone.utc) + timedelta(seconds=ttl)
+        if "default_credential" in self.credentials:
+            user_delegation_key = client.get_user_delegation_key(
+                datetime.now(timezone.utc) - timedelta(minutes=5),
+                expiry,
+            )
+            sas = generate_blob_sas(
+                account_name=client.account_name,
+                container_name=azure_uri.container,
+                blob_name=azure_uri.path,
+                user_delegation_key=user_delegation_key,
+                permission=BlobSasPermissions(read=True),
+                expiry=expiry,
+            )
+        else:
+            sas = generate_blob_sas(
+                account_name=client.account_name,
+                container_name=azure_uri.container,
+                blob_name=azure_uri.path,
+                account_key=client.credential.account_key,
+                permission=BlobSasPermissions(read=True),
+                expiry=expiry,
+            )
         return f"{blob_client.url}?{sas}"
 
 

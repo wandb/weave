@@ -166,6 +166,7 @@ class _SpanBase(BaseModel):
         *,
         new_trace: bool = False,
         start_time_ns: int | None = None,
+        set_current: bool = True,
     ) -> None:
         """Create an OTel span and attach it to the current context.
 
@@ -177,6 +178,9 @@ class _SpanBase(BaseModel):
         When ``_parent_otel_context`` is set (a child threaded from its parent
         Turn/SubAgent), that context wins over ambient. ``new_trace`` is only
         honored when no explicit parent was provided.
+
+        ``set_current=False`` starts the span without pushing it onto the
+        ambient OTel context stack — see ``SubAgent.start``.
         """
         if not _OTEL_AVAILABLE or should_disable_weave():
             return
@@ -189,9 +193,10 @@ class _SpanBase(BaseModel):
         elif new_trace:
             kwargs["context"] = Context()
         self._otel_span = tracer.start_span(name, **kwargs)
-        self._otel_token = otel_context.attach(
-            otel_trace.set_span_in_context(self._otel_span)
-        )
+        if set_current:
+            self._otel_token = otel_context.attach(
+                otel_trace.set_span_in_context(self._otel_span)
+            )
         # Stamp the active conversation's attributes on every span. Read from the
         # conversation contextvar (not OTel context) so they reach the root turn
         # span too, which starts in a fresh OTel Context to force a new trace.
@@ -221,13 +226,6 @@ class _SpanBase(BaseModel):
             otel_context.detach(self._otel_token)
             self._otel_token = None
 
-    def _record_otel_error(self, exc_val: BaseException) -> None:
-        """Record an exception on the OTel span."""
-        if not _OTEL_AVAILABLE or self._otel_span is None:
-            return
-        self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
-        self._otel_span.record_exception(exc_val)
-
     def _recording_span(self, operation: str, key: str | list[str]) -> _OTelSpan | None:
         """Return the OTel span if it's recording, else ``None``.
 
@@ -253,13 +251,25 @@ class _SpanBase(BaseModel):
             return None
         if not self._otel_span.is_recording():
             logger.warning(
-                "%s(%s) ignored: span already ended. Set attributes before "
+                "%s(%s) ignored: span already ended. Call it before "
                 "exiting `with` or calling .end().",
                 operation,
                 key_repr,
             )
             return None
         return self._otel_span
+
+    def record_error(self, error: BaseException) -> Self:
+        """Record a failure without ending the span; call ``end()`` when ready."""
+        if span := self._recording_span("record_error", type(error).__name__):
+            error_class = type(error)
+            error_type = error_class.__qualname__
+            if error_class.__module__ != "builtins":
+                error_type = f"{error_class.__module__}.{error_type}"
+            span.set_attribute("error.type", error_type)
+            span.set_status(StatusCode.ERROR, str(error))
+            span.record_exception(error)
+        return self
 
     def set_attributes(self, attributes: dict[str, Any]) -> Self:
         """Stamp arbitrary OTel attributes on this span.
@@ -433,7 +443,7 @@ class Tool(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -750,7 +760,7 @@ class LLM(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -761,12 +771,20 @@ class SubAgent(_SpanBase):
     Maps to a nested invoke_agent OTel span in the same trace.
     """
 
+    model_config = ConfigDict(validate_assignment=True)
+
     name: str = ""
     model: str = ""
     agent_id: str = ""
     agent_description: str = ""
     agent_version: str = ""
     system_instructions: list[str] = Field(default_factory=list)
+    input_messages: list[Message] = Field(default_factory=list)
+    output_messages: list[Message] = Field(default_factory=list)
+    tool_name: str = ""
+    tool_call_id: str = ""
+    tool_call_arguments: JSONString = ""
+    tool_call_result: JSONString = ""
     started_at: datetime | None = None
     ended_at: datetime | None = None
 
@@ -847,6 +865,12 @@ class SubAgent(_SpanBase):
         name: str | None = None,
         model: str | None = None,
         system_instructions: list[str] | None = None,
+        input_messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
+        tool_name: str | None = None,
+        tool_call_id: str | None = None,
+        tool_call_arguments: str | None = None,
+        tool_call_result: str | None = None,
         agent_id: str | None = None,
         agent_description: str | None = None,
         agent_version: str | None = None,
@@ -871,6 +895,18 @@ class SubAgent(_SpanBase):
             self.model = model
         if system_instructions is not None:
             self.system_instructions = system_instructions
+        if input_messages is not None:
+            self.input_messages = input_messages
+        if output_messages is not None:
+            self.output_messages = output_messages
+        if tool_name is not None:
+            self.tool_name = tool_name
+        if tool_call_id is not None:
+            self.tool_call_id = tool_call_id
+        if tool_call_arguments is not None:
+            self.tool_call_arguments = tool_call_arguments
+        if tool_call_result is not None:
+            self.tool_call_result = tool_call_result
         if agent_id is not None:
             self.agent_id = agent_id
         if agent_description is not None:
@@ -885,29 +921,55 @@ class SubAgent(_SpanBase):
         """Build the full OTel attribute dict for this sub-agent span.
 
         Shared between streaming (``end``) and batch (``_attrs_for_span``).
-        ``system_instructions`` is the only content-bearing field — it is
-        gated by ``include_content`` and PII-redacted, mirroring ``Turn``;
-        the identifiers are always emitted.
+        Content-bearing fields are gated by ``include_content`` and
+        PII-redacted, mirroring ``Turn`` and ``Tool``. Identifiers are always
+        emitted.
         """
+        input_messages: list[Message] | None
+        output_messages: list[Message] | None
         system_instructions: list[str] | None
         if include_content:
+            input_messages = self.input_messages
+            output_messages = self.output_messages
             system_instructions = self.system_instructions
+            tool_call_arguments = self.tool_call_arguments
+            tool_call_result = self.tool_call_result
             if should_redact_pii():
+                input_messages = pii_redaction.redact_messages(input_messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
                 system_instructions = pii_redaction.redact_system_instructions(
                     system_instructions
                 )
+                tool_call_arguments = pii_redaction.redact_pii_string(
+                    tool_call_arguments
+                )
+                tool_call_result = pii_redaction.redact_pii_string(tool_call_result)
         else:
+            input_messages = None
+            output_messages = None
             system_instructions = None
+            tool_call_arguments = ""
+            tool_call_result = ""
         attrs = invoke_agent_attributes(
             agent_name=self.name,
             model=self.model,
             conversation_id=conversation_id,
             conversation_name=conversation_name,
+            input_messages=input_messages,
+            output_messages=output_messages,
             system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
             agent_version=self.agent_version,
         )
+        if self.tool_name:
+            attrs["gen_ai.tool.name"] = self.tool_name
+        if self.tool_call_id:
+            attrs["gen_ai.tool.call.id"] = self.tool_call_id
+        if tool_call_arguments:
+            attrs["gen_ai.tool.call.arguments"] = tool_call_arguments
+        if tool_call_result:
+            attrs["gen_ai.tool.call.result"] = tool_call_result
         attrs.update(_capture_info_attrs())
         return attrs
 
@@ -926,12 +988,29 @@ class SubAgent(_SpanBase):
         )
         self._end_otel_span(attrs, end_time_ns=_to_ns(self.ended_at))
 
-    def __enter__(self) -> Self:
+    def start(self, *, set_current: bool = True) -> Self:
+        """Start this sub-agent's span. ``__enter__`` without the ``with``.
+
+        Pass ``set_current=False`` when sub-agents can be in flight
+        concurrently. ``end()`` detaches via ``ContextVar.reset``, which
+        silently corrupts the ambient context stack when overlapping spans
+        end out of LIFO order — the surviving sibling stops being current,
+        and the last detach restores an already-ended span. Children created
+        through ``start_llm`` / ``start_tool`` / ``start_subagent`` nest under
+        this span either way, because those factories thread an explicit
+        parent context.
+        """
         if self.started_at is None:
             self.started_at = datetime.now(timezone.utc)
-        start_ns = int(self.started_at.timestamp() * 1_000_000_000)
-        self._start_otel_span(f"invoke_agent {self.name}", start_time_ns=start_ns)
+        self._start_otel_span(
+            f"invoke_agent {self.name}",
+            start_time_ns=_to_ns(self.started_at),
+            set_current=set_current,
+        )
         return self
+
+    def __enter__(self) -> Self:
+        return self.start()
 
     def __exit__(
         self,
@@ -940,7 +1019,7 @@ class SubAgent(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -967,6 +1046,7 @@ class Turn(_SpanBase):
     agent_version: str = ""
     system_instructions: list[str] = Field(default_factory=list)
     messages: list[Message] = Field(default_factory=list)
+    output_messages: list[Message] = Field(default_factory=list)
     spans: list[LLM | Tool | SubAgent] = Field(default_factory=list)
     continue_parent_trace: bool = False
     started_at: datetime | None = None
@@ -1074,6 +1154,7 @@ class Turn(_SpanBase):
         self,
         *,
         messages: list[Message] | None = None,
+        output_messages: list[Message] | None = None,
         system_instructions: list[str] | None = None,
         agent_name: str | None = None,
         model: str | None = None,
@@ -1087,8 +1168,9 @@ class Turn(_SpanBase):
         otherwise makes on a turn (``system_instructions``, ``agent_id``,
         ...) into a single keyword call. Only fields explicitly passed
         (non-``None``) are applied — existing values are preserved.
-        ``messages`` **replaces** the turn's existing messages (unlike
-        ``Turn.user(...)``, which appends a single message). Returns
+        ``messages`` and ``output_messages`` independently replace the turn's
+        existing input and output messages. This differs from
+        ``Turn.user(...)``, which appends a single input message. Returns
         ``self`` for chaining. Mirrors ``LLM.record``.
 
         Note: on the streaming (``with``) path the turn span is named from
@@ -1099,6 +1181,8 @@ class Turn(_SpanBase):
         """
         if messages is not None:
             self.messages = messages
+        if output_messages is not None:
+            self.output_messages = output_messages
         if system_instructions is not None:
             self.system_instructions = system_instructions
         if agent_name is not None:
@@ -1119,21 +1203,25 @@ class Turn(_SpanBase):
         """Build the full OTel attribute dict for this turn span.
 
         Shared by streaming (``end``) and batch (``log_turn``). The Turn
-        carries user messages; ``include_content=False`` strips them at
-        source so Presidio is never called for already-dropped content.
+        carries input and output messages; ``include_content=False`` strips
+        both at source so Presidio is never called for already-dropped content.
         """
         messages: list[Message] | None
+        output_messages: list[Message] | None
         system_instructions: list[str] | None
         if include_content:
             messages = self.messages
+            output_messages = self.output_messages
             system_instructions = self.system_instructions
             if should_redact_pii():
                 messages = pii_redaction.redact_messages(messages)
+                output_messages = pii_redaction.redact_messages(output_messages)
                 system_instructions = pii_redaction.redact_system_instructions(
                     system_instructions
                 )
         else:
             messages = None
+            output_messages = None
             system_instructions = None
         attrs = invoke_agent_attributes(
             agent_name=self.agent_name,
@@ -1141,6 +1229,7 @@ class Turn(_SpanBase):
             conversation_name=conversation_name,
             model=self.model,
             input_messages=messages,
+            output_messages=output_messages,
             system_instructions=system_instructions,
             agent_id=self.agent_id,
             agent_description=self.agent_description,
@@ -1194,7 +1283,7 @@ class Turn(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -1650,6 +1739,7 @@ def log_turn(
     agent_description: str = "",
     agent_version: str = "",
     messages: list[Message] | None = None,
+    output_messages: list[Message] | None = None,
     system_instructions: list[str] | None = None,
     spans: list[LLM | Tool | SubAgent] | None = None,
     started_at: datetime | None = None,
@@ -1671,6 +1761,9 @@ def log_turn(
     these from the active conversation instead. Use custom, non-semconv keys: a
     key that collides with a span's own ``gen_ai.*`` / ``weave.*`` attribute
     is unsupported (which value wins is path-dependent).
+
+    ``messages`` records the turn input and ``output_messages`` records the
+    terminal agent response on the same ``invoke_agent`` span.
     """
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(conversation_id=conversation_id)
@@ -1692,6 +1785,7 @@ def log_turn(
         agent_version=agent_version,
         system_instructions=system_instructions or [],
         messages=messages or [],
+        output_messages=output_messages or [],
         spans=resolved_spans,
         started_at=turn_started_at,
         ended_at=turn_ended_at,

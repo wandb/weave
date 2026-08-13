@@ -7,11 +7,13 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     field_serializer,
+    field_validator,
     model_validator,
     with_config,
 )
-from typing_extensions import TypedDict
+from typing_extensions import Self, TypedDict
 
 if TYPE_CHECKING:
     from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans
@@ -29,6 +31,11 @@ from weave.trace_server.common_interface import (
     BaseModelStrict,
     SortBy,
 )
+from weave.trace_server.constants import (
+    DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+    MAX_OBJECT_NAME_LENGTH,
+)
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
@@ -511,6 +518,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     logprobs: bool | None = None
     top_logprobs: int | None = None
     parallel_tool_calls: bool | None = None
+    reasoning_effort: str | None = None
     extra_headers: dict | None = None
     # soon to be deprecated params by OpenAI
     functions: list | None = None
@@ -1327,6 +1335,7 @@ class FeedbackQueryReq(BaseModelStrict):
 class FeedbackQueryRes(BaseModel):
     # Note: this is not a list of Feedback because user can request any fields.
     result: list[dict[str, Any]]
+    total_count: int = Field(ge=0)
 
 
 class FeedbackPurgeReq(BaseModelStrict):
@@ -1838,6 +1847,8 @@ class CostQueryOutput(BaseModel):
     llm_id: str | None = Field(default=None, examples=["gpt4"])
     prompt_token_cost: float | None = Field(default=None, examples=[1.0])
     completion_token_cost: float | None = Field(default=None, examples=[1.0])
+    cache_read_input_token_cost: float | None = Field(default=None, examples=[1.0])
+    cache_creation_input_token_cost: float | None = Field(default=None, examples=[1.0])
     prompt_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     completion_token_cost_unit: str | None = Field(default=None, examples=["USD"])
     effective_date: datetime.datetime | None = Field(
@@ -2693,6 +2704,90 @@ class DatasetDeleteReq(BaseModelStrict):
 
 class DatasetDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of dataset versions deleted")
+
+
+CustomRuntimeName: TypeAlias = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=MAX_OBJECT_NAME_LENGTH,
+        # Forbid whitespace and "::".
+        pattern=r"^[^\s:]*(?::[^\s:]+)*:?$",
+    ),
+]
+
+
+class CustomRuntimeID(BaseModelStrict):
+    id: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            min_length=1,
+            # Forbid whitespace.
+            pattern=r"^\S+$",
+        ),
+    ] = Field(description="Value sent in the OpenAI-compatible request model field")
+    max_tokens: int = Field(
+        default=DEFAULT_CUSTOM_RUNTIME_MAX_TOKENS,
+        gt=0,
+        description="Maximum tokens supported by this runtime ID",
+    )
+
+
+class CustomRuntimeApplyBody(BaseModelStrict):
+    base_url: str = Field(description="Public OpenAI-compatible endpoint base URL")
+    api_key_secret: str | None = Field(
+        default=None,
+        description="Team secret name used as the endpoint API key; never the secret value",
+    )
+    headers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Literal headers forwarded to the endpoint",
+    )
+    runtime_ids: list[CustomRuntimeID] = Field(
+        description="Complete desired list of IDs exposed by the endpoint"
+    )
+
+    @field_validator("runtime_ids")
+    @classmethod
+    def validate_unique_runtime_ids(
+        cls, runtime_ids: list[CustomRuntimeID]
+    ) -> list[CustomRuntimeID]:
+        seen_ids: set[str] = set()
+        for runtime_id in runtime_ids:
+            if runtime_id.id in seen_ids:
+                raise ValueError(f"duplicate runtime ID: {runtime_id.id}")
+            seen_ids.add(runtime_id.id)
+        return runtime_ids
+
+
+class CustomRuntimeApplyReq(CustomRuntimeApplyBody):
+    project_id: str
+    runtime_name: CustomRuntimeName
+    wb_user_id: str | None = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+    @model_validator(mode="after")
+    def validate_storage_name_length(self) -> Self:
+        for runtime_id in self.runtime_ids:
+            if len(f"{self.runtime_name}/{runtime_id.id}") > MAX_OBJECT_NAME_LENGTH:
+                raise InvalidRequest(
+                    f"Runtime name and ID together cannot exceed "
+                    f"{MAX_OBJECT_NAME_LENGTH} characters"
+                )
+        return self
+
+
+class CustomRuntimeIDRes(CustomRuntimeID):
+    playground_id: str
+
+
+class CustomRuntimeApplyRes(BaseModelStrict):
+    name: str = Field(description="Stable custom runtime name")
+    base_url: str
+    api_key_secret: str | None
+    headers: dict[str, str]
+    runtime_ids: list[CustomRuntimeIDRes]
 
 
 class ScorerCreateBody(BaseModel):
@@ -3738,6 +3833,11 @@ class ObjectInterface(Protocol):
     def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetReadRes]: ...
     def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes: ...
 
+    # Custom Runtimes
+    def custom_runtime_apply(
+        self, req: CustomRuntimeApplyReq
+    ) -> CustomRuntimeApplyRes: ...
+
     # Scorers
     def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes: ...
     def scorer_read(self, req: ScorerReadReq) -> ScorerReadRes: ...
@@ -3820,7 +3920,7 @@ Token metrics are extracted from summary.usage[model]:
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
 - cache_read_input_tokens: Tokens read from prompt cache (all providers)
-- cache_creation_input_tokens: Tokens used to create prompt cache (Anthropic)
+- cache_creation_input_tokens: Tokens used to create prompt cache (all providers)
 
 Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices.
 Cache tokens are subtracted from input before applying the prompt rate (they are billed

@@ -19,6 +19,7 @@ import type {
   CallSchema,
   CallsQueryReq,
   CallsFilter,
+  CustomRuntimeApplyRes,
   EndedCallSchemaForInsert,
   Query,
   SortBy,
@@ -36,8 +37,11 @@ import {
   DEFAULT_AUDIO_TYPE,
   DEFAULT_IMAGE_TYPE,
   type ImageType,
+  imageTypeFromFileName,
   isWeaveAudio,
   isWeaveImage,
+  weaveAudio,
+  weaveImage,
 } from './media';
 import {
   type Op,
@@ -64,6 +68,22 @@ const WEAVE_ERRORS_LOG_FNAME = 'weaveErrors.log';
 const DEFAULT_GET_CALLS_LIMIT = 1000;
 
 export type Response<T> = HttpResponse<T, HTTPValidationError>;
+
+export interface CustomRuntimeId {
+  id: string;
+  maxTokens?: number;
+}
+
+export interface RegisterCustomRuntimeOptions {
+  name: string;
+  baseUrl: string;
+  /** Complete desired list; omitted IDs are removed from an existing runtime. */
+  runtimeIds: ReadonlyArray<string | CustomRuntimeId>;
+  apiKeySecret?: string;
+  headers?: Readonly<Record<string, string>>;
+}
+
+export type RegisterCustomRuntimeResult = CustomRuntimeApplyRes;
 
 /**
  * Serialized representation of a file blob stored in the Weave content store.
@@ -445,6 +465,27 @@ type CompletedCallParams = StartedCallSchemaForInsert & {
 // We count characters item by item, and try to limit batches to about this size.
 const MAX_BATCH_SIZE_CHARS = 10 * 1024 * 1024;
 
+// A plain object's prototype is `Object.prototype`, whose own prototype is
+// null. Anything with a deeper chain than that is an instance of some class.
+// Checked this way rather than comparing against `Object.prototype` directly so
+// objects built in another realm (a `vm` context, a worker) still count as
+// plain.
+function isPlainObject(val: object): boolean {
+  const proto = Object.getPrototypeOf(val);
+  return proto === null || Object.getPrototypeOf(proto) === null;
+}
+
+// An instance of a class we do not own. Call inputs record these as an opaque
+// type marker rather than expanding them.
+function isUnownedInstance(val: unknown): boolean {
+  return (
+    typeof val === 'object' &&
+    val !== null &&
+    !Array.isArray(val) &&
+    !isPlainObject(val)
+  );
+}
+
 // Whether the call is part of an evaluation: root by op-name substring (op_name
 // is a ref URI), children by the attribute marker.
 function isEvalCall(call: InternalCall): boolean {
@@ -490,6 +531,28 @@ export class WeaveClient {
     this.projectId = projectId;
     this.settings = makeSettings(settings);
     this.useCallsComplete = this.settings.useCallsComplete;
+  }
+
+  /** Register a custom runtime, replacing its complete configuration if it exists. */
+  public registerCustomRuntime(
+    options: RegisterCustomRuntimeOptions
+  ): Promise<Response<RegisterCustomRuntimeResult>> {
+    const [entity, project] = this.projectId.split('/');
+    return this.traceServerApi.v2.customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut(
+      entity,
+      project,
+      options.name,
+      {
+        base_url: options.baseUrl,
+        api_key_secret: options.apiKeySecret,
+        headers: {...(options.headers ?? {})},
+        runtime_ids: options.runtimeIds.map(runtimeId =>
+          typeof runtimeId === 'string'
+            ? {id: runtimeId}
+            : {id: runtimeId.id, max_tokens: runtimeId.maxTokens}
+        ),
+      }
+    );
   }
 
   /**
@@ -1347,40 +1410,43 @@ export class WeaveClient {
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;
       if (typeName == 'PIL.Image.Image') {
-        const loadedFiles: {[key: string]: Buffer} = {};
-        for (const [name, digest] of Object.entries(val.files)) {
-          try {
-            const fileContent =
-              await this.traceServerApi.file.fileContentFileContentPost({
-                project_id: this.projectId,
-                digest: digest as string,
-              });
-            loadedFiles[name] = fileContent.data?.content;
-          } catch (error) {
-            console.error('Error loading file:', error);
-          }
+        const files: Record<string, string | undefined> = val.files ?? {};
+        const [fileName] = Object.keys(files);
+        const digest = files[fileName];
+        if (digest == null) {
+          throw new Error(`No image file stored for ref uri: ${ref.uri()}`);
         }
-        // TODO: Implement getting img back as buffer
-        return 'Coming soon!';
+        return weaveImage({
+          data: await this.downloadFile(ref, digest),
+          imageType: imageTypeFromFileName(fileName),
+        });
       } else if (typeName == 'wave.Wave_read') {
-        const loadedFiles: {[key: string]: Buffer} = {};
-        for (const [name, digest] of Object.entries(val.files)) {
-          try {
-            const fileContent =
-              await this.traceServerApi.file.fileContentFileContentPost({
-                project_id: this.projectId,
-                digest: digest as string,
-              });
-            loadedFiles[name] = fileContent.data?.content;
-          } catch (error) {
-            console.error('Error loading file:', error);
-          }
+        const files: Record<string, string | undefined> = val.files ?? {};
+        // Every writer of this type stores one file, never a _metadata.json.
+        const [digest] = Object.values(files);
+        if (digest == null) {
+          throw new Error(`No audio file stored for ref uri: ${ref.uri()}`);
         }
-        // TODO: Implement getting audio back as buffer
-        return 'Coming soon!';
+        return weaveAudio({data: await this.downloadFile(ref, digest)});
+      } else if (typeName == 'datetime.datetime') {
+        return new Date(val.val);
       }
     }
     return val;
+  }
+
+  // Reads from the project the ref points at, not the one this client is on.
+  private async downloadFile(ref: ObjectRef, digest: string): Promise<Buffer> {
+    const fileContent =
+      await this.traceServerApi.file.fileContentFileContentPost(
+        {project_id: ref.projectId, digest},
+        // The endpoint streams the file, so the body is not JSON.
+        {format: 'arrayBuffer'}
+      );
+    if (fileContent.data == null) {
+      throw new Error(`Unable to download file for ref uri: ${ref.uri()}`);
+    }
+    return Buffer.from(fileContent.data);
   }
 
   private async resolveRegistryPromptRef(
@@ -1572,10 +1638,18 @@ export class WeaveClient {
    * This function must be synchronous, so that code that does ref-tracking
    * (currently only Dataset/DatasetRow in the js client) has refs
    * available immediately.
+   *
+   * `stopAtUnownedInstances` has the same meaning as in `serializedVal`, and the
+   * two must agree: a ref saved under a value the serializer will not walk is
+   * uploaded and then never referenced.
    */
-  private saveWeaveValues(val: any, visited = new WeakSet()): void {
+  private saveWeaveValues(
+    val: any,
+    visited = new WeakSet(),
+    opts: {stopAtUnownedInstances?: boolean} = {}
+  ): void {
     if (Array.isArray(val)) {
-      val.map(item => this.saveWeaveValues(item, visited));
+      val.map(item => this.saveWeaveValues(item, visited, opts));
     } else if (val != null && val.__savedRef) {
       return;
     } else if (val instanceof WeaveObject) {
@@ -1589,6 +1663,10 @@ export class WeaveClient {
     } else if (isOp(val)) {
       this.saveOp(val);
     } else if (typeof val === 'object' && val !== null) {
+      if (opts.stopAtUnownedInstances && isUnownedInstance(val)) {
+        return;
+      }
+
       // Detect circular references
       if (visited.has(val)) {
         return;
@@ -1596,7 +1674,7 @@ export class WeaveClient {
       visited.add(val);
 
       for (const [_key, value] of Object.entries(val)) {
-        this.saveWeaveValues(value, visited);
+        this.saveWeaveValues(value, visited, opts);
       }
     }
   }
@@ -1677,11 +1755,18 @@ export class WeaveClient {
    *
    * This function is asynchronous, and must be called after saveWeaveValues
    * has been called on the value.
+   *
+   * With `stopAtUnownedInstances`, instances of classes we do not own are recorded
+   * as an opaque type marker rather than walked.
    */
-  private async serializedVal(val: any, visited = new WeakSet()): Promise<any> {
+  private async serializedVal(
+    val: any,
+    visited = new WeakSet(),
+    opts: {stopAtUnownedInstances?: boolean} = {}
+  ): Promise<any> {
     if (Array.isArray(val)) {
       return Promise.all(
-        val.map(async item => this.serializedVal(item, visited))
+        val.map(async item => this.serializedVal(item, visited, opts))
       );
     } else if (val != null && val.__savedRef) {
       return (await val.__savedRef).uri();
@@ -1696,6 +1781,14 @@ export class WeaveClient {
     } else if (isOp(val)) {
       throw new Error('Programming error: Op not saved');
     } else if (typeof val === 'object' && val !== null) {
+      // Matches the Python SDK, which records a string for instances it does
+      // not recognise. Only call inputs opt in: provider SDKs hand back their
+      // responses as class instances, so an output has to keep the full walk.
+      if (opts.stopAtUnownedInstances && isUnownedInstance(val)) {
+        const className = Object.getPrototypeOf(val).constructor?.name;
+        return `<${className || 'anonymous'}>`;
+      }
+
       // Detect circular references
       if (visited.has(val)) {
         return '[Circular]';
@@ -1704,7 +1797,7 @@ export class WeaveClient {
 
       const result: {[key: string]: any} = {};
       for (const [key, value] of Object.entries(val)) {
-        result[key] = await this.serializedVal(value, visited);
+        result[key] = await this.serializedVal(value, visited, opts);
       }
       return result;
     } else {
@@ -1826,7 +1919,11 @@ export class WeaveClient {
       inputs['self'] = thisArg;
     }
     if (parameterNames === 'useParam0Object') {
-      inputs = {...inputs, ...params[0]};
+      // Spreading an instance would lift its fields into the inputs before the
+      // serializer sees it, so record it under a name instead.
+      inputs = isUnownedInstance(params[0])
+        ? {...inputs, arg0: params[0]}
+        : {...inputs, ...params[0]};
     } else if (parameterNames) {
       params.forEach((arg, index) => {
         inputs[parameterNames[index]] = arg;
@@ -1836,8 +1933,9 @@ export class WeaveClient {
         inputs[`arg${index}`] = arg;
       });
     }
-    this.saveWeaveValues(inputs);
-    return await this.serializedVal(inputs);
+    const opts = {stopAtUnownedInstances: true};
+    this.saveWeaveValues(inputs, new WeakSet(), opts);
+    return await this.serializedVal(inputs, new WeakSet(), opts);
   }
 
   public async saveOp(

@@ -20,6 +20,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     build_calls_complete_update_query,
     build_calls_stats_query,
     get_field_by_name,
+    process_query_to_conditions,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
 from weave.trace_server.errors import InvalidFieldError
@@ -73,6 +74,32 @@ def test_query_baseline(read_table: ReadTable, expected_table: str) -> None:
             expected_query,
             {"pb_0": SENTINEL_EPOCH, "pb_1": "project"},
         )
+
+
+def test_query_size_operand() -> None:
+    query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$gt": [
+                    {"$size": {"$getField": "op_name"}},
+                    {"$literal": 0},
+                ]
+            }
+        }
+    )
+    param_builder = ParamBuilder("test")
+
+    result = process_query_to_conditions(
+        query,
+        param_builder,
+        "calls_complete",
+        use_agg_fn=False,
+        read_table=ReadTable.CALLS_COMPLETE,
+    )
+
+    assert result.conditions == ["(length(calls_complete.op_name) > {test_0:Int64})"]
+    assert [field.field for field in result.fields_used] == ["op_name"]
+    assert param_builder.get_params() == {"test_0": 0}
 
 
 def test_query_light_column() -> None:
@@ -2267,6 +2294,107 @@ def test_storage_size_fields():
                 AND ((NOT ((any(calls_merged.op_name) IS NULL)))))
         """,
         {"pb_0": "test/project"},
+    )
+
+
+def test_selecting_storage_size_fields_enables_required_joins() -> None:
+    """Storage pseudo-columns must activate the joins that materialize them."""
+    # Reproduce the prod calls_complete two-pass query: the column is projected
+    # directly without the redundant include_storage_size request flag.
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("attributes")
+    cq.add_field("storage_size_bytes")
+    cq.add_order("started_at", "asc")
+    cq.set_limit(1000)
+
+    assert cq.include_storage_size is True
+    assert_sql(
+        cq,
+        """
+        WITH filtered_calls AS (
+            SELECT calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_1:String}
+            WHERE 1
+                AND (calls_complete.deleted_at = {pb_0:DateTime64(3)})
+            ORDER BY calls_complete.started_at ASC
+            LIMIT 1000
+        )
+        SELECT
+            calls_complete.id AS id,
+            calls_complete.attributes_dump AS attributes_dump,
+            storage_size_tbl.storage_size_bytes AS storage_size_bytes
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT
+                id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_size_bytes, 0)) AS storage_size_bytes
+            FROM calls_complete_stats
+            WHERE project_id = {pb_1:String}
+            GROUP BY id
+        ) AS storage_size_tbl
+        ON calls_complete.id = storage_size_tbl.id
+        PREWHERE calls_complete.project_id = {pb_1:String}
+        WHERE (calls_complete.id IN filtered_calls)
+        ORDER BY calls_complete.started_at ASC
+        """,
+        {"pb_0": SENTINEL_EPOCH, "pb_1": "project"},
+    )
+
+    # The trace-level pseudo-column has the same field-to-join contract.
+    cq = CallsQuery(project_id="project", read_table=ReadTable.CALLS_COMPLETE)
+    cq.add_field("id")
+    cq.add_field("total_storage_size_bytes")
+
+    assert cq.include_total_storage_size is True
+    assert_sql(
+        cq,
+        """
+        WITH storage_scope_ids AS (
+            SELECT calls_complete.id AS id
+            FROM calls_complete
+            PREWHERE calls_complete.project_id = {pb_1:String}
+            WHERE 1
+                AND (calls_complete.deleted_at = {pb_0:DateTime64(3)}))
+        SELECT
+            calls_complete.id AS id,
+            CASE
+                WHEN calls_complete.parent_id = {pb_2:String}
+                THEN rolled_up_cms.total_storage_size_bytes
+                ELSE NULL
+            END AS total_storage_size_bytes
+        FROM calls_complete
+        LEFT JOIN (
+            SELECT
+                trace_id,
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0) + COALESCE(otel_size_bytes, 0)) AS total_storage_size_bytes
+            FROM calls_complete_stats
+            WHERE project_id = {pb_1:String}
+                AND id IN (
+                    SELECT id
+                    FROM calls_complete
+                    WHERE project_id = {pb_1:String}
+                        AND trace_id IN (
+                            SELECT trace_id
+                            FROM calls_complete
+                            WHERE project_id = {pb_1:String}
+                                AND id IN storage_scope_ids
+                        )
+                )
+            GROUP BY trace_id
+        ) AS rolled_up_cms
+        ON calls_complete.trace_id = rolled_up_cms.trace_id
+        PREWHERE calls_complete.project_id = {pb_1:String}
+        WHERE 1
+            AND (calls_complete.deleted_at = {pb_3:DateTime64(3)})
+        """,
+        {
+            "pb_0": SENTINEL_EPOCH,
+            "pb_1": "project",
+            "pb_2": "",
+            "pb_3": SENTINEL_EPOCH,
+        },
     )
 
 

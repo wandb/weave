@@ -20,6 +20,7 @@ from weave.trace_server.agents.constants import (
     MAX_CUSTOM_ATTR_VALUE_CHARS,
     MAX_CUSTOM_ATTRS_PER_SPAN,
 )
+from weave.trace_server.agents.error_details import exception_event_details
 from weave.trace_server.agents.schema import (
     AgentSpanCHInsertable,
     NormalizedMessage,
@@ -28,6 +29,7 @@ from weave.trace_server.base64_content_conversion import (
     replace_base64_in_raw_messages,
     replace_base64_with_content_objects,
 )
+from weave.trace_server.credential_redaction import redact_sensitive_keys
 from weave.trace_server.opentelemetry.helpers import (
     _set_value_in_nested_dict,
     get_attribute,
@@ -466,6 +468,34 @@ def _flatten_attrs(attrs: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 
 
 # ---------------------------------------------------------------------------
+# Credential redaction
+# ---------------------------------------------------------------------------
+
+
+def redact_credentials_from_span(span: Span) -> None:
+    """Replace credential-shaped values in a span's client-authored attributes.
+
+    Replaces values in all four attribute containers a span carries -- its own,
+    its resource's, its events' and its links' -- because ``span.as_dict()`` keeps
+    every one of them in ``raw_span_dump``, and the attribute-derived columns read
+    the same values. That includes the output ones, so a credential-shaped name
+    inside a structured output is replaced too.
+
+    Runs before ``strip_inline_blobs_from_span``, not after: that step replaces a
+    long base64-shaped value with a ref, so this pass has to see the value while
+    it is still inline. Runs outside the caller's file-storage guard as well --
+    the blob strip needs a trace server, this does not.
+    """
+    span.attributes = redact_sensitive_keys(span.attributes)
+    if span.resource is not None:
+        span.resource.attributes = redact_sensitive_keys(span.resource.attributes)
+    for event in span.events:
+        event.attributes = redact_sensitive_keys(event.attributes)
+    for link in span.links:
+        link.attributes = redact_sensitive_keys(link.attributes)
+
+
+# ---------------------------------------------------------------------------
 # Inline blob stripping
 # ---------------------------------------------------------------------------
 
@@ -583,6 +613,9 @@ def extract_genai_span(
     reasoning_t = extract_reasoning_tokens(attrs)
 
     status_code = span.status.code.name
+    event_error_type, event_status_message = (
+        exception_event_details(events_dicts) if status_code == "ERROR" else ("", "")
+    )
 
     raw_output = _extract_raw_output(attrs, events_dicts)
     raw_input = _extract_raw_input(attrs)
@@ -601,7 +634,7 @@ def extract_genai_span(
         started_at=span.start_time,
         ended_at=span.end_time,
         status_code=status_code,
-        status_message=span.status.message or "",
+        status_message=span.status.message or event_status_message,
         operation_name=extract_operation_name(attrs, span.name),
         provider_name=extract_provider(attrs),
         agent_name=extract_agent_name(attrs, span.name),
@@ -619,6 +652,8 @@ def extract_genai_span(
             attrs, *semconv.EVAL_TRIAL_INDEX.lookup_keys, default=-1
         ),
         eval_evaluation_name=_get_str(attrs, *semconv.EVAL_EVALUATION_NAME.lookup_keys),
+        parent_call_id=_get_str(attrs, *semconv.PARENT_CALL_ID.lookup_keys),
+        parent_call_trace_id=_get_str(attrs, *semconv.PARENT_CALL_TRACE_ID.lookup_keys),
         request_model=_get_str(attrs, *semconv.REQUEST_MODEL.lookup_keys),
         response_model=_get_str(attrs, *semconv.RESPONSE_MODEL.lookup_keys),
         response_id=_get_str(attrs, *semconv.RESPONSE_ID.lookup_keys),
@@ -640,7 +675,9 @@ def extract_genai_span(
         tool_description=_get_str(attrs, *semconv.TOOL_DESCRIPTION.lookup_keys),
         tool_definitions=_json_str(_get(attrs, *semconv.TOOL_DEFINITIONS.lookup_keys)),
         finish_reasons=extract_finish_reasons(attrs),
-        error_type=_get_str(attrs, *semconv.ERROR_TYPE.lookup_keys),
+        error_type=(
+            _get_str(attrs, *semconv.ERROR_TYPE.lookup_keys) or event_error_type
+        ),
         request_temperature=safe_float(
             _get(attrs, *semconv.REQUEST_TEMPERATURE.lookup_keys)
         ),

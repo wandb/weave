@@ -1,15 +1,21 @@
 from dataclasses import dataclass, field
+from functools import partial
 from unittest.mock import Mock
 
 import pytest
 
 import weave
 from weave.integrations.openai.openai_sdk import (
+    _normalize_openai_cache_tokens,
     create_wrapper_async,
     create_wrapper_sync,
+    openai_on_finish,
     openai_on_input_handler,
+    serverless_inference_call_display_name,
 )
 from weave.trace.autopatch import OpSettings
+from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import CallsFilter, CostCreateReq
 
 
 @dataclass
@@ -33,6 +39,243 @@ class NonCompletion:
 
     def __init__(self):
         self.data = "not a completion"
+
+
+def test_normalize_openai_responses_cache_tokens() -> None:
+    usage = {
+        "input_tokens": 100,
+        "input_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "output_tokens": 10,
+        "total_tokens": 110,
+    }
+
+    _normalize_openai_cache_tokens(usage)
+
+    assert usage == {
+        "input_tokens": 100,
+        "input_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 30,
+        },
+        "output_tokens": 10,
+        "total_tokens": 110,
+        "cache_read_input_tokens": 20,
+        "cache_creation_input_tokens": 30,
+    }
+
+
+def test_normalize_openai_chat_completions_cache_tokens() -> None:
+    usage = {
+        "prompt_tokens": 100,
+        "prompt_tokens_details": {
+            "cache_write_tokens": 30,
+        },
+        "completion_tokens": 10,
+        "total_tokens": 110,
+    }
+
+    _normalize_openai_cache_tokens(usage)
+
+    assert usage == {
+        "prompt_tokens": 100,
+        "prompt_tokens_details": {
+            "cache_write_tokens": 30,
+        },
+        "completion_tokens": 10,
+        "total_tokens": 110,
+        "cache_creation_input_tokens": 30,
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "op_name",
+        "input_tokens_key",
+        "input_tokens_details_key",
+        "output_tokens_key",
+    ),
+    [
+        pytest.param(
+            "openai.responses.create",
+            "input_tokens",
+            "input_tokens_details",
+            "output_tokens",
+            id="responses",
+        ),
+        pytest.param(
+            "openai.chat.completions.create",
+            "prompt_tokens",
+            "prompt_tokens_details",
+            "completion_tokens",
+            id="chat-completions",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "model",
+        "cache_write_tokens",
+        "cache_creation_input_token_cost",
+    ),
+    [
+        pytest.param(
+            "gpt-5.5-cache-write-repro",
+            None,
+            0.0,
+            id="pre-5.6-no-write-field",
+        ),
+        pytest.param(
+            "gpt-5.6-cache-write-repro",
+            300_000,
+            6.25e-6,
+            id="gpt-5.6",
+        ),
+        pytest.param(
+            "future-openai-cache-write-repro",
+            300_000,
+            6.25e-6,
+            id="post-5.6-with-registry-rate",
+        ),
+    ],
+)
+def test_openai_cache_write_tokens_follow_model_pricing(
+    client: WeaveClient,
+    op_name: str,
+    input_tokens_key: str,
+    input_tokens_details_key: str,
+    output_tokens_key: str,
+    model: str,
+    cache_write_tokens: int | None,
+    cache_creation_input_token_cost: float,
+) -> None:
+    prompt_token_cost = 5e-6
+    completion_token_cost = 30e-6
+    cache_read_input_token_cost = 0.5e-6
+    client.server.cost_create(
+        CostCreateReq(
+            project_id=client.project_id,
+            costs={
+                model: {
+                    "prompt_token_cost": prompt_token_cost,
+                    "completion_token_cost": completion_token_cost,
+                    "cache_read_input_token_cost": cache_read_input_token_cost,
+                    "cache_creation_input_token_cost": cache_creation_input_token_cost,
+                    "provider_id": "openai",
+                }
+            },
+        )
+    )
+    input_tokens = 1_000_000
+    cached_tokens = 200_000
+    output_tokens = 100_000
+    input_tokens_details = {"cached_tokens": cached_tokens}
+    if cache_write_tokens is not None:
+        input_tokens_details["cache_write_tokens"] = cache_write_tokens
+    response = {
+        "id": f"resp_{model}",
+        "model": model,
+        "usage": {
+            input_tokens_key: input_tokens,
+            input_tokens_details_key: input_tokens_details,
+            output_tokens_key: output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        },
+    }
+
+    @weave.op(name=op_name)
+    def create_response() -> dict:
+        return response
+
+    create_response._set_on_finish_handler(openai_on_finish)
+    assert create_response() == response
+
+    call = next(iter(create_response.calls()))
+    expected_usage = {
+        "requests": 1,
+        input_tokens_key: input_tokens,
+        input_tokens_details_key: input_tokens_details,
+        output_tokens_key: output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+        "cache_read_input_tokens": cached_tokens,
+    }
+    if cache_write_tokens is not None:
+        expected_usage["cache_creation_input_tokens"] = cache_write_tokens
+    assert call.summary["usage"] == {model: expected_usage}
+
+    priced_calls = list(
+        client.get_calls(
+            filter=CallsFilter(call_ids=[call.id]),
+            include_costs=True,
+        )
+    )
+    assert len(priced_calls) == 1
+    cost = priced_calls[0].summary["weave"]["costs"][model]
+    assert {
+        "prompt_tokens": cost["prompt_tokens"],
+        "completion_tokens": cost["completion_tokens"],
+        "cache_read_input_tokens": cost["cache_read_input_tokens"],
+        "cache_creation_input_tokens": cost["cache_creation_input_tokens"],
+        "prompt_tokens_total_cost": cost["prompt_tokens_total_cost"],
+        "completion_tokens_total_cost": cost["completion_tokens_total_cost"],
+        "cache_read_input_tokens_total_cost": cost[
+            "cache_read_input_tokens_total_cost"
+        ],
+        "cache_creation_input_tokens_total_cost": cost[
+            "cache_creation_input_tokens_total_cost"
+        ],
+    } == {
+        "prompt_tokens": input_tokens,
+        "completion_tokens": output_tokens,
+        "cache_read_input_tokens": cached_tokens,
+        "cache_creation_input_tokens": cache_write_tokens or 0,
+        "prompt_tokens_total_cost": pytest.approx(
+            (input_tokens - cached_tokens - (cache_write_tokens or 0))
+            * prompt_token_cost
+        ),
+        "completion_tokens_total_cost": pytest.approx(
+            output_tokens * completion_token_cost
+        ),
+        "cache_read_input_tokens_total_cost": pytest.approx(
+            cached_tokens * cache_read_input_token_cost
+        ),
+        "cache_creation_input_tokens_total_cost": pytest.approx(
+            (cache_write_tokens or 0) * cache_creation_input_token_cost
+        ),
+    }
+
+
+def test_serverless_inference_call_display_name():
+    display_name = partial(
+        serverless_inference_call_display_name, "openai.chat.completions.create"
+    )
+
+    # W&B's OpenAI-compatible endpoint should show the actual provider and model.
+    call = Mock(
+        inputs={
+            "self": {"client": {"base_url": "https://api.inference.wandb.ai/v1/"}},
+            "model": "google/gemma-4-31B-it",
+        }
+    )
+    assert display_name(call) == "Serverless Inference: google/gemma-4-31B-it"
+
+    # Missing model metadata still identifies Serverless Inference accurately.
+    call.inputs = {
+        "self": {"client": {"base_url": "https://api.inference.wandb.ai/v1"}}
+    }
+    assert display_name(call) == "Serverless Inference"
+
+    # OpenAI and other compatible endpoints retain the integration's op label.
+    call.inputs = {
+        "self": {"client": {"base_url": "https://api.openai.com/v1/"}},
+        "model": "gpt-5",
+    }
+    assert display_name(call) == "openai.chat.completions.create"
+
+    call.inputs = {}
+    assert display_name(call) == "openai.chat.completions.create"
 
 
 def test_openai_on_input_handler_with_completion_instance():

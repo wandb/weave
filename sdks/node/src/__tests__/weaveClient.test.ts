@@ -74,6 +74,70 @@ describe('WeaveClient', () => {
     });
   });
 
+  describe('registerCustomRuntime', () => {
+    let register: jest.Mock;
+    let runtimeClient: WeaveClient;
+
+    beforeEach(() => {
+      register = jest.fn().mockResolvedValue({data: {name: 'support'}});
+      runtimeClient = new WeaveClient({
+        traceServerApi: {
+          v2: {
+            customRuntimeApplyV2EntityProjectRuntimesRuntimeNamePut: register,
+          },
+        } as any,
+        projectId: 'test-entity/test-project',
+      });
+    });
+
+    it('normalizes runtime IDs and registers the complete configuration', async () => {
+      const result = await runtimeClient.registerCustomRuntime({
+        name: 'support/agent',
+        baseUrl: 'https://agent.example/v1',
+        apiKeySecret: 'AGENT_API_KEY',
+        headers: {'X-Tenant-ID': 'customer-1'},
+        runtimeIds: ['support-v12', {id: 'support-canary', maxTokens: 8192}],
+      });
+
+      expect(register).toHaveBeenCalledWith(
+        'test-entity',
+        'test-project',
+        'support/agent',
+        {
+          base_url: 'https://agent.example/v1',
+          api_key_secret: 'AGENT_API_KEY',
+          headers: {'X-Tenant-ID': 'customer-1'},
+          runtime_ids: [
+            {id: 'support-v12'},
+            {id: 'support-canary', max_tokens: 8192},
+          ],
+        }
+      );
+      expect(result).toEqual({data: {name: 'support'}});
+    });
+
+    it('supports header authentication without an API key secret', async () => {
+      await runtimeClient.registerCustomRuntime({
+        name: 'support',
+        baseUrl: 'https://agent.example/v1',
+        headers: {Authorization: 'Custom token'},
+        runtimeIds: ['support-v12'],
+      });
+
+      expect(register).toHaveBeenCalledWith(
+        'test-entity',
+        'test-project',
+        'support',
+        {
+          base_url: 'https://agent.example/v1',
+          api_key_secret: undefined,
+          headers: {Authorization: 'Custom token'},
+          runtime_ids: [{id: 'support-v12'}],
+        }
+      );
+    });
+  });
+
   describe('getCalls', () => {
     it('should fetch and return calls with the legacy signature', async () => {
       const mockCalls = [

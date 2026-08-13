@@ -918,6 +918,8 @@ def is_object_ref_operand(
             return check_operand_recursive(op.contains_.input)
         elif isinstance(op, tsi_query.ConvertOperation):
             return check_operand_recursive(op.convert_.input)
+        elif isinstance(op, tsi_query.SizeOperation):
+            return check_operand_recursive(op.size_)
         return False
 
     return check_operand_recursive(operand)

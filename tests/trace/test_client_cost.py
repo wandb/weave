@@ -44,6 +44,39 @@ def test_cost_apis(client):
     cost_ids = res.ids
     assert len(cost_ids) == 4
 
+    # A matching cost in another project must never be returned.
+    other_project_id = f"{project_id}_{uuid.uuid4().hex}"
+    res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=other_project_id,
+            costs={
+                "foreign_project_model": {
+                    "prompt_token_cost": 50,
+                    "completion_token_cost": 100,
+                }
+            },
+            wb_user_id="VXNlcjo0NTI1NDQ=",
+        )
+    )
+    assert len(res.ids) == 1
+
+    res = client.server.cost_query(
+        tsi.CostQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "pricing_level_id"},
+                            {"$literal": other_project_id},
+                        ],
+                    }
+                }
+            ),
+        )
+    )
+    assert res.results == []
+
     # query costs by project
     req = tsi.CostQueryReq(
         project_id=project_id,
@@ -81,6 +114,8 @@ def test_cost_apis(client):
         prompt_token_cost=500,
         completion_token_cost=1000,
         effective_date=datetime.datetime(1998, 10, 3),
+        cache_read_input_token_cost=250,
+        cache_creation_input_token_cost=750,
     )
 
     assert len(res.ids) == 1
@@ -94,6 +129,9 @@ def test_cost_apis(client):
     else:
         assert res[1].effective_date.year == 2021
         assert res[0].effective_date.year == 1998
+    added_cost = next(cost for cost in res if cost.effective_date.year == 1998)
+    assert added_cost.cache_read_input_token_cost == 250
+    assert added_cost.cache_creation_input_token_cost == 750
 
     # query with limit and offset
     res = client.query_costs(llm_ids=["my_model_to_delete3"], limit=1)

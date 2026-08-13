@@ -148,6 +148,28 @@ def test_transform_external_field_to_internal_field():
     assert result[0] == "toString(JSON_VALUE(payload_dump, {pb_0:String}))"
     assert result[2] == {"payload_dump"}
 
+    # Qualified fields must preserve simple table aliases.
+    result = _transform_external_field_to_internal_field(
+        "f.id", all_columns=all_columns, json_columns=json_columns
+    )
+    assert result[0] == "f.id"
+    assert result[2] == {"f.id"}
+
+    # Reject malformed qualifiers and SQL expressions disguised as fields.
+    invalid_fields = [
+        ("(SELECT 'BENIGN_SQLI_PROBE') AS probe --.id", "Invalid table prefix"),
+        (".id", "Invalid table prefix"),
+        ("feedback.", "Unknown field"),
+        ("id.value) FROM system.one --", "Unknown field"),
+    ]
+    for invalid_field, error_match in invalid_fields:
+        with pytest.raises(ValueError, match=error_match):
+            _transform_external_field_to_internal_field(
+                invalid_field,
+                all_columns=all_columns,
+                json_columns=json_columns,
+            )
+
 
 def test_array_string_column_round_trip():
     table = Table("t", [Column("id", "string"), Column("tags", "array_string")])
@@ -174,6 +196,57 @@ def test_map_string_float_column_round_trip():
         "id": "a",
         "ratings": payload,
     }
+
+
+def test_select_query_collection_size_with_or():
+    table = Table(
+        "feedback",
+        [
+            Column("id", "string"),
+            Column("tags", "array_string"),
+            Column("ratings", "map_string_float"),
+        ],
+    )
+
+    query = tsi.Query.model_validate(
+        {
+            "$expr": {
+                "$or": [
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "tags"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                    {
+                        "$gt": [
+                            {"$size": {"$getField": "ratings"}},
+                            {"$literal": 0},
+                        ]
+                    },
+                ]
+            }
+        }
+    )
+    prepared = (
+        table.select()
+        .project_id("entity/project")
+        .where(query)
+        .prepare(ParamBuilder("test"))
+    )
+
+    assert (
+        prepared.sql
+        == """SELECT id, tags, ratings
+FROM feedback
+WHERE ((project_id = {project_id:String}) AND (((length(tags) > {test_1:Int64}) OR (length(ratings) > {test_2:Int64}))))"""
+    )
+    assert prepared.parameters == {
+        "project_id": "entity/project",
+        "test_1": 0,
+        "test_2": 0,
+    }
+    assert prepared.fields == ["id", "tags", "ratings"]
 
 
 def test_select_basic():

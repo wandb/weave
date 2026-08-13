@@ -910,6 +910,10 @@ class CallsQuery(BaseModel):
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
+        if name.field == "storage_size_bytes":
+            self.include_storage_size = True
+        elif name.field == "total_storage_size_bytes":
+            self.include_total_storage_size = True
         return self
 
     def add_condition(self, operand: "tsi_query.Operand") -> "CallsQuery":
@@ -2498,6 +2502,9 @@ def process_query_to_conditions(
         elif isinstance(operand, tsi_query.ConvertOperation):
             field = process_operand(operand.convert_.input)
             return clickhouse_cast(field, operand.convert_.to)
+        elif isinstance(operand, tsi_query.SizeOperation):
+            value = process_operand(operand.size_)
+            return f"length({value})"
         elif isinstance(
             operand,
             (

@@ -1264,6 +1264,7 @@ class TestErrorRecording:
         )
         assert chat_span.status.status_code == StatusCode.ERROR
         assert "LLM call failed" in chat_span.status.description
+        assert chat_span.attributes["error.type"] == "ValueError"
         assert len(chat_span.events) >= 1
         assert chat_span.events[0].name == "exception"
 
@@ -1417,6 +1418,7 @@ class TestLogTurn:
             agent_name="weather-bot",
             conversation_name="Weather Chat",
             messages=[Message(role="user", content="What's the weather?")],
+            output_messages=[Message(role="assistant", content="It is sunny.")],
             started_at=_ts(0),
             ended_at=_ts(3),
         )
@@ -1430,6 +1432,18 @@ class TestLogTurn:
         assert attrs["gen_ai.agent.name"] == "weather-bot"
         assert attrs["gen_ai.conversation.id"] == "convo-1"
         assert attrs["gen_ai.conversation.name"] == "Weather Chat"
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What's the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
+        ]
         assert sp.start_time == int(_ts(0).timestamp() * 1_000_000_000)
         assert sp.end_time == int(_ts(3).timestamp() * 1_000_000_000)
 
@@ -1853,6 +1867,8 @@ class TestLogConversation:
                     agent_description="A helpful bot",
                     agent_version="v2",
                     system_instructions=["You are a weather bot"],
+                    messages=[Message.user("What is the weather?")],
+                    output_messages=[Message.assistant("It is sunny.")],
                     started_at=_ts(0),
                     ended_at=_ts(1),
                 ),
@@ -1864,6 +1880,18 @@ class TestLogConversation:
         attrs = dict(turn_spans[0].attributes or {})
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
             {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What is the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
         ]
         assert attrs["gen_ai.agent.id"] == "agent-123"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
@@ -2198,17 +2226,22 @@ class TestTurnRecord:
 
     def test_partial_record_preserves_existing(self) -> None:
         """Fields not passed (None) keep their existing values."""
-        turn = Turn(agent_name="bot")
+        turn = Turn(
+            agent_name="bot",
+            output_messages=[Message.assistant("existing response")],
+        )
         turn.agent_id = "preset"
         turn.record(system_instructions=["You are a bot"])
         assert turn.agent_id == "preset"
         assert turn.agent_name == "bot"
+        assert turn.output_messages == [Message.assistant("existing response")]
         assert turn.system_instructions == ["You are a bot"]
 
     def test_sets_all_fields(self) -> None:
         turn = Turn()
         turn.record(
             messages=[Message.user("hi")],
+            output_messages=[Message.assistant("hello")],
             system_instructions=["sys"],
             agent_name="bot",
             model="gpt-4o",
@@ -2217,6 +2250,7 @@ class TestTurnRecord:
             agent_version="v1",
         )
         assert turn.messages == [Message.user("hi")]
+        assert turn.output_messages == [Message.assistant("hello")]
         assert turn.system_instructions == ["sys"]
         assert turn.agent_name == "bot"
         assert turn.model == "gpt-4o"
@@ -2235,6 +2269,8 @@ class TestTurnRecord:
         with Conversation(conversation_id="convo-turn-record") as s:
             with s.start_turn(agent_name="weather-bot") as turn:
                 turn.record(
+                    messages=[Message.user("What is the weather?")],
+                    output_messages=[Message.assistant("It is sunny.")],
                     system_instructions=["You are a weather bot"],
                     agent_id="agent-9",
                     agent_description="A helpful bot",
@@ -2247,6 +2283,18 @@ class TestTurnRecord:
         attrs = dict(turn_spans[0].attributes or {})
         assert json.loads(attrs["gen_ai.system_instructions"]) == [
             {"type": "text", "content": "You are a weather bot"},
+        ]
+        assert json.loads(attrs["gen_ai.input.messages"]) == [
+            {
+                "role": "user",
+                "parts": [{"type": "text", "content": "What is the weather?"}],
+            },
+        ]
+        assert json.loads(attrs["gen_ai.output.messages"]) == [
+            {
+                "role": "assistant",
+                "parts": [{"type": "text", "content": "It is sunny."}],
+            },
         ]
         assert attrs["gen_ai.agent.id"] == "agent-9"
         assert attrs["gen_ai.agent.description"] == "A helpful bot"
@@ -2271,6 +2319,12 @@ class TestSubAgentRecord:
             name="research-bot",
             model="gpt-4o-mini",
             system_instructions=["sys"],
+            input_messages=[Message.user("question")],
+            output_messages=[Message.assistant("answer")],
+            tool_name="Agent",
+            tool_call_id="toolu_1",
+            tool_call_arguments='{"prompt": "question"}',
+            tool_call_result="answer",
             agent_id="id-1",
             agent_description="desc",
             agent_version="v1",
@@ -2278,6 +2332,12 @@ class TestSubAgentRecord:
         assert sa.name == "research-bot"
         assert sa.model == "gpt-4o-mini"
         assert sa.system_instructions == ["sys"]
+        assert sa.input_messages == [Message.user("question")]
+        assert sa.output_messages == [Message.assistant("answer")]
+        assert sa.tool_name == "Agent"
+        assert sa.tool_call_id == "toolu_1"
+        assert sa.tool_call_arguments == '{"prompt": "question"}'
+        assert sa.tool_call_result == "answer"
         assert sa.agent_id == "id-1"
         assert sa.agent_description == "desc"
         assert sa.agent_version == "v1"
@@ -2346,13 +2406,14 @@ class TestUsageFromOpenAIResponses:
         assert "gen_ai.usage.output_tokens" not in attrs
         assert "gen_ai.usage.reasoning_tokens" not in attrs
         assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
 
     def test_full_usage_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
         usage = self._usage(
             input_tokens=10,
             output_tokens=20,
             output_tokens_details=self._details(reasoning_tokens=5),
-            input_tokens_details=self._details(cached_tokens=3),
+            input_tokens_details=self._details(cached_tokens=3, cache_write_tokens=7),
         )
         attrs = _emit_llm_with(
             otel_spans, usage=usage_from_openai_responses(self._resp(usage))
@@ -2361,6 +2422,7 @@ class TestUsageFromOpenAIResponses:
         assert attrs["gen_ai.usage.output_tokens"] == 20
         assert attrs["gen_ai.usage.reasoning_tokens"] == 5
         assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
+        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 7
 
     @pytest.mark.parametrize(
         (
@@ -2408,6 +2470,7 @@ class TestUsageFromOpenAIResponses:
             assert "gen_ai.usage.cache_read.input_tokens" not in attrs
         else:
             assert attrs["gen_ai.usage.cache_read.input_tokens"] == expected_cache
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
 
 
 class TestMessageFromOpenAIResponsesInput:

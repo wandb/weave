@@ -121,9 +121,20 @@ def get_weave_outputs(_: list[SpanEvent], attributes: dict[str, Any]) -> dict[st
     return parse_weave_values(attributes, OUTPUT_KEYS)
 
 
+# Read wandb.is_turn directly: parse_weave_values checks the conversation/session-id aliases first and drops a literal False
+def _explicit_is_turn(attributes: dict[str, Any]) -> bool | None:
+    value = get_attribute(attributes, "wandb.is_turn")
+    return value if isinstance(value, bool) else None
+
+
 # Custom attributes for weave to enable setting fields like wb_user_id otherwise unavailable in OTEL Traces
 def get_wandb_attributes(attributes: dict[str, Any]) -> dict[str, Any]:
-    return parse_weave_values(attributes, WB_KEYS)
+    result = parse_weave_values(attributes, WB_KEYS)
+    # An explicit Boolean wandb.is_turn overrides the conversation/session-id turn fallback
+    explicit_is_turn = _explicit_is_turn(attributes)
+    if explicit_is_turn is not None:
+        result["is_turn"] = explicit_is_turn
+    return result
 
 
 # Pass events here even though they are unused because some libraries put input in event attributes

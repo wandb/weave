@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+from weave.trace_server.agents.error_details import (
+    exception_event_details_from_span_dump,
+)
 from weave.trace_server.agents.schema import (
     ALL_SPAN_INSERT_COLUMNS,
     AgentSpanCHInsertable,
@@ -92,6 +95,14 @@ def normalize_span_row(d: dict[str, Any]) -> dict[str, Any]:
     Handles message tuple->dict conversion.
     """
     normalized_row = dict(d)
+    if normalized_row.get("status_code") == "ERROR":
+        event_error_type, event_status_message = exception_event_details_from_span_dump(
+            normalized_row.get("raw_span_dump")
+        )
+        if not normalized_row.get("error_type") and event_error_type:
+            normalized_row["error_type"] = event_error_type
+        if not normalized_row.get("status_message") and event_status_message:
+            normalized_row["status_message"] = event_status_message
     for key in ("input_messages", "output_messages"):
         msgs = normalized_row.get(key)
         if not msgs or not isinstance(msgs, list):
