@@ -56,6 +56,14 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
+### PyPI release publishing
+
+`uv build` resolves the unconstrained `hatchling` build requirement in an
+isolated environment. Keep the pinned `pypa/gh-action-pypi-publish` action new
+enough to validate the Core Metadata version emitted by current Hatchling; for
+example, Hatchling 1.32 emits Metadata 2.5, which requires the action's Twine 7
+and Packaging 26 stack rather than Twine 6.1 and Packaging 25.
+
 ### Codex Development (nox)
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`
@@ -85,6 +93,8 @@ for workload identity.
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
+
+Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
@@ -515,6 +525,17 @@ deterministic.
 - Built-in and API-key-authenticated custom providers use LiteLLM.
 - Custom runtimes without an API key use the OpenAI client directly so configured
   headers and unauthenticated endpoints do not receive a bearer header.
+- OpenAI Responses and Chat Completions report `cache_write_tokens` under
+  `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
+  Normalize either field when present instead of parsing model names. The
+  standard cost registry supplies each model's
+  `cache_creation_input_token_cost`. Because `input_tokens` and `prompt_tokens`
+  include `cached_tokens` and `cache_write_tokens`, an unmapped
+  `cache_write_tokens` value is billed at the Input rate instead of the rate for
+  cache writes.
+- The OpenAI CI shard runs with `-m trace_server`; usage-normalization coverage
+  must therefore come from client-backed pricing cases, not only standalone
+  unit tests in `tests/integrations/openai/test_openai_sdk.py`.
 
 ### Integration Testing
 
