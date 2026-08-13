@@ -187,6 +187,10 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "call_parts": "id",
     "spans": "trace_id",
     "messages": "trace_id",
+    # All insights APIs are project-scoped. Co-locate a project's vectors so
+    # nearest-neighbor search and clustering do not fan out across shards.
+    "intent_signatures": "project_id",
+    "failure_signatures": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
