@@ -1,4 +1,5 @@
 import {SpanKind, SpanStatusCode} from '@opentelemetry/api';
+import {ATTR_ERROR_TYPE} from '../../genai/semconv';
 import {Turn} from '../../genai/turn';
 
 import {
@@ -54,13 +55,58 @@ describe('Turn', () => {
     expect(getExporter().getFinishedSpans()).toHaveLength(1);
   });
 
-  it('records the error and sets ERROR status when end({ error }) is called', () => {
+  it('records an explicit error type and ERROR status at end()', () => {
     const turn = Turn.create({});
-    turn.end({error: new Error('boom')});
+    turn.end({error: new Error('429 from provider'), errorType: 'rate_limit'});
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.status.code).toBe(SpanStatusCode.ERROR);
-    expect(span.status.message).toBe('boom');
-    expect(span.events.some(e => e.name === 'exception')).toBe(true);
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('rate_limit');
+    expect(span.status).toEqual({
+      code: SpanStatusCode.ERROR,
+      message: '429 from provider',
+    });
+    expect(span.events.map(event => event.name)).toEqual(['exception']);
+  });
+
+  it('recordError() marks the span failed without ending it', () => {
+    const turn = Turn.create({});
+    const error = new TypeError('invalid response');
+    expect(turn.recordError(error)).toBe(turn);
+    turn.record({agentId: 'recorded-after-error'});
+    turn.end();
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('TypeError');
+    expect(span.attributes['gen_ai.agent.id']).toBe('recorded-after-error');
+    expect(span.status).toEqual({
+      code: SpanStatusCode.ERROR,
+      message: 'invalid response',
+    });
+    expect(span.events.map(event => event.name)).toEqual(['exception']);
+  });
+
+  it('errorType alone records a non-exception failure at end()', () => {
+    const turn = Turn.create({});
+    turn.end({errorType: 'cancelled'});
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('cancelled');
+    expect(span.status).toEqual({code: SpanStatusCode.ERROR});
+    expect(span.events).toEqual([]);
+  });
+
+  it('recordError() warns and is a no-op after end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const turn = Turn.create({});
+    turn.end();
+    turn.recordError(new Error('too late'), {errorType: 'late_error'});
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBeUndefined();
+    expect(span.status.code).not.toBe(SpanStatusCode.ERROR);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'weave.Turn.recordError() called after end() — data will not be recorded on the span.'
+    );
+    warnSpy.mockRestore();
   });
 
   it('record() updates fields, which are emitted at end()', () => {
