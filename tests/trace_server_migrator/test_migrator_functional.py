@@ -605,7 +605,6 @@ _INTENT_COLUMNS = [
     ("language", "LowCardinality(String)"),
     ("sentiment", "LowCardinality(String)"),
     ("sentiment_rationale", "String"),
-    ("sentiment_confidence", "Float32"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
     ("turn_trace_id", "String"),

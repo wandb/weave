@@ -49,6 +49,9 @@ $severity_definitions
   was proper or whether a policy was violated. Record the observable behavior, set severity from
   observable impact, and leave propriety to the reviewer.
 - Judge severity from impact on the user, not from how alarming the behavior sounds.
+- When a failure sits between two labels, take the lower one. `major` is the rare label: it needs a
+  turn the user would call wasted or misleading, not one that is merely imperfect. A shortfall the
+  user can see in the response and fix by saying so in the next turn is `minor`.
 - For `refusal` and `capability_gap`, severity reflects whether the user was left a path forward:
   `info` when the assistant offered an alternative or explained the limit, `minor` when it declined
   flatly. Never `major`, since without the product's policy you cannot show harm.

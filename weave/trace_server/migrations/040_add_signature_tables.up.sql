@@ -14,10 +14,8 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     category String,
     -- ISO 639-1 two-letter ('en', 'es'), or the ISO 639-2 'und' sentinel.
     language LowCardinality(String) DEFAULT 'und',
-    -- '' and -1 mean no usable sentiment came back from the judge, never the 'neutral' label.
-    sentiment LowCardinality(String) DEFAULT '',
+    sentiment LowCardinality(String) DEFAULT 'neutral',
     sentiment_rationale String DEFAULT '',
-    sentiment_confidence Float32 DEFAULT -1,
     vector Array(Float32),
 
     -- Denormalized span data
