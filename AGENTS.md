@@ -408,7 +408,9 @@ deterministic.
 - At a span's attribute limit OTel JS drops the *incoming* attribute, where
   Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
   halves of an overflowing set. The eval linker writes the pair eval results
-  match on before its display-only attributes for that reason.
+  match on before its display-only attributes for that reason, and the op linker
+  sits after it in the Node provider's array for the same reason. Registering the
+  two linkers in opposite order is how both SDKs end up keeping the same half.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.

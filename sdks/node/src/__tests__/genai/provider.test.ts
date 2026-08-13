@@ -13,17 +13,24 @@ import {
   shutdownWeaveTracerProvider,
 } from '../../genai/provider';
 import {WEAVE_RESOURCE_ATTR} from '../../genai/weaveResource';
+import {OpLinkSpanProcessor} from '../../opLinkSpanProcessor';
 import {packageVersion} from '../../utils/packageVersion';
 
 import {installFakeClient, setupGenAITestEnvironment} from './common';
 
-// No public API lists a provider's processors, and being in that list is the
-// eval linker's whole contract, so read the SDK's own array — same internals
-// coupling as exporterProjectId below, and the same TODO applies.
-function evalLinkProcessorCount(provider: BasicTracerProvider): number {
-  const registered = (provider as any)._registeredSpanProcessors ?? [];
-  return registered.filter((p: unknown) => p instanceof EvalLinkSpanProcessor)
-    .length;
+// The eval link writes before the op link because a span at its attribute limit
+// drops the incoming one, so both membership and order are the linkers'
+// contract. No public API lists a provider's processors, so read the SDK's own
+// array — same internals coupling as exporterProjectId below, and the same TODO
+// applies.
+const LINK_PROCESSOR_CLASSES = [EvalLinkSpanProcessor, OpLinkSpanProcessor];
+
+function linkProcessorClasses(provider: BasicTracerProvider): Function[] {
+  const registered: object[] =
+    (provider as any)._registeredSpanProcessors ?? [];
+  return registered
+    .filter(p => LINK_PROCESSOR_CLASSES.some(cls => p instanceof cls))
+    .map(p => p.constructor);
 }
 
 describe('otel/provider', () => {
@@ -66,10 +73,12 @@ describe('otel/provider', () => {
     });
   });
 
-  it('installs the eval link processor on a default-settings provider', () => {
+  it('installs the link processors, in order, on a default-settings provider', () => {
     installFakeClient();
     getWeaveTracer('weave-genai');
-    expect(evalLinkProcessorCount(getWeaveTracerProvider()!)).toBe(1);
+    expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
+      LINK_PROCESSOR_CLASSES
+    );
   });
 
   it('honors a user-supplied SpanProcessor and routes spans through it', async () => {
@@ -173,13 +182,15 @@ describe('otel/provider', () => {
       expect(exporterProjectId(getWeaveTracerProvider()!)).toBe('ent/B');
     });
 
-    it('reinstalls the eval link processor on the rebuilt provider', () => {
+    it('reinstalls the link processors on the rebuilt provider', () => {
       reinit('ent/A');
 
-      // The linker is added where the provider is built, so a rebuild has to
-      // pick it up again — registering it once from init() would not.
+      // The linkers are added where the provider is built, so a rebuild has to
+      // pick them up again — registering them once from init() would not.
       reinit('ent/B');
-      expect(evalLinkProcessorCount(getWeaveTracerProvider()!)).toBe(1);
+      expect(linkProcessorClasses(getWeaveTracerProvider()!)).toEqual(
+        LINK_PROCESSOR_CLASSES
+      );
     });
   });
 });
