@@ -523,6 +523,17 @@ deterministic.
 - Built-in and API-key-authenticated custom providers use LiteLLM.
 - Custom runtimes without an API key use the OpenAI client directly so configured
   headers and unauthenticated endpoints do not receive a bearer header.
+- OpenAI Responses and Chat Completions report `cache_write_tokens` under
+  `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
+  Normalize either field when present instead of parsing model names. The
+  standard cost registry supplies each model's
+  `cache_creation_input_token_cost`. Because `input_tokens` and `prompt_tokens`
+  include `cached_tokens` and `cache_write_tokens`, an unmapped
+  `cache_write_tokens` value is billed at the Input rate instead of the rate for
+  cache writes.
+- The OpenAI CI shard runs with `-m trace_server`; usage-normalization coverage
+  must therefore come from client-backed pricing cases, not only standalone
+  unit tests in `tests/integrations/openai/test_openai_sdk.py`.
 
 ### Integration Testing
 
