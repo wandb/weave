@@ -7,6 +7,7 @@ import pytest
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server import usage_utils
+from weave.trace_server.errors import InvalidRequest
 
 _REQUIRED_COST_FIELDS = (
     "prompt_tokens",
@@ -616,6 +617,7 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
         tsi.CallsUsageReq(
             project_id=project_id,
             call_ids=[root_id, root_id_two],
+            limit=3,
         )
     )
 
@@ -628,6 +630,15 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
     assert root_two_usage.prompt_tokens == 2
     assert root_two_usage.completion_tokens == 1
     assert root_two_usage.total_tokens == 3
+
+    with pytest.raises(InvalidRequest, match="exceeds the calls_usage limit"):
+        client.server.calls_usage(
+            tsi.CallsUsageReq(
+                project_id=project_id,
+                call_ids=[root_id, root_id_two],
+                limit=2,
+            )
+        )
 
 
 def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:

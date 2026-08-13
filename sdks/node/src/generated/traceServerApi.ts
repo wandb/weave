@@ -2342,9 +2342,8 @@ export type CallsUpsertCompleteRes = object;
  * This endpoint returns usage metrics for each requested root call, where each
  * root's metrics include the sum of its own usage plus all descendants' usage.
  *
- * Note: All matching calls are loaded into memory for aggregation. For very large
- * result sets (>10k calls), consider batching root call IDs or using narrower
- * filters at the application layer.
+ * Note: Matching calls are loaded into memory for aggregation. The per-trace
+ * limit prevents any one trace from creating an unbounded result set.
  */
 export interface CallsUsageReq {
   /** Project Id */
@@ -2362,7 +2361,7 @@ export interface CallsUsageReq {
   include_costs?: boolean;
   /**
    * Limit
-   * Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.
+   * Maximum number of calls to process per trace. Acts as a safety limit to prevent unbounded memory usage.
    * @default 10000
    */
   limit?: number;
