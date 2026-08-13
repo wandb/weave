@@ -53,6 +53,11 @@ from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
+from weave.shared.otel_span_attrs import (
+    PARENT_CALL_ID_SPAN_ATTR,
+    PARENT_CALL_TRACE_ID_SPAN_ATTR,
+)
+from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
@@ -1417,3 +1422,43 @@ async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
         "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
         "span_id": otel_trace.format_span_id(span_ctx.span_id),
     }
+
+
+def test_agents_spans_link_to_enclosing_op_call(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """Agents spans start inline in the caller's stack, so an agent run wrapped
+    in a @weave.op links back to that call.
+    """
+    otel_trace.get_tracer_provider().add_span_processor(OpLinkSpanProcessor())
+
+    @weave.op
+    def orchestrate() -> None:
+        processor = WeaveOtelTracingProcessor()
+        trace = Mock(spec=Trace)
+        trace.trace_id = "trace_link"
+        trace.name = "wf"
+        trace.group_id = None
+        processor.on_trace_start(trace)
+
+        agent_span = Mock(spec=Span)
+        agent_span.trace_id = "trace_link"
+        agent_span.span_id = "span_link"
+        agent_span.parent_id = None
+        agent_span.span_data = AgentSpanData(name="Bot")
+        agent_span.started_at = None
+        agent_span.ended_at = None
+        agent_span.error = None
+        processor.on_span_start(agent_span)
+        processor.on_span_end(agent_span)
+        processor.on_trace_end(trace)
+
+    orchestrate()
+
+    call = next(iter(orchestrate.calls()))
+    agent = next(
+        s for s in otel_spans.get_finished_spans() if s.name == "invoke_agent Bot"
+    )
+    attrs = _attrs(agent)
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id

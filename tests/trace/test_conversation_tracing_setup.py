@@ -14,9 +14,12 @@ import logging
 import pytest
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.util._once import Once
 
+from weave.evaluation.otel_eval_linker import EvalLinkSpanProcessor
 from weave.trace import weave_init
+from weave.trace.otel_op_linker import OpLinkSpanProcessor
 
 
 @pytest.fixture(autouse=True)
@@ -161,3 +164,24 @@ def test_conversation_tracing_leaves_foreign_provider_untouched(
     assert otel_trace.get_tracer_provider() is user_provider
     assert weave_init._conversation_span_exporter is None
     assert weave_init._conversation_tracer_provider is None
+
+
+def test_conversation_tracing_installs_both_link_processors():
+    """The eval and op link processors ride the provider weave installs.
+
+    Every linking test builds its own provider by hand, so this is the only
+    place that proves the processors are attached in production. The order is
+    load-bearing: processors write attributes in registration order and OTel
+    evicts the oldest first, so the op link must precede the eval link to keep
+    a crowded span from dropping eval metadata.
+    """
+    weave_init._setup_conversation_tracing("ent", "proj-a", "sekret")
+
+    provider = weave_init._conversation_tracer_provider
+    assert provider is not None
+    processors = provider._active_span_processor._span_processors
+    assert [type(p) for p in processors] == [
+        BatchSpanProcessor,
+        OpLinkSpanProcessor,
+        EvalLinkSpanProcessor,
+    ]

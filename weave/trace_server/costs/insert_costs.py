@@ -76,7 +76,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             cache_read_input_token_cost = cost.get("cache_read_input", 0)
             cache_creation_input_token_cost = cost.get("cache_creation_input", 0)
             date_str = cost.get(
-                "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "created_at",
+                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
             created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
                 tzinfo=timezone.utc
