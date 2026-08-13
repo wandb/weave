@@ -55,7 +55,7 @@ function serializeToolValue(value: JsonValue | undefined): string | undefined {
  *   const result = await getWeather('Tokyo');
  *   tool.end({result});
  * } catch (error) {
- *   tool.end({error: error as Error, errorType: 'weather_error'});
+ *   tool.end({error: error as Error});
  *   throw error;
  * }
  */

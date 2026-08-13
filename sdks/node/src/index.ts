@@ -85,7 +85,6 @@ export type {
   MessagePart,
   Modality,
   Reasoning,
-  RecordErrorOptions,
   Role,
   SpanEndOptions,
   SubAgent,

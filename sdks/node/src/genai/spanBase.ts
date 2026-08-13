@@ -19,17 +19,13 @@ export interface SpanInitBase {
   startTime?: TimeInput;
 }
 
-export interface RecordErrorOptions {
-  errorType?: string;
-}
-
 /**
  * Options shared by every emitter's `end()`.
  *
- * `error` marks the span failed before ending it; `errorType` overrides its
- * name or marks a non-exception failure. `endTime` backdates the close.
+ * `error` marks the span failed before ending it, deriving `error.type` from
+ * `error.name`. `endTime` backdates the close.
  */
-export interface SpanEndOptions extends RecordErrorOptions {
+export interface SpanEndOptions {
   error?: Error;
   endTime?: TimeInput;
 }
@@ -73,11 +69,11 @@ export abstract class SpanBase {
 
   /**
    * Record a failure without ending the span. Later call `end()` without the
-   * same error; use `end({error, errorType})` when failure and close coincide.
+   * same error; use `end({error})` when failure and close coincide.
    */
-  recordError(error: Error, opts?: RecordErrorOptions): this {
+  recordError(error: Error): this {
     if (this._warnIfEnded('recordError')) return this;
-    this._recordError(error, opts);
+    this._recordError(error);
     return this;
   }
 
@@ -109,26 +105,21 @@ export abstract class SpanBase {
    */
   protected _closeSpan(opts?: SpanEndOptions): void {
     if (opts?.error) {
-      this._recordError(opts.error, opts);
-    } else if (opts?.errorType) {
-      this._setErrorStatus(opts.errorType);
+      this._recordError(opts.error);
     }
     this.span.end(opts?.endTime);
   }
 
-  private _recordError(error: Error, opts?: RecordErrorOptions): void {
-    const errorType =
-      opts?.errorType || error.name || error.constructor?.name || 'Error';
-    this._setErrorStatus(errorType, error.message);
-    this.span.recordException(error);
-  }
-
-  private _setErrorStatus(errorType: string, message?: string): void {
-    this.span.setAttribute(ATTR_ERROR_TYPE, errorType);
+  private _recordError(error: Error): void {
+    this.span.setAttribute(
+      ATTR_ERROR_TYPE,
+      error.name || error.constructor?.name || 'Error'
+    );
     this.span.setStatus({
       code: SpanStatusCode.ERROR,
-      ...(message ? {message} : {}),
+      ...(error.message ? {message: error.message} : {}),
     });
+    this.span.recordException(error);
   }
 
   /**

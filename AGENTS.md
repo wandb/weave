@@ -465,10 +465,10 @@ deterministic.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
 - Every TypeScript GenAI span handle supports
-  `recordError(error, {errorType})` to mark a failure without ending the span.
-  Terminal failures can pass the same optional low-cardinality `errorType` to
-  `end({error, errorType})`; after `recordError()`, close with `end()` without
-  passing the same error again.
+  `recordError(error)` to mark a failure without ending the span; terminal
+  failures can use `end({error})`. The SDK derives `error.type` from
+  `error.name`. After `recordError()`, close with `end()` without passing the
+  same error again.
 - `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
   `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
   belongs on child model spans.
@@ -479,7 +479,7 @@ deterministic.
   `tool_result`.
 - `Tool` accepts JSON-compatible arguments and results. It records strings
   as-is and serializes structured values for OTel attributes. Prefer
-  `Tool.end({result, error, errorType})`; mutable `Tool.result` remains only for
+  `Tool.end({result, error})`; mutable `Tool.result` remains only for
   backward compatibility.
 - Agent span list queries omit heavy message, tool-payload, and raw-span fields;
   use an `AgentSpansQueryReq` with `include_details=True` when validating stored

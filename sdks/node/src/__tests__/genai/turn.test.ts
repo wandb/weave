@@ -55,9 +55,11 @@ describe('Turn', () => {
     expect(getExporter().getFinishedSpans()).toHaveLength(1);
   });
 
-  it('records an explicit error type and ERROR status at end()', () => {
+  it('derives error type from error.name and sets ERROR status at end()', () => {
     const turn = Turn.create({});
-    turn.end({error: new Error('429 from provider'), errorType: 'rate_limit'});
+    const error = new Error('429 from provider');
+    error.name = 'rate_limit';
+    turn.end({error});
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(span.attributes[ATTR_ERROR_TYPE]).toBe('rate_limit');
     expect(span.status).toEqual({
@@ -84,21 +86,11 @@ describe('Turn', () => {
     expect(span.events.map(event => event.name)).toEqual(['exception']);
   });
 
-  it('errorType alone records a non-exception failure at end()', () => {
-    const turn = Turn.create({});
-    turn.end({errorType: 'cancelled'});
-
-    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('cancelled');
-    expect(span.status).toEqual({code: SpanStatusCode.ERROR});
-    expect(span.events).toEqual([]);
-  });
-
   it('recordError() warns and is a no-op after end()', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.end();
-    turn.recordError(new Error('too late'), {errorType: 'late_error'});
+    turn.recordError(new Error('too late'));
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(span.attributes[ATTR_ERROR_TYPE]).toBeUndefined();
