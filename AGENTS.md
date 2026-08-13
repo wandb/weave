@@ -77,7 +77,7 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
 
-Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
+Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core. During the submodule path migration, check wandb/core's `.gitmodules`: the path may be `services/weave-python/weave-public` or `services/weave-trace/weave-public`.
 
 ### Trace Server API / Node SDK Schema
 
