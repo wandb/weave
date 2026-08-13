@@ -2,6 +2,9 @@ from collections.abc import Callable
 
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
+from clickhouse_connect.driver.exceptions import (
+    StreamFailureError as CHStreamFailureError,
+)
 from gql.transport.exceptions import TransportServerError
 from pydantic import ValidationError
 
@@ -40,6 +43,16 @@ def test_transport_server_error_5xx_or_none_returns_500(code: int | None):
     exc = TransportServerError("Server error", code=code)
     result = handle_server_exception(exc)
     assert result.status_code == 500
+
+
+def test_clickhouse_stream_failure_returns_502() -> None:
+    """Mid-stream connection failures (clickhouse-connect >= 1.4) subclass
+    Exception, not DatabaseError, and must map to 502 like other CH faults.
+    """
+    exc = CHStreamFailureError("stream failed after first block")
+    result = handle_server_exception(exc)
+    assert result.status_code == 502
+    assert result.message == {"reason": "Temporary backend error"}
 
 
 def test_clickhouse_type_mismatch_returns_400() -> None:

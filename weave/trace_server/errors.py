@@ -392,12 +392,21 @@ class ErrorRegistry:
         from clickhouse_connect.driver.exceptions import (
             OperationalError as CHOperationalError,
         )
+        from clickhouse_connect.driver.exceptions import (
+            StreamFailureError as CHStreamFailureError,
+        )
 
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
         self.register(
             CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
+        )
+        # Subclasses Exception, not DatabaseError; raised on mid-stream
+        # connection failure (clickhouse-connect >= 1.4 raises instead of
+        # returning a silently truncated stream).
+        self.register(
+            CHStreamFailureError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
 
         # GraphQL transport errors
@@ -411,7 +420,7 @@ class ErrorRegistry:
 
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
-    global _error_registry  # noqa: PLW0603
+    global _error_registry  # ruff: ignore[global-statement]
     if _error_registry is None:
         _error_registry = ErrorRegistry()
     return _error_registry
