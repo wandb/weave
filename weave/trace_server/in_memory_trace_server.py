@@ -2540,11 +2540,16 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if granularity <= 0:
             granularity = 1
 
+        calls_filter = req.filter
+        include_otel_span_usage = bool(calls_filter and calls_filter.trace_roots_only)
+        if calls_filter is not None and calls_filter.trace_roots_only:
+            calls_filter = calls_filter.model_copy(update={"trace_roots_only": None})
+
         calls = list(
             self.calls_query_stream(
                 tsi.CallsQueryReq(
                     project_id=req.project_id,
-                    filter=req.filter,
+                    filter=calls_filter,
                 )
             )
         )
@@ -2556,6 +2561,22 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             and c.started_at >= req.start
             and c.started_at < end
         ]
+        usage_calls = calls
+        metric_calls = calls
+        if include_otel_span_usage:
+            # Use otel_dump, not caller-supplied attributes.otel_span, as OTEL source.
+            with self.lock:
+                otel_call_ids = {
+                    rec.id
+                    for rec in self._calls.values()
+                    if rec.project_id == req.project_id and rec.otel_dump is not None
+                }
+            usage_calls = [
+                call
+                for call in calls
+                if call.parent_id is None or call.id in otel_call_ids
+            ]
+            metric_calls = [call for call in calls if call.parent_id is None]
 
         token_keys_map: dict[str, list[str]] = {
             "input_tokens": ["prompt_tokens", "input_tokens"],
@@ -2577,7 +2598,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 tuple[str, str], dict[str, list[int]]
             ] = {}  # (ts, model) -> metric -> values
 
-            for call in calls:
+            for call in usage_calls:
                 if not call.summary or not isinstance(call.summary, dict):
                     continue
                 usage = call.summary.get("usage")
@@ -2614,7 +2635,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         if req.call_metrics:
             bucket_data: dict[str, dict[str, list[Any]]] = {}
 
-            for call in calls:
+            for call in metric_calls:
                 ts = _bucket_ts(call.started_at)
                 if ts not in bucket_data:
                     bucket_data[ts] = {}
