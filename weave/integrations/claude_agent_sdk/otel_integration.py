@@ -459,14 +459,9 @@ def _finish_task_notification(data: dict[str, Any], state: _TurnState) -> None:
         tool_call_result=summary,
     )
     if status:
-        attributes = {_TASK_STATUS_ATTRIBUTE: status}
-        if status in _TASK_ERROR_STATUSES:
-            attributes["error.type"] = f"claude_agent_sdk.task_{status}"
-        open_subagent.span.set_attributes(attributes)
+        open_subagent.span.set_attributes({_TASK_STATUS_ATTRIBUTE: status})
     if status in _TASK_ERROR_STATUSES:
-        open_subagent.span._record_otel_error(  # pyright: ignore[reportPrivateUsage]
-            RuntimeError(f"background subagent {status}")
-        )
+        open_subagent.span.record_error(RuntimeError(f"background subagent {status}"))
     open_subagent.span.end()
     del state.open_subagents[tool_use_id]
     _discard_task_mappings(tool_use_id, state)
@@ -595,7 +590,7 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
                     tool_call_result=result_text,
                 )
                 if block.is_error:
-                    open_subagent.span._record_otel_error(  # pyright: ignore[reportPrivateUsage]
+                    open_subagent.span.record_error(
                         RuntimeError("subagent reported an error")
                     )
                 open_subagent.span.end()
@@ -609,9 +604,7 @@ def _process_message(msg: Any, state: _TurnState) -> str | None:
             with open_tool:
                 open_tool.result = result_text
                 if block.is_error:
-                    open_tool._record_otel_error(  # pyright: ignore[reportPrivateUsage]
-                        RuntimeError("tool reported an error")
-                    )
+                    open_tool.record_error(RuntimeError("tool reported an error"))
         return None
 
     if isinstance(msg, ResultMessage):
@@ -644,9 +637,7 @@ def _finalize_turn(state: _TurnState) -> None:
         else None,
     )
     if state.is_error:
-        state.turn._record_otel_error(  # pyright: ignore[reportPrivateUsage]
-            RuntimeError(state.final_text or "agent run failed")
-        )
+        state.turn.record_error(RuntimeError(state.final_text or "agent run failed"))
 
 
 def _start_tracked_turn(

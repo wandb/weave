@@ -226,13 +226,6 @@ class _SpanBase(BaseModel):
             otel_context.detach(self._otel_token)
             self._otel_token = None
 
-    def _record_otel_error(self, exc_val: BaseException) -> None:
-        """Record an exception on the OTel span."""
-        if not _OTEL_AVAILABLE or self._otel_span is None:
-            return
-        self._otel_span.set_status(StatusCode.ERROR, str(exc_val))
-        self._otel_span.record_exception(exc_val)
-
     def _recording_span(self, operation: str, key: str | list[str]) -> _OTelSpan | None:
         """Return the OTel span if it's recording, else ``None``.
 
@@ -258,13 +251,25 @@ class _SpanBase(BaseModel):
             return None
         if not self._otel_span.is_recording():
             logger.warning(
-                "%s(%s) ignored: span already ended. Set attributes before "
+                "%s(%s) ignored: span already ended. Call it before "
                 "exiting `with` or calling .end().",
                 operation,
                 key_repr,
             )
             return None
         return self._otel_span
+
+    def record_error(self, error: BaseException) -> Self:
+        """Record a failure without ending the span; call ``end()`` when ready."""
+        if span := self._recording_span("record_error", type(error).__name__):
+            error_class = type(error)
+            error_type = error_class.__qualname__
+            if error_class.__module__ != "builtins":
+                error_type = f"{error_class.__module__}.{error_type}"
+            span.set_attribute("error.type", error_type)
+            span.set_status(StatusCode.ERROR, str(error))
+            span.record_exception(error)
+        return self
 
     def set_attributes(self, attributes: dict[str, Any]) -> Self:
         """Stamp arbitrary OTel attributes on this span.
@@ -438,7 +443,7 @@ class Tool(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -755,7 +760,7 @@ class LLM(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -1014,7 +1019,7 @@ class SubAgent(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
@@ -1278,7 +1283,7 @@ class Turn(_SpanBase):
         exc_tb: types.TracebackType | None,
     ) -> Literal[False]:
         if exc_val is not None:
-            self._record_otel_error(exc_val)
+            self.record_error(exc_val)
         self.end()
         return False
 
