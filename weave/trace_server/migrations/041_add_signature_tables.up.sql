@@ -2,8 +2,7 @@
 CREATE TABLE IF NOT EXISTS intent_signatures
 (
     project_id String,
-    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id,
-    -- re-extracting a turn mints a new id and is a new row.
+    -- Writer-minted uuidv7, so only a retry reusing this id collapses in the merge.
     id UUID DEFAULT generateUUIDv7(),
     -- Digest of insights/configs/intent.yaml
     config_sha LowCardinality(String),
@@ -22,8 +21,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     trace_id String,
     user_id String DEFAULT '',
     agent_name String DEFAULT '',
-    -- Whole-turn values copied onto every row of the turn's fan-out, so summing
-    -- them across rows multiplies by the fan-out.
+    -- Whole-turn values copied onto every fan-out row, so summing them overcounts.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
     trace_started_at DateTime64(6, 'UTC'),
@@ -46,8 +44,7 @@ SETTINGS min_bytes_for_wide_part = 0;
 CREATE TABLE IF NOT EXISTS failure_signatures
 (
     project_id String,
-    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id,
-    -- re-extracting a turn mints a new id and is a new row.
+    -- Writer-minted uuidv7, so only a retry reusing this id collapses in the merge.
     id UUID DEFAULT generateUUIDv7(),
     -- Digest of insights/configs/failure.yaml
     config_sha LowCardinality(String),
