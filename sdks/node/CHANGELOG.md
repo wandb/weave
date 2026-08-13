@@ -4,12 +4,13 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.16.6] - 2026-08-12
+## [0.16.6] - 2026-08-13
 
 ### Added
 
 - Trace nested and background Claude Agent SDK subagents as `invoke_agent` spans, including their prompts, models, child chats, and terminal status. ([#7630](https://github.com/wandb/weave/pull/7630))
 - Accept JSON-compatible tool arguments and results through `Tool`, and export the `JsonObject` and `JsonValue` types. ([#7702](https://github.com/wandb/weave/pull/7702))
+- Link `weave.op` calls to the agent spans they produce, and expose the parent-call identifiers on queried span records. ([#7730](https://github.com/wandb/weave/pull/7730), [#7711](https://github.com/wandb/weave/pull/7711))
 
 ### Changed
 
