@@ -6,3 +6,10 @@ min_samples: 3
 metric: euclidean
 cluster_selection_method: eom
 allow_single_cluster: false
+
+# Projection persisted per assignment, so a finished run's scatter plot redraws
+# without reprojecting. Fixed at two components by umap_x and umap_y.
+umap:
+  n_neighbors: 15
+  min_dist: 0.0
+  random_state: 0
