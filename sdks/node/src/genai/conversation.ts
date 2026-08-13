@@ -2,8 +2,8 @@ import type {Attributes} from '@opentelemetry/api';
 import {uuidv7} from 'uuidv7';
 
 import {getGenaiState} from './context';
+import {sanitizeSpanAttributes, type SpanEndOptions} from './spanBase';
 import {Turn, type TurnInit} from './turn';
-import type {SpanEndOptions} from './spanBase';
 
 export interface ConversationInit {
   model?: string;
@@ -126,7 +126,10 @@ export class Conversation {
       agentDescription: opts.agentDescription ?? '',
       agentVersion: opts.agentVersion ?? '',
       conversationId: opts.conversationId ?? opts.sessionId ?? uuidv7(),
-      attributes: opts.attributes ?? {},
+      attributes: sanitizeSpanAttributes(
+        opts.attributes ?? {},
+        'Conversation.create()'
+      ),
     });
     state.conversation = conversation;
     return conversation;
