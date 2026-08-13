@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS intent_signatures
 (
     project_id String,
-    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id;
+    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id,
     -- re-extracting a turn mints a new id and is a new row.
     id UUID DEFAULT generateUUIDv7(),
     -- Digest of insights/configs/intent.yaml
@@ -47,7 +47,7 @@ SETTINGS min_bytes_for_wide_part = 0;
 CREATE TABLE IF NOT EXISTS failure_signatures
 (
     project_id String,
-    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id;
+    -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id,
     -- re-extracting a turn mints a new id and is a new row.
     id UUID DEFAULT generateUUIDv7(),
     -- Digest of insights/configs/failure.yaml
