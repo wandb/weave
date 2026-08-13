@@ -274,11 +274,7 @@ export class LLM extends SpanBase {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Flush accumulated state and close the span. For a terminal failure, pass
-   * `error` and an optional `errorType`. If {@link recordError} was called
-   * earlier, call `end()` without the error to avoid recording it twice.
-   */
+  /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
   end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;
