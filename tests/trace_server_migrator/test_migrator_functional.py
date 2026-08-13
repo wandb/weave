@@ -923,7 +923,9 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("cluster_run_id", "UUID"),
                 ("signature_record_id", "UUID"),
                 ("cluster_id", "Int32"),
-                ("cluster_confidence", "Float32"),
+                ("cluster_distance", "Float32"),
+                ("umap_x", "Float32"),
+                ("umap_y", "Float32"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
                 ("expire_at", "DateTime"),
             ],
@@ -1015,9 +1017,9 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
             f"{completed_at}, toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
 
-    for inserted_at, label, count, cluster_id, confidence in [
-        ("2026-06-20 15:00:00", "draft", 1, -1, 0.0),
-        ("2026-06-20 15:05:00", "checkout", 2, 7, 0.875),
+    for inserted_at, label, count, cluster_id, distance, umap in [
+        ("2026-06-20 15:00:00", "draft", 1, -1, 0.0, (0.0, 0.0)),
+        ("2026-06-20 15:05:00", "checkout", 2, 7, 0.875, (-1.5, 3.25)),
     ]:
         ch_client.command(
             f"INSERT INTO {target_db}.signature_clusters "
@@ -1028,9 +1030,10 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         ch_client.command(
             f"INSERT INTO {target_db}.signature_cluster_assignments "
             "(project_id, cluster_run_id, signature_record_id, cluster_id, "
-            "cluster_confidence, inserted_at) "
+            "cluster_distance, umap_x, umap_y, inserted_at) "
             f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', {cluster_id}, "
-            f"toFloat32({confidence}), toDateTime64('{inserted_at}', 6, 'UTC'))"
+            f"toFloat32({distance}), toFloat32({umap[0]}), toFloat32({umap[1]}), "
+            f"toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
 
     assert ch_client.query(
@@ -1048,11 +1051,13 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
     ).result_rows == [("checkout", 2)]
     assert ch_client.query(
         "SELECT argMax(cluster_id, inserted_at), "
-        "round(toFloat64(argMax(cluster_confidence, inserted_at)), 3) "
+        "round(toFloat64(argMax(cluster_distance, inserted_at)), 3), "
+        "toFloat64(argMax(umap_x, inserted_at)), "
+        "toFloat64(argMax(umap_y, inserted_at)) "
         f"FROM {target_db}.signature_cluster_assignments "
         "WHERE project_id = 'project-1' "
         "GROUP BY project_id, cluster_run_id, signature_record_id"
-    ).result_rows == [(7, 0.875)]
+    ).result_rows == [(7, 0.875, -1.5, 3.25)]
 
     # The assignment references the upstream signature row UUID directly.
     assert ch_client.query(

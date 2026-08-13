@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     cluster_run_id UUID,
     signature_record_id UUID,
     cluster_id Int32 DEFAULT -1,
-    cluster_confidence Float32 DEFAULT 0,
+    -- Distance from the signature vector to its cluster centroid, 0 for noise rows.
+    cluster_distance Float32 DEFAULT 0,
+    -- UMAP 2-D projection of the signature vector, reprojected by every run.
+    umap_x Float32 DEFAULT 0,
+    umap_y Float32 DEFAULT 0,
     inserted_at DateTime64(6, 'UTC') DEFAULT now(),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00'
 )
