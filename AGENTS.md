@@ -415,7 +415,9 @@ deterministic.
 - Every TypeScript GenAI span handle supports
   `recordError(error, {errorType})` to mark a failure without ending the span.
   Terminal failures can pass the same optional low-cardinality `errorType` to
-  `end({error, errorType})`; when omitted, the SDK records `error.name`.
+  `end({error, errorType})`; when omitted, the SDK records `error.name`. Use
+  exactly one path per failure: after `recordError()`, close with `end()` and do
+  not pass the same error again, which would duplicate the exception event.
 - `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
   `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
   belongs on child model spans.
