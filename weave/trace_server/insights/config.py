@@ -1,7 +1,7 @@
 """Insights extraction config: the thing `config_sha` on the signature tables names.
 
 Every knob that changes what gets written into `intent_signatures` or
-`failure_signatures` lives in one checked-in config file per space, so the whole
+`failure_signatures` lives in one checked-in config file per signature type, so the whole
 pipeline state is one column and none of it is in the sorting key. A reference
 serializes as its own content hash, so editing a taxonomy or a prompt moves the
 digest without anyone touching the config.
@@ -71,7 +71,7 @@ class TaxonomyRef(Reference):
 
 
 class Extraction(_Strict):
-    """What both spaces declare. A shared knob must mean the same thing in each."""
+    """What both signature types declare. A shared knob must mean the same thing in each."""
 
     prompt: Reference
     taxonomy: TaxonomyRef
@@ -111,8 +111,8 @@ class Embedding(_Strict):
 _E = TypeVar("_E", bound=Extraction)
 
 
-class _SpaceConfig(_Strict, Generic[_E]):
-    """What every space declares. `space` itself is declared per subclass."""
+class _SignatureConfig(_Strict, Generic[_E]):
+    """What every signature type declares. `signature_type` is declared per subclass."""
 
     config_schema_version: Literal[1]
     extraction: _E
@@ -120,35 +120,38 @@ class _SpaceConfig(_Strict, Generic[_E]):
     embedding: Embedding
 
 
-# Each subclass pins `space` to a Literal, so a file whose own field disagrees
-# fails to validate rather than serving one space's taxonomy under another's digest.
-class IntentConfig(_SpaceConfig[IntentExtraction]):
-    space: Literal["intent"]
+# Each subclass pins `signature_type` to a Literal, so a file whose own field disagrees
+# fails to validate rather than serving one signature type's taxonomy under another's digest.
+class IntentConfig(_SignatureConfig[IntentExtraction]):
+    signature_type: Literal["intent"]
 
 
-class FailureConfig(_SpaceConfig[FailureExtraction]):
-    space: Literal["failure"]
+class FailureConfig(_SignatureConfig[FailureExtraction]):
+    signature_type: Literal["failure"]
 
 
-SpaceConfig = IntentConfig | FailureConfig
+SignatureConfig = IntentConfig | FailureConfig
 
-_CONFIG_MODELS: dict[str, type[SpaceConfig]] = {
+_CONFIG_MODELS: dict[str, type[SignatureConfig]] = {
     "intent": IntentConfig,
     "failure": FailureConfig,
 }
-SPACES = tuple(_CONFIG_MODELS)
+SIGNATURE_TYPES = tuple(_CONFIG_MODELS)
 
 
-def load_config(space: str) -> SpaceConfig:
-    """Load and validate the checked-in config for `space`."""
-    if space not in _CONFIG_MODELS:
-        raise ValueError(f"unknown insights space {space!r}, expected one of {SPACES}")
-    path = os.path.join(CONFIG_DIR, f"{space}.json")
+def load_config(signature_type: str) -> SignatureConfig:
+    """Load and validate the checked-in config for `signature_type`."""
+    if signature_type not in _CONFIG_MODELS:
+        raise ValueError(
+            f"unknown insights signature type {signature_type!r}, "
+            f"expected one of {SIGNATURE_TYPES}"
+        )
+    path = os.path.join(CONFIG_DIR, f"{signature_type}.json")
     with open(path, encoding="utf-8") as handle:
-        return _CONFIG_MODELS[space].model_validate_json(handle.read())
+        return _CONFIG_MODELS[signature_type].model_validate_json(handle.read())
 
 
-def config_sha(config: SpaceConfig) -> str:
+def config_sha(config: SignatureConfig) -> str:
     """Digest the config with every file reference resolved to its own sha256.
 
     Keys are sorted, so reordering a config file leaves the digest alone while

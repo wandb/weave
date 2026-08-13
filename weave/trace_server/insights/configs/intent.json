@@ -1,6 +1,6 @@
 {
   "config_schema_version": 1,
-  "space": "intent",
+  "signature_type": "intent",
   "extraction": {
     "prompt": {
       "path": "prompts/intent.txt"

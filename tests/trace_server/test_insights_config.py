@@ -21,23 +21,23 @@ def config_dir(tmp_path, monkeypatch) -> str:
     return target
 
 
-def test_spaces_have_distinct_digests():
+def test_signature_types_have_distinct_digests():
     """A contamination check reading topK(config_sha) must tell them apart."""
     assert _digest("intent") != _digest("failure")
 
 
-@pytest.mark.parametrize("space", config.SPACES)
-def test_prompt_renders_every_declared_label_and_its_definition(space):
+@pytest.mark.parametrize("signature_type", config.SIGNATURE_TYPES)
+def test_prompt_renders_every_declared_label_and_its_definition(signature_type):
     """Every token resolves, and the taxonomy supplies both halves of a label.
 
     The label list reaches the judge twice: as the alternation it must choose
     from, and as the definition it reasons with. Both are generated from the one
     file, so the two cannot describe different vocabularies.
     """
-    rendered = prompt.render_prompt(space)
+    rendered = prompt.render_prompt(signature_type)
     assert "$" not in rendered
 
-    extraction = config.load_config(space).extraction
+    extraction = config.load_config(signature_type).extraction
     labels = extraction.taxonomy.labels()
     assert "|".join(label.name for label in labels) in rendered
     assert all(f"- `{label.name}`: {label.definition}" in rendered for label in labels)
@@ -101,10 +101,10 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     ("edit", "match"),
     [
         (lambda raw: raw.update(config_schema_version=2), "config_schema_version"),
-        (lambda raw: raw.update(space="intent"), "space"),
+        (lambda raw: raw.update(signature_type="intent"), "signature_type"),
         (lambda raw: raw["extraction"].update(stop_sequences=["\n"]), "stop_sequences"),
     ],
-    ids=["wrong_version", "wrong_space", "undeclared_knob"],
+    ids=["wrong_version", "wrong_signature_type", "undeclared_knob"],
 )
 def test_unloadable_configs_are_rejected_by_field(config_dir, edit, match):
     """Every failure mode names the field that is wrong, not a partial config."""
@@ -115,8 +115,8 @@ def test_unloadable_configs_are_rejected_by_field(config_dir, edit, match):
         config.load_config("failure")
 
 
-def test_an_unknown_space_is_rejected():
-    with pytest.raises(ValueError, match="unknown insights space"):
+def test_an_unknown_signature_type_is_rejected():
+    with pytest.raises(ValueError, match="unknown insights signature type"):
         config.load_config("sentiment")
 
 
@@ -137,8 +137,8 @@ def test_a_reference_may_not_read_outside_the_config_dir(path):
         reference.read_bytes()
 
 
-def _digest(space: str) -> str:
-    return config.config_sha(config.load_config(space))
+def _digest(signature_type: str) -> str:
+    return config.config_sha(config.load_config(signature_type))
 
 
 def _taxonomy_path(config_dir: str) -> str:

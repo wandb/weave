@@ -1,4 +1,4 @@
-"""Render a space's judge prompt from its config.
+"""Render a signature type's judge prompt from its config.
 
 The asset holds the wording and the config holds every value the wording shares
 with the pipeline, written as a `$name`. Both are inside `config_sha`, so a
@@ -10,13 +10,13 @@ from string import Template
 from weave.trace_server.insights import config
 
 
-def render_prompt(space: str) -> str:
-    """The space's judge prompt with every config-supplied token substituted.
+def render_prompt(signature_type: str) -> str:
+    """The signature type's judge prompt with every config-supplied token substituted.
 
     `substitute` raises `KeyError` on a token the config does not supply, which
     beats sending a judge a literal `$name`.
     """
-    extraction = config.load_config(space).extraction
+    extraction = config.load_config(signature_type).extraction
     return Template(extraction.prompt.read().strip()).substitute(_tokens(extraction))
 
 

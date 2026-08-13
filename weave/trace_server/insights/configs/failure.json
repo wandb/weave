@@ -1,6 +1,6 @@
 {
   "config_schema_version": 1,
-  "space": "failure",
+  "signature_type": "failure",
   "extraction": {
     "prompt": {
       "path": "prompts/failure.txt"
