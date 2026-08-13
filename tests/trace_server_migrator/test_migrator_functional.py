@@ -627,8 +627,8 @@ _FAILURE_COLUMNS = [
     ("severity", "LowCardinality(String)"),
     ("vector", "Array(Float32)"),
     ("conversation_id", "String"),
-    ("onset_trace_id", "String"),
-    ("trace_ids", "Array(String)"),
+    ("current_trace_id", "String"),
+    ("affected_trace_ids", "Array(String)"),
     ("evidence_span_ids", "Array(String)"),
     ("user_id", "String"),
     ("agent_name", "String"),
@@ -659,8 +659,8 @@ _SIGNATURE_TABLES = [
         "failure_signatures",
         _FAILURE_COLUMNS,
         [
+            ("idx_affected_trace_ids", "affected_trace_ids"),
             ("idx_conversation_id", "conversation_id"),
-            ("idx_trace_ids", "trace_ids"),
         ],
     ),
 ]
@@ -687,7 +687,7 @@ def _migrate_signatures_db(ch_client, name: str) -> str:
 
 # Source month is a month before extraction, so a partition that followed
 # extraction time would file the row under the wrong month.
-_SOURCE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
+_TRACE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
 _EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
 _UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
@@ -712,24 +712,24 @@ def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> Non
         f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
         f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
-        f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
+        f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
     )
 
 
 def _insert_failure(
-    ch_client, target_db: str, row_id: str, onset: str, turns: str, cost: float
+    ch_client, target_db: str, row_id: str, current: str, affected: str, cost: float
 ) -> None:
     """Insert one failure_signatures row in 'project-1'."""
     ch_client.command(
         f"INSERT INTO {target_db}.failure_signatures "
         "(project_id, id, config_sha, signature, failure_reason, category, "
-        "severity, vector, conversation_id, onset_trace_id, trace_ids, "
+        "severity, vector, conversation_id, current_trace_id, affected_trace_ids, "
         "user_id, agent_name, turn_duration_ms, turn_cost_usd, trace_started_at, "
         f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
         "'ignored the stated output path', 'The user specified /tmp/out.json.', "
         f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
-        f"'{onset}', {turns}, 'user-1', 'checkout-agent', 16000, {cost}, "
-        f"{_SOURCE_STARTED_AT}, {_EXTRACTED_AT})"
+        f"'{current}', {affected}, 'user-1', 'checkout-agent', 16000, {cost}, "
+        f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
     )
 
 
@@ -853,15 +853,15 @@ def test_signature_retry_collapses_on_read(ch_client):
     ).result_rows == [("202605",)]
 
     _insert_failure(ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4']", 0.31)
-    # The writer retrying the same id with a wider attributed span: trace_ids is not
+    # The writer retrying the same id with a wider attributed span: affected_trace_ids is not
     # part of the identity, so the later attempt replaces rather than coexists.
     _insert_failure(
         ch_client, target_db, _FAILURE_ID_1, "trace-4", "['trace-4', 'trace-6']", 0.41
     )
 
     assert ch_client.query(
-        "SELECT toString(id), argMax(onset_trace_id, inserted_at), "
-        "argMax(trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
+        "SELECT toString(id), argMax(current_trace_id, inserted_at), "
+        "argMax(affected_trace_ids, inserted_at), argMax(turn_cost_usd, inserted_at) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1' "
         f"GROUP BY {_SIGNATURE_KEY}"
     ).result_rows == [(_FAILURE_ID_1, "trace-4", ["trace-4", "trace-6"], 0.41)]
@@ -883,14 +883,14 @@ def test_failure_turn_attribution(ch_client):
         "['trace-4', 'trace-6', 'trace-9']",
         0.41,
     )
-    # A different onset is a different failure, sharing turn trace-6.
+    # A different causing turn is a different failure, sharing turn trace-6.
     _insert_failure(ch_client, target_db, _FAILURE_ID_2, "trace-6", "['trace-6']", 0.32)
 
     # The drilldown from a turn to the failures touching it. trace-6 is a member of
-    # both, and of the first only through trace_ids, not through its onset.
+    # both, and of the first only through affected_trace_ids, not as its causing turn.
     assert ch_client.query(
         f"SELECT toString(id) FROM {target_db}.failure_signatures "
-        "WHERE project_id = 'project-1' AND has(trace_ids, 'trace-6') "
+        "WHERE project_id = 'project-1' AND has(affected_trace_ids, 'trace-6') "
         "ORDER BY toString(id)"
     ).result_rows == [(_FAILURE_ID_1,), (_FAILURE_ID_2,)]
 
@@ -898,7 +898,7 @@ def test_failure_turn_attribution(ch_client):
     # overlap on trace-6, so summing them counts that turn twice. Three distinct
     # turns are attributed, and the naive sum is over four memberships.
     assert ch_client.query(
-        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(trace_ids)))) "
+        "SELECT sum(turn_cost_usd), length(arrayDistinct(arrayFlatten(groupArray(affected_trace_ids)))) "
         f"FROM {target_db}.failure_signatures WHERE project_id = 'project-1'"
     ).result_rows == [(0.73, 3)]
 
@@ -907,7 +907,7 @@ def test_failure_turn_attribution(ch_client):
     assert ch_client.query(
         f"SELECT count() FROM {target_db}.failure_signatures "
         "WHERE project_id = 'project-1' "
-        "AND (empty(trace_ids) OR NOT has(trace_ids, onset_trace_id))"
+        "AND (empty(affected_trace_ids) OR NOT has(affected_trace_ids, current_trace_id))"
     ).result_rows == [(0,)]
 
 
