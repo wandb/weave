@@ -106,14 +106,14 @@ def build_usage_query(
     tz_param = pb.add_param(req.timezone or "UTC")
     bucket_interval_param = pb.add_param(granularity_seconds)
 
-    # Root-only usage keeps native root summaries plus individual OTEL span usage.
-    calls_filter = req.filter
-    include_otel_span_usage = bool(calls_filter and calls_filter.trace_roots_only)
-    if calls_filter is not None and calls_filter.trace_roots_only:
-        calls_filter = calls_filter.model_copy(update={"trace_roots_only": None})
+    # Root-only usage keeps native root summaries plus individual OTEL span usage,
+    # so the root filter is re-applied below instead of by the shared filter builder.
+    include_otel_span_usage = bool(req.filter and req.filter.trace_roots_only)
 
     # Build filter clauses - applied directly in WHERE
-    where_filter_sql = build_calls_filter_sql(calls_filter, pb, read_table)
+    where_filter_sql = build_calls_filter_sql(
+        req.filter, pb, read_table, force_all_spans=include_otel_span_usage
+    )
 
     normalized_metrics = _normalize_usage_metrics(metrics)
 
