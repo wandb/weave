@@ -19,32 +19,18 @@ export interface SpanInitBase {
   startTime?: TimeInput;
 }
 
-/** Options for classifying an error passed to {@link SpanBase.recordError}. */
 export interface RecordErrorOptions {
-  /** Stable, low-cardinality failure classification. Defaults to `error.name`. */
   errorType?: string;
 }
 
 /**
  * Options shared by every emitter's `end()`.
  *
- * Passing `error` records the failure and ends the span in one step. This is
- * the terminal equivalent of calling `recordError(error, {errorType})` and
- * then `end()`. Use `recordError()` instead when the failure is known before
- * the span is ready to close.
- * Passing `errorType` without `error` marks and ends a non-exception failure.
- *
- * Choose one error-recording path for a given failure. After calling
- * `recordError()`, call `end()` without the same error; passing it again would
- * record a second exception event.
+ * `error` marks the span failed before ending it; `errorType` overrides its
+ * name or marks a non-exception failure. `endTime` backdates the close.
  */
 export interface SpanEndOptions extends RecordErrorOptions {
-  /** Error to record immediately before ending the span. */
   error?: Error;
-  /**
-   * Backdate the close so a replayed span carries an accurate duration.
-   * When omitted, OpenTelemetry stamps the current time.
-   */
   endTime?: TimeInput;
 }
 
@@ -86,19 +72,8 @@ export abstract class SpanBase {
   }
 
   /**
-   * Mark the span as failed without ending it. Records `error.type`, the ERROR
-   * status, and the exception while leaving the span open for additional work
-   * or child spans.
-   *
-   * Use this method when a failure is observed before the span is ready to
-   * close. Later, call `end()` without passing the error again. If the failure
-   * and span completion happen together, use
-   * `end({error, errorType})` as the one-step terminal form instead.
-   *
-   * @example
-   * span.recordError(error, {errorType: 'rate_limit'});
-   * // Finish child spans...
-   * span.end();
+   * Record a failure without ending the span. Later call `end()` without the
+   * same error; use `end({error, errorType})` when failure and close coincide.
    */
   recordError(error: Error, opts?: RecordErrorOptions): this {
     if (this._warnIfEnded('recordError')) return this;
@@ -126,11 +101,11 @@ export abstract class SpanBase {
   }
 
   /**
-   * Record an optional error and error type, then close the span — backdating
-   * the close when `endTime` is given. Subclasses call this as the final step
-   * of their own `end()`, after flushing their span-specific data. Centralizes
-   * the error-status + `span.end()` tail that is otherwise identical across
-   * all four emitters.
+   * Record an optional error, then close the span — backdating the close when
+   * `endTime` is given. Subclasses call this as the final step of their own
+   * `end()`, after flushing their span-specific data. Centralizes the
+   * error-status + `span.end()` tail that is otherwise identical across all
+   * four emitters.
    */
   protected _closeSpan(opts?: SpanEndOptions): void {
     if (opts?.error) {
