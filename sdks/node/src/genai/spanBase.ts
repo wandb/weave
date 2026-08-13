@@ -5,6 +5,8 @@ import {
   type TimeInput,
 } from '@opentelemetry/api';
 
+import {ATTR_ERROR_TYPE} from './semconv';
+
 /**
  * Init fields shared by every emitter's `create()` factory.
  *
@@ -20,11 +22,18 @@ export interface SpanInitBase {
 /**
  * Options shared by every emitter's `end()`.
  *
- * `error` marks the span failed (records the exception + ERROR status).
+ * `error` marks the span failed (records `error.type`, the exception and ERROR
+ * status). `errorType` overrides the error's name with a stable,
+ * low-cardinality classification, or marks a non-exception failure by itself.
  * `endTime` backdates the close so a replayed span carries an accurate
  * duration. Undefined `endTime` → OTel stamps the current time.
  */
-export interface SpanEndOptions {
+export interface RecordErrorOptions {
+  /** Stable, low-cardinality failure classification. Defaults to `error.name`. */
+  errorType?: string;
+}
+
+export interface SpanEndOptions extends RecordErrorOptions {
   error?: Error;
   endTime?: TimeInput;
 }
@@ -67,6 +76,22 @@ export abstract class SpanBase {
   }
 
   /**
+   * Mark the span as failed without ending it. Records `error.type`, the ERROR
+   * status and the exception so callers can continue recording child work
+   * before closing the span.
+   *
+   * @example
+   * span.recordError(error, {errorType: 'rate_limit'});
+   * // Finish child spans...
+   * span.end();
+   */
+  recordError(error: Error, opts?: RecordErrorOptions): this {
+    if (this._warnIfEnded('recordError')) return this;
+    this._recordError(error, opts);
+    return this;
+  }
+
+  /**
    * Add a named event to the span. Useful for marking non-span moments such as
    * context compaction, tool-loop detection, or guardrail trips. Warns and
    * no-ops after `end()`. Mirrors OTel `Span.addEvent`.
@@ -86,21 +111,34 @@ export abstract class SpanBase {
   }
 
   /**
-   * Record an optional error, then close the span — backdating the close when
-   * `endTime` is given. Subclasses call this as the final step of their own
-   * `end()`, after flushing their span-specific data. Centralizes the
-   * error-status + `span.end()` tail that is otherwise identical across all
-   * four emitters.
+   * Record an optional error and error type, then close the span — backdating
+   * the close when `endTime` is given. Subclasses call this as the final step
+   * of their own `end()`, after flushing their span-specific data. Centralizes
+   * the error-status + `span.end()` tail that is otherwise identical across
+   * all four emitters.
    */
   protected _closeSpan(opts?: SpanEndOptions): void {
     if (opts?.error) {
-      this.span.recordException(opts.error);
-      this.span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: opts.error.message,
-      });
+      this._recordError(opts.error, opts);
+    } else if (opts?.errorType) {
+      this._setErrorStatus(opts.errorType);
     }
     this.span.end(opts?.endTime);
+  }
+
+  private _recordError(error: Error, opts?: RecordErrorOptions): void {
+    const errorType =
+      opts?.errorType || error.name || error.constructor?.name || 'Error';
+    this._setErrorStatus(errorType, error.message);
+    this.span.recordException(error);
+  }
+
+  private _setErrorStatus(errorType: string, message?: string): void {
+    this.span.setAttribute(ATTR_ERROR_TYPE, errorType);
+    this.span.setStatus({
+      code: SpanStatusCode.ERROR,
+      ...(message ? {message} : {}),
+    });
   }
 
   /**

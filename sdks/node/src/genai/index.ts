@@ -36,6 +36,7 @@ export {
   type SessionInit,
 } from './conversation';
 export {SubAgent, type SubAgentInit} from './subagent';
+export type {RecordErrorOptions, SpanEndOptions} from './spanBase';
 export {Tool, type ToolEndOptions, type ToolInit} from './tool';
 export {Turn, type TurnInit} from './turn';
 

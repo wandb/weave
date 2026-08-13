@@ -274,7 +274,7 @@ export class LLM extends SpanBase {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  /** Flush accumulated state and close the span. Idempotent. Pass `error` to mark failed; pass `endTime` to backdate the close. */
+  /** Flush accumulated state and close the span. Pass `error` and an optional `errorType` to mark failed. */
   end(opts?: SpanEndOptions): void {
     if (this._ended) {
       return;

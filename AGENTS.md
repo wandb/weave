@@ -464,6 +464,10 @@ deterministic.
   `Tool` and `SubAgent` do not use ambient state.
 - Keep response models on child `chat` spans; use `setAttributes()` for fields
   without typed `record()` methods.
+- Every TypeScript GenAI span handle supports
+  `recordError(error, {errorType})` to mark a failure without ending the span.
+  Terminal failures can pass the same optional low-cardinality `errorType` to
+  `end({error, errorType})`; when omitted, the SDK records `error.name`.
 - `Turn` and `SubAgent` are logical in-process `invoke_agent` spans: emit
   `SpanKind.INTERNAL` and do not set `gen_ai.provider.name`; provider identity
   belongs on child model spans.
