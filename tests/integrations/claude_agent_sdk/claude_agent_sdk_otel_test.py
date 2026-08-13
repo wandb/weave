@@ -451,7 +451,7 @@ async def test_subagent_query_content_is_pii_redacted_otel(
             True,
             StatusCode.ERROR,
             "background subagent failed",
-            "claude_agent_sdk.task_failed",
+            "RuntimeError",
             id="failed-agent-direct-tool-use-id",
         ),
         pytest.param(
@@ -462,7 +462,7 @@ async def test_subagent_query_content_is_pii_redacted_otel(
             False,
             StatusCode.ERROR,
             "background subagent stopped",
-            "claude_agent_sdk.task_stopped",
+            "RuntimeError",
             id="stopped-legacy-task-task-id-fallback",
         ),
     ],
