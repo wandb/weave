@@ -23,7 +23,7 @@ export interface SpanInitBase {
  * Options shared by every emitter's `end()`.
  *
  * `error` marks the span failed before ending it, deriving `error.type` from
- * `error.name`. `endTime` backdates the close.
+ * `error.name` unless one was set explicitly. `endTime` backdates the close.
  */
 export interface SpanEndOptions {
   error?: Error;
@@ -50,6 +50,7 @@ export interface SpanEndOptions {
  */
 export abstract class SpanBase {
   protected _ended = false;
+  private _hasExplicitErrorType = false;
 
   protected constructor(protected readonly span: Span) {}
 
@@ -63,6 +64,9 @@ export abstract class SpanBase {
    */
   setAttributes(attributes: Attributes): this {
     if (this._warnIfEnded('setAttributes')) return this;
+    if (attributes[ATTR_ERROR_TYPE] !== undefined) {
+      this._hasExplicitErrorType = true;
+    }
     this.span.setAttributes(attributes);
     return this;
   }
@@ -111,10 +115,12 @@ export abstract class SpanBase {
   }
 
   private _recordError(error: Error): void {
-    this.span.setAttribute(
-      ATTR_ERROR_TYPE,
-      error.name || error.constructor?.name || 'Error'
-    );
+    if (!this._hasExplicitErrorType) {
+      this.span.setAttribute(
+        ATTR_ERROR_TYPE,
+        error.name || error.constructor?.name || 'Error'
+      );
+    }
     this.span.setStatus({
       code: SpanStatusCode.ERROR,
       ...(error.message ? {message: error.message} : {}),

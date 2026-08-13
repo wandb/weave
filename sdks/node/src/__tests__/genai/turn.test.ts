@@ -67,6 +67,20 @@ describe('Turn', () => {
     expect(span.events.map(event => event.name)).toEqual(['exception']);
   });
 
+  it('preserves an explicitly set error type at end()', () => {
+    const turn = Turn.create({});
+    turn.setAttributes({[ATTR_ERROR_TYPE]: 'rate_limit'});
+    turn.end({error: new Error('429 after 3 retries')});
+
+    const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('rate_limit');
+    expect(span.status).toEqual({
+      code: SpanStatusCode.ERROR,
+      message: '429 after 3 retries',
+    });
+    expect(span.events.map(event => event.name)).toEqual(['exception']);
+  });
+
   it('recordError() marks the span failed without ending it', () => {
     const turn = Turn.create({});
     const error = new TypeError('invalid response');
