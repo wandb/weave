@@ -1,9 +1,9 @@
-description: >-
-  Categories a failure signature may carry. `refusal` and `capability_gap` name
-  observable behavior rather than error, because the judge cannot see the
-  product's capability limits or its safety policy and so cannot decide what
-  counts as improper or as a violation. Impact is carried by `severity`, not by
-  the category name.
+# `refusal` and `capability_gap` name observable behavior rather than error,
+# because the judge cannot see the product's capability limits or its safety
+# policy and so cannot decide what counts as improper or as a violation.
+#
+# Impact is carried by `severity`, not by the category name.
+description: Categories a failure signature may carry.
 
 labels:
   - name: task_misunderstanding
