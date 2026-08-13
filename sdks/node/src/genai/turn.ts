@@ -252,7 +252,9 @@ export class Turn extends SpanBase {
   /**
    * Read current field values (to reflect mutations made via `record()`
    * since `start`) and close the span. Idempotent. Pass `error` and an optional
-   * `errorType` to mark it as failed; pass `endTime` to backdate the close.
+   * `errorType` for a terminal failure. If {@link recordError} was called
+   * earlier, call `end()` without the error to avoid recording it twice. Pass
+   * `endTime` to backdate the close.
    */
   end(opts?: SpanEndOptions): void {
     if (this._ended) {

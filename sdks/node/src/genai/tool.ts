@@ -102,9 +102,10 @@ export class Tool extends SpanBase {
   }
 
   /**
-   * Record an optional result and error type, then close the span. Idempotent.
-   * Pass `error` and an optional `errorType` to mark the span as failed, and
-   * `endTime` to backdate the close.
+   * Record an optional result, then close the span. Idempotent. Pass `error`
+   * and an optional `errorType` for a terminal failure. If {@link recordError}
+   * was called earlier, call `end()` without the error to avoid recording it
+   * twice. Pass `endTime` to backdate the close.
    */
   end(opts?: ToolEndOptions): void {
     if (this._ended) {
