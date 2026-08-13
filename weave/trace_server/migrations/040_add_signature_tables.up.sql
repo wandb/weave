@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id;
     -- re-extracting a turn mints a new id and is a new row.
     id UUID DEFAULT generateUUIDv7(),
-    -- Digest of insights/configs/intent.json
+    -- Digest of insights/configs/intent.yaml
     config_sha LowCardinality(String),
 
     -- Canonicalized before insert, lossy, use signature_display for exact judge wording.
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     -- Writer-minted uuidv7. The merge collapses only a retry that reuses this id;
     -- re-extracting a turn mints a new id and is a new row.
     id UUID DEFAULT generateUUIDv7(),
-    -- Digest of insights/configs/failure.json
+    -- Digest of insights/configs/failure.yaml
     config_sha LowCardinality(String),
 
     -- Canonicalized before insert, lossy, use signature_display for exact judge wording.

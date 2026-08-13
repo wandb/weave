@@ -1,12 +1,12 @@
 """The `config_sha` contract: one digest that moves when anything upstream moves."""
 
 import contextlib
-import json
 import os
 import shutil
 from collections.abc import Iterator
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from weave.trace_server.insights import config, prompt
@@ -51,7 +51,7 @@ def test_a_new_label_reaches_the_judge_without_touching_the_prompt(config_dir):
     judge as both a choosable value and a definition, and no prompt text is
     editable to get there.
     """
-    with _edit_json(_taxonomy_path(config_dir)) as raw:
+    with _edit_yaml(_taxonomy_path(config_dir)) as raw:
         raw["labels"].append(
             {"name": "billing_dispute", "definition": "disputes a charge."}
         )
@@ -86,13 +86,13 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
     """
     before = _digest("intent")
 
-    with _edit_json(os.path.join(config_dir, "intent.json")) as raw:
+    with _edit_yaml(os.path.join(config_dir, "intent.yaml")) as raw:
         reordered = dict(reversed(list(raw.items())))
         raw.clear()
         raw.update(reordered)
     assert _digest("intent") == before
 
-    with _edit_json(_taxonomy_path(config_dir)) as raw:
+    with _edit_yaml(_taxonomy_path(config_dir)) as raw:
         raw["labels"].append({"name": "newly_added_intent", "definition": "a new ask."})
     assert _digest("intent") != before
 
@@ -108,7 +108,7 @@ def test_digest_follows_referenced_files_not_the_config_text(config_dir):
 )
 def test_unloadable_configs_are_rejected_by_field(config_dir, edit, match):
     """Every failure mode names the field that is wrong, not a partial config."""
-    with _edit_json(os.path.join(config_dir, "failure.json")) as raw:
+    with _edit_yaml(os.path.join(config_dir, "failure.yaml")) as raw:
         edit(raw)
 
     with pytest.raises(ValidationError, match=match):
@@ -142,7 +142,7 @@ def _digest(signature_type: str) -> str:
 
 
 def _taxonomy_path(config_dir: str) -> str:
-    return os.path.join(config_dir, "taxonomies", "intent_categories.json")
+    return os.path.join(config_dir, "taxonomies", "intent_categories.yaml")
 
 
 def _append(path: str, text: str) -> None:
@@ -151,10 +151,10 @@ def _append(path: str, text: str) -> None:
 
 
 @contextlib.contextmanager
-def _edit_json(path: str) -> Iterator[dict]:
-    """Load a JSON file, yield it for mutation, write it back."""
+def _edit_yaml(path: str) -> Iterator[dict]:
+    """Load a YAML file, yield it for mutation, write it back."""
     with open(path, encoding="utf-8") as handle:
-        raw = json.load(handle)
+        raw = yaml.safe_load(handle)
     yield raw
     with open(path, "w", encoding="utf-8") as handle:
-        json.dump(raw, handle, indent=2)
+        yaml.safe_dump(raw, handle, sort_keys=False)

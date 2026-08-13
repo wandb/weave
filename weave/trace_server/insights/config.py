@@ -12,6 +12,7 @@ import json
 import os
 from typing import Generic, Literal, TypeVar
 
+import yaml
 from pydantic import BaseModel, ConfigDict, model_serializer
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "configs")
@@ -24,7 +25,11 @@ class _Strict(BaseModel):
 
 
 class Reference(_Strict):
-    """A config-relative path to a checked-in asset, digested by its content."""
+    """A config-relative path to a checked-in asset, digested by its raw bytes.
+
+    Raw bytes, so a comment in a referenced file moves `config_sha` too. That errs
+    toward declaring a new pipeline generation rather than silently reusing one.
+    """
 
     path: str
 
@@ -67,7 +72,7 @@ class TaxonomyRef(Reference):
     """
 
     def labels(self) -> list[Label]:
-        return _Taxonomy.model_validate_json(self.read()).labels
+        return _Taxonomy.model_validate(yaml.safe_load(self.read())).labels
 
 
 class Extraction(_Strict):
@@ -146,9 +151,9 @@ def load_config(signature_type: str) -> SignatureConfig:
             f"unknown insights signature type {signature_type!r}, "
             f"expected one of {SIGNATURE_TYPES}"
         )
-    path = os.path.join(CONFIG_DIR, f"{signature_type}.json")
+    path = os.path.join(CONFIG_DIR, f"{signature_type}.yaml")
     with open(path, encoding="utf-8") as handle:
-        return _CONFIG_MODELS[signature_type].model_validate_json(handle.read())
+        return _CONFIG_MODELS[signature_type].model_validate(yaml.safe_load(handle))
 
 
 def config_sha(config: SignatureConfig) -> str:
