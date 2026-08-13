@@ -21,7 +21,10 @@ import {
   /* @deprecated */
   getCurrentSession,
 } from '../../genai/context';
-import {ATTR_GEN_AI_CONVERSATION_ID} from '../../genai/semconv';
+import {
+  ATTR_ERROR_TYPE,
+  ATTR_GEN_AI_CONVERSATION_ID,
+} from '../../genai/semconv';
 
 import {
   expectSpanTimesToMatch,
@@ -382,6 +385,27 @@ describe('genai api (top-level functions)', () => {
 
     const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
     expect(turnSpan.attributes['gen_ai.operation.name']).toBe('invoke_agent');
+  });
+
+  test('custom attributes cannot set the SDK-managed error type', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    startConversation({
+      attributes: {
+        [ATTR_ERROR_TYPE]: 'rate_limit',
+        'app.failure.type': 'rate_limit',
+      },
+    });
+    startTurn({});
+    endTurn();
+    endConversation();
+
+    const turnSpan = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
+    expect(turnSpan.attributes[ATTR_ERROR_TYPE]).toBeUndefined();
+    expect(turnSpan.attributes['app.failure.type']).toBe('rate_limit');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'weave.Conversation.create() ignored error.type — it is managed by recordError() and end({error}).'
+    );
+    warnSpy.mockRestore();
   });
 
   test('conversation attributes reach spans created in a separate runIsolated frame', () => {

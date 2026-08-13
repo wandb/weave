@@ -11,7 +11,12 @@ import {
 import {getGenaiState} from './context';
 import {LLM, type LLMInit} from './llm';
 import {getWeaveTracer} from './provider';
-import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
+import {
+  sanitizeSpanAttributes,
+  SpanBase,
+  type SpanEndOptions,
+  type SpanInitBase,
+} from './spanBase';
 import {
   ATTR_GEN_AI_AGENT_DESCRIPTION,
   ATTR_GEN_AI_AGENT_ID,
@@ -138,7 +143,10 @@ export class Turn extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes: Attributes = {...(opts.attributes ?? {})};
+    const attributes = sanitizeSpanAttributes(
+      opts.attributes ?? {},
+      'Turn.create()'
+    );
     const messages: Message[] = opts.userMessage
       ? [{role: 'user', parts: [{type: 'text', content: opts.userMessage}]}]
       : [];
@@ -160,7 +168,7 @@ export class Turn extends SpanBase {
       agentId: opts.agentId ?? '',
       agentDescription: opts.agentDescription ?? '',
       agentVersion: opts.agentVersion ?? '',
-      attributes: opts.attributes ?? {},
+      attributes,
     });
     state.turn = turn;
     return turn;

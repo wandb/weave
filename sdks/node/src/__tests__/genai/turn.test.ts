@@ -67,18 +67,23 @@ describe('Turn', () => {
     expect(span.events.map(event => event.name)).toEqual(['exception']);
   });
 
-  it('preserves an explicitly set error type at end()', () => {
+  it('does not let setAttributes override error type at end()', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const turn = Turn.create({});
     turn.setAttributes({[ATTR_ERROR_TYPE]: 'rate_limit'});
     turn.end({error: new Error('429 after 3 retries')});
 
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('rate_limit');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('Error');
     expect(span.status).toEqual({
       code: SpanStatusCode.ERROR,
       message: '429 after 3 retries',
     });
     expect(span.events.map(event => event.name)).toEqual(['exception']);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'weave.Turn.setAttributes() ignored error.type — it is managed by recordError() and end({error}).'
+    );
+    warnSpy.mockRestore();
   });
 
   it('recordError() marks the span failed without ending it', () => {
