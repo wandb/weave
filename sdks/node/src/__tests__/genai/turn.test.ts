@@ -55,16 +55,14 @@ describe('Turn', () => {
     expect(getExporter().getFinishedSpans()).toHaveLength(1);
   });
 
-  it('derives error type from error.name and sets ERROR status at end()', () => {
+  it('derives error type from the Error and sets ERROR status at end()', () => {
     const turn = Turn.create({});
-    const error = new Error('429 from provider');
-    error.name = 'rate_limit';
-    turn.end({error});
+    turn.end({error: new TypeError('invalid response')});
     const span = findSpan(getExporter().getFinishedSpans(), 'invoke_agent');
-    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('rate_limit');
+    expect(span.attributes[ATTR_ERROR_TYPE]).toBe('TypeError');
     expect(span.status).toEqual({
       code: SpanStatusCode.ERROR,
-      message: '429 from provider',
+      message: 'invalid response',
     });
     expect(span.events.map(event => event.name)).toEqual(['exception']);
   });

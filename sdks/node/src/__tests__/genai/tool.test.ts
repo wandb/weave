@@ -88,11 +88,9 @@ describe('Tool', () => {
   it('derives error type and records the failure with the result', () => {
     const turn = Turn.create({});
     const tool = turn.startTool({name: 'get_weather'});
-    const error = new Error('request failed');
-    error.name = 'weather_service_error';
     tool.end({
       result: {message: 'weather service unavailable'},
-      error,
+      error: new TypeError('request failed'),
     });
     turn.end();
 
@@ -100,7 +98,7 @@ describe('Tool', () => {
     expect(toolSpan.attributes[ATTR_GEN_AI_TOOL_CALL_RESULT]).toBe(
       '{"message":"weather service unavailable"}'
     );
-    expect(toolSpan.attributes[ATTR_ERROR_TYPE]).toBe('weather_service_error');
+    expect(toolSpan.attributes[ATTR_ERROR_TYPE]).toBe('TypeError');
     expect(toolSpan.status).toEqual({
       code: SpanStatusCode.ERROR,
       message: 'request failed',
