@@ -291,14 +291,13 @@ class _LogScoreContext:
 
     def __enter__(self) -> Self:
         """Enter context and set call stack to include the score call."""
-        # Set call stack to include the score call so operations become children
-        self._call_stack_context = call_context.set_call_stack(
-            [
-                self.score_logger.evaluate_call,
-                self.score_logger.predict_and_score_call,
-                self.score_call,
-            ]
-        )
+        stack = [
+            self.score_logger.evaluate_call,
+            self.score_logger.predict_and_score_call,
+        ]
+        if not is_placeholder_call(self.score_call):
+            stack.append(self.score_call)
+        self._call_stack_context = call_context.set_call_stack(stack)
         self._call_stack_context.__enter__()
         return self
 
@@ -401,9 +400,9 @@ class ScoreLogger:
         """Internal-only: Merge potential caller-provided fields into the eval meta."""
         self._score_meta = {**eval_meta, **IMPERATIVE_SCORE_META_MARKER}
 
-    def _scores_untraced(self) -> bool:
-        """Whether scores should be captured without emitting a scorer call."""
-        return not self._trace_scores or is_tracing_setting_disabled()
+    def _scores_traced(self) -> bool:
+        """Whether each score should emit its own scorer call."""
+        return self._trace_scores and not is_tracing_setting_disabled()
 
     def _record_untraced_score(
         self, scorer: Scorer | dict | str, score: ScoreType
@@ -484,7 +483,7 @@ class ScoreLogger:
 
         # A no-op call keeps the deferred context manager working: finish_call
         # ignores placeholders and _finish_score_call captures the score anyway.
-        if self._scores_untraced():
+        if not self._scores_traced():
             return placeholder_call(), scorer
 
         # Create a placeholder score method
@@ -573,7 +572,7 @@ class ScoreLogger:
         # Short-circuit ahead of the dispatch below: reaching alog_score's fast
         # path costs an event loop or a thread per score, far more than the
         # recording it ends up doing.
-        if self._scores_untraced():
+        if not self._scores_traced():
             self._record_untraced_score(scorer, score_value)
             return None
 
@@ -622,7 +621,7 @@ class ScoreLogger:
         scorer: Scorer | dict | str,
         score: ScoreType,
     ) -> None:
-        if self._scores_untraced():
+        if not self._scores_traced():
             self._record_untraced_score(scorer, score)
             return
 

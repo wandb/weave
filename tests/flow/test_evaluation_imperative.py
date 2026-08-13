@@ -1293,11 +1293,15 @@ def test_untraced_score_context_manager_creates_no_call(client):
     """The deferred form gets a placeholder call rather than a real one."""
     ev = EvaluationLogger(trace_scores=False)
 
+    @weave.op
+    def calculate_quality() -> float:
+        return 0.75
+
     with ev.log_prediction(inputs={"q": "What is AI?"}) as pred:
         pred.output = "artificial intelligence"
         pred.log_score("correctness", 1.0)
         with pred.log_score("quality") as score:
-            score.value = 0.75
+            score.value = calculate_quality()
 
     ev.log_summary({})
     client.flush()
@@ -1308,7 +1312,9 @@ def test_untraced_score_context_manager_creates_no_call(client):
 
     assert by_op["correctness"] == []
     assert by_op["quality"] == []
-    assert by_op["Evaluation.predict_and_score"][0].output["scores"] == {
+    predict_and_score_call = by_op["Evaluation.predict_and_score"][0]
+    assert by_op["calculate_quality"][0].parent_id == predict_and_score_call.id
+    assert predict_and_score_call.output["scores"] == {
         "correctness": 1.0,
         "quality": 0.75,
     }
