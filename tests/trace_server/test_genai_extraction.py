@@ -83,6 +83,8 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.eval.example_id": "example-001",
             "weave.eval.trial_index": 2,
             "weave.eval.evaluation_name": "travel-bot-eval",
+            "weave.parent_call.id": "01997c9d-0000-7000-8000-00000000abcd",
+            "weave.parent_call.trace_id": "01997c9d-0000-7000-8000-00000000ef01",
             "gen_ai.conversation.id": "conv-abc",
             "weave.conversation.name": "My Chat",
             # Model + tokens
@@ -157,6 +159,8 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.eval_example_id == "example-001"
     assert result.eval_trial_index == 2
     assert result.eval_evaluation_name == "travel-bot-eval"
+    assert result.parent_call_id == "01997c9d-0000-7000-8000-00000000abcd"
+    assert result.parent_call_trace_id == "01997c9d-0000-7000-8000-00000000ef01"
     assert result.conversation_id == "conv-abc"
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
@@ -207,6 +211,7 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
     assert "weave.eval.run_id" not in result.custom_attrs_string
     assert "weave.eval.trial_index" not in result.custom_attrs_int
+    assert "weave.parent_call.id" not in result.custom_attrs_string
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""

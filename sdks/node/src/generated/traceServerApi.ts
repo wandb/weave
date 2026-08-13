@@ -924,6 +924,10 @@ export interface AgentSpanSchema {
   eval_trial_index?: number | null;
   /** Eval Evaluation Name */
   eval_evaluation_name?: string | null;
+  /** Parent Call Id */
+  parent_call_id?: string | null;
+  /** Parent Call Trace Id */
+  parent_call_trace_id?: string | null;
   /** Request Model */
   request_model?: string | null;
   /** Response Model */
