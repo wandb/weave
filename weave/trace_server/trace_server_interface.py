@@ -36,11 +36,12 @@ from weave.trace_server.constants import (
     MAX_OBJECT_NAME_LENGTH,
 )
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.insights import action_items
 from weave.trace_server.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
 # New code should import from weave.trace_server.service_interface directly.
-from weave.trace_server.service_interface import (  # noqa: F401
+from weave.trace_server.service_interface import (  # ruff: ignore[unused-import]
     EnsureProjectExistsRes,
     ProjectsInfoReq,
     ProjectsInfoRes,
@@ -3639,6 +3640,17 @@ class TraceServerInterface(Protocol):
     def agent_conversation_spans(
         self, req: agent_types.AgentConversationSpansReq
     ) -> agent_types.AgentConversationSpansRes: ...
+
+    # Insights Action Items API
+    def action_items_batch_upsert(
+        self, req: action_items.ActionItemsBatchUpsertReq
+    ) -> action_items.ActionItemsBatchUpsertRes: ...
+    def action_items_query(
+        self, req: action_items.ActionItemsQueryReq
+    ) -> action_items.ActionItemsQueryRes: ...
+    def action_item_update(
+        self, req: action_items.ActionItemUpdateReq
+    ) -> action_items.ActionItemUpdateRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...
