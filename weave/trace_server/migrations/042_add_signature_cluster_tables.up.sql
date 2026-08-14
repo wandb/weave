@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS signature_cluster_runs
     window_start DateTime64(6, 'UTC'),
     window_end DateTime64(6, 'UTC'),
 
-    status Enum8('unset' = 1, 'running' = 2, 'completed' = 3, 'failed' = 4) DEFAULT 'unset',
+    status Enum8('pending' = 1, 'running' = 2, 'succeeded' = 3, 'failed' = 4, 'canceled' = 5)
+        DEFAULT 'pending',
 
     started_at DateTime64(6, 'UTC'),
     completed_at DateTime64(6, 'UTC'),
@@ -37,8 +38,8 @@ CREATE TABLE IF NOT EXISTS signature_clusters
     -- Copied from the run. Fixed at run creation, so it is partition-safe.
     run_window_end DateTime64(6, 'UTC'),
 
-    -- Stable across runs. The writer matches each cluster to the previous run's
-    -- clusters by centroid similarity. Nil means no match, so this topic is new.
+    -- Not an FK: a topic identity carried forward by centroid match across runs, so it
+    -- outlives the per-run `id`. Nil until the writer links a run to its predecessor.
     topic_id UUID,
     -- Mean signature vector. Enables assigning a new signature to an existing cluster.
     centroid Array(Float32),
@@ -78,8 +79,16 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
 
     -- `failure_signatures.current_trace_id` or `intent_signatures.trace_id`
     trace_id String,
+    -- Whole-turn values copied onto every fan-out row, so summing them overcounts a
+    -- cluster that holds more than one signature from the same turn.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
+    -- Same vocabulary as the agent spans table, so no translation on the way in.
+    turn_input_tokens UInt64 DEFAULT 0,
+    turn_output_tokens UInt64 DEFAULT 0,
+    turn_reasoning_tokens UInt64 DEFAULT 0,
+    turn_cache_creation_input_tokens UInt64 DEFAULT 0,
+    turn_cache_read_input_tokens UInt64 DEFAULT 0,
 
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
@@ -92,3 +101,23 @@ PARTITION BY toYYYYMM(run_window_end)
 ORDER BY (project_id, cluster_run_id, cluster_id, signature_record_id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
+
+-- Tokens for the turn each signature came from, added here because 041 has shipped.
+-- One column per category, not a map, so a rollup can sum them with SimpleAggregateFunction.
+ALTER TABLE intent_signatures
+    ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
+    ADD COLUMN IF NOT EXISTS turn_output_tokens UInt64 DEFAULT 0 AFTER turn_input_tokens,
+    ADD COLUMN IF NOT EXISTS turn_reasoning_tokens UInt64 DEFAULT 0 AFTER turn_output_tokens,
+    ADD COLUMN IF NOT EXISTS turn_cache_creation_input_tokens UInt64 DEFAULT 0
+        AFTER turn_reasoning_tokens,
+    ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
+        AFTER turn_cache_creation_input_tokens;
+
+ALTER TABLE failure_signatures
+    ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
+    ADD COLUMN IF NOT EXISTS turn_output_tokens UInt64 DEFAULT 0 AFTER turn_input_tokens,
+    ADD COLUMN IF NOT EXISTS turn_reasoning_tokens UInt64 DEFAULT 0 AFTER turn_output_tokens,
+    ADD COLUMN IF NOT EXISTS turn_cache_creation_input_tokens UInt64 DEFAULT 0
+        AFTER turn_reasoning_tokens,
+    ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
+        AFTER turn_cache_creation_input_tokens;
