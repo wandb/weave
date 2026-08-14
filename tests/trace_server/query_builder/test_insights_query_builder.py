@@ -13,8 +13,8 @@ import datetime
 import uuid
 
 import pytest
-import sqlparse
 
+from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server.insights.types import (
     InsightSignatureCursor,
     InsightSignatureRow,
@@ -73,15 +73,7 @@ GROUP_MEASURES = """
 def assert_sql(
     expected_query: str, expected_params: dict, query: str, params: dict
 ) -> None:
-    expected_formatted = sqlparse.format(expected_query, reindent=True).strip()
-    found_formatted = sqlparse.format(query, reindent=True).strip()
-
-    assert expected_formatted == found_formatted, (
-        f"\nExpected:\n{expected_formatted}\n\nGot:\n{found_formatted}"
-    )
-    assert expected_params == params, (
-        f"\nExpected params: {expected_params}\n\nGot params: {params}"
-    )
+    assert_raw_sql(query.strip(), expected_query.strip(), params, expected_params)
 
 
 def rows_req(**overrides: object) -> InsightSignaturesQueryReq:

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import writer
 from weave.trace_server.insights.types import (
     InsightSignatureCursor,
@@ -42,27 +43,22 @@ def insights_signatures_write(
     replacing the originals. Callers dedupe upstream, on the turns they judge.
     """
     if req.intents and req.failures:
-        raise writer.InsightWriteRejected(
+        raise InvalidRequest(
             "one write carries one signature type: intents and failures name "
             "different configs"
         )
-    writer.validate_config_sha("failure" if req.failures else "intent", req.config_sha)
-
-    dropped: dict[str, int] = {}
-    written = InsightWriteCounts()
-
-    if req.intents:
-        rows, gates = writer.prepare_intents(
-            req.project_id, req.config_sha, req.intents
-        )
-        _merge(dropped, gates)
-        written.intents = _insert(server, INTENT_TABLE, rows)
     if req.failures:
-        rows, gates = writer.prepare_failures(
+        writer.validate_config_sha("failure", req.config_sha)
+        rows, dropped = writer.prepare_failures(
             req.project_id, req.config_sha, req.failures
         )
-        _merge(dropped, gates)
-        written.failures = _insert(server, FAILURE_TABLE, rows)
+        written = InsightWriteCounts(failures=_insert(server, FAILURE_TABLE, rows))
+    else:
+        writer.validate_config_sha("intent", req.config_sha)
+        rows, dropped = writer.prepare_intents(
+            req.project_id, req.config_sha, req.intents
+        )
+        written = InsightWriteCounts(intents=_insert(server, INTENT_TABLE, rows))
 
     return InsightSignaturesWriteRes(written=written, dropped=dropped)
 
@@ -131,8 +127,3 @@ def _insert(
     )
     record_db_insert(table=table, count=len(rows))
     return len(rows)
-
-
-def _merge(dropped: dict[str, int], gates: dict[str, int]) -> None:
-    for gate, count in gates.items():
-        dropped[gate] = dropped.get(gate, 0) + count

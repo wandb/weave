@@ -10,6 +10,7 @@ import datetime
 import pytest
 
 from tests.trace_server.helpers import force_optimize, make_project_id
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import config, writer
 from weave.trace_server.insights.types import (
     FailureSignatureCandidate,
@@ -193,8 +194,8 @@ def test_a_re_extraction_appends_rather_than_replacing(ch_server):
     assert sorted(row.sentiment for row in after_merge) == ["frustrated", "neutral"]
 
 
-def test_writer_gates_drop_candidates_and_count_them(ch_server):
-    """One bad candidate per gate never fails the batch, and each is counted."""
+def test_writer_gates_repair_or_drop_and_count(ch_server):
+    """Each bad candidate is counted without failing the batch."""
     project_id = make_project_id("insights_gates")
 
     result = _write_intents(
@@ -305,7 +306,7 @@ def test_cursor_pagination_walks_every_row_exactly_once(ch_server):
 def test_write_rejects_a_config_the_server_cannot_resolve(ch_server):
     project_id = make_project_id("insights_config")
 
-    with pytest.raises(writer.InsightWriteRejected):
+    with pytest.raises(InvalidRequest, match="does not match the deployed config"):
         ch_server.insights_signatures_write(
             InsightSignaturesWriteReq(
                 project_id=project_id,
@@ -314,7 +315,7 @@ def test_write_rejects_a_config_the_server_cannot_resolve(ch_server):
             )
         )
 
-    with pytest.raises(writer.InsightWriteRejected):
+    with pytest.raises(InvalidRequest, match="one write carries one signature type"):
         ch_server.insights_signatures_write(
             InsightSignaturesWriteReq(
                 project_id=project_id,

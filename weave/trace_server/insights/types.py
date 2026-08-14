@@ -82,8 +82,10 @@ class InsightWriteCounts(BaseModelStrict):
 
 
 class InsightSignaturesWriteRes(BaseModelStrict):
-    """`dropped` maps gate name to count. A dropped candidate is never an error:
-    inserts are batched, so raising would fail 255 good rows for one bad one.
+    """`dropped` maps gate name to count.
+
+    Candidate gates discard malformed rows; taxonomy gates repair the label and
+    keep the row. Neither outcome fails the surrounding batch.
     """
 
     written: InsightWriteCounts

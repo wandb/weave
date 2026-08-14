@@ -58,10 +58,9 @@ TYPE_ONLY_GROUP_FIELDS: dict[InsightGroupField, InsightSignatureType] = {
 def table_for_signature_type(signature_type: InsightSignatureType) -> str:
     if signature_type == "intent":
         return INTENT_TABLE
-    elif signature_type == "failure":
+    if signature_type == "failure":
         return FAILURE_TABLE
-    else:
-        raise ValueError(f"unknown insights signature type {signature_type!r}")
+    raise ValueError(f"unknown insights signature type {signature_type!r}")
 
 
 def make_signature_rows_query(pb: ParamBuilder, req: InsightSignaturesQueryReq) -> str:
@@ -160,11 +159,10 @@ def _filters(pb: ParamBuilder, req: InsightSignaturesQueryReq) -> list[str]:
 
 
 def _cursor_predicate(pb: ParamBuilder, cursor: InsightSignatureCursor) -> str:
-    """Keyset seek, spelled out rather than written as a tuple comparison.
+    """Keyset seek that ClickHouse can push into the primary-key condition.
 
-    Measured on ClickHouse 26.6: `(toDate(trace_started_at), id) > (day, id)` is
-    not pushed into the primary-key condition at all and its cost grows with page
-    position, while this form prunes and stays flat.
+    ClickHouse 26.6 does not push the equivalent tuple comparison into that
+    condition, so its scan grows with page position.
     """
     day = pb.add_param(cursor.day)
     row_id = pb.add_param(str(cursor.id))

@@ -1,8 +1,8 @@
 """Writer gates for the signature tables. The database enforces nothing.
 
 Migration 041 carries no CHECK constraints and no Enums because inserts are
-batched: one bad candidate would fail a batch of 256. Every gate drops the
-candidate and counts it, and the counters are the pipeline's precision signal.
+batched: one bad candidate would fail a batch of 256. Gates drop malformed
+candidates, repair unknown labels, and count both outcomes.
 
 No `id` is written. The tables mint it with `generateUUIDv7()`, so identity is
 the server's and a row is never silently replaced by a re-extraction.
@@ -15,6 +15,7 @@ from __future__ import annotations
 import unicodedata
 from functools import cache
 
+from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import config
 from weave.trace_server.insights.types import (
     FailureSignatureCandidate,
@@ -34,12 +35,9 @@ UNKNOWN_LANGUAGE = "und"
 
 Row = dict[str, object]
 Dropped = dict[str, int]
+Candidate = IntentSignatureCandidate | FailureSignatureCandidate
 # One judged occurrence: the turn it came from plus what was claimed about it.
 DedupeKey = tuple[str, str, str]
-
-
-class InsightWriteRejected(Exception):
-    """The request as a whole is unusable, as opposed to one bad candidate."""
 
 
 def validate_config_sha(signature_type: str, claimed: str) -> None:
@@ -50,7 +48,7 @@ def validate_config_sha(signature_type: str, claimed: str) -> None:
     """
     actual = config.config_sha(_load(signature_type))
     if claimed != actual:
-        raise InsightWriteRejected(
+        raise InvalidRequest(
             f"{signature_type} config_sha {claimed!r} does not match the deployed "
             f"config {actual!r}"
         )
@@ -63,9 +61,7 @@ def canonicalize_signature(text: str, *, normalization_version: int) -> str:
     `config_sha`, so changing it is a visible digest move.
     """
     if normalization_version != 1:
-        raise InsightWriteRejected(
-            f"unsupported normalization_version {normalization_version}"
-        )
+        raise RuntimeError(f"unsupported normalization_version {normalization_version}")
     collapsed = " ".join(unicodedata.normalize("NFKC", text).split())
     return collapsed.rstrip(".").strip().casefold()
 
@@ -91,9 +87,7 @@ def prepare_intents(
         key = (candidate.conversation_id, candidate.trace_id, signature)
         _note_duplicate(rows, key, dropped)
         rows[key] = {
-            "project_id": project_id,
-            "config_sha": config_sha,
-            "signature": signature,
+            **_common_row(project_id, config_sha, signature, candidate),
             "category": _label(
                 candidate.category, categories, dropped, GATE_UNKNOWN_CATEGORY
             ),
@@ -102,15 +96,7 @@ def prepare_intents(
                 candidate.sentiment, sentiments, dropped, GATE_UNKNOWN_SENTIMENT
             ),
             "sentiment_rationale": candidate.sentiment_rationale,
-            "vector": candidate.vector,
-            "conversation_id": candidate.conversation_id,
             "trace_id": candidate.trace_id,
-            "user_id": candidate.user_id,
-            "agent_name": candidate.agent_name,
-            "turn_duration_ms": candidate.turn_duration_ms,
-            "turn_cost_usd": candidate.turn_cost_usd,
-            "trace_started_at": candidate.trace_started_at,
-            "extracted_at": candidate.extracted_at,
         }
     return list(rows.values()), dropped
 
@@ -142,9 +128,7 @@ def prepare_failures(
         key = (candidate.conversation_id, candidate.current_trace_id, signature)
         _note_duplicate(rows, key, dropped)
         rows[key] = {
-            "project_id": project_id,
-            "config_sha": config_sha,
-            "signature": signature,
+            **_common_row(project_id, config_sha, signature, candidate),
             "failure_reason": candidate.failure_reason,
             "category": _label(
                 candidate.category, categories, dropped, GATE_UNKNOWN_CATEGORY
@@ -152,17 +136,9 @@ def prepare_failures(
             "severity": _optional_label(
                 candidate.severity, severities, dropped, GATE_UNKNOWN_SEVERITY
             ),
-            "vector": candidate.vector,
-            "conversation_id": candidate.conversation_id,
             "current_trace_id": candidate.current_trace_id,
             "affected_trace_ids": affected,
             "evidence_span_ids": sorted(set(candidate.evidence_span_ids)),
-            "user_id": candidate.user_id,
-            "agent_name": candidate.agent_name,
-            "turn_duration_ms": candidate.turn_duration_ms,
-            "turn_cost_usd": candidate.turn_cost_usd,
-            "trace_started_at": candidate.trace_started_at,
-            "extracted_at": candidate.extracted_at,
         }
     return list(rows.values()), dropped
 
@@ -176,15 +152,36 @@ def _load(signature_type: str) -> config.SignatureConfig:
 def _intent_config() -> config.IntentConfig:
     cfg = _load("intent")
     if not isinstance(cfg, config.IntentConfig):
-        raise InsightWriteRejected("intent.yaml does not declare the intent type")
+        raise TypeError("intent.yaml does not declare the intent type")
     return cfg
 
 
 def _failure_config() -> config.FailureConfig:
     cfg = _load("failure")
     if not isinstance(cfg, config.FailureConfig):
-        raise InsightWriteRejected("failure.yaml does not declare the failure type")
+        raise TypeError("failure.yaml does not declare the failure type")
     return cfg
+
+
+def _common_row(
+    project_id: str,
+    config_sha: str,
+    signature: str,
+    candidate: Candidate,
+) -> Row:
+    return {
+        "project_id": project_id,
+        "config_sha": config_sha,
+        "signature": signature,
+        "vector": candidate.vector,
+        "conversation_id": candidate.conversation_id,
+        "user_id": candidate.user_id,
+        "agent_name": candidate.agent_name,
+        "turn_duration_ms": candidate.turn_duration_ms,
+        "turn_cost_usd": candidate.turn_cost_usd,
+        "trace_started_at": candidate.trace_started_at,
+        "extracted_at": candidate.extracted_at,
+    }
 
 
 def _label_names(taxonomy: config.TaxonomyRef) -> set[str]:
