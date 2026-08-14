@@ -926,21 +926,24 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("cluster_distance", "Float32"),
                 ("umap_x", "Float32"),
                 ("umap_y", "Float32"),
+                ("trace_id", "String"),
+                ("turn_duration_ms", "UInt32"),
+                ("turn_cost_usd", "Float64"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
                 ("expire_at", "DateTime"),
             ],
         ),
         "signature_cluster_runs": (
-            "project_id, id",
+            "project_id, signature_type, window_end, id",
             [
                 ("project_id", "String"),
                 ("id", "UUID"),
-                ("signature_type", "LowCardinality(String)"),
+                ("signature_type", "Enum8('intent' = 1, 'failure' = 2)"),
                 ("signature_config_sha", "LowCardinality(String)"),
                 ("cluster_config_sha", "LowCardinality(String)"),
                 ("window_start", "DateTime64(6, 'UTC')"),
                 ("window_end", "DateTime64(6, 'UTC')"),
-                ("status", "LowCardinality(String)"),
+                ("status", "Enum8('running' = 1, 'completed' = 2, 'failed' = 3)"),
                 ("started_at", "DateTime64(6, 'UTC')"),
                 ("completed_at", "Nullable(DateTime64(6, 'UTC'))"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -1001,7 +1004,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         ("2026-06-20 15:00:00", "running", "NULL"),
         (
             "2026-06-20 15:05:00",
-            "complete",
+            "completed",
             "toDateTime64('2026-06-20 15:04:00', 6, 'UTC')",
         ),
     ]:
@@ -1030,9 +1033,11 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         ch_client.command(
             f"INSERT INTO {target_db}.signature_cluster_assignments "
             "(project_id, cluster_run_id, signature_record_id, cluster_id, "
-            "cluster_distance, umap_x, umap_y, inserted_at) "
+            "cluster_distance, umap_x, umap_y, trace_id, turn_duration_ms, "
+            "turn_cost_usd, inserted_at) "
             f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', {cluster_id}, "
             f"toFloat32({distance}), toFloat32({umap[0]}), toFloat32({umap[1]}), "
+            "'trace-4', 9000, 0.21, "
             f"toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
 
@@ -1043,7 +1048,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         "isNull(argMax(completed_at, inserted_at)) "
         f"FROM {target_db}.signature_cluster_runs "
         "WHERE project_id = 'project-1' GROUP BY project_id, id"
-    ).result_rows == [("complete", "intent", "signature-cfg-a", "cluster-cfg-a", 0)]
+    ).result_rows == [("completed", "intent", "signature-cfg-a", "cluster-cfg-a", 0)]
     assert ch_client.query(
         "SELECT argMax(label, inserted_at), argMax(occurrence_count, inserted_at) "
         f"FROM {target_db}.signature_clusters "
@@ -1053,20 +1058,25 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         "SELECT argMax(cluster_id, inserted_at), "
         "round(toFloat64(argMax(cluster_distance, inserted_at)), 3), "
         "toFloat64(argMax(umap_x, inserted_at)), "
-        "toFloat64(argMax(umap_y, inserted_at)) "
+        "toFloat64(argMax(umap_y, inserted_at)), "
+        "argMax(trace_id, inserted_at), argMax(turn_duration_ms, inserted_at), "
+        "round(argMax(turn_cost_usd, inserted_at), 3) "
         f"FROM {target_db}.signature_cluster_assignments "
         "WHERE project_id = 'project-1' "
         "GROUP BY project_id, cluster_run_id, signature_record_id"
-    ).result_rows == [(7, 0.875, -1.5, 3.25)]
+    ).result_rows == [(7, 0.875, -1.5, 3.25, "trace-4", 9000, 0.21)]
 
-    # The assignment references the upstream signature row UUID directly.
+    # The assignment references the upstream signature row UUID directly, and the
+    # denormalized turn columns carry the same values that join would have hydrated.
     assert ch_client.query(
-        "SELECT count() "
+        "SELECT count(), countIf(a.trace_id = s.trace_id "
+        "AND a.turn_duration_ms = s.turn_duration_ms "
+        "AND round(a.turn_cost_usd, 3) = round(s.turn_cost_usd, 3)) "
         f"FROM {target_db}.signature_cluster_assignments AS a "
         f"INNER JOIN {target_db}.intent_signatures AS s "
         "ON a.project_id = s.project_id AND a.signature_record_id = s.id "
         f"WHERE a.cluster_run_id = toUUID('{run_id}')"
-    ).result_rows == [(2,)]
+    ).result_rows == [(2, 2)]
 
     for table_name in expected_tables:
         ch_client.command(f"OPTIMIZE TABLE {target_db}.{table_name} FINAL")
