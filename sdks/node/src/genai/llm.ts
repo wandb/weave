@@ -9,12 +9,7 @@ import {
 import type {ChildSpanContext} from './common';
 import {getGenaiState} from './context';
 import {getWeaveTracer} from './provider';
-import {
-  sanitizeSpanAttributes,
-  SpanBase,
-  type SpanEndOptions,
-  type SpanInitBase,
-} from './spanBase';
+import {SpanBase, type SpanEndOptions, type SpanInitBase} from './spanBase';
 import {
   ATTR_GEN_AI_CONVERSATION_ID,
   ATTR_GEN_AI_INPUT_MESSAGES,
@@ -135,10 +130,7 @@ export class LLM extends SpanBase {
       );
     }
     const tracer = getWeaveTracer(WEAVE_GENAI_TRACER_NAME);
-    const attributes = sanitizeSpanAttributes(
-      opts.attributes ?? {},
-      'LLM.create()'
-    );
+    const attributes: Attributes = {...(opts.attributes ?? {})};
     const span = tracer.startSpan(
       'chat',
       {kind: SpanKind.CLIENT, attributes, startTime: opts.startTime},
@@ -151,7 +143,7 @@ export class LLM extends SpanBase {
       opts.model,
       opts.providerName ?? '',
       opts.systemInstructions ?? [],
-      attributes
+      opts.attributes ?? {}
     );
     state.llm = llm;
     return llm;
