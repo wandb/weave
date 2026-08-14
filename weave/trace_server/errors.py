@@ -402,9 +402,6 @@ class ErrorRegistry:
         self.register(
             CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
-        # Subclasses Exception, not DatabaseError; raised on mid-stream
-        # connection failure (clickhouse-connect >= 1.4 raises instead of
-        # returning a silently truncated stream).
         self.register(
             CHStreamFailureError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
@@ -420,7 +417,7 @@ class ErrorRegistry:
 
 def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
-    global _error_registry  # ruff: ignore[global-statement]
+    global _error_registry  # noqa: PLW0603
     if _error_registry is None:
         _error_registry = ErrorRegistry()
     return _error_registry
