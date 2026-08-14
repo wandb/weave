@@ -126,6 +126,18 @@ Evaluation result rows merge agent span links from two sources: legacy
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
 
+`weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
+call to the OTel span that was current when it started — an agent's
+`execute_tool` span in the case it is built for, but any ambient instrumentation
+qualifies. `create_call` writes it on *every* call started inside that span, not
+just the outermost one: skipping when the parent call already carries it marks
+every other level, because the check reads the parent's recorded state and the
+parent may itself have skipped. A reader must treat a missing key and a pair
+that matches no span as normal — the write does not check that the span reaches
+our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
+they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
+off the span object, which under the OTel→DD bridge is not an SDK span.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines
@@ -563,6 +575,9 @@ deterministic.
   arguments/result. Integrations populate them through `SubAgent.record()` so
   `_build_attrs()` applies `include_content` and PII redaction; do not write
   those content attributes directly with `set_attributes()`.
+- `Tool`, `LLM`, `SubAgent`, and `Turn` expose `record_error(error)` to mark a
+  failure without ending the span. It derives `error.type` from the exception;
+  call `end()` separately. Context managers do both for escaping exceptions.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.

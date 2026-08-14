@@ -517,73 +517,77 @@ def test_call_stats_op_names_filter(client: weave_client.WeaveClient):
 
 
 def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
-    """Test trace_roots_only filter excludes child calls."""
+    """Root-only stats keep native root usage and OTEL span usage."""
     project_id = client.project_id
     model_name = "gpt-4o-roots-test"
-
     start_time = _BASE_TIME
 
-    # Create a root call
-    root_call_id = str(uuid.uuid4())
-    trace_id = str(uuid.uuid4())
+    def create_call(
+        trace_id: str,
+        parent_id: str | None,
+        offset_seconds: int,
+        prompt_tokens: int,
+        *,
+        is_otel: bool = False,
+        attributes: dict | None = None,
+    ) -> str:
+        call_id = str(uuid.uuid4())
+        started_at = start_time + datetime.timedelta(seconds=offset_seconds)
+        client.server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=trace_id,
+                    started_at=started_at,
+                    op_name=f"weave:///{project_id}/op/test_op:v1",
+                    parent_id=parent_id,
+                    attributes=attributes or {},
+                    inputs={},
+                    otel_dump={"name": "span"} if is_otel else None,
+                )
+            )
+        )
+        usage = (
+            {
+                model_name: {
+                    "prompt_tokens": prompt_tokens,
+                    "total_tokens": prompt_tokens,
+                }
+            }
+            if prompt_tokens
+            else {}
+        )
+        client.server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=started_at + datetime.timedelta(seconds=1),
+                    summary={"usage": usage},
+                )
+            )
+        )
+        return call_id
 
-    client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=root_call_id,
-                trace_id=trace_id,
-                started_at=start_time,
-                op_name=f"weave:///{project_id}/op/root_op:v1",
-                parent_id=None,
-                attributes={},
-                inputs={},
-            )
-        )
-    )
-    client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=root_call_id,
-                ended_at=start_time + datetime.timedelta(seconds=1),
-                summary={
-                    "usage": {model_name: {"prompt_tokens": 100, "total_tokens": 100}}
-                },
-            )
-        )
+    # Native SDK usage is already aggregated on the root.
+    native_trace_id = str(uuid.uuid4())
+    native_root_id = create_call(native_trace_id, None, 0, 100)
+    create_call(native_trace_id, native_root_id, 2, 200)
+    # A caller-supplied compatibility attribute does not make a native call OTEL.
+    create_call(
+        native_trace_id,
+        native_root_id,
+        3,
+        400,
+        attributes={"otel_span": {"name": "caller-supplied"}},
     )
 
-    # Create a child call
-    child_call_id = str(uuid.uuid4())
-    client.server.call_start(
-        tsi.CallStartReq(
-            start=tsi.StartedCallSchemaForInsert(
-                project_id=project_id,
-                id=child_call_id,
-                trace_id=trace_id,
-                started_at=start_time + datetime.timedelta(seconds=2),
-                op_name=f"weave:///{project_id}/op/child_op:v1",
-                parent_id=root_call_id,
-                attributes={},
-                inputs={},
-            )
-        )
-    )
-    client.server.call_end(
-        tsi.CallEndReq(
-            end=tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=child_call_id,
-                ended_at=start_time + datetime.timedelta(seconds=3),
-                summary={
-                    "usage": {model_name: {"prompt_tokens": 200, "total_tokens": 200}}
-                },
-            )
-        )
-    )
+    # OTEL usage remains on descendant spans.
+    otel_trace_id = str(uuid.uuid4())
+    otel_root_id = create_call(otel_trace_id, None, 4, 0, is_otel=True)
+    create_call(otel_trace_id, otel_root_id, 6, 300, is_otel=True)
 
-    # Query with trace_roots_only=True should only get root call (100 tokens)
     force_merge_calls(client)
     result = client.server.call_stats(
         CallStatsReq(
@@ -596,14 +600,19 @@ def test_call_stats_trace_roots_only_filter(client: weave_client.WeaveClient):
                     metric="input_tokens", aggregations=[AggregationType.SUM]
                 ),
             ],
+            call_metrics=[
+                CallMetricSpec(metric="call_count", aggregations=[AggregationType.SUM])
+            ],
             filter=CallsFilter(trace_roots_only=True),
         )
     )
 
     model_buckets = [b for b in result.usage_buckets if b.get("model") == model_name]
     total_sum = sum(b.get("sum_input_tokens", 0) for b in model_buckets)
+    total_call_count = sum(b.get("sum_call_count", 0) for b in result.call_buckets)
 
-    assert total_sum == 100, f"Expected 100 (root only), got {total_sum}"
+    assert total_sum == 400
+    assert total_call_count == 2
 
 
 def test_call_stats_trace_ids_filter(client: weave_client.WeaveClient):

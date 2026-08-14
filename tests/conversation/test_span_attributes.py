@@ -1,9 +1,7 @@
-"""Tests for ``set_attributes`` and ``add_event``.
+"""Tests for the public span mutation methods.
 
-Both live on ``_SpanBase`` so every span class (Tool, LLM, SubAgent, Turn)
-gets identical behavior. Tests are parametrized across the four span
-classes; the two methods get one test each so each test reads
-top-to-bottom without indirection.
+They live on ``_SpanBase`` so every span class (Tool, LLM, SubAgent, Turn)
+gets identical behavior. Tests are parametrized across all four classes.
 """
 
 from __future__ import annotations
@@ -12,6 +10,7 @@ import logging
 
 import pytest
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 from weave.conversation.conversation import (
     LLM,
@@ -85,6 +84,31 @@ def test_set_attributes_accepts_sequence_value(
 
 
 # ---------------------------------------------------------------------------
+# record_error
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
+def test_record_error_marks_span_failed_without_ending(
+    otel_spans: InMemorySpanExporter, _class_label, factory, span_name
+) -> None:
+    with Conversation(conversation_id="test-conversation"), factory() as span_obj:
+        assert span_obj.record_error(ValueError("invalid response")) is span_obj
+        span_obj.set_attributes({"weave.after_error": True})
+
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert finished_span.attributes["error.type"] == "ValueError"
+    assert finished_span.attributes["weave.after_error"] is True
+    assert finished_span.status.status_code == StatusCode.ERROR
+    assert finished_span.status.description == "invalid response"
+    assert len(finished_span.events) == 1
+    assert finished_span.events[0].name == "exception"
+    assert finished_span.events[0].attributes["exception.type"] == "ValueError"
+
+
+# ---------------------------------------------------------------------------
 # add_event
 # ---------------------------------------------------------------------------
 
@@ -147,37 +171,42 @@ def test_add_event_emits_deprecation_warning(
 def test_returns_self_for_chaining(
     otel_spans: InMemorySpanExporter, _class_label, factory, _span_name
 ) -> None:
-    """Both mutators return ``self`` for fluent chaining on a live span."""
+    """Span mutation methods return ``self`` for fluent chaining."""
     with Conversation(conversation_id="test-conversation"), factory() as span_obj:
         assert span_obj.set_attributes({"key": "value"}) is span_obj
+        assert span_obj.record_error(RuntimeError("boom")) is span_obj
         assert span_obj.add_event("event-name") is span_obj
 
 
 def test_warns_when_span_not_started(
     caplog: pytest.LogCaptureFixture, otel_spans: InMemorySpanExporter
 ) -> None:
-    """Both mutators warn and emit no span when called before ``with``."""
+    """Span mutation methods warn and emit no span before ``with``."""
     caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
     tool = Tool(name="test-tool")
     tool.set_attributes({"weave.first": "one"})
+    tool.record_error(RuntimeError("boom"))
     tool.add_event("weave.evt")
     messages = [record.message for record in caplog.records]
     assert any("set_attributes" in m and "span not started" in m for m in messages)
+    assert any("record_error" in m and "span not started" in m for m in messages)
     assert any("add_event" in m and "span not started" in m for m in messages)
     assert len(otel_spans.get_finished_spans()) == 0
 
 
 def test_warns_when_span_already_ended(caplog: pytest.LogCaptureFixture) -> None:
-    """Both mutators warn when called after ``end()``."""
+    """Span mutation methods warn when called after ``end()``."""
     caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
     with Conversation(conversation_id="test-conversation"):
         tool = Tool(name="test-tool")
         with tool:
             pass
         tool.set_attributes({"weave.first": "one"})
+        tool.record_error(RuntimeError("boom"))
         tool.add_event("weave.evt")
     messages = [record.message for record in caplog.records]
     assert any("set_attributes" in m and "span already ended" in m for m in messages)
+    assert any("record_error" in m and "span already ended" in m for m in messages)
     assert any("add_event" in m and "span already ended" in m for m in messages)
 
 

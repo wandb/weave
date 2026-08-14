@@ -1264,6 +1264,7 @@ class TestErrorRecording:
         )
         assert chat_span.status.status_code == StatusCode.ERROR
         assert "LLM call failed" in chat_span.status.description
+        assert chat_span.attributes["error.type"] == "ValueError"
         assert len(chat_span.events) >= 1
         assert chat_span.events[0].name == "exception"
 
