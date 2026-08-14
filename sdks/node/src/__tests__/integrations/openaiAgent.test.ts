@@ -698,6 +698,43 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     );
   });
 
+  test('a weave.op tool records no invoking span', async () => {
+    const getWeather = weave.op(
+      async ({city}: {city: string}) => `${city}: Sunny, 22°C`,
+      {name: 'get_weather'}
+    );
+    const agent = new Agent({
+      name: 'Assistant',
+      tools: [
+        tool({
+          name: 'get_weather',
+          description: 'Get the current weather for a given city.',
+          parameters: z.object({city: z.string()}),
+          execute: getWeather,
+        }),
+      ],
+      model: new MockAgent([
+        toolCall('get_weather', {city: 'Tokyo'}, 'call-tokyo'),
+        assistantMessage('Tokyo is sunny.', 'msg-final'),
+      ]),
+    });
+
+    await run(agent, 'What is the weather in Tokyo?');
+
+    // `weave.invoking_span` reads the ambient OTel context, and the
+    // `execute_tool` span wrapping this call is emitted with an explicit parent
+    // and never made current, so the link cannot see it. Reaching it needs this
+    // integration's own span map, which is the next step; until then the call
+    // and the span stay unrelated. Both sides are asserted so the absence is
+    // about the link rather than about a missing span or a missing call.
+    const spans = await emittedSpans();
+    expect(spans.map(s => s.name)).toContain('execute_tool get_weather');
+
+    const calls = await inMemoryTraceServer.getCalls(testProjectName);
+    const weatherCall = calls.find(c => c.op_name.includes('get_weather'))!;
+    expect(weatherCall.attributes.weave).not.toHaveProperty('invoking_span');
+  });
+
   test('OpenAI SDK calls inside an agent context are not double-traced', async () => {
     // Under OTel V2 the agents OTel processor already emits a `chat` span
     // for every model call (with messages + usage). The OpenAI integration's
