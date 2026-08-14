@@ -63,6 +63,18 @@ def table_for_signature_type(signature_type: InsightSignatureType) -> str:
     raise ValueError(f"unknown insights signature type {signature_type!r}")
 
 
+def turn_id_column(signature_type: InsightSignatureType) -> str:
+    """The column naming the turn a row was judged from.
+
+    Turn-scoped measures collapse on it, because one turn emits several signatures.
+    """
+    if signature_type == "intent":
+        return "trace_id"
+    if signature_type == "failure":
+        return "current_trace_id"
+    raise ValueError(f"unknown insights signature type {signature_type!r}")
+
+
 def make_signature_rows_query(pb: ParamBuilder, req: InsightSignaturesQueryReq) -> str:
     """One page of occurrences.
 
@@ -101,8 +113,10 @@ def make_signature_groups_query(
 ) -> str:
     """Facet mix and pre-clustering ranking.
 
-    `uniq(conversation_id)` and `uniq(user_id)` stay separate, and `avg`/`quantile`
-    never `sum` because failure windows overlap on a turn.
+    The inner query collapses to one row per turn per group, so `turn_cost_usd`
+    and `turn_duration_ms` count a turn once however many signatures it emitted.
+    The outer query keeps `occurrences`, `modal_category`, and `configs`
+    occurrence-weighted, which is what those three describe.
     """
     if not req.group_by:
         raise ValueError("groups mode requires at least one group_by field")
@@ -110,21 +124,35 @@ def make_signature_groups_query(
         _group_expression(field, req.signature_type) for field in req.group_by
     ]
     group_keys = [expr.split(" AS ")[-1] for expr in group_exprs]
+    turn_id = turn_id_column(req.signature_type)
 
     where = _filters(pb, req)
     limit = pb.add_param(req.limit)
     return f"""
 SELECT
-    {", ".join(group_exprs)},
-    count() AS occurrences,
+    {", ".join(group_keys)},
+    sum(turn_occurrences) AS occurrences,
+    count() AS turns,
     uniq(conversation_id) AS conversations,
     uniq(user_id) AS users,
-    topK(1)(category)[1] AS modal_category,
+    topKMerge(1)(category_state)[1] AS modal_category,
     avg(turn_cost_usd) AS avg_turn_cost_usd,
     quantile(0.5)(turn_duration_ms) AS p50_turn_duration_ms,
-    topK(3)(config_sha) AS configs
-FROM {table_for_signature_type(req.signature_type)}
-WHERE {" AND ".join(where)}
+    topKMerge(3)(config_state) AS configs
+FROM (
+    SELECT
+        {", ".join(group_exprs)},
+        conversation_id,
+        user_id,
+        count() AS turn_occurrences,
+        any(turn_cost_usd) AS turn_cost_usd,
+        any(turn_duration_ms) AS turn_duration_ms,
+        topKState(1)(category) AS category_state,
+        topKState(3)(config_sha) AS config_state
+    FROM {table_for_signature_type(req.signature_type)}
+    WHERE {" AND ".join(where)}
+    GROUP BY {", ".join(group_keys)}, conversation_id, user_id, {turn_id}
+)
 GROUP BY {", ".join(group_keys)}
 ORDER BY occurrences DESC
 LIMIT {{{limit}:UInt32}}

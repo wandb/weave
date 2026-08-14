@@ -78,11 +78,9 @@ def insights_signatures_query(
     result_rows = [
         dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
     ]
-    cost_is_additive = req.signature_type == "intent"
     if req.mode == "groups":
         return InsightSignaturesQueryRes(
-            groups=[_group(row, req.group_by) for row in result_rows],
-            cost_is_additive=cost_is_additive,
+            groups=[_group(row, req.group_by) for row in result_rows]
         )
 
     cursor = None
@@ -92,9 +90,7 @@ def insights_signatures_query(
             day=last["trace_started_at"].date(), id=last["id"]
         )
     return InsightSignaturesQueryRes(
-        rows=[InsightSignatureRow(**row) for row in result_rows],
-        next_cursor=cursor,
-        cost_is_additive=cost_is_additive,
+        rows=[InsightSignatureRow(**row) for row in result_rows], next_cursor=cursor
     )
 
 
@@ -103,6 +99,7 @@ def _group(row: dict[str, Any], group_by: Sequence[str]) -> InsightSignatureGrou
     return InsightSignatureGroup(
         keys=keys,
         occurrences=row["occurrences"],
+        turns=row["turns"],
         conversations=row["conversations"],
         users=row["users"],
         modal_category=row["modal_category"],

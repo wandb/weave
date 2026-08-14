@@ -55,13 +55,23 @@ BASE_PARAMS = {
 }
 
 GROUP_MEASURES = """
-    count() AS occurrences,
+    sum(turn_occurrences) AS occurrences,
+    count() AS turns,
     uniq(conversation_id) AS conversations,
     uniq(user_id) AS users,
-    topK(1)(category)[1] AS modal_category,
+    topKMerge(1)(category_state)[1] AS modal_category,
     avg(turn_cost_usd) AS avg_turn_cost_usd,
     quantile(0.5)(turn_duration_ms) AS p50_turn_duration_ms,
-    topK(3)(config_sha) AS configs
+    topKMerge(3)(config_state) AS configs
+"""
+TURN_MEASURES = """
+    conversation_id,
+    user_id,
+    count() AS turn_occurrences,
+    any(turn_cost_usd) AS turn_cost_usd,
+    any(turn_duration_ms) AS turn_duration_ms,
+    topKState(1)(category) AS category_state,
+    topKState(3)(config_sha) AS config_state
 """
 
 
@@ -112,12 +122,23 @@ def expected_rows_sql(
 
 
 def expected_groups_sql(
-    *, group_exprs: str, table: str, where: str, group_keys: str, limit_slot: str
+    *,
+    group_exprs: str,
+    table: str,
+    where: str,
+    group_keys: str,
+    limit_slot: str,
 ) -> str:
+    """Two levels: the inner one row per turn per group, the outer the facet."""
+    turn_id = "current_trace_id" if table == "failure_signatures" else "trace_id"
     return f"""
-        SELECT {group_exprs}, {GROUP_MEASURES}
-        FROM {table}
-        WHERE {where}
+        SELECT {group_keys}, {GROUP_MEASURES}
+        FROM (
+            SELECT {group_exprs}, {TURN_MEASURES}
+            FROM {table}
+            WHERE {where}
+            GROUP BY {group_keys}, conversation_id, user_id, {turn_id}
+        )
         GROUP BY {group_keys}
         ORDER BY occurrences DESC
         LIMIT {limit_slot}

@@ -144,7 +144,6 @@ def test_write_read_and_project_isolation(ch_server):
         "explain why the build fails"
     ]
     assert turn_intents.rows[0].sentiment == "frustrated"
-    assert turn_intents.cost_is_additive is True
 
     # Turn drilldown, failure: has() over affected_trace_ids, on a turn that is
     # attributed but is not the turn the failure was detected in.
@@ -157,13 +156,13 @@ def test_write_read_and_project_isolation(ch_server):
     assert turn_failures.rows[0].affected_trace_ids == [TRACES[1], TRACES[3]]
     assert turn_failures.rows[0].evidence_span_ids == ["span-a", "span-b"]
     assert turn_failures.rows[0].severity == "major"
-    assert turn_failures.cost_is_additive is False
 
     # Groups: the repeated signature collapses, and users stay distinct from
     # conversations rather than being equated.
     groups = _query(ch_server, project_id, signature_type="intent", mode="groups")
     by_signature = {group.keys["signature"]: group for group in groups.groups}
     assert by_signature["explain why the build fails"].occurrences == 2
+    assert by_signature["explain why the build fails"].turns == 2
     assert by_signature["explain why the build fails"].users == 2
     assert by_signature["explain why the build fails"].conversations == 1
     assert by_signature["explain why the build fails"].configs == [_digest("intent")]
@@ -177,6 +176,36 @@ def test_write_read_and_project_isolation(ch_server):
         == []
     )
     assert _query(ch_server, other_project, signature_type="failure").rows == []
+
+
+def test_turn_measures_count_a_turn_once(ch_server):
+    """One turn emits several signatures, so turn cost and duration collapse onto it.
+
+    Aggregated per row instead, this group would report twice the money the turn
+    actually cost.
+    """
+    project_id = make_project_id("insights_turn_measures")
+    _write_intents(
+        ch_server,
+        project_id,
+        intents=[
+            _intent(0, "add stripe checkout to the storefront"),
+            _intent(0, "explain why the build fails"),
+        ],
+    )
+
+    [group] = _query(
+        ch_server,
+        project_id,
+        signature_type="intent",
+        mode="groups",
+        group_by=["category"],
+    ).groups
+    assert group.keys == {"category": "action_request"}
+    assert group.occurrences == 2
+    assert group.turns == 1
+    assert group.avg_turn_cost_usd == pytest.approx(0.01)
+    assert group.p50_turn_duration_ms == pytest.approx(100)
 
 
 def test_a_re_extraction_appends_rather_than_replacing(ch_server):
