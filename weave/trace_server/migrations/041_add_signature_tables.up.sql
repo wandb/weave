@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS intent_signatures
     -- Digest of insights/configs/intent.yaml
     config_sha LowCardinality(String),
 
-    -- Canonicalized before insert, so it is lossy against the judge's exact wording.
     signature String,
     category String,
     -- ISO 639-1 two-letter ('en', 'es'), or the ISO 639-2 'und' sentinel.
@@ -49,7 +48,6 @@ CREATE TABLE IF NOT EXISTS failure_signatures
     -- Digest of insights/configs/failure.yaml
     config_sha LowCardinality(String),
 
-    -- Canonicalized before insert, so it is lossy against the judge's exact wording.
     signature String,
     -- Grounded prose explaining the claim, never embedded.
     failure_reason String DEFAULT '',
