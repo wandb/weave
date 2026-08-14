@@ -222,9 +222,9 @@ describe('invoking span', () => {
       trace_id: traceId,
       span_id: spanId,
     });
-    expect(await weaveAttributes('outside')).not.toHaveProperty(
-      INVOKING_SPAN_ATTR_KEY
-    );
+    // Empty, not `WITHOUT_LINK`: the supplied object replaced ours, and all it
+    // held was the key we drop.
+    expect(await weaveAttributes('outside')).toEqual({});
   });
 
   test('keeps the other keys of a caller-supplied weave object', async () => {
