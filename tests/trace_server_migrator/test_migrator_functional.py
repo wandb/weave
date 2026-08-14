@@ -700,6 +700,8 @@ _SIGNATURE_KEY = "project_id, toDate(trace_started_at), id"
 _INTENT_ID = "019ff277-bba3-7232-aeb3-0632fd183e1e"
 _FAILURE_ID_1 = "019ff277-bba3-7232-aeb3-0632fd183e2f"
 _FAILURE_ID_2 = "019ff288-c1d4-7333-bfc4-1743fe294f3a"
+_CLUSTER_ID = "019ff4bc-2ae1-744d-ae3a-285998a9051a"
+_NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
 def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> None:
@@ -922,7 +924,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("project_id", "String"),
                 ("cluster_run_id", "UUID"),
                 ("signature_record_id", "UUID"),
-                ("cluster_id", "Int32"),
+                ("cluster_id", "UUID"),
                 ("cluster_distance", "Float32"),
                 ("umap_x", "Float32"),
                 ("umap_y", "Float32"),
@@ -945,17 +947,17 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("window_end", "DateTime64(6, 'UTC')"),
                 ("status", "Enum8('running' = 1, 'completed' = 2, 'failed' = 3)"),
                 ("started_at", "DateTime64(6, 'UTC')"),
-                ("completed_at", "Nullable(DateTime64(6, 'UTC'))"),
+                ("completed_at", "DateTime64(6, 'UTC')"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
                 ("expire_at", "DateTime"),
             ],
         ),
         "signature_clusters": (
-            "project_id, cluster_run_id, cluster_id",
+            "project_id, cluster_run_id, id",
             [
                 ("project_id", "String"),
                 ("cluster_run_id", "UUID"),
-                ("cluster_id", "Int32"),
+                ("id", "UUID"),
                 ("label", "String"),
                 ("occurrence_count", "UInt64"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -1001,7 +1003,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
     _insert_intent(ch_client, target_db, "action_request", 0.21)
     run_id = "019ff4bc-2ae1-744d-ae3a-285998a90519"
     for inserted_at, status, completed_at in [
-        ("2026-06-20 15:00:00", "running", "NULL"),
+        ("2026-06-20 15:00:00", "running", "toDateTime64(0, 6, 'UTC')"),
         (
             "2026-06-20 15:05:00",
             "completed",
@@ -1021,13 +1023,13 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         )
 
     for inserted_at, label, count, cluster_id, distance, umap in [
-        ("2026-06-20 15:00:00", "draft", 1, -1, 0.0, (0.0, 0.0)),
-        ("2026-06-20 15:05:00", "checkout", 2, 7, 0.875, (-1.5, 3.25)),
+        ("2026-06-20 15:00:00", "draft", 1, _NIL_UUID, 0.0, (0.0, 0.0)),
+        ("2026-06-20 15:05:00", "checkout", 2, _CLUSTER_ID, 0.875, (-1.5, 3.25)),
     ]:
         ch_client.command(
             f"INSERT INTO {target_db}.signature_clusters "
-            "(project_id, cluster_run_id, cluster_id, label, occurrence_count, inserted_at) "
-            f"VALUES ('project-1', '{run_id}', 7, '{label}', {count}, "
+            "(project_id, cluster_run_id, id, label, occurrence_count, inserted_at) "
+            f"VALUES ('project-1', '{run_id}', '{_CLUSTER_ID}', '{label}', {count}, "
             f"toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
         ch_client.command(
@@ -1035,7 +1037,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
             "(project_id, cluster_run_id, signature_record_id, cluster_id, "
             "cluster_distance, umap_x, umap_y, trace_id, turn_duration_ms, "
             "turn_cost_usd, inserted_at) "
-            f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', {cluster_id}, "
+            f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', '{cluster_id}', "
             f"toFloat32({distance}), toFloat32({umap[0]}), toFloat32({umap[1]}), "
             "'trace-4', 9000, 0.21, "
             f"toDateTime64('{inserted_at}', 6, 'UTC'))"
@@ -1045,17 +1047,26 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         "SELECT argMax(status, inserted_at), argMax(signature_type, inserted_at), "
         "argMax(signature_config_sha, inserted_at), "
         "argMax(cluster_config_sha, inserted_at), "
-        "isNull(argMax(completed_at, inserted_at)) "
+        "toString(argMax(completed_at, inserted_at)), toString(min(completed_at)) "
         f"FROM {target_db}.signature_cluster_runs "
         "WHERE project_id = 'project-1' GROUP BY project_id, id"
-    ).result_rows == [("completed", "intent", "signature-cfg-a", "cluster-cfg-a", 0)]
+    ).result_rows == [
+        (
+            "completed",
+            "intent",
+            "signature-cfg-a",
+            "cluster-cfg-a",
+            "2026-06-20 15:04:00.000000",
+            "1970-01-01 00:00:00.000000",
+        )
+    ]
     assert ch_client.query(
         "SELECT argMax(label, inserted_at), argMax(occurrence_count, inserted_at) "
         f"FROM {target_db}.signature_clusters "
-        "WHERE project_id = 'project-1' GROUP BY project_id, cluster_run_id, cluster_id"
+        "WHERE project_id = 'project-1' GROUP BY project_id, cluster_run_id, id"
     ).result_rows == [("checkout", 2)]
     assert ch_client.query(
-        "SELECT argMax(cluster_id, inserted_at), "
+        "SELECT toString(argMax(cluster_id, inserted_at)), "
         "round(toFloat64(argMax(cluster_distance, inserted_at)), 3), "
         "toFloat64(argMax(umap_x, inserted_at)), "
         "toFloat64(argMax(umap_y, inserted_at)), "
@@ -1064,7 +1075,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         f"FROM {target_db}.signature_cluster_assignments "
         "WHERE project_id = 'project-1' "
         "GROUP BY project_id, cluster_run_id, signature_record_id"
-    ).result_rows == [(7, 0.875, -1.5, 3.25, "trace-4", 9000, 0.21)]
+    ).result_rows == [(_CLUSTER_ID, 0.875, -1.5, 3.25, "trace-4", 9000, 0.21)]
 
     # The assignment references the upstream signature row UUID directly, and the
     # denormalized turn columns carry the same values that join would have hydrated.
