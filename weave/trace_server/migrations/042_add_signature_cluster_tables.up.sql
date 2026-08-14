@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS signature_cluster_runs
     window_end DateTime64(6, 'UTC'),
     status Enum8('running' = 1, 'completed' = 2, 'failed' = 3) DEFAULT 'running',
     started_at DateTime64(6, 'UTC'),
-    -- NULL until the run terminates. `inserted_at` is the merge version, not a finish time.
-    completed_at Nullable(DateTime64(6, 'UTC')) DEFAULT NULL,
+    -- Epoch zero until the run terminates. `inserted_at` is the merge version, not a finish time.
+    completed_at DateTime64(6, 'UTC') DEFAULT toDateTime64(0, 6, 'UTC'),
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00'
 )
@@ -27,18 +27,16 @@ CREATE TABLE IF NOT EXISTS signature_clusters
 (
     project_id String,
     cluster_run_id UUID,
-    -- The clusterer's own label, dense from 0 and unique only within `cluster_run_id`. A run
-    -- relabels from scratch, so this never identifies the same cluster across two runs.
-    cluster_id Int32,
+    -- Writer-minted uuidv7, so only a retry reusing this id collapses in the merge. A run
+    -- relabels from scratch, so an id never identifies the same cluster across two runs.
+    id UUID DEFAULT generateUUIDv7(),
     label String,
     occurrence_count UInt64 DEFAULT 0,
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00'
 )
 ENGINE = ReplacingMergeTree(inserted_at)
--- `(cluster_run_id, cluster_id)` is the natural key, so a retried run collapses rather than
--- double-counting `occurrence_count`.
-ORDER BY (project_id, cluster_run_id, cluster_id)
+ORDER BY (project_id, cluster_run_id, id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
 
@@ -48,8 +46,8 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     project_id String,
     cluster_run_id UUID,
     signature_record_id UUID,
-    -- -1 is noise, which has no `signature_clusters` row.
-    cluster_id Int32 DEFAULT -1,
+    -- References `signature_clusters.id`. The nil uuid is noise, which has no cluster row.
+    cluster_id UUID DEFAULT toUUID('00000000-0000-0000-0000-000000000000'),
     -- Distance from the signature vector to its cluster centroid, 0 for noise rows.
     cluster_distance Float32 DEFAULT 0,
     -- UMAP 2-D projection of the signature vector, reprojected by every run.
