@@ -4120,6 +4120,7 @@ class CallsUsageReq(BaseModelStrict):
     )
     limit: int = Field(
         default=10_000,
+        ge=1,
         description="Maximum number of calls to process per trace. Acts as a safety limit to prevent unbounded memory usage.",
     )
 

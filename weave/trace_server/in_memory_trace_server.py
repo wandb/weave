@@ -2713,7 +2713,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             }
             return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
 
-        # ---- Fetch every call in those traces and aggregate usage with descendants ----
+        # Scale per trace to avoid truncation; +1 detects oversized traces.
         calls = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,

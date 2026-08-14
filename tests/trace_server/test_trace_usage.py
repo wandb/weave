@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -639,6 +640,16 @@ def test_calls_usage_rolls_up_descendants(client: weave_client.WeaveClient) -> N
                 limit=2,
             )
         )
+
+
+def test_calls_usage_rejects_non_positive_limit() -> None:
+    for invalid_limit in (0, -1):
+        with pytest.raises(ValidationError):
+            tsi.CallsUsageReq(
+                project_id="entity/project",
+                call_ids=["root"],
+                limit=invalid_limit,
+            )
 
 
 def test_calls_usage_include_costs_flag(client: weave_client.WeaveClient) -> None:

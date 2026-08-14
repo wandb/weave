@@ -1808,7 +1808,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
             return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
 
-        # Fetch one row beyond each per-trace cap so oversized traces fail.
+        # Scale per trace to avoid truncation; +1 detects oversized traces.
         combined_limit = (req.limit + 1) * len(trace_ids)
 
         # Stream all calls in those traces with minimal columns for aggregation.

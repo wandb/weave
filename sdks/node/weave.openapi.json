@@ -11864,6 +11864,7 @@
           },
           "limit": {
             "type": "integer",
+            "minimum": 1.0,
             "title": "Limit",
             "description": "Maximum number of calls to process per trace. Acts as a safety limit to prevent unbounded memory usage.",
             "default": 10000
