@@ -2,16 +2,22 @@
 CREATE TABLE IF NOT EXISTS signature_cluster_runs
 (
     project_id String,
-    id UUID DEFAULT generateUUIDv7(),
+    -- Intentionally omit UUID default, tracking in-progress runs requires re-inserting 
+    -- with the same PK, consumers should generate uuidv7 before insert
+    id UUID, -- UUIDv7
+
     signature_type Enum8('intent' = 1, 'failure' = 2),
     signature_config_sha LowCardinality(String),
     cluster_config_sha LowCardinality(String),
+    naming_config_sha LowCardinality(String),
+
     window_start DateTime64(6, 'UTC'),
     window_end DateTime64(6, 'UTC'),
-    status Enum8('running' = 1, 'completed' = 2, 'failed' = 3) DEFAULT 'running',
+
+    status Enum8('unset' = 1, 'running' = 2, 'completed' = 3, 'failed' = 4) DEFAULT 'unset',
+
     started_at DateTime64(6, 'UTC'),
-    -- Epoch zero until the run terminates. `inserted_at` is the merge version, not a finish time.
-    completed_at DateTime64(6, 'UTC') DEFAULT toDateTime64(0, 6, 'UTC'),
+    completed_at DateTime64(6, 'UTC'),
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00'
 )
@@ -27,15 +33,26 @@ CREATE TABLE IF NOT EXISTS signature_clusters
 (
     project_id String,
     cluster_run_id UUID,
-    -- Writer-minted uuidv7, so only a retry reusing this id collapses in the merge. A run
-    -- relabels from scratch, so an id never identifies the same cluster across two runs.
-    id UUID DEFAULT generateUUIDv7(),
+    id UUID,
+    -- Copied from the run. Fixed at run creation, so it is partition-safe.
+    run_window_end DateTime64(6, 'UTC'),
+
+    -- Stable across runs. The writer matches each cluster to the previous run's
+    -- clusters by centroid similarity. Nil means no match, so this topic is new.
+    topic_id UUID,
+    -- Mean signature vector. Enables assigning a new signature to an existing cluster.
+    centroid Array(Float32),
+
     label String,
+    description String DEFAULT '',
     occurrence_count UInt64 DEFAULT 0,
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
-    expire_at DateTime DEFAULT '2100-01-01 00:00:00'
+    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
+
+    INDEX idx_topic_id topic_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
+PARTITION BY toYYYYMM(run_window_end)
 ORDER BY (project_id, cluster_run_id, id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
@@ -46,27 +63,32 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     project_id String,
     cluster_run_id UUID,
     signature_record_id UUID,
-    -- References `signature_clusters.id`. The nil uuid is noise, which has no cluster row.
-    cluster_id UUID DEFAULT toUUID('00000000-0000-0000-0000-000000000000'),
-    -- Distance from the signature vector to its cluster centroid, 0 for noise rows.
+    -- FK to `signature_cluster_runs.window_end`.
+    run_window_end DateTime64(6, 'UTC'),
+    -- FK to `signature_clusters.id`. The nil uuid is noise, which has no cluster row,
+    -- so a run's noise rows are one contiguous range of the sorting key.
+    cluster_id UUID,
+    signature_type Enum8('intent' = 1, 'failure' = 2),
+
+    -- Distance from the signature vector to its cluster centroid.
     cluster_distance Float32 DEFAULT 0,
-    -- UMAP 2-D projection of the signature vector, reprojected by every run.
+    -- UMAP 2-D projection of the signature vector.
     umap_x Float32 DEFAULT 0,
     umap_y Float32 DEFAULT 0,
 
-    -- Denormalized from the signature row so cluster aggregates need no join.
-    -- The turn the signature was extracted from, `failure_signatures.current_trace_id` for
-    -- failures. Join to hydrate `affected_trace_ids`, which is not copied.
+    -- `failure_signatures.current_trace_id` or `intent_signatures.trace_id`
     trace_id String,
-    -- Whole-turn values copied onto every fan-out row, so summing them across a cluster
-    -- without first deduplicating on `trace_id` overcounts.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
 
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
-    expire_at DateTime DEFAULT '2100-01-01 00:00:00'
+    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
+
+    INDEX idx_signature_record_id signature_record_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
-ORDER BY (project_id, cluster_run_id, signature_record_id)
+PARTITION BY toYYYYMM(run_window_end)
+ORDER BY (project_id, cluster_run_id, cluster_id, signature_record_id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
