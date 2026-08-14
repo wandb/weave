@@ -15,7 +15,9 @@ from weave.trace_server.insights import config, writer
 from weave.trace_server.insights.types import (
     FailureSignatureCandidate,
     InsightSignaturesQueryReq,
+    InsightSignaturesQueryRes,
     InsightSignaturesWriteReq,
+    InsightSignaturesWriteRes,
     IntentSignatureCandidate,
 )
 
@@ -55,7 +57,24 @@ def _intent(turn: int, signature: str, **overrides: object) -> IntentSignatureCa
     return IntentSignatureCandidate(**fields)
 
 
-def _write_intents(server, project_id: str, **kwargs) -> object:
+def _failure(
+    turn: int, signature: str, **overrides: object
+) -> FailureSignatureCandidate:
+    fields: dict[str, object] = {
+        "signature": signature,
+        "category": "other",
+        "conversation_id": CONVERSATION,
+        "current_trace_id": TRACES[turn],
+        "affected_trace_ids": [TRACES[turn]],
+        "trace_started_at": _at(turn),
+        "extracted_at": _at(turn),
+        "vector": _vector(),
+    }
+    fields.update(overrides)
+    return FailureSignatureCandidate(**fields)
+
+
+def _write_intents(server, project_id: str, **kwargs) -> InsightSignaturesWriteRes:
     return server.insights_signatures_write(
         InsightSignaturesWriteReq(
             project_id=project_id, config_sha=_digest("intent"), **kwargs
@@ -63,7 +82,7 @@ def _write_intents(server, project_id: str, **kwargs) -> object:
     )
 
 
-def _query(server, project_id: str, **kwargs) -> object:
+def _query(server, project_id: str, **kwargs) -> InsightSignaturesQueryRes:
     return server.insights_signatures_query(
         InsightSignaturesQueryReq(
             project_id=project_id,
@@ -89,16 +108,12 @@ def test_write_read_and_project_isolation(ch_server):
     assert written.written.intents == 3
     assert written.dropped == {}
 
-    failure = FailureSignatureCandidate(
-        signature="agent ignored the stated output path",
-        category="other",
-        conversation_id=CONVERSATION,
-        current_trace_id=TRACES[1],
+    failure = _failure(
+        1,
+        "agent ignored the stated output path",
         # Deliberately unsorted and duplicated: the writer canonicalizes.
         affected_trace_ids=[TRACES[3], TRACES[1], TRACES[1]],
         evidence_span_ids=["span-b", "span-a"],
-        trace_started_at=_at(1),
-        extracted_at=_at(1),
         vector=_vector(0.25),
         severity="major",
         failure_reason="the user named /tmp/out.json and the agent wrote ./out.json",
@@ -236,15 +251,10 @@ def test_writer_gates_repair_or_drop_and_count(ch_server):
             project_id=project_id,
             config_sha=_digest("failure"),
             failures=[
-                FailureSignatureCandidate(
-                    signature="the current turn is not among the attributed turns",
-                    category="other",
-                    conversation_id=CONVERSATION,
-                    current_trace_id=TRACES[0],
+                _failure(
+                    0,
+                    "the current turn is not among the attributed turns",
                     affected_trace_ids=[TRACES[2]],
-                    trace_started_at=_at(0),
-                    extracted_at=_at(0),
-                    vector=_vector(),
                 )
             ],
         )
@@ -321,17 +331,6 @@ def test_write_rejects_a_config_the_server_cannot_resolve(ch_server):
                 project_id=project_id,
                 config_sha=_digest("intent"),
                 intents=[_intent(0, "one signature type per call")],
-                failures=[
-                    FailureSignatureCandidate(
-                        signature="two signature types in one call",
-                        category="other",
-                        conversation_id=CONVERSATION,
-                        current_trace_id=TRACES[0],
-                        affected_trace_ids=[TRACES[0]],
-                        trace_started_at=_at(0),
-                        extracted_at=_at(0),
-                        vector=_vector(),
-                    )
-                ],
+                failures=[_failure(0, "two signature types in one call")],
             )
         )

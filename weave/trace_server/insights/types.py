@@ -22,44 +22,37 @@ InsightGroupField = Literal[
 ]
 
 
-class IntentSignatureCandidate(BaseModelStrict):
+class InsightSignatureCandidateBase(BaseModelStrict):
     signature: str
     category: str
     conversation_id: str
-    trace_id: str
     trace_started_at: datetime.datetime
     extracted_at: datetime.datetime
     vector: list[float]
-    language: str = "und"
-    sentiment: str = ""
-    sentiment_rationale: str = ""
     user_id: str = ""
     agent_name: str = ""
     turn_duration_ms: int = 0
     turn_cost_usd: float = 0.0
 
 
-class FailureSignatureCandidate(BaseModelStrict):
+class IntentSignatureCandidate(InsightSignatureCandidateBase):
+    trace_id: str
+    language: str = "und"
+    sentiment: str = ""
+    sentiment_rationale: str = ""
+
+
+class FailureSignatureCandidate(InsightSignatureCandidateBase):
     """`evidence_span_ids` are span ids, already resolved from the judge's message
     indices: the quote-is-a-substring gate needs the source turn text, so it runs
     in the judge worker and the quotes themselves are never sent here.
     """
 
-    signature: str
-    category: str
-    conversation_id: str
     current_trace_id: str
     affected_trace_ids: list[str]
-    trace_started_at: datetime.datetime
-    extracted_at: datetime.datetime
-    vector: list[float]
     evidence_span_ids: list[str] = Field(default_factory=list)
     failure_reason: str = ""
     severity: str = ""
-    user_id: str = ""
-    agent_name: str = ""
-    turn_duration_ms: int = 0
-    turn_cost_usd: float = 0.0
 
 
 class InsightSignaturesWriteReq(BaseModelStrict):

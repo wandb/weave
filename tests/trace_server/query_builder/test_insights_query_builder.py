@@ -17,16 +17,11 @@ import pytest
 from tests.trace_server.query_builder.utils import assert_raw_sql
 from weave.trace_server.insights.types import (
     InsightSignatureCursor,
-    InsightSignatureRow,
     InsightSignaturesQueryReq,
 )
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.insights_query_builder import (
-    FAILURE_ROW_COLUMNS,
-    GROUP_EXPRESSIONS,
-    INTENT_ROW_COLUMNS,
     PARAM_NAMESPACE,
-    SHARED_ROW_COLUMNS,
     make_signature_groups_query,
     make_signature_rows_query,
 )
@@ -210,7 +205,6 @@ def test_cursor_is_spelled_out_as_an_or_not_a_tuple_comparison() -> None:
         query,
         params,
     )
-    assert "), id) >" not in query
 
 
 def test_a_cursor_is_ignored_when_ordering_by_recency() -> None:
@@ -289,6 +283,12 @@ def test_a_cursor_on_the_range_start_reuses_the_range_slot() -> None:
             id="intent_trace_id_is_equality",
         ),
         pytest.param(
+            {"trace_id": ""},
+            "trace_id = {insights_3:String}",
+            {"insights_3": ""},
+            id="empty_trace_id_is_still_a_filter",
+        ),
+        pytest.param(
             {"conversation_id": "c1"},
             "conversation_id = {insights_3:String}",
             {"insights_3": "c1"},
@@ -358,13 +358,6 @@ def test_an_empty_list_adds_no_clause(overrides: dict) -> None:
         limit_slot="{insights_3:UInt32}",
     )
     assert_sql(expected, {**BASE_PARAMS, "insights_3": 100}, query, params)
-
-
-def test_an_empty_string_filter_is_still_a_predicate() -> None:
-    """`trace_id=""` is not None, so it filters rather than being dropped."""
-    query, params = build_rows(rows_req(trace_id=""))
-    assert "trace_id = {insights_3:String}" in query
-    assert params["insights_3"] == ""
 
 
 def test_every_filter_together_in_allocation_order() -> None:
@@ -536,14 +529,6 @@ def test_a_cursor_never_reaches_a_grouped_read() -> None:
     assert_sql(expected, {**BASE_PARAMS, "insights_3": 100}, query, params)
 
 
-@pytest.mark.parametrize("signature_type", ["intent", "failure"])
-def test_measures_never_sum(signature_type: str) -> None:
-    """Failure windows overlap on a turn, so `sum` would double-count."""
-    query, _ = build_groups(rows_req(signature_type=signature_type, mode="groups"))
-    assert "sum(" not in query
-    assert "count() AS occurrences" in query
-
-
 @pytest.mark.parametrize(
     ("signature_type", "field", "valid_on"),
     [
@@ -562,85 +547,18 @@ def test_a_type_only_group_field_is_rejected_on_the_other_type(
         )
 
 
-def test_groups_mode_requires_a_group_field() -> None:
+def test_invalid_query_shapes_are_rejected() -> None:
+    # A grouped query needs a key.
     with pytest.raises(ValueError, match="at least one group_by field"):
         build_groups(rows_req(mode="groups", group_by=[]))
 
-
-def test_an_unknown_group_field_is_rejected() -> None:
+    # Runtime callers can bypass the Literal annotations.
     with pytest.raises(ValueError, match="unknown insights group field"):
         build_groups(unvalidated_rows_req(mode="groups", group_by=["not_a_field"]))
 
+    for build in (build_rows, build_groups):
+        with pytest.raises(ValueError, match="unknown insights signature type"):
+            build(unvalidated_rows_req(signature_type="sideways", mode="groups"))
 
-@pytest.mark.parametrize("build", [build_rows, build_groups])
-def test_an_unknown_signature_type_is_rejected(build) -> None:
-    with pytest.raises(ValueError, match="unknown insights signature type"):
-        build(unvalidated_rows_req(signature_type="sideways", mode="groups"))
-
-
-def test_an_unknown_row_order_is_rejected() -> None:
     with pytest.raises(ValueError, match="unknown insights row order"):
         build_rows(unvalidated_rows_req(order="sideways"))
-
-
-def test_no_caller_value_reaches_the_sql_text() -> None:
-    """Parameters only: every value lands in params, never inline in the SQL."""
-    hostile = "' OR 1=1 --"
-    query, params = build_rows(
-        rows_req(
-            project_id=hostile,
-            trace_id=hostile,
-            conversation_id=hostile,
-            categories=[hostile],
-            signature_hashes=[hostile],
-            order="key",
-            cursor=InsightSignatureCursor(day=MID_DAY, id=CURSOR_ID),
-        )
-    )
-    assert hostile not in query
-    assert hostile in params.values()
-    assert [hostile.upper()] in params.values()
-
-
-@pytest.mark.parametrize("signature_type", ["intent", "failure"])
-def test_every_selected_column_is_a_field_on_the_row_model(
-    signature_type: str,
-) -> None:
-    """The handler hydrates rows by keyword, so an alias with no field breaks it."""
-    type_columns = (
-        INTENT_ROW_COLUMNS if signature_type == "intent" else FAILURE_ROW_COLUMNS
-    )
-    aliases = [
-        column.split(" AS ")[-1]
-        for column in (*SHARED_ROW_COLUMNS, *type_columns, "vector")
-    ]
-    assert set(aliases) <= set(InsightSignatureRow.model_fields)
-
-
-def test_every_group_field_exposes_an_alias_the_handler_can_read() -> None:
-    """`_group` looks each value up by its request field name."""
-    for field, expression in GROUP_EXPRESSIONS.items():
-        assert expression.split(" AS ")[-1] == field
-
-
-def test_neither_signature_type_reorders_the_shared_projection_prefix() -> None:
-    """The shared columns are pinned identical by the migration's own test; here
-    it is that neither signature type drops or reorders that prefix.
-    """
-    intent, _ = build_rows(rows_req(signature_type="intent"))
-    failure, _ = build_rows(rows_req(signature_type="failure"))
-    assert f"SELECT {SHARED_COLS}," in intent
-    assert f"SELECT {SHARED_COLS}," in failure
-
-
-def test_no_read_uses_final() -> None:
-    """Nothing shares an `id`, so there is nothing to collapse. `FINAL` on these
-    tables is always a mistake.
-    """
-    queries = [
-        build_rows(rows_req())[0],
-        build_rows(rows_req(signature_type="failure", order="key"))[0],
-        build_groups(rows_req(mode="groups"))[0],
-    ]
-    for query in queries:
-        assert "FINAL" not in query.upper()

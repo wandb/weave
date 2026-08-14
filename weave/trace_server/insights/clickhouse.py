@@ -49,18 +49,18 @@ def insights_signatures_write(
         )
     if req.failures:
         writer.validate_config_sha("failure", req.config_sha)
-        rows, dropped = writer.prepare_failures(
+        rows, gate_counts = writer.prepare_failures(
             req.project_id, req.config_sha, req.failures
         )
         written = InsightWriteCounts(failures=_insert(server, FAILURE_TABLE, rows))
     else:
         writer.validate_config_sha("intent", req.config_sha)
-        rows, dropped = writer.prepare_intents(
+        rows, gate_counts = writer.prepare_intents(
             req.project_id, req.config_sha, req.intents
         )
         written = InsightWriteCounts(intents=_insert(server, INTENT_TABLE, rows))
 
-    return InsightSignaturesWriteRes(written=written, dropped=dropped)
+    return InsightSignaturesWriteRes(written=written, dropped=gate_counts)
 
 
 def insights_signatures_query(
@@ -75,26 +75,26 @@ def insights_signatures_query(
         raise ValueError(f"unknown insights query mode {req.mode!r}")
 
     result = server._query(sql, pb.get_params())
-    dicts = [
+    result_rows = [
         dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
     ]
-    additive = req.signature_type == "intent"
+    cost_is_additive = req.signature_type == "intent"
     if req.mode == "groups":
         return InsightSignaturesQueryRes(
-            groups=[_group(row, req.group_by) for row in dicts],
-            cost_is_additive=additive,
+            groups=[_group(row, req.group_by) for row in result_rows],
+            cost_is_additive=cost_is_additive,
         )
 
     cursor = None
-    if req.order == "key" and dicts:
-        last = dicts[-1]
+    if req.order == "key" and result_rows:
+        last = result_rows[-1]
         cursor = InsightSignatureCursor(
             day=last["trace_started_at"].date(), id=last["id"]
         )
     return InsightSignaturesQueryRes(
-        rows=[InsightSignatureRow(**row) for row in dicts],
+        rows=[InsightSignatureRow(**row) for row in result_rows],
         next_cursor=cursor,
-        cost_is_additive=additive,
+        cost_is_additive=cost_is_additive,
     )
 
 

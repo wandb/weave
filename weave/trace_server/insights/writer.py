@@ -1,13 +1,8 @@
-"""Writer gates for the signature tables. The database enforces nothing.
+"""Validate and normalize signature candidates before insertion.
 
-Migration 041 carries no CHECK constraints and no Enums because inserts are
-batched: one bad candidate would fail a batch of 256. Gates drop malformed
-candidates, repair unknown labels, and count both outcomes.
-
-No `id` is written. The tables mint it with `generateUUIDv7()`, so identity is
-the server's and a row is never silently replaced by a re-extraction.
-`signature_hash` is likewise absent: it must equal ClickHouse's
-`sipHash128(signature)` to join the cluster tables, so only a `SELECT` produces it.
+Malformed candidates are dropped and unknown labels are repaired. IDs and
+signature hashes stay server-owned so re-extractions append and hashes match
+ClickHouse's `sipHash128` implementation.
 """
 
 from __future__ import annotations
@@ -19,6 +14,7 @@ from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import config
 from weave.trace_server.insights.types import (
     FailureSignatureCandidate,
+    InsightSignatureCandidateBase,
     IntentSignatureCandidate,
 )
 
@@ -34,9 +30,7 @@ FALLBACK_LABEL = "other"
 UNKNOWN_LANGUAGE = "und"
 
 Row = dict[str, object]
-Dropped = dict[str, int]
-Candidate = IntentSignatureCandidate | FailureSignatureCandidate
-# One judged occurrence: the turn it came from plus what was claimed about it.
+GateCounts = dict[str, int]
 DedupeKey = tuple[str, str, str]
 
 
@@ -70,82 +64,83 @@ def prepare_intents(
     project_id: str,
     config_sha: str,
     candidates: list[IntentSignatureCandidate],
-) -> tuple[list[Row], Dropped]:
+) -> tuple[list[Row], GateCounts]:
     cfg = _intent_config()
     categories = _label_names(cfg.extraction.taxonomy)
     sentiments = _label_names(cfg.extraction.sentiment)
-    dropped: Dropped = {}
+    gate_counts: GateCounts = {}
     rows: dict[DedupeKey, Row] = {}
 
     for candidate in candidates:
-        signature = canonicalize_signature(
-            candidate.signature,
-            normalization_version=cfg.extraction.normalization_version,
+        signature = _prepare_signature(
+            candidate,
+            cfg.extraction.normalization_version,
+            cfg.embedding.dimensions,
+            gate_counts,
         )
-        if not _accepts(signature, candidate.vector, cfg.embedding.dimensions, dropped):
+        if signature is None:
             continue
         key = (candidate.conversation_id, candidate.trace_id, signature)
-        _note_duplicate(rows, key, dropped)
-        rows[key] = {
-            **_common_row(project_id, config_sha, signature, candidate),
+        row = {
+            **_base_row(project_id, config_sha, signature, candidate),
             "category": _label(
-                candidate.category, categories, dropped, GATE_UNKNOWN_CATEGORY
+                candidate.category, categories, gate_counts, GATE_UNKNOWN_CATEGORY
             ),
             "language": candidate.language or UNKNOWN_LANGUAGE,
             "sentiment": _optional_label(
-                candidate.sentiment, sentiments, dropped, GATE_UNKNOWN_SENTIMENT
+                candidate.sentiment, sentiments, gate_counts, GATE_UNKNOWN_SENTIMENT
             ),
             "sentiment_rationale": candidate.sentiment_rationale,
             "trace_id": candidate.trace_id,
         }
-    return list(rows.values()), dropped
+        _store_row(rows, key, row, gate_counts)
+    return list(rows.values()), gate_counts
 
 
 def prepare_failures(
     project_id: str,
     config_sha: str,
     candidates: list[FailureSignatureCandidate],
-) -> tuple[list[Row], Dropped]:
+) -> tuple[list[Row], GateCounts]:
     cfg = _failure_config()
     categories = _label_names(cfg.extraction.taxonomy)
     severities = _label_names(cfg.extraction.severity)
-    dropped: Dropped = {}
+    gate_counts: GateCounts = {}
     rows: dict[DedupeKey, Row] = {}
 
     for candidate in candidates:
-        signature = canonicalize_signature(
-            candidate.signature,
-            normalization_version=cfg.extraction.normalization_version,
+        signature = _prepare_signature(
+            candidate,
+            cfg.extraction.normalization_version,
+            cfg.embedding.dimensions,
+            gate_counts,
         )
-        if not _accepts(signature, candidate.vector, cfg.embedding.dimensions, dropped):
+        if signature is None:
             continue
-        # Sorted and deduplicated so two extractions of one failure compare equal,
-        # with the current turn a member so the row is attributable.
         affected = sorted(set(candidate.affected_trace_ids))
         if candidate.current_trace_id not in affected:
-            _count(dropped, GATE_UNGROUNDED_ATTRIBUTION)
+            _increment(gate_counts, GATE_UNGROUNDED_ATTRIBUTION)
             continue
         key = (candidate.conversation_id, candidate.current_trace_id, signature)
-        _note_duplicate(rows, key, dropped)
-        rows[key] = {
-            **_common_row(project_id, config_sha, signature, candidate),
+        row = {
+            **_base_row(project_id, config_sha, signature, candidate),
             "failure_reason": candidate.failure_reason,
             "category": _label(
-                candidate.category, categories, dropped, GATE_UNKNOWN_CATEGORY
+                candidate.category, categories, gate_counts, GATE_UNKNOWN_CATEGORY
             ),
             "severity": _optional_label(
-                candidate.severity, severities, dropped, GATE_UNKNOWN_SEVERITY
+                candidate.severity, severities, gate_counts, GATE_UNKNOWN_SEVERITY
             ),
             "current_trace_id": candidate.current_trace_id,
             "affected_trace_ids": affected,
             "evidence_span_ids": sorted(set(candidate.evidence_span_ids)),
         }
-    return list(rows.values()), dropped
+        _store_row(rows, key, row, gate_counts)
+    return list(rows.values()), gate_counts
 
 
 @cache
 def _load(signature_type: str) -> config.SignatureConfig:
-    """Configs are checked in, so parsing them once per process is enough."""
     return config.load_config(signature_type)
 
 
@@ -163,11 +158,11 @@ def _failure_config() -> config.FailureConfig:
     return cfg
 
 
-def _common_row(
+def _base_row(
     project_id: str,
     config_sha: str,
     signature: str,
-    candidate: Candidate,
+    candidate: InsightSignatureCandidateBase,
 ) -> Row:
     return {
         "project_id": project_id,
@@ -188,41 +183,48 @@ def _label_names(taxonomy: config.TaxonomyRef) -> set[str]:
     return {label.name for label in taxonomy.labels()}
 
 
-def _accepts(
-    signature: str, vector: list[float], dimensions: int, dropped: Dropped
-) -> bool:
+def _prepare_signature(
+    candidate: InsightSignatureCandidateBase,
+    normalization_version: int,
+    dimensions: int,
+    gate_counts: GateCounts,
+) -> str | None:
+    signature = canonicalize_signature(
+        candidate.signature, normalization_version=normalization_version
+    )
     if not signature:
-        _count(dropped, GATE_EMPTY_SIGNATURE)
-        return False
-    if len(vector) != dimensions:
-        _count(dropped, GATE_VECTOR_DIMENSIONS)
-        return False
-    return True
+        _increment(gate_counts, GATE_EMPTY_SIGNATURE)
+        return None
+    if len(candidate.vector) != dimensions:
+        _increment(gate_counts, GATE_VECTOR_DIMENSIONS)
+        return None
+    return signature
 
 
-def _label(value: str, allowed: set[str], dropped: Dropped, gate: str) -> str:
+def _label(value: str, allowed: set[str], gate_counts: GateCounts, gate: str) -> str:
     if value in allowed:
         return value
-    _count(dropped, gate)
+    _increment(gate_counts, gate)
     return FALLBACK_LABEL
 
 
-def _optional_label(value: str, allowed: set[str], dropped: Dropped, gate: str) -> str:
-    """`''` records that no usable label came back, which is why an unknown one
-    does not fall back to a real label: `''` is not `neutral` and not `info`.
-    """
+def _optional_label(
+    value: str, allowed: set[str], gate_counts: GateCounts, gate: str
+) -> str:
+    """Keep missing labels distinct from real labels such as neutral or info."""
     if not value or value in allowed:
         return value
-    _count(dropped, gate)
+    _increment(gate_counts, gate)
     return ""
 
 
-def _note_duplicate(
-    rows: dict[DedupeKey, Row], key: DedupeKey, dropped: Dropped
+def _store_row(
+    rows: dict[DedupeKey, Row], key: DedupeKey, row: Row, gate_counts: GateCounts
 ) -> None:
     if key in rows:
-        _count(dropped, GATE_DUPLICATE_IN_BATCH)
+        _increment(gate_counts, GATE_DUPLICATE_IN_BATCH)
+    rows[key] = row
 
 
-def _count(dropped: Dropped, gate: str) -> None:
-    dropped[gate] = dropped.get(gate, 0) + 1
+def _increment(gate_counts: GateCounts, gate: str) -> None:
+    gate_counts[gate] = gate_counts.get(gate, 0) + 1
