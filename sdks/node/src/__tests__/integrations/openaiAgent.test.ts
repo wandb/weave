@@ -698,7 +698,7 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
     );
   });
 
-  test('a weave.op tool records no invoking span', async () => {
+  test('a weave.op tool is not yet linked to its execute_tool span', async () => {
     const getWeather = weave.op(
       async ({city}: {city: string}) => `${city}: Sunny, 22°C`,
       {name: 'get_weather'}
@@ -721,12 +721,9 @@ describe('OpenAI Agents Integration (with WEAVE_USE_OTEL_V2=true)', () => {
 
     await run(agent, 'What is the weather in Tokyo?');
 
-    // `weave.invoking_span` reads the ambient OTel context, and the
-    // `execute_tool` span wrapping this call is emitted with an explicit parent
-    // and never made current, so the link cannot see it. Reaching it needs this
-    // integration's own span map, which is the next step; until then the call
-    // and the span stay unrelated. Both sides are asserted so the absence is
-    // about the link rather than about a missing span or a missing call.
+    // Ambient-only for now; the integration's own span map is the follow-up.
+    // Both sides are asserted so the absence is about the link rather than
+    // about a missing span or a missing call.
     const spans = await emittedSpans();
     expect(spans.map(s => s.name)).toContain('execute_tool get_weather');
 

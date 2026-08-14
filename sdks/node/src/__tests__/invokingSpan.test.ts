@@ -13,11 +13,13 @@ import {
   SamplingDecision,
 } from '@opentelemetry/sdk-trace-base';
 
+import {requireGlobalClient} from '../clientApi';
 import {INVOKING_SPAN_ATTR_KEY} from '../constants';
 import {op} from '../op';
 import {packageVersion} from '../utils/packageVersion';
 import {initWithCustomTraceServer} from './clientMock';
-import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
+import {TEST_PROJECT} from './genai/common';
+import {type Call, InMemoryTraceServer} from './helpers/inMemoryTraceServer';
 
 /**
  * The ambient source answers only while a context manager is registered, and
@@ -66,23 +68,24 @@ const zeroIdGenerator: IdGenerator = {
   generateSpanId: () => '0'.repeat(16),
 };
 
-const PROJECT_ID = 'test-project';
+/** Everything a call carries under `weave` when no link was recorded. */
+const WITHOUT_LINK = {client_version: packageVersion, source: 'js-sdk'};
 
 // Every test goes through the public path — run an op, read the stored call —
-// because the span has to be read at a point `createCall` reaches before it
-// awaits, which a direct call to the resolver cannot show.
+// because the span has to be read before `createCall` awaits, which a direct
+// call to the resolver cannot show.
 describe('invoking span', () => {
   let traceServer: InMemoryTraceServer;
 
   beforeEach(() => {
     traceServer = new InMemoryTraceServer();
-    initWithCustomTraceServer(PROJECT_ID, traceServer);
+    initWithCustomTraceServer(TEST_PROJECT, traceServer);
     context.setGlobalContextManager(new TestContextManager());
   });
 
   afterEach(() => {
-    // Jest runs the files in one process, so a registration left behind here
-    // would make the ambient source answer in every later file.
+    // setGlobalContextManager refuses to overwrite an existing registration, so
+    // every test after the first would silently keep this one.
     context.disable();
   });
 
@@ -98,8 +101,14 @@ describe('invoking span', () => {
 
   /** The `weave` attributes of the stored call named `opName`. */
   async function weaveAttributes(opName: string): Promise<Record<string, any>> {
-    const calls = await traceServer.getCalls(PROJECT_ID);
-    const call = calls.find(c => c.op_name.includes(opName));
+    // Query directly once the client has drained: getCalls() waits for the call
+    // count to move, so after a flush it burns its full 1500ms timeout and logs
+    // a warning.
+    await requireGlobalClient().flush();
+    const {calls} = await traceServer.calls.callsStreamQueryPost({
+      project_id: TEST_PROJECT,
+    });
+    const call = calls.find((c: Call) => c.op_name.includes(opName));
     if (!call) {
       throw new Error(`no stored call for op ${opName}`);
     }
@@ -120,19 +129,19 @@ describe('invoking span', () => {
       }
     );
 
+    // Spelled out, not via the constant: Python matches on this string, so a
+    // rename has to fail here rather than pass every test that imports it.
     expect(await weaveAttributes('lookup')).toEqual({
       client_version: packageVersion,
       source: 'js-sdk',
-      [INVOKING_SPAN_ATTR_KEY]: {trace_id: traceId, span_id: spanId},
+      invoking_span: {trace_id: traceId, span_id: spanId},
     });
   });
 
   test('records nothing outside a span', async () => {
     await tracedOp('lookup')();
 
-    expect(await weaveAttributes('lookup')).not.toHaveProperty(
-      INVOKING_SPAN_ATTR_KEY
-    );
+    expect(await weaveAttributes('lookup')).toEqual(WITHOUT_LINK);
   });
 
   test('records nothing for a span that will not be exported', async () => {
@@ -142,9 +151,7 @@ describe('invoking span', () => {
       span.end();
     });
 
-    expect(await weaveAttributes('lookup')).not.toHaveProperty(
-      INVOKING_SPAN_ATTR_KEY
-    );
+    expect(await weaveAttributes('lookup')).toEqual(WITHOUT_LINK);
   });
 
   test('records nothing for a span that has already ended', async () => {
@@ -153,9 +160,7 @@ describe('invoking span', () => {
       await tracedOp('lookup')();
     });
 
-    expect(await weaveAttributes('lookup')).not.toHaveProperty(
-      INVOKING_SPAN_ATTR_KEY
-    );
+    expect(await weaveAttributes('lookup')).toEqual(WITHOUT_LINK);
   });
 
   test('records nothing for an all-zero span identity', async () => {
@@ -165,9 +170,7 @@ describe('invoking span', () => {
       span.end();
     });
 
-    expect(await weaveAttributes('lookup')).not.toHaveProperty(
-      INVOKING_SPAN_ATTR_KEY
-    );
+    expect(await weaveAttributes('lookup')).toEqual(WITHOUT_LINK);
   });
 
   test('records the span on every call started inside it, not just the first', async () => {
@@ -188,14 +191,15 @@ describe('invoking span', () => {
     );
   });
 
-  test('records the span across an await inside it', async () => {
+  test('records a span the op body ends while the call start is in flight', async () => {
+    // `createCall` suspends on its first await and hands control back, so the
+    // op body runs — and ends the span — before it reaches the attributes. Read
+    // the span there instead of on entry and this is the case that goes silent.
     await userTracer().startActiveSpan('user_work', async span => {
-      await new Promise(resolve => setTimeout(resolve, 0));
-      await tracedOp('lookup')();
-      span.end();
+      await op(async () => span.end(), {name: 'ends_span'})();
     });
 
-    expect(await weaveAttributes('lookup')).toHaveProperty(
+    expect(await weaveAttributes('ends_span')).toHaveProperty(
       INVOKING_SPAN_ATTR_KEY
     );
   });
@@ -233,8 +237,8 @@ describe('invoking span', () => {
       }
     );
 
-    // A caller's `weave` object replaces ours instead of merging with it, so
-    // `client_version` and `source` are gone here. That predates this link.
+    // A caller's `weave` object replaces ours instead of merging, so
+    // `client_version` and `source` are gone here — that predates this link.
     expect(await weaveAttributes('lookup')).toEqual({
       tenant: 'acme',
       [INVOKING_SPAN_ATTR_KEY]: {trace_id: traceId, span_id: spanId},

@@ -2023,9 +2023,8 @@ export class WeaveClient {
       ...combinedAttributes,
     };
 
-    // Written after the merge because a caller's own `weave` object replaces
-    // ours wholesale, and dropped first because this key is ours to write and
-    // never a caller's to supply.
+    // After the merge: a caller's own `weave` object replaces ours wholesale.
+    // Dropped first: this key is ours to write, never a caller's to supply.
     const weaveAttributes: Record<string, any> = {...mergedAttributes.weave};
     delete weaveAttributes[INVOKING_SPAN_ATTR_KEY];
     if (invokingSpan !== null) {
