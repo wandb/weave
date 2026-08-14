@@ -611,6 +611,11 @@ _INTENT_COLUMNS = [
     ("agent_name", "String"),
     ("turn_duration_ms", "UInt32"),
     ("turn_cost_usd", "Float64"),
+    ("turn_input_tokens", "UInt64"),
+    ("turn_output_tokens", "UInt64"),
+    ("turn_reasoning_tokens", "UInt64"),
+    ("turn_cache_creation_input_tokens", "UInt64"),
+    ("turn_cache_read_input_tokens", "UInt64"),
     ("trace_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -634,6 +639,11 @@ _FAILURE_COLUMNS = [
     ("agent_name", "String"),
     ("turn_duration_ms", "UInt32"),
     ("turn_cost_usd", "Float64"),
+    ("turn_input_tokens", "UInt64"),
+    ("turn_output_tokens", "UInt64"),
+    ("turn_reasoning_tokens", "UInt64"),
+    ("turn_cache_creation_input_tokens", "UInt64"),
+    ("turn_cache_read_input_tokens", "UInt64"),
     ("trace_started_at", "DateTime64(6, 'UTC')"),
     ("extracted_at", "DateTime64(6, 'UTC')"),
     ("inserted_at", "DateTime64(6, 'UTC')"),
@@ -644,7 +654,7 @@ _FAILURE_COLUMNS = [
 # from a shared block: the assert is ORDER BY position, and shared columns
 # interleave with grain-specific ones differently in each table. Growing this
 # count is a decision, not a side effect.
-_EXPECTED_SHARED_COLUMNS = 15
+_EXPECTED_SHARED_COLUMNS = 20
 
 _SIGNATURE_TABLES = [
     (
@@ -691,6 +701,18 @@ _TRACE_STARTED_AT = "toDateTime64('2026-05-30 09:15:00', 6, 'UTC')"
 _EXTRACTED_AT = "toDateTime64('2026-06-20 14:32:00', 6, 'UTC')"
 _UNIT_VECTOR = "arrayResize([toFloat32(1)], 1024, toFloat32(0))"
 
+# Every value distinct, so a pair transposed on the way in fails the assert. Written
+# in schema order, which is what lets one dict drive both the insert and the read.
+_TURN_TOKENS = {
+    "turn_input_tokens": 12000,
+    "turn_output_tokens": 800,
+    "turn_reasoning_tokens": 320,
+    "turn_cache_creation_input_tokens": 4096,
+    "turn_cache_read_input_tokens": 65536,
+}
+_TOKEN_COLUMNS = ", ".join(_TURN_TOKENS)
+_TOKEN_VALUES = ", ".join(str(count) for count in _TURN_TOKENS.values())
+
 # The sorting key, and therefore the dedup key: a read that collapses a retry
 # groups by all three terms, because no read here uses FINAL.
 _SIGNATURE_KEY = "project_id, toDate(trace_started_at), id"
@@ -712,10 +734,12 @@ def _insert_intent(ch_client, target_db: str, category: str, cost: float) -> Non
         f"INSERT INTO {target_db}.intent_signatures "
         "(project_id, id, config_sha, signature, category, language, "
         "sentiment, vector, conversation_id, trace_id, user_id, agent_name, "
-        "turn_duration_ms, turn_cost_usd, trace_started_at, extracted_at) VALUES "
+        f"turn_duration_ms, turn_cost_usd, {_TOKEN_COLUMNS}, "
+        "trace_started_at, extracted_at) VALUES "
         f"('project-1', '{_INTENT_ID}', 'cfg-a', 'add stripe checkout', "
         f"'{category}', 'es', 'frustrated', {_UNIT_VECTOR}, "
         f"'conversation-1', 'trace-4', 'user-1', 'checkout-agent', 9000, {cost}, "
+        f"{_TOKEN_VALUES}, "
         f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
     )
 
@@ -728,11 +752,13 @@ def _insert_failure(
         f"INSERT INTO {target_db}.failure_signatures "
         "(project_id, id, config_sha, signature, failure_reason, category, "
         "severity, vector, conversation_id, current_trace_id, affected_trace_ids, "
-        "user_id, agent_name, turn_duration_ms, turn_cost_usd, trace_started_at, "
-        f"extracted_at) VALUES ('project-1', '{row_id}', 'cfg-a', "
+        f"user_id, agent_name, turn_duration_ms, turn_cost_usd, {_TOKEN_COLUMNS}, "
+        "trace_started_at, extracted_at) VALUES "
+        f"('project-1', '{row_id}', 'cfg-a', "
         "'ignored the stated output path', 'The user specified /tmp/out.json.', "
         f"'requirement_violation', 'major', {_UNIT_VECTOR}, 'conversation-1', "
         f"'{current}', {affected}, 'user-1', 'checkout-agent', 16000, {cost}, "
+        f"{_TOKEN_VALUES}, "
         f"{_TRACE_STARTED_AT}, {_EXTRACTED_AT})"
     )
 
@@ -936,6 +962,11 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("trace_id", "String"),
                 ("turn_duration_ms", "UInt32"),
                 ("turn_cost_usd", "Float64"),
+                ("turn_input_tokens", "UInt64"),
+                ("turn_output_tokens", "UInt64"),
+                ("turn_reasoning_tokens", "UInt64"),
+                ("turn_cache_creation_input_tokens", "UInt64"),
+                ("turn_cache_read_input_tokens", "UInt64"),
                 ("inserted_at", "DateTime64(6, 'UTC')"),
                 ("expire_at", "DateTime"),
             ],
@@ -954,7 +985,8 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("window_end", "DateTime64(6, 'UTC')"),
                 (
                     "status",
-                    "Enum8('unset' = 1, 'running' = 2, 'completed' = 3, 'failed' = 4)",
+                    "Enum8('pending' = 1, 'running' = 2, 'succeeded' = 3, "
+                    "'failed' = 4, 'canceled' = 5)",
                 ),
                 ("started_at", "DateTime64(6, 'UTC')"),
                 ("completed_at", "DateTime64(6, 'UTC')"),
@@ -1041,7 +1073,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         ("2026-06-20 15:00:00", "running", "toDateTime64(0, 6, 'UTC')"),
         (
             "2026-06-20 15:05:00",
-            "completed",
+            "succeeded",
             "toDateTime64('2026-06-20 15:04:00', 6, 'UTC')",
         ),
     ]:
@@ -1076,11 +1108,12 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
             f"INSERT INTO {target_db}.signature_cluster_assignments "
             "(project_id, cluster_run_id, signature_record_id, run_window_end, "
             "cluster_id, signature_type, cluster_distance, umap_x, umap_y, trace_id, "
-            "turn_duration_ms, turn_cost_usd, inserted_at) "
+            f"turn_duration_ms, turn_cost_usd, {_TOKEN_COLUMNS}, "
+            "inserted_at) "
             f"VALUES ('project-1', '{run_id}', '{_INTENT_ID}', "
             f"toDateTime64('2026-06-01', 6, 'UTC'), '{_CLUSTER_ID}', 'intent', "
             f"toFloat32({distance}), toFloat32({umap[0]}), toFloat32({umap[1]}), "
-            "'trace-4', 9000, 0.21, "
+            f"'trace-4', 9000, 0.21, {_TOKEN_VALUES}, "
             f"toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
 
@@ -1094,7 +1127,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         "WHERE project_id = 'project-1' GROUP BY project_id, id"
     ).result_rows == [
         (
-            "completed",
+            "succeeded",
             "intent",
             "signature-cfg-a",
             "cluster-cfg-a",
@@ -1114,18 +1147,23 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         "toFloat64(argMax(umap_x, inserted_at)), "
         "toFloat64(argMax(umap_y, inserted_at)), "
         "argMax(trace_id, inserted_at), argMax(turn_duration_ms, inserted_at), "
-        "round(argMax(turn_cost_usd, inserted_at), 3) "
-        f"FROM {target_db}.signature_cluster_assignments "
+        "round(argMax(turn_cost_usd, inserted_at), 3), "
+        + ", ".join(f"argMax({column}, inserted_at)" for column in _TURN_TOKENS)
+        + f" FROM {target_db}.signature_cluster_assignments "
         "WHERE project_id = 'project-1' "
         "GROUP BY project_id, cluster_run_id, signature_record_id"
-    ).result_rows == [(_CLUSTER_ID, 0.875, -1.5, 3.25, "trace-4", 9000, 0.21)]
+    ).result_rows == [
+        (_CLUSTER_ID, 0.875, -1.5, 3.25, "trace-4", 9000, 0.21, *_TURN_TOKENS.values())
+    ]
 
     # The assignment references the upstream signature row UUID directly, and the
     # denormalized turn columns carry the same values that join would have hydrated.
     assert ch_client.query(
         "SELECT count(), countIf(a.trace_id = s.trace_id "
         "AND a.turn_duration_ms = s.turn_duration_ms "
-        "AND round(a.turn_cost_usd, 3) = round(s.turn_cost_usd, 3)) "
+        "AND round(a.turn_cost_usd, 3) = round(s.turn_cost_usd, 3) "
+        + "".join(f"AND a.{column} = s.{column} " for column in _TURN_TOKENS)
+        + ") "
         f"FROM {target_db}.signature_cluster_assignments AS a "
         f"INNER JOIN {target_db}.intent_signatures AS s "
         "ON a.project_id = s.project_id AND a.signature_record_id = s.id "
