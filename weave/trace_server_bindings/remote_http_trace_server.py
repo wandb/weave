@@ -20,6 +20,7 @@ from weave.trace.settings import (
 from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
+from weave.trace_server.insights import action_items
 from weave.trace_server.service_interface import ServerInfoRes
 from weave.trace_server.trace_server_interface import agent_types
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -705,6 +706,41 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
             req,
             agent_types.AgentCustomAttrsSchemaReq,
             agent_types.AgentCustomAttrsSchemaRes,
+        )
+
+    # === Insights Action Items API ===
+
+    @validate_call
+    def action_items_batch_upsert(
+        self, req: action_items.ActionItemsBatchUpsertReq
+    ) -> action_items.ActionItemsBatchUpsertRes:
+        return self._generic_request(
+            "/insights/action-items/batch-upsert",
+            req,
+            action_items.ActionItemsBatchUpsertReq,
+            action_items.ActionItemsBatchUpsertRes,
+        )
+
+    @validate_call
+    def action_items_query(
+        self, req: action_items.ActionItemsQueryReq
+    ) -> action_items.ActionItemsQueryRes:
+        return self._generic_request(
+            "/insights/action-items/query",
+            req,
+            action_items.ActionItemsQueryReq,
+            action_items.ActionItemsQueryRes,
+        )
+
+    @validate_call
+    def action_item_update(
+        self, req: action_items.ActionItemUpdateReq
+    ) -> action_items.ActionItemUpdateRes:
+        return self._generic_request(
+            "/insights/action-items/update",
+            req,
+            action_items.ActionItemUpdateReq,
+            action_items.ActionItemUpdateRes,
         )
 
     @validate_call

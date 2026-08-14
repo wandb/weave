@@ -725,6 +725,7 @@ _FAILURE_ID_2 = "019ff288-c1d4-7333-bfc4-1743fe294f3a"
 _CLUSTER_ID = "019ff4bc-2ae1-744d-ae3a-285998a9051a"
 # Stable across runs, unlike `_CLUSTER_ID`, which a run re-mints.
 _TOPIC_ID = "019ff4bc-2ae1-744d-ae3a-285998a9051b"
+_ACTION_ITEM_ID = "019ff4bc-2ae1-744d-ae3a-285998a9051c"
 _NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
 
@@ -1207,6 +1208,109 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         f"FROM {target_db}.signature_cluster_assignments "
         f"WHERE project_id = 'project-1' AND signature_record_id = '{_INTENT_ID}'"
     ).result_rows == [(2, 2, _NIL_UUID)]
+
+
+def test_cluster_action_items_schema_and_retry(ch_client):
+    """Action Items are cluster-scoped and user edits append complete versions."""
+    target_db = _migrate_signatures_db(ch_client, "cluster_action_items")
+
+    assert ch_client.query(
+        "SELECT engine, partition_key, sorting_key, primary_key, "
+        "extract(create_table_query, 'TTL (.+) SETTINGS') "
+        f"FROM system.tables WHERE database = '{target_db}' "
+        "AND name = 'cluster_action_items'"
+    ).result_rows == [
+        (
+            "ReplacingMergeTree",
+            "toYYYYMM(run_window_end)",
+            "project_id, cluster_run_id, cluster_id, id",
+            "project_id, cluster_run_id, cluster_id, id",
+            "expire_at",
+        )
+    ]
+    assert ch_client.query(
+        "SELECT name, type, default_kind, default_expression "
+        "FROM system.columns "
+        f"WHERE database = '{target_db}' AND table = 'cluster_action_items' "
+        "ORDER BY position"
+    ).result_rows == [
+        ("project_id", "String", "", ""),
+        ("cluster_run_id", "UUID", "", ""),
+        ("cluster_id", "UUID", "", ""),
+        ("run_window_end", "DateTime64(6, 'UTC')", "", ""),
+        ("signature_type", "Enum8('intent' = 1, 'failure' = 2)", "", ""),
+        ("id", "UUID", "", ""),
+        ("action_item_config_sha", "LowCardinality(String)", "", ""),
+        ("title", "String", "", ""),
+        ("description", "String", "DEFAULT", "''"),
+        ("evidence_trace_ids", "Array(String)", "DEFAULT", "[]"),
+        (
+            "status",
+            "Enum8('OPEN' = 1, 'IN_PROGRESS' = 2, 'COMPLETED' = 3, 'DISMISSED' = 4)",
+            "DEFAULT",
+            "'OPEN'",
+        ),
+        (
+            "severity",
+            "Enum8('SEVERE' = 1, 'MAJOR' = 2, 'MINOR' = 3)",
+            "DEFAULT",
+            "'MINOR'",
+        ),
+        ("inserted_at", "DateTime64(6, 'UTC')", "DEFAULT", "now64(6)"),
+        ("expire_at", "DateTime", "DEFAULT", "'2100-01-01 00:00:00'"),
+    ]
+
+    run_id = "019ff4bc-2ae1-744d-ae3a-285998a90519"
+    for inserted_at, title, status, severity in [
+        ("2026-06-20 15:00:00", "Draft issue", "OPEN", "MINOR"),
+        ("2026-06-20 15:05:00", "Honor output path", "IN_PROGRESS", "SEVERE"),
+    ]:
+        ch_client.command(
+            f"INSERT INTO {target_db}.cluster_action_items "
+            "(project_id, cluster_run_id, cluster_id, run_window_end, "
+            "signature_type, id, action_item_config_sha, title, description, "
+            "evidence_trace_ids, status, severity, inserted_at) VALUES "
+            f"('project-1', '{run_id}', '{_CLUSTER_ID}', "
+            "toDateTime64('2026-06-01', 6, 'UTC'), 'failure', "
+            f"'{_ACTION_ITEM_ID}', 'action-cfg-a', '{title}', 'Details', "
+            f"['trace-4'], '{status}', '{severity}', "
+            f"toDateTime64('{inserted_at}', 6, 'UTC'))"
+        )
+
+    assert ch_client.query(
+        "SELECT argMax(title, inserted_at), argMax(status, inserted_at), "
+        "argMax(severity, inserted_at), argMax(evidence_trace_ids, inserted_at) "
+        f"FROM {target_db}.cluster_action_items WHERE project_id = 'project-1' "
+        "GROUP BY project_id, cluster_run_id, cluster_id, id"
+    ).result_rows == [("Honor output path", "IN_PROGRESS", "SEVERE", ["trace-4"])]
+    assert ch_client.query(
+        "SELECT DISTINCT partition FROM system.parts "
+        f"WHERE database = '{target_db}' AND table = 'cluster_action_items' "
+        "AND active"
+    ).result_rows == [("202606",)]
+
+    second_item_id = "019ff4bc-2ae1-744d-ae3a-285998a9051d"
+    ch_client.command(
+        f"INSERT INTO {target_db}.cluster_action_items "
+        "(project_id, cluster_run_id, cluster_id, run_window_end, "
+        "signature_type, id, action_item_config_sha, title) VALUES "
+        f"('project-1', '{run_id}', '{_CLUSTER_ID}', "
+        "toDateTime64('2026-06-01', 6, 'UTC'), 'failure', "
+        f"'{second_item_id}', 'action-cfg-a', 'Second issue')"
+    )
+    assert ch_client.query(
+        "SELECT countDistinct(id) FROM "
+        f"{target_db}.cluster_action_items WHERE project_id = 'project-1' "
+        f"AND cluster_run_id = toUUID('{run_id}') "
+        f"AND cluster_id = toUUID('{_CLUSTER_ID}')"
+    ).result_rows == [(2,)]
+
+    # A forced merge is test-only proof that the version key physically collapses.
+    ch_client.command(f"OPTIMIZE TABLE {target_db}.cluster_action_items FINAL")
+    assert ch_client.query(
+        f"SELECT count() FROM {target_db}.cluster_action_items "
+        "WHERE project_id = 'project-1'"
+    ).result_rows == [(2,)]
 
 
 def test_migration_client_timeout_outlasts_replicated_ddl(ch_keeper_server):

@@ -90,6 +90,13 @@ for backward compatibility. When neither is configured, it uses
 links use an account-key SAS for explicit credentials and a user-delegation SAS
 for workload identity.
 
+### Insights Action Items
+
+`cluster_action_items` stores user-editable issues for one concrete signature
+cluster. Writers reuse the same item UUID for retries and edits, append complete
+row versions, and keep actionability outside the stored model. The table stores
+workflow status separately from `SEVERE`, `MAJOR`, or `MINOR` severity.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
