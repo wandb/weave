@@ -1856,6 +1856,19 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError(""))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
 
+    # clickhouse-connect >= 1.3 sets an int `code`.
+    coded = DatabaseError("replica sync pending")
+    coded.code = 999
+    assert _is_transient_ch_error(coded)
+    coded.code = 62
+    assert not _is_transient_ch_error(coded)
+    # A non-int code attr falls back to message parsing.
+    coded.code = "999"
+    assert not _is_transient_ch_error(DatabaseError("no code here"))
+    coded_msg = DatabaseError("Code: 517. DB::Exception: ...")
+    coded_msg.code = None
+    assert _is_transient_ch_error(coded_msg)
+
 
 def test_split_migration_sql() -> None:
     """One dense case exercising every rule the splitter cares about.

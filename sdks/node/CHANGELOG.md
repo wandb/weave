@@ -4,6 +4,27 @@ All notable changes to the Weave TypeScript SDK will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.6] - 2026-08-14
+
+### Added
+
+- Trace nested and background Claude Agent SDK subagents as `invoke_agent` spans, including their prompts, models, child chats, and terminal status. ([#7630](https://github.com/wandb/weave/pull/7630))
+- Accept JSON-compatible tool arguments and results through `Tool`, and export the `JsonObject` and `JsonValue` types. ([#7702](https://github.com/wandb/weave/pull/7702))
+- Link `weave.op` calls to the agent spans they produce, and expose the parent-call identifiers on queried span records. ([#7730](https://github.com/wandb/weave/pull/7730), [#7711](https://github.com/wandb/weave/pull/7711))
+- Add `recordError(error)` to GenAI spans for recording failures without ending them, and derive `error.type` from standard `Error` values passed to `recordError()` or `end()`. ([#7738](https://github.com/wandb/weave/pull/7738))
+
+### Changed
+
+- Hide the deprecated `Session` alias from generated TypeDoc reference pages. ([#7722](https://github.com/wandb/weave/pull/7722))
+
+### Fixed
+
+- Make `client.get()` reconstruct stored images as `WeaveImage` values, read them from the referenced project, and retain their PNG, JPEG, or WebP format. ([#7685](https://github.com/wandb/weave/pull/7685), [#7686](https://github.com/wandb/weave/pull/7686))
+- Make `client.get()` reconstruct `wave.Wave_read` audio as `WeaveAudio` and Python datetimes as JavaScript `Date` values. ([#7689](https://github.com/wandb/weave/pull/7689), [#7695](https://github.com/wandb/weave/pull/7695))
+- Link `Evaluation` prediction calls to the agent spans they produce so the UI can open those spans from evaluation results. ([#7708](https://github.com/wandb/weave/pull/7708))
+- Skip failed, canceled, and expired Anthropic batch results while recording successful results, instead of throwing and losing the trace. ([#7721](https://github.com/wandb/weave/pull/7721))
+
+
 ## [0.16.5] - 2026-07-30
 
 ### Security
