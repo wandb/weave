@@ -8,7 +8,12 @@ from typing import TypedDict
 import pytest
 
 import weave
-from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import (
+    EvaluationLogger,
+    Model,
+    ScoreLogger,
+    Scorer,
+)
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
@@ -1264,6 +1269,12 @@ def test_untraced_scores_are_captured_without_scorer_calls(
     # No scorer call means no scorer feedback on the predict call either.
     for call in by_op["Model.predict"]:
         assert list(call.feedback) == []
+
+
+def test_score_logger_trace_scores_is_keyword_only():
+    parameter = inspect.signature(ScoreLogger).parameters["trace_scores"]
+
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_untraced_scores_via_log_example(client):

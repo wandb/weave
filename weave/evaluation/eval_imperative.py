@@ -376,6 +376,8 @@ class ScoreLogger:
         predict_call: Call,
         predefined_scorers: list[str] | None = None,
         eval_span_context: EvalSpanContext | None = None,
+        *,
+        # EvalTable disables this because it stores each score directly on the row.
         trace_scores: bool = True,
     ) -> None:
         self.predict_and_score_call = predict_and_score_call
@@ -732,11 +734,11 @@ class EvaluationLogger:
 
     Args:
         trace_scores: Whether each logged score also emits its own scorer call.
-            Defaults to True. Pass False when the scores are plain values rather
-            than the result of scoring code worth tracing: they are still
-            recorded on the prediction and auto-summarized, but no longer
-            individually inspectable. A call per score is the dominant cost of
-            logging an evaluation with many scores per example.
+            Defaults to True. `EvalTable` passes False because it already stores
+            each score directly on the row. The score remains on the prediction
+            and in automatic summaries, while skipping the individually
+            inspectable scorer call. This avoids a call per score, the dominant
+            cost when logging tables with many score columns.
     """
 
     def __init__(
