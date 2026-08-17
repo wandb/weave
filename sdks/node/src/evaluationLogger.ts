@@ -519,6 +519,8 @@ export class ScoreLogger {
 
 /**
  * Options for creating an EvaluationLogger.
+ *
+ * @inline
  */
 export interface EvaluationLoggerOptions {
   name: string;

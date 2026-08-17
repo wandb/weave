@@ -1,3 +1,4 @@
+/** @inline */
 export type ColumnMapping<I, O> = {
   [K in keyof O]: keyof I;
 };

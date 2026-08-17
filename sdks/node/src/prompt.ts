@@ -11,6 +11,7 @@ export class Prompt extends WeaveObject {
   }
 }
 
+/** @inline */
 interface StringPromptParameters extends WeaveObjectParameters {
   content: string;
 }
@@ -34,6 +35,7 @@ export class StringPrompt extends Prompt {
   }
 }
 
+/** @inline */
 interface MessagesPromptParameters extends WeaveObjectParameters {
   messages: Record<string, any>[];
 }

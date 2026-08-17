@@ -15,6 +15,7 @@ export function markOpEager(opFn: Op<any>): void {
   eagerOps.add(opFn);
 }
 
+/** @inline */
 export interface MethodDecoratorContext {
   kind: 'method';
   name: string | symbol;

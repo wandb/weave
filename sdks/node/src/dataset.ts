@@ -6,6 +6,7 @@ import {
   type WeaveObjectParameters,
 } from './weaveObject';
 
+/** @inline */
 interface DatasetParameters<R extends DatasetRow>
   extends WeaveObjectParameters {
   rows: R[];
@@ -24,6 +25,7 @@ export class DatasetRowRef {
   }
 }
 
+/** @inline */
 export type DatasetRow = Record<string, any> & {
   __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
 };

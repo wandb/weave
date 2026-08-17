@@ -23,6 +23,8 @@ export interface SpanInitBase {
  * `error` marks the span failed (records the exception + ERROR status).
  * `endTime` backdates the close so a replayed span carries an accurate
  * duration. Undefined `endTime` → OTel stamps the current time.
+ *
+ * @inline
  */
 export interface SpanEndOptions {
   error?: Error;

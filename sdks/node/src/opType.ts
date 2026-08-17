@@ -2,6 +2,7 @@ import {type Call} from './call';
 import {getGlobalDomain} from './urls';
 import {type WeaveObject} from './weaveObject';
 
+/** @inline */
 export type ParameterNamesOption = 'useParam0Object' | string[] | undefined;
 
 export type Op<T extends (...args: any[]) => any> = {
@@ -52,6 +53,8 @@ export type OpDecorator<T extends (...args: any[]) => any> = ((
 
 /**
  * Options that can be passed to the op wrapper
+ *
+ * @inline
  */
 export interface OpOptions<T extends (...args: any[]) => any> {
   name?: string;
@@ -84,6 +87,7 @@ export interface OpWrapper<F extends (...args: any[]) => any> {
   (this: any, ...params: Parameters<F>): AsyncResult<F>;
 }
 
+/** @inline */
 export interface CallMethod<F extends (...args: any[]) => any> {
   (
     this: any,

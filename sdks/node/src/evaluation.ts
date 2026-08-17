@@ -10,7 +10,11 @@ import {WeaveObject, type WeaveObjectParameters} from './weaveObject';
 
 const PROGRESS_BAR = false;
 
-// Column mapping takes a dataset row of type R and maps it to a scorer's dataset row of type E
+/**
+ * Column mapping takes a dataset row of type R and maps it to a scorer's dataset row of type E
+ *
+ * @inline
+ */
 interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M>
   extends WeaveObjectParameters {
   dataset: Dataset<R>;
@@ -24,6 +28,7 @@ interface Runnable<T extends (...args: any[]) => any> {
   invoke: (...args: Parameters<T>) => ReturnType<T>;
 }
 
+/** @inline */
 type WeaveCallable<T extends (...args: any[]) => any> = Op<T> | Runnable<T>;
 
 function callWeaveCallable<T extends (...args: any[]) => any>(
