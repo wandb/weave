@@ -8,11 +8,17 @@ block and `with_integration_metadata` to thread it through `OpSettings`.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 import weave
 from weave.integrations.integration_metadata import (
     INTEGRATION_ATTRIBUTE_KEY,
+    WEAVE_INTEGRATION_META_PREFIX,
+    WEAVE_INTEGRATION_NAME,
+    WEAVE_INTEGRATION_VERSION,
     IntegrationMetadata,
     apply_integration_metadata,
     library_integration,
@@ -50,10 +56,10 @@ def test_as_otel_attributes_flattens_to_dotted_keys():
         meta={"package_name": "openai-agents", "package_version": "0.1.0"},
     )
     assert meta.as_otel_attributes() == {
-        "integration.name": "openai_agents",
-        "integration.version": "1.2.3",
-        "integration.meta.package_name": "openai-agents",
-        "integration.meta.package_version": "0.1.0",
+        "weave.integration.name": "openai_agents",
+        "weave.integration.version": "1.2.3",
+        "weave.integration.meta.package_name": "openai-agents",
+        "weave.integration.meta.package_version": "0.1.0",
     }
 
 
@@ -61,7 +67,29 @@ def test_as_otel_attributes_stringifies_non_scalar_meta():
     meta = IntegrationMetadata(name="demo", version="1", meta={"opts": {"a": 1}})
     otel = meta.as_otel_attributes()
     # Nested values are not OTel-legal scalars, so they are stringified.
-    assert otel["integration.meta.opts"] == "{'a': 1}"
+    assert otel["weave.integration.meta.opts"] == "{'a': 1}"
+
+
+@pytest.mark.parametrize(
+    ("constant_name", "python_value"),
+    [
+        ("WEAVE_INTEGRATION_NAME", WEAVE_INTEGRATION_NAME),
+        ("WEAVE_INTEGRATION_VERSION", WEAVE_INTEGRATION_VERSION),
+        ("WEAVE_INTEGRATION_META_PREFIX", WEAVE_INTEGRATION_META_PREFIX),
+    ],
+)
+def test_otel_attribute_constants_match_node(
+    constant_name: str, python_value: str
+) -> None:
+    node_semconv = (
+        Path(__file__).resolve().parents[2] / "sdks/node/src/genai/semconv.ts"
+    )
+    match = re.search(
+        rf"export const {constant_name} = ['\"]([^'\"]+)['\"];",
+        node_semconv.read_text(encoding="utf-8"),
+    )
+    assert match is not None
+    assert match.group(1) == python_value
 
 
 def test_as_attributes_returns_fresh_copies():

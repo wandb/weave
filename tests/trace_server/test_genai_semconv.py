@@ -43,7 +43,7 @@ def test_multi_alias_lookup_keys_priority_order() -> None:
         key="weave.example",
         type="string",
         description="synthetic example with multiple aliases",
-        gen_ai_aliases=[
+        wire_aliases=[
             "gen_ai.example.primary",
             "gen_ai.example.legacy",
             "gen_ai.example.experimental",

@@ -505,7 +505,7 @@ def test_multi_alias_extraction_canonical_weave_key_wins() -> None:
         _make_span(
             attrs={
                 semconv.USAGE_REASONING_TOKENS.key: 99,
-                **dict.fromkeys(semconv.USAGE_REASONING_TOKENS.gen_ai_aliases, 10),
+                **dict.fromkeys(semconv.USAGE_REASONING_TOKENS.wire_aliases, 10),
             }
         ),
         project_id="p1",
