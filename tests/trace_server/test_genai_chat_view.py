@@ -46,6 +46,7 @@ def _span(
     compaction_summary: str = "",
     compaction_items_before: int = 0,
     compaction_items_after: int = 0,
+    status_code: str = "OK",
     started_at: datetime.datetime | None = None,
     ended_at: datetime.datetime | None = None,
     **kwargs: object,
@@ -68,7 +69,7 @@ def _span(
         compaction_summary=compaction_summary,
         compaction_items_before=compaction_items_before,
         compaction_items_after=compaction_items_after,
-        status_code="OK",
+        status_code=status_code,
         started_at=started_at
         or datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc),
         ended_at=ended_at
@@ -1146,6 +1147,36 @@ def test_tool_call_step_without_reasoning_emits_no_assistant_message() -> None:
 
     messages = build_chat_messages(spans)
     assert [m.type for m in messages if m.type == "assistant_message"] == []
+
+
+def test_contentless_error_span_emits_assistant_message() -> None:
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="wb-agent",
+            input_messages=[{"role": "user", "content": "run it"}],
+        ),
+        _span(
+            span_id="llm-error",
+            parent_span_id="agent",
+            operation_name="chat",
+            status_code="ERROR",
+        ),
+    ]
+
+    messages = build_chat_messages(spans)
+
+    assert [message.type for message in messages] == [
+        "user_message",
+        "agent_start",
+        "assistant_message",
+    ]
+    error_message = messages[-1]
+    assert error_message.span_id == "llm-error"
+    assert error_message.status_code == "ERROR"
+    assert _assistant_payload(error_message).text == ""
+    assert _assistant_payload(error_message).status == "ERROR"
 
 
 def test_subagent_spans_render_inline_with_agent_label_inheritance() -> None:

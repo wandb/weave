@@ -7,13 +7,16 @@ emitted OTel spans instead of Weave calls.
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Generator
 from typing import Any
 from unittest.mock import Mock
 
-import agents
+import httpx
 import pytest
-from agents import Agent, Runner
+from agents import Agent, Runner, function_tool
+from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tracing import (
     AgentSpanData,
     CustomSpanData,
@@ -26,19 +29,37 @@ from agents.tracing import (
     TaskSpanData,
     Trace,
     TurnSpanData,
+    generation_span,
+    get_trace_provider,
+    response_span,
+    set_trace_processors,
+    set_trace_provider,
+    trace,
 )
+from agents.tracing.provider import DefaultTraceProvider
+from openai import AsyncOpenAI
 from opentelemetry import context as otel_context
 from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.sdk.trace.sampling import Decision, StaticSampler
 
+import weave
 from weave.conversation import agent_name_override
+from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.integrations.openai_agents.otel_processor import (
     WeaveOtelTracingProcessor,
     _iso_to_ns,
 )
+from weave.shared.otel_span_attrs import (
+    PARENT_CALL_ID_SPAN_ATTR,
+    PARENT_CALL_TRACE_ID_SPAN_ATTR,
+)
+from weave.trace.otel_op_linker import OpLinkSpanProcessor
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.constants import INVOKING_SPAN_ATTR_KEY
 
 
 @pytest.fixture
@@ -58,12 +79,27 @@ def otel_spans(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture
-def setup_tests():
-    """Install only the OTel processor for the duration of the test.
+def setup_tests() -> Generator[WeaveOtelTracingProcessor, None, None]:
+    """Install exactly one OTel processor and restore the Agents provider."""
+    original_provider = get_trace_provider()
+    set_trace_provider(DefaultTraceProvider())
+    processor = WeaveOtelTracingProcessor()
+    set_trace_processors([processor])
+    try:
+        yield processor
+    finally:
+        processor.shutdown()
+        set_trace_provider(original_provider)
 
-    Mirrors the calls-side fixture but uses ``WeaveOtelTracingProcessor``.
-    """
-    agents.set_trace_processors([WeaveOtelTracingProcessor()])
+
+@pytest.fixture
+def patched_openai() -> Generator[None, None, None]:
+    patcher = get_openai_patcher()
+    patcher.attempt_patch()
+    yield
+    # MultiPatcher stops undoing after its first unsuccessful child.
+    for symbol_patcher in patcher.patchers:
+        symbol_patcher.undo_patch()
 
 
 # 5 spans gives ~0.8% chance (1/120) of a random set-iteration happening to
@@ -127,6 +163,106 @@ def _attrs(span: Any) -> dict[str, Any]:
 
 def _by_name(spans: list[Any], prefix: str) -> list[Any]:
     return [s for s in spans if s.name.startswith(prefix)]
+
+
+def _response_payload(response_id: str, text: str) -> dict[str, Any]:
+    return {
+        "id": response_id,
+        "object": "response",
+        "created_at": 1,
+        "status": "completed",
+        "error": None,
+        "incomplete_details": None,
+        "instructions": "You are a helpful assistant",
+        "max_output_tokens": None,
+        "model": "gpt-4o-2024-08-06",
+        "output": [
+            {
+                "type": "message",
+                "id": f"msg_{response_id}",
+                "status": "completed",
+                "role": "assistant",
+                "content": [{"type": "output_text", "text": text, "annotations": []}],
+            }
+        ],
+        "parallel_tool_calls": True,
+        "previous_response_id": None,
+        "reasoning": {"effort": None, "generate_summary": None},
+        "store": True,
+        "temperature": 1.0,
+        "text": {"format": {"type": "text"}},
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1.0,
+        "truncation": "disabled",
+        "usage": {
+            "input_tokens": 4,
+            "input_tokens_details": {"cached_tokens": 0},
+            "output_tokens": 2,
+            "output_tokens_details": {"reasoning_tokens": 0},
+            "total_tokens": 6,
+        },
+        "user": None,
+        "metadata": {},
+    }
+
+
+def _chat_completion_payload(response_id: str) -> dict[str, Any]:
+    return {
+        "id": response_id,
+        "object": "chat.completion",
+        "created": 1,
+        "model": "gpt-4o",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "Hi"},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 2,
+            "completion_tokens": 1,
+            "total_tokens": 3,
+        },
+    }
+
+
+def _tool_call_payload(
+    response_id: str, tool_name: str, arguments: str
+) -> dict[str, Any]:
+    """A Responses payload whose only output item calls ``tool_name``."""
+    payload = _response_payload(response_id, "")
+    payload["output"] = [
+        {
+            "type": "function_call",
+            "id": f"fc_{response_id}",
+            "call_id": f"call_{response_id}",
+            "name": tool_name,
+            "arguments": arguments,
+            "status": "completed",
+        }
+    ]
+    return payload
+
+
+def _mock_transport(
+    *payloads: dict[str, Any],
+) -> tuple[httpx.MockTransport, list[httpx.Request]]:
+    remaining = iter(payloads)
+    requests: list[httpx.Request] = []
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json=next(remaining))
+
+    return httpx.MockTransport(handle), requests
+
+
+def _calls_named(client: WeaveClient, name: str) -> list[Any]:
+    return [
+        call for call in client.get_calls() if op_name_from_ref(call.op_name) == name
+    ]
 
 
 @pytest.mark.vcr(
@@ -1033,3 +1169,296 @@ def test_undo_patch_is_noop_when_not_patched() -> None:
     patcher = OpenAIAgentsOtelPatcher(IntegrationSettings())
     assert patcher.patched is False
     assert patcher.undo_patch() is True
+
+
+@pytest.mark.asyncio
+async def test_responses_model_and_direct_call_emit_one_record_each(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+    patched_openai: None,
+) -> None:
+    transport, requests = _mock_transport(
+        _response_payload("resp_agents", "Agent answer"),
+        _response_payload("resp_direct", "Direct answer"),
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    try:
+        model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
+        agent = Agent(name="Assistant", model=model)
+
+        await Runner.run(agent, "Say hi")
+        direct_response = await openai_client.responses.create(
+            model="gpt-4o", input="Direct call"
+        )
+    finally:
+        await openai_client.close()
+
+    agent_chats = [
+        span
+        for span in otel_spans.get_finished_spans()
+        if span.name.startswith("chat ")
+        and _attrs(span).get("gen_ai.response.id") == "resp_agents"
+    ]
+    openai_calls = _calls_named(client, "openai.responses.create")
+
+    assert direct_response.id == "resp_direct"
+    assert len(requests) == 2
+    assert len(agent_chats) == 1
+    assert len(openai_calls) == 1
+    assert openai_calls[0].output["id"] == "resp_direct"
+
+
+@pytest.mark.asyncio
+async def test_sampled_generation_span_bypasses_chat_completions_call(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+    patched_openai: None,
+) -> None:
+    transport, requests = _mock_transport(_chat_completion_payload("chatcmpl_agents"))
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    try:
+        with trace("sampled generation"):
+            with generation_span(
+                input=[{"role": "user", "content": "Say hi"}],
+                output=[{"role": "assistant", "content": "Hi"}],
+                model="gpt-4o",
+            ):
+                response = await openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "user", "content": "Say hi"}],
+                )
+    finally:
+        await openai_client.close()
+
+    assert response.id == "chatcmpl_agents"
+    assert len(requests) == 1
+    assert len(_by_name(otel_spans.get_finished_spans(), "chat ")) == 1
+    assert _calls_named(client, "openai.chat.completions.create") == []
+
+
+@pytest.mark.asyncio
+async def test_disabled_response_span_keeps_openai_call(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+    patched_openai: None,
+) -> None:
+    transport, requests = _mock_transport(
+        _response_payload("resp_disabled", "Direct answer")
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    try:
+        with trace("disabled response"):
+            with response_span(disabled=True):
+                response = await openai_client.responses.create(
+                    model="gpt-4o", input="Direct call"
+                )
+    finally:
+        await openai_client.close()
+
+    openai_calls = _calls_named(client, "openai.responses.create")
+    assert response.id == "resp_disabled"
+    assert len(requests) == 1
+    assert len(openai_calls) == 1
+    assert openai_calls[0].output["id"] == "resp_disabled"
+
+
+@pytest.mark.parametrize(
+    "decision",
+    [Decision.DROP, Decision.RECORD_ONLY],
+    ids=["drop", "record-only"],
+)
+@pytest.mark.asyncio
+async def test_unsampled_response_span_keeps_openai_call(
+    decision: Decision,
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    patched_openai: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = SDKTracerProvider(sampler=StaticSampler(decision))
+    monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", provider)
+    response_id = f"resp_{decision.name.lower()}"
+    transport, requests = _mock_transport(
+        _response_payload(response_id, "Direct answer")
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    try:
+        with trace(f"{decision.name.lower()} response"):
+            with response_span() as model_span:
+                response = await openai_client.responses.create(
+                    model="gpt-4o", input="Direct call"
+                )
+                model_span.span_data.response = response
+    finally:
+        await openai_client.close()
+        provider.shutdown()
+
+    openai_calls = _calls_named(client, "openai.responses.create")
+    assert response.id == response_id
+    assert len(requests) == 1
+    assert len(openai_calls) == 1
+    assert openai_calls[0].output["id"] == response_id
+
+
+@pytest.mark.asyncio
+async def test_model_span_context_is_isolated_between_asyncio_tasks(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+    patched_openai: None,
+) -> None:
+    transport, requests = _mock_transport(
+        _response_payload("resp_model_task", "Model answer"),
+        _response_payload("resp_direct_task", "Direct answer"),
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+    model_request_finished = asyncio.Event()
+    direct_request_finished = asyncio.Event()
+
+    async def direct_request() -> Any:
+        await model_request_finished.wait()
+        try:
+            return await openai_client.responses.create(
+                model="gpt-4o", input="Independent direct call"
+            )
+        finally:
+            direct_request_finished.set()
+
+    async def model_request() -> Any:
+        with trace("model task"):
+            with response_span() as model_span:
+                try:
+                    response = await openai_client.responses.create(
+                        model="gpt-4o", input="Agents model call"
+                    )
+                    model_span.span_data.response = response
+                finally:
+                    model_request_finished.set()
+                await direct_request_finished.wait()
+                return response
+
+    try:
+        direct_task = asyncio.create_task(direct_request())
+        model_task = asyncio.create_task(model_request())
+        model_response, direct_response = await asyncio.gather(model_task, direct_task)
+    finally:
+        await openai_client.close()
+
+    model_chats = [
+        span
+        for span in otel_spans.get_finished_spans()
+        if span.name.startswith("chat ")
+        and _attrs(span).get("gen_ai.response.id") == "resp_model_task"
+    ]
+    openai_calls = _calls_named(client, "openai.responses.create")
+
+    assert model_response.id == "resp_model_task"
+    assert direct_response.id == "resp_direct_task"
+    assert len(requests) == 2
+    assert len(model_chats) == 1
+    assert len(openai_calls) == 1
+    assert openai_calls[0].output["id"] == "resp_direct_task"
+
+
+@pytest.mark.asyncio
+async def test_op_tool_records_the_execute_tool_span_that_invoked_it(
+    client: WeaveClient,
+    setup_tests: WeaveOtelTracingProcessor,
+    otel_spans: InMemorySpanExporter,
+) -> None:
+    """A ``@weave.op`` tool records the span the agent opened around its call.
+
+    The assertion names the ``execute_tool`` span rather than "some span": the
+    agent span is current further up the stack too, and a reference to that one
+    would point at the wrong level of the tree.
+    """
+    transport, _ = _mock_transport(
+        _tool_call_payload("resp_tool", "lookup", '{"query": "papers"}'),
+        _response_payload("resp_final", "done"),
+    )
+    openai_client = AsyncOpenAI(
+        api_key="test",
+        http_client=httpx.AsyncClient(transport=transport),
+    )
+
+    @function_tool
+    @weave.op
+    def lookup(query: str) -> str:
+        return "ok"
+
+    try:
+        model = OpenAIResponsesModel(model="gpt-4o", openai_client=openai_client)
+        agent = Agent(name="researcher", model=model, tools=[lookup])
+        await Runner.run(agent, "find papers")
+    finally:
+        await openai_client.close()
+
+    tool_span = next(
+        s for s in otel_spans.get_finished_spans() if s.name == "execute_tool lookup"
+    )
+    span_ctx = tool_span.get_span_context()
+    lookup_calls = _calls_named(client, "lookup")
+
+    assert len(lookup_calls) == 1
+    assert lookup_calls[0].attributes["weave"][INVOKING_SPAN_ATTR_KEY] == {
+        "trace_id": otel_trace.format_trace_id(span_ctx.trace_id),
+        "span_id": otel_trace.format_span_id(span_ctx.span_id),
+    }
+
+
+def test_agents_spans_link_to_enclosing_op_call(
+    client: WeaveClient, otel_spans: InMemorySpanExporter
+) -> None:
+    """Agents spans start inline in the caller's stack, so an agent run wrapped
+    in a @weave.op links back to that call.
+    """
+    otel_trace.get_tracer_provider().add_span_processor(OpLinkSpanProcessor())
+
+    @weave.op
+    def orchestrate() -> None:
+        processor = WeaveOtelTracingProcessor()
+        trace = Mock(spec=Trace)
+        trace.trace_id = "trace_link"
+        trace.name = "wf"
+        trace.group_id = None
+        processor.on_trace_start(trace)
+
+        agent_span = Mock(spec=Span)
+        agent_span.trace_id = "trace_link"
+        agent_span.span_id = "span_link"
+        agent_span.parent_id = None
+        agent_span.span_data = AgentSpanData(name="Bot")
+        agent_span.started_at = None
+        agent_span.ended_at = None
+        agent_span.error = None
+        processor.on_span_start(agent_span)
+        processor.on_span_end(agent_span)
+        processor.on_trace_end(trace)
+
+    orchestrate()
+
+    call = next(iter(orchestrate.calls()))
+    agent = next(
+        s for s in otel_spans.get_finished_spans() if s.name == "invoke_agent Bot"
+    )
+    attrs = _attrs(agent)
+    assert attrs[PARENT_CALL_ID_SPAN_ATTR] == call.id
+    assert attrs[PARENT_CALL_TRACE_ID_SPAN_ATTR] == call.trace_id

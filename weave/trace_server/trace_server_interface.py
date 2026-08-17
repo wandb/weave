@@ -3920,7 +3920,7 @@ Token metrics are extracted from summary.usage[model]:
 - output_tokens: Sum of completion_tokens (OpenAI) and output_tokens (Anthropic/others)
 - total_tokens: Total tokens (input + output)
 - cache_read_input_tokens: Tokens read from prompt cache (all providers)
-- cache_creation_input_tokens: Tokens used to create prompt cache (Anthropic)
+- cache_creation_input_tokens: Tokens used to create prompt cache (all providers)
 
 Cost metrics are computed post-query by multiplying token counts by prices from llm_token_prices.
 Cache tokens are subtracted from input before applying the prompt rate (they are billed

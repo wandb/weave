@@ -10,6 +10,8 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 
 import {getGlobalClient} from '../clientApi';
+import {EvalLinkSpanProcessor} from '../evalLinkSpanProcessor';
+import {OpLinkSpanProcessor} from '../opLinkSpanProcessor';
 import {packageVersion} from '../utils/packageVersion';
 import type {WeaveClient} from '../weaveClient';
 import {getWandbConfigs} from '../wandb/settings';
@@ -97,7 +99,11 @@ function getOrBuildProvider(client: WeaveClient): BasicTracerProvider {
 
   const tracerProvider = new BasicTracerProvider({
     resource,
-    spanProcessors: [buildSpanProcessor(client)],
+    spanProcessors: [
+      buildSpanProcessor(client),
+      new EvalLinkSpanProcessor(getGlobalClient),
+      new OpLinkSpanProcessor(getGlobalClient),
+    ],
   });
   state.genAi.provider = {tracerProvider, projectId: client.projectId};
   registerBeforeExitHookOnce();

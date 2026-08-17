@@ -111,7 +111,10 @@ from weave.trace.wandb_run_context import (
 )
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.common_interface import AnnotationQueueItemsFilter, SortBy
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import (
+    INVOKING_SPAN_ATTR_KEY,
+    MAX_OBJECT_NAME_LENGTH,
+)
 from weave.trace_server.errors import DigestMismatchError, InvalidExternalRef
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
@@ -203,6 +206,19 @@ from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.project_id import from_project_id, to_project_id
 from weave.utils.sanitize import REDACTED_VALUE, redact_dataclass_fields, should_redact
 
+# OTel imports — kept top-level under a try/except guard so the module
+# loads cleanly when opentelemetry is not installed. When unavailable,
+# calls simply carry no invoking-span reference.
+try:
+    from opentelemetry import context as otel_context
+    from opentelemetry import trace as otel_trace
+
+    from weave.shared.otel_context_keys import WEAVE_SERVER_SPAN_KEY
+
+    _OTEL_AVAILABLE = True
+except ImportError:
+    _OTEL_AVAILABLE = False
+
 if TYPE_CHECKING:
     from weave.evaluation.eval import Evaluation
 
@@ -232,6 +248,44 @@ class CrossProjectRefError(Exception):
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
         logger.info("%s %s", TRACE_CALL_EMOJI, call.ui_url)
+
+
+def _invoking_span_attr() -> dict[str, str] | None:
+    """Identity of the OTel span a call starting now was invoked from.
+
+    Recorded on the call so a reader can walk from an agent's `execute_tool`
+    span to the op call it invoked. The pair means "this span was current",
+    not "this span called exactly this call", so one span maps to every call
+    started inside it.
+
+    Nothing is recorded for a span a reader could not use. `is_recording()`
+    says the span is alive; `sampled` says it will be exported, which a
+    RECORD_ONLY sampler decision withholds; `is_valid` rejects the all-zero
+    identity a custom `IdGenerator` can produce. Weave's own server spans are
+    skipped because they are not agent spans and an in-process server holds
+    one current while user code runs — the hosted eval worker runs
+    `Evaluation.evaluate` inside a `@traced` frame. That last one compares
+    against the span the server put on the context, not against a flag, so an
+    agent span opened *inside* a server frame still links.
+
+    Who installed the tracer provider is deliberately not checked: that is
+    process state while the question is about one span, and a user who
+    configures OTel themselves and exports to Weave has a reference that does
+    resolve. So a missing key and a reference that resolves to nothing are
+    both normal states.
+    """
+    if not _OTEL_AVAILABLE:
+        return None
+    span = otel_trace.get_current_span()
+    if span is otel_context.get_value(WEAVE_SERVER_SPAN_KEY):
+        return None
+    ctx = span.get_span_context()
+    if not (ctx.is_valid and span.is_recording() and ctx.trace_flags.sampled):
+        return None
+    return {
+        "trace_id": otel_trace.format_trace_id(ctx.trace_id),
+        "span_id": otel_trace.format_span_id(ctx.span_id),
+    }
 
 
 def _add_scored_by_to_calls_query(
@@ -1486,6 +1540,11 @@ class WeaveClient:
 
         for k, v in get_capture_info().items():
             attributes_dict._set_weave_item(k, v)
+
+        # Dropped first: this key is ours to write, never a caller's to supply.
+        attributes_dict["weave"].pop(INVOKING_SPAN_ATTR_KEY, None)
+        if (invoking_span := _invoking_span_attr()) is not None:
+            attributes_dict._set_weave_item(INVOKING_SPAN_ATTR_KEY, invoking_span)
 
         # Skip the future allocation once the op's digest is resolved (any
         # call after the first). Reading `.uri` directly is a no-op string

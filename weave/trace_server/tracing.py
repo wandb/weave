@@ -33,10 +33,14 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Callable, Generator, Iterator
+from contextlib import contextmanager
 from functools import wraps
 from typing import Any, TypeVar, cast
 
+from opentelemetry import context as otel_context
 from opentelemetry import trace
+
+from weave.shared.otel_context_keys import WEAVE_SERVER_SPAN_KEY
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -45,6 +49,22 @@ F = TypeVar("F", bound=Callable[..., Any])
 # dozens of spans per request. Tests swap this binding via
 # `monkeypatch.setattr(tracing, "_tracer", ...)`.
 _tracer = trace.get_tracer("weave.trace_server")
+
+
+@contextmanager
+def _server_span(name: str) -> Iterator[None]:
+    """Open the span and mark the context for the duration it is current.
+
+    The mark is how the client SDK tells one of our spans from an agent's when
+    it records the invoking span on a call; without it a call created under an
+    in-process server would claim Weave's own telemetry as its caller.
+    """
+    with _tracer.start_as_current_span(name) as span:
+        token = otel_context.attach(otel_context.set_value(WEAVE_SERVER_SPAN_KEY, span))
+        try:
+            yield
+        finally:
+            otel_context.detach(token)
 
 
 def _reject_unsupported_shape(
@@ -89,14 +109,14 @@ def traced(name: str) -> Callable[[F], F]:
 
             @wraps(fn)
             async def awrap(*args: Any, **kwargs: Any) -> Any:
-                with _tracer.start_as_current_span(name):
+                with _server_span(name):
                     return await fn(*args, **kwargs)
 
             return cast(F, awrap)
 
         @wraps(fn)
         def swrap(*args: Any, **kwargs: Any) -> Any:
-            with _tracer.start_as_current_span(name):
+            with _server_span(name):
                 return fn(*args, **kwargs)
 
         return cast(F, swrap)
@@ -126,7 +146,7 @@ def traced_generator(
 
         @wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Generator[Any, None, None]:
-            with _tracer.start_as_current_span(name):
+            with _server_span(name):
                 yield from fn(*args, **kwargs)
 
         return wrapper

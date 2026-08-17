@@ -465,6 +465,8 @@ class AgentSpanSchema(BaseModel):
     eval_example_id: str | None = None
     eval_trial_index: int | None = None
     eval_evaluation_name: str | None = None
+    parent_call_id: str | None = None
+    parent_call_trace_id: str | None = None
     request_model: str | None = None
     response_model: str | None = None
     response_id: str | None = None

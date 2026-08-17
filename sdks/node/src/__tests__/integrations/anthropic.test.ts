@@ -72,10 +72,9 @@ function createMockAnthropic() {
 
   const mockBatchResultsChunks = [
     {
-      type: undefined,
       custom_id: 'request_1',
       result: {
-        type: 'message',
+        type: 'succeeded',
         message: mockMessages,
       },
     },
@@ -173,11 +172,13 @@ function createMockAnthropic() {
     // Constructor function
   }
 
-  MockBatches.prototype.create = jest.fn().mockResolvedValue(mockBatchResult);
-  MockBatches.prototype.retrieve = jest.fn().mockResolvedValue(mockBatchResult);
-  MockBatches.prototype.results = jest.fn().mockImplementation(async () => {
+  const mockResults = jest.fn().mockImplementation(async () => {
     return new MockAnthropicStream(mockBatchResultsChunks);
   });
+
+  MockBatches.prototype.create = jest.fn().mockResolvedValue(mockBatchResult);
+  MockBatches.prototype.retrieve = jest.fn().mockResolvedValue(mockBatchResult);
+  MockBatches.prototype.results = mockResults;
 
   // Set up static reference
   MockMessages.Batches = MockBatches;
@@ -188,7 +189,13 @@ function createMockAnthropic() {
     },
   };
 
-  return {mockAnthropic, MockMessages, MockBatches};
+  return {
+    mockAnthropic,
+    MockMessages,
+    MockAnthropicStream,
+    mockMessages,
+    mockResults,
+  };
 }
 
 describe('Anthropic Integration', () => {
@@ -196,7 +203,9 @@ describe('Anthropic Integration', () => {
   const testProjectName = 'test-project';
   let mockAnthropic: any;
   let MockMessages: any;
-  let _MockBatches: any;
+  let MockAnthropicStream: any;
+  let mockMessages: any;
+  let mockResults: jest.Mock;
   let patchedAnthropic: any;
 
   beforeEach(() => {
@@ -206,7 +215,9 @@ describe('Anthropic Integration', () => {
     const mockData = createMockAnthropic();
     mockAnthropic = mockData.mockAnthropic;
     MockMessages = mockData.MockMessages;
-    _MockBatches = mockData.MockBatches;
+    MockAnthropicStream = mockData.MockAnthropicStream;
+    mockMessages = mockData.mockMessages;
+    mockResults = mockData.mockResults;
 
     // Apply patching
     patchedAnthropic = commonPatchAnthropic(mockAnthropic);
@@ -452,7 +463,7 @@ describe('Anthropic Integration', () => {
       if (chunk.custom_id) {
         resultCount++;
         expect(chunk.custom_id).toBe('request_1');
-        expect(chunk.result.type).toBe('message');
+        expect(chunk.result.type).toBe('succeeded');
         expect(chunk.result.message).toMatchObject({
           id: 'msg_123',
           role: 'assistant',
@@ -489,6 +500,118 @@ describe('Anthropic Integration', () => {
         },
       },
     });
+  });
+
+  test('batch results operation with mixed outcomes', async () => {
+    const batchId = 'batch_123';
+
+    mockResults.mockImplementationOnce(
+      async () =>
+        new MockAnthropicStream([
+          {
+            custom_id: 'request_1',
+            result: {
+              type: 'errored',
+              error: {
+                type: 'error',
+                request_id: null,
+                error: {type: 'invalid_request_error', message: 'too long'},
+              },
+            },
+          },
+          {custom_id: 'request_2', result: {type: 'canceled'}},
+          {custom_id: 'request_3', result: {type: 'expired'}},
+          {
+            custom_id: 'request_4',
+            result: {type: 'succeeded', message: mockMessages},
+          },
+        ])
+    );
+
+    const batches = new patchedAnthropic.Anthropic.Messages.Batches();
+    const stream = await batches.results(batchId);
+
+    const seen: string[] = [];
+    for await (const chunk of stream) {
+      seen.push(chunk.result.type);
+    }
+    expect(seen).toEqual(['errored', 'canceled', 'expired', 'succeeded']);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].ended_at).toBeDefined();
+    expect(calls[0].exception ?? null).toBeNull();
+    expect(calls[0].output).toEqual({messages: [mockMessages]});
+    expect(calls[0].summary).toEqual({
+      usage: {
+        'claude-3-opus-20240229': {
+          input_tokens: 10,
+          output_tokens: 8,
+          requests: 1,
+        },
+      },
+    });
+  });
+
+  test('batch results operation with no succeeded entries', async () => {
+    const batchId = 'batch_123';
+
+    mockResults.mockImplementationOnce(
+      async () =>
+        new MockAnthropicStream([
+          {custom_id: 'request_1', result: {type: 'canceled'}},
+          {custom_id: 'request_2', result: {type: 'expired'}},
+        ])
+    );
+
+    const batches = new patchedAnthropic.Anthropic.Messages.Batches();
+    const stream = await batches.results(batchId);
+
+    const seen: string[] = [];
+    for await (const chunk of stream) {
+      seen.push(chunk.result.type);
+    }
+    expect(seen).toEqual(['canceled', 'expired']);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].ended_at).toBeDefined();
+    expect(calls[0].exception ?? null).toBeNull();
+    expect(calls[0].output).toEqual({messages: []});
+    expect(calls[0].summary).toEqual({});
+  });
+
+  test('batch results operation with an early break', async () => {
+    const batchId = 'batch_123';
+
+    mockResults.mockImplementationOnce(
+      async () =>
+        new MockAnthropicStream([
+          {custom_id: 'request_1', result: {type: 'canceled'}},
+          {
+            custom_id: 'request_2',
+            result: {type: 'succeeded', message: mockMessages},
+          },
+        ])
+    );
+
+    const batches = new patchedAnthropic.Anthropic.Messages.Batches();
+    const stream = await batches.results(batchId);
+
+    const seen: string[] = [];
+    // Breaking runs the same finally block, by way of the iterator's return().
+    for await (const chunk of stream) {
+      seen.push(chunk.custom_id);
+      break;
+    }
+    expect(seen).toEqual(['request_1']);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].ended_at).toBeDefined();
+    expect(calls[0].exception ?? null).toBeNull();
+    expect(calls[0].output).toEqual({messages: []});
+    expect(calls[0].summary).toEqual({});
   });
 
   test('error handling in non-streaming mode', async () => {

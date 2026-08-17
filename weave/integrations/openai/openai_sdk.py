@@ -30,6 +30,9 @@ from weave.integrations.integration_metadata import (
     library_integration,
     with_integration_metadata,
 )
+from weave.integrations.openai_agents._otel_context import (
+    has_active_sampled_model_span,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.call import Call
@@ -432,28 +435,23 @@ def openai_on_input_handler(
 
 
 def _normalize_openai_cache_tokens(usage: dict[str, Any]) -> None:
-    """Flatten OpenAI's nested cache token fields to canonical names.
+    """Copy OpenAI's nested cache token fields to Weave usage fields.
 
-    OpenAI Chat Completions nests cached tokens under prompt_tokens_details,
-    and the Responses API nests them under input_tokens_details. This extracts
-    them to the top-level canonical field `cache_read_input_tokens`.
+    Chat Completions nests cache reads and writes under prompt_tokens_details,
+    and Responses nests them under input_tokens_details. This copies them to
+    `cache_read_input_tokens` and `cache_creation_input_tokens`.
     """
-    prompt_tokens_details = usage.get("prompt_tokens_details")
-    if (
-        isinstance(prompt_tokens_details, dict)
-        and prompt_tokens_details.get("cached_tokens") is not None
-    ):
-        usage.setdefault(
-            "cache_read_input_tokens", prompt_tokens_details["cached_tokens"]
-        )
-    input_tokens_details = usage.get("input_tokens_details")
-    if (
-        isinstance(input_tokens_details, dict)
-        and input_tokens_details.get("cached_tokens") is not None
-    ):
-        usage.setdefault(
-            "cache_read_input_tokens", input_tokens_details["cached_tokens"]
-        )
+    for details_key in ("prompt_tokens_details", "input_tokens_details"):
+        details = usage.get(details_key)
+        if not isinstance(details, dict):
+            continue
+        for source_key, target_key in (
+            ("cached_tokens", "cache_read_input_tokens"),
+            ("cache_write_tokens", "cache_creation_input_tokens"),
+        ):
+            value = details.get(source_key)
+            if value is not None:
+                usage.setdefault(target_key, value)
 
 
 def openai_on_finish(
@@ -518,7 +516,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # Surprisingly, the async `client.chat.completions.create` does not pass
 # `inspect.iscoroutinefunction`, so we can't dispatch on it and must write
 # it manually here...
-def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
+def create_wrapper_async(
+    settings: OpSettings, *, bypass_for_agents_model_span: bool = False
+) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         """We need to do this so we can check if `stream` is used."""
 
@@ -545,7 +545,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        traced = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: (
                 lambda acc, value: openai_accumulator(
@@ -558,6 +558,16 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
         )
+        if not bypass_for_agents_model_span:
+            return traced
+
+        @wraps(fn)
+        async def _dispatch(self: Any, *args: Any, **kwargs: Any) -> Any:
+            if has_active_sampled_model_span():
+                return await fn(self, *args, **kwargs)
+            return await traced(self, *args, **kwargs)
+
+        return _dispatch
 
     return wrapper
 
@@ -791,7 +801,7 @@ def create_wrapper_responses_sync(
 
 
 def create_wrapper_responses_async(
-    settings: OpSettings,
+    settings: OpSettings, *, bypass_for_agents_model_span: bool = False
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
@@ -803,12 +813,22 @@ def create_wrapper_responses_async(
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
         op._set_on_finish_handler(openai_on_finish)
-        return _add_accumulator(
+        traced = _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: responses_accumulator,
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=responses_on_finish_post_processor,
         )
+        if not bypass_for_agents_model_span:
+            return traced
+
+        @wraps(fn)
+        async def _dispatch(*args: Any, **kwargs: Any) -> Any:
+            if has_active_sampled_model_span():
+                return await fn(*args, **kwargs)
+            return await traced(*args, **kwargs)
+
+        return _dispatch
 
     return wrapper
 
@@ -921,7 +941,10 @@ def get_openai_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.chat.completions"),
                 "AsyncCompletions.create",
-                create_wrapper_async(settings=async_completions_create_settings),
+                create_wrapper_async(
+                    settings=async_completions_create_settings,
+                    bypass_for_agents_model_span=True,
+                ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.chat.completions"),
@@ -977,7 +1000,8 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.responses"),
                 "AsyncResponses.create",
                 create_wrapper_responses_async(
-                    settings=async_responses_create_settings
+                    settings=async_responses_create_settings,
+                    bypass_for_agents_model_span=True,
                 ),
             ),
             SymbolPatcher(

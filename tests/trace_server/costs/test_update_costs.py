@@ -1,6 +1,6 @@
 import json
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import httpx
@@ -73,6 +73,7 @@ class TestUpdateCosts(unittest.TestCase):
             mock_datetime.now.return_value = frozen_time
             mock_datetime.side_effect = datetime
             costs = fetch_new_costs()
+            mock_datetime.now.assert_called_once_with(timezone.utc)
         assert "model1" in costs
         assert costs["model1"]["input"] == 0.01
         assert costs["model1"]["output"] == 0.02
@@ -430,6 +431,25 @@ class TestFetchManualCosts(unittest.TestCase):
         assert costs["model-with-history"]["output"] == 4e-06
         assert costs["model-with-history"]["created_at"] == "2026-05-19 00:00:00"
 
+    @patch("weave.trace_server.costs.update_costs.os.path.exists")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data=json.dumps(
+            {"model-without-date": [{"input": 1e-06, "output": 2e-06}]}
+        ),
+    )
+    def test_missing_created_at_uses_utc(self, mock_file, mock_exists):
+        mock_exists.return_value = True
+        frozen_time = datetime(2025, 1, 1, 12, 0, 0)
+
+        with patch("weave.trace_server.costs.update_costs.datetime") as mock_datetime:
+            mock_datetime.now.return_value = frozen_time
+            costs = fetch_manual_costs()
+            mock_datetime.now.assert_called_once_with(timezone.utc)
+
+        assert costs["model-without-date"]["created_at"] == "2025-01-01 12:00:00"
+
     @patch("builtins.open", new_callable=mock_open)
     @patch("os.path.exists")
     @patch("weave.trace_server.costs.update_costs.fetch_manual_costs")
@@ -519,7 +539,11 @@ def test_fetch_models_begin_costs_prices_bare_and_prefixed_id(mock_file, mock_ex
     Cents-per-billion-tokens converts to dollars-per-token (divide by 1e11).
     """
     mock_exists.return_value = True
-    costs = fetch_models_begin_costs()
+    frozen_time = datetime(2025, 1, 1, 12, 0, 0)
+    with patch("weave.trace_server.costs.update_costs.datetime") as mock_datetime:
+        mock_datetime.now.return_value = frozen_time
+        costs = fetch_models_begin_costs()
+        mock_datetime.now.assert_called_once_with(timezone.utc)
 
     assert set(costs.keys()) == {
         "openai/gpt-oss-20b",
@@ -529,6 +553,7 @@ def test_fetch_models_begin_costs_prices_bare_and_prefixed_id(mock_file, mock_ex
         assert costs[key]["input"] == 5e-08
         assert costs[key]["output"] == 2e-07
         assert costs[key]["provider"] == "coreweave"
+        assert costs[key]["created_at"] == "2025-01-01 12:00:00"
 
 
 if __name__ == "__main__":

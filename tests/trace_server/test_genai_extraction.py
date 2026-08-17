@@ -83,6 +83,8 @@ def test_extract_genai_span_comprehensive() -> None:
             "weave.eval.example_id": "example-001",
             "weave.eval.trial_index": 2,
             "weave.eval.evaluation_name": "travel-bot-eval",
+            "weave.parent_call.id": "01997c9d-0000-7000-8000-00000000abcd",
+            "weave.parent_call.trace_id": "01997c9d-0000-7000-8000-00000000ef01",
             "gen_ai.conversation.id": "conv-abc",
             "weave.conversation.name": "My Chat",
             # Model + tokens
@@ -157,6 +159,8 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.eval_example_id == "example-001"
     assert result.eval_trial_index == 2
     assert result.eval_evaluation_name == "travel-bot-eval"
+    assert result.parent_call_id == "01997c9d-0000-7000-8000-00000000abcd"
+    assert result.parent_call_trace_id == "01997c9d-0000-7000-8000-00000000ef01"
     assert result.conversation_id == "conv-abc"
     assert result.request_model == "gpt-4o"
     assert result.response_model == "gpt-4o-2024-05-13"
@@ -207,6 +211,7 @@ def test_extract_genai_span_comprehensive() -> None:
     assert result.custom_attrs_string["gen_ai.retrieval.query.text"] == "Paris weather"
     assert "weave.eval.run_id" not in result.custom_attrs_string
     assert "weave.eval.trial_index" not in result.custom_attrs_int
+    assert "weave.parent_call.id" not in result.custom_attrs_string
 
     # Raw dumps populated for debugging
     assert result.raw_span_dump != ""
@@ -239,6 +244,76 @@ def test_extract_genai_span_error_status() -> None:
     assert result.status_code == "ERROR"
     assert result.status_message == "rate limited"
     assert result.error_type == "RateLimitError"
+
+
+def test_extract_genai_span_error_details_fall_back_to_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "asyncio.exceptions.CancelledError",
+                        "message": "stream cancelled",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "asyncio.exceptions.CancelledError"
+    assert result.status_message == "stream cancelled"
+
+
+def test_extract_genai_span_error_details_prefer_explicit_fields() -> None:
+    span = _make_span(
+        attrs={"error.type": "RateLimitError"},
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "FallbackError",
+                        "message": "fallback message",
+                    }
+                },
+            )
+        ],
+        status=Status(code=StatusCode.ERROR, message="rate limited"),
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.error_type == "RateLimitError"
+    assert result.status_message == "rate limited"
+
+
+def test_extract_genai_span_does_not_promote_handled_exception_event() -> None:
+    span = _make_span(
+        events=[
+            Event(
+                name="exception",
+                timestamp=0,
+                attributes={
+                    "exception": {
+                        "type": "HandledError",
+                        "message": "recovered",
+                    }
+                },
+            )
+        ]
+    )
+
+    result = extract_genai_span(span, project_id="p1")
+
+    assert result.status_code == "OK"
+    assert result.error_type == ""
+    assert result.status_message == ""
 
 
 def test_extract_genai_span_preserves_unset_status() -> None:

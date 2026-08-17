@@ -31,7 +31,7 @@ def get_current_costs(
             cache_read_input_token_cost,
             cache_creation_input_token_cost,
             effective_date
-        FROM llm_token_prices
+        FROM {COSTS_TABLE}
         WHERE
         created_by = 'system'
         -- There should not ever be more than {MAX_DEFAULT_COST_ROWS} default rows in the table, but just in case we limit
@@ -76,7 +76,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             cache_read_input_token_cost = cost.get("cache_read_input", 0)
             cache_creation_input_token_cost = cost.get("cache_creation_input", 0)
             date_str = cost.get(
-                "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "created_at",
+                datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             )
             created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
                 tzinfo=timezone.utc
@@ -99,27 +100,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
                     created_at,
                 ),
             )
-    # Insert the data into the table
-    client.insert(
-        "llm_token_prices",
-        rows,
-        column_names=[
-            "id",
-            "pricing_level",
-            "pricing_level_id",
-            "provider_id",
-            "llm_id",
-            "effective_date",
-            "prompt_token_cost",
-            "prompt_token_cost_unit",
-            "completion_token_cost",
-            "completion_token_cost_unit",
-            "cache_read_input_token_cost",
-            "cache_creation_input_token_cost",
-            "created_by",
-            "created_at",
-        ],
-    )
+    # `rows` above is built in `COST_COLUMNS` order.
+    client.insert(COSTS_TABLE, rows, column_names=list(COST_COLUMNS))
 
 
 def filter_out_current_costs(
@@ -173,28 +155,36 @@ def sum_costs(data: dict[str, list[CostDetails]]) -> float:
     return total_costs
 
 
-def insert_costs(client: Client, target_db: str) -> None:
+def pending_costs(client: Client, target_db: str) -> dict[str, list[CostDetails]]:
+    """Costs from `cost_checkpoint.json` not yet present in `target_db`.
+
+    Defensive by design: a failure loading or diffing the checkpoint logs and
+    returns no pending costs rather than raising, since both callers below
+    (the migration hook and the lock-free pre-check) must never crash on it.
+    Silent otherwise: this also runs from the read-only pre-check on every
+    boot once the schema is caught up, so summary logging belongs to
+    `insert_costs`, the one caller that actually inserts.
+    """
     client.database = target_db
-    # Get costs from json
     try:
         new_costs = load_costs_from_json()
     except Exception as e:
         logger.exception("Failed to load costs from json")
-        return
-    logger.info("Loaded %d costs from json", sum_costs(new_costs))
+        return {}
 
-    # filter out current costs
     try:
-        new_costs = filter_out_current_costs(client, new_costs)
+        return filter_out_current_costs(client, new_costs)
     except Exception as e:
         logger.exception("Failed to filter out current costs")
-        return
+        return {}
 
+
+def insert_costs(client: Client, target_db: str) -> None:
+    new_costs = pending_costs(client, target_db)
     logger.info(
         "There are %d costs to insert, after filtering out existing costs",
         sum_costs(new_costs),
     )
-
     if len(new_costs) == 0:
         return
 
@@ -207,11 +197,69 @@ def insert_costs(client: Client, target_db: str) -> None:
     logger.info("Inserted %d costs", sum_costs(new_costs))
 
 
-# We only want to insert costs if the target db version is 5 or higher
-# because the costs table was added in migration 5
-def should_insert_costs(
-    db_curr_version: int, db_target_version: int | None = None
-) -> bool:
-    return db_target_version is None or (
-        db_target_version >= 5 and db_curr_version < db_target_version
-    )
+def has_pending_costs(client: Client, target_db: str) -> bool:
+    """Read-only check for whether any checkpoint costs are missing from `target_db`.
+
+    Runs on the shared migrator client outside the normal migration flow (the
+    lock-free pre-check in apply_migrations), so it saves and restores the
+    caller's `client.database` instead of leaving it pointed at `target_db`.
+    Never raises: a broken check must not break server startup.
+    """
+    prev_database = client.database
+    try:
+        return len(pending_costs(client, target_db)) > 0
+    except Exception:
+        logger.exception("Failed to check for pending costs")
+        return False
+    finally:
+        client.database = prev_database
+
+
+def costs_schema_is_ready(client: Client, target_db: str) -> bool:
+    """Whether `target_db` has a `COSTS_TABLE` carrying every `COST_COLUMNS` column.
+
+    Asks the schema rather than comparing against a hardcoded migration version,
+    so adding a cost column cannot leave this gate approving a database whose
+    table predates it. Never raises, for the same reason as `has_pending_costs`.
+    """
+    try:
+        result = client.query(
+            """
+            SELECT count()
+            FROM system.columns
+            WHERE database = %(database)s
+                AND table = %(table)s
+                AND name IN %(columns)s
+            """,
+            parameters={
+                "database": target_db,
+                "table": COSTS_TABLE,
+                "columns": COST_COLUMNS,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to check the costs table schema")
+        return False
+    return int(result.result_rows[0][0]) == len(COST_COLUMNS)
+
+
+COSTS_TABLE = "llm_token_prices"
+
+# Every column the cost code touches, in the order `insert_costs_into_db` builds
+# rows. `get_current_costs` reads a subset, so gating on all of them covers both.
+COST_COLUMNS = (
+    "id",
+    "pricing_level",
+    "pricing_level_id",
+    "provider_id",
+    "llm_id",
+    "effective_date",
+    "prompt_token_cost",
+    "prompt_token_cost_unit",
+    "completion_token_cost",
+    "completion_token_cost_unit",
+    "cache_read_input_token_cost",
+    "cache_creation_input_token_cost",
+    "created_by",
+    "created_at",
+)
