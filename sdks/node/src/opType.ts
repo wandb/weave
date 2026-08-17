@@ -20,6 +20,7 @@ export type Op<T extends (...args: any[]) => any> = {
     ? AsyncIterable<Awaited<U>>
     : Promise<Awaited<ReturnType<T>>>);
 
+/** @inline */
 export interface StreamReducer<T, R> {
   initialStateFn: () => R;
   reduceFn: (state: R, chunk: T) => R;
@@ -87,7 +88,6 @@ export interface OpWrapper<F extends (...args: any[]) => any> {
   (this: any, ...params: Parameters<F>): AsyncResult<F>;
 }
 
-/** @inline */
 export interface CallMethod<F extends (...args: any[]) => any> {
   (
     this: any,

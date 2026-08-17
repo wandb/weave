@@ -23,6 +23,7 @@ interface EvaluationParameters<R extends DatasetRow, E extends DatasetRow, M>
   columnMapping?: ColumnMapping<R, E>;
 }
 
+/** @inline */
 interface Runnable<T extends (...args: any[]) => any> {
   id: string;
   invoke: (...args: Parameters<T>) => ReturnType<T>;

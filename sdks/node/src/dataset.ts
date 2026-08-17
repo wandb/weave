@@ -25,7 +25,6 @@ export class DatasetRowRef {
   }
 }
 
-/** @inline */
 export type DatasetRow = Record<string, any> & {
   __savedRef?: DatasetRowRef | Promise<DatasetRowRef>;
 };
