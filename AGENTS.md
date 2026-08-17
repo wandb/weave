@@ -577,7 +577,8 @@ deterministic.
   those content attributes directly with `set_attributes()`.
 - `Tool`, `LLM`, `SubAgent`, and `Turn` expose `record_error(error)` to mark a
   failure without ending the span. It derives `error.type` from the exception;
-  call `end()` separately. Context managers do both for escaping exceptions.
+  custom attribute attempts to set `error.type` are ignored. Call `end()`
+  separately. Context managers do both for escaping exceptions.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.

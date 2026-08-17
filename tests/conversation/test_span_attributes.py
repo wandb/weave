@@ -83,6 +83,32 @@ def test_set_attributes_accepts_sequence_value(
     assert tuple(chat_span.attributes["gen_ai.response.finish_reasons"]) == ("stop",)
 
 
+@pytest.mark.parametrize(
+    ("_class_label", "factory", "span_name"), CASES, ids=CLASS_LABELS
+)
+def test_set_attributes_cannot_override_error_type(
+    caplog: pytest.LogCaptureFixture,
+    otel_spans: InMemorySpanExporter,
+    _class_label,
+    factory,
+    span_name,
+) -> None:
+    caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
+    with Conversation(conversation_id="test-conversation"), factory() as span_obj:
+        span_obj.record_error(ValueError("invalid response"))
+        span_obj.set_attributes(
+            {"error.type": "rate_limit", "app.failure.type": "rate_limit"}
+        )
+
+    finished_span = _only_span(otel_spans.get_finished_spans(), span_name)
+    assert finished_span.attributes["error.type"] == "ValueError"
+    assert finished_span.attributes["app.failure.type"] == "rate_limit"
+    assert any(
+        "set_attributes ignored 'error.type'" in record.message
+        for record in caplog.records
+    )
+
+
 # ---------------------------------------------------------------------------
 # record_error
 # ---------------------------------------------------------------------------
@@ -244,6 +270,26 @@ def test_conversation_attributes_on_every_streaming_span(
         assert span.attributes["custom.tier"] == "gold"
 
 
+def test_conversation_attributes_cannot_set_error_type(
+    caplog: pytest.LogCaptureFixture, otel_spans: InMemorySpanExporter
+) -> None:
+    caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
+    with Conversation(
+        conversation_id="convo-managed-error",
+        attributes={"error.type": "rate_limit", "app.failure.type": "rate_limit"},
+    ) as conversation:
+        with conversation.start_turn(agent_name="bot"):
+            pass
+
+    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
+    assert "error.type" not in span.attributes
+    assert span.attributes["app.failure.type"] == "rate_limit"
+    assert any(
+        "Conversation.attributes ignored 'error.type'" in record.message
+        for record in caplog.records
+    )
+
+
 def test_conversation_attributes_on_every_batch_span(
     otel_spans: InMemorySpanExporter,
 ) -> None:
@@ -258,6 +304,25 @@ def test_conversation_attributes_on_every_batch_span(
     assert len(spans) == 3
     for span in spans:
         assert span.attributes["weave.integration.name"] == "wb-agent"
+
+
+def test_batch_attributes_cannot_set_error_type(
+    caplog: pytest.LogCaptureFixture, otel_spans: InMemorySpanExporter
+) -> None:
+    caplog.set_level(logging.WARNING, logger="weave.conversation.conversation")
+    log_turn(
+        conversation_id="convo-managed-error-batch",
+        agent_name="bot",
+        attributes={"error.type": "rate_limit", "app.failure.type": "rate_limit"},
+    )
+
+    span = _only_span(otel_spans.get_finished_spans(), "invoke_agent bot")
+    assert "error.type" not in span.attributes
+    assert span.attributes["app.failure.type"] == "rate_limit"
+    assert any(
+        "log_turn attributes ignored 'error.type'" in record.message
+        for record in caplog.records
+    )
 
 
 def test_conversation_attributes_on_every_log_conversation_span(

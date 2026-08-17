@@ -112,8 +112,24 @@ __all__ = [
 
 # OTel tracer name — identifies the Conversation SDK as the source of these spans.
 _TRACER_NAME = "weave.conversation"
+_ERROR_TYPE_ATTRIBUTE = "error.type"
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_custom_attributes(
+    attributes: dict[str, Any], operation: str
+) -> dict[str, Any]:
+    if _ERROR_TYPE_ATTRIBUTE not in attributes:
+        return attributes
+    sanitized = dict(attributes)
+    del sanitized[_ERROR_TYPE_ATTRIBUTE]
+    logger.warning(
+        "%s ignored %r: managed by record_error() and context-manager errors.",
+        operation,
+        _ERROR_TYPE_ATTRIBUTE,
+    )
+    return sanitized
 
 
 def _capture_info_attrs() -> dict[str, str]:
@@ -202,6 +218,9 @@ class _SpanBase(BaseModel):
         # span too, which starts in a fresh OTel Context to force a new trace.
         conversation = get_current_conversation()
         if conversation is not None and conversation.attributes:
+            conversation.attributes = _sanitize_custom_attributes(
+                conversation.attributes, "Conversation.attributes"
+            )
             self._otel_span.set_attributes(conversation.attributes)
 
     def _end_otel_span(
@@ -266,7 +285,7 @@ class _SpanBase(BaseModel):
             error_type = error_class.__qualname__
             if error_class.__module__ != "builtins":
                 error_type = f"{error_class.__module__}.{error_type}"
-            span.set_attribute("error.type", error_type)
+            span.set_attribute(_ERROR_TYPE_ATTRIBUTE, error_type)
             span.set_status(StatusCode.ERROR, str(error))
             span.record_exception(error)
         return self
@@ -278,13 +297,16 @@ class _SpanBase(BaseModel):
         use ``span.set_attributes({"weave.tag": "value"})``. Mirrors OTel's
         ``Span.set_attributes``.
 
-        Must be called between span start and span end — i.e. inside a
+        ``error.type`` is SDK-managed and ignored here. Must be called between
+        span start and span end — i.e. inside a
         ``with`` block. Outside that window the call is a no-op and logs
         a warning. For batch ingest, populate the object's declared fields
         directly and pass it to ``log_turn`` / ``log_conversation``.
         """
         if span := self._recording_span("set_attributes", list(attributes)):
-            span.set_attributes(attributes)
+            span.set_attributes(
+                _sanitize_custom_attributes(attributes, "set_attributes")
+            )
         return self
 
     @deprecated(_ADD_EVENT_DEPRECATION_MESSAGE)
@@ -1323,6 +1345,9 @@ class Conversation(BaseModel):
     def model_post_init(self, context: Any, /) -> None:
         if not self.conversation_id:
             self.conversation_id = str(uuid.uuid4())
+        self.attributes = _sanitize_custom_attributes(
+            self.attributes, "Conversation.attributes"
+        )
 
     def start_turn(
         self,
@@ -1768,6 +1793,10 @@ def log_turn(
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(conversation_id=conversation_id)
 
+    safe_attributes = _sanitize_custom_attributes(
+        dict(attributes or {}), "log_turn attributes"
+    )
+
     resolved_spans = spans or []
     # Resolve timestamps before constructing the Turn so model_post_init
     # doesn't override a missing started_at with now() ahead of the
@@ -1796,7 +1825,7 @@ def log_turn(
         conversation_id=conversation_id,
         conversation_name=conversation_name,
         include_content=include_content,
-        attributes=attributes,
+        attributes=safe_attributes,
     )
 
 
@@ -1831,6 +1860,10 @@ def log_conversation(
     if not _OTEL_AVAILABLE or should_disable_weave():
         return LogResult(conversation_id=sid)
 
+    safe_attributes = _sanitize_custom_attributes(
+        dict(attributes or {}), "log_conversation attributes"
+    )
+
     trace_ids: list[str] = []
     root_span_ids: list[str] = []
     span_count = 0
@@ -1852,7 +1885,7 @@ def log_conversation(
             conversation_id=sid,
             conversation_name=conversation_name,
             include_content=include_content,
-            attributes=attributes,
+            attributes=safe_attributes,
         )
         trace_ids.extend(result.trace_ids)
         root_span_ids.extend(result.root_span_ids)
