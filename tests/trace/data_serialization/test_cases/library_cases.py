@@ -121,7 +121,7 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:YLYVrBqCtlMOa770T1oPssqYnf9rgqdnY5hVCwRcrm8",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:xGNFtpWKgn1TyYA0YzLMrKVxJkg3Mf8NyHzFc1R2sLg",
+                "weave:///shawn/test-project/object/MyScorer:8v25dGChke4FIp8qcRWvrQp72FNJkLSxByuG2uE3Rck",
                 f"weave:///shawn/test-project/object/LLMAsAJudgeScorer:{llm_as_a_judge_scorer_digest}",
             ],
             "preprocess_model_input": None,
@@ -168,14 +168,14 @@ library_cases = [
             },
             {
                 "object_id": "MyScorer",
-                "digest": "xGNFtpWKgn1TyYA0YzLMrKVxJkg3Mf8NyHzFc1R2sLg",
+                "digest": "8v25dGChke4FIp8qcRWvrQp72FNJkLSxByuG2uE3Rck",
                 "exp_val": {
                     "_type": "MyScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
                     "score": "weave:///shawn/test-project/op/MyScorer.score:lwLZn8tYQ025uYUv8SPwa1TlVfWSbzVSyw4aDynz1yQ",
-                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:bxtFn6x27RJmJ1fzbdfY76Y1XgYfSemEXU2XBqcFCnI",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:kXItGo03ynxVl7CJCp6AGrtpOQe02L5QqsVGyFYXnWo",
                     "_class_name": "MyScorer",
                     "_bases": ["Scorer", "Object", "BaseModel"],
                 },
@@ -259,11 +259,11 @@ library_cases = [
             },
             {
                 "object_id": "Scorer.summarize",
-                "digest": "bxtFn6x27RJmJ1fzbdfY76Y1XgYfSemEXU2XBqcFCnI",
+                "digest": "kXItGo03ynxVl7CJCp6AGrtpOQe02L5QqsVGyFYXnWo",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "VOiN2jQwOlcTREFr5xoJhZbRsyKaRkiNMGk9O5XeCxo"},
+                    "files": {"obj.py": "LFL8Nn0Psr2gWeobJolUjjIsOZUO2vq4lRwTV8twu7Y"},
                 },
             },
         ],
@@ -277,8 +277,8 @@ library_cases = [
                 "exp_content": b"import weave\n\n@weave.op\ndef score(self, user_input: str, output: str) -> str:\n    return user_input in output\n",
             },
             {
-                "digest": "VOiN2jQwOlcTREFr5xoJhZbRsyKaRkiNMGk9O5XeCxo",
-                "exp_content": b'import weave\nfrom typing import Any\nfrom numbers import Number\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\ndef _row_produced_a_score(x: Any) -> bool:\n    """A row that produced no score is recorded as an empty dict."""\n    return not isinstance(x, dict) or bool(x)\n\ndef _import_numpy() -> Any | None:\n    try:\n        import numpy\n    except ImportError:\n        return None\n    return numpy\n\ndef _summarize(data: list, *, unscored: int) -> dict[str, Any] | None:\n    """Summarize one column, given how many of its rows produced no score."""\n    data = [x for x in data if x is not None]\n\n    if not data:\n        return None\n\n    val = data[0]\n\n    if isinstance(val, bool):\n        return {\n            "true_count": (true_count := sum(1 for x in data if x)),\n            "true_fraction": true_count / (len(data) + unscored),\n        }\n    elif isinstance(val, Number):\n        if np := _import_numpy():\n            return {"mean": np.mean(data).item()}\n        else:\n            return {"mean": sum(data) / len(data)}\n    elif isinstance(val, dict):\n        result = {}\n        all_keys = list(\n            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])\n        )\n        for k in all_keys:\n            if (\n                summary := _summarize(\n                    [x.get(k) for x in data if isinstance(x, dict)],\n                    unscored=unscored,\n                )\n            ) is not None:\n                if k in summary:\n                    result.update(summary)\n                else:\n                    result[k] = summary\n        if not result:\n            return None\n        return result\n    elif isinstance(val, BaseModel):\n        return _summarize(\n            [x.model_dump() if isinstance(x, BaseModel) else x for x in data],\n            unscored=unscored,\n        )\n    return None\n\ndef auto_summarize(data: list) -> dict[str, Any] | None:\n    """Automatically summarize a list of (potentially nested) dicts.\n\n    Computes:\n        - avg for numeric cols\n        - count and fraction for boolean cols\n        - other col types are ignored\n\n    If col is all None, result is None\n\n    A top-level empty dict marks a row that produced no score, because its model or\n    one of its scorers raised. Such a row does not pick the aggregation branch and\n    stays in the denominator of a boolean fraction. Numeric means still divide by\n    the rows that produced a value. A nested empty dict is an ordinary value.\n\n    Returns:\n      dict of summary stats, with structure matching input dict structure.\n    """\n    if not data:\n        return {}\n    scored = [x for x in data if _row_produced_a_score(x)]\n    return _summarize(scored, unscored=len(data) - len(scored))\n\n@weave.op\n@op\ndef summarize(self, score_rows: list) -> dict | None:\n    return auto_summarize(score_rows)\n',
+                "digest": "LFL8Nn0Psr2gWeobJolUjjIsOZUO2vq4lRwTV8twu7Y",
+                "exp_content": b'import weave\nfrom typing import Any\nfrom numbers import Number\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\ndef _row_has_score(x: Any) -> bool:\n    """Return False for the empty dict that marks a row with no score."""\n    return not isinstance(x, dict) or bool(x)\n\ndef _import_numpy() -> Any | None:\n    try:\n        import numpy\n    except ImportError:\n        return None\n    return numpy\n\ndef _auto_summarize(data: list, *, unscored: int) -> dict[str, Any] | None:\n    """Summarize one column, given how many of its rows produced no score."""\n    data = [x for x in data if x is not None]\n\n    if not data:\n        return None\n\n    val = data[0]\n\n    if isinstance(val, bool):\n        return {\n            "true_count": (true_count := sum(1 for x in data if x)),\n            "true_fraction": true_count / (len(data) + unscored),\n        }\n    elif isinstance(val, Number):\n        if np := _import_numpy():\n            return {"mean": np.mean(data).item()}\n        else:\n            return {"mean": sum(data) / len(data)}\n    elif isinstance(val, dict):\n        result = {}\n        all_keys = list(\n            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])\n        )\n        for k in all_keys:\n            if (\n                summary := _auto_summarize(\n                    [x.get(k) for x in data if isinstance(x, dict)],\n                    unscored=unscored,\n                )\n            ) is not None:\n                if k in summary:\n                    result.update(summary)\n                else:\n                    result[k] = summary\n        if not result:\n            return None\n        return result\n    elif isinstance(val, BaseModel):\n        return _auto_summarize(\n            [x.model_dump() if isinstance(x, BaseModel) else x for x in data],\n            unscored=unscored,\n        )\n    return None\n\ndef auto_summarize(data: list) -> dict[str, Any] | None:\n    """Automatically summarize a list of (potentially nested) dicts.\n\n    Computes:\n        - avg for numeric cols\n        - count and fraction for boolean cols\n        - other col types are ignored\n\n    If col is all None, result is None\n\n    A top-level empty dict marks a row that produced no score. Such a row does not\n    pick the aggregation branch and stays in the denominator of a boolean fraction.\n    Numeric means still divide by the rows that produced a value. A nested empty\n    dict is an ordinary value.\n\n    Returns:\n      dict of summary stats, with structure matching input dict structure.\n    """\n    if not data:\n        return {}\n    scored = [x for x in data if _row_has_score(x)]\n    return _auto_summarize(scored, unscored=len(data) - len(scored))\n\n@weave.op\n@op\ndef summarize(self, score_rows: list) -> dict | None:\n    return auto_summarize(score_rows)\n',
             },
             {
                 "digest": "ZHD4K7uUDPT93NdVQO3I6F9Xah9AEceWYBSQXg1bZPM",
