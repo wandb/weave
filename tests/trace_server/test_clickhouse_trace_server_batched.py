@@ -1,5 +1,6 @@
 import base64
 import datetime as dt
+import logging
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1281,6 +1282,52 @@ def test_insert_error_handling(error, expected_calls):
             server._insert("t", data=[[1]], column_names=["a"])
 
         assert mock_ch_client.insert.call_count == expected_calls
+
+
+@pytest.mark.disable_logging_error_check
+def test_query_id_is_logged_on_success_and_failure(caplog):
+    """A query_id is minted before firing so failure logs can be correlated
+    with system.query_log, and it is the id ClickHouse was actually given."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.query.return_value = MagicMock(summary={"read_rows": "1"})
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+
+        with caplog.at_level(logging.INFO):
+            server._query("SELECT 1", parameters={})
+        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
+        ok = [r for r in caplog.records if r.message == "clickhouse_query"][0]
+        assert ok.query_id == sent_id
+
+        caplog.clear()
+        mock_ch_client.query.side_effect = DatabaseError("boom")
+        with caplog.at_level(logging.INFO), pytest.raises(Exception):
+            server._query("SELECT 1", parameters={})
+        failed = [r for r in caplog.records if r.message == "clickhouse_query_error"][0]
+        assert failed.query_id == (
+            mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
+        )
+
+
+def test_caller_supplied_query_id_wins():
+    """export.py passes its own query_id in settings; do not overwrite it."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._command("OPTIMIZE TABLE t", settings={"query_id": "job-42:target"})
+
+    assert (
+        mock_ch_client.command.call_args.kwargs["settings"]["query_id"]
+        == "job-42:target"
+    )
 
 
 @pytest.mark.disable_logging_error_check

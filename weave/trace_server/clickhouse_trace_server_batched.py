@@ -7581,7 +7581,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        merged = ch_settings.merge_default_query_settings(settings)
+        merged, query_id = self._with_query_id(
+            ch_settings.merge_default_query_settings(settings)
+        )
 
         summary = None
         parameters = process_parameters(parameters)
@@ -7604,6 +7606,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
+                        "query_id": query_id,
                     },
                 )
                 yield from stream
@@ -7616,10 +7619,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
+
+    @staticmethod
+    def _with_query_id(
+        settings: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], str]:
+        """Mint a query_id up front so failure logs carry it too.
+
+        A caller-supplied query_id wins. `query_id` rides in settings: the
+        driver routes valid_transport_settings keys to URL params.
+        """
+        merged = dict(settings or {})
+        query_id = str(merged.setdefault("query_id", generate_id()))
+        return merged, query_id
 
     @traced(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -7630,7 +7647,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        merged = ch_settings.merge_default_query_settings(settings)
+        merged, query_id = self._with_query_id(
+            ch_settings.merge_default_query_settings(settings)
+        )
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7651,6 +7670,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7665,6 +7685,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
+                "query_id": query_id,
             },
         )
         return res
@@ -7683,7 +7704,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = ch_settings.merge_default_command_settings(settings)
+        merged, query_id = self._with_query_id(
+            ch_settings.merge_default_command_settings(settings)
+        )
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7702,6 +7725,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "command": command,
                     "parameters": processed_params,
+                    "query_id": query_id,
                 },
             )
             handle_clickhouse_query_error(e)
@@ -7714,6 +7738,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
+                "query_id": query_id,
             },
         )
         return
@@ -7758,6 +7783,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
         # invalid client UTF-8.
+        settings, query_id = self._with_query_id(settings)
         for _ in range(2):
             try:
                 result = self.ch_client.insert(
@@ -7767,7 +7793,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
                 if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data)
+                    log_and_raise_insert_error(e, table, data, query_id)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
                 continue
@@ -7775,11 +7801,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
                 converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data)
+                log_and_raise_insert_error(converted, table, data, query_id)
 
             # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
-                log_and_raise_insert_error(e, table, data)
+                log_and_raise_insert_error(e, table, data, query_id)
 
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -7790,6 +7816,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "table": table,
                         "row_count": len(data),
                         "async_insert": async_insert,
+                        "query_id": query_id,
                     },
                 )
                 return result
