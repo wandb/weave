@@ -23,7 +23,6 @@ from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
     ch_complete_call_to_row,
 )
-from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_COMPLETE_INSERT_COLUMNS,
     ALL_CALL_INSERT_COLUMNS,
@@ -1111,27 +1110,6 @@ class _MockInsertError(Exception):
     pass
 
 
-def test_insert_retries_empty_query_error():
-    """Verify 'Empty query' errors are retried (generator exhaustion during HTTP retry)."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_summary = MagicMock()
-    # First call fails with empty query, second succeeds
-    mock_ch_client.insert.side_effect = [
-        DatabaseError("Empty query. (SYNTAX_ERROR)"),
-        mock_summary,
-    ]
-
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        result = server._insert("t", data=[[1]], column_names=["a"])
-
-        assert result == mock_summary
-        assert mock_ch_client.insert.call_count == 2  # Retried once
-
-
 def test_insert_deduplication_token_gated_on_replicated():
     """Replicated/distributed inserts carry a unique dedup-opt-out token; non-replicated is untouched."""
 
@@ -1160,55 +1138,6 @@ def test_insert_deduplication_token_gated_on_replicated():
     assert all(
         "insert_deduplication_token" not in s for s in capture_settings(False)
     ), "non-replicated inserts must be unchanged (SharedMergeTree/CH Cloud)"
-
-
-def test_insert_with_empty_query_retry_contract():
-    """The shared direct-insert helper retries empty query, exhausts, and passes through."""
-    summary = MagicMock()
-
-    # Retry once then succeed.
-    client = MagicMock()
-    client.insert.side_effect = [DatabaseError("Empty query. (SYNTAX_ERROR)"), summary]
-    assert (
-        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
-        is summary
-    )
-    assert client.insert.call_count == 2
-    # The retry must re-send the same rows (fresh generator over the same list).
-    assert client.insert.call_args.kwargs["data"] == [[1]]
-
-    # Empty query on every attempt: exhausts the retry budget then re-raises.
-    client = MagicMock()
-    client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
-    with pytest.raises(DatabaseError, match="Empty query"):
-        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
-    assert client.insert.call_count == ch_settings.INSERT_MAX_RETRIES
-
-    # Any other database error raises immediately, no retry.
-    client = MagicMock()
-    client.insert.side_effect = DatabaseError("Table does not exist")
-    with pytest.raises(DatabaseError, match="Table does not exist"):
-        insert_with_empty_query_retry(client, "spans", data=[[1]], column_names=["a"])
-    assert client.insert.call_count == 1
-
-
-def test_agent_write_handler_retries_empty_query():
-    """Regression: the agent spans write path retries empty query (was bypassing _insert)."""
-    summary = MagicMock()
-    client = MagicMock()
-    client.insert.side_effect = [DatabaseError("Empty query. (SYNTAX_ERROR)"), summary]
-    span = AgentSpanCHInsertable(
-        project_id="entity/project",
-        trace_id="trace-1",
-        span_id="span-1",
-        span_name="chat",
-        started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-    )
-
-    AgentWriteHandler(client).insert_span(span)
-
-    assert client.insert.call_count == 2
-    assert client.insert.call_args.args[0] == "spans"
 
 
 def test_ensure_obj_version_exists_retries_eventual_consistency():
@@ -1332,25 +1261,17 @@ def test_file_content_read_retries_eventual_consistency():
         # Other errors should NOT be retried (call_count=1)
         (RuntimeError("unexpected"), 1),
         (ValueError("some value error"), 1),
-        # Empty query errors retry up to INSERT_MAX_RETRIES
-        pytest.param(
-            "empty_query",
-            3,  # INSERT_MAX_RETRIES
-            id="empty_query_exhausts_retries",
-        ),
+        # Empty query errors are no longer retried client-side: the 1.x
+        # driver rebuilds the insert body on its own connection retry.
+        (DatabaseError("Code: 62. DB::Exception: Empty query"), 1),
     ],
 )
 def test_insert_error_handling(error, expected_calls):
-    """Verify only 'Empty query' errors are retried; others fail immediately."""
+    """Insert errors fail immediately; no client-side retry loop remains."""
     mock_ch_client = MagicMock()
     mock_ch_client.command.return_value = None
-
-    if error == "empty_query":
-        mock_ch_client.insert.side_effect = DatabaseError("Empty query. (SYNTAX_ERROR)")
-        expected_exception = DatabaseError
-    else:
-        mock_ch_client.insert.side_effect = error
-        expected_exception = type(error)
+    mock_ch_client.insert.side_effect = error
+    expected_exception = type(error)
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client

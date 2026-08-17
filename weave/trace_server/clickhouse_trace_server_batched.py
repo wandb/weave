@@ -140,7 +140,6 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
-    insert_with_empty_query_retry,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
@@ -7758,11 +7757,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         start = time.monotonic()
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
-        # invalid client UTF-8. Empty-query retries are handled in the helper.
+        # invalid client UTF-8.
         for _ in range(2):
             try:
-                result = insert_with_empty_query_retry(
-                    self.ch_client, table, data, column_names, settings
+                result = self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
                 )
 
             # Invalid client Unicode: sanitize the batch and retry once.
