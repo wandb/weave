@@ -1808,6 +1808,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             }
             return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
 
+        # Scale per trace to avoid truncation; +1 detects oversized traces.
+        combined_limit = (req.limit + 1) * len(trace_ids)
+
         # Stream all calls in those traces with minimal columns for aggregation.
         calls = self.calls_query_stream(
             tsi.CallsQueryReq(
@@ -1815,13 +1818,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
                 columns=["id", "parent_id", "summary"],
                 include_costs=req.include_costs,
-                limit=req.limit,
+                limit=combined_limit,
             )
         )
 
         usage_calls: list[usage_utils.UsageCall] = []
         unfinished_call_ids: set[str] = set()
+        calls_per_trace: defaultdict[str, int] = defaultdict(int)
         for call in calls:
+            calls_per_trace[call.trace_id] += 1
             usage_calls.append(
                 usage_utils.UsageCall(
                     id=call.id,
@@ -1831,6 +1836,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
             if call.ended_at is None:
                 unfinished_call_ids.add(call.id)
+
+        if any(call_count > req.limit for call_count in calls_per_trace.values()):
+            raise InvalidRequest(
+                "At least one requested trace exceeds the calls_usage limit; "
+                "increase limit or request fewer roots"
+            )
 
         # Aggregate usage bottom-up to include descendants.
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(

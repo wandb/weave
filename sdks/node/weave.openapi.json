@@ -11886,8 +11886,9 @@
           },
           "limit": {
             "type": "integer",
+            "minimum": 1.0,
             "title": "Limit",
-            "description": "Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
+            "description": "Maximum number of calls to process per trace. Acts as a safety limit to prevent unbounded memory usage.",
             "default": 10000
           }
         },
@@ -11898,7 +11899,7 @@
           "call_ids"
         ],
         "title": "CallsUsageReq",
-        "description": "Request to compute aggregated usage for multiple root calls.\n\nThis endpoint returns usage metrics for each requested root call, where each\nroot's metrics include the sum of its own usage plus all descendants' usage.\n\nNote: All matching calls are loaded into memory for aggregation. For very large\nresult sets (>10k calls), consider batching root call IDs or using narrower\nfilters at the application layer."
+        "description": "Request to compute aggregated usage for multiple root calls.\n\nThis endpoint returns usage metrics for each requested root call, where each\nroot's metrics include the sum of its own usage plus all descendants' usage.\n\nNote: Matching calls are loaded into memory for aggregation. The per-trace\nlimit prevents any one trace from creating an unbounded result set."
       },
       "CallsUsageRes": {
         "properties": {

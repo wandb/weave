@@ -4106,9 +4106,8 @@ class CallsUsageReq(BaseModelStrict):
     This endpoint returns usage metrics for each requested root call, where each
     root's metrics include the sum of its own usage plus all descendants' usage.
 
-    Note: All matching calls are loaded into memory for aggregation. For very large
-    result sets (>10k calls), consider batching root call IDs or using narrower
-    filters at the application layer.
+    Note: Matching calls are loaded into memory for aggregation. The per-trace
+    limit prevents any one trace from creating an unbounded result set.
     """
 
     project_id: str
@@ -4121,7 +4120,8 @@ class CallsUsageReq(BaseModelStrict):
     )
     limit: int = Field(
         default=10_000,
-        description="Maximum number of calls to process across all traces. Acts as a safety limit to prevent unbounded memory usage.",
+        ge=1,
+        description="Maximum number of calls to process per trace. Acts as a safety limit to prevent unbounded memory usage.",
     )
 
 

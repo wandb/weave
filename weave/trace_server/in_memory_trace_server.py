@@ -2734,20 +2734,22 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             }
             return tsi.CallsUsageRes(call_usage=root_usage, unfinished_call_ids=[])
 
-        # ---- Fetch every call in those traces and aggregate usage with descendants ----
+        # Scale per trace to avoid truncation; +1 detects oversized traces.
         calls = self.calls_query_stream(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=tsi.CallsFilter(trace_ids=list(trace_ids)),
                 columns=["id", "parent_id", "summary"],
                 include_costs=req.include_costs,
-                limit=req.limit,
+                limit=(req.limit + 1) * len(trace_ids),
             )
         )
 
         usage_calls: list[usage_utils.UsageCall] = []
         unfinished_call_ids: set[str] = set()
+        calls_per_trace: dict[str, int] = {}
         for call in calls:
+            calls_per_trace[call.trace_id] = calls_per_trace.get(call.trace_id, 0) + 1
             usage_calls.append(
                 usage_utils.UsageCall(
                     id=call.id,
@@ -2757,6 +2759,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
             )
             if call.ended_at is None:
                 unfinished_call_ids.add(call.id)
+
+        if any(call_count > req.limit for call_count in calls_per_trace.values()):
+            raise InvalidRequest(
+                "At least one requested trace exceeds the calls_usage limit; "
+                "increase limit or request fewer roots"
+            )
 
         aggregated_usage = usage_utils.aggregate_usage_with_descendants(
             usage_calls, req.include_costs
