@@ -445,7 +445,9 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
         def encode_batch(batch: list[tsi.FeedbackCreateReq]) -> bytes:
             batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
-            data = batch_req.model_dump_json()
+            data = batch_req.model_dump_json(
+                by_alias=True, exclude_defaults=True, exclude_none=True
+            )
             return data.encode("utf-8")
 
         def send_feedback_batch(encoded_data: bytes) -> None:
@@ -513,13 +515,17 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
         stream: bool = False,
         trace_id: str | None = None,
     ) -> httpx.Response:
+        # `by_alias` preserves Mongo-style query properties that start with `$`.
+        if isinstance(req, (tsi.FeedbackCreateReq, tsi.FeedbackCreateBatchReq)):
+            # Keep additive defaults off the wire for the minimum supported server.
+            data = req.model_dump_json(
+                by_alias=True, exclude_defaults=True, exclude_none=True
+            )
+        else:
+            data = req.model_dump_json(by_alias=True)
         r = self.post(
             url,
-            # `by_alias` is required since we have Mongo-style properties in the
-            # query models that are aliased to conform to start with `$`. Without
-            # this, the model_dump will use the internal property names which are
-            # not valid for the `model_validate` step.
-            data=req.model_dump_json(by_alias=True).encode("utf-8"),
+            data=data.encode("utf-8"),
             stream=stream,
             trace_id=trace_id,
         )
