@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from weave.trace_server.calls_query_builder.utils import param_slot, safely_format_sql
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.trace_server_interface import FeedbackAggregateReq
+
+if TYPE_CHECKING:
+    from weave.trace_server.agents.types import AgentSignalsQueryReq
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +83,9 @@ def build_feedback_aggregate_query(
         f"{_SCORED_COUNT_SQL} AS scored_count",
     ]
     select_sql = ",\n      ".join(select_parts)
-    where_sql = _build_where_sql(req, project_param, after_param, before_param, pb)
+    where_sql = build_feedback_filter_sql(
+        req, project_param, after_param, before_param, pb
+    )
 
     raw_sql = f"SELECT {select_sql} FROM feedback WHERE {where_sql}"
     if group_keys:
@@ -160,8 +165,8 @@ def _object_id_match_clause(column: str, values: list[str], pb: ParamBuilder) ->
     return f"({' OR '.join(ors)})"
 
 
-def _build_where_sql(
-    req: FeedbackAggregateReq,
+def build_feedback_filter_sql(
+    req: FeedbackAggregateReq | AgentSignalsQueryReq,
     project_param: str,
     after_param: str,
     before_param: str,
