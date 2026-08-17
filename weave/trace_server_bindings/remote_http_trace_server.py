@@ -21,7 +21,11 @@ from weave.trace_server import http_service_interface as his
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server.service_interface import ServerInfoRes
-from weave.trace_server.trace_server_interface import agent_types, insights_types
+from weave.trace_server.trace_server_interface import (
+    agent_types,
+    insights_read_types,
+    insights_write_types,
+)
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.client_interface import TraceServerClientInterface
@@ -632,24 +636,24 @@ class RemoteHTTPTraceServer(TraceServerClientInterface):
 
     @validate_call
     def insights_signatures_write(
-        self, req: insights_types.InsightSignaturesWriteReq
-    ) -> insights_types.InsightSignaturesWriteRes:
+        self, req: insights_write_types.InsightSignaturesWriteReq
+    ) -> insights_write_types.InsightSignaturesWriteRes:
         return self._generic_request(
             "/insights/signatures/write",
             req,
-            insights_types.InsightSignaturesWriteReq,
-            insights_types.InsightSignaturesWriteRes,
+            insights_write_types.InsightSignaturesWriteReq,
+            insights_write_types.InsightSignaturesWriteRes,
         )
 
     @validate_call
     def insights_signatures_query(
-        self, req: insights_types.InsightSignaturesQueryReq
-    ) -> insights_types.InsightSignaturesQueryRes:
+        self, req: insights_read_types.InsightSignaturesQueryReq
+    ) -> insights_read_types.InsightSignaturesQueryRes:
         return self._generic_request(
             "/insights/signatures/query",
             req,
-            insights_types.InsightSignaturesQueryReq,
-            insights_types.InsightSignaturesQueryRes,
+            insights_read_types.InsightSignaturesQueryReq,
+            insights_read_types.InsightSignaturesQueryRes,
         )
 
     # === GenAI / Agent Observability API (read) ===

@@ -36,7 +36,8 @@ from weave.trace_server.constants import (
     MAX_OBJECT_NAME_LENGTH,
 )
 from weave.trace_server.errors import InvalidRequest
-from weave.trace_server.insights import types as insights_types
+from weave.trace_server.insights import read_types as insights_read_types
+from weave.trace_server.insights import write_types as insights_write_types
 from weave.trace_server.interface.query import Query
 
 # Re-exported from service_interface for backwards compatibility.
@@ -3643,11 +3644,11 @@ class TraceServerInterface(Protocol):
 
     # Insights API
     def insights_signatures_write(
-        self, req: insights_types.InsightSignaturesWriteReq
-    ) -> insights_types.InsightSignaturesWriteRes: ...
+        self, req: insights_write_types.InsightSignaturesWriteReq
+    ) -> insights_write_types.InsightSignaturesWriteRes: ...
     def insights_signatures_query(
-        self, req: insights_types.InsightSignaturesQueryReq
-    ) -> insights_types.InsightSignaturesQueryRes: ...
+        self, req: insights_read_types.InsightSignaturesQueryReq
+    ) -> insights_read_types.InsightSignaturesQueryRes: ...
 
     # Call API
     def call_start(self, req: CallStartReq) -> CallStartRes: ...

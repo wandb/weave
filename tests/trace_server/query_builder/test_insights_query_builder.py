@@ -7,6 +7,10 @@ formatted SQL plus the exact param dict, matching the style of
 The expected column lists and measure block are spelled out literally rather
 than composed from the builder's own constants, so changing what the builder
 selects has to be a deliberate edit here too.
+
+Shapes the request model rejects outright (a cursor without `order='key'`, a
+`rows` knob in `groups` mode) are covered in `test_insights_endpoints.py`; they
+cannot reach a builder.
 """
 
 import datetime
@@ -15,7 +19,7 @@ import uuid
 import pytest
 
 from tests.trace_server.query_builder.utils import assert_raw_sql
-from weave.trace_server.insights.types import (
+from weave.trace_server.insights.read_types import (
     InsightSignatureCursor,
     InsightSignaturesQueryReq,
 )
@@ -33,15 +37,17 @@ MID_DAY = datetime.date(2026, 6, 15)
 CURSOR_ID = uuid.UUID("0197a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b")
 
 SHARED_COLS = (
-    "id, signature, hex(sipHash128(signature)) AS signature_hash, category, "
-    "conversation_id, user_id, agent_name, turn_duration_ms, turn_cost_usd, "
-    "trace_started_at, inserted_at"
+    "id, signature, category, conversation_id, user_id, agent_name, "
+    "turn_duration_ms, turn_cost_usd, trace_started_at, inserted_at"
 )
-INTENT_COLS = f"{SHARED_COLS}, trace_id, sentiment"
+INTENT_COLS = f"{SHARED_COLS}, trace_id, language, sentiment"
 FAILURE_COLS = (
     f"{SHARED_COLS}, current_trace_id, affected_trace_ids, evidence_span_ids, "
     "failure_reason, severity"
 )
+# A `key` page carries the day it sorted on, so the cursor echoes ClickHouse's
+# own bucket rather than one Python re-derives from a timestamp.
+DAY_COL = "toDate(trace_started_at) AS day"
 
 BASE_WHERE = (
     "project_id = {insights_0:String} "
@@ -61,7 +67,7 @@ GROUP_MEASURES = """
     uniq(user_id) AS users,
     topKMerge(1)(category_state)[1] AS modal_category,
     avg(turn_cost_usd) AS avg_turn_cost_usd,
-    quantile(0.5)(turn_duration_ms) AS p50_turn_duration_ms,
+    quantileTDigest(0.5)(turn_duration_ms) AS p50_turn_duration_ms,
     topKMerge(3)(config_state) AS configs
 """
 TURN_MEASURES = """
@@ -156,6 +162,7 @@ def build_groups(req: InsightSignaturesQueryReq) -> tuple[str, dict]:
 
 
 # The signature type picks the table and the type-specific tail of the projection.
+# No hash column: the signature itself is the cluster join key.
 @pytest.mark.parametrize(
     ("overrides", "columns", "table"),
     [
@@ -186,10 +193,10 @@ def test_signature_rows_projection(overrides: dict, columns: str, table: str) ->
     assert_sql(expected, {**BASE_PARAMS, "insights_3": 100}, query, params)
 
 
-def test_key_order_without_a_cursor_is_the_first_page() -> None:
+def test_key_order_selects_the_day_it_sorts_on() -> None:
     query, params = build_rows(rows_req(order="key"))
     expected = expected_rows_sql(
-        columns=INTENT_COLS,
+        columns=f"{INTENT_COLS}, {DAY_COL}",
         table="intent_signatures",
         where=BASE_WHERE,
         order_by="toDate(trace_started_at), id",
@@ -209,7 +216,7 @@ def test_cursor_is_spelled_out_as_an_or_not_a_tuple_comparison() -> None:
         "AND id > {insights_4:UUID}))"
     )
     expected = expected_rows_sql(
-        columns=INTENT_COLS,
+        columns=f"{INTENT_COLS}, {DAY_COL}",
         table="intent_signatures",
         where=f"{BASE_WHERE} AND {seek}",
         order_by="toDate(trace_started_at), id",
@@ -226,23 +233,6 @@ def test_cursor_is_spelled_out_as_an_or_not_a_tuple_comparison() -> None:
         query,
         params,
     )
-
-
-def test_a_cursor_is_ignored_when_ordering_by_recency() -> None:
-    """`recent` order has no stable seek, so the cursor must not leak in."""
-    query, params = build_rows(
-        rows_req(
-            order="recent", cursor=InsightSignatureCursor(day=MID_DAY, id=CURSOR_ID)
-        )
-    )
-    expected = expected_rows_sql(
-        columns=INTENT_COLS,
-        table="intent_signatures",
-        where=BASE_WHERE,
-        order_by="trace_started_at DESC, id",
-        limit_slot="{insights_3:UInt32}",
-    )
-    assert_sql(expected, {**BASE_PARAMS, "insights_3": 100}, query, params)
 
 
 def test_a_single_day_range_binds_one_slot_twice() -> None:
@@ -280,7 +270,7 @@ def test_a_cursor_on_the_range_start_reuses_the_range_slot() -> None:
         "AND id > {insights_3:UUID}))"
     )
     expected = expected_rows_sql(
-        columns=INTENT_COLS,
+        columns=f"{INTENT_COLS}, {DAY_COL}",
         table="intent_signatures",
         where=f"{BASE_WHERE} AND {seek}",
         order_by="toDate(trace_started_at), id",
@@ -322,10 +312,10 @@ def test_a_cursor_on_the_range_start_reuses_the_range_slot() -> None:
             id="categories",
         ),
         pytest.param(
-            {"signature_hashes": ["abcd", "EF01"]},
-            "hex(sipHash128(signature)) IN {insights_3:Array(String)}",
-            {"insights_3": ["ABCD", "EF01"]},
-            id="signature_hashes_are_uppercased_to_match_hex",
+            {"signatures": ["cancel my subscription"]},
+            "signature IN {insights_3:Array(String)}",
+            {"insights_3": ["cancel my subscription"]},
+            id="signatures_match_the_stored_text_directly",
         ),
     ],
 )
@@ -365,7 +355,7 @@ def test_failure_trace_id_is_array_membership() -> None:
     "overrides",
     [
         pytest.param({"categories": []}, id="empty_categories"),
-        pytest.param({"signature_hashes": []}, id="empty_signature_hashes"),
+        pytest.param({"signatures": []}, id="empty_signatures"),
     ],
 )
 def test_an_empty_list_adds_no_clause(overrides: dict) -> None:
@@ -388,7 +378,7 @@ def test_every_filter_together_in_allocation_order() -> None:
             trace_id="t1",
             conversation_id="c1",
             categories=["other"],
-            signature_hashes=["ab"],
+            signatures=["a signature"],
             include_vector=True,
             order="key",
             cursor=InsightSignatureCursor(day=MID_DAY, id=CURSOR_ID),
@@ -400,13 +390,13 @@ def test_every_filter_together_in_allocation_order() -> None:
         " AND has(affected_trace_ids, {insights_3:String})"
         " AND conversation_id = {insights_4:String}"
         " AND category IN {insights_5:Array(String)}"
-        " AND hex(sipHash128(signature)) IN {insights_6:Array(String)}"
+        " AND signature IN {insights_6:Array(String)}"
         " AND (toDate(trace_started_at) > {insights_7:Date}"
         " OR (toDate(trace_started_at) = {insights_7:Date}"
         " AND id > {insights_8:UUID}))"
     )
     expected = expected_rows_sql(
-        columns=f"{FAILURE_COLS}, vector",
+        columns=f"{FAILURE_COLS}, {DAY_COL}, vector",
         table="failure_signatures",
         where=where,
         order_by="toDate(trace_started_at), id",
@@ -419,7 +409,7 @@ def test_every_filter_together_in_allocation_order() -> None:
             "insights_3": "t1",
             "insights_4": "c1",
             "insights_5": ["other"],
-            "insights_6": ["AB"],
+            "insights_6": ["a signature"],
             "insights_7": MID_DAY,
             "insights_8": str(CURSOR_ID),
             "insights_9": 7,
@@ -531,25 +521,6 @@ def test_filters_apply_to_groups_the_same_way() -> None:
     )
 
 
-def test_a_cursor_never_reaches_a_grouped_read() -> None:
-    """Groups have no keyset order, so the cursor must be inert here."""
-    query, params = build_groups(
-        rows_req(
-            mode="groups",
-            order="key",
-            cursor=InsightSignatureCursor(day=MID_DAY, id=CURSOR_ID),
-        )
-    )
-    expected = expected_groups_sql(
-        group_exprs="signature",
-        table="intent_signatures",
-        where=BASE_WHERE,
-        group_keys="signature",
-        limit_slot="{insights_3:UInt32}",
-    )
-    assert_sql(expected, {**BASE_PARAMS, "insights_3": 100}, query, params)
-
-
 @pytest.mark.parametrize(
     ("signature_type", "field", "valid_on"),
     [
@@ -568,12 +539,8 @@ def test_a_type_only_group_field_is_rejected_on_the_other_type(
         )
 
 
-def test_invalid_query_shapes_are_rejected() -> None:
-    # A grouped query needs a key.
-    with pytest.raises(ValueError, match="at least one group_by field"):
-        build_groups(rows_req(mode="groups", group_by=[]))
-
-    # Runtime callers can bypass the Literal annotations.
+def test_a_bypassed_literal_still_raises_rather_than_building_sql() -> None:
+    """Runtime callers can bypass the `Literal` annotations; nothing falls through."""
     with pytest.raises(ValueError, match="unknown insights group field"):
         build_groups(unvalidated_rows_req(mode="groups", group_by=["not_a_field"]))
 

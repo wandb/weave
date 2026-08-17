@@ -1595,14 +1595,14 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     # Insights rows carry no refs, so these translate the project id and nothing
     # else. Responses expose no project_id, so there is nothing to translate back.
     def insights_signatures_write(
-        self, req: tsi.insights_types.InsightSignaturesWriteReq
-    ) -> tsi.insights_types.InsightSignaturesWriteRes:
+        self, req: tsi.insights_write_types.InsightSignaturesWriteReq
+    ) -> tsi.insights_write_types.InsightSignaturesWriteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.insights_signatures_write(req)
 
     def insights_signatures_query(
-        self, req: tsi.insights_types.InsightSignaturesQueryReq
-    ) -> tsi.insights_types.InsightSignaturesQueryRes:
+        self, req: tsi.insights_read_types.InsightSignaturesQueryReq
+    ) -> tsi.insights_read_types.InsightSignaturesQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._internal_trace_server.insights_signatures_query(req)
 

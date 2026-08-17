@@ -1,46 +1,43 @@
 """Validate and normalize signature candidates before insertion.
 
-Malformed candidates are dropped and unknown labels are repaired. IDs and
-signature hashes stay server-owned so re-extractions append and hashes match
-ClickHouse's `sipHash128` implementation.
+Malformed candidates are dropped and unknown labels are repaired. The server owns
+identity: a row's `id` is derived from the fields that make the occurrence unique,
+so a retried or replayed write collapses in the merge instead of double-counting.
 """
 
 from __future__ import annotations
 
 import unicodedata
-from functools import cache
+import uuid
+from collections import Counter
 
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import config
-from weave.trace_server.insights.types import (
+from weave.trace_server.insights.enums import InsightSignatureType, InsightWriteGate
+from weave.trace_server.insights.write_types import (
     FailureSignatureCandidate,
     InsightSignatureCandidateBase,
     IntentSignatureCandidate,
 )
 
-GATE_UNGROUNDED_ATTRIBUTION = "ungrounded_attribution"
-GATE_EMPTY_SIGNATURE = "empty_signature"
-GATE_VECTOR_DIMENSIONS = "vector_dimensions"
-GATE_UNKNOWN_CATEGORY = "unknown_category"
-GATE_UNKNOWN_SENTIMENT = "unknown_sentiment"
-GATE_UNKNOWN_SEVERITY = "unknown_severity"
-GATE_DUPLICATE_IN_BATCH = "duplicate_in_batch"
-
 FALLBACK_LABEL = "other"
 UNKNOWN_LANGUAGE = "und"
 
+# Namespace for the derived row id. Changing it re-mints every id and so orphans
+# every stored row from its replays; it is permanent.
+ROW_ID_NAMESPACE = uuid.UUID("320faf23-fcac-48f0-9161-54f2ab433304")
+
 Row = dict[str, object]
-GateCounts = dict[str, int]
-DedupeKey = tuple[str, str, str]
+GateCounts = Counter[InsightWriteGate]
 
 
-def validate_config_sha(signature_type: str, claimed: str) -> None:
+def validate_config_sha(signature_type: InsightSignatureType, claimed: str) -> None:
     """Require the caller to agree with the deployed config.
 
     A row points at its config by digest, so a digest this deployment cannot
     resolve would be an unreadable provenance pointer.
     """
-    actual = config.config_sha(_load(signature_type))
+    actual = config.deployed_config_sha(signature_type)
     if claimed != actual:
         raise InvalidRequest(
             f"{signature_type} config_sha {claimed!r} does not match the deployed "
@@ -57,7 +54,7 @@ def canonicalize_signature(text: str, *, normalization_version: int) -> str:
     if normalization_version != 1:
         raise RuntimeError(f"unsupported normalization_version {normalization_version}")
     collapsed = " ".join(unicodedata.normalize("NFKC", text).split())
-    return collapsed.rstrip(".").strip().casefold()
+    return collapsed.rstrip(" .").casefold()
 
 
 def prepare_intents(
@@ -65,35 +62,37 @@ def prepare_intents(
     config_sha: str,
     candidates: list[IntentSignatureCandidate],
 ) -> tuple[list[Row], GateCounts]:
-    cfg = _intent_config()
+    cfg = config.load_intent_config()
     categories = _label_names(cfg.extraction.taxonomy)
     sentiments = _label_names(cfg.extraction.sentiment)
-    gate_counts: GateCounts = {}
-    rows: dict[DedupeKey, Row] = {}
+    gate_counts: GateCounts = Counter()
+    rows: dict[uuid.UUID, Row] = {}
 
     for candidate in candidates:
-        signature = _prepare_signature(
-            candidate,
-            cfg.extraction.normalization_version,
-            cfg.embedding.dimensions,
-            gate_counts,
-        )
+        signature = _gate(cfg, candidate, gate_counts)
         if signature is None:
             continue
-        key = (candidate.conversation_id, candidate.trace_id, signature)
+        row_id = _row_id(
+            project_id,
+            config_sha,
+            candidate.conversation_id,
+            candidate.trace_id,
+            signature,
+        )
         row = {
+            "id": row_id,
             **_base_row(project_id, config_sha, signature, candidate),
             "category": _label(
-                candidate.category, categories, gate_counts, GATE_UNKNOWN_CATEGORY
+                candidate.category, categories, gate_counts, "unknown_category"
             ),
             "language": candidate.language or UNKNOWN_LANGUAGE,
             "sentiment": _optional_label(
-                candidate.sentiment, sentiments, gate_counts, GATE_UNKNOWN_SENTIMENT
+                candidate.sentiment, sentiments, gate_counts, "unknown_sentiment"
             ),
             "sentiment_rationale": candidate.sentiment_rationale,
             "trace_id": candidate.trace_id,
         }
-        _store_row(rows, key, row, gate_counts)
+        _store(rows, row_id, row, gate_counts)
     return list(rows.values()), gate_counts
 
 
@@ -102,60 +101,43 @@ def prepare_failures(
     config_sha: str,
     candidates: list[FailureSignatureCandidate],
 ) -> tuple[list[Row], GateCounts]:
-    cfg = _failure_config()
+    cfg = config.load_failure_config()
     categories = _label_names(cfg.extraction.taxonomy)
     severities = _label_names(cfg.extraction.severity)
-    gate_counts: GateCounts = {}
-    rows: dict[DedupeKey, Row] = {}
+    gate_counts: GateCounts = Counter()
+    rows: dict[uuid.UUID, Row] = {}
 
     for candidate in candidates:
-        signature = _prepare_signature(
-            candidate,
-            cfg.extraction.normalization_version,
-            cfg.embedding.dimensions,
-            gate_counts,
-        )
+        signature = _gate(cfg, candidate, gate_counts)
         if signature is None:
             continue
         affected = sorted(set(candidate.affected_trace_ids))
         if candidate.current_trace_id not in affected:
-            _increment(gate_counts, GATE_UNGROUNDED_ATTRIBUTION)
+            gate_counts["ungrounded_attribution"] += 1
             continue
-        key = (candidate.conversation_id, candidate.current_trace_id, signature)
+        row_id = _row_id(
+            project_id,
+            config_sha,
+            candidate.conversation_id,
+            candidate.current_trace_id,
+            signature,
+        )
         row = {
+            "id": row_id,
             **_base_row(project_id, config_sha, signature, candidate),
             "failure_reason": candidate.failure_reason,
             "category": _label(
-                candidate.category, categories, gate_counts, GATE_UNKNOWN_CATEGORY
+                candidate.category, categories, gate_counts, "unknown_category"
             ),
             "severity": _optional_label(
-                candidate.severity, severities, gate_counts, GATE_UNKNOWN_SEVERITY
+                candidate.severity, severities, gate_counts, "unknown_severity"
             ),
             "current_trace_id": candidate.current_trace_id,
             "affected_trace_ids": affected,
             "evidence_span_ids": sorted(set(candidate.evidence_span_ids)),
         }
-        _store_row(rows, key, row, gate_counts)
+        _store(rows, row_id, row, gate_counts)
     return list(rows.values()), gate_counts
-
-
-@cache
-def _load(signature_type: str) -> config.SignatureConfig:
-    return config.load_config(signature_type)
-
-
-def _intent_config() -> config.IntentConfig:
-    cfg = _load("intent")
-    if not isinstance(cfg, config.IntentConfig):
-        raise TypeError("intent.yaml does not declare the intent type")
-    return cfg
-
-
-def _failure_config() -> config.FailureConfig:
-    cfg = _load("failure")
-    if not isinstance(cfg, config.FailureConfig):
-        raise TypeError("failure.yaml does not declare the failure type")
-    return cfg
 
 
 def _base_row(
@@ -179,52 +161,64 @@ def _base_row(
     }
 
 
+def _store(
+    rows: dict[uuid.UUID, Row], row_id: uuid.UUID, row: Row, gate_counts: GateCounts
+) -> None:
+    """File a row under its derived id, which is also its in-batch dedupe key."""
+    if row_id in rows:
+        gate_counts["duplicate_in_batch"] += 1
+    rows[row_id] = row
+
+
+def _row_id(
+    project_id: str, config_sha: str, conversation_id: str, turn_id: str, signature: str
+) -> uuid.UUID:
+    """Identity of one judged occurrence: one signature, off one turn, under one config.
+
+    Derived rather than minted, so a replay of the same batch reuses the id and the
+    ReplacingMergeTree collapses the pair. A NUL separator cannot appear in any part.
+    """
+    parts = (project_id, config_sha, conversation_id, turn_id, signature)
+    return uuid.uuid5(ROW_ID_NAMESPACE, "\x00".join(parts))
+
+
 def _label_names(taxonomy: config.TaxonomyRef) -> set[str]:
     return {label.name for label in taxonomy.labels()}
 
 
-def _prepare_signature(
+def _gate(
+    cfg: config.SignatureConfig,
     candidate: InsightSignatureCandidateBase,
-    normalization_version: int,
-    dimensions: int,
     gate_counts: GateCounts,
 ) -> str | None:
+    """The candidate's stored signature, or `None` when a gate discards it."""
     signature = canonicalize_signature(
-        candidate.signature, normalization_version=normalization_version
+        candidate.signature,
+        normalization_version=cfg.extraction.normalization_version,
     )
     if not signature:
-        _increment(gate_counts, GATE_EMPTY_SIGNATURE)
+        gate_counts["empty_signature"] += 1
         return None
-    if len(candidate.vector) != dimensions:
-        _increment(gate_counts, GATE_VECTOR_DIMENSIONS)
+    if len(candidate.vector) != cfg.embedding.dimensions:
+        gate_counts["vector_dimensions"] += 1
         return None
     return signature
 
 
-def _label(value: str, allowed: set[str], gate_counts: GateCounts, gate: str) -> str:
+def _label(
+    value: str, allowed: set[str], gate_counts: GateCounts, gate: InsightWriteGate
+) -> str:
     if value in allowed:
         return value
-    _increment(gate_counts, gate)
+    gate_counts[gate] += 1
     return FALLBACK_LABEL
 
 
 def _optional_label(
-    value: str, allowed: set[str], gate_counts: GateCounts, gate: str
+    value: str, allowed: set[str], gate_counts: GateCounts, gate: InsightWriteGate
 ) -> str:
     """Keep missing labels distinct from real labels such as neutral or info."""
     if not value or value in allowed:
         return value
-    _increment(gate_counts, gate)
+    gate_counts[gate] += 1
     return ""
-
-
-def _store_row(
-    rows: dict[DedupeKey, Row], key: DedupeKey, row: Row, gate_counts: GateCounts
-) -> None:
-    if key in rows:
-        _increment(gate_counts, GATE_DUPLICATE_IN_BATCH)
-    rows[key] = row
-
-
-def _increment(gate_counts: GateCounts, gate: str) -> None:
-    gate_counts[gate] = gate_counts.get(gate, 0) + 1

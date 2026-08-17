@@ -7,25 +7,26 @@ from typing import TYPE_CHECKING, Any
 
 from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert
-from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.insights import writer
-from weave.trace_server.insights.types import (
+from weave.trace_server.insights.read_types import (
+    FailureSignatureRow,
     InsightSignatureCursor,
     InsightSignatureGroup,
-    InsightSignatureRow,
     InsightSignaturesQueryReq,
     InsightSignaturesQueryRes,
+    IntentSignatureRow,
+)
+from weave.trace_server.insights.write_types import (
     InsightSignaturesWriteReq,
     InsightSignaturesWriteRes,
-    InsightWriteCounts,
 )
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.insights_query_builder import (
-    FAILURE_TABLE,
-    INTENT_TABLE,
+    DAY_KEY,
     PARAM_NAMESPACE,
     make_signature_groups_query,
     make_signature_rows_query,
+    spec_for,
 )
 
 if TYPE_CHECKING:
@@ -39,59 +40,82 @@ def insights_signatures_write(
 ) -> InsightSignaturesWriteRes:
     """Insert everything a batch of judged turns emitted.
 
-    No `id` is supplied, so a replayed request inserts new rows rather than
-    replacing the originals. Callers dedupe upstream, on the turns they judge.
+    `id` is derived from the occurrence, so a replayed request writes the same ids
+    and the ReplacingMergeTree collapses the pair on its next merge. A read between
+    the replay and that merge still sees both.
     """
-    if req.intents and req.failures:
-        raise InvalidRequest(
-            "one write carries one signature type: intents and failures name "
-            "different configs"
-        )
-    if req.failures:
-        writer.validate_config_sha("failure", req.config_sha)
-        rows, gate_counts = writer.prepare_failures(
-            req.project_id, req.config_sha, req.failures
-        )
-        written = InsightWriteCounts(failures=_insert(server, FAILURE_TABLE, rows))
-    else:
-        writer.validate_config_sha("intent", req.config_sha)
+    writer.validate_config_sha(req.signature_type, req.config_sha)
+    if req.signature_type == "intent":
         rows, gate_counts = writer.prepare_intents(
             req.project_id, req.config_sha, req.intents
         )
-        written = InsightWriteCounts(intents=_insert(server, INTENT_TABLE, rows))
+    elif req.signature_type == "failure":
+        rows, gate_counts = writer.prepare_failures(
+            req.project_id, req.config_sha, req.failures
+        )
+    else:
+        raise ValueError(f"unknown insights signature type {req.signature_type!r}")
 
-    return InsightSignaturesWriteRes(written=written, dropped=gate_counts)
+    written = _insert(server, spec_for(req.signature_type).table, rows)
+    return InsightSignaturesWriteRes(written=written, dropped=dict(gate_counts))
 
 
 def insights_signatures_query(
     server: ClickHouseTraceServer, req: InsightSignaturesQueryReq
 ) -> InsightSignaturesQueryRes:
-    pb = ParamBuilder(PARAM_NAMESPACE)
     if req.mode == "rows":
-        sql = make_signature_rows_query(pb, req)
-    elif req.mode == "groups":
-        sql = make_signature_groups_query(pb, req)
-    else:
-        raise ValueError(f"unknown insights query mode {req.mode!r}")
-
-    result = server._query(sql, pb.get_params())
-    result_rows = [
-        dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
-    ]
+        return _query_rows(server, req)
     if req.mode == "groups":
-        return InsightSignaturesQueryRes(
-            groups=[_group(row, req.group_by) for row in result_rows]
-        )
+        return _query_groups(server, req)
+    raise ValueError(f"unknown insights query mode {req.mode!r}")
+
+
+def _query_rows(
+    server: ClickHouseTraceServer, req: InsightSignaturesQueryReq
+) -> InsightSignaturesQueryRes:
+    """One page of occurrences, plus the cursor to resume a `key` walk.
+
+    `next_cursor` is set only on a full page, so a caller stops on a short page
+    rather than spending a request to discover the walk is over.
+    """
+    pb = ParamBuilder(PARAM_NAMESPACE)
+    result_rows = _run(server, make_signature_rows_query(pb, req), pb)
 
     cursor = None
-    if req.order == "key" and result_rows:
+    if req.order == "key" and len(result_rows) == req.limit:
         last = result_rows[-1]
-        cursor = InsightSignatureCursor(
-            day=last["trace_started_at"].date(), id=last["id"]
+        cursor = InsightSignatureCursor(day=last[DAY_KEY], id=last["id"])
+
+    # `day` exists to carry the cursor, and is not part of a row.
+    fields = [{k: v for k, v in row.items() if k != DAY_KEY} for row in result_rows]
+    if req.signature_type == "intent":
+        return InsightSignaturesQueryRes(
+            rows=[IntentSignatureRow(**row) for row in fields], next_cursor=cursor
         )
+    if req.signature_type == "failure":
+        return InsightSignaturesQueryRes(
+            rows=[FailureSignatureRow(**row) for row in fields], next_cursor=cursor
+        )
+    raise ValueError(f"unknown insights signature type {req.signature_type!r}")
+
+
+def _query_groups(
+    server: ClickHouseTraceServer, req: InsightSignaturesQueryReq
+) -> InsightSignaturesQueryRes:
+    pb = ParamBuilder(PARAM_NAMESPACE)
+    result_rows = _run(server, make_signature_groups_query(pb, req), pb)
     return InsightSignaturesQueryRes(
-        rows=[InsightSignatureRow(**row) for row in result_rows], next_cursor=cursor
+        groups=[_group(row, req.group_by) for row in result_rows]
     )
+
+
+def _run(
+    server: ClickHouseTraceServer, sql: str, pb: ParamBuilder
+) -> list[dict[str, Any]]:
+    result = server._query(sql, pb.get_params())
+    return [
+        dict(zip(result.column_names, row, strict=True)) for row in result.result_rows
+    ]
 
 
 def _group(row: dict[str, Any], group_by: Sequence[str]) -> InsightSignatureGroup:
@@ -114,7 +138,9 @@ def _insert(
 ) -> int:
     if not rows:
         return 0
-    columns = list(rows[0].keys())
+    # Every column any row carries, so a row missing one raises rather than
+    # silently shifting the insert by a position.
+    columns = sorted({column for row in rows for column in row})
     insert_with_empty_query_retry(
         server.ch_client,
         table,

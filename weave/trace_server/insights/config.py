@@ -10,6 +10,7 @@ digest without anyone touching the config.
 import hashlib
 import json
 import os
+from functools import cache
 from typing import Generic, Literal, TypeVar
 
 import yaml
@@ -145,16 +146,29 @@ _CONFIG_MODELS: dict[str, type[SignatureConfig]] = {
 SIGNATURE_TYPES = tuple(_CONFIG_MODELS)
 
 
+@cache
+def load_intent_config() -> IntentConfig:
+    """The deployed intent config, typed, so no caller narrows a union."""
+    return IntentConfig.model_validate(_read_config_yaml("intent"))
+
+
+@cache
+def load_failure_config() -> FailureConfig:
+    """The deployed failure config, typed, so no caller narrows a union."""
+    return FailureConfig.model_validate(_read_config_yaml("failure"))
+
+
+@cache
 def load_config(signature_type: str) -> SignatureConfig:
-    """Load and validate the checked-in config for `signature_type`."""
+    """Load and validate the checked-in config named by a runtime signature type."""
     if signature_type not in _CONFIG_MODELS:
         raise ValueError(
             f"unknown insights signature type {signature_type!r}, "
             f"expected one of {SIGNATURE_TYPES}"
         )
-    path = os.path.join(CONFIG_DIR, f"{signature_type}.yaml")
-    with open(path, encoding="utf-8") as handle:
-        return _CONFIG_MODELS[signature_type].model_validate(yaml.safe_load(handle))
+    return _CONFIG_MODELS[signature_type].model_validate(
+        _read_config_yaml(signature_type)
+    )
 
 
 def config_sha(config: SignatureConfig) -> str:
@@ -165,6 +179,23 @@ def config_sha(config: SignatureConfig) -> str:
     """
     canonical = json.dumps(config.model_dump(), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+@cache
+def deployed_config_sha(signature_type: str) -> str:
+    """The digest this deployment resolves for `signature_type`.
+
+    Cached because `config_sha` re-reads and re-digests every referenced file, which
+    a write request would otherwise pay per batch.
+    """
+    return config_sha(load_config(signature_type))
+
+
+def _read_config_yaml(signature_type: str) -> object:
+    with open(
+        os.path.join(CONFIG_DIR, f"{signature_type}.yaml"), encoding="utf-8"
+    ) as handle:
+        return yaml.safe_load(handle)
 
 
 def _resolve_in_config_dir(path: str) -> str:
