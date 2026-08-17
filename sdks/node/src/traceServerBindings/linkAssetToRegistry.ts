@@ -15,6 +15,7 @@ export interface LinkAssetToRegistryReq {
   aliases: string[];
 }
 
+/** @inline */
 export interface LinkAssetToRegistryRes {
   version_index: number | null;
 }

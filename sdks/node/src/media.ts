@@ -1,10 +1,12 @@
 export const DEFAULT_IMAGE_TYPE = 'png';
 export const DEFAULT_AUDIO_TYPE = 'wav';
 
+/** @inline */
 export type ImageType = 'png' | 'jpeg' | 'webp';
 export type AudioType = 'wav';
 
 // Define WeaveImage type
+/** @inline */
 type WeaveImageInput = {
   data: Buffer;
   imageType?: ImageType;
@@ -59,6 +61,7 @@ export function isWeaveImage(value: any): value is WeaveImage {
   return value && value._weaveType === 'Image';
 }
 
+/** @inline */
 type WeaveAudioInput = {
   data: Buffer;
   audioType?: AudioType;

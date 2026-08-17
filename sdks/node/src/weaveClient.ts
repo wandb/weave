@@ -90,6 +90,8 @@ export type RegisterCustomRuntimeResult = CustomRuntimeApplyRes;
 /**
  * Serialized representation of a file blob stored in the Weave content store.
  * Returned by serializedFileBlob/serializedImage/serializedAudio.
+ *
+ * @inline
  */
 interface SerializedFileBlob {
   _type: 'CustomWeaveType';
@@ -106,6 +108,7 @@ type BatchItem =
   | {mode: 'end'; data: {end: CallEndParams}}
   | {mode: 'complete'; data: {complete: CompletedCallParams}};
 
+/** @inline */
 export type CallStackEntry = {
   callId: string;
   traceId: string;
@@ -211,6 +214,8 @@ export type GetAgentSpansResult = {
 
 /**
  * Options for {@link WeaveClient.getAgentSpanStats}.
+ *
+ * @inline
  */
 export interface GetAgentSpanStatsOptions {
   start: string;
@@ -227,6 +232,8 @@ export interface GetAgentSpanStatsOptions {
 
 /**
  * Result shape returned by {@link WeaveClient.getAgentSpanStats}.
+ *
+ * @inline
  */
 export type GetAgentSpanStatsResult = {
   start: string;
@@ -285,6 +292,8 @@ export type GetAgentTurnsResult = {
 
 /**
  * Options for {@link WeaveClient.searchAgents}.
+ *
+ * @inline
  */
 export interface SearchAgentsOptions {
   query: string;
@@ -308,6 +317,8 @@ export interface SearchAgentsOptions {
 
 /**
  * Result shape returned by {@link WeaveClient.searchAgents}.
+ *
+ * @inline
  */
 export type SearchAgentsResult = {
   results: AgentSearchConversationResult[];
@@ -316,6 +327,8 @@ export type SearchAgentsResult = {
 
 /**
  * Options for {@link WeaveClient.getAgentCustomAttributes}.
+ *
+ * @inline
  */
 export interface GetAgentCustomAttributesOptions {
   query?: Query | null;
@@ -336,6 +349,8 @@ export interface GetAgentCustomAttributesOptions {
 
 /**
  * Result shape returned by {@link WeaveClient.getAgentCustomAttributes}.
+ *
+ * @inline
  */
 export type GetAgentCustomAttributesResult = {
   attributes?: AgentCustomAttrSchemaItem[];
@@ -403,8 +418,10 @@ function generateCallId(): string {
   return uuidv7();
 }
 
+/** @inline */
 export type RegistryLinkable = Prompt | ObjectRef | string;
 
+/** @inline */
 export interface LinkPromptToRegistryOptions {
   targetPath: string;
   aliases?: string[];
@@ -451,6 +468,7 @@ export class CallStack {
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
+/** @inline */
 type CallEndParams = EndedCallSchemaForInsert & {display_name?: string | null};
 
 // Merged start + end payload for the `calls/complete` endpoint.

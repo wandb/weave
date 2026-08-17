@@ -39,7 +39,11 @@ export interface LLMInit extends SpanInitBase {
   systemInstructions?: string[];
 }
 
-/** Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId. */
+/**
+ * Discriminated union for `LLM.attachMedia`: pick one of content / uri / fileId.
+ *
+ * @inline
+ */
 export type AttachMediaOpts =
   | {content: string; mimeType: string; modality: Modality}
   | {uri: string; modality: Modality}
