@@ -28,6 +28,7 @@ from weave.integrations.patch import (
 )
 
 __all__ = [
+    "patch_ag2",
     "patch_anthropic",
     "patch_autogen",
     "patch_cerebras",
