@@ -140,11 +140,6 @@ def stderr(data: Sequence[int | float]) -> float:
         return float(math.sqrt(sample_variance / len(data)))  # type: ignore
 
 
-def _row_has_no_score(x: Any) -> bool:
-    """True for the empty dict an evaluation records for a row that produced no score."""
-    return isinstance(x, dict) and not x
-
-
 def auto_summarize(data: list) -> dict[str, Any] | None:
     """Automatically summarize a list of (potentially nested) dicts.
 
@@ -155,18 +150,23 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
 
     If col is all None, result is None
 
-    A top-level empty dict marks a row whose model or scorer raised. Such rows do
-    not pick the aggregation branch, and they stay in the denominator of a boolean
-    fraction. Numeric means are computed over the values that exist. Nested empty
-    dicts are ordinary values and are left alone.
+    A top-level empty dict marks a row that produced no score, because its model or
+    one of its scorers raised. Such a row does not pick the aggregation branch and
+    stays in the denominator of a boolean fraction. Numeric means still divide by
+    the rows that produced a value. A nested empty dict is an ordinary value.
 
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
     if not data:
         return {}
-    scored = [x for x in data if not _row_has_no_score(x)]
+    scored = [x for x in data if _row_produced_a_score(x)]
     return _summarize(scored, unscored=len(data) - len(scored))
+
+
+def _row_produced_a_score(x: Any) -> bool:
+    """A row that produced no score is recorded as an empty dict."""
+    return not isinstance(x, dict) or bool(x)
 
 
 def _summarize(data: list, *, unscored: int) -> dict[str, Any] | None:
@@ -184,11 +184,10 @@ def _summarize(data: list, *, unscored: int) -> dict[str, Any] | None:
             "true_fraction": true_count / (len(data) + unscored),
         }
     elif isinstance(val, Number):
-        nums: list[Any] = [x for x in data if isinstance(x, Number)]
         if np := _import_numpy():
-            return {"mean": np.mean(nums).item()}
+            return {"mean": np.mean(data).item()}
         else:
-            return {"mean": sum(nums) / len(nums)}
+            return {"mean": sum(data) / len(data)}
     elif isinstance(val, dict):
         result = {}
         all_keys = list(

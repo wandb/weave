@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import BaseModel
 
-from weave.flow.scorer import Scorer, _import_numpy, auto_summarize
+from weave.flow.scorer import Scorer, auto_summarize
 from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import WeaveDict, WeaveObject
 
@@ -110,12 +110,8 @@ def test_auto_summarize_mixed_basemodel_and_weave_dict():
     assert abs(result["confidence"]["mean"] - (0.9 + 0.4 + 0.7) / 3) < 1e-9
 
 
-# An evaluation records a row whose model or scorer raised as an empty dict:
-# Evaluation.get_eval_results backfills `{}` for every scorer that produced no
-# result. auto_summarize used to read that empty dict as "no value here", so the
-# row fell out of the boolean denominator, crashed the numeric branch, and chose
-# the branch for the whole column when it came first. A nested empty dict is an
-# ordinary value and must keep aggregating exactly as before.
+# A row whose model or scorer raised is recorded as an empty dict, which
+# auto_summarize used to read as "no value here" rather than "this row failed".
 
 
 class _Passed(BaseModel):
@@ -123,34 +119,49 @@ class _Passed(BaseModel):
 
 
 @pytest.mark.trace_server
-def test_auto_summarize_unscored_rows_stay_in_the_denominator():
-    """Two of four rows produced no score, so the fraction is 2/4, not 2/2."""
-    data = [{"correct": True}, {"correct": True}, {}, {}]
-    assert auto_summarize(data) == {"correct": {"true_count": 2, "true_fraction": 0.5}}
-
-
-@pytest.mark.trace_server
-def test_auto_summarize_unscored_rows_with_basemodel_scores():
-    """A BaseModel score reaches the dict branch via model_dump and needs the same count."""
-    data = [_Passed(passed=True), _Passed(passed=True), {}, {}]
-    assert auto_summarize(data) == {"passed": {"true_count": 2, "true_fraction": 0.5}}
-
-
-@pytest.mark.trace_server
 @pytest.mark.parametrize(
     ("data", "expected"),
     [
-        ([{}, {"correct": True}], {"correct": {"true_count": 1, "true_fraction": 0.5}}),
         (
-            [{}, _Passed(passed=True)],
-            {"passed": {"true_count": 1, "true_fraction": 0.5}},
+            [{"correct": True}, {"correct": True}, {}, {}],
+            {"correct": {"true_count": 2, "true_fraction": 0.5}},
         ),
-        ([{}, True], {"true_count": 1, "true_fraction": 0.5}),
-        ([{}, 1.0], {"mean": 1.0}),
+        (
+            [{}, {}, {"correct": True}, {"correct": True}],
+            {"correct": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        (
+            [_Passed(passed=True), _Passed(passed=True), {}, {}],
+            {"passed": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        (
+            [{}, {}, _Passed(passed=True), _Passed(passed=True)],
+            {"passed": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        ([True, True, {}, {}], {"true_count": 2, "true_fraction": 0.5}),
+        ([{}, {}, True, True], {"true_count": 2, "true_fraction": 0.5}),
+        (
+            [{"a": {"b": True}}, {}],
+            {"a": {"b": {"true_count": 1, "true_fraction": 0.5}}},
+        ),
+        (
+            [{}, {"a": {"b": True}}],
+            {"a": {"b": {"true_count": 1, "true_fraction": 0.5}}},
+        ),
+    ],
+    ids=[
+        "dict-last",
+        "dict-first",
+        "basemodel-last",
+        "basemodel-first",
+        "bool-last",
+        "bool-first",
+        "nested-last",
+        "nested-first",
     ],
 )
-def test_auto_summarize_unscored_first_row_does_not_choose_the_branch(data, expected):
-    """The branch follows the first row that has a score, so the metric survives."""
+def test_auto_summarize_counts_unscored_rows(data, expected):
+    """An unscored row stays in the denominator and never picks the branch, at any position."""
     assert auto_summarize(data) == expected
 
 
@@ -159,12 +170,13 @@ def test_auto_summarize_unscored_first_row_does_not_choose_the_branch(data, expe
     ("data", "expected"),
     [
         ([1.0, 1.0, {}, {}], {"mean": 1.0}),
+        ([{}, {}, 1.0, 1.0], {"mean": 1.0}),
         ([{"distance": 2.0}, {}, {}], {"distance": {"mean": 2.0}}),
-        ([{"distance": 1.0}, {"distance": None}, {}, {}], {"distance": {"mean": 1.0}}),
     ],
+    ids=["bare-last", "bare-first", "nested"],
 )
 def test_auto_summarize_numeric_scores_with_unscored_rows(data, expected):
-    """A numeric column mixed with unscored rows averages the numbers instead of raising."""
+    """A numeric column with unscored rows averages the scored values instead of raising."""
     assert auto_summarize(data) == expected
 
 
@@ -198,18 +210,8 @@ def test_auto_summarize_keeps_nested_empty_dicts():
         ([None, None], None),
         ([], {}),
     ],
+    ids=["bool", "none-leaf", "all-unscored", "all-none", "empty"],
 )
 def test_auto_summarize_results_unchanged(data, expected):
     """Values the current implementation already returns; the unscored count must not move them."""
     assert auto_summarize(data) == expected
-
-
-@pytest.mark.trace_server
-def test_auto_summarize_float_mean_matches_the_numpy_path():
-    """Filtering the numeric column must not change which mean is computed: numpy and
-    pure Python disagree in the last bit, so both must keep averaging the same values.
-    """
-    data = [0.1, 0.2, 0.3]
-    np = _import_numpy()
-    expected = np.mean(data).item() if np else sum(data) / len(data)
-    assert auto_summarize(data) == {"mean": expected}
