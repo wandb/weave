@@ -8,10 +8,7 @@ import {
   type Turn,
   type Usage,
 } from '../../genai';
-import {
-  ATTR_ERROR_TYPE,
-  ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
-} from '../../genai/semconv';
+import {ATTR_GEN_AI_USAGE_TOTAL_TOKENS} from '../../genai/semconv';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 import type {
   ModelUsage,
@@ -278,19 +275,13 @@ type PendingTurn = {
 };
 
 /**
- * A subagent's terminal state. Buffered rather than applied on the spot because
- * `SpanBase` only exposes error recording through `end()`, so deferring the
- * close (to keep child spans closing before their parent) also defers the
- * `Error`. `endedAt` preserves the real duration across that deferral.
+ * A subagent's terminal state. Buffered so child spans close before their
+ * parent. Failures are recorded immediately without ending the span;
+ * `endedAt` preserves the real duration across the deferred close.
  */
 type SubagentOutcome =
   | {status: 'ok'; endedAt: Date}
-  | {
-      status: 'error';
-      errorType: 'aborted' | 'subagent_error';
-      error: Error;
-      endedAt: Date;
-    };
+  | {status: 'error'; endedAt: Date};
 
 type OpenSubagent = {
   /** `AgentOutput.agentId` — the subagent's own identity. */
@@ -428,7 +419,6 @@ export class ClaudeAgentOtelTracer {
 
     const errorMessage = runErrorMessage(error, result);
     if (errorMessage != null) {
-      turn.setAttributes({[ATTR_ERROR_TYPE]: 'agent_error'});
       turn.end({
         error: new Error(errorMessage || 'Conversation ended with error'),
       });
@@ -655,8 +645,9 @@ export class ClaudeAgentOtelTracer {
       const tool = openTool.tool;
       tool.result = resultText;
       if (block.is_error) {
-        tool.setAttributes({[ATTR_ERROR_TYPE]: 'tool_error'});
-        tool.end({error: new Error(resultText || 'Tool execution failed')});
+        tool.end({
+          error: new Error(resultText || 'Tool execution failed'),
+        });
       } else {
         tool.end();
       }
@@ -695,14 +686,15 @@ export class ClaudeAgentOtelTracer {
         ? [{role: 'assistant', content: terminalOutputText}]
         : [],
     });
-    openSubagent.outcome = block.is_error
-      ? {
-          status: 'error',
-          errorType: 'subagent_error',
-          error: new Error(terminalOutputText || 'Subagent execution failed'),
-          endedAt: new Date(),
-        }
-      : {status: 'ok', endedAt: new Date()};
+    const endedAt = new Date();
+    if (block.is_error) {
+      openSubagent.span.recordError(
+        new Error(terminalOutputText || 'Subagent execution failed')
+      );
+      openSubagent.outcome = {status: 'error', endedAt};
+    } else {
+      openSubagent.outcome = {status: 'ok', endedAt};
+    }
   }
 
   private processTaskNotification(msg: SDKTaskNotificationMessage): void {
@@ -745,12 +737,10 @@ export class ClaudeAgentOtelTracer {
       return;
     }
 
-    openSubagent.outcome = {
-      status: 'error',
-      errorType: msg.status === 'stopped' ? 'aborted' : 'subagent_error',
-      error: new Error(msg.summary || `Background subagent ${msg.status}`),
-      endedAt,
-    };
+    openSubagent.span.recordError(
+      new Error(msg.summary || `Background subagent ${msg.status}`)
+    );
+    openSubagent.outcome = {status: 'error', endedAt};
   }
 
   /**
@@ -781,8 +771,9 @@ export class ClaudeAgentOtelTracer {
       ) {
         continue;
       }
-      openTool.tool.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
-      openTool.tool.end({error: new Error('Agent ended with open tool span')});
+      openTool.tool.end({
+        error: new Error('Agent ended with open tool span'),
+      });
       this.openTools.delete(toolUseId);
     }
   }
@@ -793,24 +784,13 @@ export class ClaudeAgentOtelTracer {
     for (const [toolUseId, openSubagent] of openSubagents) {
       const outcome = openSubagent.outcome;
       if (outcome) {
-        if (outcome.status === 'error') {
-          openSubagent.span.setAttributes({
-            [ATTR_ERROR_TYPE]: outcome.errorType,
-          });
-          openSubagent.span.end({
-            error: outcome.error,
-            endTime: outcome.endedAt,
-          });
-        } else {
-          openSubagent.span.end({endTime: outcome.endedAt});
-        }
+        openSubagent.span.end({endTime: outcome.endedAt});
         this.openSubagents.delete(toolUseId);
         continue;
       }
       if (reason === 'turn-boundary' && this.outlivesTurn(toolUseId)) {
         continue;
       }
-      openSubagent.span.setAttributes({[ATTR_ERROR_TYPE]: 'aborted'});
       openSubagent.span.end({
         error: new Error('Agent ended with open subagent span'),
       });
