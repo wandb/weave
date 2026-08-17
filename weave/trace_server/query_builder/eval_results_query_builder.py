@@ -68,6 +68,32 @@ def _build_eval_start_lower_bound(
     )"""
 
 
+def _build_eval_end_upper_bound(project_id_param: str, eval_root_ids_param: str) -> str:
+    """sortable_datetime ceiling for the calls_merged scan, as a scalar subquery.
+
+    Predict-and-score calls finish before their eval root does, so bounding by
+    the roots' latest ended_at (plus a buffer) keeps the scan inside the eval
+    run window instead of eval start -> now. Falls back to a far-future
+    datetime (no ceiling) when any root is still running or has no rows.
+    """
+    return f"""coalesce(
+        (
+            SELECT CASE
+                WHEN countIf(root_ended_at IS NULL) > 0 THEN NULL
+                ELSE max(root_ended_at) + toIntervalSecond({DATETIME_BUFFER_TIME_SECONDS})
+            END
+            FROM (
+                SELECT max(roots.ended_at) AS root_ended_at
+                FROM calls_merged AS roots
+                PREWHERE roots.project_id = {project_id_param}
+                WHERE roots.id IN {eval_root_ids_param}
+                GROUP BY roots.id
+            )
+        ),
+        toDateTime64('2100-01-01 00:00:00', 3)
+    )"""
+
+
 def _sort_filter_uses_inputs(
     sort_by: list[tsi.EvalResultsSortBy] | None,
     filters: list[tsi.EvalResultsFilter] | None,
@@ -122,6 +148,15 @@ def build_predict_and_score_calls_cte(
         eval_start_lower_bound = _build_eval_start_lower_bound(
             project_id_param, eval_root_ids_param
         )
+        eval_end_upper_bound = _build_eval_end_upper_bound(
+            project_id_param, eval_root_ids_param
+        )
+        # The inner id subquery matches on call-start rows only (they carry
+        # parent_id/op_name), reading light columns; the outer aggregation then
+        # touches inputs_dump/output_dump for just those ids instead of every
+        # call in the window. The outer keeps only the lower bound: delete rows
+        # are written at deletion time (after the eval window) and must still
+        # merge in so HAVING can exclude deleted calls.
         return f"""predict_and_score_calls AS (
     SELECT
         calls_merged.id AS call_id,
@@ -131,14 +166,15 @@ def build_predict_and_score_calls_cte(
         {row_digest_expr} AS row_digest
     FROM calls_merged
     PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE (
-        calls_merged.parent_id IN {eval_root_ids_param}
-        OR calls_merged.parent_id IS NULL
-    )
-    AND calls_merged.id NOT IN {eval_root_ids_param}
-    AND (
-        {op_match_where}
-        OR calls_merged.op_name IS NULL
+    WHERE calls_merged.id IN (
+        SELECT calls_merged.id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {project_id_param}
+        WHERE calls_merged.parent_id IN {eval_root_ids_param}
+        AND calls_merged.id NOT IN {eval_root_ids_param}
+        AND {op_match_where}
+        AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
+        AND calls_merged.sortable_datetime <= {eval_end_upper_bound}
     )
     AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -510,9 +546,17 @@ def build_page_rows_cte() -> str:
 )"""
 
 
-def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
+def _build_page_calls_cte(
+    project_id_param: str,
+    read_table: str,
+    eval_root_ids_param: str | None = None,
+) -> str:
     """Build page_calls CTE: pre-filter and pre-aggregate source table for page rows only."""
     if read_table == "calls_merged":
+        assert eval_root_ids_param is not None
+        eval_start_lower_bound = _build_eval_start_lower_bound(
+            project_id_param, eval_root_ids_param
+        )
         return f"""page_calls AS (
     SELECT
         calls_merged.id AS call_id,
@@ -528,6 +572,7 @@ def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
     FROM calls_merged
     PREWHERE calls_merged.project_id = {project_id_param}
     WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
+    AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
 )"""
     else:
@@ -580,7 +625,12 @@ def build_eval_results_query(
         filter_logic_operator,
     )
     project_id_param = param_slot(pb.add_param(project_id), "String")
-    page_calls_cte = _build_page_calls_cte(project_id_param, read_table)
+    page_eval_root_ids_param = None
+    if read_table == "calls_merged":
+        page_eval_root_ids_param = pb.add(eval_root_ids, None, "Array(String)")
+    page_calls_cte = _build_page_calls_cte(
+        project_id_param, read_table, page_eval_root_ids_param
+    )
 
     return f"""WITH {cte_chain.strip()},
 
