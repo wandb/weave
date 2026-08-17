@@ -5,15 +5,31 @@ algorithm: hdbscan
 # category, which resolves finer topics inside a category that dominates the space.
 scope: global
 
-min_cluster_size: 3
-min_samples: 3
-metric: euclidean
-cluster_selection_method: eom
-allow_single_cluster: false
+# What HDBSCAN actually clusters. Reducing first was chosen against a measurement rather than
+# taken as a default: on the reference corpus, reducing with UMAP or not reducing at all both
+# beat reducing with PCA, so these are the measured parameters and not tunables.
+reduction:
+  dimensions: 15
+  neighbors: 15
+  min_dist: 0.0
+  metric: cosine
+  # Pinned, so a refit on identical input returns an identical partition. Unpinning it is a
+  # different pipeline generation, which is why the digest covers this field.
+  random_state: 0
+  # Below this many distinct signatures the reducer's own degenerate paths cost more than the
+  # curse of dimensionality it exists to fix, and the raw vectors cluster well already.
+  minimum_rows: 50
 
-# Projection persisted per assignment, so a finished run's scatter plot redraws
-# without reprojecting. Fixed at two components by umap_x and umap_y.
-umap:
-  n_neighbors: 15
+density:
+  min_cluster_size: 3
+  min_samples: 3
+  metric: euclidean
+  cluster_selection_method: eom
+  allow_single_cluster: false
+
+# The 2-D coordinates stored per assignment, for drawing only. Nothing here decides a label,
+# so it is separate from `reduction` and its neighbor count is a different knob.
+projection:
+  neighbors: 15
   min_dist: 0.0
   random_state: 0
