@@ -10,7 +10,6 @@ digest without anyone touching the config.
 import hashlib
 import json
 import os
-from functools import cache
 from typing import Generic, Literal, TypeVar
 
 import yaml
@@ -146,19 +145,16 @@ _CONFIG_MODELS: dict[str, type[SignatureConfig]] = {
 SIGNATURE_TYPES = tuple(_CONFIG_MODELS)
 
 
-@cache
 def load_intent_config() -> IntentConfig:
     """The deployed intent config, typed, so no caller narrows a union."""
     return IntentConfig.model_validate(_read_config_yaml("intent"))
 
 
-@cache
 def load_failure_config() -> FailureConfig:
     """The deployed failure config, typed, so no caller narrows a union."""
     return FailureConfig.model_validate(_read_config_yaml("failure"))
 
 
-@cache
 def load_config(signature_type: str) -> SignatureConfig:
     """Load and validate the checked-in config named by a runtime signature type."""
     if signature_type not in _CONFIG_MODELS:
@@ -181,12 +177,11 @@ def config_sha(config: SignatureConfig) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-@cache
 def deployed_config_sha(signature_type: str) -> str:
-    """The digest this deployment resolves for `signature_type`.
+    """The digest this deployment resolves for `signature_type`, read fresh.
 
-    Cached because `config_sha` re-reads and re-digests every referenced file, which
-    a write request would otherwise pay per batch.
+    Uncached: the digest is a function of the config files on disk, so a memo keyed
+    on the signature type alone would answer for a config it never read.
     """
     return config_sha(load_config(signature_type))
 
