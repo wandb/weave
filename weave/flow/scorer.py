@@ -140,6 +140,11 @@ def stderr(data: Sequence[int | float]) -> float:
         return float(math.sqrt(sample_variance / len(data)))  # type: ignore
 
 
+def _row_has_no_score(x: Any) -> bool:
+    """True for the empty dict an evaluation records for a row that produced no score."""
+    return isinstance(x, dict) and not x
+
+
 def auto_summarize(data: list) -> dict[str, Any] | None:
     """Automatically summarize a list of (potentially nested) dicts.
 
@@ -150,11 +155,22 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
 
     If col is all None, result is None
 
+    A top-level empty dict marks a row whose model or scorer raised. Such rows do
+    not pick the aggregation branch, and they stay in the denominator of a boolean
+    fraction. Numeric means are computed over the values that exist. Nested empty
+    dicts are ordinary values and are left alone.
+
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
     if not data:
         return {}
+    scored = [x for x in data if not _row_has_no_score(x)]
+    return _summarize(scored, unscored=len(data) - len(scored))
+
+
+def _summarize(data: list, *, unscored: int) -> dict[str, Any] | None:
+    """Summarize one column, given how many of its rows produced no score."""
     data = [x for x in data if x is not None]
 
     if not data:
@@ -165,13 +181,14 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
-            "true_fraction": true_count / len(data),
+            "true_fraction": true_count / (len(data) + unscored),
         }
     elif isinstance(val, Number):
+        nums: list[Any] = [x for x in data if isinstance(x, Number)]
         if np := _import_numpy():
-            return {"mean": np.mean(data).item()}
+            return {"mean": np.mean(nums).item()}
         else:
-            return {"mean": sum(data) / len(data)}
+            return {"mean": sum(nums) / len(nums)}
     elif isinstance(val, dict):
         result = {}
         all_keys = list(
@@ -179,8 +196,9 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
         )
         for k in all_keys:
             if (
-                summary := auto_summarize(
-                    [x.get(k) for x in data if isinstance(x, dict)]
+                summary := _summarize(
+                    [x.get(k) for x in data if isinstance(x, dict)],
+                    unscored=unscored,
                 )
             ) is not None:
                 if k in summary:
@@ -191,8 +209,9 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
             return None
         return result
     elif isinstance(val, BaseModel):
-        return auto_summarize(
-            [x.model_dump() if isinstance(x, BaseModel) else x for x in data]
+        return _summarize(
+            [x.model_dump() if isinstance(x, BaseModel) else x for x in data],
+            unscored=unscored,
         )
     return None
 
