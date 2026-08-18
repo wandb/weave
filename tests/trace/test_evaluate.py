@@ -527,3 +527,28 @@ async def test_evaluate_with_pydantic_summary(weave_active):
     model = EvalModel()
     result = await evaluation.evaluate(model)
     assert result["MyScorer"].awesome == 3
+
+
+@pytest.mark.asyncio
+async def test_summary_counts_rows_the_model_failed_on(weave_active):
+    """A row whose model raised reaches the aggregation as an empty dict, and counts."""
+
+    @weave.op
+    def sometimes_raises(input):
+        if input == "boom":
+            raise ValueError("boom")
+        return 1
+
+    @weave.op
+    def dict_score(output):
+        return {"correct": output == 1}
+
+    evaluation = Evaluation(
+        dataset=[{"input": "ok"}, {"input": "boom"}], scorers=[dict_score]
+    )
+    result = await evaluation.evaluate(sometimes_raises)
+    assert result == {
+        "output": {"mean": 1.0},
+        "dict_score": {"correct": {"true_count": 1, "true_fraction": 0.5}},
+        "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
+    }

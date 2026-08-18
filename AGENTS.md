@@ -211,6 +211,11 @@ without a marker filter so both tracing paths contribute coverage.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
 
+Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
+that filter comes from the workflow rather than from `noxfile.py`. A test that
+uses no server fixture therefore never runs in CI unless it carries
+`@pytest.mark.trace_server` itself.
+
 ### Running Tests
 
 **IMPORTANT**: Any test depending on the `client` fixture runs against ClickHouse, the only trace-server backend. Locally, the test fixtures auto-start a ClickHouse Docker container if one isn't already running, so Docker must be available. Pass `--clickhouse-process=true` to use a local `clickhouse-server` binary instead of Docker.

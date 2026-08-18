@@ -1365,3 +1365,28 @@ def test_scores_are_traced_by_default(client):
 
     assert len(by_op["correctness"]) == 1
     assert by_op["correctness"][0].output == 1.0
+
+
+def test_prediction_without_scores_is_not_counted(client):
+    """Here an empty score dict means nothing was logged, so it must stay out of the
+    denominator: a prediction whose scoring failed logs None instead.
+    """
+    ev = EvaluationLogger()
+
+    pred = ev.log_prediction(inputs={"a": 1}, output=2)
+    pred.log_score(scorer="is_even", score=True)
+    pred.finish()
+
+    ev.log_prediction(inputs={"a": 2}, output=3).finish()
+
+    ev.log_summary()
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert by_op["Evaluation.evaluate"][0].output == {
+        "is_even": {"true_count": 1, "true_fraction": 1.0},
+        "output": {},
+    }

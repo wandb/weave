@@ -150,11 +150,27 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
 
     If col is all None, result is None
 
+    A top-level empty dict marks a row that produced no score. Such a row does not
+    pick the aggregation branch and stays in the denominator of a boolean fraction.
+    Numeric means still divide by the rows that produced a value. A nested empty
+    dict is an ordinary value.
+
     Returns:
       dict of summary stats, with structure matching input dict structure.
     """
     if not data:
         return {}
+    scored = [x for x in data if _row_has_score(x)]
+    return _auto_summarize(scored, unscored=len(data) - len(scored))
+
+
+def _row_has_score(x: Any) -> bool:
+    """Return False for the empty dict that marks a row with no score."""
+    return not isinstance(x, dict) or bool(x)
+
+
+def _auto_summarize(data: list, *, unscored: int) -> dict[str, Any] | None:
+    """Summarize one column, given how many of its rows produced no score."""
     data = [x for x in data if x is not None]
 
     if not data:
@@ -165,7 +181,7 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
     if isinstance(val, bool):
         return {
             "true_count": (true_count := sum(1 for x in data if x)),
-            "true_fraction": true_count / len(data),
+            "true_fraction": true_count / (len(data) + unscored),
         }
     elif isinstance(val, Number):
         if np := _import_numpy():
@@ -179,8 +195,9 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
         )
         for k in all_keys:
             if (
-                summary := auto_summarize(
-                    [x.get(k) for x in data if isinstance(x, dict)]
+                summary := _auto_summarize(
+                    [x.get(k) for x in data if isinstance(x, dict)],
+                    unscored=unscored,
                 )
             ) is not None:
                 if k in summary:
@@ -191,8 +208,9 @@ def auto_summarize(data: list) -> dict[str, Any] | None:
             return None
         return result
     elif isinstance(val, BaseModel):
-        return auto_summarize(
-            [x.model_dump() if isinstance(x, BaseModel) else x for x in data]
+        return _auto_summarize(
+            [x.model_dump() if isinstance(x, BaseModel) else x for x in data],
+            unscored=unscored,
         )
     return None
 
