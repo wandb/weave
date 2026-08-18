@@ -385,6 +385,22 @@ deterministic.
   reconfigures the mock it captured before patching, or reaches it through
   `__wrappedFunction`.
 
+### TypeScript Anthropic token accounting
+
+- Anthropic reports `input_tokens` as fresh, uncached prompt only and bills the
+  rest through `cache_read_input_tokens` and `cache_creation_input_tokens`.
+  Weave's cost math subtracts those two from the prompt total, so the usage
+  summary has to carry an inclusive `input_tokens`. `totalInputTokens()` in
+  `integrations/anthropicUsage.ts` is where that sum lives, for this integration
+  and for the Claude Agent SDK OTel tracer; it mirrors the Python
+  `total_input_tokens()`.
+- Only the summary is normalized. The provider's own `usage` object stays
+  untouched, so the response the caller receives keeps Anthropic's own numbers.
+- Streaming `message_delta` usage is cumulative, and every field except
+  `output_tokens` is nullable. Skip the null ones, as the vendor's own client
+  does, and overwrite rather than add — a delta carries the running total, not
+  an increment.
+
 ### TypeScript custom type round trip
 
 - `client.get()` rebuilds a `WeaveImage` from a `PIL.Image.Image` payload and a
