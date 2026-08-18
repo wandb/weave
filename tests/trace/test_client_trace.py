@@ -54,7 +54,12 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidFieldError,
+    InvalidRequest,
+    ObjectNameTypeCollision,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
@@ -3559,6 +3564,10 @@ def test_object_with_char_over_limit(client):
         client.server.obj_create(create_req)
 
 
+class OtherCustom(weave.Object):
+    val: dict
+
+
 def _expected_truncation_warning(name: str) -> str:
     return (
         f"Object name '{name}' is longer than {CHAR_LIMIT} characters and is published "
@@ -3617,6 +3626,29 @@ def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, capl
         weave.publish(Custom(name=name, val={"1": 2}))
 
     assert caplog.messages == [_expected_truncation_warning(name)]
+
+
+@pytest.mark.disable_logging_error_check
+def test_names_truncated_to_one_id_are_rejected_with_the_name_that_was_sent(client):
+    """Two types cannot share an id (WB-30574). When the id is a truncation, the
+    rejection quotes the name that produced it, which is the only part the caller
+    recognizes.
+    """
+    object_id = "p" * CHAR_LIMIT
+    other_name = object_id + "-and-more"
+
+    weave.publish(Custom(name=object_id, val={"1": 1}))
+
+    with pytest.raises(ObjectNameTypeCollision) as excinfo:
+        weave.publish(OtherCustom(name=other_name, val={"1": 2}))
+
+    assert excinfo.value.object_id == object_id
+    assert excinfo.value.object_name == other_name
+    assert str(excinfo.value) == (
+        f"Cannot publish '{object_id}' as a OtherCustom: that name is already used "
+        f"by a Custom in this project. The object is named '{other_name}'. Object "
+        "versions cannot share types, publish this object under a different name."
+    )
 
 
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"

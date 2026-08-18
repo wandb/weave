@@ -39,6 +39,7 @@ from weave.shared.digest import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.shared.object_class_util import get_object_name
 from weave.shared.trace_server_interface_util import (
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     assert_non_null_wb_user_id,
@@ -2870,6 +2871,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 object_id=object_id,
                 kind=kind,
                 new_base_object_class=digest_result.base_object_class,
+                object_name=get_object_name(processed_val),
             )
 
             self._mark_existing_objects_as_not_latest(project_id, object_id)
@@ -2933,6 +2935,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         kind: str,
         new_base_object_class: str | None,
+        object_name: str | None,
     ) -> None:
         existing_classes = {
             rec.base_object_class
@@ -2946,6 +2949,7 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                 kind=kind,
                 new_base_object_class=new_base_object_class,
                 existing_base_object_classes=mismatched,
+                object_name=object_name,
             )
 
     def _mark_existing_objects_as_not_latest(
