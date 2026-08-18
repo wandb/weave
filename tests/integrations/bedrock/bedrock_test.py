@@ -386,6 +386,19 @@ MOCK_INVOKE_AGENT_RESPONSE = {
     "sessionId": "test-session",
 }
 
+MOCK_INVOKE_STREAM_EVENTS = [
+    {
+        "chunk": {
+            "bytes": b'{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}'
+        }
+    },
+    {
+        "chunk": {
+            "bytes": b'{"type":"content_block_delta","delta":{"type":"text_delta","text":" World"}}'
+        }
+    },
+]
+
 # Original botocore _make_api_call function
 orig = botocore.client.BaseClient._make_api_call
 
@@ -479,6 +492,30 @@ def mock_invoke_agent_make_api_call(
 ) -> dict:
     if operation_name == "InvokeAgent":
         return MOCK_INVOKE_AGENT_RESPONSE
+    return orig(self, operation_name, api_params)
+
+
+def mock_invoke_stream_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeModelWithResponseStream":
+        return {
+            "ResponseMetadata": {
+                "RequestId": "b2c3d4e5-f6a7-890b-c1d2-e3f4a5b6c7d8",
+                "HTTPStatusCode": 200,
+                "HTTPHeaders": {
+                    "date": "Fri, 20 Dec 2024 16:44:08 GMT",
+                    "content-type": "application/vnd.amazon.eventstream",
+                    "connection": "keep-alive",
+                    "x-amzn-requestid": "b2c3d4e5-f6a7-890b-c1d2-e3f4a5b6c7d8",
+                    "x-amzn-bedrock-input-token-count": "42",
+                    "x-amzn-bedrock-output-token-count": "15",
+                },
+                "RetryAttempts": 0,
+            },
+            "body": iter(MOCK_INVOKE_STREAM_EVENTS),
+            "contentType": "application/json",
+        }
     return orig(self, operation_name, api_params)
 
 
@@ -1049,3 +1086,62 @@ def test_bedrock_agent_invoke_agent(
     summary = call.summary
     assert summary is not None, "Summary should not be None"
     assert "usage" in summary
+
+
+@mock_aws
+def test_bedrock_invoke_model_stream(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """invoke_model_with_response_stream is patched and token counts are captured from headers."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call", new=mock_invoke_stream_make_api_call
+    ):
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+        response = bedrock_client.invoke_model_with_response_stream(
+            modelId=model_id,
+            body=body,
+            contentType="application/json",
+            accept="application/json",
+        )
+
+        # The caller can consume events from the body stream
+        received_bytes = b""
+        for event in response["body"]:
+            chunk = event.get("chunk", {})
+            if "bytes" in chunk:
+                received_bytes += chunk["bytes"]
+
+        assert b"Hello" in received_bytes
+        assert b"World" in received_bytes
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1, "Expected exactly one trace call"
+    call = calls[0]
+
+    assert call.exception is None
+    assert call.ended_at is not None
+    assert "invoke_stream" in call.op_name
+
+    # Token counts extracted from HTTP response headers
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
+    assert model_usage["prompt_tokens"] == 42
+    assert model_usage["completion_tokens"] == 15
+    assert model_usage["total_tokens"] == 57
+
+    # Logged output contains the buffered stream content
+    output = call.output
+    assert "body" in output
+    assert "Hello" in output["body"]["content"]
+    assert "World" in output["body"]["content"]
