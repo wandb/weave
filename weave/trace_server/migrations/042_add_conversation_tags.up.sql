@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS conversation_tags
     -- Removal or re-add rows for a (conversation_id, trace_id, tag) must preserve trace_ended_at.
     trace_ended_at  DateTime64(6),
 
+    -- The agent's name from the span data
+    agent_name      String DEFAULT '',
+
     -- The source responsible for this tag. Either an LLM judge or human.
     source          Enum8('judge' = 1, 'human' = 2),
 
@@ -34,7 +37,7 @@ CREATE TABLE IF NOT EXISTS conversation_tags
     is_removed      UInt8 DEFAULT 0,
 
     -- If customers need to set a custom TTL
-    expire_at DateTime DEFAULT '2100-01-01 00:00:00',
+    expire_at       DateTime DEFAULT '2100-01-01 00:00:00',
 
     -- When this record was inserted
     inserted_at     DateTime64(6, 'UTC') DEFAULT now64(6)
@@ -52,6 +55,7 @@ CREATE TABLE IF NOT EXISTS conversation_tags_by_tag
     trace_id        String,
     tag             String,
     trace_ended_at  DateTime64(6),
+    agent_name      String DEFAULT '',
     source          Enum8('judge' = 1, 'human' = 2),
     judge_version   LowCardinality(String),
     wb_user_id      String,
@@ -69,10 +73,11 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS conversation_tags_by_tag_mv
 TO conversation_tags_by_tag AS
 SELECT
     project_id,
-    tag,
-    trace_ended_at,
     conversation_id,
     trace_id,
+    tag,
+    trace_ended_at,
+    agent_name,
     source,
     judge_version,
     wb_user_id,
