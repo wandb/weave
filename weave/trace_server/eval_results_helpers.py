@@ -676,9 +676,15 @@ def finalize_rows(
     limit: int | None,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
     """Attach evaluations to rows, apply intersection filter, sort, and paginate."""
+    # Order each row's evaluations by the requested eval ids, not by call scan
+    # order, which varies with the query plan.
+    eval_order = {eval_id: i for i, eval_id in enumerate(eval_root_ids)}
     for row_digest, eval_entries in row_eval_map.items():
         if row_digest in row_map:
-            row_map[row_digest].evaluations = list(eval_entries.values())
+            row_map[row_digest].evaluations = sorted(
+                eval_entries.values(),
+                key=lambda e: eval_order.get(e.evaluation_call_id, len(eval_order)),
+            )
 
     rows = list(row_map.values())
 
@@ -738,9 +744,15 @@ def build_eval_rows(
 
         eval_entry.trials.append(_build_trial(predict_and_score_call, child_by_parent))
 
+    # Order each row's evaluations by the requested eval ids, not by call scan
+    # order, which varies with the query plan.
+    eval_order = {eval_id: i for i, eval_id in enumerate(eval_root_ids)}
     for row_digest, eval_entries in row_eval_map.items():
         if row_digest in row_map:
-            row_map[row_digest].evaluations = list(eval_entries.values())
+            row_map[row_digest].evaluations = sorted(
+                eval_entries.values(),
+                key=lambda e: eval_order.get(e.evaluation_call_id, len(eval_order)),
+            )
 
     return list(row_map.values())
 
