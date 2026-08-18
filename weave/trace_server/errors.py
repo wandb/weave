@@ -392,12 +392,18 @@ class ErrorRegistry:
         from clickhouse_connect.driver.exceptions import (
             OperationalError as CHOperationalError,
         )
+        from clickhouse_connect.driver.exceptions import (
+            StreamFailureError as CHStreamFailureError,
+        )
 
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
         self.register(
             CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
+        )
+        self.register(
+            CHStreamFailureError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
 
         # GraphQL transport errors

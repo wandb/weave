@@ -190,6 +190,7 @@ def build_calls_filter_sql(
     calls_filter: CallsFilter | None,
     pb: ParamBuilder,
     read_table: ReadTable = ReadTable.CALLS_MERGED,
+    force_all_spans: bool = False,
 ) -> str:
     """Build WHERE clause SQL for CallsFilter.
 
@@ -200,6 +201,8 @@ def build_calls_filter_sql(
         calls_filter: The filter to convert to SQL.
         pb: Parameter builder for parameterized queries.
         read_table: Which table is being queried; affects NULL vs sentinel checks.
+        force_all_spans: Drop the `trace_roots_only` clause so descendant spans
+            are selected too, for callers that apply their own row filter.
 
     Returns:
         SQL fragment with leading `` AND `` if any filters apply, or empty string.
@@ -217,7 +220,7 @@ def build_calls_filter_sql(
         )
 
     # Handle trace_roots_only
-    if calls_filter.trace_roots_only:
+    if calls_filter.trace_roots_only and not force_all_spans:
         where_clauses.append(null_check_sql("parent_id", "parent_id", read_table, pb))
 
     # Handle trace_ids

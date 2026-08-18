@@ -56,6 +56,14 @@ This project uses `uv` for dependency management. Dependencies are organized int
 - Ruff now enforces `PLW` rules. `PLW0602`, `PLW0603`, `PLW1641`, and `PLW3201` are handled with spot-level inline `# noqa` on specific lines (not global/per-file ignore). Prefer fixing code first; if intentional, suppress only the exact line.
 - Be careful with `PLW1514` autofixes on serialization-sensitive code (`weave/type_handlers/Content/content.py`, `weave/type_handlers/Audio/audio.py`) and mocked file I/O (`weave/trace_server/costs/update_costs.py`): adding `encoding=` changed behavior/tests, so these files are explicitly ignored for that rule.
 
+### PyPI release publishing
+
+`uv build` resolves the unconstrained `hatchling` build requirement in an
+isolated environment. Keep the pinned `pypa/gh-action-pypi-publish` action new
+enough to validate the Core Metadata version emitted by current Hatchling; for
+example, Hatchling 1.32 emits Metadata 2.5, which requires the action's Twine 7
+and Packaging 26 stack rather than Twine 6.1 and Packaging 25.
+
 ### Codex Development (nox)
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`
@@ -95,6 +103,8 @@ transport.
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
 
+Generate implicit cost `created_at` values in UTC because insertion interprets naive checkpoint timestamps as UTC.
+
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
@@ -124,6 +134,18 @@ Evaluation result rows merge agent span links from two sources: legacy
 `eval_run_id` plus `eval_predict_and_score_call_id` columns identify the
 trial. Keep the promoted-column hydration best-effort so eval results remain
 available during rolling deploys.
+
+`weave.invoking_span` (`{trace_id, span_id}`, hex) points the other way, from a
+call to the OTel span that was current when it started — an agent's
+`execute_tool` span in the case it is built for, but any ambient instrumentation
+qualifies. `create_call` writes it on *every* call started inside that span, not
+just the outermost one: skipping when the parent call already carries it marks
+every other level, because the check reads the parent's recorded state and the
+parent may itself have skipped. A reader must treat a missing key and a pair
+that matches no span as normal — the write does not check that the span reaches
+our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
+they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
+off the span object, which under the OTel→DD bridge is not an SDK span.
 
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
@@ -407,7 +429,9 @@ deterministic.
 - At a span's attribute limit OTel JS drops the *incoming* attribute, where
   Python's `BoundedAttributes` evicts the oldest, so the two SDKs keep different
   halves of an overflowing set. The eval linker writes the pair eval results
-  match on before its display-only attributes for that reason.
+  match on before its display-only attributes for that reason, and the op linker
+  sits after it in the Node provider's array for the same reason. Registering the
+  two linkers in opposite order is how both SDKs end up keeping the same half.
 - For callback or generator integrations, create `Conversation`, `Turn`, and
   `LLM` in short `runIsolated()` scopes, then retain and pass explicit handles.
   `Tool` and `SubAgent` do not use ambient state.
@@ -524,6 +548,17 @@ deterministic.
 - Built-in and API-key-authenticated custom providers use LiteLLM.
 - Custom runtimes without an API key use the OpenAI client directly so configured
   headers and unauthenticated endpoints do not receive a bearer header.
+- OpenAI Responses and Chat Completions report `cache_write_tokens` under
+  `usage.input_tokens_details` and `usage.prompt_tokens_details`, respectively.
+  Normalize either field when present instead of parsing model names. The
+  standard cost registry supplies each model's
+  `cache_creation_input_token_cost`. Because `input_tokens` and `prompt_tokens`
+  include `cached_tokens` and `cache_write_tokens`, an unmapped
+  `cache_write_tokens` value is billed at the Input rate instead of the rate for
+  cache writes.
+- The OpenAI CI shard runs with `-m trace_server`; usage-normalization coverage
+  must therefore come from client-backed pricing cases, not only standalone
+  unit tests in `tests/integrations/openai/test_openai_sdk.py`.
 
 ### Integration Testing
 
@@ -549,6 +584,9 @@ deterministic.
   arguments/result. Integrations populate them through `SubAgent.record()` so
   `_build_attrs()` applies `include_content` and PII redaction; do not write
   those content attributes directly with `set_attributes()`.
+- `Tool`, `LLM`, `SubAgent`, and `Turn` expose `record_error(error)` to mark a
+  failure without ending the span. It derives `error.type` from the exception;
+  call `end()` separately. Context managers do both for escaping exceptions.
 - Mypy requires explicit `return None` paths in functions annotated with
   `T | None`; bare `return` and implicit fallthrough trigger return-value
   errors.
@@ -584,6 +622,9 @@ deterministic.
   fall back to the latest OTel `exception` event. Explicit `error.type` and
   status-message values take precedence, and handled exception events on
   non-error spans remain raw-only.
+- Content spans with `ERROR` status emit a chat message even without text or
+  reasoning so the conversation timeline retains the failure. Successful empty
+  tool-calling steps remain omitted.
 - Use the Trace tree view for parentage comparisons. The default flamegraph
   collapses overlapping siblings into synthetic groups, which can make flat
   and nested traces look deceptively similar; give live-example spans realistic

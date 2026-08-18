@@ -910,6 +910,10 @@ class CallsQuery(BaseModel):
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
+        if name.field == "storage_size_bytes":
+            self.include_storage_size = True
+        elif name.field == "total_storage_size_bytes":
+            self.include_total_storage_size = True
         return self
 
     def add_condition(self, operand: "tsi_query.Operand") -> "CallsQuery":

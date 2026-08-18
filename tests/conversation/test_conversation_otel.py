@@ -1264,6 +1264,7 @@ class TestErrorRecording:
         )
         assert chat_span.status.status_code == StatusCode.ERROR
         assert "LLM call failed" in chat_span.status.description
+        assert chat_span.attributes["error.type"] == "ValueError"
         assert len(chat_span.events) >= 1
         assert chat_span.events[0].name == "exception"
 
@@ -2405,13 +2406,14 @@ class TestUsageFromOpenAIResponses:
         assert "gen_ai.usage.output_tokens" not in attrs
         assert "gen_ai.usage.reasoning_tokens" not in attrs
         assert "gen_ai.usage.cache_read.input_tokens" not in attrs
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
 
     def test_full_usage_lands_on_span(self, otel_spans: InMemorySpanExporter) -> None:
         usage = self._usage(
             input_tokens=10,
             output_tokens=20,
             output_tokens_details=self._details(reasoning_tokens=5),
-            input_tokens_details=self._details(cached_tokens=3),
+            input_tokens_details=self._details(cached_tokens=3, cache_write_tokens=7),
         )
         attrs = _emit_llm_with(
             otel_spans, usage=usage_from_openai_responses(self._resp(usage))
@@ -2420,6 +2422,7 @@ class TestUsageFromOpenAIResponses:
         assert attrs["gen_ai.usage.output_tokens"] == 20
         assert attrs["gen_ai.usage.reasoning_tokens"] == 5
         assert attrs["gen_ai.usage.cache_read.input_tokens"] == 3
+        assert attrs["gen_ai.usage.cache_creation.input_tokens"] == 7
 
     @pytest.mark.parametrize(
         (
@@ -2467,6 +2470,7 @@ class TestUsageFromOpenAIResponses:
             assert "gen_ai.usage.cache_read.input_tokens" not in attrs
         else:
             assert attrs["gen_ai.usage.cache_read.input_tokens"] == expected_cache
+        assert "gen_ai.usage.cache_creation.input_tokens" not in attrs
 
 
 class TestMessageFromOpenAIResponsesInput:

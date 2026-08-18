@@ -1016,10 +1016,12 @@ def test_create_distributed_table_sql_id_sharded():
         ("messages", "sipHash64(trace_id)"),
         ("agents", "sipHash64(project_id, agent_name)"),
         ("agent_versions", "sipHash64(project_id, agent_name)"),
+        ("intent_signatures", "sipHash64(project_id)"),
+        ("failure_signatures", "sipHash64(project_id)"),
     ],
 )
 def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_expr):
-    """Test distributed table creation SQL for GenAI agent tables."""
+    """Test distributed table creation SQL for project-local tables."""
     distributed_migrator = DistributedClickHouseTraceServerMigrator(
         _make_ch_client(),
         replicated_cluster="test_cluster",
@@ -1028,7 +1030,12 @@ def test_create_distributed_table_sql_agent_tables_sharded(table_name, expected_
 
     sql = distributed_migrator._create_distributed_table_sql(table_name)
 
-    assert expected_expr in sql
+    expected = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} ON CLUSTER test_cluster
+        AS {table_name}_local
+        ENGINE = Distributed(test_cluster, currentDatabase(), {table_name}_local, {expected_expr})
+    """
+    assert sql.strip() == expected.strip()
 
 
 @pytest.mark.parametrize(
@@ -1848,6 +1855,19 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(DatabaseError("some other error"))
     assert not _is_transient_ch_error(DatabaseError(""))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
+
+    # clickhouse-connect >= 1.3 sets an int `code`.
+    coded = DatabaseError("replica sync pending")
+    coded.code = 999
+    assert _is_transient_ch_error(coded)
+    coded.code = 62
+    assert not _is_transient_ch_error(coded)
+    # A non-int code attr falls back to message parsing.
+    coded.code = "999"
+    assert not _is_transient_ch_error(DatabaseError("no code here"))
+    coded_msg = DatabaseError("Code: 517. DB::Exception: ...")
+    coded_msg.code = None
+    assert _is_transient_ch_error(coded_msg)
 
 
 def test_split_migration_sql() -> None:

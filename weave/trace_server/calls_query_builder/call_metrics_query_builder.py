@@ -59,7 +59,10 @@ def _get_call_metric_extraction_sql(
         SQL expression that extracts the metric value.
     """
     if metric == "latency_ms":
-        return "dateDiff('millisecond', started_at, ended_at)"
+        return (
+            "if(ended_at >= started_at, "
+            "dateDiff('millisecond', started_at, ended_at), NULL)"
+        )
     elif metric == "call_count":
         return "1"
     elif metric == "error_count":
