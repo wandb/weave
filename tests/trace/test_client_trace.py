@@ -47,6 +47,7 @@ from weave.trace.context.weave_client_context import (
     set_weave_client_global,
 )
 from weave.trace.refs import TableRef
+from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
@@ -3556,6 +3557,66 @@ def test_object_with_char_over_limit(client):
     )
     with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
+
+
+def _expected_truncation_warning(name: str) -> str:
+    return (
+        f"Object name '{name}' is longer than {CHAR_LIMIT} characters and is published "
+        f"as '{name[:CHAR_LIMIT]}'. Names whose sanitized forms only differ past that "
+        f"limit become one object." + LOG_ONCE_MESSAGE_SUFFIX
+    )
+
+
+def test_object_name_over_limit_warns_once(client, caplog):
+    """Truncation is silent today, so a caller cannot tell that the id they published
+    under is not the name they asked for.
+    """
+    name = "w" * (CHAR_LIMIT + 1)
+    logger_name = "weave.trace.weave_client"
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        first = weave.publish(Custom(name=name, val={"1": 1}))
+        second = weave.publish(Custom(name=name, val={"1": 2}))
+
+    assert first.name == name[:CHAR_LIMIT]
+    assert second.name == name[:CHAR_LIMIT]
+    assert caplog.messages == [_expected_truncation_warning(name)]
+
+
+@pytest.mark.parametrize(
+    ("name", "object_id"),
+    [
+        ("y" * CHAR_LIMIT, "y" * CHAR_LIMIT),
+        ("z" + "." * 200 + "z", "z-z"),
+    ],
+    ids=["at_the_limit", "sanitized_under_the_limit"],
+)
+def test_object_name_that_fits_its_id_does_not_warn(client, caplog, name, object_id):
+    """Only a name the limit cut is worth reporting. A name of exactly the limit is
+    published whole, and one that sanitizing shortens never reached the limit.
+    """
+    with caplog.at_level("WARNING", logger="weave.trace.weave_client"):
+        ref = weave.publish(Custom(name=name, val={"1": 1}))
+
+    assert ref.name == object_id
+    assert caplog.messages == []
+
+
+def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, caplog):
+    """A warning nobody could see is not remembered, so turning warnings back on
+    still reports it.
+    """
+    name = "m" * (CHAR_LIMIT + 1)
+    logger_name = "weave.trace.weave_client"
+
+    with caplog.at_level("ERROR", logger=logger_name):
+        weave.publish(Custom(name=name, val={"1": 1}))
+    assert not logged_messages
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        weave.publish(Custom(name=name, val={"1": 2}))
+
+    assert caplog.messages == [_expected_truncation_warning(name)]
 
 
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
