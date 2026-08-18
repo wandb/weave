@@ -1,8 +1,23 @@
 """Tests for trace server version checking."""
 
+import json
+from pathlib import Path
+
 from weave.trace.init_message import check_min_trace_server_version
+from weave.trace_server_version import (
+    MIN_SUPPORTED_SERVER_VERSION,
+    MIN_TRACE_SERVER_VERSION,
+)
 
 TEST_SERVER_URL = "https://test.trace.server"
+
+
+def test_minimum_supported_server_protocol_matches_runtime() -> None:
+    contract_path = Path(__file__).parents[2] / "client_server_compatibility.json"
+    contract = json.loads(contract_path.read_text())
+
+    assert contract["minimum_server_version"] == MIN_SUPPORTED_SERVER_VERSION
+    assert contract["minimum_trace_server_version"] == MIN_TRACE_SERVER_VERSION
 
 
 class TestCheckMinTraceServerVersion:

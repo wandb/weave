@@ -10,8 +10,12 @@ on:
         default: true
 
 jobs:
+  minimum-server-compatibility:
+    uses: ./.github/workflows/client-server-compatibility.yaml
+
   build-release:
     name: Build and publish to pypi
+    needs: [minimum-server-compatibility]
     runs-on: ubuntu-8core
     timeout-minutes: 10
     environment:

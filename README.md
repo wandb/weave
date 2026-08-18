@@ -23,6 +23,9 @@ Our goal is to bring rigor, best-practices, and composability to the inherently 
 
 Our documentation site can be found [here](https://wandb.me/weave).
 
+See [Client-server compatibility](CLIENT_SERVER_COMPATIBILITY.md) for the
+minimum supported W&B server release and the client release policy.
+
 ## Prerequisites
 
 - Python 3.10 or higher
@@ -123,4 +126,3 @@ We're in the process of 🧹 cleaning up 🧹. This codebase contains a large am
 The Weave Tracing code is mostly in: `weave/trace` and `weave/trace_server`.
 
 The Weave Evaluations code is mostly in `weave/flow`.
-

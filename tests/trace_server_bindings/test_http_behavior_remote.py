@@ -9,6 +9,12 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
 from types import MethodType
 from unittest.mock import MagicMock, patch
 
@@ -59,10 +65,107 @@ def _request_headers(mock_call) -> dict:
     return mock_call.kwargs.get("headers", {})
 
 
+def _minimum_server_contract() -> dict:
+    contract_path = Path(__file__).parents[2] / "client_server_compatibility.json"
+    return json.loads(contract_path.read_text())
+
+
+@contextmanager
+def _minimum_server_feedback_endpoint() -> Iterator[str]:
+    if external_server := os.environ.get("WEAVE_MIN_SERVER_URL"):
+        yield external_server
+        return
+
+    contract = _minimum_server_contract()["feedback_create_batch"]
+    allowed_fields = set(contract["request_fields"])
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            content_length = int(self.headers["Content-Length"])
+            payload = json.loads(self.rfile.read(content_length))
+            extra_fields = sorted(
+                {
+                    field
+                    for item in payload["batch"]
+                    for field in item
+                    if field not in allowed_fields
+                }
+            )
+            if self.path != contract["path"]:
+                self.send_response(404)
+                response = {"detail": "not found"}
+            elif extra_fields:
+                self.send_response(422)
+                response = {
+                    "detail": [
+                        {"type": "extra_forbidden", "field": field}
+                        for field in extra_fields
+                    ]
+                }
+            else:
+                self.send_response(200)
+                response = {"res": []}
+            body = json.dumps(response).encode("utf-8")
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever)
+    thread.start()
+    try:
+        host, port = server.server_address
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
+
+
 @pytest.fixture
 def unbatched_server():
     """Create a RemoteHTTPTraceServer instance without batching for testing."""
     return RemoteHTTPTraceServer("http://example.com")
+
+
+def test_feedback_batch_compatible_with_minimum_supported_server() -> None:
+    request = tsi.FeedbackCreateBatchReq(
+        batch=[
+            tsi.FeedbackCreateReq(
+                project_id="entity/project",
+                weave_ref="weave:///entity/project/call/call-id",
+                feedback_type="custom",
+                payload={"value": 1},
+            )
+        ]
+    )
+    contract = _minimum_server_contract()["feedback_create_batch"]
+
+    with _minimum_server_feedback_endpoint() as base_url:
+        incompatible_response = httpx.post(
+            base_url + contract["path"],
+            json=request.model_dump(mode="json"),
+        )
+        assert incompatible_response.status_code == 422
+        assert {
+            detail["type"] for detail in incompatible_response.json()["detail"]
+        } == {"extra_forbidden"}
+
+        client = RemoteHTTPTraceServer(base_url, should_batch=True)
+        try:
+            response = client.feedback_create_batch(request)
+            client._flush_feedback(request.batch)
+        finally:
+            if client.call_processor:
+                client.call_processor.stop_accepting_new_work_and_flush_queue()
+            if client.feedback_processor:
+                client.feedback_processor.stop_accepting_new_work_and_flush_queue()
+
+    assert response.res == []
 
 
 @patch("weave.utils.http_requests.post")
