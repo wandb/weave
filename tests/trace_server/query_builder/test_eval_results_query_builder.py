@@ -13,8 +13,8 @@ from weave.trace_server.query_builder.eval_results_query_builder import (
     build_eval_results_cte_chain,
     build_eval_results_hydration_query,
     build_eval_results_page_query,
-    build_table_rows_resolution_query,
     build_sort_expression,
+    build_table_rows_resolution_query,
 )
 
 

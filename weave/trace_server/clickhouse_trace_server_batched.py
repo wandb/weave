@@ -6014,12 +6014,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         page_calls: list[tsi.CallSchema] = []
         for call_id in ordered_call_ids:
-            hdata = hydrated_by_id.get(call_id)
-            if hdata is None:
+            call_data = hydrated_by_id.get(call_id)
+            if call_data is None:
                 continue
-            hdata["parent_id"] = eval_call_id_by_call.get(call_id)
+            call_data["parent_id"] = eval_call_id_by_call.get(call_id)
             page_calls.append(
-                tsi.CallSchema.model_validate(ch_call_dict_to_call_schema_dict(hdata))
+                tsi.CallSchema.model_validate(
+                    ch_call_dict_to_call_schema_dict(call_data)
+                )
             )
 
         for call in page_calls:
