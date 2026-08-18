@@ -1003,6 +1003,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("id", "UUID"),
                 ("run_window_end", "DateTime64(6, 'UTC')"),
                 ("topic_id", "UUID"),
+                ("category", "LowCardinality(String)"),
                 ("centroid", "Array(Float32)"),
                 ("label", "String"),
                 ("description", "String"),
@@ -1097,11 +1098,11 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
     ]:
         ch_client.command(
             f"INSERT INTO {target_db}.signature_clusters "
-            "(project_id, cluster_run_id, id, run_window_end, topic_id, centroid, "
-            "label, description, occurrence_count, inserted_at) "
+            "(project_id, cluster_run_id, id, run_window_end, topic_id, category, "
+            "centroid, label, description, occurrence_count, inserted_at) "
             f"VALUES ('project-1', '{run_id}', '{_CLUSTER_ID}', "
-            f"toDateTime64('2026-06-01', 6, 'UTC'), '{_TOPIC_ID}', [0.5, -0.25], "
-            f"'{label}', '{label} intents', {count}, "
+            f"toDateTime64('2026-06-01', 6, 'UTC'), '{_TOPIC_ID}', 'action_request', "
+            f"[0.5, -0.25], '{label}', '{label} intents', {count}, "
             f"toDateTime64('{inserted_at}', 6, 'UTC'))"
         )
         ch_client.command(
@@ -1137,10 +1138,11 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
         )
     ]
     assert ch_client.query(
-        "SELECT argMax(label, inserted_at), argMax(occurrence_count, inserted_at) "
+        "SELECT argMax(label, inserted_at), argMax(occurrence_count, inserted_at), "
+        "argMax(category, inserted_at) "
         f"FROM {target_db}.signature_clusters "
         "WHERE project_id = 'project-1' GROUP BY project_id, cluster_run_id, id"
-    ).result_rows == [("checkout", 2)]
+    ).result_rows == [("checkout", 2, "action_request")]
     assert ch_client.query(
         "SELECT toString(argMax(cluster_id, inserted_at)), "
         "round(toFloat64(argMax(cluster_distance, inserted_at)), 3), "

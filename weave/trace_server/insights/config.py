@@ -131,6 +131,8 @@ class ClusteringConfig(_Strict):
 
     config_schema_version: Literal[1]
     algorithm: Literal["hdbscan"]
+    # What one fit covers: the whole signature type, or each category on its own.
+    scope: Literal["global", "category"]
     min_cluster_size: Annotated[int, Field(ge=2)]
     min_samples: Annotated[int, Field(ge=1)]
     metric: Literal["euclidean"]

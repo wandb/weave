@@ -31,6 +31,7 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
     assert clustering.model_dump() == {
         "config_schema_version": 1,
         "algorithm": "hdbscan",
+        "scope": "global",
         "min_cluster_size": 3,
         "min_samples": 3,
         "metric": "euclidean",

@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS signature_clusters
     -- Not an FK: a topic identity carried forward by centroid match across runs, so it
     -- outlives the per-run `id`. Nil until the writer links a run to its predecessor.
     topic_id UUID,
+    -- The signature category this cluster was fit within, empty when the run fit the
+    -- whole space at once. Set by the clustering config's `scope`.
+    category LowCardinality(String) DEFAULT '',
     -- Mean signature vector. Enables assigning a new signature to an existing cluster.
     centroid Array(Float32),
 

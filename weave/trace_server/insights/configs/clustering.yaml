@@ -1,6 +1,10 @@
 config_schema_version: 1
 algorithm: hdbscan
 
+# `global` fits one model over the whole signature type. `category` fits one per
+# category, which resolves finer topics inside a category that dominates the space.
+scope: global
+
 min_cluster_size: 3
 min_samples: 3
 metric: euclidean
