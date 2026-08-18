@@ -138,6 +138,15 @@ our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
 they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
 off the span object, which under the OTel→DD bridge is not an SDK span.
 
+`WeaveClient.createCall` in the Node SDK writes the same key with the same
+meaning, but sees fewer spans. That SDK registers no OTel context manager and
+never calls `startActiveSpan`, so its own spans never become current and
+`getActiveSpan` returns only instrumentation the user installed themselves.
+Linking the `execute_tool` spans the `openai-agents` and `google_adk`
+integrations emit has to read those integrations' own state instead — the
+agents SDK keeps its current span in its own AsyncLocalStorage, and the ADK
+plugin keeps a map of open tool spans.
+
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
 ## Python Testing Guidelines
