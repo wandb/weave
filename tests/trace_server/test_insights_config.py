@@ -37,6 +37,7 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
         "cluster_selection_method": "eom",
         "allow_single_cluster": False,
         "umap": {"n_neighbors": 15, "min_dist": 0.0, "random_state": 0},
+        "scope": "global",
     }
 
     before = config.config_sha(clustering)

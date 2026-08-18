@@ -137,6 +137,9 @@ class ClusteringConfig(_Strict):
     cluster_selection_method: Literal["eom"]
     allow_single_cluster: bool
     umap: UmapProjection
+    # "category" fits one HDBSCAN model per signature category; "global" fits one
+    # model over the whole window. Either way UMAP still fits once, globally.
+    scope: Literal["global", "category"]
 
 
 _E = TypeVar("_E", bound=Extraction)

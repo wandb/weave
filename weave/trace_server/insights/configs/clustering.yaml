@@ -6,6 +6,7 @@ min_samples: 3
 metric: euclidean
 cluster_selection_method: eom
 allow_single_cluster: false
+scope: global
 
 # Projection persisted per assignment, so a finished run's scatter plot redraws
 # without reprojecting. Fixed at two components by umap_x and umap_y.

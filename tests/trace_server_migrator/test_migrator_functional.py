@@ -1003,6 +1003,7 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
                 ("id", "UUID"),
                 ("run_window_end", "DateTime64(6, 'UTC')"),
                 ("topic_id", "UUID"),
+                ("category", "LowCardinality(String)"),
                 ("centroid", "Array(Float32)"),
                 ("label", "String"),
                 ("description", "String"),
