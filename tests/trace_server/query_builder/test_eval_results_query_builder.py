@@ -45,7 +45,7 @@ def test_cte_chain_calls_merged() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE calls_merged.id IN (
+                AND calls_merged.id IN (
                     SELECT calls_merged.id
                     FROM calls_merged
                     PREWHERE calls_merged.project_id = {pb_0:String}
@@ -73,7 +73,7 @@ def test_cte_chain_calls_merged() -> None:
                             )),
                             toDateTime64('2100-01-01 00:00:00', 3))
                 )
-                AND calls_merged.sortable_datetime >= coalesce(
+                WHERE calls_merged.sortable_datetime >= coalesce(
                     (SELECT min(roots.started_at) - toIntervalSecond(300)
                         FROM calls_merged AS roots
                         PREWHERE roots.project_id = {pb_0:String}
@@ -433,7 +433,7 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE calls_merged.id IN (
+                AND calls_merged.id IN (
                     SELECT calls_merged.id
                     FROM calls_merged
                     PREWHERE calls_merged.project_id = {pb_0:String}
@@ -461,7 +461,7 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                             )),
                             toDateTime64('2100-01-01 00:00:00', 3))
                 )
-                AND calls_merged.sortable_datetime >= coalesce(
+                WHERE calls_merged.sortable_datetime >= coalesce(
                     (SELECT min(roots.started_at) - toIntervalSecond(300)
                         FROM calls_merged AS roots
                         PREWHERE roots.project_id = {pb_0:String}
@@ -561,7 +561,7 @@ def test_full_query_calls_merged() -> None:
                     END AS row_digest
                 FROM calls_merged
                 PREWHERE calls_merged.project_id = {pb_0:String}
-                WHERE calls_merged.id IN (
+                AND calls_merged.id IN (
                     SELECT calls_merged.id
                     FROM calls_merged
                     PREWHERE calls_merged.project_id = {pb_0:String}
@@ -589,7 +589,7 @@ def test_full_query_calls_merged() -> None:
                             )),
                             toDateTime64('2100-01-01 00:00:00', 3))
                 )
-                AND calls_merged.sortable_datetime >= coalesce(
+                WHERE calls_merged.sortable_datetime >= coalesce(
                     (SELECT min(roots.started_at) - toIntervalSecond(300)
                         FROM calls_merged AS roots
                         PREWHERE roots.project_id = {pb_0:String}
