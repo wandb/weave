@@ -5938,7 +5938,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
 
-        page_query = eval_results_query_builder.build_eval_results_query(
+        page_query = eval_results_query_builder.build_eval_results_page_query(
             req.project_id,
             eval_root_ids,
             req.sort_by,
@@ -5955,27 +5955,52 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         digest_by_call: dict[str, str] = {}
         resolved_by_call_id: dict[str, Any] = {}
+        eval_call_id_by_call: dict[str, str | None] = {}
+        ordered_call_ids: list[str] = []
         total_rows = 0
-        page_calls: list[tsi.CallSchema] = []
 
         for row in result.result_rows:
             row_data = dict(zip(result.column_names, row, strict=True))
-            total_rows = int(row_data.get("__total_rows", 0))
-            row_digest = row_data.get("__row_digest")
-            resolved_raw = row_data.get("__resolved_inputs")
-
-            call_id = row_data.get("id")
-            if row_digest and call_id:
+            total_rows = int(row_data.get("total_rows", 0))
+            call_id = row_data.get("call_id")
+            if not call_id:
+                continue
+            ordered_call_ids.append(call_id)
+            eval_call_id_by_call[call_id] = row_data.get("eval_call_id")
+            row_digest = row_data.get("row_digest")
+            if row_digest:
                 digest_by_call[call_id] = row_digest
-            if resolved_raw and call_id and req.resolve_row_refs:
+            resolved_raw = row_data.get("resolved_inputs")
+            if resolved_raw and req.resolve_row_refs:
                 parsed = try_parse_json(resolved_raw)
                 if parsed is not None:
                     resolved_by_call_id[call_id] = parsed
 
-            page_calls.append(
-                tsi.CallSchema.model_validate(
-                    ch_call_dict_to_call_schema_dict(row_data)
+        # Hydrate heavy call columns in a second statement so the id set is a
+        # literal PREWHERE param (row-level lazy reads); see
+        # build_eval_results_hydration_query for why this can't be one statement.
+        hydrated_by_id: dict[str, dict[str, Any]] = {}
+        for i in range(0, len(ordered_call_ids), MAX_FILTER_LENGTH):
+            batch = ordered_call_ids[i : i + MAX_FILTER_LENGTH]
+            hpb = ParamBuilder()
+            hydration_query = (
+                eval_results_query_builder.build_eval_results_hydration_query(
+                    req.project_id, batch, hpb, read_table
                 )
+            )
+            hydration_result = self._query(hydration_query, hpb.get_params())
+            for hrow in hydration_result.result_rows:
+                hdata = dict(zip(hydration_result.column_names, hrow, strict=True))
+                hydrated_by_id[hdata["id"]] = hdata
+
+        page_calls: list[tsi.CallSchema] = []
+        for call_id in ordered_call_ids:
+            hdata = hydrated_by_id.get(call_id)
+            if hdata is None:
+                continue
+            hdata["parent_id"] = eval_call_id_by_call.get(call_id)
+            page_calls.append(
+                tsi.CallSchema.model_validate(ch_call_dict_to_call_schema_dict(hdata))
             )
 
         for call in page_calls:

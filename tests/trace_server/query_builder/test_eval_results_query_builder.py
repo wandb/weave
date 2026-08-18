@@ -11,7 +11,8 @@ from weave.trace_server.interface.query import Query
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.query_builder.eval_results_query_builder import (
     build_eval_results_cte_chain,
-    build_eval_results_query,
+    build_eval_results_hydration_query,
+    build_eval_results_page_query,
     build_sort_expression,
 )
 
@@ -532,10 +533,10 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
     )
 
 
-def test_full_query_calls_merged() -> None:
-    """Full SQL: lean CTEs + outer SELECT hydrates from calls_merged."""
+def test_page_query_calls_merged() -> None:
+    """Page query: lean CTE chain + page_rows projection, no hydration columns."""
     pb = ParamBuilder("pb")
-    sql = build_eval_results_query(
+    sql = build_eval_results_page_query(
         project_id="proj-1",
         eval_root_ids=["eval-1"],
         sort_by=None,
@@ -546,171 +547,65 @@ def test_full_query_calls_merged() -> None:
         pb=pb,
         read_table="calls_merged",
     )
+    pb_chain = ParamBuilder("pb")
+    chain = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=None,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb_chain,
+        read_table="calls_merged",
+    )
     assert_raw_sql(
         sql,
-        """
-        WITH predict_and_score_calls AS (
-                SELECT calls_merged.id AS call_id,
-                    any(calls_merged.parent_id) AS eval_call_id,
-                    any(calls_merged.inputs_dump) AS inputs_dump,
-                    any(calls_merged.output_dump) AS output_dump,
-                    CASE
-                        WHEN position(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/') > 0
-                            THEN regexpExtract(JSON_VALUE(any(calls_merged.inputs_dump), '$.example'), '/attr/rows/id/([^/]+)$', 1)
-                        ELSE hex(SHA256(JSONExtractRaw(any(calls_merged.inputs_dump), 'example')))
-                    END AS row_digest
-                FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_0:String}
-                AND calls_merged.id IN (
-                    SELECT calls_merged.id
-                    FROM calls_merged
-                    PREWHERE calls_merged.project_id = {pb_0:String}
-                    WHERE calls_merged.parent_id IN {pb_1:Array(String)}
-                        AND calls_merged.id NOT IN {pb_1:Array(String)}
-                        AND multiSearchAny(calls_merged.op_name, [{pb_2:String}, {pb_3:String}])
-                        AND calls_merged.sortable_datetime >= coalesce(
-                            (SELECT min(roots.started_at) - toIntervalSecond(300)
-                                FROM calls_merged AS roots
-                                PREWHERE roots.project_id = {pb_0:String}
-                                WHERE roots.id IN {pb_1:Array(String)}
-                            ),
-                            toDateTime64(0, 3))
-                        AND calls_merged.sortable_datetime <= coalesce(
-                            (SELECT CASE
-                                WHEN countIf(root_ended_at IS NULL) > 0 THEN NULL
-                                ELSE max(root_ended_at) + toIntervalSecond(300)
-                            END
-                            FROM (
-                                SELECT max(roots.ended_at) AS root_ended_at
-                                FROM calls_merged AS roots
-                                PREWHERE roots.project_id = {pb_0:String}
-                                WHERE roots.id IN {pb_1:Array(String)}
-                                GROUP BY roots.id
-                            )),
-                            toDateTime64('2100-01-01 00:00:00', 3))
-                )
-                WHERE calls_merged.sortable_datetime >= coalesce(
-                    (SELECT min(roots.started_at) - toIntervalSecond(300)
-                        FROM calls_merged AS roots
-                        PREWHERE roots.project_id = {pb_0:String}
-                        WHERE roots.id IN {pb_1:Array(String)}
-                    ),
-                    toDateTime64(0, 3))
-                GROUP BY (calls_merged.project_id, calls_merged.id)
-                HAVING any(calls_merged.parent_id) IN {pb_1:Array(String)}
-                    AND (multiSearchAny(any(calls_merged.op_name), [{pb_2:String}, {pb_3:String}]))
-                    AND any(calls_merged.deleted_at) IS NULL
-                    AND any(calls_merged.started_at) IS NOT NULL
-            ),
-
-            predict_and_score_calls_resolved AS (
-                SELECT * FROM predict_and_score_calls
-            ),
-
-            ranked_digests AS (
-                SELECT row_digest,
-                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
-                FROM predict_and_score_calls_resolved
-                GROUP BY row_digest
-                HAVING 1=1
-            ),
-
-            ranked_digest_count AS (
-                SELECT count(*) AS total_rows FROM ranked_digests
-            ),
-
-            page_digests AS (
-                SELECT row_digest, row_order
-                FROM ranked_digests
-                ORDER BY row_order
-                LIMIT 10
-                OFFSET 0
-            ),
-
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
-            page_rows AS (
-                SELECT predict_and_score_calls_resolved.call_id AS call_id,
-                    predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
-                    predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
-                FROM predict_and_score_calls_resolved
-                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
-            ),
-
-            page_calls AS (
-                SELECT calls_merged.id AS call_id,
-                    any(calls_merged.project_id) AS project_id,
-                    any(calls_merged.trace_id) AS trace_id,
-                    any(calls_merged.op_name) AS op_name,
-                    any(calls_merged.started_at) AS started_at,
-                    any(calls_merged.ended_at) AS ended_at,
-                    any(calls_merged.attributes_dump) AS attributes_dump,
-                    any(calls_merged.inputs_dump) AS inputs_dump,
-                    any(calls_merged.output_dump) AS output_dump,
-                    any(calls_merged.summary_dump) AS summary_dump
-                FROM calls_merged
-                PREWHERE calls_merged.project_id = {pb_4:String}
-                WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
-                AND calls_merged.sortable_datetime >= coalesce(
-                    (SELECT min(roots.started_at) - toIntervalSecond(300)
-                        FROM calls_merged AS roots
-                        PREWHERE roots.project_id = {pb_4:String}
-                        WHERE roots.id IN {pb_5:Array(String)}
-                    ),
-                    toDateTime64(0, 3))
-                AND calls_merged.sortable_datetime <= coalesce(
-                    (SELECT CASE
-                        WHEN countIf(root_ended_at IS NULL) > 0 THEN NULL
-                        ELSE max(root_ended_at) + toIntervalSecond(300)
-                    END
-                    FROM (
-                        SELECT max(roots.ended_at) AS root_ended_at
-                        FROM calls_merged AS roots
-                        PREWHERE roots.project_id = {pb_4:String}
-                        WHERE roots.id IN {pb_5:Array(String)}
-                        GROUP BY roots.id
-                    )),
-                    toDateTime64('2100-01-01 00:00:00', 3))
-                GROUP BY (calls_merged.project_id, calls_merged.id)
-            )
+        f"""
+        WITH {chain}
         SELECT
-            page_rows.call_id AS id,
-            page_rows.eval_call_id AS parent_id,
-            page_calls.project_id,
-            page_calls.trace_id,
-            page_calls.op_name,
-            page_calls.started_at,
-            page_calls.ended_at,
-            page_calls.attributes_dump,
-            page_calls.inputs_dump,
-            page_calls.output_dump,
-            page_calls.summary_dump,
-            page_rows.row_digest AS __row_digest,
-            page_rows.row_order AS __row_order,
-            page_rows.resolved_inputs AS __resolved_inputs,
-            (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+            page_rows.call_id AS call_id,
+            page_rows.eval_call_id AS eval_call_id,
+            page_rows.row_digest AS row_digest,
+            page_rows.row_order AS row_order,
+            page_rows.resolved_inputs AS resolved_inputs,
+            (SELECT total_rows FROM ranked_digest_count) AS total_rows
         FROM page_rows
-        LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
         ORDER BY page_rows.row_order ASC
         """,
         pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": "proj-1",
-            "pb_5": ["eval-1"],
-        },
+        pb_chain.get_params(),
+    )
+
+
+def test_hydration_query_calls_merged() -> None:
+    """Hydration query: literal id set in PREWHERE so dump reads are row-level."""
+    pb = ParamBuilder("pb")
+    sql = build_eval_results_hydration_query(
+        project_id="proj-1",
+        call_ids=["call-1", "call-2"],
+        pb=pb,
+        read_table="calls_merged",
+    )
+    assert_raw_sql(
+        sql,
+        """SELECT
+    calls_merged.id AS id,
+    any(calls_merged.project_id) AS project_id,
+    any(calls_merged.trace_id) AS trace_id,
+    any(calls_merged.op_name) AS op_name,
+    any(calls_merged.started_at) AS started_at,
+    any(calls_merged.ended_at) AS ended_at,
+    any(calls_merged.attributes_dump) AS attributes_dump,
+    any(calls_merged.inputs_dump) AS inputs_dump,
+    any(calls_merged.output_dump) AS output_dump,
+    any(calls_merged.summary_dump) AS summary_dump
+FROM calls_merged
+PREWHERE calls_merged.project_id = {pb_0:String}
+AND calls_merged.id IN {pb_1:Array(String)}
+GROUP BY (calls_merged.project_id, calls_merged.id)""",
+        pb.get_params(),
+        {"pb_0": "proj-1", "pb_1": ["call-1", "call-2"]},
     )
 
 
@@ -1161,10 +1056,10 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
     )
 
 
-def test_full_query_calls_complete() -> None:
-    """Full SQL: lean CTEs + page_calls hydration on calls_complete (no GROUP BY)."""
+def test_page_query_calls_complete() -> None:
+    """Page query on calls_complete: same lean projection over its CTE chain."""
     pb = ParamBuilder("pb")
-    sql = build_eval_results_query(
+    sql = build_eval_results_page_query(
         project_id="proj-1",
         eval_root_ids=["eval-1"],
         sort_by=None,
@@ -1175,114 +1070,64 @@ def test_full_query_calls_complete() -> None:
         pb=pb,
         read_table="calls_complete",
     )
+    pb_chain = ParamBuilder("pb")
+    chain = build_eval_results_cte_chain(
+        project_id="proj-1",
+        eval_root_ids=["eval-1"],
+        sort_by=None,
+        filters=None,
+        require_intersection=False,
+        limit=10,
+        offset=0,
+        pb=pb_chain,
+        read_table="calls_complete",
+    )
     assert_raw_sql(
         sql,
-        """
-        WITH predict_and_score_calls AS (
-                SELECT calls_complete.id AS call_id,
-                    calls_complete.parent_id AS eval_call_id,
-                    calls_complete.inputs_dump,
-                    calls_complete.output_dump,
-                    CASE
-                        WHEN position(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/') > 0
-                            THEN regexpExtract(JSON_VALUE(calls_complete.inputs_dump, '$.example'), '/attr/rows/id/([^/]+)$', 1)
-                        ELSE hex(SHA256(JSONExtractRaw(calls_complete.inputs_dump, 'example')))
-                    END AS row_digest
-                FROM calls_complete
-                PREWHERE calls_complete.project_id = {pb_0:String}
-                WHERE calls_complete.parent_id IN {pb_1:Array(String)}
-                    AND calls_complete.id NOT IN {pb_1:Array(String)}
-                    AND (multiSearchAny(calls_complete.op_name, [{pb_2:String}, {pb_3:String}]))
-                    AND calls_complete.deleted_at = {pb_4:DateTime64(3)}
-            ),
-
-            predict_and_score_calls_resolved AS (
-                SELECT * FROM predict_and_score_calls
-            ),
-
-            ranked_digests AS (
-                SELECT row_digest,
-                    ROW_NUMBER() OVER(ORDER BY row_digest ASC) AS row_order
-                FROM predict_and_score_calls_resolved
-                GROUP BY row_digest
-                HAVING 1=1
-            ),
-
-            ranked_digest_count AS (
-                SELECT count(*) AS total_rows FROM ranked_digests
-            ),
-
-            page_digests AS (
-                SELECT row_digest, row_order
-                FROM ranked_digests
-                ORDER BY row_order
-                LIMIT 10
-                OFFSET 0
-            ),
-
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
-            page_rows AS (
-                SELECT predict_and_score_calls_resolved.call_id AS call_id,
-                    predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
-                    predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
-                FROM predict_and_score_calls_resolved
-                INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
-            ),
-
-            page_calls AS (
-                SELECT calls_complete.id AS call_id,
-                    calls_complete.project_id,
-                    calls_complete.trace_id,
-                    calls_complete.op_name,
-                    calls_complete.started_at,
-                    calls_complete.ended_at,
-                    calls_complete.attributes_dump,
-                    calls_complete.inputs_dump,
-                    calls_complete.output_dump,
-                    calls_complete.summary_dump
-                FROM calls_complete
-                WHERE calls_complete.project_id = {pb_5:String}
-                    AND calls_complete.id IN (SELECT call_id FROM page_rows)
-            )
+        f"""
+        WITH {chain}
         SELECT
-            page_rows.call_id AS id,
-            page_rows.eval_call_id AS parent_id,
-            page_calls.project_id,
-            page_calls.trace_id,
-            page_calls.op_name,
-            page_calls.started_at,
-            page_calls.ended_at,
-            page_calls.attributes_dump,
-            page_calls.inputs_dump,
-            page_calls.output_dump,
-            page_calls.summary_dump,
-            page_rows.row_digest AS __row_digest,
-            page_rows.row_order AS __row_order,
-            page_rows.resolved_inputs AS __resolved_inputs,
-            (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+            page_rows.call_id AS call_id,
+            page_rows.eval_call_id AS eval_call_id,
+            page_rows.row_digest AS row_digest,
+            page_rows.row_order AS row_order,
+            page_rows.resolved_inputs AS resolved_inputs,
+            (SELECT total_rows FROM ranked_digest_count) AS total_rows
         FROM page_rows
-        LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
         ORDER BY page_rows.row_order ASC
         """,
         pb.get_params(),
-        {
-            "pb_0": "proj-1",
-            "pb_1": ["eval-1"],
-            "pb_2": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
-            "pb_3": EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME_TS,
-            "pb_4": SENTINEL_EPOCH,
-            "pb_5": "proj-1",
-        },
+        pb_chain.get_params(),
+    )
+
+
+def test_hydration_query_calls_complete() -> None:
+    """Hydration on calls_complete: literal id set in PREWHERE, no GROUP BY."""
+    pb = ParamBuilder("pb")
+    sql = build_eval_results_hydration_query(
+        project_id="proj-1",
+        call_ids=["call-1"],
+        pb=pb,
+        read_table="calls_complete",
+    )
+    assert_raw_sql(
+        sql,
+        """SELECT
+    calls_complete.id AS id,
+    calls_complete.project_id,
+    calls_complete.trace_id,
+    calls_complete.op_name,
+    calls_complete.started_at,
+    calls_complete.ended_at,
+    calls_complete.attributes_dump,
+    calls_complete.inputs_dump,
+    calls_complete.output_dump,
+    calls_complete.summary_dump
+FROM calls_complete
+PREWHERE calls_complete.project_id = {pb_0:String}
+AND calls_complete.id IN {pb_1:Array(String)}""",
+        pb.get_params(),
+        {"pb_0": "proj-1", "pb_1": ["call-1"]},
     )
 
 
