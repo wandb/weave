@@ -5954,7 +5954,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(page_query, pb.get_params())
 
         digest_by_call: dict[str, str] = {}
-        resolved_by_call_id: dict[str, Any] = {}
         eval_call_id_by_call: dict[str, str | None] = {}
         ordered_call_ids: list[str] = []
         total_rows = 0
@@ -5970,11 +5969,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             row_digest = row_data.get("row_digest")
             if row_digest:
                 digest_by_call[call_id] = row_digest
-            resolved_raw = row_data.get("resolved_inputs")
-            if resolved_raw and req.resolve_row_refs:
-                parsed = try_parse_json(resolved_raw)
-                if parsed is not None:
-                    resolved_by_call_id[call_id] = parsed
+
+        # Resolve dataset-row payloads by literal digests (PREWHERE); inline
+        # rows have no table_rows entry and keep their inputs.example as-is.
+        resolved_by_call_id: dict[str, Any] = {}
+        if req.resolve_row_refs and digest_by_call:
+            val_by_digest: dict[str, Any] = {}
+            unique_digests = list(dict.fromkeys(digest_by_call.values()))
+            for i in range(0, len(unique_digests), MAX_FILTER_LENGTH):
+                dbatch = unique_digests[i : i + MAX_FILTER_LENGTH]
+                rpb = ParamBuilder()
+                resolution_query = (
+                    eval_results_query_builder.build_table_rows_resolution_query(
+                        req.project_id, dbatch, rpb
+                    )
+                )
+                for digest, val_dump in self._query(
+                    resolution_query, rpb.get_params()
+                ).result_rows:
+                    if val_dump:
+                        parsed = try_parse_json(val_dump)
+                        if parsed is not None:
+                            val_by_digest[digest] = parsed
+            for call_id, digest in digest_by_call.items():
+                if digest in val_by_digest:
+                    resolved_by_call_id[call_id] = val_by_digest[digest]
 
         # Hydrate heavy call columns in a second statement so the id set is a
         # literal PREWHERE param (row-level lazy reads); see

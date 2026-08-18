@@ -13,6 +13,7 @@ from weave.trace_server.query_builder.eval_results_query_builder import (
     build_eval_results_cte_chain,
     build_eval_results_hydration_query,
     build_eval_results_page_query,
+    build_table_rows_resolution_query,
     build_sort_expression,
 )
 
@@ -113,23 +114,13 @@ def test_cte_chain_calls_merged() -> None:
                 OFFSET 0
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -202,23 +193,13 @@ def test_cte_chain_calls_complete() -> None:
                 OFFSET 10
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -338,23 +319,13 @@ def test_cte_chain_sort_and_multi_eval_filters() -> None:
                 OFFSET 50
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -501,23 +472,13 @@ def test_eval_filter_infers_cast_for_typed_literal_without_convert() -> None:
                 OFFSET 0
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -568,7 +529,6 @@ def test_page_query_calls_merged() -> None:
             page_rows.eval_call_id AS eval_call_id,
             page_rows.row_digest AS row_digest,
             page_rows.row_order AS row_order,
-            page_rows.resolved_inputs AS resolved_inputs,
             (SELECT total_rows FROM ranked_digest_count) AS total_rows
         FROM page_rows
         ORDER BY page_rows.row_order ASC
@@ -765,23 +725,13 @@ def test_filter_logic_operator_or_produces_match_any() -> None:
                 OFFSET 0
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -895,23 +845,13 @@ def test_filter_logic_operator_and_produces_match_all() -> None:
                 OFFSET 0
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -1022,23 +962,13 @@ def test_filter_logic_operator_or_same_eval_multiple_conditions() -> None:
                 OFFSET 0
             ),
 
-            page_resolved_inputs AS (
-                SELECT digest, any(val_dump) AS val_dump
-                FROM table_rows
-                PREWHERE project_id = {pb_0:String}
-                WHERE digest IN (SELECT row_digest FROM page_digests)
-                GROUP BY digest
-            ),
-
             page_rows AS (
                 SELECT predict_and_score_calls_resolved.call_id AS call_id,
                     predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
                     predict_and_score_calls_resolved.row_digest AS row_digest,
-                    page_digests.row_order AS row_order,
-                    COALESCE(nullIf(page_resolved_inputs.val_dump, ''), JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')) AS resolved_inputs
+                    page_digests.row_order AS row_order
                 FROM predict_and_score_calls_resolved
                 INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-                LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
             )
             """,
         pb.get_params(),
@@ -1091,7 +1021,6 @@ def test_page_query_calls_complete() -> None:
             page_rows.eval_call_id AS eval_call_id,
             page_rows.row_digest AS row_digest,
             page_rows.row_order AS row_order,
-            page_rows.resolved_inputs AS resolved_inputs,
             (SELECT total_rows FROM ranked_digest_count) AS total_rows
         FROM page_rows
         ORDER BY page_rows.row_order ASC
@@ -1128,6 +1057,26 @@ PREWHERE calls_complete.project_id = {pb_0:String}
 AND calls_complete.id IN {pb_1:Array(String)}""",
         pb.get_params(),
         {"pb_0": "proj-1", "pb_1": ["call-1"]},
+    )
+
+
+def test_table_rows_resolution_query() -> None:
+    """Dataset-row resolution uses a literal digest set in PREWHERE."""
+    pb = ParamBuilder("pb")
+    sql = build_table_rows_resolution_query(
+        project_id="proj-1",
+        digests=["digest-1", "digest-2"],
+        pb=pb,
+    )
+    assert_raw_sql(
+        sql,
+        """SELECT digest, any(val_dump) AS val_dump
+FROM table_rows
+PREWHERE project_id = {pb_0:String}
+AND digest IN {pb_1:Array(String)}
+GROUP BY digest""",
+        pb.get_params(),
+        {"pb_0": "proj-1", "pb_1": ["digest-1", "digest-2"]},
     )
 
 

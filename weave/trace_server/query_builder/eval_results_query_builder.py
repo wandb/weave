@@ -6,8 +6,11 @@ Generates ClickHouse CTEs for the eval_results CTE chain:
   ranked_digests                   → GROUP BY row_digest, HAVING filters, ROW_NUMBER for sort
   ranked_digest_count              → total matching rows (for pagination metadata)
   page_digests                     → paginated slice of ranked_digests
-  page_resolved_inputs             → table_rows JOIN for the paginated digests only
-  page_rows                        → call IDs + resolved_inputs for the page
+  page_rows                        → call IDs + digests + order for the page
+
+Heavy data (call payload columns, dataset-row val_dump) is fetched by separate
+statements with literal id/digest params in PREWHERE — see
+build_eval_results_hydration_query and build_table_rows_resolution_query.
 """
 
 from functools import partial
@@ -516,35 +519,40 @@ page_digests AS (
 )"""
 
 
-def build_page_resolved_inputs_cte(project_id_param: str) -> str:
-    """Hydrate dataset-row val_dump for just the page's digests."""
-    return f"""page_resolved_inputs AS (
-    SELECT digest, any(val_dump) AS val_dump
-    FROM table_rows
-    PREWHERE project_id = {project_id_param}
-    WHERE digest IN (SELECT row_digest FROM page_digests)
-    GROUP BY digest
-)"""
-
-
 def build_page_rows_cte() -> str:
-    """Build page_rows CTE: joins page digests with the per-page val_dump
-    resolution.
+    """Build page_rows CTE: page digests joined back to their calls.
+
+    Dataset-row resolution deliberately does NOT happen here: a
+    `digest IN (SELECT ... FROM page_digests)` scan of table_rows reads
+    val_dump for every row in the surviving granules (GBs on fat datasets)
+    even though only the page's digests are needed. Callers that want
+    resolved rows fetch them with build_table_rows_resolution_query using
+    the returned digests as a literal PREWHERE param.
     """
     return """page_rows AS (
     SELECT
         predict_and_score_calls_resolved.call_id AS call_id,
         predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
         predict_and_score_calls_resolved.row_digest AS row_digest,
-        page_digests.row_order AS row_order,
-        COALESCE(
-            nullIf(page_resolved_inputs.val_dump, ''),
-            JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')
-        ) AS resolved_inputs
+        page_digests.row_order AS row_order
     FROM predict_and_score_calls_resolved
     INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-    LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
 )"""
+
+
+def build_table_rows_resolution_query(
+    project_id: str,
+    digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Resolve dataset-row val_dump for a literal digest list (PREWHERE)."""
+    project_id_param = param_slot(pb.add_param(project_id), "String")
+    digests_param = pb.add(digests, None, "Array(String)")
+    return f"""SELECT digest, any(val_dump) AS val_dump
+FROM table_rows
+PREWHERE project_id = {project_id_param}
+AND digest IN {digests_param}
+GROUP BY digest"""
 
 
 def build_eval_results_page_query(
@@ -588,7 +596,6 @@ SELECT
     page_rows.eval_call_id AS eval_call_id,
     page_rows.row_digest AS row_digest,
     page_rows.row_order AS row_order,
-    page_rows.resolved_inputs AS resolved_inputs,
     (SELECT total_rows FROM ranked_digest_count) AS total_rows
 FROM page_rows
 ORDER BY page_rows.row_order ASC"""
@@ -702,7 +709,6 @@ def build_eval_results_cte_chain(
         pb,
         filter_logic_operator,
     )
-    page_resolved_cte = build_page_resolved_inputs_cte(project_id_param)
     page_rows_cte = build_page_rows_cte()
 
     return f"""{calls_cte},
@@ -710,7 +716,5 @@ def build_eval_results_cte_chain(
 {resolved_cte},
 
 {ranked_cte},
-
-{page_resolved_cte},
 
 {page_rows_cte}"""
