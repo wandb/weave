@@ -552,10 +552,21 @@ def _build_page_calls_cte(
     read_table: str,
     eval_root_ids_param: str | None = None,
 ) -> str:
-    """Build page_calls CTE: pre-filter and pre-aggregate source table for page rows only."""
+    """Build page_calls CTE: pre-filter and pre-aggregate source table for page rows only.
+
+    page_calls only hydrates display columns for calls already selected by
+    page_rows, and every such call's start/end rows lie inside the eval run
+    window -- so both time bounds apply. The bounds prune granules via the
+    sortable_datetime minmax index from WHERE (the id filter must stay out of
+    PREWHERE: referencing a chained CTE there re-evaluates it pathologically),
+    which keeps the dump-column reads to the window instead of the project.
+    """
     if read_table == "calls_merged":
         assert eval_root_ids_param is not None
         eval_start_lower_bound = _build_eval_start_lower_bound(
+            project_id_param, eval_root_ids_param
+        )
+        eval_end_upper_bound = _build_eval_end_upper_bound(
             project_id_param, eval_root_ids_param
         )
         return f"""page_calls AS (
@@ -574,6 +585,7 @@ def _build_page_calls_cte(
     PREWHERE calls_merged.project_id = {project_id_param}
     WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
     AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
+    AND calls_merged.sortable_datetime <= {eval_end_upper_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
 )"""
     else:

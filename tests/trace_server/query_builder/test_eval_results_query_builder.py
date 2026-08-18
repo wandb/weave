@@ -667,6 +667,19 @@ def test_full_query_calls_merged() -> None:
                         WHERE roots.id IN {pb_5:Array(String)}
                     ),
                     toDateTime64(0, 3))
+                AND calls_merged.sortable_datetime <= coalesce(
+                    (SELECT CASE
+                        WHEN countIf(root_ended_at IS NULL) > 0 THEN NULL
+                        ELSE max(root_ended_at) + toIntervalSecond(300)
+                    END
+                    FROM (
+                        SELECT max(roots.ended_at) AS root_ended_at
+                        FROM calls_merged AS roots
+                        PREWHERE roots.project_id = {pb_4:String}
+                        WHERE roots.id IN {pb_5:Array(String)}
+                        GROUP BY roots.id
+                    )),
+                    toDateTime64('2100-01-01 00:00:00', 3))
                 GROUP BY (calls_merged.project_id, calls_merged.id)
             )
         SELECT
