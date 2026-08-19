@@ -166,7 +166,7 @@ MIGRATION_DDL_QUERY_SETTINGS: dict[str, int | str] = {
 def merge_default_query_settings(
     overrides: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
-    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_QUERY_SETTINGS."""
+    """Always a fresh dict, so callers can add per-query keys."""
     if not overrides:
         return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS}
     return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
@@ -175,7 +175,7 @@ def merge_default_query_settings(
 def merge_default_command_settings(
     overrides: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
-    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_COMMAND_SETTINGS."""
+    """Always a fresh dict, so callers can add per-query keys."""
     if not overrides:
         return {**CLICKHOUSE_DEFAULT_COMMAND_SETTINGS}
     return {**CLICKHOUSE_DEFAULT_COMMAND_SETTINGS, **overrides}
