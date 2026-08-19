@@ -141,7 +141,6 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
-    insert_with_empty_query_retry,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
@@ -7644,6 +7643,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         summary = None
         parameters = process_parameters(parameters)
@@ -7666,6 +7667,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
+                        "query_id": query_id,
                     },
                 )
                 yield from stream
@@ -7678,6 +7680,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7693,6 +7696,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7713,6 +7718,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7727,6 +7733,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
+                "query_id": query_id,
             },
         )
         return res
@@ -7746,6 +7753,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
         merged = ch_settings.merge_default_command_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7764,6 +7773,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "command": command,
                     "parameters": processed_params,
+                    "query_id": query_id,
                 },
             )
             handle_clickhouse_query_error(e)
@@ -7776,6 +7786,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
+                "query_id": query_id,
             },
         )
         return
@@ -7819,17 +7830,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         start = time.monotonic()
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
-        # invalid client UTF-8. Empty-query retries are handled in the helper.
+        # invalid client UTF-8.
+        settings = dict(settings or {})
+        # Reused across attempts: the only retry is a client-side encode
+        # failure, so ClickHouse never saw the first one.
+        query_id = settings.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
         for _ in range(2):
             try:
-                result = insert_with_empty_query_retry(
-                    self.ch_client, table, data, column_names, settings
+                result = self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
                 )
 
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
                 if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data)
+                    log_and_raise_insert_error(e, table, data, query_id)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
                 continue
@@ -7837,11 +7853,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
                 converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data)
+                log_and_raise_insert_error(converted, table, data, query_id)
 
             # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
-                log_and_raise_insert_error(e, table, data)
+                log_and_raise_insert_error(e, table, data, query_id)
 
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -7852,6 +7868,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "table": table,
                         "row_count": len(data),
                         "async_insert": async_insert,
+                        "query_id": query_id,
                     },
                 )
                 return result

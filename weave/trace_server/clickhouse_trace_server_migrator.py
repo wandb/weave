@@ -150,15 +150,7 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
     if not isinstance(exc, DatabaseError):
         return False
-    # clickhouse-connect >= 1.3 sets an int `code`; older clickhouse-connect
-    # versions need the regex fallback.
-    code = getattr(exc, "code", None)
-    if isinstance(code, int):
-        return code in _TRANSIENT_CH_ERROR_CODES
-    match = re.search(r"Code:\s*(\d+)", str(exc))
-    if match is None:
-        return False
-    return int(match.group(1)) in _TRANSIENT_CH_ERROR_CODES
+    return exc.code in _TRANSIENT_CH_ERROR_CODES
 
 
 # These settings are only used when `replicated` mode is enabled for
