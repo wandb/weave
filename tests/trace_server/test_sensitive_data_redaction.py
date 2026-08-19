@@ -13,6 +13,16 @@ from weave.trace_server.environment import (
     sensitive_data_policy,
 )
 from weave.trace_server.errors import RequestTooLarge
+from weave.trace_server.opentelemetry.python_spans import (
+    Event,
+    Link,
+    Span,
+    Status,
+    StatusCode,
+)
+from weave.trace_server.opentelemetry.python_spans import (
+    Resource as SpanResource,
+)
 from weave.trace_server.sensitive_data.budget import ScanBudget
 from weave.trace_server.sensitive_data.call_redaction import (
     redact_call_batch,
@@ -23,6 +33,7 @@ from weave.trace_server.sensitive_data.call_redaction import (
 )
 from weave.trace_server.sensitive_data.detectors import redact_pii_string
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
+from weave.trace_server.sensitive_data.span_redaction import redact_pii_from_span
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
 NOW = datetime.datetime(2026, 8, 12, tzinfo=datetime.timezone.utc)
@@ -100,6 +111,19 @@ def test_redacts_compact_e164_phone() -> None:
     ],
 )
 def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> None:
+    assert redact_pii_string(text, ScanBudget()) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("jane.doe@example.com", "<EMAIL_ADDRESS>"),
+        ("a.b@x.co", "<EMAIL_ADDRESS>"),
+        ("first.middle.last@sub.example.com", "<EMAIL_ADDRESS>"),
+        ("Contact jane.doe@example.com today", "Contact <EMAIL_ADDRESS> today"),
+    ],
+)
+def test_redacts_emails_with_dotted_local_parts(text: str, expected: str) -> None:
     assert redact_pii_string(text, ScanBudget()) == expected
 
 
@@ -481,3 +505,70 @@ def _completed_call() -> tsi.CompletedCallSchemaForInsert:
         output={"card": "4111 1111 1111 1111"},
         summary={"ssn": "123-45-6789"},
     )
+
+
+def _span_with_pii() -> Span:
+    return Span(
+        resource=SpanResource(attributes={"service.owner": "ada@example.com"}),
+        name="agents_pii_surface",
+        trace_id="a1" * 16,
+        span_id="b2" * 8,
+        start_time_unix_nano=1,
+        end_time_unix_nano=2,
+        attributes={
+            "gen_ai.prompt": "Email ada@example.com",
+            "payload": {"image": "data:image/png;base64,QUJD"},
+        },
+        events=[
+            Event(
+                name="exception",
+                timestamp=1,
+                attributes={"note": "call (415) 555-2671"},
+            )
+        ],
+        links=[
+            Link(
+                trace_id="c3" * 16,
+                span_id="d4" * 8,
+                attributes={"context": "ssn 123-45-6789"},
+            )
+        ],
+        status=Status(code=StatusCode.ERROR, message="card 4111 1111 1111 1111"),
+    )
+
+
+def test_redacts_pii_from_every_span_container() -> None:
+    span = _span_with_pii()
+
+    redact_pii_from_span(span, SensitiveDataPolicy.PII_V1, ScanBudget())
+
+    assert span.attributes == {
+        "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
+        "payload": {"image": "data:image/png;base64,QUJD"},
+    }
+    assert span.resource is not None
+    assert span.resource.attributes == {"service.owner": "<EMAIL_ADDRESS>"}
+    assert span.events[0].attributes == {"note": "call <PHONE_NUMBER>"}
+    assert span.links[0].attributes == {"context": "ssn <US_SSN>"}
+    assert span.status.message == "card <CREDIT_CARD>"
+    assert span.name == "agents_pii_surface"
+    assert span.span_id == "b2" * 8
+
+
+def test_span_redaction_off_policy_is_a_noop() -> None:
+    span = _span_with_pii()
+    original_attributes = span.attributes
+
+    redact_pii_from_span(span, SensitiveDataPolicy.OFF, ScanBudget())
+
+    assert span.attributes is original_attributes
+    assert span.status.message == "card 4111 1111 1111 1111"
+
+
+def test_span_redaction_fails_closed_on_budget_exhaustion() -> None:
+    span = _span_with_pii()
+
+    with pytest.raises(RequestTooLarge):
+        redact_pii_from_span(
+            span, SensitiveDataPolicy.PII_V1, ScanBudget(max_total_characters=10)
+        )

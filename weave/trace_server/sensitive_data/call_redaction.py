@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.sensitive_data.budget import ScanBudget
-from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy, pii_enabled
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
 TModel = TypeVar("TModel", bound=BaseModel)
@@ -21,7 +21,7 @@ def redact_call_start(
     budget: ScanBudget | None = None,
 ) -> tsi.CallStartReq | tsi.CallStartV2Req:
     """Redact customer-authored fields on a v1 or v2 call start."""
-    if not _pii_enabled(policy):
+    if not pii_enabled(policy):
         return req
     scan_budget = budget or ScanBudget()
     start = _redact_fields(
@@ -36,7 +36,7 @@ def redact_call_end(
     budget: ScanBudget | None = None,
 ) -> tsi.CallEndReq | tsi.CallEndV2Req:
     """Redact customer-authored fields on a v1 or v2 call end."""
-    if not _pii_enabled(policy):
+    if not pii_enabled(policy):
         return req
     scan_budget = budget or ScanBudget()
     end = _redact_fields(req.end, ("output", "summary", "exception"), scan_budget)
@@ -49,7 +49,7 @@ def redact_call_batch(
     budget: ScanBudget | None = None,
 ) -> tsi.CallCreateBatchReq:
     """Redact every item using one request-wide scan budget."""
-    if not _pii_enabled(policy):
+    if not pii_enabled(policy):
         return req
     scan_budget = budget or ScanBudget()
 
@@ -81,7 +81,7 @@ def redact_calls_complete(
     budget: ScanBudget | None = None,
 ) -> tsi.CallsUpsertCompleteReq:
     """Redact every completed call using one request-wide scan budget."""
-    if not _pii_enabled(policy):
+    if not pii_enabled(policy):
         return req
     scan_budget = budget or ScanBudget()
 
@@ -112,17 +112,9 @@ def redact_call_update(
     budget: ScanBudget | None = None,
 ) -> tsi.CallUpdateReq:
     """Redact the customer-authored display name on a call update."""
-    if not _pii_enabled(policy):
+    if not pii_enabled(policy):
         return req
     return _redact_fields(req, ("display_name",), budget or ScanBudget())
-
-
-def _pii_enabled(policy: SensitiveDataPolicy) -> bool:
-    if policy is SensitiveDataPolicy.OFF:
-        return False
-    if policy is SensitiveDataPolicy.PII_V1:
-        return True
-    raise ValueError(f"Unknown sensitive-data policy: {policy!r}")
 
 
 def _redact_fields(
