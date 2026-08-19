@@ -29812,5 +29812,15 @@
       "cache_creation_input": 0.0,
       "created_at": "2026-08-18 17:54:20"
     }
+  ],
+  "cerebras/gemma-4-31b": [
+    {
+      "provider": "cerebras",
+      "input": 9.9e-07,
+      "output": 1.49e-06,
+      "cache_read_input": 0.0,
+      "cache_creation_input": 0.0,
+      "created_at": "2026-07-28 00:00:00"
+    }
   ]
 }
