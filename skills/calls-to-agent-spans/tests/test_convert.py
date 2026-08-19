@@ -138,7 +138,9 @@ def test_turn_tree_and_write_guards():
     assert chat["attributes"]["weave.conversation.id"] == "sess-a"
     assert chat["attributes"]["weave.usage.input_tokens"] == 300
     assert "weave.conversation.id" not in tool_span["attributes"]
-    assert tool_span["attributes"]["weave.tool.call.arguments"] == '{"query": "pricing"}'
+    assert (
+        tool_span["attributes"]["weave.tool.call.arguments"] == '{"query": "pricing"}'
+    )
     assert solo_span["attributes"]["weave.operation.name"] == "invoke_agent"
     assert solo_span["attributes"]["weave.agent.name"] == "openai_completion"
     assert solo_span["attributes"]["weave.usage.input_tokens"] == 120
