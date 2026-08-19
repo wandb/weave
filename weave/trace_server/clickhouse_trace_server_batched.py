@@ -7581,9 +7581,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
-        merged, query_id = self._with_query_id(
-            ch_settings.merge_default_query_settings(settings)
-        )
+        merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
 
         summary = None
         parameters = process_parameters(parameters)
@@ -7625,19 +7624,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # always raises, optionally with custom error class
             handle_clickhouse_query_error(e)
 
-    @staticmethod
-    def _with_query_id(
-        settings: dict[str, Any] | None,
-    ) -> tuple[dict[str, Any], str]:
-        """Mint a query_id up front so failure logs carry it too.
-
-        A caller-supplied query_id wins. `query_id` rides in settings: the
-        driver routes valid_transport_settings keys to URL params.
-        """
-        merged = dict(settings or {})
-        query_id = str(merged.setdefault("query_id", generate_id()))
-        return merged, query_id
-
     @traced(name="clickhouse_trace_server_batched._query")
     def _query(
         self,
@@ -7647,9 +7633,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        merged, query_id = self._with_query_id(
-            ch_settings.merge_default_query_settings(settings)
-        )
+        merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7704,9 +7689,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged, query_id = self._with_query_id(
-            ch_settings.merge_default_command_settings(settings)
-        )
+        merged = ch_settings.merge_default_command_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7783,7 +7767,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
         # invalid client UTF-8.
-        settings, query_id = self._with_query_id(settings)
+        settings = dict(settings or {})
+        query_id = settings.setdefault("query_id", generate_id())
         for _ in range(2):
             try:
                 result = self.ch_client.insert(
