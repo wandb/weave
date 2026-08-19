@@ -11346,7 +11346,7 @@ dev = [
 ]
 pandas-test = [{ name = "pandas", specifier = ">=2.2.3" }]
 test = [
-    { name = "clickhouse-connect", specifier = "==1.6.0" },
+    { name = "clickhouse-connect", specifier = ">=1.6,<1.7" },
     { name = "confluent-kafka" },
     { name = "fastapi", specifier = ">=0.110.0" },
     { name = "flask" },
