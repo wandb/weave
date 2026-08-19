@@ -1,6 +1,6 @@
 import abc
 import asyncio
-from collections.abc import Awaitable, Callable, Iterable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
@@ -313,6 +313,39 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             if hasattr(res, "close"):
                 res.close()
 
+    async def _astream_ref_apply(
+        self,
+        method: Callable[[A], AsyncIterator[B]],
+        req: A,
+        internal_project_id: str,
+    ) -> AsyncIterator[B]:
+        """Async twin of `_stream_ref_apply`."""
+        req_conv = universal_ext_to_int_ref_converter(
+            req,
+            self._idc.ext_to_int_project_id,
+            verify_internal_project_id=self._make_project_verifier(internal_project_id),
+        )
+        res = method(req_conv)
+
+        int_to_ext_project_cache: dict[str, str | None] = {}
+
+        def cached_int_to_ext_project_id(project_id: str) -> str | None:
+            if project_id not in int_to_ext_project_cache:
+                int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
+                    project_id
+                )
+            return int_to_ext_project_cache[project_id]
+
+        try:
+            async for item in res:
+                yield universal_int_to_ext_ref_converter(
+                    item, cached_int_to_ext_project_id
+                )
+        finally:
+            int_to_ext_project_cache.clear()
+            if hasattr(res, "aclose"):
+                await res.aclose()
+
     # Standard API Below:
     def otel_export(self, req: tsi.OTelExportReq) -> tsi.OTelExportRes:
         req = req.model_copy(deep=True)
@@ -468,6 +501,47 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             req.project_id,
         )
         for call in res:
+            if call.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            call.project_id = original_project_id
+            if call.wb_run_id is not None:
+                call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
+            internal_user_id = call.wb_user_id
+            if (
+                req.include_usernames
+                and self._username_resolver is not None
+                and internal_user_id is not None
+            ):
+                # Resolve the username from the internal ID before we convert
+                # wb_user_id back to its external representation.
+                call.wb_username = self._username_resolver(internal_user_id)
+            if internal_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(internal_user_id)
+            yield call
+
+    async def calls_query_stream_async(
+        self, req: tsi.CallsQueryReq
+    ) -> AsyncIterator[tsi.CallSchema]:
+        """Async twin of `calls_query_stream`."""
+        req = req.model_copy(deep=True)
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        if req.filter is not None:
+            if req.filter.wb_run_ids is not None:
+                req.filter.wb_run_ids = self._ext_to_int_run_ids(
+                    req.filter.wb_run_ids, original_project_id
+                )
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
+        res = self._astream_ref_apply(
+            self._internal_trace_server.calls_query_stream_async,
+            req,
+            req.project_id,
+        )
+        async for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             call.project_id = original_project_id

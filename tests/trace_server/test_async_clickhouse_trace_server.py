@@ -1,6 +1,9 @@
 """Tests for `AsyncClickHouseTraceServer.acompletions_create`."""
 
 import asyncio
+import base64
+import datetime
+import random
 import threading
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +16,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from tests.trace_server.helpers import make_project_id
+from weave.shared import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import AgentSpansQueryReq
@@ -24,6 +28,7 @@ from weave.trace_server.datadog import _db_insert_path
 from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
 )
+from weave.trace_server.ids import generate_id
 
 LITELLM_ACOMPLETION_PATCH = (
     "weave.trace_server.async_clickhouse_trace_server.lite_llm_acompletion"
@@ -422,3 +427,186 @@ async def test_external_adapter_falls_back_for_sync_backend() -> None:
     res = await adapter.acompletions_create(_make_req(track_llm_call=False))
     assert res.response == {"ok": True}
     assert captured["tid"] != loop_tid
+
+
+# ---- calls_query_stream_async -------------------------------------------
+
+
+def _seed_calls(server: ClickHouseTraceServer, project_id: str, n: int) -> list[str]:
+    call_ids = []
+    for i in range(n):
+        call_id = generate_id()
+        call_ids.append(call_id)
+        server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=generate_id(),
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    op_name=f"op-{i % 3}",
+                    attributes={"i": i},
+                    inputs={"x": i, "nested": {"y": [i, i + 1]}},
+                )
+            )
+        )
+        server.call_end(
+            tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    ended_at=datetime.datetime.now(datetime.timezone.utc),
+                    exception=None if i % 4 else "ValueError: boom",
+                    output={"result": i * 2},
+                    summary={"usage": {"model-a": {"total_tokens": i, "requests": 1}}},
+                )
+            )
+        )
+    return call_ids
+
+
+def _make_async_twin(ch_server: ClickHouseTraceServer) -> AsyncClickHouseTraceServer:
+    return AsyncClickHouseTraceServer(
+        host=ch_server._host,
+        port=ch_server._port,
+        user=ch_server._user,
+        password=ch_server._password,
+        database=ch_server._database,
+    )
+
+
+@pytest.mark.asyncio
+async def test_calls_query_stream_async_matches_sync(ch_server):
+    # token_costs validation requires ids decoding to "ProjectInternalId:<n>".
+    project_id = base64.b64encode(
+        f"ProjectInternalId:{random.randrange(10**8)}".encode()
+    ).decode()
+    _seed_calls(ch_server, project_id, 25)
+    aserver = _make_async_twin(ch_server)
+
+    reqs = [
+        tsi.CallsQueryReq(project_id=project_id),
+        tsi.CallsQueryReq(project_id=project_id, columns=["id", "op_name", "inputs"]),
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            limit=10,
+        ),
+        tsi.CallsQueryReq(project_id=project_id, include_costs=True, limit=10),
+    ]
+    for req in reqs:
+        sync_calls = [c.model_dump() for c in ch_server.calls_query_stream(req)]
+        async_calls = [
+            c.model_dump() async for c in aserver.calls_query_stream_async(req)
+        ]
+        assert len(sync_calls) > 0
+        assert async_calls == sync_calls
+
+
+@pytest.mark.asyncio
+async def test_calls_query_stream_async_matches_sync_with_feedback(ch_server):
+    project_id = make_project_id("async_stream_feedback")
+    call_ids = _seed_calls(ch_server, project_id, 12)
+    for call_id in call_ids[:5]:
+        ch_server.feedback_create(
+            tsi.FeedbackCreateReq(
+                project_id=project_id,
+                weave_ref=ri.InternalCallRef(project_id=project_id, id=call_id).uri,
+                feedback_type="wandb.reaction.1",
+                payload={"emoji": "👍", "alias": ":thumbs_up:"},
+                wb_user_id="u1",
+            )
+        )
+    aserver = _make_async_twin(ch_server)
+
+    req = tsi.CallsQueryReq(project_id=project_id, include_feedback=True)
+    sync_calls = [c.model_dump() for c in ch_server.calls_query_stream(req)]
+    async_calls = [c.model_dump() async for c in aserver.calls_query_stream_async(req)]
+    assert len(sync_calls) == 12
+    assert async_calls == sync_calls
+    # The hydrated feedback must actually be present, not merely equal-and-empty.
+    with_feedback = [
+        c
+        for c in async_calls
+        if c["summary"] and c["summary"].get("weave", {}).get("feedback")
+    ]
+    assert len(with_feedback) == 5
+
+
+@pytest.mark.asyncio
+async def test_calls_query_stream_async_matches_sync_with_expand_columns(ch_server):
+    project_id = make_project_id("async_stream_expand")
+    created = ch_server.obj_create(
+        tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=project_id, object_id="target", val={"greeting": "hello"}
+            )
+        )
+    )
+    ref = ri.InternalObjectRef(
+        project_id=project_id, name="target", version=created.digest
+    ).uri
+    for i in range(6):
+        call_id = generate_id()
+        ch_server.call_start(
+            tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=call_id,
+                    trace_id=generate_id(),
+                    started_at=datetime.datetime.now(datetime.timezone.utc),
+                    op_name=f"op-{i}",
+                    attributes={},
+                    inputs={"obj": ref},
+                )
+            )
+        )
+    aserver = _make_async_twin(ch_server)
+
+    req = tsi.CallsQueryReq(
+        project_id=project_id,
+        expand_columns=["inputs.obj"],
+        return_expanded_column_values=True,
+    )
+    sync_calls = [c.model_dump() for c in ch_server.calls_query_stream(req)]
+    async_calls = [c.model_dump() async for c in aserver.calls_query_stream_async(req)]
+    assert len(sync_calls) == 6
+    assert async_calls == sync_calls
+    # Refs must be expanded to values, not left as ref strings.
+    assert all(c["inputs"]["obj"]["greeting"] == "hello" for c in async_calls)
+
+
+@pytest.mark.asyncio
+async def test_calls_query_stream_async_concurrent_streams(ch_server):
+    project_id = make_project_id("async_stream_conc")
+    _seed_calls(ch_server, project_id, 20)
+    aserver = _make_async_twin(ch_server)
+
+    async def collect() -> list[str]:
+        req = tsi.CallsQueryReq(project_id=project_id)
+        return [c.id async for c in aserver.calls_query_stream_async(req)]
+
+    results = await asyncio.gather(*[collect() for _ in range(8)])
+    assert all(len(r) == 20 for r in results)
+    assert all(r == results[0] for r in results)
+
+
+@pytest.mark.asyncio
+async def test_calls_query_stream_async_abandoned_stream_keeps_client_usable(
+    ch_server,
+):
+    project_id = make_project_id("async_stream_abandon")
+    _seed_calls(ch_server, project_id, 20)
+    aserver = _make_async_twin(ch_server)
+
+    req = tsi.CallsQueryReq(project_id=project_id)
+    agen = aserver.calls_query_stream_async(req)
+    got = 0
+    async for _ in agen:
+        got += 1
+        if got >= 3:
+            break
+    await agen.aclose()
+
+    remaining = [c.id async for c in aserver.calls_query_stream_async(req)]
+    assert len(remaining) == 20

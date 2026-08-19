@@ -13,6 +13,8 @@ DEFAULT_SCORING_WORKER_BATCH_TIMEOUT = 5
 
 # ClickHouse async insert timeout defaults (milliseconds)
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS = 100
+# Mirrors anyio's default 40-thread cap, the sync path's effective per-process limit.
+DEFAULT_CLICKHOUSE_ASYNC_MAX_CONCURRENT_QUERIES = 40
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS = 1000
 
 # Kafka Settings
@@ -434,6 +436,25 @@ def wf_clickhouse_max_estimated_execution_time() -> int | None:
             "WF_CLICKHOUSE_MAX_ESTIMATED_EXECUTION_TIME value '%s' is not valid", time
         )
         return None
+
+
+def wf_clickhouse_async_max_concurrent_queries() -> int:
+    """Per-process admission cap on concurrent async ClickHouse queries.
+
+    Bounds in-flight queries issued through the native async client. Replaces
+    the implicit cap the anyio thread pool provides on the sync path, so the
+    fleet-wide total (pods x workers x this value) stays sized against the CH
+    cluster's max_concurrent_queries.
+    """
+    env_key = "WF_CLICKHOUSE_ASYNC_MAX_CONCURRENT_QUERIES"
+    val = os.environ.get(env_key)
+    if val is None:
+        return DEFAULT_CLICKHOUSE_ASYNC_MAX_CONCURRENT_QUERIES
+    try:
+        return int(val)
+    except ValueError:
+        logger.exception("%s value '%s' is not valid", env_key, val)
+        return DEFAULT_CLICKHOUSE_ASYNC_MAX_CONCURRENT_QUERIES
 
 
 def wf_clickhouse_disable_query_failure_prediction() -> bool:

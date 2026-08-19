@@ -2,15 +2,17 @@ import copy
 import datetime
 import json
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterator
+from collections.abc import AsyncGenerator, AsyncIterator, Generator, Iterator
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar, cast
 
 from weave.shared import refs_internal as ri
 from weave.trace_server import constants
 from weave.trace_server import trace_server_interface as tsi
 
 CallStatus = Literal["running", "completed", "failed"]
+
+T = TypeVar("T")
 
 FEEDBACK_QUERY_FIELDS = [
     "id",
@@ -267,10 +269,28 @@ class DynamicBatchProcessor:
         self.max_size = max_size
         self.growth_factor = growth_factor
 
-    def make_batches(self, iterator: Iterator[Any]) -> Iterator[list[Any]]:
-        batch = []
+    def make_batches(self, iterator: Iterator[T]) -> Generator[list[T], None, None]:
+        batch: list[T] = []
 
         for item in iterator:
+            batch.append(item)
+
+            if len(batch) >= self.batch_size:
+                yield batch
+
+                batch = []
+                self.batch_size = self._compute_batch_size()
+
+        if batch:
+            yield batch
+
+    async def amake_batches(
+        self, aiterator: AsyncIterator[T]
+    ) -> AsyncGenerator[list[T], None]:
+        """Async twin of `make_batches`."""
+        batch: list[T] = []
+
+        async for item in aiterator:
             batch.append(item)
 
             if len(batch) >= self.batch_size:

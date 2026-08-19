@@ -1860,6 +1860,61 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
+        prepared = self._prepare_calls_query(req, read_table)
+        raw_res = self._query_stream(
+            prepared.sql, prepared.parameters, settings=prepared.settings
+        )
+        select_columns = prepared.select_columns
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
+
+        if include_feedback:
+            set_current_span_dd_tags({"include_feedback": "true"})
+        if expand_columns:
+            set_current_span_dd_tags({"expand_columns": "true"})
+
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return ch_call_dict_to_call_schema_dict(
+                dict(zip(select_columns, row, strict=False))
+            )
+
+        try:
+            if not expand_columns and not include_feedback:
+                for row in raw_res:
+                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                return
+
+            ref_cache = LRUCache(max_size=REF_EXPANSION_CACHE_SIZE)
+            batch_processor = DynamicBatchProcessor(
+                initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+                max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
+                growth_factor=CALLS_STREAM_GROWTH_FACTOR,
+            )
+
+            for batch in batch_processor.make_batches(raw_res):
+                call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                if expand_columns and req.return_expanded_column_values:
+                    self._expand_call_refs(
+                        req.project_id, call_dicts, expand_columns, ref_cache
+                    )
+                if include_feedback:
+                    self._add_feedback_to_calls(req.project_id, call_dicts)
+
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_validate(call)
+        finally:
+            # Ensure upstream _query_stream is closed on any exit
+            if hasattr(raw_res, "close"):
+                raw_res.close()
+
+    def _prepare_calls_query(
+        self, req: tsi.CallsQueryReq, read_table: ReadTable
+    ) -> "_PreparedCallsQuery":
+        """Build the calls SQL, parameters, settings, and result columns for `req`.
+
+        Pure query construction (no ClickHouse I/O); shared by the sync and
+        async streaming paths.
+        """
         settings = None
         cq = CallsQuery(
             project_id=req.project_id,
@@ -1955,7 +2010,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings = ch_settings.update_settings_for_calls_complete_read(settings)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
+        sql = cq.as_sql(pb)
 
         if req.include_costs:
             # Cost query SELECT adds ORDER BY fields; result columns must match.
@@ -1964,47 +2019,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             )
         else:
             select_columns = [c.field for c in cq.select_fields]
-        expand_columns = req.expand_columns or []
-        include_feedback = req.include_feedback or False
-
-        if include_feedback:
-            set_current_span_dd_tags({"include_feedback": "true"})
-        if expand_columns:
-            set_current_span_dd_tags({"expand_columns": "true"})
-
-        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return ch_call_dict_to_call_schema_dict(
-                dict(zip(select_columns, row, strict=False))
-            )
-
-        try:
-            if not expand_columns and not include_feedback:
-                for row in raw_res:
-                    yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
-                return
-
-            ref_cache = LRUCache(max_size=REF_EXPANSION_CACHE_SIZE)
-            batch_processor = DynamicBatchProcessor(
-                initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
-                max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
-                growth_factor=CALLS_STREAM_GROWTH_FACTOR,
-            )
-
-            for batch in batch_processor.make_batches(raw_res):
-                call_dicts = [row_to_call_schema_dict(row) for row in batch]
-                if expand_columns and req.return_expanded_column_values:
-                    self._expand_call_refs(
-                        req.project_id, call_dicts, expand_columns, ref_cache
-                    )
-                if include_feedback:
-                    self._add_feedback_to_calls(req.project_id, call_dicts)
-
-                for call in call_dicts:
-                    yield tsi.CallSchema.model_validate(call)
-        finally:
-            # Ensure upstream _query_stream is closed on any exit
-            if hasattr(raw_res, "close"):
-                raw_res.close()
+        return _PreparedCallsQuery(
+            sql=sql,
+            parameters=pb.get_params(),
+            settings=settings,
+            select_columns=select_columns,
+        )
 
     @traced(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
@@ -8352,6 +8372,15 @@ class CompletionModelInfo:
     extra_headers: dict[str, str]
     return_type: str | None
     vertex_credentials: str | None = None
+
+
+class _PreparedCallsQuery(NamedTuple):
+    """Built calls query shared by the sync and async streaming paths."""
+
+    sql: str
+    parameters: dict[str, Any]
+    settings: dict[str, Any] | None
+    select_columns: list[str]
 
 
 class CompletionPrepResult(NamedTuple):
