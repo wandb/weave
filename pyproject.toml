@@ -473,7 +473,7 @@ test = [
   # todo(nkumar): these are trace-server deps not test. however moving them breaks integration tests.
   "clickhouse_connect>=1.6,<1.7",
   "fastapi>=0.110.0",
-  "sqlparse==0.5.0",
+  "sqlparse==0.6.0",
   "rich",
 
   # Integration Tests
