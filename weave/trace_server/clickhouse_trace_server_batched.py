@@ -7583,6 +7583,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Streams the results of a query from the database."""
         merged = ch_settings.merge_default_query_settings(settings)
         query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         summary = None
         parameters = process_parameters(parameters)
@@ -7635,6 +7636,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """Directly queries the database and returns the result."""
         merged = ch_settings.merge_default_query_settings(settings)
         query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7691,6 +7693,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         """
         merged = ch_settings.merge_default_command_settings(settings)
         query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7769,6 +7772,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # invalid client UTF-8.
         settings = dict(settings or {})
         query_id = settings.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
         for _ in range(2):
             try:
                 result = self.ch_client.insert(
