@@ -7771,6 +7771,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # At most two attempts: the original, plus one retry after sanitizing
         # invalid client UTF-8.
         settings = dict(settings or {})
+        # Reused across attempts: the only retry is a client-side encode
+        # failure, so ClickHouse never saw the first one.
         query_id = settings.setdefault("query_id", generate_id())
         set_current_span_dd_tags({"clickhouse.query_id": query_id})
         for _ in range(2):
