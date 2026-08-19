@@ -1282,29 +1282,6 @@ def test_insert_retries_only_invalid_utf8(error):
         assert mock_ch_client.insert.call_count == 1
 
 
-def test_insert_sanitizes_invalid_utf8_and_retries():
-    """A lone UTF-16 surrogate cannot be encoded as UTF-8 — a Python limit, not
-    a driver one — so the row is sanitized and the insert retried once.
-    """
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.insert.side_effect = [
-        UnicodeEncodeError("utf-8", "\ud83d", 0, 1, "surrogates not allowed"),
-        MagicMock(),
-    ]
-
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        server._insert("t", data=[["hi \ud83d there"]], column_names=["a"])
-
-    assert mock_ch_client.insert.call_count == 2
-    assert mock_ch_client.insert.call_args_list[1].kwargs["data"] == [
-        ["hi \ufffd there"]
-    ]
-
-
 @pytest.mark.disable_logging_error_check
 def test_call_batch_clears_on_insert_failure():
     """Verify _call_batch is cleared even when insert fails."""

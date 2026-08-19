@@ -1793,15 +1793,15 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
     error_517 = DatabaseError(
         "Code: 517. DB::Exception: Looks like this replica doesn't catchup "
         "with latest ALTER query updates: metadata version on replica is 2, "
-        "while common metadata is 3. (CANNOT_ASSIGN_ALTER)"
+        "while common metadata is 3. (CANNOT_ASSIGN_ALTER)",
+        code=517,
     )
-    error_517.code = 517
     error_999 = DatabaseError(
         "Code: 999. Coordination::Exception: Coordination error: "
         "Connection loss, path /clickhouse/task_queue/ddl/query-. "
-        "(KEEPER_EXCEPTION)"
+        "(KEEPER_EXCEPTION)",
+        code=999,
     )
-    error_999.code = 999
 
     # Succeeds immediately on clean call
     migrator._run_ddl_with_retry("ALTER TABLE foo ADD COLUMN bar String")
@@ -1845,11 +1845,8 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
 
 def test_is_transient_ch_error():
     """Only replication codes 517/999 retry, read off the driver's `code`."""
-    coded = DatabaseError("replica sync pending")
-    coded.code = 517
-    assert _is_transient_ch_error(coded)
-    coded.code = 62
-    assert not _is_transient_ch_error(coded)
+    assert _is_transient_ch_error(DatabaseError("replica sync pending", code=517))
+    assert not _is_transient_ch_error(DatabaseError("syntax error", code=62))
     # `code` is None on transport errors, so the lookup must not raise.
     assert not _is_transient_ch_error(DatabaseError("transport failure"))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
