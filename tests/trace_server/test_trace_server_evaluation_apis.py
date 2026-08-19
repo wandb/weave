@@ -2117,3 +2117,199 @@ def test_eval_results_summary_with_filter(client):
         s for s in eval_summary.scorer_stats if s.scorer_key == "accuracy"
     )
     assert accuracy_stat.numeric_mean == pytest.approx(0.75, abs=0.01)
+
+
+def _create_raw_eval(client, n_rows, started_at, ended_at=None):
+    """Helper: create an eval root + predict-and-score calls at explicit times.
+
+    Timestamp control matters for the calls_merged scan-window tests below:
+    the query bounds its scan by the root's started_at/ended_at (+5min buffer).
+    ended_at=None leaves the root running. Returns (eval_call_id, [pas_ids]).
+    """
+    project_id = client.project_id
+    eval_id = generate_id()
+    client.server.call_start(
+        CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=eval_id,
+                trace_id=eval_id,
+                op_name="Evaluation.evaluate",
+                started_at=started_at,
+                attributes={},
+                inputs={"self": "eval://raw", "model": "model://raw"},
+            )
+        )
+    )
+    pas_ids = []
+    for i in range(n_rows):
+        pas_id = generate_id()
+        pas_ids.append(pas_id)
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    trace_id=eval_id,
+                    parent_id=eval_id,
+                    op_name="Evaluation.predict_and_score",
+                    started_at=started_at + datetime.timedelta(seconds=i + 1),
+                    attributes={},
+                    inputs={"example": {"idx": i}, "model": "model://raw"},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=pas_id,
+                    ended_at=started_at + datetime.timedelta(seconds=i + 2),
+                    output={"output": i, "scores": {"accuracy": i / 10}},
+                    summary={},
+                )
+            )
+        )
+    if ended_at is not None:
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=project_id,
+                    id=eval_id,
+                    ended_at=ended_at,
+                    output={"summary": {}},
+                    summary={},
+                )
+            )
+        )
+    return eval_id, pas_ids
+
+
+def test_eval_results_ignores_post_eval_traffic(client):
+    """Calls written to the project after the eval ended must not change results.
+
+    Exercises the scan-window bounds: the calls_merged path prefilters on
+    [eval start - buffer, eval end + buffer], so unrelated post-eval project
+    traffic stays out of the scan without affecting the rows returned.
+    """
+    hour_ago = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+        hours=1
+    )
+    eval_id, _ = _create_raw_eval(
+        client, 3, hour_ago, ended_at=hour_ago + datetime.timedelta(minutes=5)
+    )
+    req = EvalResultsQueryReq(
+        project_id=client.project_id, evaluation_call_ids=[eval_id]
+    )
+    before = client.server.eval_results_query(req)
+    assert before.total_rows == 3
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    for i in range(20):
+        noise_id = generate_id()
+        client.server.call_start(
+            CallStartReq(
+                start=StartedCallSchemaForInsert(
+                    project_id=client.project_id,
+                    id=noise_id,
+                    trace_id=noise_id,
+                    op_name="unrelated_op",
+                    started_at=now,
+                    attributes={},
+                    inputs={"i": i},
+                )
+            )
+        )
+        client.server.call_end(
+            CallEndReq(
+                end=EndedCallSchemaForInsert(
+                    project_id=client.project_id,
+                    id=noise_id,
+                    ended_at=now,
+                    output="x" * 100,
+                    summary={},
+                )
+            )
+        )
+
+    after = client.server.eval_results_query(req)
+    assert after.total_rows == 3
+    assert [r.row_digest for r in after.rows] == [r.row_digest for r in before.rows]
+    assert [
+        [t.scores for e in r.evaluations for t in e.trials] for r in after.rows
+    ] == [[t.scores for e in r.evaluations for t in e.trials] for r in before.rows]
+
+
+def test_eval_results_excludes_calls_deleted_after_eval_window(client):
+    """A predict call deleted long after the eval ended must stay excluded.
+
+    The delete marker's row lands at deletion time — outside the eval's scan
+    window — so this pins the design constraint that the outer aggregation
+    keeps only the lower time bound (a two-sided bound would miss the marker
+    and resurrect the deleted call).
+    """
+    two_hours_ago = datetime.datetime.now(
+        tz=datetime.timezone.utc
+    ) - datetime.timedelta(hours=2)
+    eval_id, pas_ids = _create_raw_eval(
+        client, 3, two_hours_ago, ended_at=two_hours_ago + datetime.timedelta(minutes=5)
+    )
+    req = EvalResultsQueryReq(
+        project_id=client.project_id, evaluation_call_ids=[eval_id]
+    )
+    assert client.server.eval_results_query(req).total_rows == 3
+
+    # Deletion happens "now" — ~2 hours past the eval window and its buffer.
+    client.server.calls_delete(
+        CallsDeleteReq(project_id=client.project_id, call_ids=[pas_ids[0]])
+    )
+    res = client.server.eval_results_query(req)
+    assert res.total_rows == 2
+    returned_pas_ids = {
+        t.predict_and_score_call_id
+        for r in res.rows
+        for e in r.evaluations
+        for t in e.trials
+    }
+    assert pas_ids[0] not in returned_pas_ids
+
+
+def test_eval_results_running_eval_returns_rows(client):
+    """An eval whose root has not ended must still return its rows.
+
+    Exercises the upper-bound fallback: with a NULL root ended_at the scan
+    ceiling falls back to no limit instead of cutting off in-flight results.
+    """
+    hour_ago = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+        hours=1
+    )
+    eval_id, _ = _create_raw_eval(client, 2, hour_ago, ended_at=None)
+    res = client.server.eval_results_query(
+        EvalResultsQueryReq(project_id=client.project_id, evaluation_call_ids=[eval_id])
+    )
+    assert res.total_rows == 2
+
+
+def test_eval_results_evaluations_follow_request_order(client):
+    """Each row's evaluations list is ordered by the requested eval ids."""
+    hour_ago = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(
+        hours=1
+    )
+    eval_a, _ = _create_raw_eval(
+        client, 2, hour_ago, ended_at=hour_ago + datetime.timedelta(minutes=5)
+    )
+    eval_b, _ = _create_raw_eval(
+        client,
+        2,
+        hour_ago + datetime.timedelta(minutes=10),
+        ended_at=hour_ago + datetime.timedelta(minutes=15),
+    )
+    for requested in ([eval_a, eval_b], [eval_b, eval_a]):
+        res = client.server.eval_results_query(
+            EvalResultsQueryReq(
+                project_id=client.project_id, evaluation_call_ids=requested
+            )
+        )
+        assert res.total_rows == 2
+        for row in res.rows:
+            assert [e.evaluation_call_id for e in row.evaluations] == requested
