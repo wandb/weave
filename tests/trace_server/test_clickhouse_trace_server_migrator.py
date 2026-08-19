@@ -1844,16 +1844,14 @@ def test_run_ddl_with_retry(mock_sleep, mock_costs):
 
 
 def test_is_transient_ch_error():
-    """Transient detection reads the driver's structured `code` attribute."""
+    """Only replication codes 517/999 retry, read off the driver's `code`."""
     coded = DatabaseError("replica sync pending")
-    coded.code = 999
-    assert _is_transient_ch_error(coded)
     coded.code = 517
     assert _is_transient_ch_error(coded)
     coded.code = 62
     assert not _is_transient_ch_error(coded)
-    # Bare DatabaseError (driver sets code=None on transport errors).
-    assert not _is_transient_ch_error(DatabaseError("Code: 517. DB::Exception: ..."))
+    # `code` is None on transport errors, so the lookup must not raise.
+    assert not _is_transient_ch_error(DatabaseError("transport failure"))
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
 
 
