@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
-from payload_paths import Row, resolve, resolve_text
+from payload_paths import Row, last_user_message_text, resolve, resolve_text
 
 
 def build_spans(
@@ -29,16 +29,18 @@ def build_spans(
         # A root carrying no conversation key becomes its own single-turn conversation, which
         # keeps traces that predate the project's session concept instead of dropping them.
         conversation = resolve_text(root, mapping["conversation"]) or trace_id
+        user_text, assistant_text = turn_texts(root, trace_calls, mapping)
         for call in trace_calls:
             spans.append(
                 _span(
                     call,
                     conversation=conversation,
-                    mapping=mapping,
                     is_root=call is root,
                     is_tool=call is not root and op_short(call) in tools,
                     is_agent=call is root or op_short(call) in agents,
                     turn_model=_answer_model(trace_calls) if call is root else "",
+                    user_text=user_text if call is root else "",
+                    assistant_text=assistant_text if call is root else "",
                 )
             )
     return spans
@@ -48,19 +50,24 @@ def _span(
     call: Row,
     *,
     conversation: str,
-    mapping: dict[str, list[str]],
     is_root: bool,
     is_tool: bool,
     is_agent: bool,
     turn_model: str,
+    user_text: str,
+    assistant_text: str,
 ) -> dict[str, object]:
     model = model_of(call)
-    operation = (
-        EXECUTE_TOOL
-        if is_tool
-        else (CHAT if model else (INVOKE_AGENT if is_agent else ""))
-    )
-    agent = op_short(call) if is_agent and not model else ""
+    # A root that is itself a model call is still the turn, not a bare chat span.
+    if is_tool:
+        operation = EXECUTE_TOOL
+    elif is_root or (is_agent and not model):
+        operation = INVOKE_AGENT
+    elif model:
+        operation = CHAT
+    else:
+        operation = ""
+    agent = op_short(call) if operation == INVOKE_AGENT else ""
     subject = op_short(call) if is_tool else (model or agent)
 
     attributes: dict[str, object] = {"weave.operation.name": operation}
@@ -83,8 +90,6 @@ def _span(
     for name, count in usage_of(call).items():
         attributes[USAGE_ATTRIBUTES[name]] = count
     if is_root:
-        user_text = resolve_text(call, mapping["user"])
-        assistant_text = resolve_text(call, mapping["assistant"])
         if user_text:
             attributes["weave.input.messages"] = _json(
                 [{"role": "user", "content": user_text}]
@@ -109,6 +114,22 @@ def _span(
             key: value for key, value in attributes.items() if value not in {"", None}
         },
     }
+
+
+def turn_texts(
+    root: Row, trace_calls: list[Row], mapping: dict[str, list[str]]
+) -> tuple[str, str]:
+    """User text from the root; assistant text from the last model child when one exists."""
+    user = last_user_message_text(root) or resolve_text(root, mapping["user"])
+    children = [call for call in trace_calls if model_of(call) and call is not root]
+    if children:
+        last = max(children, key=lambda call: str(call.get("started_at") or ""))
+        assistant = resolve_text(last, mapping["assistant"]) or resolve_text(
+            root, mapping["assistant"]
+        )
+    else:
+        assistant = resolve_text(root, mapping["assistant"])
+    return user, assistant
 
 
 def _answer_model(trace_calls: list[Row]) -> str:

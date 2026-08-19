@@ -16,6 +16,10 @@ description: >-
 Your job is to add Weave tracing to someone's LLM or agent code so their runs show up in the W&B Weave
 UI. Fit the approach to their codebase instead of applying a one-size-fits-all template.
 
+This skill changes source so new runs appear. If the project already logs classic `@weave.op` calls
+and they want that history in the Agents tab without editing code, use `skills/calls-to-agent-spans`
+instead.
+
 This skill works for any agent, whatever libraries it uses or none at all. Choose the approach based
 on two things:
 

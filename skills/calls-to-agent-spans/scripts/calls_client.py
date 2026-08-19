@@ -80,6 +80,18 @@ def attach_tool_payloads(
             call["output"] = payload.get("output")
 
 
+def span_count(session: requests.Session, base_url: str, project: str) -> int:
+    """How many agent spans the target already has. Used to refuse a non-empty project."""
+    response = session.post(
+        f"{base_url}/agents/spans/query",
+        json={"project_id": project, "limit": 1},
+        timeout=TIMEOUT,
+    )
+    response.raise_for_status()
+    body = response.json()
+    return int(body.get("total_count") or 0)
+
+
 DEFAULT_BASE_URL = "https://trace.wandb.ai"
 
 PAGE_SIZE = 1_000

@@ -54,6 +54,17 @@ def resolve_text(payload: Row, paths: Sequence[str]) -> str:
     return ""
 
 
+def last_user_message_text(payload: Row) -> str:
+    """The last role=user item in `inputs.messages`, which is the turn text once the list is a history."""
+    messages = resolve(payload, "inputs.messages")
+    if not isinstance(messages, Sequence) or isinstance(messages, str):
+        return ""
+    for item in reversed(messages):
+        if isinstance(item, Mapping) and str(item.get("role") or "") == "user":
+            return text_of(item.get("content"))
+    return ""
+
+
 def detect_paths(rows: Sequence[Row], paths: Iterable[str]) -> list[str]:
     """Every candidate some sampled root carries, in candidate order."""
     return [path for path in paths if any(text_of(resolve(row, path)) for row in rows)]
@@ -74,6 +85,8 @@ def infer_mapping(sample: list[Row], overrides: dict[str, str]) -> dict[str, lis
         role: [overrides[role]] if overrides.get(role) else detect_paths(sample, paths)
         for role, paths in candidates.items()
     }
+    if not mapping["user"] and any(last_user_message_text(row) for row in sample):
+        mapping["user"] = ["inputs.messages"]
     for role in ("user", "assistant"):
         if not mapping[role]:
             keys = sorted({key for row in sample for key in _payload_keys(row)})
@@ -121,10 +134,12 @@ CONVERSATION_PATHS = (
 
 USER_TEXT_PATHS = (
     "inputs.message",
-    "inputs.messages[-1].content",
     "inputs.query",
     "inputs.prompt",
     "inputs.question",
+    "inputs.task",
+    "inputs.goal",
+    "inputs.user_input",
     "inputs.user_message",
     "inputs.input",
     "inputs.text",
