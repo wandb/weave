@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS signature_clusters
     id UUID,
     -- Copied from the run. Fixed at run creation, so it is partition-safe.
     run_window_end DateTime64(6, 'UTC'),
+    -- Copied from the run. A cluster never spans types.
+    signature_type Enum8('intent' = 1, 'failure' = 2),
 
     -- Not an FK: a topic identity carried forward by centroid match across runs, so it
     -- outlives the per-run `id`. Nil until the writer links a run to its predecessor.
@@ -76,12 +78,18 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
 
     -- Distance from the signature vector to its cluster centroid.
     cluster_distance Float32 DEFAULT 0,
+    -- HDBSCAN membership strength in [0, 1]. Zero on noise rows.
+    cluster_probability Float32 DEFAULT 0,
     -- UMAP 2-D projection of the signature vector.
     umap_x Float32 DEFAULT 0,
     umap_y Float32 DEFAULT 0,
 
     -- `failure_signatures.current_trace_id` or `intent_signatures.trace_id`
     trace_id String,
+    conversation_id String,
+    user_id String DEFAULT '',
+    -- Source-turn end time, not insert time, so a late clustering run still windows.
+    trace_ended_at DateTime64(6, 'UTC'),
     -- Whole-turn values copied onto every fan-out row, so summing them overcounts a
     -- cluster that holds more than one signature from the same turn.
     turn_duration_ms UInt32 DEFAULT 0,
@@ -97,7 +105,8 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_signature_record_id signature_record_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
+    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
+    INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
 PARTITION BY toYYYYMM(run_window_end)
@@ -105,8 +114,8 @@ ORDER BY (project_id, cluster_run_id, cluster_id, signature_record_id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
 
--- Tokens for the turn each signature came from, added here because 041 has shipped.
--- One column per category, not a map, so a rollup can sum them with SimpleAggregateFunction.
+-- Added here because 041 has shipped. Token columns are one per category, not a
+-- map, so a rollup can sum them with SimpleAggregateFunction.
 ALTER TABLE intent_signatures
     ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
     ADD COLUMN IF NOT EXISTS turn_output_tokens UInt64 DEFAULT 0 AFTER turn_input_tokens,
@@ -114,7 +123,8 @@ ALTER TABLE intent_signatures
     ADD COLUMN IF NOT EXISTS turn_cache_creation_input_tokens UInt64 DEFAULT 0
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
-        AFTER turn_cache_creation_input_tokens;
+        AFTER turn_cache_creation_input_tokens,
+    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at;
 
 ALTER TABLE failure_signatures
     ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
@@ -123,4 +133,5 @@ ALTER TABLE failure_signatures
     ADD COLUMN IF NOT EXISTS turn_cache_creation_input_tokens UInt64 DEFAULT 0
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
-        AFTER turn_cache_creation_input_tokens;
+        AFTER turn_cache_creation_input_tokens,
+    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at;
