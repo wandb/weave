@@ -16,5 +16,13 @@ from weave.trace.box import box, unbox
     ],
 )
 def test_unbox_round_trips_box(value):
-    """Unbox must give back the value box was handed, tzinfo included."""
-    assert unbox(box(value)) == value
+    """Unbox must reproduce what box stored, as a plain type.
+
+    Not what box was *handed*: box normalizes a datetime to UTC, so a naive input
+    comes back aware and the round trip is only lossless from box's output on.
+    """
+    unboxed = unbox(box(value))
+
+    # Equality alone would pass on a boxed value: the subclasses compare equal.
+    assert type(unboxed) is type(value)
+    assert unboxed == value

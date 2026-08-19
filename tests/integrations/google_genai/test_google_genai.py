@@ -980,7 +980,7 @@ def test_content_generation_with_image_bytes(client):
 
 
 def test_wrapper_sync_unboxes_contents(weave_active):
-    """A dataset string reaches the SDK as a plain str, not a BoxedStr."""
+    """A boxed string reaches the SDK as a plain str, not a BoxedStr."""
     captured = {}
 
     def generate_content(self, *, model, contents, config=None):
@@ -1000,7 +1000,7 @@ def test_wrapper_sync_unboxes_contents(weave_active):
 
 @pytest.mark.asyncio
 async def test_wrapper_async_unboxes_contents(weave_active):
-    """The async wrapper unboxes too."""
+    """The async wrapper unboxes contents the same way."""
     captured = {}
 
     async def generate_content(self, *, model, contents, config=None):
@@ -1019,7 +1019,7 @@ async def test_wrapper_async_unboxes_contents(weave_active):
 
 
 def test_wrapper_unboxes_weave_list_contents(client):
-    """A dataset column arrives as a WeaveList; the SDK gets a plain list."""
+    """A WeaveList of boxed strings reaches the SDK as a plain list of str."""
     captured = {}
 
     def generate_content(self, *, model, contents, config=None):
@@ -1073,13 +1073,12 @@ def test_wrapper_unboxes_positional_message(weave_active):
     assert captured["message"] == "hello"
 
 
-def test_wrapper_hands_on_a_user_built_config_by_identity(weave_active):
+def test_wrapper_preserves_user_built_config_identity(weave_active):
     """A config the user built is handed on as-is, never rebuilt."""
     captured = {}
     config = GenerateContentConfig(system_instruction="stay terse")
 
     def generate_content(self, *, model, contents, config=None):
-        captured["contents"] = contents
         captured["config"] = config
 
     wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
@@ -1087,12 +1086,11 @@ def test_wrapper_hands_on_a_user_built_config_by_identity(weave_active):
     wrapped(
         Mock(_model="gemini-2.0-flash"),
         model="gemini-2.0-flash",
-        contents=["hello"],
+        contents="hello",
         config=config,
     )
 
     assert captured["config"] is config
-    assert captured["contents"] == ["hello"]
 
 
 def test_wrapper_keeps_a_stream_method_a_generator(weave_active):

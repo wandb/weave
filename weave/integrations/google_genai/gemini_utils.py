@@ -229,10 +229,11 @@ def _unbox_traced_values(obj: Any) -> Any:
 def _unbox_inputs(fn: Callable) -> Callable:
     """Unbox the arguments of a sync ``google.genai`` method before it runs.
 
-    ``google.genai`` request models set ``from_attributes=True`` with every field
-    optional, so pydantic reads fields off any object it is handed and returns an
-    empty model. A bare ``str`` is excluded from that rule; a subclass is not, so
-    the value is dropped without an error.
+    ``contents`` is a union whose ``Content`` candidate sets ``from_attributes=True``
+    and has both its fields optional, so pydantic reads them off whatever object it
+    is handed and returns an empty ``Content``. A bare ``str`` is excluded from that
+    rule and matches its own branch; a subclass is not, so the value is dropped
+    without an error.
 
     The generator branch is load-bearing: ``weave.op`` classifies the function with
     ``inspect.isgeneratorfunction``, which ``functools.wraps`` does not carry over,
