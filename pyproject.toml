@@ -462,6 +462,7 @@ test = [
   "pytest-rerunfailures>=14.0",
   "pytest-timeout>=2.3.1",
   "pytest-shard==0.1.2",
+  # todo(nkumar): these are trace-server deps not test. however moving them breaks integration tests.
   "clickhouse_connect==1.6.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
