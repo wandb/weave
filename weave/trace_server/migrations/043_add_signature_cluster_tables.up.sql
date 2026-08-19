@@ -86,8 +86,12 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
 
     -- `failure_signatures.current_trace_id` or `intent_signatures.trace_id`
     trace_id String,
+    -- Required for join to spans.
+    span_id String,
     conversation_id String,
     user_id String DEFAULT '',
+    -- Required for join to signatures and spans.
+    trace_started_at DateTime64(6, 'UTC'),
     -- Source-turn end time, not insert time, so a late clustering run still windows.
     trace_ended_at DateTime64(6, 'UTC'),
     -- Whole-turn values copied onto every fan-out row, so summing them overcounts a
@@ -124,7 +128,9 @@ ALTER TABLE intent_signatures
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
         AFTER turn_cache_creation_input_tokens,
-    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at;
+    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at,
+    -- Required for join to spans.
+    ADD COLUMN IF NOT EXISTS span_id String AFTER trace_id;
 
 ALTER TABLE failure_signatures
     ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
@@ -134,4 +140,6 @@ ALTER TABLE failure_signatures
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
         AFTER turn_cache_creation_input_tokens,
-    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at;
+    ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at,
+    -- Required for join to spans.
+    ADD COLUMN IF NOT EXISTS span_id String AFTER current_trace_id;
