@@ -1256,31 +1256,53 @@ def test_file_content_read_retries_eventual_consistency():
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize(
-    ("error", "expected_calls"),
+    "error",
     [
-        # Other errors should NOT be retried (call_count=1)
-        (RuntimeError("unexpected"), 1),
-        (ValueError("some value error"), 1),
-        # Empty query errors are no longer retried client-side: the 1.x
-        # driver rebuilds the insert body on its own connection retry.
-        (DatabaseError("Code: 62. DB::Exception: Empty query"), 1),
+        RuntimeError("unexpected"),
+        ValueError("some value error"),
+        DatabaseError("Code: 62. DB::Exception: Empty query"),
     ],
 )
-def test_insert_error_handling(error, expected_calls):
-    """Insert errors fail immediately; no client-side retry loop remains."""
+def test_insert_retries_only_invalid_utf8(error):
+    """Only UnicodeEncodeError re-enters the insert loop, after sanitizing.
+
+    Widening that except clause would silently retry unrelated failures.
+    """
     mock_ch_client = MagicMock()
     mock_ch_client.command.return_value = None
     mock_ch_client.insert.side_effect = error
-    expected_exception = type(error)
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
-        with pytest.raises(expected_exception):
+        with pytest.raises(type(error)):
             server._insert("t", data=[[1]], column_names=["a"])
 
-        assert mock_ch_client.insert.call_count == expected_calls
+        assert mock_ch_client.insert.call_count == 1
+
+
+def test_insert_sanitizes_invalid_utf8_and_retries():
+    """A lone UTF-16 surrogate cannot be encoded as UTF-8 — a Python limit, not
+    a driver one — so the row is sanitized and the insert retried once.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.command.return_value = None
+    mock_ch_client.insert.side_effect = [
+        UnicodeEncodeError("utf-8", "\ud83d", 0, 1, "surrogates not allowed"),
+        MagicMock(),
+    ]
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._insert("t", data=[["hi \ud83d there"]], column_names=["a"])
+
+    assert mock_ch_client.insert.call_count == 2
+    assert mock_ch_client.insert.call_args_list[1].kwargs["data"] == [
+        ["hi \ufffd there"]
+    ]
 
 
 @pytest.mark.disable_logging_error_check
