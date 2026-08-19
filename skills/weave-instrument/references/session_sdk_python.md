@@ -1,4 +1,4 @@
-# Session SDK — Python
+# Session SDK: Python
 
 These are the explicit agent-logging APIs. Everything is top-level (`weave.Turn`,
 `weave.start_session`, and so on) except the message-part classes, which come from `weave.session`
@@ -36,10 +36,11 @@ with weave.start_session(agent_name="weather-bot") as session:
 Sub-agents nest the same way: `with turn.subagent(name="researcher", model="gpt-4o") as sub:`, then
 `sub.llm(...)` or `sub.tool(...)` inside.
 
-**`LLM` helpers:** `.output(content)` appends an assistant message. `.think(content)` sets the
-reasoning. `.record(input_messages=, output_messages=, usage=, reasoning=, response_id=,
-finish_reasons=)` bulk-sets the fields. `.attach_media(...)` and `.attach_media_url(url, modality=)`
-attach media. Always pass `provider_name`, because the SDK will not guess it.
+**`LLM` helpers:** `.output(content)` appends an assistant reply on the LLM span (a single reply is
+fine). `.think(content)` sets the reasoning. `.record(usage=, ...)` bulk-sets fields. Do not pass the
+conversation history as `input_messages`; the user text belongs on `start_turn(user_message=...)`.
+`.attach_media(...)` and `.attach_media_url(url, modality=)` attach media. Always pass
+`provider_name`, because the SDK will not guess it. See `span-shape.md`.
 
 ## Methods vs. top-level functions
 
@@ -78,9 +79,7 @@ log_turn(
     session_id="sess-2", agent_name="bot",
     messages=[Message.user("Search for X")],
     spans=[
-        LLM(model="gpt-4o", input_messages=[Message.user("Search for X")],
-            output_messages=[Message.assistant("Searching...")],
-            usage=Usage(input_tokens=10, output_tokens=5)),
+        LLM(model="gpt-4o", usage=Usage(input_tokens=10, output_tokens=5)),
         Tool(name="search", arguments={"q": "X"}, result="found", tool_call_id="tc_1"),
     ],
 )
