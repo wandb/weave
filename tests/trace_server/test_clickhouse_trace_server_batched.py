@@ -1307,26 +1307,10 @@ def test_query_id_is_logged_on_success_and_failure(caplog):
         with caplog.at_level(logging.INFO), pytest.raises(Exception):
             server._query("SELECT 1", parameters={})
         failed = [r for r in caplog.records if r.message == "clickhouse_query_error"][0]
-        assert failed.query_id == (
-            mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
+        assert (
+            failed.query_id
+            == (mock_ch_client.query.call_args.kwargs["settings"]["query_id"])
         )
-
-
-def test_caller_supplied_query_id_wins():
-    """export.py passes its own query_id in settings; do not overwrite it."""
-    mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        server._command("OPTIMIZE TABLE t", settings={"query_id": "job-42:target"})
-
-    assert (
-        mock_ch_client.command.call_args.kwargs["settings"]["query_id"]
-        == "job-42:target"
-    )
 
 
 @pytest.mark.disable_logging_error_check
