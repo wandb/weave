@@ -289,7 +289,10 @@ def convert_to_insert_too_large(e: Exception) -> Exception:
 
 
 def log_and_raise_insert_error(
-    e: Exception, table: str, data: Sequence[Sequence[Any]]
+    e: Exception,
+    table: str,
+    data: Sequence[Sequence[Any]],
+    query_id: str | None = None,
 ) -> None:
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(num_bytes(row) for row in data)
@@ -298,6 +301,7 @@ def log_and_raise_insert_error(
         extra={
             "error_str": str(e),
             "table": table,
+            "query_id": query_id,
             "data_len": len(data),
             "data_bytes": data_bytes,
         },
