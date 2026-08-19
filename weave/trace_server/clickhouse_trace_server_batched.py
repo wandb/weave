@@ -37,6 +37,7 @@ from weave.shared.digest import (
     compute_row_digest,
     compute_table_digest,
 )
+from weave.shared.object_class_util import get_object_name
 from weave.shared.trace_server_interface_util import (
     assert_non_null_wb_user_id,
     extract_refs_from_values,
@@ -1271,13 +1272,20 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             by_project.setdefault(obj.project_id, []).append(obj)
 
         for project_id, project_objs in by_project.items():
-            checks: list[tuple[str, str, str | None]] = []
+            checks: list[tuple[str, str, str | None, str | None]] = []
             for obj in project_objs:
                 digest_result = compute_object_digest_result(
                     obj.val, obj.builtin_object_class
                 )
                 kind = get_kind(digest_result.processed_val)
-                checks.append((obj.object_id, kind, digest_result.base_object_class))
+                checks.append(
+                    (
+                        obj.object_id,
+                        kind,
+                        digest_result.base_object_class,
+                        get_object_name(digest_result.processed_val),
+                    )
+                )
             collisions = self._find_obj_name_type_collisions(project_id, checks)
             for collision in collisions:
                 logger.warning(
@@ -2317,6 +2325,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             object_id=req.obj.object_id,
             kind=kind,
             new_base_object_class=digest_result.base_object_class,
+            object_name=get_object_name(processed_val),
         )
 
         ch_obj = ObjCHInsertable(
@@ -2357,6 +2366,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         object_id: str,
         kind: str,
         new_base_object_class: str | None,
+        object_name: str | None,
     ) -> None:
         """Reject obj_create when (project_id, object_id) already exists with a
         different base_object_class. Names are bound to one type per project
@@ -2364,7 +2374,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         different-type would make refs ambiguous.
         """
         collisions = self._find_obj_name_type_collisions(
-            project_id, [(object_id, kind, new_base_object_class)]
+            project_id, [(object_id, kind, new_base_object_class, object_name)]
         )
         if collisions:
             raise collisions[0]
@@ -2372,20 +2382,24 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def _find_obj_name_type_collisions(
         self,
         project_id: str,
-        checks: list[tuple[str, str, str | None]],
+        checks: list[tuple[str, str, str | None, str | None]],
     ) -> list[ObjectNameTypeCollision]:
         """WB-30574 collision check: one query per distinct kind, returning
         one ObjectNameTypeCollision per object_id bound to more than one
         base_object_class, by committed rows or by conflicting entries
         within ``checks`` itself. Callers decide whether to raise.
 
-        ``checks`` is a list of (object_id, kind, new_base_object_class).
+        ``checks`` is a list of (object_id, kind, new_base_object_class, object_name),
+        where object_name is the name the serialized object declares, so a caller whose
+        name did not fit the id can be told so.
         """
         by_kind: dict[str, dict[str, set[str | None]]] = {}
-        for object_id, kind, new_base_object_class in checks:
+        names: dict[tuple[str, str, str | None], str | None] = {}
+        for object_id, kind, new_base_object_class, object_name in checks:
             by_kind.setdefault(kind, {}).setdefault(object_id, set()).add(
                 new_base_object_class
             )
+            names[kind, object_id, new_base_object_class] = object_name
 
         collisions: list[ObjectNameTypeCollision] = []
         for kind, object_id_to_classes in by_kind.items():
@@ -2413,6 +2427,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             existing_base_object_classes=sorted(
                                 (c for c in bound if c != new_class), key=str
                             ),
+                            object_name=names[kind, object_id, new_class],
                         )
                     )
         return collisions

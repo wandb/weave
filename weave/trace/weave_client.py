@@ -2867,7 +2867,9 @@ class WeaveClient:
         if name is None:
             raise ValueError("Name must be provided for object saving")
 
+        original_name = name
         name = sanitize_object_name(name)
+        _warn_if_object_name_truncated(original_name, name)
 
         compute_digests = self._should_compute_client_digests()
 
@@ -3674,6 +3676,23 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
+
+
+def _warn_if_object_name_truncated(name: str, object_id: str) -> None:
+    """Report a name that did not fit the id it is published under."""
+    if len(name) <= MAX_OBJECT_NAME_LENGTH or len(object_id) < MAX_OBJECT_NAME_LENGTH:
+        return
+
+    # Do not remember what the level suppressed; raising it later must still report.
+    if not logger.isEnabledFor(logging.WARNING):
+        return
+
+    log_once(
+        logger.warning,
+        f"Object name {name!r} is longer than {MAX_OBJECT_NAME_LENGTH} characters and is "
+        f"published as {object_id!r}. Names whose sanitized forms only differ past that "
+        f"limit become one object.",
+    )
 
 
 def _get_call_processor(server: Any) -> Any:
