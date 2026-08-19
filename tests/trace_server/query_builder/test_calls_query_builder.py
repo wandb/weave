@@ -23,7 +23,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     process_query_to_conditions,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.project_version.types import ReadTable
 
@@ -2943,35 +2943,24 @@ def test_datetime_optimization_invalid_field() -> None:
             }
         )
     )
-    cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {
-                "$gt": [
-                    {"$getField": "started_at"},
-                    {"$literal": "2025-03-01 00:00:00 UTC"},
-                ]
-            }
-        )
-    )
 
-    # The optimization should not be applied since wb_user_id is not a timestamp field
-    # and '2025-03-01 00:00:00 UTC' isn't a timestamp
+    # wb_user_id is not a datetime field, so its numeric literal is left as an
+    # Int64 param and no sortable_datetime prefilter is emitted.
     assert_sql(
         cq,
         """
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_2:String}
+        PREWHERE calls_merged.project_id = {pb_1:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.wb_user_id) > {pb_0:Int64}))
-            AND ((any(calls_merged.started_at) > {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
-        {"pb_0": 1709251200, "pb_1": "2025-03-01 00:00:00 UTC", "pb_2": "project"},
+        {"pb_0": 1709251200, "pb_1": "project"},
     )
 
 
@@ -3089,9 +3078,24 @@ def test_maybe_convert_skips_non_datetime_string_field() -> None:
     assert ops == original
 
 
-def test_maybe_convert_skips_unparseable_string() -> None:
+@pytest.mark.parametrize(
+    "bad_value",
+    ["not-a-timestamp", "T00:00:00Z", "", "2024-13-01"],
+)
+def test_maybe_convert_rejects_unparseable_datetime_string(bad_value: str) -> None:
+    """An unparseable string compared to a DateTime column is a 400, not a CH 500."""
+    with pytest.raises(InvalidRequest):
+        _maybe_convert_datetime_operands(
+            [
+                tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+                tsi_query.LiteralOperation(**{"$literal": bad_value}),
+            ]
+        )
+
+
+def test_maybe_convert_skips_unparseable_string_for_non_datetime_field() -> None:
     original = [
-        tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+        tsi_query.GetFieldOperator(**{"$getField": "display_name"}),
         tsi_query.LiteralOperation(**{"$literal": "not-a-timestamp"}),
     ]
     ops = _maybe_convert_datetime_operands(original)

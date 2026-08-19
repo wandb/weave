@@ -1971,6 +1971,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         if parsed is not None:
                             converted_literal = parsed
                             literal_side = side
+                        elif isinstance(operand.literal_, str):
+                            raise InvalidRequest(
+                                f"Invalid datetime value {operand.literal_!r} in "
+                                "filter: expected a unix timestamp or an ISO 8601 "
+                                "/ YYYY-MM-DD date string."
+                            )
             lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
             rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
             if literal_side is not None:
@@ -7194,6 +7200,7 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
     field_idx = None
     literal_idx = None
     timestamp: float | None = None
+    unparseable_str_idx = None
     for i, op in enumerate(operands):
         if (
             isinstance(op, tsi_query.GetFieldOperator)
@@ -7212,6 +7219,16 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
                 if parsed is not None:
                     literal_idx = i
                     timestamp = parsed
+                else:
+                    unparseable_str_idx = i
+
+    if field_idx is not None and unparseable_str_idx is not None:
+        bad = operands[unparseable_str_idx]
+        assert isinstance(bad, tsi_query.LiteralOperation)
+        raise InvalidRequest(
+            f"Invalid datetime value {bad.literal_!r} in filter: "
+            "expected a unix timestamp or an ISO 8601 / YYYY-MM-DD date string."
+        )
 
     if field_idx is None or literal_idx is None or timestamp is None:
         return lhs, rhs

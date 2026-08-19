@@ -7,7 +7,7 @@ from tests.trace.util import NOT_CLICKHOUSE_BACKEND
 from tests.trace_server.helpers import force_optimize_calls_merged
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.errors import NotFoundError
+from weave.trace_server.errors import InvalidRequest, NotFoundError
 from weave.trace_server.interface import query as tsi_query
 
 
@@ -184,3 +184,48 @@ def test_call_end_started_at_anchors_sortable_datetime(
     # evaluated false and the granule was skipped.
     assert len(res.calls) == 1
     assert res.calls[0].id == call_id
+
+
+@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "2025-03-01 00:00:00 UTC", ""])
+def test_calls_query_rejects_unparseable_started_at_filter(
+    client: weave_client.WeaveClient, bad_value: str
+) -> None:
+    """A malformed datetime filter is a 400, not an opaque ClickHouse 500.
+
+    Reproduces a client (e.g. a generated `get_calls` filter) sending an empty
+    date concatenated with a time, e.g. `'T00:00:00Z'`, as a `started_at` bound.
+    Left unchecked this reaches ClickHouse verbatim and fails with
+    CANNOT_PARSE_DATETIME surfaced as a 502.
+    """
+    project_id = client.project_id
+    call_id = str(uuid.uuid4())
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                op_name="test_op",
+                started_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    with pytest.raises(InvalidRequest):
+        client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query=tsi_query.Query.model_validate(
+                    {
+                        "$expr": {
+                            "$lt": [
+                                {"$getField": "started_at"},
+                                {"$literal": bad_value},
+                            ]
+                        }
+                    }
+                ),
+            )
+        )

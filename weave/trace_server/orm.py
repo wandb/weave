@@ -11,7 +11,7 @@ from typing import Any, Literal, TypeAlias
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.errors import InvalidFieldError, InvalidRequest
 from weave.trace_server.interface import query as tsi_query
 
 param_builder_count = 0
@@ -811,6 +811,12 @@ def maybe_convert_datetime_operands(
     strings are rewritten to the canonical `YYYY-MM-DD HH:MM:SS.ffffff` form,
     which ClickHouse parses against DateTime columns.
 
+    A string literal that cannot be parsed as a date(time) — e.g. `'T00:00:00Z'`
+    from a client that concatenated an empty date with a time — is rejected with
+    `InvalidRequest`. Passing it through would reach ClickHouse verbatim and fail
+    with an opaque `CANNOT_PARSE_DATETIME` error surfaced as a 502 instead of a
+    clear 400.
+
     Returns a new sequence with the conversion applied, or the original
     sequence if neither operand is a DateTime field/parseable literal pair.
     """
@@ -820,6 +826,7 @@ def maybe_convert_datetime_operands(
     field_idx = None
     literal_idx = None
     timestamp: float | None = None
+    unparseable_str_idx = None
     for i, op in enumerate(operands):
         if (
             isinstance(op, tsi_query.GetFieldOperator)
@@ -831,6 +838,16 @@ def maybe_convert_datetime_operands(
             if parsed is not None:
                 literal_idx = i
                 timestamp = parsed
+            elif isinstance(op.literal_, str):
+                unparseable_str_idx = i
+
+    if field_idx is not None and unparseable_str_idx is not None:
+        bad_value = operands[unparseable_str_idx]
+        assert isinstance(bad_value, tsi_query.LiteralOperation)
+        raise InvalidRequest(
+            f"Invalid datetime value {bad_value.literal_!r} in filter: "
+            "expected a unix timestamp or an ISO 8601 / YYYY-MM-DD date string."
+        )
 
     if field_idx is None or literal_idx is None or timestamp is None:
         return operands
