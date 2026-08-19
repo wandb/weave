@@ -98,6 +98,12 @@ Generate implicit cost `created_at` values in UTC because insertion interprets n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+`weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
+in from wandb/core rather than depended on because it is not published to PyPI.
+Never edit it by hand — regenerate it in core, then re-run
+`scripts/vendor_weave_server_sdk.py` with `--sdk-output` and `--core`. See
+`weave/vendor/README.md`.
+
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
 to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
