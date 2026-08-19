@@ -1022,6 +1022,10 @@ def test_create_distributed_table_sql_id_sharded():
         ("signature_clusters", "sipHash64(project_id)"),
         ("signature_cluster_assignments", "sipHash64(project_id)"),
         (
+            "signature_cluster_assignments_by_conversation",
+            "sipHash64(project_id)",
+        ),
+        (
             "conversation_tags",
             "sipHash64(project_id, conversation_id, trace_id, tag)",
         ),

@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS signature_clusters
     project_id String,
     cluster_run_id UUID,
     id UUID,
-    -- Copied from the run. Fixed at run creation, so it is partition-safe.
+    -- A cluster describes a run, not a turn, so the run window is its only time.
+    -- Fixed at run creation, so it is partition-safe.
     run_window_end DateTime64(6, 'UTC'),
     -- Copied from the run. A cluster never spans types.
     signature_type Enum8('intent' = 1, 'failure' = 2),
@@ -59,6 +60,8 @@ CREATE TABLE IF NOT EXISTS signature_clusters
 )
 ENGINE = ReplacingMergeTree(inserted_at)
 PARTITION BY toYYYYMM(run_window_end)
+-- `centroid` and `occurrence_count` sit outside the key, so recentering a cluster
+-- collapses onto the existing row.
 ORDER BY (project_id, cluster_run_id, id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
@@ -69,12 +72,11 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     project_id String,
     cluster_run_id UUID,
     signature_record_id UUID,
-    -- FK to `signature_cluster_runs.window_end`.
-    run_window_end DateTime64(6, 'UTC'),
-    -- FK to `signature_clusters.id`. The nil uuid is noise, which has no cluster row,
-    -- so a run's noise rows are one contiguous range of the sorting key.
+    -- FK to `signature_clusters.id`. The nil uuid is noise, which has no cluster row.
     cluster_id UUID,
     signature_type Enum8('intent' = 1, 'failure' = 2),
+    -- Copied from the signature row, so faceting a cluster by category needs no join.
+    category LowCardinality(String) DEFAULT '',
 
     -- Distance from the signature vector to its cluster centroid.
     cluster_distance Float32 DEFAULT 0,
@@ -90,12 +92,13 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     span_id String,
     conversation_id String,
     user_id String DEFAULT '',
+    agent_name String DEFAULT '',
     -- Required for join to signatures and spans.
     trace_started_at DateTime64(6, 'UTC'),
     -- Source-turn end time, not insert time, so a late clustering run still windows.
     trace_ended_at DateTime64(6, 'UTC'),
-    -- Whole-turn values copied onto every fan-out row, so summing them overcounts a
-    -- cluster that holds more than one signature from the same turn.
+    -- Whole-turn values copied onto every fan-out row. Divide by `turn_signature_count`
+    -- to sum them, or group by `trace_id` first to credit the whole turn once.
     turn_duration_ms UInt32 DEFAULT 0,
     turn_cost_usd Float64 DEFAULT 0,
     -- Same vocabulary as the agent spans table, so no translation on the way in.
@@ -104,19 +107,98 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
     turn_reasoning_tokens UInt64 DEFAULT 0,
     turn_cache_creation_input_tokens UInt64 DEFAULT 0,
     turn_cache_read_input_tokens UInt64 DEFAULT 0,
+    -- Signatures the judge emitted for this turn. Defaults to 1, so an unset value
+    -- leaves the columns above unapportioned instead of dividing by zero.
+    turn_signature_count UInt16 DEFAULT 1,
 
     inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
     expire_at DateTime DEFAULT '2100-01-01 00:00:00',
 
     INDEX idx_signature_record_id signature_record_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1,
-    INDEX idx_conversation_id conversation_id TYPE bloom_filter(0.01) GRANULARITY 1
+    INDEX idx_trace_id trace_id TYPE bloom_filter(0.01) GRANULARITY 1
 )
 ENGINE = ReplacingMergeTree(inserted_at)
-PARTITION BY toYYYYMM(run_window_end)
-ORDER BY (project_id, cluster_run_id, cluster_id, signature_record_id)
+-- The turn's own time, matching the signature tables this row fans out from, so
+-- retention and time-windowed reads are partition work rather than a scan.
+PARTITION BY toYYYYMM(trace_started_at)
+-- A signature holds one assignment per run, so `cluster_id` stays out of the key and
+-- a rewrite that moves the signature collapses onto the existing row.
+ORDER BY (project_id, cluster_run_id, signature_record_id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
+
+-- Conversation-ordered copy of the assignments, for the conversation-keyed reads the
+-- UI routes on. Same identity columns, so a rewrite collapses here too.
+CREATE TABLE IF NOT EXISTS signature_cluster_assignments_by_conversation
+(
+    project_id String,
+    conversation_id String,
+    cluster_run_id UUID,
+    signature_record_id UUID,
+    cluster_id UUID,
+    signature_type Enum8('intent' = 1, 'failure' = 2),
+    category LowCardinality(String) DEFAULT '',
+
+    cluster_distance Float32 DEFAULT 0,
+    cluster_probability Float32 DEFAULT 0,
+    umap_x Float32 DEFAULT 0,
+    umap_y Float32 DEFAULT 0,
+
+    trace_id String,
+    span_id String,
+    user_id String DEFAULT '',
+    agent_name String DEFAULT '',
+    trace_started_at DateTime64(6, 'UTC'),
+    trace_ended_at DateTime64(6, 'UTC'),
+    turn_duration_ms UInt32 DEFAULT 0,
+    turn_cost_usd Float64 DEFAULT 0,
+    turn_input_tokens UInt64 DEFAULT 0,
+    turn_output_tokens UInt64 DEFAULT 0,
+    turn_reasoning_tokens UInt64 DEFAULT 0,
+    turn_cache_creation_input_tokens UInt64 DEFAULT 0,
+    turn_cache_read_input_tokens UInt64 DEFAULT 0,
+    turn_signature_count UInt16 DEFAULT 1,
+
+    inserted_at DateTime64(6, 'UTC') DEFAULT now64(6),
+    expire_at DateTime DEFAULT '2100-01-01 00:00:00'
+)
+ENGINE = ReplacingMergeTree(inserted_at)
+PARTITION BY toYYYYMM(trace_started_at)
+ORDER BY (project_id, conversation_id, cluster_run_id, signature_record_id)
+TTL expire_at DELETE
+SETTINGS min_bytes_for_wide_part = 0;
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS signature_cluster_assignments_by_conversation_mv
+TO signature_cluster_assignments_by_conversation AS
+SELECT
+    project_id,
+    conversation_id,
+    cluster_run_id,
+    signature_record_id,
+    cluster_id,
+    signature_type,
+    category,
+    cluster_distance,
+    cluster_probability,
+    umap_x,
+    umap_y,
+    trace_id,
+    span_id,
+    user_id,
+    agent_name,
+    trace_started_at,
+    trace_ended_at,
+    turn_duration_ms,
+    turn_cost_usd,
+    turn_input_tokens,
+    turn_output_tokens,
+    turn_reasoning_tokens,
+    turn_cache_creation_input_tokens,
+    turn_cache_read_input_tokens,
+    turn_signature_count,
+    inserted_at,
+    expire_at
+FROM signature_cluster_assignments;
 
 -- Added here because 041 has shipped. Token columns are one per category, not a
 -- map, so a rollup can sum them with SimpleAggregateFunction.
@@ -128,10 +210,15 @@ ALTER TABLE intent_signatures
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
         AFTER turn_cache_creation_input_tokens,
+    -- Divisor that makes the whole-turn columns above additive across fan-out rows.
+    ADD COLUMN IF NOT EXISTS turn_signature_count UInt16 DEFAULT 1
+        AFTER turn_cache_read_input_tokens,
     ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at,
     -- Required for join to spans.
     ADD COLUMN IF NOT EXISTS span_id String AFTER trace_id;
 
+-- Supersedes 041's note on this table: every `turn_` column describes the turn in
+-- `current_trace_id`, so it means what the same column means on `intent_signatures`.
 ALTER TABLE failure_signatures
     ADD COLUMN IF NOT EXISTS turn_input_tokens UInt64 DEFAULT 0 AFTER turn_cost_usd,
     ADD COLUMN IF NOT EXISTS turn_output_tokens UInt64 DEFAULT 0 AFTER turn_input_tokens,
@@ -140,6 +227,8 @@ ALTER TABLE failure_signatures
         AFTER turn_reasoning_tokens,
     ADD COLUMN IF NOT EXISTS turn_cache_read_input_tokens UInt64 DEFAULT 0
         AFTER turn_cache_creation_input_tokens,
+    ADD COLUMN IF NOT EXISTS turn_signature_count UInt16 DEFAULT 1
+        AFTER turn_cache_read_input_tokens,
     ADD COLUMN IF NOT EXISTS trace_ended_at DateTime64(6, 'UTC') AFTER trace_started_at,
     -- Required for join to spans.
     ADD COLUMN IF NOT EXISTS span_id String AFTER current_trace_id;

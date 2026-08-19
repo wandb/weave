@@ -190,6 +190,7 @@ ID_SHARDED_TABLES: dict[str, str] = {
     "signature_cluster_runs": "project_id",
     "signature_clusters": "project_id",
     "signature_cluster_assignments": "project_id",
+    "signature_cluster_assignments_by_conversation": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
