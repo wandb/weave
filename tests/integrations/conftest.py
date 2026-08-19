@@ -28,15 +28,10 @@ try:
 except ImportError:  # pragma: no cover - vcrpy is a test-group dependency
     vcr_patch = None
 
-try:
-    from clickhouse_connect.driver import httpclient as ch_httpclient
-    from clickhouse_connect.driver import httputil as ch_httputil
+from clickhouse_connect.driver import httpclient as ch_httpclient
+from clickhouse_connect.driver import httputil as ch_httputil
 
-    from weave.trace_server import clickhouse_trace_server_batched as chts
-except ImportError:  # pragma: no cover - shards without the trace server deps
-    ch_httpclient = None
-    ch_httputil = None
-    chts = None
+from weave.trace_server import clickhouse_trace_server_batched as chts
 
 # Captured at import time, i.e. before any cassette is active, so these are
 # guaranteed to be the real (unpatched) urllib3 connection classes.
@@ -103,10 +98,6 @@ def clickhouse_traffic_bypasses_vcr() -> Generator[None, None, None]:
     close. Provider traffic (openai, google-auth, ...) is unaffected and
     still replays from cassettes.
     """
-    if ch_httputil is None:
-        yield
-        return
-
     mp = pytest.MonkeyPatch()
 
     real_get_pool_manager = ch_httputil.get_pool_manager
