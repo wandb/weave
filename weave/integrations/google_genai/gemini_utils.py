@@ -14,7 +14,6 @@ from weave.trace.box import unbox
 from weave.trace.call import Call
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
-from weave.trace.vals import unwrap
 
 if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse
@@ -210,14 +209,13 @@ def google_genai_gemini_accumulator(
 
 
 def _unbox_traced_values(obj: Any) -> Any:
-    """Recursively replace Weave's tracked values with plain Python values.
+    """Recursively replace Weave's boxed scalars with plain Python values.
 
-    Values read out of a saved Weave object carry a ref so Weave can tell where
-    they came from: scalars come back as ``BoxedStr``/``BoxedInt``/..., and
-    containers as ``WeaveList``/``WeaveDict``. ``unwrap`` handles the containers
-    and ``unbox`` handles the scalars, so both are needed.
+    A value read out of a saved Weave object carries a ref, so a string comes back
+    as ``BoxedStr``, an int as ``BoxedInt``, and a list as a ``WeaveList`` of boxed
+    items. ``WeaveList`` and ``WeaveDict`` subclass ``list`` and ``dict``, so the
+    branches below rebuild them as plain containers on the way through.
     """
-    obj = unwrap(obj)
     if isinstance(obj, dict):
         return {k: _unbox_traced_values(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -232,15 +230,13 @@ def _unbox_inputs(fn: Callable) -> Callable:
     """Unbox the arguments of a sync ``google.genai`` method before it runs.
 
     ``google.genai`` request models set ``from_attributes=True`` with every field
-    optional, so pydantic accepts any object as an attribute source. A subclass of
-    a builtin therefore validates into an empty model and the value is dropped
-    without an error.
+    optional, so pydantic reads fields off any object it is handed and returns an
+    empty model. A bare ``str`` is excluded from that rule; a subclass is not, so
+    the value is dropped without an error.
 
     The generator branch is load-bearing: ``weave.op`` classifies the function with
-    ``inspect.isgeneratorfunction``, which ``functools.wraps`` does not carry over.
-    Only the generator path pushes the call when iteration starts, so without it
-    the ops a caller runs while consuming a stream are recorded as top-level calls
-    instead of children of ``generate_content_stream``.
+    ``inspect.isgeneratorfunction``, which ``functools.wraps`` does not carry over,
+    and only the generator path pushes the call when iteration starts.
     """
     if inspect.isgeneratorfunction(fn):
 
@@ -282,6 +278,7 @@ def google_genai_gemini_wrapper_async(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
+        # Not _unbox_inputs: the async shell has to be an unconditional `async def`.
         def _fn_wrapper(fn: Callable) -> Callable:
             @wraps(fn)
             async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
