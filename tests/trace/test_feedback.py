@@ -1927,7 +1927,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
     assert res.result[0]["payload"]["dataset_id_str"] == "94"
 
 
-@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "2025-03-01 00:00:00 UTC", ""])
+@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "not-a-timestamp", ""])
 def test_feedback_query_rejects_unparseable_created_at_filter(
     client: WeaveClient, bad_value: str
 ) -> None:

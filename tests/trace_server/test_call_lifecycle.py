@@ -186,7 +186,7 @@ def test_call_end_started_at_anchors_sortable_datetime(
     assert res.calls[0].id == call_id
 
 
-@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "2025-03-01 00:00:00 UTC", ""])
+@pytest.mark.parametrize("bad_value", ["T00:00:00Z", "not-a-timestamp", ""])
 def test_calls_query_rejects_unparseable_started_at_filter(
     client: weave_client.WeaveClient, bad_value: str
 ) -> None:
@@ -229,3 +229,46 @@ def test_calls_query_rejects_unparseable_started_at_filter(
                 ),
             )
         )
+
+
+@pytest.mark.parametrize(
+    "ok_value", ["2025-03-01 00:00:00 UTC", "2025-03-01", "2025-03-01T00:00:00Z"]
+)
+def test_calls_query_accepts_permissive_started_at_filter(
+    client: weave_client.WeaveClient, ok_value: str
+) -> None:
+    """A reasonable datetime filter (incl. a spelled-out ` UTC`) runs, not 400s."""
+    project_id = client.project_id
+    call_id = str(uuid.uuid4())
+    started_at = datetime.datetime(2025, 6, 1, tzinfo=datetime.timezone.utc)
+    client.server.call_start(
+        tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=project_id,
+                id=call_id,
+                trace_id=call_id,
+                op_name="test_op",
+                started_at=started_at,
+                attributes={},
+                inputs={},
+            )
+        )
+    )
+
+    # started_at (2025-06) is after the filter bound (2025-03), so the call matches.
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+            query=tsi_query.Query.model_validate(
+                {
+                    "$expr": {
+                        "$gt": [
+                            {"$getField": "started_at"},
+                            {"$literal": ok_value},
+                        ]
+                    }
+                }
+            ),
+        )
+    )
+    assert [c.id for c in res.calls] == [call_id]

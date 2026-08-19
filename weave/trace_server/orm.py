@@ -566,13 +566,19 @@ def parse_string_to_utc_timestamp(value: str) -> float | None:
 
     Parsing is delegated to `datetime.datetime.fromisoformat`, which accepts
     both date-only strings (`YYYY-MM-DD`, read as midnight) and full ISO-8601
-    datetimes. A trailing `Z` / `z` is treated as UTC, and naive datetimes are
-    assumed to be UTC wall time. Unparsable strings return `None`.
+    datetimes. To stay permissive with reasonable client input, a trailing UTC
+    marker that `fromisoformat` itself rejects is normalized first: `Z` / `z`
+    and a trailing ` UTC` / ` GMT` word all mean UTC. Naive datetimes are
+    assumed to be UTC wall time. Strings that still don't parse return `None`.
 
     Examples:
         >>> parse_string_to_utc_timestamp("2024-03-01")
         1709251200.0
         >>> parse_string_to_utc_timestamp("2024-03-01T12:00:00Z") == parse_string_to_utc_timestamp(
+        ...     "2024-03-01T12:00:00+00:00"
+        ... )
+        True
+        >>> parse_string_to_utc_timestamp("2024-03-01 12:00:00 UTC") == parse_string_to_utc_timestamp(
         ...     "2024-03-01T12:00:00+00:00"
         ... )
         True
@@ -582,8 +588,17 @@ def parse_string_to_utc_timestamp(value: str) -> float | None:
     s = value.strip()
     if not s:
         return None
-    if s.endswith(("Z", "z")):
+    if s[-1:] in {"Z", "z"}:
         s = s[:-1] + "+00:00"
+    else:
+        # A spelled-out UTC/GMT suffix (e.g. "2024-03-01 00:00:00 UTC") is common
+        # and unambiguous but not ISO-8601, so fromisoformat rejects it. Treat it
+        # as the UTC offset rather than erroring.
+        upper = s.upper()
+        for suffix in (" UTC", " GMT"):
+            if upper.endswith(suffix):
+                s = s[: -len(suffix)].rstrip() + "+00:00"
+                break
     try:
         dt = datetime.datetime.fromisoformat(s)
     except ValueError:

@@ -2943,24 +2943,43 @@ def test_datetime_optimization_invalid_field() -> None:
             }
         )
     )
+    cq.add_condition(
+        tsi_query.GtOperation.model_validate(
+            {
+                "$gt": [
+                    {"$getField": "started_at"},
+                    {"$literal": "2025-03-01 00:00:00 UTC"},
+                ]
+            }
+        )
+    )
 
     # wb_user_id is not a datetime field, so its numeric literal is left as an
-    # Int64 param and no sortable_datetime prefilter is emitted.
+    # Int64 param. The spelled-out ` UTC` suffix on the started_at literal is
+    # normalized to the canonical CH datetime string (permissive parsing), which
+    # also lets the sortable_datetime prefilter apply.
     assert_sql(
         cq,
         """
         SELECT
             calls_merged.id AS id
         FROM calls_merged
-        PREWHERE calls_merged.project_id = {pb_1:String}
+        PREWHERE calls_merged.project_id = {pb_3:String}
+        WHERE (calls_merged.sortable_datetime > {pb_2:String})
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
             ((any(calls_merged.wb_user_id) > {pb_0:Int64}))
+            AND ((any(calls_merged.started_at) > {pb_1:String}))
             AND ((any(calls_merged.deleted_at) IS NULL))
             AND ((NOT ((any(calls_merged.op_name) IS NULL))))
         )
         """,
-        {"pb_0": 1709251200, "pb_1": "project"},
+        {
+            "pb_0": 1709251200,
+            "pb_1": "2025-03-01 00:00:00.000000",
+            "pb_2": "2025-02-28 23:55:00.000000",
+            "pb_3": "project",
+        },
     )
 
 
@@ -3091,6 +3110,21 @@ def test_maybe_convert_rejects_unparseable_datetime_string(bad_value: str) -> No
                 tsi_query.LiteralOperation(**{"$literal": bad_value}),
             ]
         )
+
+
+@pytest.mark.parametrize(
+    "ok_value",
+    ["2025-03-01 00:00:00 UTC", "2025-03-01 00:00:00 gmt", "2025-03-01 00:00:00Z"],
+)
+def test_maybe_convert_accepts_permissive_datetime_string(ok_value: str) -> None:
+    """A reasonable, non-strict-ISO datetime (spelled-out UTC/GMT) is accepted."""
+    ops = _maybe_convert_datetime_operands(
+        [
+            tsi_query.GetFieldOperator(**{"$getField": "started_at"}),
+            tsi_query.LiteralOperation(**{"$literal": ok_value}),
+        ]
+    )
+    assert ops[1].literal_ == "2025-03-01 00:00:00.000000"
 
 
 def test_maybe_convert_skips_unparseable_string_for_non_datetime_field() -> None:

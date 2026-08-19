@@ -119,7 +119,11 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.orm import (
+    Table,
+    parse_string_to_utc_timestamp,
+    split_escaped_field_path,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -236,15 +240,12 @@ def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
     if isinstance(value, (int, float)):
         return datetime.datetime.fromtimestamp(float(value), tz=datetime.timezone.utc)
     if isinstance(value, str):
-        s = value.strip()
-        if not s:
+        # Delegate to the shared parser so the fake accepts exactly what the real
+        # backend does (including permissive forms like a spelled-out ` UTC`).
+        parsed = parse_string_to_utc_timestamp(value)
+        if parsed is None:
             return None
-        if s.endswith(("Z", "z")):
-            s = s[:-1] + "+00:00"
-        try:
-            return _ensure_tz(datetime.datetime.fromisoformat(s))
-        except ValueError:
-            return None
+        return datetime.datetime.fromtimestamp(parsed, tz=datetime.timezone.utc)
     return None
 
 
@@ -7196,10 +7197,6 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
     """Mirror `maybe_convert_datetime_operands`: a literal compared against a
     DateTime column is normalized to 'YYYY-MM-DD HH:MM:SS.ffffff'.
     """
-    from weave.trace_server.orm import (
-        parse_string_to_utc_timestamp,
-    )
-
     operands = [lhs, rhs]
     field_idx = None
     literal_idx = None
