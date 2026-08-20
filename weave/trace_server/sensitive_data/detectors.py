@@ -97,10 +97,8 @@ def detect_pii(
             if _valid_email(candidate) and _absolute_token_boundaries(
                 text, match.start(), match.end()
             ):
-                _append_detection(
-                    detections,
-                    Detection(match.start(), match.end(), "EMAIL_ADDRESS"),
-                    budget,
+                detections.append(
+                    Detection(match.start(), match.end(), "EMAIL_ADDRESS")
                 )
 
     if _ASCII_DIGIT_RE.search(text) is not None:
@@ -129,7 +127,7 @@ def detect_pii(
                     and detections[email_index].start < detection.end
                 ):
                     continue
-                _append_detection(detections, detection, budget)
+                detections.append(detection)
 
     return _select_non_overlapping(detections)
 
@@ -278,13 +276,6 @@ def _card_boundaries(candidate: str, match: re.Match[str]) -> bool:
         and candidate[end] in " -"
         and candidate[end + 1].isdigit()
     )
-
-
-def _append_detection(
-    detections: list[Detection], detection: Detection, budget: ScanBudget
-) -> None:
-    budget.accept_match()
-    detections.append(detection)
 
 
 def _detections_overlap(left: Detection, right: Detection) -> bool:

@@ -84,13 +84,6 @@ def test_redacts_supported_pii_with_typed_markers() -> None:
     )
 
 
-def test_match_budget_counts_one_span_seen_by_two_phone_patterns() -> None:
-    budget = ScanBudget(max_matches=1)
-
-    assert redact_pii_string("Call +1 415 555 2671", budget) == ("Call <PHONE_NUMBER>")
-    assert budget.matches == 1
-
-
 def test_redacts_compact_luhn_valid_card() -> None:
     assert redact_pii_string("4111111111111111", ScanBudget()) == "<CREDIT_CARD>"
 
@@ -355,11 +348,6 @@ def test_walker_enforces_request_wide_limits() -> None:
             {"outer": {"inner": "value"}}, ScanBudget(max_structure_depth=1)
         )
 
-    with pytest.raises(RequestTooLarge, match="match limit"):
-        redact_pii_value(
-            "ada@example.com and grace@example.com", ScanBudget(max_matches=1)
-        )
-
 
 def test_walker_fails_closed_on_cyclic_input() -> None:
     payload: dict[str, object] = {}
@@ -448,11 +436,11 @@ def test_call_batch_uses_one_request_wide_budget() -> None:
         ]
     )
 
-    with pytest.raises(RequestTooLarge, match="match limit"):
+    with pytest.raises(RequestTooLarge, match="character limit"):
         redact_call_batch(
             req,
             SensitiveDataPolicy.PII_V1,
-            ScanBudget(max_matches=4),
+            ScanBudget(max_total_characters=100),
         )
 
     assert req.batch[0].req.start.inputs == {"email": "ada@example.com"}
