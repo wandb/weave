@@ -5,6 +5,7 @@ import functools
 import json
 import os
 import threading
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,7 @@ CREDENTIALS_FILE_ENV = "WANDB_CREDENTIALS_FILE"
 DEFAULT_CREDENTIALS_FILE = Path("~/.config/wandb/credentials.json").expanduser()
 TOKEN_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 TOKEN_REFRESH_SKEW = timedelta(minutes=5)
+TOKEN_EXCHANGE_FAILURE_COOLDOWN_SECONDS = 30
 EXPIRES_AT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -67,6 +69,7 @@ class IdentityTokenCredentials(WandbCredentials):
         self.token_file = token_file
         self.credentials_file = credentials_file
         self._lock = threading.Lock()
+        self._exchange_failure: tuple[float, str] | None = None
 
     def authorization_header(self) -> str:
         return f"Bearer {self.access_token()}"
@@ -82,7 +85,20 @@ class IdentityTokenCredentials(WandbCredentials):
             cached = self._read_cached_token()
             if cached is not None:
                 return cached
-            token, expires_at = self._exchange_token()
+            now = time.monotonic()
+            if self._exchange_failure is not None:
+                retry_at, message = self._exchange_failure
+                if now < retry_at:
+                    raise AuthenticationError(message)
+            try:
+                token, expires_at = self._exchange_token()
+            except AuthenticationError as e:
+                self._exchange_failure = (
+                    now + TOKEN_EXCHANGE_FAILURE_COOLDOWN_SECONDS,
+                    str(e),
+                )
+                raise
+            self._exchange_failure = None
             self._write_cached_token(token, expires_at)
             return token
 

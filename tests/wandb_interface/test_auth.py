@@ -191,6 +191,52 @@ def test_identity_credentials_reject_failed_exchange(
     )
 
 
+def test_identity_credentials_cache_exchange_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+    request = httpx.Request("POST", "https://api.wandb.test/oidc/token")
+    exchange_count = 0
+    now = 100.0
+
+    def post(*args, **kwargs) -> httpx.Response:
+        nonlocal exchange_count
+        exchange_count += 1
+        if exchange_count == 1:
+            return httpx.Response(
+                503,
+                text="unavailable",
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            json={"access_token": "access-token", "expires_in": 3600},
+            request=request,
+        )
+
+    monkeypatch.setattr(auth.httpx, "post", post)
+    monkeypatch.setattr(auth.time, "monotonic", lambda: now)
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+
+    for _ in range(2):
+        with pytest.raises(AuthenticationError) as exc_info:
+            credentials.access_token()
+        assert str(exc_info.value) == (
+            "Failed to exchange identity token: 503, unavailable"
+        )
+    assert exchange_count == 1
+
+    now += auth.TOKEN_EXCHANGE_FAILURE_COOLDOWN_SECONDS
+
+    assert credentials.access_token() == "access-token"
+    assert exchange_count == 2
+
+
 def test_identity_credentials_wrap_transport_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

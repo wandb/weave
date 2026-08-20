@@ -97,7 +97,8 @@ The Python SDK resolves either an API key or a federated identity token through
 `WANDB_IDENTITY_TOKEN_FILE`, exchanges the assertion at the W&B
 `/oidc/token` endpoint, caches access tokens under
 `WANDB_CREDENTIALS_FILE`, and applies Bearer auth to every W&B and Weave
-transport.
+transport. Failed token exchanges are cached in-process for 30 seconds to
+prevent request traffic from repeatedly calling an unavailable token endpoint.
 
 ## Generated Files — Do Not Hand-Edit
 
