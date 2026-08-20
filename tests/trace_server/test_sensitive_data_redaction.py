@@ -12,7 +12,6 @@ from weave.trace_server.environment import (
     SENSITIVE_DATA_POLICY_ENV,
     sensitive_data_policy,
 )
-from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.opentelemetry.python_spans import (
     Event,
     Link,
@@ -23,7 +22,6 @@ from weave.trace_server.opentelemetry.python_spans import (
 from weave.trace_server.opentelemetry.python_spans import (
     Resource as SpanResource,
 )
-from weave.trace_server.sensitive_data.budget import ScanBudget
 from weave.trace_server.sensitive_data.call_redaction import (
     redact_call_batch,
     redact_call_end,
@@ -78,20 +76,18 @@ def test_redacts_supported_pii_with_typed_markers() -> None:
         "card 4111 1111 1111 1111, international +44 20 7946 0958."
     )
 
-    assert redact_pii_string(text, ScanBudget()) == (
+    assert redact_pii_string(text) == (
         "Email <EMAIL_ADDRESS>, phone <PHONE_NUMBER>, SSN <US_SSN>, "
         "card <CREDIT_CARD>, international <PHONE_NUMBER>."
     )
 
 
 def test_redacts_compact_luhn_valid_card() -> None:
-    assert redact_pii_string("4111111111111111", ScanBudget()) == "<CREDIT_CARD>"
+    assert redact_pii_string("4111111111111111") == "<CREDIT_CARD>"
 
 
 def test_redacts_compact_e164_phone() -> None:
-    assert redact_pii_string("Call +14155552671", ScanBudget()) == (
-        "Call <PHONE_NUMBER>"
-    )
+    assert redact_pii_string("Call +14155552671") == ("Call <PHONE_NUMBER>")
 
 
 @pytest.mark.parametrize(
@@ -104,7 +100,7 @@ def test_redacts_compact_e164_phone() -> None:
     ],
 )
 def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> None:
-    assert redact_pii_string(text, ScanBudget()) == expected
+    assert redact_pii_string(text) == expected
 
 
 @pytest.mark.parametrize(
@@ -117,7 +113,7 @@ def test_unicode_neighbors_cannot_hide_ascii_pii(text: str, expected: str) -> No
     ],
 )
 def test_redacts_emails_with_dotted_local_parts(text: str, expected: str) -> None:
-    assert redact_pii_string(text, ScanBudget()) == expected
+    assert redact_pii_string(text) == expected
 
 
 @pytest.mark.parametrize(
@@ -153,7 +149,7 @@ def test_redacts_emails_with_dotted_local_parts(text: str, expected: str) -> Non
     ],
 )
 def test_leaves_common_numeric_non_matches_unchanged(text: str) -> None:
-    assert redact_pii_string(text, ScanBudget()) == text
+    assert redact_pii_string(text) == text
 
 
 def test_walker_is_copy_on_write_and_does_not_scan_keys() -> None:
@@ -164,7 +160,7 @@ def test_walker_is_copy_on_write_and_does_not_scan_keys() -> None:
         "clean": clean_subtree,
     }
 
-    redacted = redact_pii_value(payload, ScanBudget())
+    redacted = redact_pii_value(payload)
 
     assert redacted == {
         "ada@example.com": "dictionary key",
@@ -185,7 +181,7 @@ def test_walker_fuses_credential_key_and_pii_redaction() -> None:
         ],
     }
 
-    redacted = redact_pii_value(payload, ScanBudget())
+    redacted = redact_pii_value(payload)
 
     assert redacted == {
         "api_key": REDACTED_VALUE,
@@ -210,7 +206,7 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
         r'"phone":"\u0028415\u0029 555-2671"}'
     )
 
-    assert redact_pii_value(value, ScanBudget()) == (
+    assert redact_pii_value(value) == (
         '{"ada@example.com":"dictionary key",'
         '"contact":"<EMAIL_ADDRESS>",'
         '"phone":"<PHONE_NUMBER>"}'
@@ -219,10 +215,7 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
 
 def test_walker_does_not_rewrite_string_enum_discriminators() -> None:
     assert (
-        redact_pii_value(
-            _StructuralLabel.EMAIL_SHAPED, ScanBudget(max_total_characters=0)
-        )
-        is _StructuralLabel.EMAIL_SHAPED
+        redact_pii_value(_StructuralLabel.EMAIL_SHAPED) is _StructuralLabel.EMAIL_SHAPED
     )
 
 
@@ -234,7 +227,7 @@ def test_walker_copies_models_and_tuples_only_along_changed_paths() -> None:
         extra_contact="linus@example.com",
     )
 
-    redacted = redact_pii_value(payload, ScanBudget())
+    redacted = redact_pii_value(payload)
 
     assert redacted is not payload
     assert redacted.values == (clean_list, "<EMAIL_ADDRESS>")
@@ -257,12 +250,12 @@ def test_walker_preserves_refs_base64_data_urls_and_inline_base64() -> None:
         "base64": base64_value,
     }
 
-    assert redact_pii_value(payload, ScanBudget(max_total_characters=0)) is payload
+    assert redact_pii_value(payload) is payload
 
 
 @pytest.mark.parametrize("prefix", ["data:", "DATA:"])
 def test_walker_scans_plaintext_data_urls(prefix: str) -> None:
-    assert redact_pii_value(f"{prefix}text/plain,ada@example.com", ScanBudget()) == (
+    assert redact_pii_value(f"{prefix}text/plain,ada@example.com") == (
         f"{prefix}text/plain,<EMAIL_ADDRESS>"
     )
 
@@ -285,7 +278,7 @@ def test_walker_scans_plaintext_data_urls(prefix: str) -> None:
     ],
 )
 def test_walker_scans_malformed_ref_prefixes(value: str, expected: str) -> None:
-    assert redact_pii_value(value, ScanBudget()) == expected
+    assert redact_pii_value(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -297,7 +290,7 @@ def test_walker_scans_malformed_ref_prefixes(value: str, expected: str) -> None:
     ],
 )
 def test_walker_scans_refs_with_missing_required_parts(value: str) -> None:
-    redacted = redact_pii_value(value, ScanBudget())
+    redacted = redact_pii_value(value)
 
     assert "ada@example.com" not in redacted
     assert "<EMAIL_ADDRESS>" in redacted
@@ -327,48 +320,23 @@ def test_walker_scans_refs_with_missing_required_parts(value: str) -> None:
 def test_walker_does_not_preserve_invalid_encoded_content(
     value: str, expected_prefix: str
 ) -> None:
-    assert redact_pii_value(value, ScanBudget()).startswith(expected_prefix)
+    assert redact_pii_value(value).startswith(expected_prefix)
 
 
-def test_walker_enforces_request_wide_limits() -> None:
-    with pytest.raises(RequestTooLarge, match="character limit"):
-        redact_pii_value("four", ScanBudget(max_total_characters=3))
-
-    with pytest.raises(RequestTooLarge, match="candidate length"):
-        redact_pii_value("4111 1111 1111 1111", ScanBudget(max_candidate_characters=10))
-
-    with pytest.raises(RequestTooLarge, match="detailed scan"):
-        redact_pii_value(
-            ["123-45-6789", "123-45-6789"],
-            ScanBudget(max_detailed_characters=15),
-        )
-
-    with pytest.raises(RequestTooLarge, match="nesting limit"):
-        redact_pii_value(
-            {"outer": {"inner": "value"}}, ScanBudget(max_structure_depth=1)
-        )
-
-
-def test_walker_fails_closed_on_cyclic_input() -> None:
+def test_walker_fails_loudly_on_cyclic_input() -> None:
     payload: dict[str, object] = {}
     payload["self"] = payload
 
-    with pytest.raises(RequestTooLarge, match="nesting limit"):
-        redact_pii_value(payload, ScanBudget(max_structure_depth=4))
+    with pytest.raises(RecursionError):
+        redact_pii_value(payload)
 
     assert payload["self"] is payload
 
 
-def test_numeric_candidate_requires_enough_digits_before_charging_budget() -> None:
+def test_numeric_run_without_minimum_digits_is_unchanged() -> None:
     value = "1" + "-" * 600 + "2"
 
-    assert (
-        redact_pii_value(
-            value,
-            ScanBudget(max_candidate_characters=10, max_detailed_characters=0),
-        )
-        is value
-    )
+    assert redact_pii_value(value) is value
 
 
 def test_call_start_redacts_content_but_not_structural_fields() -> None:
@@ -428,36 +396,10 @@ def test_call_end_update_complete_and_batch_redact_content() -> None:
     assert redacted_batch.batch[1].req.end.output == {"card": "<CREDIT_CARD>"}
 
 
-def test_call_batch_uses_one_request_wide_budget() -> None:
-    req = tsi.CallCreateBatchReq(
-        batch=[
-            tsi.CallBatchStartMode(req=_call_start_req()),
-            tsi.CallBatchEndMode(req=_call_end_req()),
-        ]
-    )
-
-    with pytest.raises(RequestTooLarge, match="character limit"):
-        redact_call_batch(
-            req,
-            SensitiveDataPolicy.PII_V1,
-            ScanBudget(max_total_characters=100),
-        )
-
-    assert req.batch[0].req.start.inputs == {"email": "ada@example.com"}
-    assert req.batch[1].req.end.output == {"card": "4111 1111 1111 1111"}
-
-
 def test_off_policy_skips_the_walker() -> None:
     req = _call_start_req()
 
-    assert (
-        redact_call_start(
-            req,
-            SensitiveDataPolicy.OFF,
-            ScanBudget(max_total_characters=0),
-        )
-        is req
-    )
+    assert redact_call_start(req, SensitiveDataPolicy.OFF) is req
 
 
 def _call_start_req() -> tsi.CallStartReq:
@@ -538,7 +480,7 @@ def _span_with_pii() -> Span:
 def test_redacts_pii_from_every_span_container() -> None:
     span = _span_with_pii()
 
-    redact_pii_from_span(span, SensitiveDataPolicy.PII_V1, ScanBudget())
+    redact_pii_from_span(span, SensitiveDataPolicy.PII_V1)
 
     assert span.attributes == {
         "gen_ai.prompt": "Email <EMAIL_ADDRESS>",
@@ -557,16 +499,7 @@ def test_span_redaction_off_policy_is_a_noop() -> None:
     span = _span_with_pii()
     original_attributes = span.attributes
 
-    redact_pii_from_span(span, SensitiveDataPolicy.OFF, ScanBudget())
+    redact_pii_from_span(span, SensitiveDataPolicy.OFF)
 
     assert span.attributes is original_attributes
     assert span.status.message == "card 4111 1111 1111 1111"
-
-
-def test_span_redaction_fails_closed_on_budget_exhaustion() -> None:
-    span = _span_with_pii()
-
-    with pytest.raises(RequestTooLarge):
-        redact_pii_from_span(
-            span, SensitiveDataPolicy.PII_V1, ScanBudget(max_total_characters=10)
-        )

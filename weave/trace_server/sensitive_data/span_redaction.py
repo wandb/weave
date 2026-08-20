@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from weave.trace_server.sensitive_data.budget import ScanBudget
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy, pii_enabled
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
@@ -12,9 +11,7 @@ if TYPE_CHECKING:
     from weave.trace_server.opentelemetry.python_spans import Span
 
 
-def redact_pii_from_span(
-    span: Span, policy: SensitiveDataPolicy, budget: ScanBudget
-) -> None:
+def redact_pii_from_span(span: Span, policy: SensitiveDataPolicy) -> None:
     """Redact supported PII in a span's customer-authored string values.
 
     Mirrors ``redact_credentials_from_span``: covers all four attribute
@@ -28,11 +25,11 @@ def redact_pii_from_span(
     """
     if not pii_enabled(policy):
         return
-    span.attributes = redact_pii_value(span.attributes, budget)
+    span.attributes = redact_pii_value(span.attributes)
     if span.resource is not None:
-        span.resource.attributes = redact_pii_value(span.resource.attributes, budget)
+        span.resource.attributes = redact_pii_value(span.resource.attributes)
     for event in span.events:
-        event.attributes = redact_pii_value(event.attributes, budget)
+        event.attributes = redact_pii_value(event.attributes)
     for link in span.links:
-        link.attributes = redact_pii_value(link.attributes, budget)
-    span.status.message = redact_pii_value(span.status.message, budget)
+        link.attributes = redact_pii_value(link.attributes)
+    span.status.message = redact_pii_value(span.status.message)

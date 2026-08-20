@@ -11,8 +11,6 @@ from __future__ import annotations
 import re
 from typing import Literal, NamedTuple
 
-from weave.trace_server.sensitive_data.budget import ScanBudget
-
 PIIEntity = Literal["EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN", "CREDIT_CARD"]
 
 REPLACEMENT_MARKERS: dict[PIIEntity, str] = {
@@ -31,8 +29,7 @@ _DETECTOR_PRIORITY: dict[PIIEntity, int] = {
 
 _ASCII_DIGIT_RE = re.compile(r"[0-9]")
 _MIN_NUMERIC_CANDIDATE_DIGITS = 9
-# One search for "at least 9 digits in the window", instead of 9 chained
-# single-digit searches: the count stays in C.
+# One C-level search for "at least 9 digits in the window".
 _MIN_NUMERIC_DIGITS_RE = re.compile(
     rf"(?:[0-9][^0-9]*){{{_MIN_NUMERIC_CANDIDATE_DIGITS - 1}}}[0-9]", re.ASCII
 )
@@ -58,11 +55,9 @@ _INTERNATIONAL_PHONE_RE = re.compile(
 _COMPACT_INTERNATIONAL_PHONE_RE = re.compile(
     r"(?<![A-Za-z0-9+])\+[1-9][0-9]{9,14}(?![A-Za-z0-9])"
 )
-# Candidates from the numeric patterns contain only digits and these
-# separators, so dropping the separators leaves exactly the digits.
+# Numeric candidates contain only digits and these separators.
 _DROP_NUMERIC_SEPARATORS = str.maketrans("", "", "+() .-")
-# Same rule as one 1-to-63 character domain label with no edge hyphen,
-# applied to the whole dot-separated domain in one C-level match.
+# Dot-separated 1-to-63 character labels with no edge hyphens.
 _DOMAIN_LABELS_RE = re.compile(
     r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?",
@@ -79,21 +74,13 @@ class Detection(NamedTuple):
     entity: PIIEntity
 
 
-def detect_pii(
-    text: str,
-    budget: ScanBudget,
-    *,
-    inspect_string: bool = True,
-) -> list[Detection]:
+def detect_pii(text: str) -> list[Detection]:
     """Return non-overlapping PII spans without retaining matched text."""
-    if inspect_string:
-        budget.inspect_string(len(text))
     detections: list[Detection] = []
 
     if text.find("@") != -1:
         for match in _EMAIL_RE.finditer(text):
             candidate = match.group(0)
-            budget.inspect_candidate(len(candidate))
             if _valid_email(candidate) and _absolute_token_boundaries(
                 text, match.start(), match.end()
             ):
@@ -102,16 +89,12 @@ def detect_pii(
                 )
 
     if _ASCII_DIGIT_RE.search(text) is not None:
-        # A numeric detection can only overlap an email: runs are mutually
-        # disjoint and within-run overlaps are already resolved. Both lists
-        # ascend by start, so one monotone pointer replaces an O(n^2) scan.
+        # Only emails can overlap numerics, and both lists ascend by start.
         email_count = len(detections)
         email_index = 0
         for run in _NUMERIC_RUN_RE.finditer(text):
             if not _has_minimum_digits(text, run.start(), run.end()):
                 continue
-            candidate_length = run.end() - run.start()
-            budget.inspect_candidate(candidate_length)
             candidate = run.group(0)
             numeric_detections = _select_non_overlapping(
                 _detect_numeric(candidate, run.start(), text)
@@ -132,14 +115,9 @@ def detect_pii(
     return _select_non_overlapping(detections)
 
 
-def redact_pii_string(
-    text: str,
-    budget: ScanBudget,
-    *,
-    inspect_string: bool = True,
-) -> str:
+def redact_pii_string(text: str) -> str:
     """Replace supported PII spans with stable typed markers."""
-    detections = detect_pii(text, budget, inspect_string=inspect_string)
+    detections = detect_pii(text)
     if not detections:
         return text
 
@@ -166,8 +144,7 @@ def _has_minimum_digits(text: str, start: int, end: int) -> bool:
 
 
 def _detect_numeric(candidate: str, offset: int, text: str) -> list[Detection]:
-    # ``pii-v1`` does not accept compact unprefixed phones or SSNs, so a
-    # digits-only run can only be a card.
+    # A digits-only run can only be a card under ``pii-v1``.
     if candidate.isdecimal():
         if (
             13 <= len(candidate) <= 19
@@ -179,9 +156,7 @@ def _detect_numeric(candidate: str, offset: int, text: str) -> list[Detection]:
             ]
         return []
 
-    # Run only the sub-detectors whose required characters can occur in this
-    # candidate: an SSN needs dashes, a card match spans at least 13
-    # characters, and the international forms need a plus sign.
+    # Skip sub-detectors whose required characters are absent.
     detections: list[Detection] = []
     if "-" in candidate:
         for match in _SSN_RE.finditer(candidate):

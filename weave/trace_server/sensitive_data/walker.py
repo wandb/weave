@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from weave.shared import refs_internal as ri
 from weave.trace_server.credential_redaction import REDACTED_VALUE, should_redact
 from weave.trace_server.errors import RequestTooLarge
-from weave.trace_server.sensitive_data.budget import ScanBudget
 from weave.trace_server.sensitive_data.detectors import redact_pii_string
 
 T = TypeVar("T")
@@ -34,25 +33,24 @@ _PRIVATE_REF_PREFIX = f"{ri.WEAVE_PRIVATE_SCHEME}://///"
 _SYNTHETIC_PROJECT_ID = "cHJvamVjdA=="
 
 
-def redact_pii_value(value: T, budget: ScanBudget, depth: int = 0) -> T:
+def redact_pii_value(value: T) -> T:
     """Redact credential-shaped fields and PII while reusing clean subtrees."""
-    budget.check_depth(depth)
     if isinstance(value, Enum):
         return value
     if isinstance(value, str):
         if _preserve_string(value):
             return value
         if _is_json_candidate(value):
-            return cast(T, _redact_json_string(value, budget, depth))
-        return cast(T, redact_pii_string(value, budget))
+            return cast(T, _redact_json_string(value))
+        return cast(T, redact_pii_string(value))
     if isinstance(value, BaseModel):
-        return cast(T, _redact_model(value, budget, depth))
+        return cast(T, _redact_model(value))
     if isinstance(value, dict):
-        return cast(T, _redact_mapping(value, budget, depth))
+        return cast(T, _redact_mapping(value))
     if isinstance(value, list):
-        return cast(T, _redact_sequence(value, list, budget, depth))
+        return cast(T, _redact_sequence(value, list))
     if isinstance(value, tuple):
-        return cast(T, _redact_sequence(value, tuple, budget, depth))
+        return cast(T, _redact_sequence(value, tuple))
     return value
 
 
@@ -67,17 +65,16 @@ def _is_json_candidate(value: str) -> bool:
     return "@" in stripped or any("0" <= character <= "9" for character in stripped)
 
 
-def _redact_json_string(value: str, budget: ScanBudget, depth: int) -> str:
-    budget.inspect_string(len(value))
+def _redact_json_string(value: str) -> str:
     try:
         parsed = json.loads(value)
     except ValueError:
-        return redact_pii_string(value, budget, inspect_string=False)
+        return redact_pii_string(value)
     except RecursionError as error:
         raise RequestTooLarge("Sensitive-data nesting limit exceeded") from error
     if not isinstance(parsed, (dict, list, str)):
-        return redact_pii_string(value, budget, inspect_string=False)
-    redacted = redact_pii_value(parsed, budget, depth + 1)
+        return redact_pii_string(value)
+    redacted = redact_pii_value(parsed)
     if redacted is parsed:
         return value
     return json.dumps(redacted, separators=(",", ":"))
@@ -156,28 +153,26 @@ def _is_base64_data_url(value: str) -> bool:
     )
 
 
-def _redact_model(model: BaseModel, budget: ScanBudget, depth: int) -> BaseModel:
+def _redact_model(model: BaseModel) -> BaseModel:
     updates: dict[str, Any] = {}
     for field_name, field_info in model.__class__.model_fields.items():
         if field_info.exclude is True:
             continue
         original = getattr(model, field_name)
-        redacted = _redact_named_value(field_name, original, budget, depth + 1)
+        redacted = _redact_named_value(field_name, original)
         if redacted is not original:
             updates[field_name] = redacted
     for field_name, original in (model.model_extra or {}).items():
-        redacted = _redact_named_value(field_name, original, budget, depth + 1)
+        redacted = _redact_named_value(field_name, original)
         if redacted is not original:
             updates[field_name] = redacted
     return model if not updates else model.model_copy(update=updates)
 
 
-def _redact_mapping(
-    value: dict[Any, Any], budget: ScanBudget, depth: int
-) -> dict[Any, Any]:
+def _redact_mapping(value: dict[Any, Any]) -> dict[Any, Any]:
     redacted: dict[Any, Any] | None = None
     for key, original in value.items():
-        item = _redact_named_value(key, original, budget, depth + 1)
+        item = _redact_named_value(key, original)
         if item is original:
             continue
         if redacted is None:
@@ -186,7 +181,7 @@ def _redact_mapping(
     return value if redacted is None else redacted
 
 
-def _redact_named_value(name: Any, value: Any, budget: ScanBudget, depth: int) -> Any:
+def _redact_named_value(name: Any, value: Any) -> Any:
     if (
         isinstance(name, str)
         and isinstance(value, str)
@@ -195,18 +190,16 @@ def _redact_named_value(name: Any, value: Any, budget: ScanBudget, depth: int) -
         and should_redact(name)
     ):
         return REDACTED_VALUE
-    return redact_pii_value(value, budget, depth)
+    return redact_pii_value(value)
 
 
 def _redact_sequence(
     value: Sequence[Any],
     rebuild: Callable[[list[Any]], Sequence[Any]],
-    budget: ScanBudget,
-    depth: int,
 ) -> Sequence[Any]:
     redacted: list[Any] | None = None
     for index, original in enumerate(value):
-        item = redact_pii_value(original, budget, depth + 1)
+        item = redact_pii_value(original)
         if item is original:
             continue
         if redacted is None:
