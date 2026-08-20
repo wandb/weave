@@ -1,4 +1,4 @@
-"""Insights extraction config: the thing `config_sha` on the signature tables names.
+"""Content-addressed configuration for insights extraction and clustering.
 
 Every knob that changes what gets written into `intent_signatures` or
 `failure_signatures` lives in one checked-in config file per signature type, so the whole
@@ -10,10 +10,10 @@ digest without anyone touching the config.
 import hashlib
 import json
 import os
-from typing import Generic, Literal, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
 import yaml
-from pydantic import BaseModel, ConfigDict, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 CONFIG_DIR = os.path.join(os.path.dirname(__file__), "configs")
 
@@ -114,6 +114,33 @@ class Embedding(_Strict):
     output_normalization: str
 
 
+class UmapProjection(_Strict):
+    """Knobs for the 2-D projection persisted on every cluster assignment.
+
+    It carries no metric of its own: on l2-normalized vectors cosine and euclidean
+    rank neighbors identically, so the clustering `metric` describes both.
+    """
+
+    n_neighbors: Annotated[int, Field(ge=2)]
+    min_dist: Annotated[float, Field(ge=0, lt=1)]
+    random_state: int
+
+
+class ClusteringConfig(_Strict):
+    """Every parameter that changes a clustering run's output."""
+
+    config_schema_version: Literal[1]
+    algorithm: Literal["hdbscan"]
+    # What one fit covers: the whole signature type, or each category on its own.
+    scope: Literal["global", "category"]
+    min_cluster_size: Annotated[int, Field(ge=2)]
+    min_samples: Annotated[int, Field(ge=1)]
+    metric: Literal["euclidean"]
+    cluster_selection_method: Literal["eom"]
+    allow_single_cluster: bool
+    umap: UmapProjection
+
+
 _E = TypeVar("_E", bound=Extraction)
 
 
@@ -157,7 +184,14 @@ def load_config(signature_type: str) -> SignatureConfig:
         return _CONFIG_MODELS[signature_type].model_validate(yaml.safe_load(handle))
 
 
-def config_sha(config: SignatureConfig) -> str:
+def load_clustering_config() -> ClusteringConfig:
+    """Load and validate the checked-in clustering config."""
+    path = os.path.join(CONFIG_DIR, "clustering.yaml")
+    with open(path, encoding="utf-8") as handle:
+        return ClusteringConfig.model_validate(yaml.safe_load(handle))
+
+
+def config_sha(config: _Strict) -> str:
     """Digest the config with every file reference resolved to its own sha256.
 
     Keys are sorted, so reordering a config file leaves the digest alone while

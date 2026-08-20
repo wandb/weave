@@ -1,0 +1,19 @@
+config_schema_version: 1
+algorithm: hdbscan
+
+# `global` fits one model over the whole signature type. `category` fits one per
+# category, which resolves finer topics inside a category that dominates the space.
+scope: global
+
+min_cluster_size: 3
+min_samples: 3
+metric: euclidean
+cluster_selection_method: eom
+allow_single_cluster: false
+
+# Projection persisted per assignment, so a finished run's scatter plot redraws
+# without reprojecting. Fixed at two components by umap_x and umap_y.
+umap:
+  n_neighbors: 15
+  min_dist: 0.0
+  random_state: 0
