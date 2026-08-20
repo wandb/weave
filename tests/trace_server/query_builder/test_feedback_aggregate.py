@@ -32,10 +32,8 @@ def _make_pb() -> ParamBuilder:
 
 
 def _normalize_sql(sql: str) -> str:
-    # Whitespace-insensitive: the SQL is generated through sqlparse's
-    # pretty-printer, whose spacing shifts between releases, and ClickHouse
-    # ignores it either way. Spacing around parens and commas is never
-    # semantic in SQL, so drop it too.
+    # sqlparse's whitespace formatting changes between releases, so strip
+    # whitespace out.
     collapsed = " ".join(sql.split())
     return re.sub(r"\s*([(),])\s*", r"\1", collapsed)
 
