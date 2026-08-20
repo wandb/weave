@@ -25,6 +25,33 @@ _NOW_NS = 1_767_225_600_000_000_000
 _PII_ATTR_VALUE = "Email ada@example.com"
 _PII_STATUS_MESSAGE = "card 4111 1111 1111 1111"
 _PII_RESOURCE_VALUE = "call (415) 555-2671"
+_PII_CONVERSATION_NAME = "chat with ada@example.com"
+
+# One PII value per derived content column, so every column is observed.
+_PII_CONTENT_ATTRS = {
+    "gen_ai.conversation.name": _PII_CONVERSATION_NAME,
+    "gen_ai.system_instructions": json.dumps(["obey ada@example.com"]),
+    "gen_ai.output.messages": json.dumps(
+        [
+            {
+                "role": "assistant",
+                "content": "reply to ada@example.com",
+                "finish_reason": "stop",
+            },
+            {
+                "role": "assistant",
+                "parts": [{"type": "reasoning", "content": "think 123-45-6789"}],
+                "finish_reason": "stop",
+            },
+        ]
+    ),
+    "gen_ai.tool.call.arguments": json.dumps({"query": "email ada@example.com"}),
+    "gen_ai.tool.call.result": json.dumps({"answer": "call (415) 555-2671"}),
+    "gen_ai.tool.definitions": json.dumps(
+        [{"name": "lookup", "description": "for 4111 1111 1111 1111"}]
+    ),
+    "weave.compaction.summary": "card 4111 1111 1111 1111",
+}
 
 
 def _pii_proto_span(span_id: bytes) -> PbSpan:
@@ -39,6 +66,11 @@ def _pii_proto_span(span_id: bytes) -> PbSpan:
     kv.key = "gen_ai.prompt"
     kv.value.string_value = _PII_ATTR_VALUE
     span.attributes.append(kv)
+    for key, value in _PII_CONTENT_ATTRS.items():
+        item = KeyValue()
+        item.key = key
+        item.value.string_value = value
+        span.attributes.append(item)
     span.status.code = 2  # ERROR, so the status message persists
     span.status.message = _PII_STATUS_MESSAGE
     return span
@@ -93,12 +125,23 @@ def test_pii_policy_redacts_stored_span_details(
     assert res.rejected_spans == 0
     row = _stored_span_details(ch_server, project_id)
     dump = json.loads(row.raw_span_dump)
-    assert dump["attributes"] == {"gen_ai": {"prompt": "Email <EMAIL_ADDRESS>"}}
+    assert dump["attributes"]["gen_ai"]["prompt"] == "Email <EMAIL_ADDRESS>"
     assert dump["resource"]["attributes"] == {
         "service": {"owner": "call <PHONE_NUMBER>"}
     }
     assert dump["status"]["message"] == "card <CREDIT_CARD>"
     assert row.status_message == "card <CREDIT_CARD>"
+    assert row.conversation_name == "chat with <EMAIL_ADDRESS>"
+    assert row.system_instructions == ["obey <EMAIL_ADDRESS>"]
+    assert row.output_messages[0].content == "reply to <EMAIL_ADDRESS>"
+    assert row.reasoning_content == "think <US_SSN>"
+    assert row.tool_call_arguments == '{"query": "email <EMAIL_ADDRESS>"}'
+    assert row.tool_call_result == '{"answer": "call <PHONE_NUMBER>"}'
+    assert (
+        row.tool_definitions
+        == '[{"name": "lookup", "description": "for <CREDIT_CARD>"}]'
+    )
+    assert row.compaction_summary == "card <CREDIT_CARD>"
 
 
 def test_default_off_policy_stores_span_values_unchanged(
@@ -114,6 +157,8 @@ def test_default_off_policy_stores_span_values_unchanged(
     assert res.rejected_spans == 0
     row = _stored_span_details(ch_server, project_id)
     dump = json.loads(row.raw_span_dump)
-    assert dump["attributes"] == {"gen_ai": {"prompt": _PII_ATTR_VALUE}}
-    assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}
+    assert dump["attributes"]["gen_ai"]["prompt"] == _PII_ATTR_VALUE
     assert dump["status"]["message"] == _PII_STATUS_MESSAGE
+    assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}
+    assert row.conversation_name == _PII_CONVERSATION_NAME
+    assert row.reasoning_content == "think 123-45-6789"
