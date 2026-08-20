@@ -9,7 +9,10 @@ from clickhouse_connect.driver.exceptions import DatabaseError
 
 from weave.trace_server import clickhouse_trace_server_migrator as trace_server_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
-from weave.trace_server.clickhouse.utilities import split_migration_sql
+from weave.trace_server.clickhouse.utilities import (
+    _sqlparse_grouping_limit_lifted,
+    split_migration_sql,
+)
 from weave.trace_server.clickhouse_trace_server_migrator import (
     _MAX_RETRIES,
     BaseClickHouseTraceServerMigrator,
@@ -1867,6 +1870,20 @@ def test_is_transient_ch_error():
     assert not _is_transient_ch_error(ConnectionError("not a db error"))
 
 
+def test_split_migration_sql_handles_statements_past_sqlparse_token_cap() -> None:
+    """006_seed_costs is one ~74KB statement; sqlparse >=0.5.5 caps grouping at
+    10k tokens and raises SQLParseError without the cap lifted.
+    """
+    values = ",\n".join(f"('model-{i}', {i}, {i}.5)" for i in range(4000))
+    sql = f"INSERT INTO llm_token_prices (id, a, b) VALUES\n{values};"
+
+    statements = split_migration_sql(sql)
+
+    assert len(statements) == 1
+    assert statements[0].startswith("INSERT INTO llm_token_prices")
+    assert statements[0].endswith("('model-3999', 3999, 3999.5)")
+
+
 def test_split_migration_sql() -> None:
     """One dense case exercising every rule the splitter cares about.
 
@@ -1994,8 +2011,10 @@ def test_split_migration_sql_equivalent_on_all_shipped_migrations() -> None:
     def normalize(stmt: str) -> str:
         # Strip comments (CH ignores them anyway) and collapse whitespace to
         # a canonical single-space form, so layout differences don't mask a
-        # true-positive semantic match.
-        no_comments = sqlparse.format(stmt, strip_comments=True)
+        # true-positive semantic match. Same token-cap lift the splitter uses,
+        # since 006_seed_costs is one statement past sqlparse's limit.
+        with _sqlparse_grouping_limit_lifted():
+            no_comments = sqlparse.format(stmt, strip_comments=True)
         return " ".join(no_comments.split())
 
     migration_files = sorted(

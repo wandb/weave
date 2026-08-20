@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
-import textwrap
+import re
 from unittest.mock import MagicMock
 
 import pytest
@@ -266,9 +266,12 @@ def _make_pb() -> ParamBuilder:
 
 
 def _normalize_sql(sql: str) -> str:
-    return "\n".join(
-        line.rstrip() for line in textwrap.dedent(sql).strip().splitlines()
-    )
+    # Whitespace-insensitive: the SQL is generated through sqlparse's
+    # pretty-printer, whose spacing shifts between releases, and ClickHouse
+    # ignores it either way. Spacing around parens and commas is never
+    # semantic in SQL, so drop it too.
+    collapsed = " ".join(sql.split())
+    return re.sub(r"\s*([(),])\s*", r"\1", collapsed)
 
 
 def _assert_sql_equal(actual: str, expected: str) -> None:

@@ -4,15 +4,17 @@ Serialization, datetime conversion, parameter processing, and insert error
 handling utilities shared across the CH trace server modules.
 """
 
+import contextlib
 import datetime
 import hashlib
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any, TypeVar, cast
 
 import sqlparse
+from sqlparse.engine import grouping as _sqlparse_grouping
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
@@ -140,6 +142,23 @@ def nullable_any_dump_to_any(
 # ---------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _sqlparse_grouping_limit_lifted() -> Iterator[None]:
+    """Lift sqlparse's token cap while parsing our own migration files.
+
+    sqlparse >=0.5.5 caps grouping at MAX_GROUPING_TOKENS to bound work on
+    untrusted input, and documents None as the way to disable it. Migration
+    text ships in this repo, and 006_seed_costs is a single statement well
+    past the cap.
+    """
+    previous = getattr(_sqlparse_grouping, "MAX_GROUPING_TOKENS", None)
+    _sqlparse_grouping.MAX_GROUPING_TOKENS = None
+    try:
+        yield
+    finally:
+        _sqlparse_grouping.MAX_GROUPING_TOKENS = previous
+
+
 def split_migration_sql(sql: str) -> list[str]:
     """Split a ClickHouse migration SQL script into individual statements.
 
@@ -153,10 +172,11 @@ def split_migration_sql(sql: str) -> list[str]:
     statements from the result.
     """
     statements: list[str] = []
-    for raw in sqlparse.split(sql, strip_semicolon=True):
-        stripped = sqlparse.format(raw, strip_comments=True).strip()
-        if stripped:
-            statements.append(stripped)
+    with _sqlparse_grouping_limit_lifted():
+        for raw in sqlparse.split(sql, strip_semicolon=True):
+            stripped = sqlparse.format(raw, strip_comments=True).strip()
+            if stripped:
+                statements.append(stripped)
     return statements
 
 
