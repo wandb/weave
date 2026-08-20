@@ -234,8 +234,7 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
     server.call_start(req_start)
     server.call_end(req_end)
 
-    # Verify that we tried to enqueue the item. CallBatchProcessor pairs the
-    # start and end into one queued item; a plain AsyncBatchProcessor queues both.
+    # CallBatchProcessor queues the pair as one item; AsyncBatchProcessor queues both.
     expected_puts = 1 if isinstance(server.call_processor, CallBatchProcessor) else 2
     assert mock_queue.put_nowait.call_count == expected_puts
 

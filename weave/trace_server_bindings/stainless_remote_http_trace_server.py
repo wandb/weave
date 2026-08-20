@@ -164,8 +164,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         req_dict = req.model_dump(**dump_kwargs)
         response = stainless_api(**req_dict, **extra_kwargs)
-        # An empty response schema is generated as a bare `object`, so the
-        # parsed body arrives as a plain dict.
+        # An empty response schema is generated as a bare `object`: a plain dict.
         if hasattr(response, "model_dump"):
             response = response.model_dump()
         return res_type.model_validate(response)
@@ -723,8 +722,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Tag and Alias API
-    # The routes take the acting user from the auth header, so `wb_user_id` is
-    # not in their generated signatures.
+    # The routes take the acting user from the auth header, not the body.
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
         return self._stainless_request(
             req,
@@ -941,8 +939,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        # The spec types the route's `file` field as a plain string, so the
-        # generated method form-encodes the bytes instead of attaching a file.
+        # The spec types `file` as a string, so the generated method cannot attach one.
         raise NotImplementedError(
             "file_create is not yet implemented in stainless client"
         )
@@ -959,7 +956,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         # TODO: Should stream to disk rather than to memory
-        # The plain call decodes the body as text, which corrupts binary files.
+        # The plain call decodes the body as text, corrupting binary files.
         response = self._stainless_client.files.with_raw_response.content(
             digest=req.digest, project_id=req.project_id
         )

@@ -1,8 +1,9 @@
 """Tests for the requests StainlessRemoteHTTPTraceServer sends.
 
 These tests drive the binding through the vendored generated client over an
-httpx.MockTransport, so they cover both the request the generated resource
-builds and the way the binding reads the response back.
+httpx.MockTransport, so what they assert is the request the generated resource
+builds. The file is not gated to the stainless shard, so it also runs against
+the default one.
 """
 
 from __future__ import annotations
@@ -24,8 +25,8 @@ BASE_URL = "http://example.com"
 PROJECT = "entity/project"
 V2 = "/v2/entity/project"
 
-# The v2 response models ignore extra fields, so one body carrying the union of
-# their required fields answers every row of the route table below.
+# One body serves the whole route table: it carries the union of the v2 response
+# models' required fields, and those models ignore the fields they do not declare.
 V2_RESPONSE = {
     "code": "def f(): pass",
     "created_at": "2026-08-20T00:00:00Z",
@@ -80,7 +81,7 @@ def _mock_server(
 
 
 @pytest.mark.parametrize(
-    ("method_name", "req", "expected_method", "expected_path"),
+    ("method_name", "req", "expected_method", "expected_path", "res_type"),
     [
         pytest.param(
             "op_create",
@@ -89,6 +90,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/ops",
+            tsi.OpCreateRes,
             id="op_create",
         ),
         pytest.param(
@@ -96,20 +98,15 @@ def _mock_server(
             tsi.OpReadReq(project_id=PROJECT, object_id="my-object", digest="abc123"),
             "GET",
             f"{V2}/ops/my-object/versions/abc123",
+            tsi.OpReadRes,
             id="op_read",
-        ),
-        pytest.param(
-            "op_delete",
-            tsi.OpDeleteReq(project_id=PROJECT, object_id="my-object"),
-            "DELETE",
-            f"{V2}/ops/my-object",
-            id="op_delete",
         ),
         pytest.param(
             "dataset_create",
             tsi.DatasetCreateReq(project_id=PROJECT, name="my-object", rows=[]),
             "POST",
             f"{V2}/datasets",
+            tsi.DatasetCreateRes,
             id="dataset_create",
         ),
         pytest.param(
@@ -119,14 +116,8 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/datasets/my-object/versions/abc123",
+            tsi.DatasetReadRes,
             id="dataset_read",
-        ),
-        pytest.param(
-            "dataset_delete",
-            tsi.DatasetDeleteReq(project_id=PROJECT, object_id="my-object"),
-            "DELETE",
-            f"{V2}/datasets/my-object",
-            id="dataset_delete",
         ),
         pytest.param(
             "scorer_create",
@@ -135,6 +126,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scorers",
+            tsi.ScorerCreateRes,
             id="scorer_create",
         ),
         pytest.param(
@@ -144,14 +136,8 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/scorers/my-object/versions/abc123",
+            tsi.ScorerReadRes,
             id="scorer_read",
-        ),
-        pytest.param(
-            "scorer_delete",
-            tsi.ScorerDeleteReq(project_id=PROJECT, object_id="my-object"),
-            "DELETE",
-            f"{V2}/scorers/my-object",
-            id="scorer_delete",
         ),
         pytest.param(
             "evaluation_create",
@@ -160,6 +146,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluations",
+            tsi.EvaluationCreateRes,
             id="evaluation_create",
         ),
         pytest.param(
@@ -169,14 +156,8 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/evaluations/my-object/versions/abc123",
+            tsi.EvaluationReadRes,
             id="evaluation_read",
-        ),
-        pytest.param(
-            "evaluation_delete",
-            tsi.EvaluationDeleteReq(project_id=PROJECT, object_id="my-object"),
-            "DELETE",
-            f"{V2}/evaluations/my-object",
-            id="evaluation_delete",
         ),
         pytest.param(
             "model_create",
@@ -185,6 +166,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/models",
+            tsi.ModelCreateRes,
             id="model_create",
         ),
         pytest.param(
@@ -194,14 +176,8 @@ def _mock_server(
             ),
             "GET",
             f"{V2}/models/my-object/versions/abc123",
+            tsi.ModelReadRes,
             id="model_read",
-        ),
-        pytest.param(
-            "model_delete",
-            tsi.ModelDeleteReq(project_id=PROJECT, object_id="my-object"),
-            "DELETE",
-            f"{V2}/models/my-object",
-            id="model_delete",
         ),
         pytest.param(
             "evaluation_run_create",
@@ -210,6 +186,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/evaluation_runs",
+            tsi.EvaluationRunCreateRes,
             id="evaluation_run_create",
         ),
         pytest.param(
@@ -217,6 +194,7 @@ def _mock_server(
             tsi.EvaluationRunReadReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "GET",
             f"{V2}/evaluation_runs/run-id",
+            tsi.EvaluationRunReadRes,
             id="evaluation_run_read",
         ),
         pytest.param(
@@ -226,6 +204,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/evaluation_runs",
+            tsi.EvaluationRunDeleteRes,
             id="evaluation_run_delete",
         ),
         pytest.param(
@@ -233,6 +212,7 @@ def _mock_server(
             tsi.EvaluationRunFinishReq(project_id=PROJECT, evaluation_run_id="run-id"),
             "POST",
             f"{V2}/evaluation_runs/run-id/finish",
+            tsi.EvaluationRunFinishRes,
             id="evaluation_run_finish",
         ),
         pytest.param(
@@ -242,6 +222,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/predictions",
+            tsi.PredictionCreateRes,
             id="prediction_create",
         ),
         pytest.param(
@@ -249,6 +230,7 @@ def _mock_server(
             tsi.PredictionReadReq(project_id=PROJECT, prediction_id="prediction-id"),
             "GET",
             f"{V2}/predictions/prediction-id",
+            tsi.PredictionReadRes,
             id="prediction_read",
         ),
         pytest.param(
@@ -258,6 +240,7 @@ def _mock_server(
             ),
             "DELETE",
             f"{V2}/predictions",
+            tsi.PredictionDeleteRes,
             id="prediction_delete",
         ),
         pytest.param(
@@ -265,6 +248,7 @@ def _mock_server(
             tsi.PredictionFinishReq(project_id=PROJECT, prediction_id="prediction-id"),
             "POST",
             f"{V2}/predictions/prediction-id/finish",
+            tsi.PredictionFinishRes,
             id="prediction_finish",
         ),
         pytest.param(
@@ -277,6 +261,7 @@ def _mock_server(
             ),
             "POST",
             f"{V2}/scores",
+            tsi.ScoreCreateRes,
             id="score_create",
         ),
         pytest.param(
@@ -284,6 +269,7 @@ def _mock_server(
             tsi.ScoreReadReq(project_id=PROJECT, score_id="score-id"),
             "GET",
             f"{V2}/scores/score-id",
+            tsi.ScoreReadRes,
             id="score_read",
         ),
         pytest.param(
@@ -291,21 +277,27 @@ def _mock_server(
             tsi.ScoreDeleteReq(project_id=PROJECT, score_ids=["score-id"]),
             "DELETE",
             f"{V2}/scores",
+            tsi.ScoreDeleteRes,
             id="score_delete",
         ),
     ],
 )
 def test_v2_method_reaches_its_flat_route(
-    method_name: str, req: BaseModel, expected_method: str, expected_path: str
+    method_name: str,
+    req: BaseModel,
+    expected_method: str,
+    expected_path: str,
+    res_type: type[BaseModel],
 ):
     """Test that a v2 method reaches its route with entity and project filled in."""
     server, requests = _mock_server(httpx.Response(200, json=V2_RESPONSE))
 
-    getattr(server, method_name)(req)
+    res = getattr(server, method_name)(req)
 
     assert [(r.method, r.url.path) for r in requests] == [
         (expected_method, expected_path)
     ]
+    assert isinstance(res, res_type)
 
 
 @pytest.mark.parametrize(
@@ -474,7 +466,7 @@ def test_delete_sends_the_requested_digests(
     getattr(server, method_name)(req)
 
     assert len(requests) == 1
-    assert requests[0].url.path == expected_path
+    assert (requests[0].method, requests[0].url.path) == ("DELETE", expected_path)
     assert dict(requests[0].url.params) == {"digests": "abc123"}
 
 
@@ -596,12 +588,69 @@ def test_call_start_batch_reads_the_response_list():
     ]
 
 
-def test_evaluation_run_list_reads_one_item_per_stream_line():
+@pytest.mark.parametrize(
+    ("method_name", "req", "expected_path", "rows", "expected"),
+    [
+        pytest.param(
+            "evaluation_run_list",
+            tsi.EvaluationRunListReq(project_id=PROJECT),
+            f"{V2}/evaluation_runs",
+            [
+                {"evaluation_run_id": "r1", "evaluation": "ev-ref", "model": "m-ref"},
+                {"evaluation_run_id": "r2", "evaluation": "ev-ref", "model": "m-ref"},
+            ],
+            [
+                tsi.EvaluationRunReadRes(
+                    evaluation_run_id="r1", evaluation="ev-ref", model="m-ref"
+                ),
+                tsi.EvaluationRunReadRes(
+                    evaluation_run_id="r2", evaluation="ev-ref", model="m-ref"
+                ),
+            ],
+            id="evaluation_run_list",
+        ),
+        pytest.param(
+            "prediction_list",
+            tsi.PredictionListReq(project_id=PROJECT),
+            f"{V2}/predictions",
+            [
+                {"prediction_id": "p1", "model": "m-ref", "inputs": {}, "output": None},
+                {"prediction_id": "p2", "model": "m-ref", "inputs": {}, "output": None},
+            ],
+            [
+                tsi.PredictionReadRes(
+                    prediction_id="p1", model="m-ref", inputs={}, output=None
+                ),
+                tsi.PredictionReadRes(
+                    prediction_id="p2", model="m-ref", inputs={}, output=None
+                ),
+            ],
+            id="prediction_list",
+        ),
+        pytest.param(
+            "score_list",
+            tsi.ScoreListReq(project_id=PROJECT),
+            f"{V2}/scores",
+            [
+                {"score_id": "s1", "scorer": "s-ref", "value": 1},
+                {"score_id": "s2", "scorer": "s-ref", "value": 2},
+            ],
+            [
+                tsi.ScoreReadRes(score_id="s1", scorer="s-ref", value=1),
+                tsi.ScoreReadRes(score_id="s2", scorer="s-ref", value=2),
+            ],
+            id="score_list",
+        ),
+    ],
+)
+def test_typed_stream_reads_one_item_per_line(
+    method_name: str,
+    req: BaseModel,
+    expected_path: str,
+    rows: list[dict],
+    expected: list[BaseModel],
+):
     """Test that a route whose stream the spec types yields one item per line."""
-    rows = [
-        {"evaluation_run_id": "r1", "evaluation": "ev-ref", "model": "m-ref"},
-        {"evaluation_run_id": "r2", "evaluation": "ev-ref", "model": "m-ref"},
-    ]
     server, requests = _mock_server(
         httpx.Response(
             200,
@@ -610,18 +659,11 @@ def test_evaluation_run_list_reads_one_item_per_stream_line():
         )
     )
 
-    res = list(server.evaluation_run_list(tsi.EvaluationRunListReq(project_id=PROJECT)))
+    res = list(getattr(server, method_name)(req))
 
     assert len(requests) == 1
-    assert requests[0].url.path == f"{V2}/evaluation_runs"
-    assert res == [
-        tsi.EvaluationRunReadRes(
-            evaluation_run_id="r1", evaluation="ev-ref", model="m-ref"
-        ),
-        tsi.EvaluationRunReadRes(
-            evaluation_run_id="r2", evaluation="ev-ref", model="m-ref"
-        ),
-    ]
+    assert requests[0].url.path == expected_path
+    assert res == expected
 
 
 def test_file_content_read_keeps_bytes():
