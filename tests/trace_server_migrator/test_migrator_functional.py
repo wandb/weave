@@ -955,7 +955,8 @@ def test_signature_cluster_tables_schema_and_retry(ch_client):
 
     expected_tables = {
         "signature_cluster_assignments": (
-            "project_id, cluster_run_id, signature_record_id",
+            "project_id, cluster_run_id, toStartOfHour(trace_started_at), "
+            "signature_record_id",
             "toYYYYMM(trace_started_at)",
             [
                 ("project_id", "String"),

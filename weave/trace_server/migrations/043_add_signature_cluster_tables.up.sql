@@ -119,11 +119,14 @@ CREATE TABLE IF NOT EXISTS signature_cluster_assignments
 )
 ENGINE = ReplacingMergeTree(inserted_at)
 -- The turn's own time, matching the signature tables this row fans out from, so
--- retention and time-windowed reads are partition work rather than a scan.
+-- retention is a partition drop. A month is too coarse to narrow a read: at 1M
+-- signatures a day this partition holds 30M rows, so the hour is in the key too.
 PARTITION BY toYYYYMM(trace_started_at)
 -- A signature holds one assignment per run, so `cluster_id` stays out of the key and
--- a rewrite that moves the signature collapses onto the existing row.
-ORDER BY (project_id, cluster_run_id, signature_record_id)
+-- a rewrite that moves the signature collapses onto the existing row. The hour is
+-- fixed for a signature, which the partition key already relies on, so it narrows a
+-- time-windowed read without putting that collapse at risk.
+ORDER BY (project_id, cluster_run_id, toStartOfHour(trace_started_at), signature_record_id)
 TTL expire_at DELETE
 SETTINGS min_bytes_for_wide_part = 0;
 
