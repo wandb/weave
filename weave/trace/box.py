@@ -107,7 +107,7 @@ def unbox(
     elif type(obj) == BoxedStr:
         return str(obj)
     elif type(obj) == BoxedDatetime:
-        return datetime.datetime.fromtimestamp(obj.timestamp())
+        return datetime.datetime.fromtimestamp(obj.timestamp(), tz=obj.tzinfo)
     elif type(obj) == BoxedTimedelta:
         return datetime.timedelta(seconds=obj.total_seconds())
     return obj

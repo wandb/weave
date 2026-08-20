@@ -1,3 +1,4 @@
+import inspect
 import os
 import unittest.mock
 from collections.abc import Generator
@@ -5,18 +6,24 @@ from unittest.mock import Mock
 
 import pytest
 from google import genai
-from google.genai.types import GenerateImagesConfig
+from google.genai.types import GenerateContentConfig, GenerateImagesConfig
 from pydantic import BaseModel
 
+import weave
 from weave.integrations.google_genai.gemini_utils import (
     _traverse_and_replace_blobs,
     google_genai_gemini_accumulator,
     google_genai_gemini_on_finish,
     google_genai_gemini_postprocess_inputs,
     google_genai_gemini_postprocess_output,
+    google_genai_gemini_wrapper_async,
+    google_genai_gemini_wrapper_sync,
 )
 from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.trace.autopatch import OpSettings
+from weave.trace.box import BoxedStr
+from weave.trace.vals import WeaveList
 
 
 @pytest.fixture(autouse=True)
@@ -970,3 +977,160 @@ def test_content_generation_with_image_bytes(client):
         "Image bytes must be converted to Content so they display in the Weave UI"
     )
     assert image_part["inline_data"].mimetype == "image/jpeg"
+
+
+def test_wrapper_sync_unboxes_contents(weave_active):
+    """A boxed string reaches the SDK as a plain str, not a BoxedStr."""
+    captured = {}
+
+    def generate_content(self, *, model, contents, config=None):
+        captured["contents"] = contents
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
+
+    wrapped(
+        Mock(_model="gemini-2.0-flash"),
+        model="gemini-2.0-flash",
+        contents=BoxedStr("hello"),
+    )
+
+    assert type(captured["contents"]) is str
+    assert captured["contents"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_wrapper_async_unboxes_contents(weave_active):
+    """The async wrapper unboxes contents the same way."""
+    captured = {}
+
+    async def generate_content(self, *, model, contents, config=None):
+        captured["contents"] = contents
+
+    wrapped = google_genai_gemini_wrapper_async(OpSettings())(generate_content)
+
+    await wrapped(
+        Mock(_model="gemini-2.0-flash"),
+        model="gemini-2.0-flash",
+        contents=BoxedStr("hello"),
+    )
+
+    assert type(captured["contents"]) is str
+    assert captured["contents"] == "hello"
+
+
+def test_wrapper_unboxes_weave_list_contents(client):
+    """A WeaveList of boxed strings reaches the SDK as a plain list of str."""
+    captured = {}
+
+    def generate_content(self, *, model, contents, config=None):
+        captured["contents"] = contents
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
+
+    wrapped(
+        Mock(_model="gemini-2.0-flash"),
+        model="gemini-2.0-flash",
+        contents=WeaveList([BoxedStr("hello")], server=client.server),
+    )
+
+    assert type(captured["contents"]) is list
+    assert [type(part) for part in captured["contents"]] == [str]
+    assert captured["contents"] == ["hello"]
+
+
+def test_wrapper_unboxes_dict_config_system_instruction(weave_active):
+    """system_instruction inside a dict config is unboxed as well."""
+    captured = {}
+
+    def generate_content(self, *, model, contents, config=None):
+        captured["config"] = config
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
+
+    wrapped(
+        Mock(_model="gemini-2.0-flash"),
+        model="gemini-2.0-flash",
+        contents="hello",
+        config={"system_instruction": BoxedStr("stay terse")},
+    )
+
+    assert type(captured["config"]["system_instruction"]) is str
+    assert captured["config"] == {"system_instruction": "stay terse"}
+
+
+def test_wrapper_unboxes_positional_message(weave_active):
+    """Chat.send_message takes its message positionally, so args are unboxed too."""
+    captured = {}
+
+    def send_message(self, message, config=None):
+        captured["message"] = message
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(send_message)
+
+    wrapped(Mock(_model="gemini-2.0-flash"), BoxedStr("hello"))
+
+    assert type(captured["message"]) is str
+    assert captured["message"] == "hello"
+
+
+def test_wrapper_preserves_user_built_config_identity(weave_active):
+    """A config the user built is handed on as-is, never rebuilt."""
+    captured = {}
+    config = GenerateContentConfig(system_instruction="stay terse")
+
+    def generate_content(self, *, model, contents, config=None):
+        captured["config"] = config
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
+
+    wrapped(
+        Mock(_model="gemini-2.0-flash"),
+        model="gemini-2.0-flash",
+        contents="hello",
+        config=config,
+    )
+
+    assert captured["config"] is config
+
+
+def test_wrapper_keeps_a_stream_method_a_generator(weave_active):
+    """weave.op must still see generate_content_stream as a generator function."""
+    captured = {}
+
+    def generate_content_stream(self, *, model, contents, config=None):
+        captured["contents"] = contents
+        yield "chunk"
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content_stream)
+    chunks = list(
+        wrapped(
+            Mock(_model="gemini-2.0-flash"),
+            model="gemini-2.0-flash",
+            contents=BoxedStr("hello"),
+        )
+    )
+
+    assert inspect.isgeneratorfunction(wrapped.resolve_fn)
+    assert chunks == ["chunk"]
+    assert type(captured["contents"]) is str
+
+
+def test_wrapper_leaves_recorded_inputs_boxed(client):
+    """Unboxing happens inside the op, so the recorded inputs still carry the ref."""
+    captured = {}
+    dataset = weave.Dataset(rows=[{"question": "hello"}])
+    weave.publish(dataset)
+    question = dataset.rows[0]["question"]
+
+    def generate_content(self, *, model, contents, config=None):
+        captured["contents"] = contents
+
+    wrapped = google_genai_gemini_wrapper_sync(OpSettings())(generate_content)
+
+    wrapped(
+        Mock(_model="gemini-2.0-flash"), model="gemini-2.0-flash", contents=question
+    )
+
+    assert type(captured["contents"]) is str
+    call = next(iter(client.get_calls()))
+    assert call.inputs["contents"].ref.uri() == question.ref.uri()
