@@ -393,9 +393,18 @@ def test_call_start_redacts_content_but_not_structural_fields() -> None:
     assert redacted.start.attributes == {"phone": "<PHONE_NUMBER>"}
     assert redacted.start.otel_dump == {"ssn": "<US_SSN>"}
     assert redacted.start.display_name == "Contact <EMAIL_ADDRESS>"
-    assert redacted.start.op_name == "ada@example.com"
+    assert redacted.start.op_name == "<EMAIL_ADDRESS>"
     assert redacted.start.project_id == "ada@example.com/project"
     assert req.start.inputs == {"email": "ada@example.com"}
+
+
+def test_call_start_preserves_ref_op_names() -> None:
+    req = _call_start_req()
+    req.start.op_name = "weave:///entity/project/op/my-op:v1"
+
+    redacted = redact_call_start(req, SensitiveDataPolicy.PII_V1)
+
+    assert redacted.start.op_name == "weave:///entity/project/op/my-op:v1"
 
 
 def test_call_end_update_complete_and_batch_redact_content() -> None:
@@ -426,6 +435,7 @@ def test_call_end_update_complete_and_batch_redact_content() -> None:
     assert redacted_update.call_id == "ada@example.com"
     assert redacted_complete.batch[0].inputs == {"email": "<EMAIL_ADDRESS>"}
     assert redacted_complete.batch[0].output == {"card": "<CREDIT_CARD>"}
+    assert redacted_complete.batch[0].op_name == "<EMAIL_ADDRESS>"
     assert redacted_batch.batch[0].req.start.inputs == {"email": "<EMAIL_ADDRESS>"}
     assert redacted_batch.batch[1].req.end.output == {"card": "<CREDIT_CARD>"}
 

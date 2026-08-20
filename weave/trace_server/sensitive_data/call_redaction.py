@@ -20,12 +20,19 @@ def redact_call_start(
     policy: SensitiveDataPolicy,
     budget: ScanBudget | None = None,
 ) -> tsi.CallStartReq | tsi.CallStartV2Req:
-    """Redact customer-authored fields on a v1 or v2 call start."""
+    """Redact customer-authored fields on a v1 or v2 call start.
+
+    ``op_name`` is scanned as content: SDK-written op refs pass through the
+    walker's ref-preservation rule unchanged, so only free-string op names
+    from direct writers can be rewritten.
+    """
     if not pii_enabled(policy):
         return req
     scan_budget = budget or ScanBudget()
     start = _redact_fields(
-        req.start, ("inputs", "attributes", "otel_dump", "display_name"), scan_budget
+        req.start,
+        ("inputs", "attributes", "otel_dump", "display_name", "op_name"),
+        scan_budget,
     )
     return req if start is req.start else req.model_copy(update={"start": start})
 
@@ -95,6 +102,7 @@ def redact_calls_complete(
                 "attributes",
                 "otel_dump",
                 "display_name",
+                "op_name",
                 "output",
                 "summary",
                 "exception",
