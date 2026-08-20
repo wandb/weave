@@ -164,8 +164,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         req_dict = req.model_dump(**dump_kwargs)
         response = stainless_api(**req_dict, **extra_kwargs)
-        # Routes with an empty response schema are generated as returning a bare
-        # `object`, so their parsed body arrives as a plain dict.
+        # An empty response schema is generated as a bare `object`, so the
+        # parsed body arrives as a plain dict.
         if hasattr(response, "model_dump"):
             response = response.model_dump()
         return res_type.model_validate(response)
@@ -504,10 +504,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response = self._stainless_client.calls.upsert_batch(batch=stainless_batch)  # type: ignore[arg-type]
         # Convert response back
         res_items = []
-        for item in response.batch:
-            if hasattr(item, "id"):  # CallStartRes
-                res_items.append(tsi.CallStartRes.model_validate(item.model_dump()))
-            else:  # CallEndRes
+        for res_item in response.res:
+            # A start result is generated as a model, an end result as an empty object.
+            if isinstance(res_item, BaseModel):
+                res_items.append(tsi.CallStartRes.model_validate(res_item.model_dump()))
+            else:
                 res_items.append(tsi.CallEndRes())
         return tsi.CallCreateBatchRes(res=res_items)
 
@@ -940,17 +941,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        self._update_client_headers()
-        # Files API uses multipart/form-data - stainless expects (filename, content) tuple
-        file_tuple = (req.name, req.content)
-        kwargs: dict[str, Any] = {
-            "file": file_tuple,
-            "project_id": req.project_id,
-        }
-        if req.expected_digest is not None:
-            kwargs["expected_digest"] = req.expected_digest
-        response = self._stainless_client.files.create(**kwargs)
-        return tsi.FileCreateRes.model_validate(response.model_dump())
+        # The spec types the route's `file` field as a plain string, so the
+        # generated method form-encodes the bytes instead of attaching a file.
+        raise NotImplementedError(
+            "file_create is not yet implemented in stainless client"
+        )
 
     @validate_call
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
@@ -964,8 +959,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         # TODO: Should stream to disk rather than to memory
-        # The generated method is typed to return a bare `object` and decodes the
-        # body as text, which corrupts binary files; the raw response keeps bytes.
+        # The plain call decodes the body as text, which corrupts binary files.
         response = self._stainless_client.files.with_raw_response.content(
             digest=req.digest, project_id=req.project_id
         )
@@ -1150,9 +1144,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         Returns:
             Completions create response.
-
-        Raises:
-            NotImplementedError: The completions route is not in the API spec.
         """
         raise NotImplementedError(
             "completions_create is not yet implemented in stainless client"
@@ -1170,10 +1161,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             Dictionary chunks of the streamed response.
         """
-        # For remote servers, streaming is not implemented
-        # Fall back to non-streaming completion
-        response = self.completions_create(req)
-        yield {"response": response.response, "weave_call_id": response.weave_call_id}
+        raise NotImplementedError(
+            "completions_create_stream is not yet implemented in stainless client"
+        )
 
     @validate_call
     def image_create(
@@ -1201,9 +1191,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         Returns:
             Project stats response.
-
-        Raises:
-            NotImplementedError: The project stats route is not in the API spec.
         """
         raise NotImplementedError(
             "project_stats is not yet implemented in stainless client"
@@ -1365,6 +1352,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.OpDeleteRes.model_validate(response.model_dump())
 
@@ -1442,6 +1430,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.DatasetDeleteRes.model_validate(response.model_dump())
 
@@ -1517,6 +1506,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.ScorerDeleteRes.model_validate(response.model_dump())
 
@@ -1541,6 +1531,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             description=req.description,
             scorers=req.scorers,
             trials=req.trials,
+            evaluation_name=req.evaluation_name,
+            eval_attributes=req.eval_attributes,
         )
         return tsi.EvaluationCreateRes.model_validate(response.model_dump())
 
@@ -1600,6 +1592,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.EvaluationDeleteRes.model_validate(response.model_dump())
 
@@ -1678,6 +1671,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.ModelDeleteRes.model_validate(response.model_dump())
 
@@ -1699,6 +1693,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             project=project,
             evaluation=req.evaluation,
             model=req.model,
+            source_evaluation_run_id=req.source_evaluation_run_id,
         )
         return tsi.EvaluationRunCreateRes.model_validate(response.model_dump())
 
@@ -1809,6 +1804,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             model=req.model,
             output=req.output,
             evaluation_run_id=req.evaluation_run_id,
+            genai_span_ref=req.genai_span_ref,
         )
         return tsi.PredictionCreateRes.model_validate(response.model_dump())
 
