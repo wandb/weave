@@ -462,6 +462,8 @@ _CHAT_VIEW_FIELD_NAMES = [
     "input_tokens",
     "output_tokens",
     "reasoning_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
     "reasoning_content",
     "conversation_id",
     "conversation_name",

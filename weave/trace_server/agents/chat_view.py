@@ -77,6 +77,17 @@ class SpanNode:
 
 
 @dataclass(frozen=True)
+class TraceTokenTotals:
+    """One trace's usage, named for the response fields it fills."""
+
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
+    total_cache_creation_input_tokens: int = 0
+    total_cache_read_input_tokens: int = 0
+
+
+@dataclass(frozen=True)
 class TokenTotals:
     input_tokens: int
     output_tokens: int
@@ -232,6 +243,7 @@ def build_trace_chat(
         # Cost, unlike duration, IS a sum across every span in the trace.
         for span in spans:
             total_cost_usd = add_optional_cost(total_cost_usd, span.total_cost_usd)
+    tokens = _sum_trace_tokens(spans)
 
     return AgentTraceChatRes(
         trace_id=trace_id,
@@ -242,7 +254,34 @@ def build_trace_chat(
         provider=provider,
         total_duration_ms=total_duration_ms,
         total_cost_usd=total_cost_usd,
+        total_input_tokens=tokens.total_input_tokens,
+        total_output_tokens=tokens.total_output_tokens,
+        total_reasoning_tokens=tokens.total_reasoning_tokens,
+        total_cache_creation_input_tokens=tokens.total_cache_creation_input_tokens,
+        total_cache_read_input_tokens=tokens.total_cache_read_input_tokens,
         messages=messages,
+    )
+
+
+def _sum_trace_tokens(spans: list[AgentSpanSchema]) -> TraceTokenTotals:
+    """Sum every span's usage, like cost and unlike duration.
+
+    A plain per-span sum, the same definition a grouped spans query's
+    `total_input_tokens` carries, so one turn means one number wherever it is
+    read. Not the subtree walk `_sum_descendant_tokens` does: that one exists to
+    attribute a subtree's usage to the one message standing in for it, and
+    summing its results would count an enclosed llm span twice.
+    """
+    return TraceTokenTotals(
+        total_input_tokens=sum(span.input_tokens or 0 for span in spans),
+        total_output_tokens=sum(span.output_tokens or 0 for span in spans),
+        total_reasoning_tokens=sum(span.reasoning_tokens or 0 for span in spans),
+        total_cache_creation_input_tokens=sum(
+            span.cache_creation_input_tokens or 0 for span in spans
+        ),
+        total_cache_read_input_tokens=sum(
+            span.cache_read_input_tokens or 0 for span in spans
+        ),
     )
 
 

@@ -1159,6 +1159,13 @@ class AgentTraceChatRes(BaseModel):
     # Summed query-time cost (USD) across all spans in the trace. Unlike
     # duration, this IS a sum across spans. None when no span had a price.
     total_cost_usd: float | None = None
+    # Summed usage across all spans in the trace, matching the aggregates a
+    # grouped spans query returns. Zero, not None: usage is a stored count.
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
+    total_cache_creation_input_tokens: int = 0
+    total_cache_read_input_tokens: int = 0
     messages: list[AgentChatMessage] = Field(default_factory=list)
     feedback: list[dict[str, Any]] | None = None
 

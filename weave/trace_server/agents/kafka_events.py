@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,14 @@ class _AgentSpansEvent(BaseModel):
     operation_name: str | None
     parent_span_id: str | None
     conversation_id: str | None
+    # Turn facts carried from the source row so a consumer needs no read to get
+    # them. Naive UTC, exactly as the column stores them and a span read returns
+    # them. Optional because an event emitted before they existed can be in
+    # flight when the consumer that wants them starts.
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    wb_user_id: str | None = None
+    agent_name: str | None = None
 
     @classmethod
     def from_row(
@@ -58,10 +67,14 @@ class _AgentSpansEvent(BaseModel):
                 entity_name=entity_name,
                 trace_id=row.trace_id,
                 span_id=row.span_id,
+                started_at=row.started_at,
+                ended_at=row.ended_at,
                 # Resolve optional fields to None (instead of empty strings)
                 parent_span_id=row.parent_span_id or None,
                 conversation_id=row.conversation_id or None,
                 operation_name=row.operation_name or None,
+                wb_user_id=row.wb_user_id or None,
+                agent_name=row.agent_name or None,
             )
         return None
 

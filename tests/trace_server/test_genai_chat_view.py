@@ -346,6 +346,49 @@ def test_chat_view_aggregates_cost() -> None:
     assert res.total_cost_usd == pytest.approx(0.033)
 
 
+def test_chat_view_aggregates_tokens() -> None:
+    """Trace usage is a plain per-span sum, the same total a grouped query gives.
+
+    A consumer that needs one turn's usage reads it here instead of paying a
+    second query for the same spans, so the two have to agree.
+    """
+    spans = [
+        _span(
+            span_id="agent",
+            operation_name="invoke_agent",
+            agent_name="my-bot",
+            output_messages=[{"role": "assistant", "content": "done"}],
+            input_tokens=10,
+        ),
+        _span(
+            span_id="llm-1",
+            parent_span_id="agent",
+            input_tokens=100,
+            output_tokens=20,
+            reasoning_tokens=5,
+            cache_creation_input_tokens=8,
+            cache_read_input_tokens=64,
+        ),
+        _span(span_id="llm-2", parent_span_id="agent", input_tokens=200),
+    ]
+
+    res = build_trace_chat(spans, "trace-tokens")
+
+    # The root's own 10 is counted, matching `sum(input_tokens)` over the trace.
+    # A subtree walk would drop it or, on a root that mirrors its children,
+    # count those children twice.
+    assert (
+        res.total_input_tokens,
+        res.total_output_tokens,
+        res.total_reasoning_tokens,
+        res.total_cache_creation_input_tokens,
+        res.total_cache_read_input_tokens,
+    ) == (310, 20, 5, 8, 64)
+
+    # An empty trace is zero, not None: usage is a stored count, unlike cost.
+    assert build_trace_chat([], "trace-empty").total_input_tokens == 0
+
+
 def test_chat_view_cost_none_when_unpriced() -> None:
     """With no priced spans, costs stay None (unknown), not 0."""
     spans = [
