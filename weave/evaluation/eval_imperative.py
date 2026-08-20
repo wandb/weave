@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import atexit
@@ -1141,7 +1141,7 @@ class EvaluationLogger:
         final_summary = {}
         if summary_data:
             final_summary = summary_data
-        if summary is not None:
+        if auto_summarize and summary:
             final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
