@@ -224,6 +224,9 @@ def build_trace_chat(
     root_agent_version: str | None = None
     root_status_code: str | None = None
     provider: str | None = None
+    root_started_at: datetime | None = None
+    root_ended_at: datetime | None = None
+    root_wb_user_id: str | None = None
     total_duration_ms: int | None = None
     total_cost_usd: float | None = None
 
@@ -234,6 +237,9 @@ def build_trace_chat(
         root_agent_version = root.agent_version
         root_status_code = root.status_code
         provider = root.provider_name
+        root_started_at = root.started_at
+        root_ended_at = root.ended_at
+        root_wb_user_id = root.wb_user_id
         # `total_duration_ms` == root span wall-clock duration
         # (`root.ended_at - root.started_at`). Under OTel convention the
         # root encloses its children, so this is the elapsed time for the
@@ -252,6 +258,9 @@ def build_trace_chat(
         agent_version=root_agent_version,
         status_code=root_status_code,
         provider=provider,
+        started_at=root_started_at,
+        ended_at=root_ended_at,
+        wb_user_id=root_wb_user_id,
         total_duration_ms=total_duration_ms,
         total_cost_usd=total_cost_usd,
         total_input_tokens=tokens.total_input_tokens,

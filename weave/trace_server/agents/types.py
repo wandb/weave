@@ -1149,6 +1149,12 @@ class AgentTraceChatRes(BaseModel):
     agent_version: str | None = None
     status_code: StatusCodeLiteral | None = None
     provider: str | None = None
+    # The turn root's own facts, carried so a consumer needs no second read to
+    # get them. Raw, exactly as the column stores them: `ended_at` is the
+    # sentinel epoch rather than null while the turn is still open.
+    started_at: datetime.datetime | None = None
+    ended_at: datetime.datetime | None = None
+    wb_user_id: str | None = None
     total_duration_ms: int | None = Field(
         default=None,
         description=(

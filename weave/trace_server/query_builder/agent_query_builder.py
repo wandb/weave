@@ -456,6 +456,7 @@ _CHAT_VIEW_FIELD_NAMES = [
     "agent_id",
     "agent_description",
     "agent_version",
+    "wb_user_id",
     "request_model",
     "response_model",
     "response_id",
