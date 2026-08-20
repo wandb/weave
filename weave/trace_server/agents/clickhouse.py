@@ -82,7 +82,6 @@ from weave.trace_server.agents.types import (
     GenAIOTelExportRes,
     group_by_ref_alias,
 )
-from weave.trace_server.clickhouse.utilities import insert_with_empty_query_retry
 from weave.trace_server.datadog import record_db_insert, set_root_span_dd_tags
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.genai_extraction import (
@@ -992,8 +991,7 @@ class AgentWriteHandler:
                 "weave_trace_server.insert.row_count": len(span_rows),
             }
         )
-        insert_with_empty_query_retry(
-            self._ch_client,
+        self._ch_client.insert(
             "spans",
             data=[genai_span_to_row(s) for s in span_rows],
             column_names=ALL_SPAN_INSERT_COLUMNS,

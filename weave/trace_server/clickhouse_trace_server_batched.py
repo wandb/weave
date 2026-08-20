@@ -141,7 +141,6 @@ from weave.trace_server.clickhouse.utilities import (
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
-    insert_with_empty_query_retry,
     log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
@@ -5953,7 +5952,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         pb = ParamBuilder()
 
-        page_query = eval_results_query_builder.build_eval_results_query(
+        page_query = eval_results_query_builder.build_eval_results_page_query(
             req.project_id,
             eval_root_ids,
             req.sort_by,
@@ -5969,27 +5968,73 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self._query(page_query, pb.get_params())
 
         digest_by_call: dict[str, str] = {}
-        resolved_by_call_id: dict[str, Any] = {}
+        eval_call_id_by_call: dict[str, str | None] = {}
+        ordered_call_ids: list[str] = []
         total_rows = 0
-        page_calls: list[tsi.CallSchema] = []
 
         for row in result.result_rows:
             row_data = dict(zip(result.column_names, row, strict=True))
-            total_rows = int(row_data.get("__total_rows", 0))
-            row_digest = row_data.get("__row_digest")
-            resolved_raw = row_data.get("__resolved_inputs")
-
-            call_id = row_data.get("id")
-            if row_digest and call_id:
+            total_rows = int(row_data.get("total_rows", 0))
+            call_id = row_data.get("call_id")
+            if not call_id:
+                continue
+            ordered_call_ids.append(call_id)
+            eval_call_id_by_call[call_id] = row_data.get("eval_call_id")
+            row_digest = row_data.get("row_digest")
+            if row_digest:
                 digest_by_call[call_id] = row_digest
-            if resolved_raw and call_id and req.resolve_row_refs:
-                parsed = try_parse_json(resolved_raw)
-                if parsed is not None:
-                    resolved_by_call_id[call_id] = parsed
 
+        # Resolve dataset-row payloads by literal digests (PREWHERE); inline
+        # rows have no table_rows entry and keep their inputs.example as-is.
+        resolved_by_call_id: dict[str, Any] = {}
+        if req.resolve_row_refs and digest_by_call:
+            val_by_digest: dict[str, Any] = {}
+            unique_digests = list(dict.fromkeys(digest_by_call.values()))
+            for i in range(0, len(unique_digests), MAX_FILTER_LENGTH):
+                dbatch = unique_digests[i : i + MAX_FILTER_LENGTH]
+                rpb = ParamBuilder()
+                resolution_query = (
+                    eval_results_query_builder.build_table_rows_resolution_query(
+                        req.project_id, dbatch, rpb
+                    )
+                )
+                for digest, val_dump in self._query(
+                    resolution_query, rpb.get_params()
+                ).result_rows:
+                    if val_dump:
+                        parsed = try_parse_json(val_dump)
+                        if parsed is not None:
+                            val_by_digest[digest] = parsed
+            for call_id, digest in digest_by_call.items():
+                if digest in val_by_digest:
+                    resolved_by_call_id[call_id] = val_by_digest[digest]
+
+        # Hydrate heavy call columns in a second statement so the id set is a
+        # literal PREWHERE param (row-level lazy reads); see
+        # build_eval_results_hydration_query for why this can't be one statement.
+        hydrated_by_id: dict[str, dict[str, Any]] = {}
+        for i in range(0, len(ordered_call_ids), MAX_FILTER_LENGTH):
+            batch = ordered_call_ids[i : i + MAX_FILTER_LENGTH]
+            hpb = ParamBuilder()
+            hydration_query = (
+                eval_results_query_builder.build_eval_results_hydration_query(
+                    req.project_id, batch, hpb, read_table
+                )
+            )
+            hydration_result = self._query(hydration_query, hpb.get_params())
+            for hrow in hydration_result.result_rows:
+                hdata = dict(zip(hydration_result.column_names, hrow, strict=True))
+                hydrated_by_id[hdata["id"]] = hdata
+
+        page_calls: list[tsi.CallSchema] = []
+        for call_id in ordered_call_ids:
+            call_data = hydrated_by_id.get(call_id)
+            if call_data is None:
+                continue
+            call_data["parent_id"] = eval_call_id_by_call.get(call_id)
             page_calls.append(
                 tsi.CallSchema.model_validate(
-                    ch_call_dict_to_call_schema_dict(row_data)
+                    ch_call_dict_to_call_schema_dict(call_data)
                 )
             )
 
@@ -7598,6 +7643,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> Iterator[tuple]:
         """Streams the results of a query from the database."""
         merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         summary = None
         parameters = process_parameters(parameters)
@@ -7620,6 +7667,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "query": query,
                         "parameters": parameters,
                         "summary": summary,
+                        "query_id": query_id,
                     },
                 )
                 yield from stream
@@ -7632,6 +7680,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7647,6 +7696,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
         merged = ch_settings.merge_default_query_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         parameters = process_parameters(parameters)
         start = time.monotonic()
@@ -7667,6 +7718,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "query": query,
                     "parameters": parameters,
+                    "query_id": query_id,
                 },
             )
             # always raises, optionally with custom error class
@@ -7681,6 +7733,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "query": query,
                 "parameters": parameters,
                 "summary": res.summary,
+                "query_id": query_id,
             },
         )
         return res
@@ -7700,6 +7753,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
         merged = ch_settings.merge_default_command_settings(settings)
+        query_id = merged.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
 
         processed_params = process_parameters(parameters) if parameters else None
         start = time.monotonic()
@@ -7718,6 +7773,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     "error_str": str(e),
                     "command": command,
                     "parameters": processed_params,
+                    "query_id": query_id,
                 },
             )
             handle_clickhouse_query_error(e)
@@ -7730,6 +7786,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
+                "query_id": query_id,
             },
         )
         return
@@ -7773,17 +7830,22 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         start = time.monotonic()
         sanitized_invalid_utf8 = False
         # At most two attempts: the original, plus one retry after sanitizing
-        # invalid client UTF-8. Empty-query retries are handled in the helper.
+        # invalid client UTF-8.
+        settings = dict(settings or {})
+        # Reused across attempts: the only retry is a client-side encode
+        # failure, so ClickHouse never saw the first one.
+        query_id = settings.setdefault("query_id", generate_id())
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
         for _ in range(2):
             try:
-                result = insert_with_empty_query_retry(
-                    self.ch_client, table, data, column_names, settings
+                result = self.ch_client.insert(
+                    table, data=data, column_names=column_names, settings=settings
                 )
 
             # Invalid client Unicode: sanitize the batch and retry once.
             except UnicodeEncodeError as e:
                 if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data)
+                    log_and_raise_insert_error(e, table, data, query_id)
                 sanitized_invalid_utf8 = True
                 data = sanitize_invalid_utf8_surrogates(data)
                 continue
@@ -7791,11 +7853,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # InsertTooLarge: raise immediately, no retry
             except ValueError as e:
                 converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data)
+                log_and_raise_insert_error(converted, table, data, query_id)
 
             # All other errors (including exhausted empty-query retries): no retry
             except Exception as e:
-                log_and_raise_insert_error(e, table, data)
+                log_and_raise_insert_error(e, table, data, query_id)
 
             else:
                 duration_ms = round((time.monotonic() - start) * 1000, 1)
@@ -7806,6 +7868,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "table": table,
                         "row_count": len(data),
                         "async_insert": async_insert,
+                        "query_id": query_id,
                     },
                 )
                 return result
