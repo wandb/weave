@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from typing import Any, TypeVar, cast
 
 import sqlparse
@@ -143,7 +143,7 @@ def nullable_any_dump_to_any(
 
 
 @contextlib.contextmanager
-def _sqlparse_grouping_limit_lifted() -> Iterator[None]:
+def _sqlparse_grouping_limit_lifted() -> Generator[None, None, None]:
     """Lift sqlparse's token cap while parsing our own migration files.
 
     sqlparse >=0.5.5 caps grouping at MAX_GROUPING_TOKENS to bound work on
