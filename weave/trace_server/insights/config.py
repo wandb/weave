@@ -164,6 +164,7 @@ class ClusteringConfig(_Strict):
     algorithm: Literal["hdbscan"]
     # What one fit covers: the whole signature type, or each category on its own.
     scope: Literal["global", "category"]
+    max_clusters: Annotated[int, Field(ge=1)]
     reduction: Reduction
     density: Density
     projection: Projection
