@@ -371,6 +371,12 @@ module = "weave.*"
 disallow_untyped_defs = true
 disallow_untyped_calls = true
 
+# `exclude` above only skips directory crawling. Now that weave imports the
+# vendored SDK, mypy follows that import and checks the generated tree anyway.
+[[tool.mypy.overrides]]
+module = "weave.vendor.weave_server_sdk.*"
+ignore_errors = true
+
 [tool.bumpversion]
 current_version = "0.53.7-dev0"
 parse = """(?x)

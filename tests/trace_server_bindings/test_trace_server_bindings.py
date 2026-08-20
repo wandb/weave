@@ -22,6 +22,7 @@ from tests.trace_server_bindings.conftest import (
     generate_start,
 )
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.call_batch_processor import CallBatchProcessor
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
@@ -233,8 +234,10 @@ def test_drop_data_when_queue_is_full(server, server_class, log_collector):
     server.call_start(req_start)
     server.call_end(req_end)
 
-    # Verify that the put_nowait method was called (meaning we tried to enqueue the item)
-    mock_queue.put_nowait.assert_called_once()
+    # Verify that we tried to enqueue the item. CallBatchProcessor pairs the
+    # start and end into one queued item; a plain AsyncBatchProcessor queues both.
+    expected_puts = 1 if isinstance(server.call_processor, CallBatchProcessor) else 2
+    assert mock_queue.put_nowait.call_count == expected_puts
 
     # We can still check logs as a secondary verification
     logs = log_collector.get_warning_logs()
