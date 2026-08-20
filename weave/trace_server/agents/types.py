@@ -1307,6 +1307,7 @@ class GenAIOTelExportReq(BaseModel):
     )
     project_id: str
     wb_user_id: str | None = None
+    entity_name: str | None = None
 
 
 class GenAIOTelExportRes(BaseModel):

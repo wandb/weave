@@ -7445,9 +7445,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         producer = self.kafka_producer
         for row in span_rows:
-            if scoring_enabled and (event := ScoreAgentSpansEvent.from_row(row)):
+            if scoring_enabled and (
+                event := ScoreAgentSpansEvent.from_row(row, req.entity_name)
+            ):
                 event.emit(producer)
-            if insights_enabled and (event := EmbedAgentSpansEvent.from_row(row)):
+            if insights_enabled and (
+                event := EmbedAgentSpansEvent.from_row(row, req.entity_name)
+            ):
                 event.emit(producer)
 
         # Flush kafka producer
