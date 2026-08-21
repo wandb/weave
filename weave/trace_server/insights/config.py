@@ -1,10 +1,13 @@
-"""Content-addressed configuration for insights extraction and clustering.
+"""Insights configs: the things `config_sha` names on the signature and cluster tables.
 
 Every knob that changes what gets written into `intent_signatures` or
 `failure_signatures` lives in one checked-in config file per signature type, so the whole
 pipeline state is one column and none of it is in the sorting key. A reference
 serializes as its own content hash, so editing a taxonomy or a prompt moves the
 digest without anyone touching the config.
+
+The clustering recipe is a separate file with its own digest, because a partition can be
+refit without re-extracting anything and the two digests answer different questions.
 """
 
 import hashlib
@@ -114,31 +117,56 @@ class Embedding(_Strict):
     output_normalization: str
 
 
-class UmapProjection(_Strict):
-    """Knobs for the 2-D projection persisted on every cluster assignment.
+class Reduction(_Strict):
+    """The space HDBSCAN clusters in, which is not the 2-D layout the UI draws.
 
-    It carries no metric of its own: on l2-normalized vectors cosine and euclidean
-    rank neighbors identically, so the clustering `metric` describes both.
+    Every field moves the partition, so every field is in the digest. `random_state`
+    included: a run that unpins the seed is a different pipeline generation, not the
+    same one with jitter.
     """
 
-    n_neighbors: Annotated[int, Field(ge=2)]
+    dimensions: Annotated[int, Field(ge=2)]
+    neighbors: Annotated[int, Field(ge=2)]
     min_dist: Annotated[float, Field(ge=0, lt=1)]
-    random_state: int
+    metric: str
+    random_state: int | None
+    minimum_rows: Annotated[int, Field(ge=2)]
+
+
+class Density(_Strict):
+    """The density clusterer's own knobs, applied to the reduced space."""
+
+    min_cluster_size: Annotated[int, Field(ge=2)]
+    min_samples: Annotated[int, Field(ge=1)]
+    metric: str
+    cluster_selection_method: str
+    allow_single_cluster: bool
+
+
+class Projection(_Strict):
+    """The stored 2-D coordinates. Display only, so it never decides a label."""
+
+    neighbors: Annotated[int, Field(ge=2)]
+    min_dist: Annotated[float, Field(ge=0, lt=1)]
+    random_state: int | None
 
 
 class ClusteringConfig(_Strict):
-    """Every parameter that changes a clustering run's output."""
+    """The recipe behind one partition, named by `cluster_config_sha` on a cluster run.
+
+    Separate from the signature configs because a partition can be refit without
+    re-extracting anything, and the two digests answer different questions.
+    """
 
     config_schema_version: Literal[1]
+    # A one-value Literal on purpose: a config naming an algorithm nothing implements
+    # fails to load rather than being silently ignored.
     algorithm: Literal["hdbscan"]
     # What one fit covers: the whole signature type, or each category on its own.
     scope: Literal["global", "category"]
-    min_cluster_size: Annotated[int, Field(ge=2)]
-    min_samples: Annotated[int, Field(ge=1)]
-    metric: Literal["euclidean"]
-    cluster_selection_method: Literal["eom"]
-    allow_single_cluster: bool
-    umap: UmapProjection
+    reduction: Reduction
+    density: Density
+    projection: Projection
 
 
 _E = TypeVar("_E", bound=Extraction)
@@ -165,6 +193,7 @@ class FailureConfig(_SignatureConfig[FailureExtraction]):
 
 SignatureConfig = IntentConfig | FailureConfig
 
+
 _CONFIG_MODELS: dict[str, type[SignatureConfig]] = {
     "intent": IntentConfig,
     "failure": FailureConfig,
@@ -185,7 +214,7 @@ def load_config(signature_type: str) -> SignatureConfig:
 
 
 def load_clustering_config() -> ClusteringConfig:
-    """Load and validate the checked-in clustering config."""
+    """Load and validate the checked-in clustering recipe."""
     path = os.path.join(CONFIG_DIR, "clustering.yaml")
     with open(path, encoding="utf-8") as handle:
         return ClusteringConfig.model_validate(yaml.safe_load(handle))
