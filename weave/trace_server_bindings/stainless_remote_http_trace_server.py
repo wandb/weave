@@ -68,22 +68,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         self.feedback_processor: AsyncBatchProcessor | None = None
         self.remote_request_bytes_limit = remote_request_bytes_limit
         self._extra_headers: dict[str, str] = extra_headers or {}
-        self._username: str = username
-        self._password: str = password
-        self._credentials: WandbCredentials | None = None
-
-        # Initialize stainless client
-        default_headers = self._extra_headers.copy()
-        if retry_id := get_current_retry_id():
-            default_headers["X-Weave-Retry-Id"] = retry_id
-
-        self._stainless_client = StainlessClient(
-            base_url=trace_server_url,
-            username=username,
-            password=password,
-            default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
+        self._credentials: WandbCredentials | None = (
+            ApiKeyCredentials(password) if password else None
         )
+        self._rebuild_client()
 
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(
@@ -111,43 +99,31 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: tuple[str, str] | WandbCredentials) -> None:
-        """Set authentication credentials.
+        if isinstance(auth, tuple):
+            auth = ApiKeyCredentials(auth[1])
+        self._credentials = auth
+        self._rebuild_client()
 
-        Args:
-            auth: Tuple of (username, password) for authentication.
-        """
-        self._credentials = None
-        if isinstance(auth, ApiKeyCredentials):
-            self._username = "api"
-            self._password = auth.api_key
-        elif isinstance(auth, WandbCredentials):
-            self._username = ""
-            self._password = ""
-            self._credentials = auth
-        else:
-            self._username, self._password = auth
-        # Recreate stainless client with new credentials
-        default_headers = self._extra_headers.copy()
-        if self._credentials is not None:
-            default_headers["Authorization"] = self._credentials.authorization_header()
-        if retry_id := get_current_retry_id():
-            default_headers["X-Weave-Retry-Id"] = retry_id
-
+    def _rebuild_client(self) -> None:
         self._stainless_client = StainlessClient(
             base_url=self.trace_server_url,
-            username=self._username,
-            password=self._password,
-            default_headers=default_headers,
+            username="",
+            password="",
+            default_headers=self._compose_headers(),
             batch_requests=False,  # We handle batching ourselves
         )
 
-    def _update_client_headers(self) -> None:
-        """Update client headers with current retry ID and extra headers."""
+    def _compose_headers(self) -> dict[str, str]:
         headers = self._extra_headers.copy()
         if self._credentials is not None:
             headers["Authorization"] = self._credentials.authorization_header()
         if retry_id := get_current_retry_id():
             headers["X-Weave-Retry-Id"] = retry_id
+        return headers
+
+    def _update_client_headers(self) -> None:
+        """Update client headers with current retry ID and extra headers."""
+        headers = self._compose_headers()
         if headers:
             self._stainless_client = self._stainless_client.copy(
                 default_headers=headers

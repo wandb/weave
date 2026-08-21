@@ -40,7 +40,8 @@ def test_conversation_tracing_reroutes_project_on_reinit(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """A second init to a new project reroutes the live exporter, not the Resource."""
-    weave_init._setup_conversation_tracing("ent", "proj-a", "sekret")
+    credentials = wandb_auth.ApiKeyCredentials("sekret")
+    weave_init._setup_conversation_tracing("ent", "proj-a", credentials)
 
     provider = otel_trace.get_tracer_provider()
     exporter = weave_init._conversation_span_exporter
@@ -58,7 +59,7 @@ def test_conversation_tracing_reroutes_project_on_reinit(
 
     # Re-init to a different project: same provider + exporter objects (OTel's
     # global provider is set-once), header now points at the new project.
-    weave_init._setup_conversation_tracing("ent", "proj-b", "sekret")
+    weave_init._setup_conversation_tracing("ent", "proj-b", credentials)
     assert otel_trace.get_tracer_provider() is provider
     assert weave_init._conversation_span_exporter is exporter
     assert exporter._session.headers["project_id"] == "ent/proj-b"
@@ -74,13 +75,17 @@ def test_conversation_tracing_reroutes_credentials_on_reinit(
     Authorization would export the new project's spans with the old account's
     credentials (cross-account attribution / 403s).
     """
-    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-a", wandb_auth.ApiKeyCredentials("key-a")
+    )
     exporter = weave_init._conversation_span_exporter
     assert exporter is not None
     auth_a = exporter._session.headers["Authorization"]
     assert auth_a == "Basic " + base64.b64encode(b"api:key-a").decode()
 
-    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-b", wandb_auth.ApiKeyCredentials("key-b")
+    )
     assert weave_init._conversation_span_exporter is exporter
     assert exporter._session.headers["project_id"] == "ent/proj-b"
     assert exporter._session.headers["Authorization"] == (
@@ -130,7 +135,9 @@ def test_conversation_tracing_flush_semantics_on_reinit(
     caplog: pytest.LogCaptureFixture,
 ):
     """Flush precedes reheader; same project skips it; a timed-out flush still reroutes (warns)."""
-    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-a", wandb_auth.ApiKeyCredentials("key-a")
+    )
     provider = weave_init._conversation_tracer_provider
     exporter = weave_init._conversation_span_exporter
     assert provider is not None
@@ -146,18 +153,21 @@ def test_conversation_tracing_flush_semantics_on_reinit(
 
     monkeypatch.setattr(provider, "force_flush", _spy_flush)
 
-    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    credentials_b = wandb_auth.ApiKeyCredentials("key-b")
+    weave_init._setup_conversation_tracing("ent", "proj-b", credentials_b)
     assert flushed_project_ids == ["ent/proj-a"]
     assert exporter._session.headers["project_id"] == "ent/proj-b"
 
     # Same project + creds: no reroute work, no blocking flush.
-    weave_init._setup_conversation_tracing("ent", "proj-b", "key-b")
+    weave_init._setup_conversation_tracing("ent", "proj-b", credentials_b)
     assert flushed_project_ids == ["ent/proj-a"]
 
     # A timed-out flush still reroutes (queued spans misroute to the new project) and warns.
     flush_ok = False
     with caplog.at_level(logging.WARNING):
-        weave_init._setup_conversation_tracing("ent", "proj-c", "key-c")
+        weave_init._setup_conversation_tracing(
+            "ent", "proj-c", wandb_auth.ApiKeyCredentials("key-c")
+        )
     assert flushed_project_ids == ["ent/proj-a", "ent/proj-b"]
     assert exporter._session.headers["project_id"] == "ent/proj-c"
     assert "flush timed out" in caplog.text
@@ -178,7 +188,9 @@ def test_conversation_tracing_disowns_provider_if_set_once_refused(
     # Simulate losing the set-once race: our set_tracer_provider call is ignored.
     monkeypatch.setattr(otel_trace, "set_tracer_provider", lambda provider: None)
 
-    weave_init._setup_conversation_tracing("ent", "proj-a", "key-a")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-a", wandb_auth.ApiKeyCredentials("key-a")
+    )
 
     assert shutdowns == [True]
     assert weave_init._conversation_tracer_provider is None
@@ -192,7 +204,9 @@ def test_conversation_tracing_leaves_foreign_provider_untouched(
     user_provider = TracerProvider()
     monkeypatch.setattr(otel_trace, "_TRACER_PROVIDER", user_provider)
 
-    weave_init._setup_conversation_tracing("ent", "proj-a", "sekret")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-a", wandb_auth.ApiKeyCredentials("sekret")
+    )
 
     assert otel_trace.get_tracer_provider() is user_provider
     assert weave_init._conversation_span_exporter is None
@@ -208,7 +222,9 @@ def test_conversation_tracing_installs_both_link_processors():
     evicts the oldest first, so the op link must precede the eval link to keep
     a crowded span from dropping eval metadata.
     """
-    weave_init._setup_conversation_tracing("ent", "proj-a", "sekret")
+    weave_init._setup_conversation_tracing(
+        "ent", "proj-a", wandb_auth.ApiKeyCredentials("sekret")
+    )
 
     provider = weave_init._conversation_tracer_provider
     assert provider is not None

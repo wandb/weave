@@ -130,7 +130,7 @@ def _get_server_info(server: TraceServerClientInterface) -> ServerInfoRes | None
 def _setup_conversation_tracing(
     entity: str,
     project: str,
-    auth: str | WandbCredentials | None,
+    credentials: WandbCredentials | None,
 ) -> None:
     """Configure OTel TracerProvider for the Conversation SDK using weave credentials.
 
@@ -166,7 +166,6 @@ def _setup_conversation_tracing(
     if not trace_server_url:
         return
 
-    credentials = _coerce_credentials(auth)
     project_id = f"{entity}/{project}"
     headers = _conversation_headers(project_id, credentials)
 
@@ -240,14 +239,6 @@ def _setup_conversation_tracing(
         return
     _conversation_tracer_provider = provider
     _conversation_span_exporter = exporter
-
-
-def _coerce_credentials(
-    auth: str | WandbCredentials | None,
-) -> WandbCredentials | None:
-    if isinstance(auth, str):
-        return ApiKeyCredentials(auth)
-    return auth
 
 
 def _conversation_headers(
@@ -395,7 +386,7 @@ def init_weave_disabled(
     client = weave_client.WeaveClient(
         "DISABLED",
         "DISABLED",
-        init_weave_get_server("DISABLED", should_batch=False),
+        init_weave_get_server(ApiKeyCredentials("DISABLED"), should_batch=False),
         ensure_project_exists=False,
         postprocess_inputs=postprocess_inputs,
         postprocess_output=postprocess_output,
@@ -407,7 +398,7 @@ def init_weave_disabled(
 
 
 def init_weave_get_server(
-    auth: str | WandbCredentials | None = None,
+    credentials: WandbCredentials | None = None,
     should_batch: bool = True,
 ) -> TraceServerClientInterface:
     res: TraceServerClientInterface
@@ -419,7 +410,6 @@ def init_weave_get_server(
         res = StainlessRemoteHTTPTraceServer.from_env(should_batch)
     else:
         res = RemoteHTTPTraceServer.from_env(should_batch)
-    credentials = _coerce_credentials(auth)
     if credentials is not None:
         res.set_auth(credentials)
     return res
