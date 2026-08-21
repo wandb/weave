@@ -147,11 +147,18 @@ def _sqlparse_grouping_limit_lifted() -> Generator[None, None, None]:
     """Lift sqlparse's token cap while parsing our own migration files.
 
     sqlparse >=0.5.5 caps grouping at MAX_GROUPING_TOKENS to bound work on
-    untrusted input, and documents None as the way to disable it. Migration
-    text ships in this repo, and 006_seed_costs is a single statement well
-    past the cap.
+    untrusted input, and its changelog documents None as the way to disable
+    the cap for legitimate large statements. Migration text ships in this
+    repo, and 006_seed_costs is a single statement well past the cap.
+
+    The trace service still resolves sqlparse 0.5.3, which predates the cap;
+    drop the guard once it pins 0.6.
     """
-    previous = getattr(_sqlparse_grouping, "MAX_GROUPING_TOKENS", None)
+    if not hasattr(_sqlparse_grouping, "MAX_GROUPING_TOKENS"):
+        yield
+        return
+
+    previous = _sqlparse_grouping.MAX_GROUPING_TOKENS
     _sqlparse_grouping.MAX_GROUPING_TOKENS = None
     try:
         yield
