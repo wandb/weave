@@ -33,6 +33,7 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
         "algorithm": "hdbscan",
         "scope": "category",
         "max_clusters": 100,
+        "merge_similarity": 0.9,
         "reduction": {
             "dimensions": 15,
             "neighbors": 15,
@@ -78,6 +79,11 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
     with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
         raw["max_clusters"] = 0
     with pytest.raises(ValidationError, match="max_clusters"):
+        config.load_clustering_config()
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["merge_similarity"] = 1.5
+    with pytest.raises(ValidationError, match="merge_similarity"):
         config.load_clustering_config()
 
 
@@ -186,6 +192,7 @@ def test_the_clustering_recipe_is_a_separate_digest_from_the_signature_configs()
     assert clustering.algorithm == "hdbscan"
     assert clustering.scope == "category"
     assert clustering.max_clusters == 100
+    assert clustering.merge_similarity == 0.9
     # The reduced space is what gets clustered; the projection is drawn. Separate knobs,
     # because reading the projection's neighbor count as the partition's is a real mistake.
     assert clustering.reduction.dimensions == 15

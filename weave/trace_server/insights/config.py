@@ -165,6 +165,9 @@ class ClusteringConfig(_Strict):
     # What one fit covers: the whole signature type, or each category on its own.
     scope: Literal["global", "category"]
     max_clusters: Annotated[int, Field(ge=1)]
+    # Cosine floor for folding two fitted clusters into one, measured between
+    # centroids after the run's mean centroid is removed. 0 merges nothing.
+    merge_similarity: Annotated[float, Field(ge=0, le=1)]
     reduction: Reduction
     density: Density
     projection: Projection
