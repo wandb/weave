@@ -13,8 +13,7 @@ tests:
    that has a `package.json` and `npm install` the tarball into it
    (committed scaffold projects, `node_modules/` gitignored).
 4. Spawn `python -m trace_server_mock` (the in-memory mock trace server in
-   `services/weave-python/weave-public/trace_server_mock/`) on an ephemeral
-   port.
+   `trace_server_mock/` within the Weave repository) on an ephemeral port.
 5. Launch each host app via `launchAppFrom({path, projectId})`, which runs
    `npm run start` (the script declared by the host app's own `package.json`
    — e.g. `node main.cjs` for CJS, `node --import=weave/instrument main.mjs`
@@ -65,6 +64,8 @@ The host apps are real, runnable projects. To debug outside Jest:
 ```sh
 # in one shell, start the mock on a known port:
 cd services/weave-python/weave-public/trace_server_mock
+# or, after the core submodule path moves:
+cd services/weave-trace/weave-public/trace_server_mock
 uv run python -m trace_server_mock --port=6346
 
 # in another shell, install the tarball and run a host app by hand:
