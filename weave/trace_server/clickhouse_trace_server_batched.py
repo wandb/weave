@@ -217,6 +217,14 @@ from weave.trace_server.file_storage import (
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
+from weave.trace_server.insights import read_types as insights_read_types
+from weave.trace_server.insights import write_types as insights_write_types
+from weave.trace_server.insights.clickhouse import (
+    insights_signatures_query as insights_signatures_query_handler,
+)
+from weave.trace_server.insights.clickhouse import (
+    insights_signatures_write as insights_signatures_write_handler,
+)
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.builtin_object_classes.provider import (
     sanitize_name_for_object_id,
@@ -7431,6 +7439,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return AgentQueryHandler(self._query, self.feedback_query).conversation_spans(
             req
         )
+
+    # Insights API
+    @tag_db_insert_path("insights_signatures_write")
+    def insights_signatures_write(
+        self, req: insights_write_types.InsightSignaturesWriteReq
+    ) -> insights_write_types.InsightSignaturesWriteRes:
+        return insights_signatures_write_handler(self, req)
+
+    def insights_signatures_query(
+        self, req: insights_read_types.InsightSignaturesQueryReq
+    ) -> insights_read_types.InsightSignaturesQueryRes:
+        return insights_signatures_query_handler(self, req)
 
     @tag_db_insert_path("genai_otel_export")
     def genai_otel_export(self, req: GenAIOTelExportReq) -> GenAIOTelExportRes:
