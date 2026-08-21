@@ -137,8 +137,8 @@ def tests(session: nox.Session, shard: str):
     elif shard in {"autogen_tests", "verifiers_test", "pandas_test"}:
         sync_args.extend(["--group", shard])
     elif shard in {"trace_server", "trace_server_migrator"}:
-        # trace_server shards need both trace_server dependency group and trace_server_tests
-        sync_args.extend(["--group", "trace_server", "--group", "trace_server_tests"])
+        # The trace_server deps arrive via `weave[trace_server]` in the test group.
+        sync_args.extend(["--group", "trace_server_tests"])
     elif shard == "scorers":
         # scorer tests include a few that hit W&B Artifacts directly, so install
         # both extras to cover the full suite.
