@@ -90,6 +90,16 @@ for backward compatibility. When neither is configured, it uses
 links use an account-key SAS for explicit credentials and a user-delegation SAS
 for workload identity.
 
+### W&B authentication
+
+The Python SDK resolves either an API key or a federated identity token through
+`weave/wandb_interface/auth.py`. Federated identity uses
+`WANDB_IDENTITY_TOKEN_FILE`, exchanges the assertion at the W&B
+`/oidc/token` endpoint, caches access tokens under
+`WANDB_CREDENTIALS_FILE`, and applies Bearer auth to every W&B and Weave
+transport. Failed token exchanges are cached in-process for 30 seconds to
+prevent request traffic from repeatedly calling an unavailable token endpoint.
+
 ## Generated Files — Do Not Hand-Edit
 
 `weave/trace_server/model_providers/model_providers.json` and `weave/trace_server/costs/cost_checkpoint.json` are generated. Never edit them by hand — regenerate with `make update_model_providers` / `make update_costs` (see `weave/Makefile`).
