@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import io
 import logging
 from collections.abc import Callable, Iterator
 from typing import Any, TypeVar
@@ -9,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, validate_call
 from typing_extensions import Self
-from weave_server_sdk import Client as StainlessClient
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
@@ -31,6 +29,7 @@ from weave.trace_server_bindings.models import (
 )
 from weave.utils.project_id import from_project_id
 from weave.utils.retry import get_current_retry_id, with_retry
+from weave.vendor.weave_server_sdk import Client as StainlessClient
 from weave.wandb_interface import project_creator
 
 TReq = TypeVar("TReq", bound=BaseModel)
@@ -77,7 +76,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             username=username,
             password=password,
             default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
         )
 
         if self.should_batch:
@@ -122,7 +120,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             username=self._username,
             password=self._password,
             default_headers=default_headers,
-            batch_requests=False,  # We handle batching ourselves
         )
 
     def _update_client_headers(self) -> None:
@@ -167,7 +164,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
 
         req_dict = req.model_dump(**dump_kwargs)
         response = stainless_api(**req_dict, **extra_kwargs)
-        return res_type.model_validate(response.model_dump())
+        # An empty response schema is generated as a bare `object`: a plain dict.
+        if hasattr(response, "model_dump"):
+            response = response.model_dump()
+        return res_type.model_validate(response)
 
     def _stainless_request_object(
         self,
@@ -289,7 +289,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         "req": item.req.model_dump(by_alias=True),
                     }
                 )
-        self._stainless_client.calls.upsert_batch(batch=stainless_batch)
+        self._stainless_client.calls.upsert_batch(batch=stainless_batch)  # type: ignore[arg-type]
 
     def _flush_calls(
         self,
@@ -500,13 +500,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
                         "req": item.req.model_dump(by_alias=True),
                     }
                 )
-        response = self._stainless_client.calls.upsert_batch(batch=stainless_batch)
+        response = self._stainless_client.calls.upsert_batch(batch=stainless_batch)  # type: ignore[arg-type]
         # Convert response back
         res_items = []
-        for item in response.batch:
-            if hasattr(item, "id"):  # CallStartRes
-                res_items.append(tsi.CallStartRes.model_validate(item.model_dump()))
-            else:  # CallEndRes
+        for res_item in response.res:
+            # A start result is generated as a model, an end result as an empty object.
+            if isinstance(res_item, BaseModel):
+                res_items.append(tsi.CallStartRes.model_validate(res_item.model_dump()))
+            else:
                 res_items.append(tsi.CallEndRes())
         return tsi.CallCreateBatchRes(res=res_items)
 
@@ -721,77 +722,56 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
     # Tag and Alias API
-    # NOTE: These methods require the Stainless SDK to include tag/alias endpoints.
-    # Until the SDK spec is updated, these will raise NotImplementedError at call time.
+    # The routes take the acting user from the auth header, not the body.
     def obj_add_tags(self, req: tsi.ObjAddTagsReq) -> tsi.ObjAddTagsRes:
-        try:
-            return self._stainless_request(
-                req, tsi.ObjAddTagsRes, self._stainless_client.objects.tags.add
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Tag operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.ObjAddTagsRes,
+            self._stainless_client.objects.tags.add,
+            exclude={"wb_user_id"},
+        )
 
     def obj_remove_tags(self, req: tsi.ObjRemoveTagsReq) -> tsi.ObjRemoveTagsRes:
-        try:
-            return self._stainless_request(
-                req, tsi.ObjRemoveTagsRes, self._stainless_client.objects.tags.remove
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Tag operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.ObjRemoveTagsRes,
+            self._stainless_client.objects.tags.remove,
+            exclude={"wb_user_id"},
+        )
 
     def obj_set_aliases(self, req: tsi.ObjSetAliasesReq) -> tsi.ObjSetAliasesRes:
-        try:
-            return self._stainless_request(
-                req, tsi.ObjSetAliasesRes, self._stainless_client.objects.aliases.set
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Alias operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.ObjSetAliasesRes,
+            self._stainless_client.objects.aliases.set,
+            exclude={"wb_user_id"},
+        )
 
     def obj_remove_aliases(
         self, req: tsi.ObjRemoveAliasesReq
     ) -> tsi.ObjRemoveAliasesRes:
-        try:
-            return self._stainless_request(
-                req,
-                tsi.ObjRemoveAliasesRes,
-                self._stainless_client.objects.aliases.remove,
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Alias operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.ObjRemoveAliasesRes,
+            self._stainless_client.objects.aliases.remove,
+            exclude={"wb_user_id"},
+        )
 
     def tags_list(self, req: tsi.TagsListReq) -> tsi.TagsListRes:
-        try:
-            return self._stainless_request(
-                req, tsi.TagsListRes, self._stainless_client.objects.tags.list
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Tag operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.TagsListRes,
+            self._stainless_client.objects.tags.list,
+            exclude={"wb_user_id"},
+        )
 
     def aliases_list(self, req: tsi.AliasesListReq) -> tsi.AliasesListRes:
-        try:
-            return self._stainless_request(
-                req, tsi.AliasesListRes, self._stainless_client.objects.aliases.list
-            )
-        except AttributeError:
-            raise NotImplementedError(
-                "Alias operations are not yet supported by the Stainless SDK. "
-                "Please upgrade the SDK or use RemoteHTTPTraceServer instead."
-            ) from None
+        return self._stainless_request(
+            req,
+            tsi.AliasesListRes,
+            self._stainless_client.objects.aliases.list,
+            exclude={"wb_user_id"},
+        )
 
     # Table API
     @validate_call
@@ -959,17 +939,10 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        self._update_client_headers()
-        # Files API uses multipart/form-data - stainless expects (filename, content) tuple
-        file_tuple = (req.name, req.content)
-        kwargs: dict[str, Any] = {
-            "file": file_tuple,
-            "project_id": req.project_id,
-        }
-        if req.expected_digest is not None:
-            kwargs["expected_digest"] = req.expected_digest
-        response = self._stainless_client.files.create(**kwargs)
-        return tsi.FileCreateRes.model_validate(response.model_dump())
+        # The spec types `file` as a string, so the generated method cannot attach one.
+        raise NotImplementedError(
+            "file_create is not yet implemented in stainless client"
+        )
 
     @validate_call
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
@@ -982,22 +955,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             File content read response.
         """
         self._update_client_headers()
-        response = self._stainless_client.files.content(
+        # TODO: Should stream to disk rather than to memory
+        # The plain call decodes the body as text, corrupting binary files.
+        response = self._stainless_client.files.with_raw_response.content(
             digest=req.digest, project_id=req.project_id
         )
-        # TODO: Should stream to disk rather than to memory
-        bytes_content = io.BytesIO()
-        # BinaryAPIResponse has content property or we can read it directly
-        if hasattr(response, "content"):
-            bytes_content.write(response.content)
-        elif hasattr(response, "iter_bytes"):
-            for chunk in response.iter_bytes():
-                bytes_content.write(chunk)
-        else:
-            # Fallback: read from raw response
-            bytes_content.write(response.read())
-        bytes_content.seek(0)
-        return tsi.FileContentReadRes(content=bytes_content.read())
+        return tsi.FileContentReadRes(content=response.read())
 
     @validate_call
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
@@ -1179,10 +1142,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Completions create response.
         """
-        return self._stainless_request(
-            req,
-            tsi.CompletionsCreateRes,
-            self._stainless_client.completions.create,
+        raise NotImplementedError(
+            "completions_create is not yet implemented in stainless client"
         )
 
     @validate_call
@@ -1197,10 +1158,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Yields:
             Dictionary chunks of the streamed response.
         """
-        # For remote servers, streaming is not implemented
-        # Fall back to non-streaming completion
-        response = self.completions_create(req)
-        yield {"response": response.response, "weave_call_id": response.weave_call_id}
+        raise NotImplementedError(
+            "completions_create_stream is not yet implemented in stainless client"
+        )
 
     @validate_call
     def image_create(
@@ -1229,10 +1189,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             Project stats response.
         """
-        return self._stainless_request(
-            req,
-            tsi.ProjectStatsRes,
-            self._stainless_client.services.project_stats,
+        raise NotImplementedError(
+            "project_stats is not yet implemented in stainless client"
         )
 
     @validate_call
@@ -1265,7 +1223,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         req_dict = req.model_dump(by_alias=True)
-        response = self._stainless_client.threads.stream_query(**req_dict)
+        response: Any = self._stainless_client.threads.stream_query(**req_dict)
         for item in response:
             yield tsi.ThreadSchema.model_validate(item)
 
@@ -1329,7 +1287,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Op create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.ops.create(
+        response = self._stainless_client.v2_ops.create(
             entity=entity,
             project=project,
             name=req.name,
@@ -1348,7 +1306,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Op read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.ops.read(
+        response = self._stainless_client.v2_ops.read(
             entity=entity,
             project=project,
             object_id=req.object_id,
@@ -1367,7 +1325,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             OpReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.ops.list(
+        response: Any = self._stainless_client.v2_ops.list(
             entity=entity,
             project=project,
             limit=req.limit,
@@ -1387,10 +1345,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Op delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.ops.delete(
+        response = self._stainless_client.v2_ops.delete(
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.OpDeleteRes.model_validate(response.model_dump())
 
@@ -1405,7 +1364,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Dataset create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.datasets.create(
+        response = self._stainless_client.v2_datasets.create(
             entity=entity,
             project=project,
             rows=req.rows,
@@ -1425,7 +1384,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Dataset read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.datasets.read(
+        response = self._stainless_client.v2_datasets.read(
             entity=entity,
             project=project,
             object_id=req.object_id,
@@ -1444,7 +1403,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             DatasetReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.datasets.list(
+        response: Any = self._stainless_client.v2_datasets.list(
             entity=entity,
             project=project,
             limit=req.limit,
@@ -1464,10 +1423,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Dataset delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.datasets.delete(
+        response = self._stainless_client.v2_datasets.delete(
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.DatasetDeleteRes.model_validate(response.model_dump())
 
@@ -1482,7 +1442,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Scorer create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scorers.create(
+        response = self._stainless_client.v2_scorers.create(
             entity=entity,
             project=project,
             name=req.name,
@@ -1502,7 +1462,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Scorer read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scorers.read(
+        response = self._stainless_client.v2_scorers.read(
             entity=entity,
             project=project,
             object_id=req.object_id,
@@ -1521,11 +1481,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             ScorerReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scorers.list(
+        response: Any = self._stainless_client.v2_scorers.list(
             entity=entity,
             project=project,
-            limit=req.limit,
-            offset=req.offset,
         )
         for item in response:
             yield tsi.ScorerReadRes.model_validate(item)
@@ -1541,10 +1499,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Scorer delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scorers.delete(
+        response = self._stainless_client.v2_scorers.delete(
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.ScorerDeleteRes.model_validate(response.model_dump())
 
@@ -1561,7 +1520,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluations.create(
+        response = self._stainless_client.v2_evaluations.create(
             entity=entity,
             project=project,
             dataset=req.dataset,
@@ -1569,6 +1528,8 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             description=req.description,
             scorers=req.scorers,
             trials=req.trials,
+            evaluation_name=req.evaluation_name,
+            eval_attributes=req.eval_attributes,
         )
         return tsi.EvaluationCreateRes.model_validate(response.model_dump())
 
@@ -1583,7 +1544,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluations.read(
+        response = self._stainless_client.v2_evaluations.read(
             entity=entity,
             project=project,
             object_id=req.object_id,
@@ -1604,11 +1565,9 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             EvaluationReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluations.list(
+        response: Any = self._stainless_client.v2_evaluations.list(
             entity=entity,
             project=project,
-            limit=req.limit,
-            offset=req.offset,
         )
         for item in response:
             yield tsi.EvaluationReadRes.model_validate(item)
@@ -1626,10 +1585,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluations.delete(
+        response = self._stainless_client.v2_evaluations.delete(
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.EvaluationDeleteRes.model_validate(response.model_dump())
 
@@ -1644,7 +1604,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Model create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.models.create(
+        response = self._stainless_client.v2_models.create(
             entity=entity,
             project=project,
             name=req.name,
@@ -1665,7 +1625,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Model read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.models.read(
+        response = self._stainless_client.v2_models.read(
             entity=entity,
             project=project,
             object_id=req.object_id,
@@ -1684,7 +1644,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             ModelReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.models.list(
+        response: Any = self._stainless_client.v2_models.list(
             entity=entity,
             project=project,
             limit=req.limit,
@@ -1704,10 +1664,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Model delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.models.delete(
+        response = self._stainless_client.v2_models.delete(
             entity=entity,
             project=project,
             object_id=req.object_id,
+            digests=req.digests,
         )
         return tsi.ModelDeleteRes.model_validate(response.model_dump())
 
@@ -1724,11 +1685,12 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation run create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluation_runs.create(
+        response = self._stainless_client.v2_evaluation_runs.create(
             entity=entity,
             project=project,
             evaluation=req.evaluation,
             model=req.model,
+            source_evaluation_run_id=req.source_evaluation_run_id,
         )
         return tsi.EvaluationRunCreateRes.model_validate(response.model_dump())
 
@@ -1745,7 +1707,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation run read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluation_runs.read(
+        response = self._stainless_client.v2_evaluation_runs.read(
             entity=entity,
             project=project,
             evaluation_run_id=req.evaluation_run_id,
@@ -1765,32 +1727,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             EvaluationRunReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-
-        # Extract filter parameters with explicit typing
-        evaluation_refs: str | None = (
-            ",".join(req.filter.evaluations)
-            if req.filter and req.filter.evaluations
-            else None
-        )
-        model_refs: str | None = (
-            ",".join(req.filter.models) if req.filter and req.filter.models else None
-        )
-        evaluation_run_ids: str | None = (
-            ",".join(req.filter.evaluation_run_ids)
-            if req.filter and req.filter.evaluation_run_ids
-            else None
-        )
-
-        # Call stainless API with typed parameters
-        # Pass filter parameters explicitly as typed keyword arguments
-        response = self._stainless_client.v2.evaluation_runs.list(
+        response = self._stainless_client.v2_evaluation_runs.list(
             entity=entity,
             project=project,
             limit=req.limit,
             offset=req.offset,
-            evaluation_refs=evaluation_refs,
-            model_refs=model_refs,
-            evaluation_run_ids=evaluation_run_ids,
+            evaluations=req.filter.evaluations if req.filter else None,
+            models=req.filter.models if req.filter else None,
+            evaluation_run_ids=req.filter.evaluation_run_ids if req.filter else None,
         )
 
         for item in response:
@@ -1809,7 +1753,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation run delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluation_runs.delete(
+        response = self._stainless_client.v2_evaluation_runs.delete(
             entity=entity,
             project=project,
             evaluation_run_ids=req.evaluation_run_ids,
@@ -1829,7 +1773,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Evaluation run finish response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.evaluation_runs.finish(
+        response = self._stainless_client.v2_evaluation_runs.finish(
             entity=entity,
             project=project,
             evaluation_run_id=req.evaluation_run_id,
@@ -1850,13 +1794,14 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Prediction create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.predictions.create(
+        response = self._stainless_client.v2_predictions.create(
             entity=entity,
             project=project,
             inputs=req.inputs,
             model=req.model,
             output=req.output,
             evaluation_run_id=req.evaluation_run_id,
+            genai_span_ref=req.genai_span_ref,
         )
         return tsi.PredictionCreateRes.model_validate(response.model_dump())
 
@@ -1871,7 +1816,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Prediction read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.predictions.read(
+        response = self._stainless_client.v2_predictions.read(
             entity=entity,
             project=project,
             prediction_id=req.prediction_id,
@@ -1891,7 +1836,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             PredictionReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.predictions.list(
+        response = self._stainless_client.v2_predictions.list(
             entity=entity,
             project=project,
             evaluation_run_id=req.evaluation_run_id,
@@ -1914,7 +1859,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Prediction delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.predictions.delete(
+        response = self._stainless_client.v2_predictions.delete(
             entity=entity,
             project=project,
             prediction_ids=req.prediction_ids,
@@ -1934,7 +1879,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Prediction finish response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.predictions.finish(
+        response = self._stainless_client.v2_predictions.finish(
             entity=entity,
             project=project,
             prediction_id=req.prediction_id,
@@ -1952,7 +1897,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Score create response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scores.create(
+        response = self._stainless_client.v2_scores.create(
             entity=entity,
             project=project,
             prediction_id=req.prediction_id,
@@ -1973,7 +1918,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Score read response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scores.read(
+        response = self._stainless_client.v2_scores.read(
             entity=entity,
             project=project,
             score_id=req.score_id,
@@ -1991,7 +1936,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             ScoreReadRes instances.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scores.list(
+        response = self._stainless_client.v2_scores.list(
             entity=entity,
             project=project,
             evaluation_run_id=req.evaluation_run_id,
@@ -2012,7 +1957,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             Score delete response.
         """
         entity, project = self._prepare_v2_request(req)
-        response = self._stainless_client.v2.scores.delete(
+        response = self._stainless_client.v2_scores.delete(
             entity=entity,
             project=project,
             score_ids=req.score_ids,
