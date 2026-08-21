@@ -708,6 +708,10 @@ deterministic.
 
 ### Credential-shaped fields in agent span columns
 
+- `GenAIOTelExportReq.sensitive_data_policy` carries a policy resolved by an
+  authorized server route. `AgentWriteHandler` uses it when present and falls
+  back to the process policy for internal callers that do not supply one. Do
+  not expose this field as caller-controlled OTel input.
 - The agents OTel ingest calls `redact_credentials_from_span` before
   `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
   Both are load-bearing — see that function's docstring — so keep the order and

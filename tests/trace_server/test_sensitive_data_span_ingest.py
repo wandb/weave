@@ -20,6 +20,7 @@ from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.types import AgentSpansQueryReq, GenAIOTelExportReq
 from weave.trace_server.environment import SENSITIVE_DATA_POLICY_ENV
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 _NOW_NS = 1_767_225_600_000_000_000
 _PII_ATTR_VALUE = "Email ada@example.com"
@@ -76,7 +77,11 @@ def _pii_proto_span(span_id: bytes) -> PbSpan:
     return span
 
 
-def _export_req(project_id: str, span: PbSpan) -> GenAIOTelExportReq:
+def _export_req(
+    project_id: str,
+    span: PbSpan,
+    policy: SensitiveDataPolicy | None = None,
+) -> GenAIOTelExportReq:
     scope = InstrumentationScope()
     scope.name = "test_instrumentation"
     scope_spans = ScopeSpans()
@@ -101,6 +106,7 @@ def _export_req(project_id: str, span: PbSpan) -> GenAIOTelExportReq:
         ],
         project_id=project_id,
         wb_user_id="test-user",
+        sensitive_data_policy=policy,
     )
 
 
@@ -162,3 +168,43 @@ def test_default_off_policy_stores_span_values_unchanged(
     assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}
     assert row.conversation_name == _PII_CONVERSATION_NAME
     assert row.reasoning_content == "think 123-45-6789"
+
+
+def test_request_policy_overrides_process_policy(
+    ch_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "off")
+    project_id = make_project_id("span_request_pii_on")
+
+    ch_server.genai_otel_export(
+        _export_req(
+            project_id,
+            _pii_proto_span(b"\x43" * 8),
+            SensitiveDataPolicy.PII_V1,
+        )
+    )
+
+    row = _stored_span_details(ch_server, project_id)
+    assert json.loads(row.raw_span_dump)["attributes"]["gen_ai"]["prompt"] == (
+        "Email <EMAIL_ADDRESS>"
+    )
+
+
+def test_request_off_policy_overrides_enabled_process_policy(
+    ch_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "pii-v1")
+    project_id = make_project_id("span_request_pii_off")
+
+    ch_server.genai_otel_export(
+        _export_req(
+            project_id,
+            _pii_proto_span(b"\x44" * 8),
+            SensitiveDataPolicy.OFF,
+        )
+    )
+
+    row = _stored_span_details(ch_server, project_id)
+    assert json.loads(row.raw_span_dump)["attributes"]["gen_ai"]["prompt"] == (
+        _PII_ATTR_VALUE
+    )

@@ -849,8 +849,9 @@ class AgentWriteHandler:
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
 
-        # One policy read for the whole request.
-        pii_policy = wf_env.sensitive_data_policy()
+        # An authorized route can supply a project policy. Other internal
+        # callers retain the process policy as their fallback.
+        pii_policy = req.sensitive_data_policy or wf_env.sensitive_data_policy()
 
         # Both branches below account every parse/extraction failure through
         # these two helpers, so the bookkeeping cannot drift between them.
