@@ -119,7 +119,11 @@ from weave.trace_server.model_providers.model_providers import (
 )
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
-from weave.trace_server.orm import Table, split_escaped_field_path
+from weave.trace_server.orm import (
+    Table,
+    parse_string_to_utc_timestamp,
+    split_escaped_field_path,
+)
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.token_costs import (
     DEFAULT_PRICING_LEVEL_ID,
@@ -236,15 +240,12 @@ def _maybe_datetime_literal(value: Any) -> datetime.datetime | None:
     if isinstance(value, (int, float)):
         return datetime.datetime.fromtimestamp(float(value), tz=datetime.timezone.utc)
     if isinstance(value, str):
-        s = value.strip()
-        if not s:
+        # Delegate to the shared parser so the fake accepts exactly what the real
+        # backend does (including permissive forms like a spelled-out ` UTC`).
+        parsed = parse_string_to_utc_timestamp(value)
+        if parsed is None:
             return None
-        if s.endswith(("Z", "z")):
-            s = s[:-1] + "+00:00"
-        try:
-            return _ensure_tz(datetime.datetime.fromisoformat(s))
-        except ValueError:
-            return None
+        return datetime.datetime.fromtimestamp(parsed, tz=datetime.timezone.utc)
     return None
 
 
@@ -1972,6 +1973,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                         if parsed is not None:
                             converted_literal = parsed
                             literal_side = side
+                        elif isinstance(operand.literal_, str):
+                            raise InvalidRequest(
+                                f"Invalid datetime value {operand.literal_!r} in "
+                                "filter: expected a unix timestamp or an ISO 8601 "
+                                "/ YYYY-MM-DD date string."
+                            )
             lhs_cast = tsi_query.infer_literal_filter_cast(rhs)
             rhs_cast = tsi_query.infer_literal_filter_cast(lhs)
             if literal_side is not None:
@@ -7190,14 +7197,11 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
     """Mirror `maybe_convert_datetime_operands`: a literal compared against a
     DateTime column is normalized to 'YYYY-MM-DD HH:MM:SS.ffffff'.
     """
-    from weave.trace_server.orm import (
-        parse_string_to_utc_timestamp,
-    )
-
     operands = [lhs, rhs]
     field_idx = None
     literal_idx = None
     timestamp: float | None = None
+    unparseable_str_idx = None
     for i, op in enumerate(operands):
         if (
             isinstance(op, tsi_query.GetFieldOperator)
@@ -7216,6 +7220,16 @@ def _orm_maybe_datetime_literal(table: Table, lhs: Any, rhs: Any) -> tuple[Any, 
                 if parsed is not None:
                     literal_idx = i
                     timestamp = parsed
+                else:
+                    unparseable_str_idx = i
+
+    if field_idx is not None and unparseable_str_idx is not None:
+        bad = operands[unparseable_str_idx]
+        assert isinstance(bad, tsi_query.LiteralOperation)
+        raise InvalidRequest(
+            f"Invalid datetime value {bad.literal_!r} in filter: "
+            "expected a unix timestamp or an ISO 8601 / YYYY-MM-DD date string."
+        )
 
     if field_idx is None or literal_idx is None or timestamp is None:
         return lhs, rhs
