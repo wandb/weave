@@ -36,6 +36,7 @@ from weave.trace_server.opentelemetry.helpers import (
 from weave.trace_server.opentelemetry.python_spans import Resource as PyResource
 from weave.trace_server.opentelemetry.python_spans import Span as PySpan
 from weave.trace_server.opentelemetry.python_spans import StatusCode
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 EVAL_MARKER_ATTR = "weave.eval.predict_and_score_call_id"
 STAMP_ATTR = "weave.ingest_sample_rate"
@@ -97,6 +98,7 @@ def _export(ch_server, project_id: str, *spans: PbSpan):
             processed_spans=[_processed(*spans)],
             project_id=project_id,
             wb_user_id="test-user",
+            sensitive_data_policy=SensitiveDataPolicy.OFF,
         )
     )
 

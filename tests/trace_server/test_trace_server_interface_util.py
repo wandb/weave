@@ -16,6 +16,7 @@ from weave.trace_server.external_to_internal_trace_server_adapter import (
     ExternalTraceServer,
     IdConverter,
 )
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 REF_A = "weave-trace-internal:///test_project/object/obj_a:abc123"
 REF_B = "weave-trace-internal:///test_project/object/obj_b:def456"
@@ -410,7 +411,10 @@ def _make_otel_export_req_with_ref_attrs(
         resource_spans=resource_spans,
     )
     return tsi.agent_types.GenAIOTelExportReq(
-        processed_spans=[processed], project_id=project_id, wb_user_id=None
+        processed_spans=[processed],
+        project_id=project_id,
+        wb_user_id=None,
+        sensitive_data_policy=SensitiveDataPolicy.OFF,
     )
 
 
@@ -577,7 +581,10 @@ def _make_otel_export_req_with_string_attr(
         resource_spans=resource_spans,
     )
     return tsi.agent_types.GenAIOTelExportReq(
-        processed_spans=[processed], project_id=project_id, wb_user_id=None
+        processed_spans=[processed],
+        project_id=project_id,
+        wb_user_id=None,
+        sensitive_data_policy=SensitiveDataPolicy.OFF,
     )
 
 
@@ -686,7 +693,10 @@ def test_genai_otel_export_caches_project_id_lookup_across_batch() -> None:
         resource_spans=resource_spans,
     )
     req = tsi.agent_types.GenAIOTelExportReq(
-        processed_spans=[processed], project_id="ent/proj", wb_user_id=None
+        processed_spans=[processed],
+        project_id="ent/proj",
+        wb_user_id=None,
+        sensitive_data_policy=SensitiveDataPolicy.OFF,
     )
 
     inner = MagicMock(spec=tsi.FullTraceServerInterface)

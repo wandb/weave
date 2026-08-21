@@ -1,8 +1,6 @@
 import logging
 import os
 
-from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
-
 logger = logging.getLogger(__name__)
 
 # Default port numbers
@@ -16,19 +14,6 @@ DEFAULT_SCORING_WORKER_BATCH_TIMEOUT = 5
 # ClickHouse async insert timeout defaults (milliseconds)
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MIN_MS = 100
 DEFAULT_ASYNC_INSERT_BUSY_TIMEOUT_MAX_MS = 1000
-
-SENSITIVE_DATA_POLICY_ENV = "WEAVE_TRACE_SERVER_SENSITIVE_DATA_POLICY"
-
-
-def sensitive_data_policy() -> SensitiveDataPolicy:
-    """Return the process-wide trace-ingest redaction policy."""
-    raw = os.environ.get(SENSITIVE_DATA_POLICY_ENV, SensitiveDataPolicy.OFF.value)
-    try:
-        return SensitiveDataPolicy(raw)
-    except ValueError:
-        raise ValueError(
-            f"{SENSITIVE_DATA_POLICY_ENV} must be 'off' or 'pii-v1'"
-        ) from None
 
 
 # Kafka Settings

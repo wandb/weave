@@ -33,6 +33,7 @@ from weave.trace_server.clickhouse_schema import (
 from weave.trace_server.errors import NotFoundError, ObjectDeletedError
 from weave.trace_server.project_version.types import ReadTable
 from weave.trace_server.secret_fetcher_context import secret_fetcher_context
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 
 class MockObjectReadError(Exception):
@@ -2122,7 +2123,12 @@ def test_genai_otel_export_emit_gate(monkeypatch, online_eval, scoring, insights
     )
 
     res = server.genai_otel_export(
-        GenAIOTelExportReq(processed_spans=[], project_id="p", wb_user_id="")
+        GenAIOTelExportReq(
+            processed_spans=[],
+            project_id="p",
+            wb_user_id="",
+            sensitive_data_policy=SensitiveDataPolicy.OFF,
+        )
     )
 
     assert res.accepted_spans == 1

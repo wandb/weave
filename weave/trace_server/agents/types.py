@@ -1308,7 +1308,7 @@ class GenAIOTelExportReq(BaseModel):
     )
     project_id: str
     wb_user_id: str | None = None
-    sensitive_data_policy: SensitiveDataPolicy | None = None
+    sensitive_data_policy: SensitiveDataPolicy
 
 
 class GenAIOTelExportRes(BaseModel):

@@ -55,6 +55,7 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.interface.query import Query
 from weave.trace_server.opentelemetry.python_spans import StatusCode
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 
 def _make_span(project_id: str, **overrides: object) -> AgentSpanCHInsertable:
@@ -3267,6 +3268,7 @@ def test_genai_otel_export_ref_boundary_internal_in_db_external_out(
             processed_spans=[processed],
             project_id=external_project_id,
             wb_user_id=external_user_id,
+            sensitive_data_policy=SensitiveDataPolicy.OFF,
         )
     )
     assert res.accepted_spans == 1
@@ -3448,6 +3450,7 @@ def test_genai_otel_export_redacts_credential_shaped_fields(ch_server, trace_ser
             processed_spans=[_build_credential_processed_span()],
             project_id=external_project_id,
             wb_user_id="user-42",
+            sensitive_data_policy=SensitiveDataPolicy.OFF,
         )
     )
     assert res.accepted_spans == 1
@@ -3500,6 +3503,7 @@ def test_genai_otel_export_redacts_without_file_storage(ch_server):
             processed_spans=[_build_credential_processed_span()],
             project_id=project_id,
             wb_user_id="u-1",
+            sensitive_data_policy=SensitiveDataPolicy.OFF,
         )
     )
     assert res.accepted_spans == 1

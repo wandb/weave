@@ -2,15 +2,14 @@
 
 Runs the real ``genai_otel_export`` against ClickHouse via the ``ch_server``
 fixture and reads the stored span details back, proving the ``pii-v1`` policy
-reaches ``raw_span_dump`` and the attribute-derived columns, and that the
-default ``off`` policy stores values unchanged.
+reaches ``raw_span_dump`` and the attribute-derived columns, and that an
+explicit ``off`` policy stores values unchanged.
 """
 
 from __future__ import annotations
 
 import json
 
-import pytest
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans
@@ -19,7 +18,6 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
 from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.agents.types import AgentSpansQueryReq, GenAIOTelExportReq
-from weave.trace_server.environment import SENSITIVE_DATA_POLICY_ENV
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 _NOW_NS = 1_767_225_600_000_000_000
@@ -80,7 +78,7 @@ def _pii_proto_span(span_id: bytes) -> PbSpan:
 def _export_req(
     project_id: str,
     span: PbSpan,
-    policy: SensitiveDataPolicy | None = None,
+    policy: SensitiveDataPolicy,
 ) -> GenAIOTelExportReq:
     scope = InstrumentationScope()
     scope.name = "test_instrumentation"
@@ -118,14 +116,15 @@ def _stored_span_details(ch_server, project_id: str):
     return res.spans[0]
 
 
-def test_pii_policy_redacts_stored_span_details(
-    ch_server, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "pii-v1")
+def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
     project_id = make_project_id("span_pii_on")
 
     res = ch_server.genai_otel_export(
-        _export_req(project_id, _pii_proto_span(b"\x41" * 8))
+        _export_req(
+            project_id,
+            _pii_proto_span(b"\x41" * 8),
+            SensitiveDataPolicy.PII_V1,
+        )
     )
 
     assert res.rejected_spans == 0
@@ -150,14 +149,15 @@ def test_pii_policy_redacts_stored_span_details(
     assert row.compaction_summary == "card <CREDIT_CARD>"
 
 
-def test_default_off_policy_stores_span_values_unchanged(
-    ch_server, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv(SENSITIVE_DATA_POLICY_ENV, raising=False)
+def test_off_policy_stores_span_values_unchanged(ch_server) -> None:
     project_id = make_project_id("span_pii_off")
 
     res = ch_server.genai_otel_export(
-        _export_req(project_id, _pii_proto_span(b"\x42" * 8))
+        _export_req(
+            project_id,
+            _pii_proto_span(b"\x42" * 8),
+            SensitiveDataPolicy.OFF,
+        )
     )
 
     assert res.rejected_spans == 0
@@ -168,43 +168,3 @@ def test_default_off_policy_stores_span_values_unchanged(
     assert dump["resource"]["attributes"] == {"service": {"owner": _PII_RESOURCE_VALUE}}
     assert row.conversation_name == _PII_CONVERSATION_NAME
     assert row.reasoning_content == "think 123-45-6789"
-
-
-def test_request_policy_overrides_process_policy(
-    ch_server, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "off")
-    project_id = make_project_id("span_request_pii_on")
-
-    ch_server.genai_otel_export(
-        _export_req(
-            project_id,
-            _pii_proto_span(b"\x43" * 8),
-            SensitiveDataPolicy.PII_V1,
-        )
-    )
-
-    row = _stored_span_details(ch_server, project_id)
-    assert json.loads(row.raw_span_dump)["attributes"]["gen_ai"]["prompt"] == (
-        "Email <EMAIL_ADDRESS>"
-    )
-
-
-def test_request_off_policy_overrides_enabled_process_policy(
-    ch_server, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "pii-v1")
-    project_id = make_project_id("span_request_pii_off")
-
-    ch_server.genai_otel_export(
-        _export_req(
-            project_id,
-            _pii_proto_span(b"\x44" * 8),
-            SensitiveDataPolicy.OFF,
-        )
-    )
-
-    row = _stored_span_details(ch_server, project_id)
-    assert json.loads(row.raw_span_dump)["attributes"]["gen_ai"]["prompt"] == (
-        _PII_ATTR_VALUE
-    )

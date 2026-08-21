@@ -8,10 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.credential_redaction import REDACTED_VALUE
-from weave.trace_server.environment import (
-    SENSITIVE_DATA_POLICY_ENV,
-    sensitive_data_policy,
-)
 from weave.trace_server.opentelemetry.python_spans import (
     Event,
     Link,
@@ -46,28 +42,6 @@ class _PayloadModel(BaseModel):
 
     values: tuple[object, ...]
     excluded: str = Field(exclude=True)
-
-
-def test_sensitive_data_policy_defaults_to_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(SENSITIVE_DATA_POLICY_ENV, raising=False)
-
-    assert sensitive_data_policy() is SensitiveDataPolicy.OFF
-
-
-def test_sensitive_data_policy_parses_pii_v1(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "pii-v1")
-
-    assert sensitive_data_policy() is SensitiveDataPolicy.PII_V1
-
-
-def test_sensitive_data_policy_rejects_unknown_value(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv(SENSITIVE_DATA_POLICY_ENV, "unknown")
-
-    with pytest.raises(ValueError, match="must be 'off' or 'pii-v1'") as exc_info:
-        sensitive_data_policy()
-    assert "unknown" not in str(exc_info.value)
 
 
 def test_redacts_supported_pii_with_typed_markers() -> None:

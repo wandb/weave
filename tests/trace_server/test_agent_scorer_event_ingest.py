@@ -9,6 +9,7 @@ from weave.trace_server.agents import clickhouse as ch_module
 from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import GenAIOTelExportReq
+from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 
 def test_insert_otel_spans_returns_accepted_rows(monkeypatch):
@@ -67,7 +68,12 @@ def test_insert_otel_spans_returns_accepted_rows(monkeypatch):
     # Stub row-conversion helper so we don't depend on its internals.
     monkeypatch.setattr(ch_module, "genai_span_to_row", lambda r: [])
 
-    req = GenAIOTelExportReq(processed_spans=[processed], project_id="p", wb_user_id="")
+    req = GenAIOTelExportReq(
+        processed_spans=[processed],
+        project_id="p",
+        wb_user_id="",
+        sensitive_data_policy=SensitiveDataPolicy.OFF,
+    )
     res, accepted_rows = handler.insert_otel_spans(req)
 
     assert res.accepted_spans == 2

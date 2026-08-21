@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
 from weave.shared import refs_internal as ri
-from weave.trace_server import environment as wf_env
 from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.chat_view import (
     add_optional_cost,
@@ -849,10 +848,6 @@ class AgentWriteHandler:
         failure_counts: dict[str, int] = {}
         failure_examples: list[str] = []
 
-        # An authorized route can supply a project policy. Other internal
-        # callers retain the process policy as their fallback.
-        pii_policy = req.sensitive_data_policy or wf_env.sensitive_data_policy()
-
         # Both branches below account every parse/extraction failure through
         # these two helpers, so the bookkeeping cannot drift between them.
         def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
@@ -872,7 +867,7 @@ class AgentWriteHandler:
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
             # Outside the try: a scan failure rejects the whole request before any insert.
-            redact_pii_from_span(span, pii_policy)
+            redact_pii_from_span(span, req.sensitive_data_policy)
             try:
                 # Before the blob strip: that step can move a value into file
                 # storage.
