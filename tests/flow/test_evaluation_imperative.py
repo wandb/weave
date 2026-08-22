@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import inspect
 import json
 from collections import defaultdict
@@ -542,7 +542,7 @@ def test_evaluation_no_auto_summarize(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {"output": {}}
+    assert summarize_call.output == {}
 
 
 def test_evaluation_fail_with_exception(client):
@@ -571,11 +571,24 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {
-        "something": 1,
-        "else": 2,
-        "output": {"something": 1, "else": 2},
-    }
+    assert summarize_call.output == {"something": 1, "else": 2}
+
+
+def test_evaluation_log_summary_auto_summarize_false_no_duplicate_output(client):
+    ev = weave.EvaluationLogger()
+    pred = ev.log_prediction(inputs={"a": 1}, output=2)
+    pred.log_score(scorer="s", score=0.9)
+    ev.log_summary(summary={"metric": 0.9}, auto_summarize=False)
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    summarize_call = calls[4]
+    output = summarize_call.output
+    assert "output" not in output, (
+        "log_summary with auto_summarize=False must not nest the summary under 'output'"
+    )
+    assert output == {"metric": 0.9}
 
 
 def test_evaluation_logger_model_inference_method_handling(weave_active):
