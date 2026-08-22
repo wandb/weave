@@ -37,6 +37,22 @@ def _chunk_payload(content: str = "Hello") -> dict:
     }
 
 
+def _completion_payload(content: str = "Hello") -> dict:
+    return {
+        "id": "completion-1",
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+            }
+        ],
+        "created": 1,
+        "model": "runtime-model",
+        "object": "chat.completion",
+    }
+
+
 class _TrackingByteStream(httpx.SyncByteStream):
     def __init__(self, content: bytes, close_error: Exception | None = None) -> None:
         self.content = content
@@ -208,3 +224,102 @@ def test_stream_parse_error_closes_resources(monkeypatch) -> None:
     assert stream.response.is_closed
     assert body.closed
     assert clients[0].is_closed
+
+
+def test_playground_completion_reuses_conversation_across_provider_switches(
+    monkeypatch,
+) -> None:
+    request_bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        request_bodies.append(body)
+        conversation_id = body.get("conversation_id", "server-conversation")
+        return httpx.Response(
+            200,
+            json={
+                "response": _completion_payload(),
+                "conversation_id": conversation_id,
+            },
+        )
+
+    _install_mock_transport(monkeypatch, handler)
+    completions = Completions(_client())
+
+    first = completions.create(
+        endpoint="playground",
+        model="custom::runtime-a::model-a",
+        messages=[{"role": "user", "content": "Hello"}],
+        track_llm_call=False,
+    )
+    second = completions.create(
+        endpoint="playground",
+        model="openai/gpt-4o",
+        messages=[{"role": "user", "content": "Continue"}],
+        conversation_id=first.conversation_id,
+        track_llm_call=False,
+    )
+    third = completions.create(
+        endpoint="playground",
+        model="custom::runtime-b::model-b",
+        messages=[{"role": "user", "content": "Finish"}],
+        conversation_id=second.conversation_id,
+        track_llm_call=False,
+    )
+
+    assert second.conversation_id == first.conversation_id
+    assert third.conversation_id == first.conversation_id
+    assert [body["inputs"]["model"] for body in request_bodies] == [
+        "custom::runtime-a::model-a",
+        "openai/gpt-4o",
+        "custom::runtime-b::model-b",
+    ]
+    assert "conversation_id" not in request_bodies[0]
+    assert request_bodies[1]["conversation_id"] == first.conversation_id
+    assert request_bodies[2]["conversation_id"] == first.conversation_id
+
+
+def test_custom_runtime_stream_consumes_server_conversation_context(
+    monkeypatch,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        content = (
+            json.dumps({"_meta": {"conversation_id": "server-conversation"}}).encode()
+            + b"\n"
+            + json.dumps(_chunk_payload()).encode()
+            + b"\n"
+        )
+        return httpx.Response(200, content=content)
+
+    _install_mock_transport(monkeypatch, handler)
+    completions = Completions(_client())
+
+    stream = completions.create(
+        endpoint="playground",
+        model="custom::runtime::model",
+        messages=[{"role": "user", "content": "Hello"}],
+        stream=True,
+        track_llm_call=False,
+    )
+
+    assert [chunk.choices[0].delta.content for chunk in stream] == ["Hello"]
+    assert stream.conversation_id == "server-conversation"
+
+
+def test_inference_completion_has_no_playground_conversation_context(
+    monkeypatch,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion_payload())
+
+    _install_mock_transport(monkeypatch, handler)
+    completions = Completions(_client())
+
+    result = completions.create(
+        endpoint="inference",
+        model="coreweave/runtime-model",
+        messages=[{"role": "user", "content": "Hello"}],
+        track_llm_call=False,
+    )
+
+    assert "conversation_id" not in result.model_dump()

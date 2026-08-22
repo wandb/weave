@@ -110,7 +110,12 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+            return tsi.CompletionsCreateRes(
+                response=res.response,
+                conversation_id=(
+                    req.conversation_id if info.is_custom_runtime else None
+                ),
+            )
         return _CompletionCall(prep, res, start_time, end_time)
 
     async def _run_on_ch_executor(self, fn: Callable[..., _T], *args: object) -> _T:

@@ -12,11 +12,13 @@ class ChatCompletionChunkStream:
     """A stream wrapper for ChatCompletionChunk objects from an httpx response.
 
     This class takes an httpx response object and yields ChatCompletionChunk
-    objects by parsing the server-sent events stream.
+    objects by parsing the server-sent events stream. W&B ``_meta`` records are
+    consumed internally and are not yielded as completion chunks.
 
     Args:
         response: The httpx.Response object from a streaming API call.
         exit_stack: Optional owned contexts for the response and its client.
+        initial_conversation_id: Optional caller-supplied conversation context.
 
     Yields:
         ChatCompletionChunk: Parsed chat completion chunks from the stream.
@@ -33,10 +35,14 @@ class ChatCompletionChunkStream:
     """
 
     def __init__(
-        self, response: httpx.Response, exit_stack: ExitStack | None = None
+        self,
+        response: httpx.Response,
+        exit_stack: ExitStack | None = None,
+        initial_conversation_id: str | None = None,
     ) -> None:
         self.response = response
         self._exit_stack = exit_stack
+        self.conversation_id = initial_conversation_id
 
     def close(self) -> None:
         if self._exit_stack is None:
@@ -61,7 +67,16 @@ class ChatCompletionChunkStream:
                     if line == "[DONE]":
                         continue
                     try:
-                        yield ChatCompletionChunk.model_validate_json(line)
+                        data = json.loads(line)
                     except json.JSONDecodeError:
-                        print(f"Error parsing line as JSON: {line}")
-                        raise
+                        # Preserve the existing Pydantic validation error for
+                        # malformed completion chunks.
+                        yield ChatCompletionChunk.model_validate_json(line)
+                        continue
+                    metadata = data.get("_meta") if isinstance(data, dict) else None
+                    if isinstance(metadata, dict):
+                        conversation_id = metadata.get("conversation_id")
+                        if isinstance(conversation_id, str):
+                            self.conversation_id = conversation_id
+                        continue
+                    yield ChatCompletionChunk.model_validate(data)

@@ -9,6 +9,11 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 )
 
 
+def is_custom_runtime_model(model: str) -> bool:
+    """Return whether a model selector targets a Custom Runtime."""
+    return model.startswith("custom::")
+
+
 def apply_custom_runtime(
     req: tsi.CustomRuntimeApplyReq,
     obj_create: Callable[[tsi.ObjCreateReq], tsi.ObjCreateRes],

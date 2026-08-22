@@ -72,6 +72,8 @@ from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER, SENTINEL_EPOC
 # module; import it rather than fork it.
 from weave.trace_server.clickhouse_trace_server_batched import (
     CompletionPrepResult,
+    _ensure_custom_runtime_conversation_id,
+    _prepend_completion_conversation_context,
     _setup_completion_model_info,
 )
 from weave.trace_server.clickhouse_trace_server_settings import (
@@ -4319,6 +4321,8 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
                     response={"error": f"Failed to resolve prompt: {e!s}"}
                 )
 
+        _ensure_custom_runtime_conversation_id(req)
+
         model_info = _model_to_provider_info_map().get(req.inputs.model)
         try:
             completion_model_info = _setup_completion_model_info(
@@ -4388,7 +4392,12 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         end_time = datetime.datetime.now()
 
         if not req.track_llm_call:
-            return tsi.CompletionsCreateRes(response=res.response)
+            return tsi.CompletionsCreateRes(
+                response=res.response,
+                conversation_id=(
+                    req.conversation_id if info.is_custom_runtime else None
+                ),
+            )
 
         req.inputs.messages = prep.initial_messages
         span_id = generate_id()
@@ -4463,6 +4472,10 @@ class InMemoryTraceServer(tsi.FullTraceServerInterface):
         )
 
         if not req.track_llm_call:
+            if info.is_custom_runtime and req.conversation_id:
+                return _prepend_completion_conversation_context(
+                    chunk_iter, req.conversation_id
+                )
             return chunk_iter
 
         req.inputs.messages = prep.initial_messages
