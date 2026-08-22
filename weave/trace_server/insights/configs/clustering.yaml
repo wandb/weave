@@ -3,7 +3,10 @@ algorithm: hdbscan
 
 # `global` fits one model over the whole signature type. `category` fits one per
 # category, which resolves finer topics inside a category that dominates the space.
-scope: global
+scope: category
+
+# Cap on topics one fit may keep. The job reads this; changing it moves the digest.
+max_clusters: 100
 
 # What HDBSCAN actually clusters. Reducing first was chosen against a measurement rather than
 # taken as a default: on the reference corpus, reducing with UMAP or not reducing at all both
