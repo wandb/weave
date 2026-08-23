@@ -1145,3 +1145,103 @@ def test_bedrock_invoke_model_stream(
     assert "body" in output
     assert "Hello" in output["body"]["content"]
     assert "World" in output["body"]["content"]
+
+
+MOCK_INVOKE_STREAM_CLAUDE_CACHE_EVENTS = [
+    {
+        "chunk": {
+            "bytes": b'{"type":"message_start","message":{"id":"msg_01","usage":{"input_tokens":42,"output_tokens":0,"cache_read_input_tokens":80,"cache_creation_input_tokens":15}}}'
+        }
+    },
+    {
+        "chunk": {
+            "bytes": b'{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello"}}'
+        }
+    },
+    {
+        "chunk": {
+            "bytes": b'{"type":"content_block_delta","delta":{"type":"text_delta","text":" Cache"}}'
+        }
+    },
+    {
+        "chunk": {
+            "bytes": b'{"type":"message_delta","usage":{"output_tokens":10}}'
+        }
+    },
+]
+
+
+def mock_invoke_stream_cache_make_api_call(
+    self, operation_name: str, api_params: dict
+) -> dict:
+    if operation_name == "InvokeModelWithResponseStream":
+        return {
+            "ResponseMetadata": {
+                "RequestId": "cache-test-req-id",
+                "HTTPStatusCode": 200,
+                "HTTPHeaders": {
+                    "content-type": "application/vnd.amazon.eventstream",
+                    "x-amzn-requestid": "cache-test-req-id",
+                    "x-amzn-bedrock-input-token-count": "42",
+                    "x-amzn-bedrock-output-token-count": "10",
+                },
+                "RetryAttempts": 0,
+            },
+            "body": iter(MOCK_INVOKE_STREAM_CLAUDE_CACHE_EVENTS),
+            "contentType": "application/json",
+        }
+    return orig(self, operation_name, api_params)
+
+
+@mock_aws
+def test_bedrock_invoke_model_stream_anthropic_cache_tokens(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    """Cache token counts from Anthropic message_start events are surfaced in usage."""
+    bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
+    patch_client(bedrock_client)
+
+    with patch(
+        "botocore.client.BaseClient._make_api_call",
+        new=mock_invoke_stream_cache_make_api_call,
+    ):
+        body = json.dumps(
+            {
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 30,
+                "messages": [{"role": "user", "content": invoke_prompt}],
+            }
+        )
+        response = bedrock_client.invoke_model_with_response_stream(
+            modelId=model_id,
+            body=body,
+            contentType="application/json",
+            accept="application/json",
+        )
+
+        received_bytes = b""
+        for event in response["body"]:
+            chunk = event.get("chunk", {})
+            if "bytes" in chunk:
+                received_bytes += chunk["bytes"]
+
+    calls = list(client.get_calls())
+    assert len(calls) == 1
+    call = calls[0]
+    assert call.exception is None
+
+    summary = call.summary
+    assert summary is not None
+    model_usage = summary["usage"][model_id]
+    assert model_usage["requests"] == 1
+
+    # Cache tokens parsed from body and added to prompt_tokens (gross total)
+    assert model_usage["cache_read_input_tokens"] == 80
+    assert model_usage["cache_creation_input_tokens"] == 15
+    assert model_usage["prompt_tokens"] == 42 + 80 + 15  # 137
+    assert model_usage["completion_tokens"] == 10
+    assert model_usage["total_tokens"] == 147
+
+    # Structured text extracted from content_block_delta events
+    output = call.output
+    assert output["body"]["text"] == "Hello Cache"

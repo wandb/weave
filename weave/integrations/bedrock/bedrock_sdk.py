@@ -228,6 +228,22 @@ def bedrock_on_finish_invoke_stream(
             "completion_tokens": completion_tokens,
             "total_tokens": prompt_tokens + completion_tokens,
         }
+        # For Anthropic/Claude models invoked via invoke_model_with_response_stream,
+        # the HTTP headers do not report cache token counts. These are parsed from
+        # the NDJSON body by postprocess_output_invoke_stream and stored separately.
+        cache = output.get("_anthropic_cache_tokens", {})
+        cache_read = cache.get("cache_read_input_tokens", 0)
+        cache_creation = cache.get("cache_creation_input_tokens", 0)
+        if cache_read:
+            tokens_metrics["cache_read_input_tokens"] = cache_read
+            tokens_metrics["prompt_tokens"] += cache_read
+        if cache_creation:
+            tokens_metrics["cache_creation_input_tokens"] = cache_creation
+            tokens_metrics["prompt_tokens"] += cache_creation
+        if cache_read or cache_creation:
+            tokens_metrics["total_tokens"] = (
+                tokens_metrics["prompt_tokens"] + completion_tokens
+            )
         usage[model_name].update(tokens_metrics)
     if call.summary is not None:
         call.summary.update(summary_update)
@@ -271,10 +287,45 @@ def postprocess_output_invoke_stream(
         except UnicodeDecodeError:
             body_text = repr(all_bytes)
 
-        outputs_copy["body"] = {
+        body_summary: dict[str, Any] = {
             "content": body_text,
             "event_count": len(all_events),
         }
+
+        # For Anthropic/Claude models, parse the NDJSON body to extract
+        # structured text and cache-token usage that HTTP headers omit.
+        text_parts: list[str] = []
+        cache_read_tokens = 0
+        cache_creation_tokens = 0
+        for line in body_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            event_type = event.get("type")
+            if event_type == "message_start":
+                usage = event.get("message", {}).get("usage", {})
+                cache_read_tokens = usage.get("cache_read_input_tokens", 0) or 0
+                cache_creation_tokens = (
+                    usage.get("cache_creation_input_tokens", 0) or 0
+                )
+            elif event_type == "content_block_delta":
+                delta = event.get("delta", {})
+                if delta.get("type") == "text_delta":
+                    text_parts.append(delta.get("text", ""))
+
+        if text_parts:
+            body_summary["text"] = "".join(text_parts)
+        if cache_read_tokens or cache_creation_tokens:
+            outputs_copy["_anthropic_cache_tokens"] = {
+                "cache_read_input_tokens": cache_read_tokens,
+                "cache_creation_input_tokens": cache_creation_tokens,
+            }
+
+        outputs_copy["body"] = body_summary
     except Exception as e:
         outputs_copy["body"] = {"_stream_error": str(e)}
 
