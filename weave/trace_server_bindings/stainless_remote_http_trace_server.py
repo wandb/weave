@@ -169,45 +169,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             response = response.model_dump()
         return res_type.model_validate(response)
 
-    def _stainless_request_object(
-        self,
-        req: BaseModel,
-        res_type: type[TRes],
-        stainless_api: Callable[..., Any],
-        *,
-        exclude: set[str] | None = None,
-        **extra_kwargs: Any,
-    ) -> TRes:
-        """Helper method for Object API requests that split project_id into entity/project.
-
-        Args:
-            req: Request object (already validated by @validate_call).
-            res_type: Type of the response model.
-            stainless_api: Stainless API callable to invoke.
-            exclude: Set of field names to exclude from request dump.
-            **extra_kwargs: Additional keyword arguments to pass to the API.
-
-        Returns:
-            Validated response model instance.
-        """
-        self._update_client_headers()
-        entity, project = from_project_id(req.project_id)
-
-        exclude_set = {"project_id"}
-        if exclude:
-            exclude_set.update(exclude)
-        exclude_set.update(extra_kwargs.keys())
-
-        dump_kwargs: dict[str, Any] = {"by_alias": True}
-        if exclude_set:
-            dump_kwargs["exclude"] = exclude_set
-
-        req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(
-            entity=entity, project=project, **req_dict, **extra_kwargs
-        )
-        return res_type.model_validate(response.model_dump())
-
     def _prepare_v2_request(self, req: BaseModel) -> tuple[str, str]:
         """Prepare v2 API request by updating headers and splitting project_id.
 
@@ -222,46 +183,6 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         """
         self._update_client_headers()
         return from_project_id(req.project_id)
-
-    def _stainless_list_object(
-        self,
-        req: BaseModel,
-        res_type: type[TRes],
-        stainless_api: Callable[..., Any],
-        *,
-        exclude: set[str] | None = None,
-        **extra_kwargs: Any,
-    ) -> Iterator[TRes]:
-        """Helper method for Object API list requests that split project_id into entity/project.
-
-        Args:
-            req: Request object (already validated by @validate_call).
-            res_type: Type of the response model to yield.
-            stainless_api: Stainless API callable to invoke.
-            exclude: Set of field names to exclude from request dump.
-            **extra_kwargs: Additional keyword arguments to pass to the API.
-
-        Yields:
-            Validated response model instances of type res_type.
-        """
-        self._update_client_headers()
-        entity, project = from_project_id(req.project_id)
-
-        exclude_set = {"project_id"}
-        if exclude:
-            exclude_set.update(exclude)
-        exclude_set.update(extra_kwargs.keys())
-
-        dump_kwargs: dict[str, Any] = {"by_alias": True, "exclude_none": True}
-        if exclude_set:
-            dump_kwargs["exclude"] = exclude_set
-
-        req_dict = req.model_dump(**dump_kwargs)
-        response = stainless_api(
-            entity=entity, project=project, **req_dict, **extra_kwargs
-        )
-        for item in response:
-            yield res_type.model_validate(item)
 
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
