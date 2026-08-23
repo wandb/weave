@@ -939,10 +939,13 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         Returns:
             File create response.
         """
-        # The spec types `file` as a string, so the generated method cannot attach one.
-        raise NotImplementedError(
-            "file_create is not yet implemented in stainless client"
+        self._update_client_headers()
+        response = self._stainless_client.files.create(
+            project_id=req.project_id,
+            file=(req.name, req.content),
+            expected_digest=req.expected_digest,
         )
+        return tsi.FileCreateRes.model_validate(response.model_dump())
 
     @validate_call
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
@@ -1225,7 +1228,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         req_dict = req.model_dump(by_alias=True)
         response: Any = self._stainless_client.threads.stream_query(**req_dict)
         for item in response:
-            yield tsi.ThreadSchema.model_validate(item)
+            yield tsi.ThreadSchema.model_validate(item.model_dump())
 
     @validate_call
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
@@ -1332,7 +1335,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             offset=req.offset,
         )
         for item in response:
-            yield tsi.OpReadRes.model_validate(item)
+            yield tsi.OpReadRes.model_validate(item.model_dump())
 
     @validate_call
     def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
@@ -1410,7 +1413,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             offset=req.offset,
         )
         for item in response:
-            yield tsi.DatasetReadRes.model_validate(item)
+            yield tsi.DatasetReadRes.model_validate(item.model_dump())
 
     @validate_call
     def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
@@ -1484,9 +1487,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response: Any = self._stainless_client.v2_scorers.list(
             entity=entity,
             project=project,
+            limit=req.limit,
+            offset=req.offset,
         )
         for item in response:
-            yield tsi.ScorerReadRes.model_validate(item)
+            yield tsi.ScorerReadRes.model_validate(item.model_dump())
 
     @validate_call
     def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
@@ -1568,9 +1573,11 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         response: Any = self._stainless_client.v2_evaluations.list(
             entity=entity,
             project=project,
+            limit=req.limit,
+            offset=req.offset,
         )
         for item in response:
-            yield tsi.EvaluationReadRes.model_validate(item)
+            yield tsi.EvaluationReadRes.model_validate(item.model_dump())
 
     @validate_call
     def evaluation_delete(
@@ -1651,7 +1658,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             offset=req.offset,
         )
         for item in response:
-            yield tsi.ModelReadRes.model_validate(item)
+            yield tsi.ModelReadRes.model_validate(item.model_dump())
 
     @validate_call
     def model_delete(self, req: tsi.ModelDeleteReq) -> tsi.ModelDeleteRes:
@@ -1738,7 +1745,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
         )
 
         for item in response:
-            yield tsi.EvaluationRunReadRes.model_validate(item)
+            yield tsi.EvaluationRunReadRes.model_validate(item.model_dump())
 
     @validate_call
     def evaluation_run_delete(
@@ -1844,7 +1851,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             offset=req.offset,
         )
         for item in response:
-            yield tsi.PredictionReadRes.model_validate(item)
+            yield tsi.PredictionReadRes.model_validate(item.model_dump())
 
     @validate_call
     def prediction_delete(
@@ -1944,7 +1951,7 @@ class StainlessRemoteHTTPTraceServer(TraceServerClientInterface):
             offset=req.offset,
         )
         for item in response:
-            yield tsi.ScoreReadRes.model_validate(item)
+            yield tsi.ScoreReadRes.model_validate(item.model_dump())
 
     @validate_call
     def score_delete(self, req: tsi.ScoreDeleteReq) -> tsi.ScoreDeleteRes:
