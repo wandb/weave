@@ -7794,7 +7794,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
-                "query_id": record_query_id(result),
+                "query_id": (
+                    record_query_id(result)
+                    if isinstance(result, QuerySummary)
+                    else None
+                ),
                 "correlation_id": correlation_id,
             },
         )

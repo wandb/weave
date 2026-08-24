@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from typing import Any, TypeVar, cast
 
 import sqlparse
+from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
@@ -303,9 +305,13 @@ def set_correlation_id(settings: dict[str, Any]) -> str:
     return correlation_id
 
 
-def record_query_id(result: Any) -> str | None:
-    """Tag the span with the server-minted query_id off a driver result."""
-    query_id = getattr(result, "query_id", None) or None
+def record_query_id(result: QueryResult | QuerySummary) -> str | None:
+    """Tag the span with the server-minted query_id off a driver result.
+
+    Both types read it off the `X-ClickHouse-Query-Id` response header, which is
+    absent on a summary the driver built without a response.
+    """
+    query_id = result.query_id or None
     if query_id:
         set_current_span_dd_tags({"clickhouse.query_id": query_id})
     return query_id
