@@ -19,9 +19,9 @@ the same checkout you then pass as `--core`.
 To refresh the copy:
 
 ```
-make -C core/services/weave-trace/tools/codegen build \
-    SDK_TARGETS=typescript SDK_OUTPUT=/tmp/weave-sdk
+cd core/services/weave-trace
+make -C tools/codegen build SDK_TARGETS=typescript SDK_OUTPUT=/tmp/weave-sdk
 
-python scripts/vendor_node_weave_server_sdk.py \
-    --sdk-output /tmp/weave-sdk --core ../core
+cd ../../../weave
+python scripts/vendor_node_weave_server_sdk.py --sdk-output /tmp/weave-sdk --core ../core
 ```

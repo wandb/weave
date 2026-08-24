@@ -7,7 +7,6 @@ import {stainlessPromise} from '../helpers/stainlessPromise';
 jest.mock('../../wandb/wandbServerApi');
 jest.mock('../../traceServerClient', () => ({
   createTraceServerClient: jest.fn(),
-  TRACE_SERVER_TIMEOUT_MS: 5 * 60 * 1000,
 }));
 
 describe('Prompt', () => {

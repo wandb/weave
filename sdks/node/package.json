@@ -137,7 +137,6 @@
     ],
     "collectCoverage": true,
     "coveragePathIgnorePatterns": [
-      "<rootDir>/src/generated",
       "<rootDir>/src/vendor/",
       "<rootDir>/src/utils/userAgent.ts",
       "<rootDir>/src/inMemoryTraceServer.ts"

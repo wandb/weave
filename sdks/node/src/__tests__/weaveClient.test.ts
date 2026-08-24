@@ -999,9 +999,7 @@ describe('WeaveClient', () => {
     let mockTransport: jest.SpyInstance;
 
     beforeEach(() => {
-      mockTraceServerApi = {
-        request: jest.fn(),
-      } as any;
+      mockTraceServerApi = {} as any;
       client = new WeaveClient({
         traceServerApi: mockTraceServerApi as any,
         projectId: 'current-entity/current-project',

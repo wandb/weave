@@ -8,7 +8,6 @@ jest.mock('../utils/netrc');
 jest.mock('../urls');
 jest.mock('../traceServerClient', () => ({
   createTraceServerClient: jest.fn(),
-  TRACE_SERVER_TIMEOUT_MS: 5 * 60 * 1000,
 }));
 
 describe('login', () => {

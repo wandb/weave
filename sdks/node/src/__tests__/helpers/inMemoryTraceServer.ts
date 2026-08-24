@@ -206,10 +206,6 @@ export class InMemoryTraceServer {
     }
   ) => {
     const body = opts?.body;
-    if (path.endsWith('/calls/complete')) {
-      this._applyCompletes(body?.batch ?? []);
-      return ok({});
-    }
     if (path.endsWith('/call/start')) {
       const start = body?.start;
       if (start) {
@@ -228,10 +224,6 @@ export class InMemoryTraceServer {
       return ok({});
     }
     throw new Error(`InMemoryTraceServer: unhandled post to ${path}`);
-  };
-
-  put = (path: string, _opts?: {body?: unknown}) => {
-    throw new Error(`InMemoryTraceServer: unhandled put to ${path}`);
   };
 
   private _applyCompletes(batch: Call[]) {
