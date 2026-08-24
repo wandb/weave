@@ -2,6 +2,7 @@ import base64
 import datetime as dt
 import logging
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import clickhouse_connect
 import pytest
+import urllib3
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -1680,6 +1682,72 @@ def test_delete_preserves_version_index_gaps(ch_server):
     by_digest = {o.digest: o for o in non_deleted}
     assert by_digest[digests[0]].version_index == 0
     assert by_digest[digests[2]].version_index == 2
+
+
+def test_mint_client_disables_both_client_side_ids() -> None:
+    """Neither the session_id nor the query_id may be minted client-side: both
+    collide server-side (codes 373 and 216). See PR #6655.
+    """
+    with patch.object(chts.clickhouse_connect, "get_client") as get_client:
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._mint_client()
+
+    kwargs = get_client.call_args.kwargs
+    assert kwargs["autogenerate_session_id"] is False
+    assert kwargs["autogenerate_query_id"] is False
+
+
+@pytest.mark.parametrize("autogenerate_query_id", [True, False])
+def test_resent_request_vs_query_id_autogeneration(
+    ch_server, autogenerate_query_id: bool
+) -> None:
+    """Query-id guard: a client-side query_id is pinned in the request URL above
+    the driver's retry loop, so a resent request hits the still-running original
+    with code 216; with it disabled ClickHouse mints one per attempt and the
+    resend succeeds. Same shape as the session_id fix in PR #6655.
+    """
+    client = clickhouse_connect.get_client(
+        host=ch_server._host,
+        port=ch_server._port,
+        user=ch_server._user,
+        password=ch_server._password,
+        secure=ch_server._port == chts.CLICKHOUSE_SECURE_PORT,
+        pool_mgr=urllib3.PoolManager(maxsize=8, num_pools=4),
+        autogenerate_session_id=False,
+        autogenerate_query_id=autogenerate_query_id,
+    )
+    unpatched = urllib3.PoolManager.request
+
+    def resend_once(self, method, url, **kwargs):
+        """Land a copy of the query first, then let the driver's own copy go."""
+        if b"sleep" not in (kwargs.get("body") or b""):
+            return unpatched(self, method, url, **kwargs)
+
+        landed_first: list = []
+
+        def send_copy() -> None:
+            landed_first.append(unpatched(self, method, url, **kwargs))
+
+        copy = threading.Thread(target=send_copy)
+        copy.start()
+        time.sleep(0.5)
+        try:
+            return unpatched(self, method, url, **kwargs)
+        finally:
+            copy.join()
+            for response in landed_first:
+                response.close()
+
+    try:
+        with patch.object(urllib3.PoolManager, "request", resend_once):
+            if autogenerate_query_id:
+                with pytest.raises(DatabaseError) as exc_info:
+                    client.query("SELECT sleep(2)")
+                assert "QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING" in str(exc_info.value)
+            else:
+                assert client.query("SELECT sleep(2)").result_rows == [(0,)]
+    finally:
+        client.close()
 
 
 @pytest.mark.parametrize("autogenerate_session_id", [True, False])
