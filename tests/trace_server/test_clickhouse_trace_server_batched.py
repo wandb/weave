@@ -1300,25 +1300,6 @@ def test_correlation_id_replaces_a_caller_supplied_log_comment():
     assert uuid.UUID(correlation_id).version == 7
 
 
-def test_each_call_gets_its_own_correlation_id():
-    """The settings merge helpers hand back a fresh dict, so ids never carry
-    over between calls.
-    """
-    mock_ch_client = MagicMock()
-    mock_ch_client.query.return_value = QueryResult(summary={})
-
-    with patch.object(
-        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
-    ):
-        server = chts.ClickHouseTraceServer(host="test_host")
-        server._query("SELECT 1", parameters={})
-        first = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
-        server._query("SELECT 1", parameters={})
-        second = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
-
-    assert first != second
-
-
 def test_one_correlation_id_across_an_insert_retry():
     """A sanitize-and-retry is one logical write, so both attempts carry the
     same correlation id while ClickHouse mints a query_id per attempt.

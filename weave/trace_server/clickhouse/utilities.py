@@ -294,10 +294,6 @@ def convert_to_insert_too_large(e: Exception) -> Exception:
 def set_correlation_id(settings: dict[str, Any]) -> str:
     """Stamp our own id on a ClickHouse call via `log_comment` and return it.
 
-    The trace server owns `log_comment`: adopting an inherited value would make
-    the correlation id something that can repeat across queries, which breaks
-    the system.query_log pivot without any sign in the logs.
-
     We never send a `query_id`: the driver reuses the URL across its internal
     retries, and a client-supplied id that the server has already registered
     fails with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING. ClickHouse mints the
