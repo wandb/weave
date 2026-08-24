@@ -250,7 +250,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         method: Callable[[A], B],
         req: A,
         internal_project_id: str,
-        tolerate_external_refs: bool = False,
     ) -> B:
         req_conv = universal_ext_to_int_ref_converter(
             req,
@@ -259,7 +258,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         )
         res = method(req_conv)
         res_conv = universal_int_to_ext_ref_converter(
-            res, self._idc.int_to_ext_project_id, tolerate_external_refs
+            res, self._idc.int_to_ext_project_id
         )
         return res_conv
 
@@ -1486,7 +1485,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_spans_query,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
         for span in res.spans:
             if span.project_id != req.project_id:
@@ -1503,7 +1501,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_spans_stats,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def agent_custom_attrs_schema(
@@ -1514,7 +1511,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_custom_attrs_schema,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def agent_agents_query(
@@ -1526,7 +1522,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_agents_query,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
         for agent in res.agents:
             if agent.project_id != req.project_id:
@@ -1543,7 +1538,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_versions_query,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
         for version in res.versions:
             if version.project_id != req.project_id:
@@ -1559,7 +1553,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_search,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def agent_traces_chat(
@@ -1570,7 +1563,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_traces_chat,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def agent_conversation_chat(
@@ -1581,7 +1573,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_conversation_chat,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def agent_conversation_spans(
@@ -1592,7 +1583,6 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
             self._internal_trace_server.agent_conversation_spans,
             req,
             req.project_id,
-            tolerate_external_refs=True,
         )
 
     def projects_info(self, req: tsi.ProjectsInfoReq) -> list[tsi.ProjectsInfoRes]:
