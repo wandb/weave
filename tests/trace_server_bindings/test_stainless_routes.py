@@ -9,6 +9,7 @@ the default one.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 import httpx
 import pytest
@@ -25,8 +26,6 @@ BASE_URL = "http://example.com"
 PROJECT = "entity/project"
 V2 = "/v2/entity/project"
 
-# One body serves the whole route table: it carries the union of the v2 response
-# models' required fields, and those models ignore the fields they do not declare.
 V2_RESPONSE = {
     "code": "def f(): pass",
     "created_at": "2026-08-20T00:00:00Z",
@@ -56,9 +55,15 @@ V2_RESPONSE = {
 }
 
 
+@dataclass
+class _MockServerResult:
+    server: StainlessRemoteHTTPTraceServer
+    requests: list[httpx.Request]
+
+
 def _mock_server(
     response: httpx.Response,
-) -> tuple[StainlessRemoteHTTPTraceServer, list[httpx.Request]]:
+) -> _MockServerResult:
     """Return a server that answers every request with `response`.
 
     The binding builds its own generated client and takes no transport, so the
@@ -77,7 +82,7 @@ def _mock_server(
         password="",
         http_client=httpx.Client(transport=httpx.MockTransport(handle)),
     )
-    return server, requests
+    return _MockServerResult(server=server, requests=requests)
 
 
 @pytest.mark.parametrize(
@@ -290,11 +295,11 @@ def test_v2_method_reaches_its_flat_route(
     res_type: type[BaseModel],
 ):
     """Test that a v2 method reaches its route with entity and project filled in."""
-    server, requests = _mock_server(httpx.Response(200, json=V2_RESPONSE))
+    mock_server = _mock_server(httpx.Response(200, json=V2_RESPONSE))
 
-    res = getattr(server, method_name)(req)
+    res = getattr(mock_server.server, method_name)(req)
 
-    assert [(r.method, r.url.path) for r in requests] == [
+    assert [(r.method, r.url.path) for r in mock_server.requests] == [
         (expected_method, expected_path)
     ]
     assert isinstance(res, res_type)
@@ -368,16 +373,16 @@ def test_tag_and_alias_method_omits_wb_user_id(
     expected_body: dict,
 ):
     """Test that the server-populated wb_user_id stays out of the request."""
-    server, requests = _mock_server(httpx.Response(200, json={}))
+    mock_server = _mock_server(httpx.Response(200, json={}))
 
-    getattr(server, method_name)(req)
+    getattr(mock_server.server, method_name)(req)
 
-    assert len(requests) == 1
-    assert (requests[0].method, requests[0].url.path) == (
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
         expected_method,
         expected_path,
     )
-    assert json.loads(requests[0].content) == expected_body
+    assert json.loads(mock_server.requests[0].content) == expected_body
 
 
 @pytest.mark.parametrize(
@@ -401,15 +406,16 @@ def test_tag_and_alias_list_omits_wb_user_id(
     method_name: str, req: BaseModel, expected_path: str
 ):
     """Test that the server-populated wb_user_id stays out of the query."""
-    server, requests = _mock_server(
-        httpx.Response(200, json={"tags": [], "aliases": []})
+    mock_server = _mock_server(httpx.Response(200, json={"tags": [], "aliases": []}))
+
+    getattr(mock_server.server, method_name)(req)
+
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        "GET",
+        expected_path,
     )
-
-    getattr(server, method_name)(req)
-
-    assert len(requests) == 1
-    assert (requests[0].method, requests[0].url.path) == ("GET", expected_path)
-    assert dict(requests[0].url.params) == {"project_id": PROJECT}
+    assert dict(mock_server.requests[0].url.params) == {"project_id": PROJECT}
 
 
 @pytest.mark.parametrize(
@@ -461,13 +467,16 @@ def test_delete_sends_the_requested_digests(
     method_name: str, req: BaseModel, expected_path: str
 ):
     """Test that deleting one version does not ask to delete every version."""
-    server, requests = _mock_server(httpx.Response(200, json=V2_RESPONSE))
+    mock_server = _mock_server(httpx.Response(200, json=V2_RESPONSE))
 
-    getattr(server, method_name)(req)
+    getattr(mock_server.server, method_name)(req)
 
-    assert len(requests) == 1
-    assert (requests[0].method, requests[0].url.path) == ("DELETE", expected_path)
-    assert dict(requests[0].url.params) == {"digests": "abc123"}
+    assert len(mock_server.requests) == 1
+    assert (mock_server.requests[0].method, mock_server.requests[0].url.path) == (
+        "DELETE",
+        expected_path,
+    )
+    assert dict(mock_server.requests[0].url.params) == {"digests": "abc123"}
 
 
 @pytest.mark.parametrize(
@@ -534,19 +543,19 @@ def test_create_sends_every_supported_field(
     method_name: str, req: BaseModel, expected_body: dict
 ):
     """Test that the optional fields the route accepts reach the wire."""
-    server, requests = _mock_server(httpx.Response(200, json=V2_RESPONSE))
+    mock_server = _mock_server(httpx.Response(200, json=V2_RESPONSE))
 
-    getattr(server, method_name)(req)
+    getattr(mock_server.server, method_name)(req)
 
-    assert len(requests) == 1
-    assert json.loads(requests[0].content) == expected_body
+    assert len(mock_server.requests) == 1
+    assert json.loads(mock_server.requests[0].content) == expected_body
 
 
 def test_call_end_reads_an_empty_response_body():
     """Test that a route generated as returning a bare `object` is read back."""
-    server, requests = _mock_server(httpx.Response(200, json={}))
+    mock_server = _mock_server(httpx.Response(200, json={}))
 
-    res = server.call_end(
+    res = mock_server.server.call_end(
         tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=PROJECT,
@@ -557,21 +566,21 @@ def test_call_end_reads_an_empty_response_body():
         )
     )
 
-    assert len(requests) == 1
-    assert requests[0].url.path == "/call/end"
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == "/call/end"
     assert res == tsi.CallEndRes()
 
 
 def test_call_start_batch_reads_the_response_list():
     """Test that the batch response is read from the field the route returns."""
-    server, requests = _mock_server(
+    mock_server = _mock_server(
         httpx.Response(
             200, json={"res": [{"id": "call-id", "trace_id": "trace-id"}, {}]}
         )
     )
     start, end = generate_call_start_end_pair(id="call-id")
 
-    res = server.call_start_batch(
+    res = mock_server.server.call_start_batch(
         tsi.CallCreateBatchReq(
             batch=[
                 tsi.CallBatchStartMode(req=start),
@@ -580,8 +589,8 @@ def test_call_start_batch_reads_the_response_list():
         )
     )
 
-    assert len(requests) == 1
-    assert requests[0].url.path == "/call/upsert_batch"
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == "/call/upsert_batch"
     assert res.res == [
         tsi.CallStartRes(id="call-id", trace_id="trace-id"),
         tsi.CallEndRes(),
@@ -651,7 +660,7 @@ def test_typed_stream_reads_one_item_per_line(
     expected: list[BaseModel],
 ):
     """Test that a route whose stream the spec types yields one item per line."""
-    server, requests = _mock_server(
+    mock_server = _mock_server(
         httpx.Response(
             200,
             content="\n".join(json.dumps(row) for row in rows).encode(),
@@ -659,28 +668,28 @@ def test_typed_stream_reads_one_item_per_line(
         )
     )
 
-    res = list(getattr(server, method_name)(req))
+    res = list(getattr(mock_server.server, method_name)(req))
 
-    assert len(requests) == 1
-    assert requests[0].url.path == expected_path
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == expected_path
     assert res == expected
 
 
 def test_file_content_read_keeps_bytes():
     """Test that a non-text file comes back as the bytes the server sent."""
     content = b"\x89PNG\r\n\x1a\n\xff\xfe"
-    server, requests = _mock_server(
+    mock_server = _mock_server(
         httpx.Response(
             200, content=content, headers={"content-type": "application/octet-stream"}
         )
     )
 
-    res = server.file_content_read(
+    res = mock_server.server.file_content_read(
         tsi.FileContentReadReq(project_id=PROJECT, digest="abc123")
     )
 
-    assert len(requests) == 1
-    assert requests[0].url.path == "/file/content"
+    assert len(mock_server.requests) == 1
+    assert mock_server.requests[0].url.path == "/file/content"
     assert res.content == content
 
 
@@ -711,9 +720,9 @@ def test_file_content_read_keeps_bytes():
 )
 def test_route_missing_from_the_spec_raises(method_name: str, req: BaseModel):
     """Test that a method with no usable generated route says so."""
-    server, requests = _mock_server(httpx.Response(200, json={}))
+    mock_server = _mock_server(httpx.Response(200, json={}))
 
     with pytest.raises(NotImplementedError):
-        getattr(server, method_name)(req)
+        getattr(mock_server.server, method_name)(req)
 
-    assert requests == []
+    assert mock_server.requests == []
