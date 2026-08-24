@@ -63,7 +63,9 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
         cols = transpose(score_rows)
 
         for class_name in self.class_names:
-            col = cols[class_name]
+            # transpose adds no keys for a row with no score, so cols is empty when
+            # every row failed.
+            col = cols[class_name] if cols else []
             tp = sum(r["correct"] and not r["negative"] for r in col)
             fp = sum(not r["correct"] and not r["negative"] for r in col)
             fn = sum(not r["correct"] and r["negative"] for r in col)

@@ -47,6 +47,11 @@ dependencies = [
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
   "cachetools>=6.2.4",                    # Used for TTLCache in call_batch_processor
 
+  # Imported by the vendored weave_server_sdk. distro arrives with none of weave's
+  # base dependencies, and sniffio stopped arriving when httpx and anyio dropped it.
+  "distro>=1.7.0,<2",
+  "sniffio",
+
   # Used for content type detection
   # Remove once license content filtering is upstreamed
   "polyfile-weave>=0.5.9",
@@ -328,7 +333,7 @@ fixture-parentheses = false
 [tool.ruff]
 line-length = 88
 show-fixes = true
-exclude = ["rules"]
+exclude = ["rules", "weave/vendor/weave_server_sdk"]
 
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
@@ -344,7 +349,7 @@ exclude = ["rules"]
 
 [tool.pyright]
 include = ["weave"]
-exclude = ["tests", "examples", "docs", "noxfile.py"]
+exclude = ["tests", "examples", "docs", "noxfile.py", "weave/vendor/weave_server_sdk"]
 # In cases where we support multiple versions of an integration, some imports can be missing
 reportMissingImports = false
 
@@ -358,7 +363,7 @@ reportCallIssue = false
 [tool.mypy]
 warn_unused_configs = true
 # Note: You have to update .pre-commit-config.yaml too!
-exclude = [".*pyi$", "tests", "examples", "skills"]
+exclude = [".*pyi$", "tests", "examples", "skills", "weave/vendor/weave_server_sdk"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -366,8 +371,14 @@ module = "weave.*"
 disallow_untyped_defs = true
 disallow_untyped_calls = true
 
+# `exclude` above only skips directory crawling. Now that weave imports the
+# vendored SDK, mypy follows that import and checks the generated tree anyway.
+[[tool.mypy.overrides]]
+module = "weave.vendor.weave_server_sdk.*"
+ignore_errors = true
+
 [tool.bumpversion]
-current_version = "0.53.6-dev0"
+current_version = "0.53.7-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -399,6 +410,9 @@ commit_args = ""
 [tool.bumpversion.parts.pre_l]
 values = ["dev", "final"]
 optional_value = "final"
+
+[tool.typos.files]
+extend-exclude = ["weave/vendor/weave_server_sdk/"]
 
 [tool.typos.default.extend-words]
 fasion = "fasion" # Wandb lore
@@ -462,7 +476,8 @@ test = [
   "pytest-rerunfailures>=14.0",
   "pytest-timeout>=2.3.1",
   "pytest-shard==0.1.2",
-  "clickhouse_connect==0.11.0",
+  # todo(nkumar): these are trace-server deps not test. however moving them breaks integration tests.
+  "clickhouse_connect>=1.6,<1.7",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "rich",
@@ -543,11 +558,11 @@ members = ["trace_server_mock"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
-omit = ["weave/agent/**"]
+omit = ["weave/agent/**", "weave/vendor/weave_server_sdk/**"]
 
 [tool.ty.src]
 include = ["weave"]
-exclude = ["tests", "examples", "pyproject.toml"]
+exclude = ["tests", "examples", "pyproject.toml", "weave/vendor/weave_server_sdk"]
 
 [tool.ty.environment]
 python-version = "3.10"

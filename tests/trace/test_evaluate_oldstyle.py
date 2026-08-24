@@ -207,3 +207,12 @@ async def test_multiclass_f1_score(weave_active):
             "mean": pytest.approx(0, abs=LATENCY_TOL),
         },
     }
+
+
+def test_multiclass_f1_score_with_unscored_rows(weave_active):
+    """Every row produced no score, so transpose yields no class columns at all."""
+    scorer = MultiTaskBinaryClassificationF1(class_names=["a"])
+    assert scorer.summarize([{}, {}]) == {"a": {"f1": 0, "precision": 0, "recall": 0}}
+    # A class the scorer never produced is a configuration error, and still raises.
+    with pytest.raises(KeyError):
+        scorer.summarize([{"b": {"correct": True, "negative": False}}])

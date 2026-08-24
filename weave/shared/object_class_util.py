@@ -42,6 +42,14 @@ def get_object_classes(val: Any) -> GetObjectClassesResult | None:
     )
 
 
+def get_object_name(val: Any) -> str | None:
+    """The ``name`` a serialized weave object declares, if it has one."""
+    if get_object_classes(val) is None:
+        return None
+    name = val.get("name")
+    return name if isinstance(name, str) else None
+
+
 class ProcessIncomingObjectResult(TypedDict):
     val: Any
     base_object_class: str | None

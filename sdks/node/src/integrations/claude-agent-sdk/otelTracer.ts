@@ -12,6 +12,7 @@ import {
   ATTR_ERROR_TYPE,
   ATTR_GEN_AI_USAGE_TOTAL_TOKENS,
 } from '../../genai/semconv';
+import {totalInputTokens} from '../anthropicUsage';
 import {asOtelAttributes, libraryIntegration} from '../integrationMetadata';
 import type {
   ModelUsage,
@@ -231,10 +232,7 @@ function normalizeUsage(
 ): NormalizedUsage {
   const usage = toWeaveUsage(rawUsage);
   // Anthropic excludes cache tokens from input tokens; Weave includes them.
-  const inputTokens =
-    usage.input_tokens +
-    usage.cache_read_input_tokens +
-    usage.cache_creation_input_tokens;
+  const inputTokens = totalInputTokens(usage);
   const outputTokens = usage.output_tokens;
 
   return {

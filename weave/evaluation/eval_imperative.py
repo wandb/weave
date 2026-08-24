@@ -28,7 +28,7 @@ from weave.evaluation.eval import (
 from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
-from weave.flow.scorer import auto_summarize as auto_summarize_fn
+from weave.flow.scorer import _auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.object.obj import Object
 from weave.shared.digest import compute_row_digest
@@ -36,7 +36,14 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, as_op, is_tracing_setting_disabled, op
+from weave.trace.op import (
+    Op,
+    as_op,
+    is_placeholder_call,
+    is_tracing_setting_disabled,
+    op,
+    placeholder_call,
+)
 from weave.trace.table import Table
 from weave.trace.util import Thread
 from weave.trace.view_utils import set_call_view
@@ -284,14 +291,13 @@ class _LogScoreContext:
 
     def __enter__(self) -> Self:
         """Enter context and set call stack to include the score call."""
-        # Set call stack to include the score call so operations become children
-        self._call_stack_context = call_context.set_call_stack(
-            [
-                self.score_logger.evaluate_call,
-                self.score_logger.predict_and_score_call,
-                self.score_call,
-            ]
-        )
+        stack = [
+            self.score_logger.evaluate_call,
+            self.score_logger.predict_and_score_call,
+        ]
+        if not is_placeholder_call(self.score_call):
+            stack.append(self.score_call)
+        self._call_stack_context = call_context.set_call_stack(stack)
         self._call_stack_context.__enter__()
         return self
 
@@ -370,6 +376,9 @@ class ScoreLogger:
         predict_call: Call,
         predefined_scorers: list[str] | None = None,
         eval_span_context: EvalSpanContext | None = None,
+        *,
+        # EvalTable disables this because it stores each score directly on the row.
+        trace_scores: bool = True,
     ) -> None:
         self.predict_and_score_call = predict_and_score_call
         self.evaluate_call = evaluate_call
@@ -377,6 +386,7 @@ class ScoreLogger:
         self.predefined_scorers = predefined_scorers
         self._eval_span_context = eval_span_context
         self._score_meta = IMPERATIVE_SCORE_META_MARKER
+        self._trace_scores = trace_scores
 
         self._captured_scores: dict[str, ScoreType] = {}
         self._has_finished: bool = False
@@ -391,6 +401,25 @@ class ScoreLogger:
     def _apply_eval_meta(self, eval_meta: dict[str, Any]) -> None:
         """Internal-only: Merge potential caller-provided fields into the eval meta."""
         self._score_meta = {**eval_meta, **IMPERATIVE_SCORE_META_MARKER}
+
+    def _scores_traced(self) -> bool:
+        """Whether each score should emit its own scorer call."""
+        return self._trace_scores and not is_tracing_setting_disabled()
+
+    def _record_untraced_score(
+        self, scorer: Scorer | dict | str, score: ScoreType
+    ) -> None:
+        """Capture a score without emitting a scorer call.
+
+        The captured value is what `finish` writes to the predict_and_score
+        output and what `log_summary` auto-summarizes, so an untraced score is
+        still fully present in the evaluation — only its own call is skipped.
+        """
+        if self._has_finished:
+            raise ValueError("Cannot log score after finish has been called")
+
+        scorer = self._prepare_scorer(scorer)
+        self._captured_scores[cast(str, scorer.name)] = score
 
     def finish(self, output: Any | None = None) -> None:
         """Finish the prediction and log all scores.
@@ -454,6 +483,11 @@ class ScoreLogger:
         """Create a score call but don't finish it yet."""
         scorer = self._prepare_scorer(scorer)
 
+        # A no-op call keeps the deferred context manager working: finish_call
+        # ignores placeholders and _finish_score_call captures the score anyway.
+        if not self._scores_traced():
+            return placeholder_call(), scorer
+
         # Create a placeholder score method
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
@@ -484,8 +518,11 @@ class ScoreLogger:
         exception: BaseException | None = None,
     ) -> None:
         """Finish a score call and record the score."""
-        wc = require_weave_client()
-        wc.finish_call(score_call, output=score_value, exception=exception)
+        # An untraced score's placeholder would be discarded by finish_call, so
+        # don't require a client just to no-op.
+        if not is_placeholder_call(score_call):
+            wc = require_weave_client()
+            wc.finish_call(score_call, output=score_value, exception=exception)
         if exception is None and score_value is not None:
             self._captured_scores[cast(str, scorer.name)] = score_value
 
@@ -534,6 +571,13 @@ class ScoreLogger:
         assert not isinstance(score, _NotSetType), "score should not be NOT_SET here"
         score_value: ScoreType = score
 
+        # Short-circuit ahead of the dispatch below: reaching alog_score's fast
+        # path costs an event loop or a thread per score, far more than the
+        # recording it ends up doing.
+        if not self._scores_traced():
+            self._record_untraced_score(scorer, score_value)
+            return None
+
         # Otherwise, log the score immediately
         # When in an active asyncio test environment (like pytest.mark.asyncio),
         # we need special handling to avoid "already running" errors
@@ -579,15 +623,14 @@ class ScoreLogger:
         scorer: Scorer | dict | str,
         score: ScoreType,
     ) -> None:
+        if not self._scores_traced():
+            self._record_untraced_score(scorer, score)
+            return
+
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
 
         scorer = self._prepare_scorer(scorer)
-
-        if is_tracing_setting_disabled():
-            scorer_name = cast(str, scorer.name)
-            self._captured_scores[scorer_name] = score
-            return
 
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
@@ -688,6 +731,14 @@ class EvaluationLogger:
     # Finish the evaluation
     ev.log_summary({"avg_score": 0.9})
     ```
+
+    Args:
+        trace_scores: Whether each logged score also emits its own scorer call.
+            Defaults to True. `EvalTable` passes False because it already stores
+            each score directly on the row. The score remains on the prediction
+            and in automatic summaries, while skipping the individually
+            inspectable scorer call. This avoids a call per score, the dominant
+            cost when logging tables with many score columns.
     """
 
     def __init__(
@@ -697,6 +748,7 @@ class EvaluationLogger:
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
+        trace_scores: bool = True,
     ) -> None:
         self._eval_meta = {
             **(self._client_eval_meta or {}),
@@ -705,6 +757,7 @@ class EvaluationLogger:
 
         self.name = name
         self.scorers = scorers
+        self.trace_scores = trace_scores
         self.eval_attributes = eval_attributes if eval_attributes is not None else {}
 
         # Convert model to Model instance if needed
@@ -825,6 +878,7 @@ class EvaluationLogger:
         dataset: Dataset | list[dict] | str | None = None,
         eval_attributes: dict[str, Any] | None = None,
         scorers: list[str] | None = None,
+        trace_scores: bool = True,
     ) -> EvaluationLogger:
         """Internal factory: build an EvaluationLogger with extra
         `_weave_eval_meta` keys propagated to every emitted call.
@@ -840,6 +894,7 @@ class EvaluationLogger:
             dataset=dataset,
             eval_attributes=eval_attributes,
             scorers=scorers,
+            trace_scores=trace_scores,
         )
         return instance
 
@@ -1007,6 +1062,7 @@ class EvaluationLogger:
             predict_call=predict_call,
             predefined_scorers=self.scorers,
             eval_span_context=eval_span_context,
+            trace_scores=self.trace_scores,
         )
         pred._apply_eval_meta(self._eval_meta)
         # Store the output so we can use it when finishing the predict_call
@@ -1076,7 +1132,9 @@ class EvaluationLogger:
             data_to_summarize = [
                 pred._captured_scores for pred in self._accumulated_predictions
             ]
-            summary_data = auto_summarize_fn(data_to_summarize)
+            # Here an empty dict means no score was logged, not that scoring failed:
+            # a failed score is logged as None.
+            summary_data = auto_summarize_fn(data_to_summarize, unscored=0)
         else:
             summary_data = summary
 

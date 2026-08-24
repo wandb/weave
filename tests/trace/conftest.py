@@ -13,6 +13,7 @@ from google.api_core import exceptions as gcp_exceptions
 from google.auth.credentials import AnonymousCredentials
 
 from tests.trace.test_utils import FailingSaveType, failing_load, failing_save
+from weave.trace import util as trace_util
 from weave.trace.serialization import serializer
 from weave.trace_server.file_storage import reset_stored_key_cache
 
@@ -27,6 +28,14 @@ def reset_bucket_dedup_cache():
     reset_stored_key_cache()
     yield
     reset_stored_key_cache()
+
+
+@pytest.fixture(autouse=True)
+def reset_logged_once_messages():
+    """The memo of what log_once already said would silence later tests."""
+    trace_util.logged_messages.clear()
+    yield
+    trace_util.logged_messages.clear()
 
 
 @pytest.fixture

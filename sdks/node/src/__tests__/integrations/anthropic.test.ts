@@ -1,6 +1,31 @@
 import {InMemoryTraceServer} from '../helpers/inMemoryTraceServer';
 import {commonPatchAnthropic} from '../../integrations/anthropic';
+import {totalInputTokens} from '../../integrations/anthropicUsage';
 import {initWithCustomTraceServer} from '../clientMock';
+
+describe('Anthropic — totalInputTokens', () => {
+  test('adds the cache counts to the fresh input tokens', () => {
+    expect(
+      totalInputTokens({
+        input_tokens: 4,
+        cache_read_input_tokens: 20000,
+        cache_creation_input_tokens: 1500,
+      })
+    ).toBe(21504);
+  });
+
+  test('treats absent, null and missing usage as zero', () => {
+    expect(totalInputTokens({input_tokens: 10})).toBe(10);
+    expect(
+      totalInputTokens({
+        input_tokens: 10,
+        cache_read_input_tokens: null,
+        cache_creation_input_tokens: null,
+      })
+    ).toBe(10);
+    expect(totalInputTokens(undefined)).toBe(0);
+  });
+});
 
 // Mock Anthropic SDK
 function createMockAnthropic() {
@@ -15,6 +40,24 @@ function createMockAnthropic() {
     usage: {
       input_tokens: 10,
       output_tokens: 8,
+    },
+  };
+
+  // A cached call: Anthropic reports only the 4 fresh tokens in
+  // input_tokens and bills the other 21500 through the two cache fields.
+  const mockCachedMessage = {
+    id: 'msg_456',
+    role: 'assistant',
+    type: 'message',
+    model: 'claude-opus-5',
+    content: [{type: 'text', text: 'Hello again!'}],
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: {
+      input_tokens: 4,
+      cache_creation_input_tokens: 1500,
+      cache_read_input_tokens: 20000,
+      output_tokens: 300,
     },
   };
 
@@ -193,7 +236,9 @@ function createMockAnthropic() {
     mockAnthropic,
     MockMessages,
     MockAnthropicStream,
+    MockAPIPromise,
     mockMessages,
+    mockCachedMessage,
     mockResults,
   };
 }
@@ -204,7 +249,9 @@ describe('Anthropic Integration', () => {
   let mockAnthropic: any;
   let MockMessages: any;
   let MockAnthropicStream: any;
+  let MockAPIPromise: any;
   let mockMessages: any;
+  let mockCachedMessage: any;
   let mockResults: jest.Mock;
   let patchedAnthropic: any;
 
@@ -216,7 +263,9 @@ describe('Anthropic Integration', () => {
     mockAnthropic = mockData.mockAnthropic;
     MockMessages = mockData.MockMessages;
     MockAnthropicStream = mockData.MockAnthropicStream;
+    MockAPIPromise = mockData.MockAPIPromise;
     mockMessages = mockData.mockMessages;
+    mockCachedMessage = mockData.mockCachedMessage;
     mockResults = mockData.mockResults;
 
     // Apply patching
@@ -273,6 +322,44 @@ describe('Anthropic Integration', () => {
         'claude-3-opus-20240229': {
           input_tokens: 10,
           output_tokens: 8,
+          requests: 1,
+        },
+      },
+    });
+  });
+
+  test('non-streaming message creation with prompt caching', async () => {
+    const options = {
+      model: 'claude-opus-5',
+      max_tokens: 100,
+      messages: [{role: 'user', content: 'Hello again, Claude!'}],
+    };
+
+    MockMessages.prototype.create.mockResolvedValueOnce(mockCachedMessage);
+
+    const anthropic = new patchedAnthropic.Anthropic.Messages();
+    const result = await anthropic.create(options);
+
+    // Only the summary is normalized; the provider's own numbers are kept.
+    const providerUsage = {
+      input_tokens: 4,
+      cache_creation_input_tokens: 1500,
+      cache_read_input_tokens: 20000,
+      output_tokens: 300,
+    };
+    expect(result.usage).toEqual(providerUsage);
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].output.usage).toEqual(providerUsage);
+    expect(calls[0].summary).toEqual({
+      usage: {
+        'claude-opus-5': {
+          // 4 fresh + 20000 read from cache + 1500 written to cache
+          input_tokens: 21504,
+          output_tokens: 300,
+          cache_read_input_tokens: 20000,
+          cache_creation_input_tokens: 1500,
           requests: 1,
         },
       },
@@ -336,6 +423,78 @@ describe('Anthropic Integration', () => {
         'claude-3-opus-20240229': {
           input_tokens: 10,
           output_tokens: 8,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          requests: 1,
+        },
+      },
+    });
+  });
+
+  test('streaming message creation with prompt caching', async () => {
+    const options = {
+      model: 'claude-opus-5',
+      max_tokens: 100,
+      messages: [{role: 'user', content: 'Hello again, streaming Claude!'}],
+      stream: true,
+    };
+
+    MockMessages.prototype.create.mockImplementationOnce(
+      () =>
+        new MockAPIPromise(
+          new MockAnthropicStream([
+            {
+              type: 'message_start',
+              message: {
+                ...mockCachedMessage,
+                content: [],
+                stop_reason: null,
+                usage: {...mockCachedMessage.usage, output_tokens: 1},
+              },
+            },
+            {
+              type: 'content_block_start',
+              index: 0,
+              content_block: {type: 'text', text: 'Hello again!'},
+            },
+            {type: 'content_block_stop', index: 0},
+            {
+              type: 'message_delta',
+              delta: {stop_reason: 'end_turn', stop_sequence: null},
+              // Cumulative: the nulls are fields this delta is not restating.
+              usage: {
+                input_tokens: 4,
+                output_tokens: 300,
+                cache_creation_input_tokens: null,
+                cache_read_input_tokens: null,
+              },
+            },
+            {type: 'message_stop'},
+          ])
+        )
+    );
+
+    const anthropic = new patchedAnthropic.Anthropic.Messages();
+    const stream = await anthropic.create(options);
+    for await (const _chunk of stream) {
+      // Drain the stream so the call is recorded.
+    }
+
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].output.messages[0].usage).toEqual({
+      input_tokens: 4,
+      cache_creation_input_tokens: 1500,
+      cache_read_input_tokens: 20000,
+      output_tokens: 300,
+    });
+    expect(calls[0].summary).toEqual({
+      usage: {
+        'claude-opus-5': {
+          input_tokens: 21504,
+          output_tokens: 300,
+          cache_read_input_tokens: 20000,
+          cache_creation_input_tokens: 1500,
           requests: 1,
         },
       },
@@ -387,6 +546,8 @@ describe('Anthropic Integration', () => {
         'claude-3-opus-20240229': {
           input_tokens: 10,
           output_tokens: 8,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
           requests: 1,
         },
       },
@@ -496,6 +657,8 @@ describe('Anthropic Integration', () => {
         'claude-3-opus-20240229': {
           input_tokens: 10,
           output_tokens: 8,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
           requests: 1,
         },
       },
@@ -547,6 +710,8 @@ describe('Anthropic Integration', () => {
         'claude-3-opus-20240229': {
           input_tokens: 10,
           output_tokens: 8,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
           requests: 1,
         },
       },
@@ -612,6 +777,45 @@ describe('Anthropic Integration', () => {
     expect(calls[0].exception ?? null).toBeNull();
     expect(calls[0].output).toEqual({messages: []});
     expect(calls[0].summary).toEqual({});
+  });
+
+  test('batch results operation with prompt caching', async () => {
+    const batchId = 'batch_123';
+
+    mockResults.mockImplementationOnce(
+      async () =>
+        new MockAnthropicStream([
+          {
+            custom_id: 'request_1',
+            result: {type: 'succeeded', message: mockCachedMessage},
+          },
+          {
+            custom_id: 'request_2',
+            result: {type: 'succeeded', message: mockCachedMessage},
+          },
+        ])
+    );
+
+    const batches = new patchedAnthropic.Anthropic.Messages.Batches();
+    const stream = await batches.results(batchId);
+    for await (const _chunk of stream) {
+      // Drain the stream so the call is recorded.
+    }
+
+    // Two results for one model: the token counts are the sum of both.
+    const calls = await traceServer.getCalls(testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].summary).toEqual({
+      usage: {
+        'claude-opus-5': {
+          input_tokens: 43008,
+          output_tokens: 600,
+          cache_read_input_tokens: 40000,
+          cache_creation_input_tokens: 3000,
+          requests: 1,
+        },
+      },
+    });
   });
 
   test('error handling in non-streaming mode', async () => {

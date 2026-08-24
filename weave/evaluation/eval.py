@@ -30,6 +30,7 @@ from weave.flow.scorer import (
     get_scorer_attributes,
 )
 from weave.flow.util import make_memorable_name, transpose
+from weave.integrations.integration_utilities import _uniquely_truncate_str
 from weave.object.obj import Object
 from weave.trace.api import attributes
 from weave.trace.call import Call, CallsIter
@@ -42,7 +43,7 @@ from weave.trace.op_protocol import CallDisplayNameFunc, Op
 from weave.trace.refs import ObjectRef
 from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import get_ref
+from weave.trace.weave_client import get_ref, sanitize_object_name
 from weave.trace_server import constants
 from weave.trace_server.trace_server_interface import CallsFilter
 from weave.utils.project_id import from_project_id
@@ -261,7 +262,17 @@ class Evaluation(Object):
             eval_op.call_display_name = self.evaluation_name
 
         if self.name is None and self.dataset.name is not None:
-            self.name = self.dataset.name + "-evaluation"  # type: ignore
+            derived_name = f"{self.dataset.name}-evaluation"
+            derived_id = sanitize_object_name(derived_name)
+            # An id at the limit may be the dataset's own, which the server rejects
+            # (WB-30574); one character under the limit cannot be.
+            if len(derived_id) == constants.MAX_OBJECT_NAME_LENGTH and derived_id == (
+                sanitize_object_name(self.dataset.name)
+            ):
+                derived_name = _uniquely_truncate_str(
+                    derived_id, constants.MAX_OBJECT_NAME_LENGTH - 1
+                )
+            self.name = derived_name
 
     @op
     async def predict_and_score(self, model: Op | Model, example: dict) -> dict:

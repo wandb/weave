@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 from gql.transport.exceptions import TransportQueryError, TransportServerError
 
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.validation_util import CHValidationError
 
 # =============================================================================
@@ -60,18 +61,21 @@ class ObjectNameTypeCollision(InvalidRequest):
         kind: str,
         new_base_object_class: str | None,
         existing_base_object_classes: list[str | None],
+        object_name: str | None = None,
     ):
         self.object_id = object_id
         self.kind = kind
         self.new_base_object_class = new_base_object_class
         self.existing_base_object_classes = existing_base_object_classes
+        self.object_name = object_name
         existing_labels = [
             _describe_object_class(c) for c in existing_base_object_classes
         ]
         existing_desc = " or ".join(dict.fromkeys(existing_labels))
         super().__init__(
             f"Cannot publish {object_id!r} as {_describe_object_class(new_base_object_class)}: "
-            f"that name is already used by {existing_desc} in this project. "
+            f"that name is already used by {existing_desc} in this project."
+            f"{_describe_object_name(object_id, object_name)} "
             f"Object versions cannot share types, publish this object under a different name."
         )
 
@@ -392,12 +396,18 @@ class ErrorRegistry:
         from clickhouse_connect.driver.exceptions import (
             OperationalError as CHOperationalError,
         )
+        from clickhouse_connect.driver.exceptions import (
+            StreamFailureError as CHStreamFailureError,
+        )
 
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
         self.register(
             CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
+        )
+        self.register(
+            CHStreamFailureError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
 
         # GraphQL transport errors
@@ -522,6 +532,17 @@ def _describe_object_class(base_object_class: str | None) -> str:
     if base_object_class is None:
         return "a generic (untyped) object"
     return f"a {base_object_class}"
+
+
+def _describe_object_name(object_id: str, object_name: str | None) -> str:
+    """Quote the object's own name when the id is at the limit and the name overran it."""
+    if (
+        object_name is None
+        or len(object_id) < MAX_OBJECT_NAME_LENGTH
+        or len(object_name) <= len(object_id)
+    ):
+        return ""
+    return f" The object is named {object_name!r}."
 
 
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:

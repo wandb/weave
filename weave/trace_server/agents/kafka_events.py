@@ -30,6 +30,7 @@ class _AgentSpansEvent(BaseModel):
     event_type: AgentSpanOpName
     status_code: StatusCodeLiteral
     project_id: str
+    entity_name: str | None = None
     trace_id: str
     span_id: str
     operation_name: str | None
@@ -37,7 +38,9 @@ class _AgentSpansEvent(BaseModel):
     conversation_id: str | None
 
     @classmethod
-    def from_row(cls, row: AgentSpanCHInsertable) -> Self | None:
+    def from_row(
+        cls, row: AgentSpanCHInsertable, entity_name: str | None = None
+    ) -> Self | None:
         """Return an event from a finished span row if it matches an event type.
 
         Currently only "turn_ended" is supported, but the interface is designed to support multiple types.
@@ -52,6 +55,7 @@ class _AgentSpansEvent(BaseModel):
                 event_type=event_type,
                 status_code=row.status_code,
                 project_id=row.project_id,
+                entity_name=entity_name,
                 trace_id=row.trace_id,
                 span_id=row.span_id,
                 # Resolve optional fields to None (instead of empty strings)

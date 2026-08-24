@@ -150,11 +150,7 @@ def _is_transient_ch_error(exc: BaseException) -> bool:
     """Check if a ClickHouse error is a known transient replication error."""
     if not isinstance(exc, DatabaseError):
         return False
-    # clickhouse_connect.DatabaseError has no structured error code attr; parse from message.
-    match = re.search(r"Code:\s*(\d+)", str(exc))
-    if match is None:
-        return False
-    return int(match.group(1)) in _TRANSIENT_CH_ERROR_CODES
+    return exc.code in _TRANSIENT_CH_ERROR_CODES
 
 
 # These settings are only used when `replicated` mode is enabled for
@@ -191,10 +187,19 @@ ID_SHARDED_TABLES: dict[str, str] = {
     # nearest-neighbor search and clustering do not fan out across shards.
     "intent_signatures": "project_id",
     "failure_signatures": "project_id",
+    "signature_cluster_runs": "project_id",
+    "signature_clusters": "project_id",
+    "signature_cluster_assignments": "project_id",
+    "signature_cluster_assignments_by_conversation": "project_id",
     # Keep each agent aggregate on one shard. Shard versions by the same key so
     # "versions for agent" queries have the same locality as the agent row.
     "agents": "project_id, agent_name",
     "agent_versions": "project_id, agent_name",
+    # Keep every audit version for one trace tag on the same shard so current-state
+    # argMax queries can resolve the tag locally. The tag-centric copy preserves the
+    # same logical key even though its ORDER BY puts tag before conversation_id.
+    "conversation_tags": "project_id, conversation_id, trace_id, tag",
+    "conversation_tags_by_tag": "project_id, conversation_id, trace_id, tag",
     # Files are chunked: `_file_content_read_once` selects all rows for a
     # (project_id, digest) and checks the count against `n_chunks`. With
     # rand() sharding chunks land on different shards, so any per-shard

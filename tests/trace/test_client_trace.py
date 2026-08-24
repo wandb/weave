@@ -47,13 +47,19 @@ from weave.trace.context.weave_client_context import (
     set_weave_client_global,
 )
 from weave.trace.refs import TableRef
+from weave.trace.util import LOG_ONCE_MESSAGE_SUFFIX, logged_messages
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.common_interface import SortBy
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
+from weave.trace_server.errors import (
+    InsertTooLarge,
+    InvalidFieldError,
+    InvalidRequest,
+    ObjectNameTypeCollision,
+)
 from weave.trace_server.ids import generate_id
 from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.validation_util import CHValidationError
@@ -3556,6 +3562,93 @@ def test_object_with_char_over_limit(client):
     )
     with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
+
+
+class OtherCustom(weave.Object):
+    val: dict
+
+
+def _expected_truncation_warning(name: str) -> str:
+    return (
+        f"Object name '{name}' is longer than {CHAR_LIMIT} characters and is published "
+        f"as '{name[:CHAR_LIMIT]}'. Names whose sanitized forms only differ past that "
+        f"limit become one object." + LOG_ONCE_MESSAGE_SUFFIX
+    )
+
+
+def test_object_name_over_limit_warns_once(client, caplog):
+    """Truncation is silent today, so a caller cannot tell that the id they published
+    under is not the name they asked for.
+    """
+    name = "w" * (CHAR_LIMIT + 1)
+    logger_name = "weave.trace.weave_client"
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        first = weave.publish(Custom(name=name, val={"1": 1}))
+        second = weave.publish(Custom(name=name, val={"1": 2}))
+
+    assert first.name == name[:CHAR_LIMIT]
+    assert second.name == name[:CHAR_LIMIT]
+    assert caplog.messages == [_expected_truncation_warning(name)]
+
+
+@pytest.mark.parametrize(
+    ("name", "object_id"),
+    [
+        ("y" * CHAR_LIMIT, "y" * CHAR_LIMIT),
+        ("z" + "." * 200 + "z", "z-z"),
+    ],
+    ids=["at_the_limit", "sanitized_under_the_limit"],
+)
+def test_object_name_that_fits_its_id_does_not_warn(client, caplog, name, object_id):
+    """Only a name the limit cut is worth reporting. A name of exactly the limit is
+    published whole, and one that sanitizing shortens never reached the limit.
+    """
+    with caplog.at_level("WARNING", logger="weave.trace.weave_client"):
+        ref = weave.publish(Custom(name=name, val={"1": 1}))
+
+    assert ref.name == object_id
+    assert caplog.messages == []
+
+
+def test_object_name_over_limit_warns_after_the_log_level_is_raised(client, caplog):
+    """A warning nobody could see is not remembered, so turning warnings back on
+    still reports it.
+    """
+    name = "m" * (CHAR_LIMIT + 1)
+    logger_name = "weave.trace.weave_client"
+
+    with caplog.at_level("ERROR", logger=logger_name):
+        weave.publish(Custom(name=name, val={"1": 1}))
+    assert not logged_messages
+
+    with caplog.at_level("WARNING", logger=logger_name):
+        weave.publish(Custom(name=name, val={"1": 2}))
+
+    assert caplog.messages == [_expected_truncation_warning(name)]
+
+
+@pytest.mark.disable_logging_error_check
+def test_names_truncated_to_one_id_are_rejected_with_the_name_that_was_sent(client):
+    """Two types cannot share an id (WB-30574). When the id is a truncation, the
+    rejection quotes the name that produced it, which is the only part the caller
+    recognizes.
+    """
+    object_id = "p" * CHAR_LIMIT
+    other_name = object_id + "-and-more"
+
+    weave.publish(Custom(name=object_id, val={"1": 1}))
+
+    with pytest.raises(ObjectNameTypeCollision) as excinfo:
+        weave.publish(OtherCustom(name=other_name, val={"1": 2}))
+
+    assert excinfo.value.object_id == object_id
+    assert excinfo.value.object_name == other_name
+    assert str(excinfo.value) == (
+        f"Cannot publish '{object_id}' as a OtherCustom: that name is already used "
+        f"by a Custom in this project. The object is named '{other_name}'. Object "
+        "versions cannot share types, publish this object under a different name."
+    )
 
 
 chars = "+_(){}|\"'<>!@$^&*#:,.[]-=;~`"
