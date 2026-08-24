@@ -8,7 +8,12 @@ from typing import TypedDict
 import pytest
 
 import weave
-from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import (
+    EvaluationLogger,
+    Model,
+    ScoreLogger,
+    Scorer,
+)
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
@@ -1215,3 +1220,173 @@ def test_evaluation_logger_with_weave_disabled(weave_active, monkeypatch):
     pred.finish()
     ev.log_summary({"avg_score": 0.9})
     ev.finish()
+
+
+def test_untraced_scores_are_captured_without_scorer_calls(
+    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+):
+    """trace_scores=False drops the scorer calls but keeps the scores."""
+    ev = EvaluationLogger(trace_scores=False)
+
+    for row in user_dataset:
+        output = user_model(row["a"], row["b"])
+        pred = ev.log_prediction(inputs=row, output=output)
+        pred.log_score(scorer="greater_than_2_scorer", score=output > 2)
+        pred.log_score(scorer="greater_than_4_scorer", score=output > 4)
+        pred.finish()
+
+    ev.log_summary({"avg_score": 1.0})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    # Same tree as test_basic_evaluation minus the six scorer calls.
+    assert len(by_op["Evaluation.evaluate"]) == 1
+    assert len(by_op["Evaluation.predict_and_score"]) == 3
+    assert len(by_op["Model.predict"]) == 3
+    assert len(by_op["Evaluation.summarize"]) == 1
+    assert by_op["greater_than_2_scorer"] == []
+    assert by_op["greater_than_4_scorer"] == []
+
+    # Scores still reach the predict_and_score output, which is what consumers
+    # read per row.
+    for call in by_op["Evaluation.predict_and_score"]:
+        output = call.output["output"]
+        assert call.output["scores"] == {
+            "greater_than_2_scorer": output > 2,
+            "greater_than_4_scorer": output > 4,
+        }
+
+    # ... and still auto-summarize. Outputs are 3, 5, 7.
+    assert by_op["Evaluation.evaluate"][0].output == {
+        "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "greater_than_4_scorer": {"true_count": 2, "true_fraction": 2 / 3},
+        "output": {"avg_score": 1.0},
+    }
+
+    # No scorer call means no scorer feedback on the predict call either.
+    for call in by_op["Model.predict"]:
+        assert list(call.feedback) == []
+
+
+def test_score_logger_trace_scores_is_keyword_only():
+    parameter = inspect.signature(ScoreLogger).parameters["trace_scores"]
+
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+def test_untraced_scores_via_log_example(client):
+    """log_example is the path wandb.EvalTable drives, one call per row."""
+    ev = EvaluationLogger(trace_scores=False)
+    ev.log_example(
+        inputs={"question": "What is 2+2?"},
+        output="4",
+        scores={"correctness": 1.0, "fluency": 0.9},
+    )
+    ev.log_summary({})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert by_op["correctness"] == []
+    assert by_op["fluency"] == []
+    assert by_op["Evaluation.predict_and_score"][0].output["scores"] == {
+        "correctness": 1.0,
+        "fluency": 0.9,
+    }
+
+
+def test_untraced_score_context_manager_creates_no_call(client):
+    """The deferred form gets a placeholder call rather than a real one."""
+    ev = EvaluationLogger(trace_scores=False)
+
+    @weave.op
+    def calculate_quality() -> float:
+        return 0.75
+
+    with ev.log_prediction(inputs={"q": "What is AI?"}) as pred:
+        pred.output = "artificial intelligence"
+        pred.log_score("correctness", 1.0)
+        with pred.log_score("quality") as score:
+            score.value = calculate_quality()
+
+    ev.log_summary({})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert by_op["correctness"] == []
+    assert by_op["quality"] == []
+    predict_and_score_call = by_op["Evaluation.predict_and_score"][0]
+    assert by_op["calculate_quality"][0].parent_id == predict_and_score_call.id
+    assert predict_and_score_call.output["scores"] == {
+        "correctness": 1.0,
+        "quality": 0.75,
+    }
+
+
+@pytest.mark.asyncio
+async def test_untraced_alog_score(client):
+    ev = EvaluationLogger(trace_scores=False)
+    pred = ev.log_prediction(inputs={"q": "test"}, output="answer")
+    await pred.alog_score(scorer="correctness", score=0.5)
+    pred.finish()
+    ev.log_summary({})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert by_op["correctness"] == []
+    assert by_op["Evaluation.predict_and_score"][0].output["scores"] == {
+        "correctness": 0.5
+    }
+
+
+def test_scores_are_traced_by_default(client):
+    """Guards the default: flipping it would silently drop scorer calls."""
+    ev = EvaluationLogger()
+    pred = ev.log_prediction(inputs={"q": "test"}, output="answer")
+    pred.log_score(scorer="correctness", score=1.0)
+    pred.finish()
+    ev.log_summary({})
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert len(by_op["correctness"]) == 1
+    assert by_op["correctness"][0].output == 1.0
+
+
+def test_prediction_without_scores_is_not_counted(client):
+    """Here an empty score dict means nothing was logged, so it must stay out of the
+    denominator: a prediction whose scoring failed logs None instead.
+    """
+    ev = EvaluationLogger()
+
+    pred = ev.log_prediction(inputs={"a": 1}, output=2)
+    pred.log_score(scorer="is_even", score=True)
+    pred.finish()
+
+    ev.log_prediction(inputs={"a": 2}, output=3).finish()
+
+    ev.log_summary()
+    client.flush()
+
+    by_op: dict[str, list] = defaultdict(list)
+    for c in client.get_calls():
+        by_op[op_name_from_call(c)].append(c)
+
+    assert by_op["Evaluation.evaluate"][0].output == {
+        "is_even": {"true_count": 1, "true_fraction": 1.0},
+        "output": {},
+    }

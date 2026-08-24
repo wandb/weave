@@ -31,9 +31,12 @@ except ImportError:  # pragma: no cover - vcrpy is a test-group dependency
 try:
     from clickhouse_connect.driver import httpclient as ch_httpclient
     from clickhouse_connect.driver import httputil as ch_httputil
+
+    from weave.trace_server import clickhouse_trace_server_batched as chts
 except ImportError:  # pragma: no cover - shards without the trace server deps
     ch_httpclient = None
     ch_httputil = None
+    chts = None
 
 # Captured at import time, i.e. before any cassette is active, so these are
 # guaranteed to be the real (unpatched) urllib3 connection classes.
@@ -113,8 +116,12 @@ def clickhouse_traffic_bypasses_vcr() -> Generator[None, None, None]:
         _pin_real_pools(manager)
         return manager
 
-    # The module-level singleton predates this fixture; pin it in place.
+    # The module-level singletons predate this fixture; pin them in place.
+    # The trace server builds its own pool manager at import, so pinning
+    # clickhouse-connect's default alone leaves our traffic inside VCR, which
+    # serves a decompressed body still labelled `Content-Encoding: zstd`.
     _pin_real_pools(ch_httputil._default_pool_manager)
+    _pin_real_pools(chts._CH_POOL_MANAGER)
     # httpclient binds get_pool_manager by name at import, so patch both the
     # defining module and the importing module.
     mp.setattr(ch_httputil, "get_pool_manager", immune_get_pool_manager)

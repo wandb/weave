@@ -667,6 +667,24 @@ def build_eval_rows_from_calls(
     return row_map, row_eval_map
 
 
+def _attach_evaluations(
+    row_map: dict[str, tsi.EvalResultsRow],
+    row_eval_map: dict[str, dict[str, tsi.EvalResultsRowEvaluation]],
+    eval_root_ids: list[str],
+) -> None:
+    """Attach each row's evaluations, ordered by the requested eval ids.
+
+    Scan order varies with the query plan, so it is not a stable ordering.
+    """
+    eval_order = {eval_id: i for i, eval_id in enumerate(eval_root_ids)}
+    for row_digest, eval_entries in row_eval_map.items():
+        if row_digest in row_map:
+            row_map[row_digest].evaluations = sorted(
+                eval_entries.values(),
+                key=lambda e: eval_order.get(e.evaluation_call_id, len(eval_order)),
+            )
+
+
 def finalize_rows(
     row_map: dict[str, tsi.EvalResultsRow],
     row_eval_map: dict[str, dict[str, tsi.EvalResultsRowEvaluation]],
@@ -676,9 +694,7 @@ def finalize_rows(
     limit: int | None,
 ) -> tuple[list[tsi.EvalResultsRow], int]:
     """Attach evaluations to rows, apply intersection filter, sort, and paginate."""
-    for row_digest, eval_entries in row_eval_map.items():
-        if row_digest in row_map:
-            row_map[row_digest].evaluations = list(eval_entries.values())
+    _attach_evaluations(row_map, row_eval_map, eval_root_ids)
 
     rows = list(row_map.values())
 
@@ -738,9 +754,7 @@ def build_eval_rows(
 
         eval_entry.trials.append(_build_trial(predict_and_score_call, child_by_parent))
 
-    for row_digest, eval_entries in row_eval_map.items():
-        if row_digest in row_map:
-            row_map[row_digest].evaluations = list(eval_entries.values())
+    _attach_evaluations(row_map, row_eval_map, eval_root_ids)
 
     return list(row_map.values())
 

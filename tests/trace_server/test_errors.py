@@ -2,6 +2,9 @@ from collections.abc import Callable
 
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError as CHDatabaseError
+from clickhouse_connect.driver.exceptions import (
+    StreamFailureError as CHStreamFailureError,
+)
 from gql.transport.exceptions import TransportServerError
 from pydantic import ValidationError
 
@@ -40,6 +43,16 @@ def test_transport_server_error_5xx_or_none_returns_500(code: int | None):
     exc = TransportServerError("Server error", code=code)
     result = handle_server_exception(exc)
     assert result.status_code == 500
+
+
+def test_clickhouse_stream_failure_returns_502() -> None:
+    """Mid-stream connection failures (clickhouse-connect >= 1.4) subclass
+    Exception, not DatabaseError, and must map to 502 like other CH faults.
+    """
+    exc = CHStreamFailureError("stream failed after first block")
+    result = handle_server_exception(exc)
+    assert result.status_code == 502
+    assert result.message == {"reason": "Temporary backend error"}
 
 
 def test_clickhouse_type_mismatch_returns_400() -> None:
@@ -210,6 +223,62 @@ def test_object_name_type_collision_maps_to_400() -> None:
     assert result.message == {
         "reason": (
             "Cannot publish 'my-object' as a Prompt: that name is already used "
+            "by a generic (untyped) object in this project. Object versions "
+            "cannot share types, publish this object under a different name."
+        )
+    }
+
+
+def test_object_name_type_collision_quotes_an_over_long_name() -> None:
+    """object_id is cut from the object's name, so a caller who ran past the length
+    limit is quoted an id they never wrote. Quote the name they did write too.
+    """
+    object_id = "d" * 128
+    exc = ObjectNameTypeCollision(
+        object_id=object_id,
+        kind="object",
+        new_base_object_class="Evaluation",
+        existing_base_object_classes=["Dataset"],
+        object_name=f"{object_id}-evaluation",
+    )
+    result = handle_server_exception(exc)
+    assert result.status_code == 400
+    assert result.message == {
+        "reason": (
+            f"Cannot publish '{object_id}' as a Evaluation: that name is already "
+            f"used by a Dataset in this project. The object is named "
+            f"'{object_id}-evaluation'. Object versions cannot share types, "
+            "publish this object under a different name."
+        )
+    }
+
+
+@pytest.mark.parametrize(
+    ("object_id", "object_name"),
+    [
+        ("Custom-1", "Custom(1)"),
+        ("d" * 128, "d" * 128),
+    ],
+    ids=["sanitized_not_truncated", "name_is_the_id"],
+)
+def test_object_name_type_collision_omits_a_name_that_fits(
+    object_id: str, object_name: str
+) -> None:
+    """A name is only worth quoting when the limit cut it. Sanitizing shortens names
+    the limit never touched, and a name already at the limit says nothing new.
+    """
+    exc = ObjectNameTypeCollision(
+        object_id=object_id,
+        kind="object",
+        new_base_object_class="Prompt",
+        existing_base_object_classes=[None],
+        object_name=object_name,
+    )
+    result = handle_server_exception(exc)
+    assert result.status_code == 400
+    assert result.message == {
+        "reason": (
+            f"Cannot publish '{object_id}' as a Prompt: that name is already used "
             "by a generic (untyped) object in this project. Object versions "
             "cannot share types, publish this object under a different name."
         )

@@ -26,6 +26,55 @@ def test_signature_types_have_distinct_digests():
     assert _digest("intent") != _digest("failure")
 
 
+def test_clustering_config_is_typed_and_content_addressed(config_dir):
+    clustering = config.load_clustering_config()
+    assert clustering.model_dump() == {
+        "config_schema_version": 1,
+        "algorithm": "hdbscan",
+        "scope": "global",
+        "reduction": {
+            "dimensions": 15,
+            "neighbors": 15,
+            "min_dist": 0.0,
+            "metric": "cosine",
+            "random_state": 0,
+            "minimum_rows": 50,
+        },
+        "density": {
+            "min_cluster_size": 3,
+            "min_samples": 3,
+            "metric": "euclidean",
+            "cluster_selection_method": "eom",
+            "allow_single_cluster": False,
+        },
+        "projection": {"neighbors": 15, "min_dist": 0.0, "random_state": 0},
+    }
+
+    before = config.config_sha(clustering)
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["density"]["min_cluster_size"] = 5
+    after_density_edit = config.config_sha(config.load_clustering_config())
+    assert after_density_edit != before
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["reduction"]["random_state"] = 7
+    assert config.config_sha(config.load_clustering_config()) not in {
+        before,
+        after_density_edit,
+    }
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["untracked_parameter"] = True
+    with pytest.raises(ValidationError, match="untracked_parameter"):
+        config.load_clustering_config()
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw.pop("untracked_parameter")
+        raw["density"]["min_cluster_size"] = 1
+    with pytest.raises(ValidationError, match="min_cluster_size"):
+        config.load_clustering_config()
+
+
 @pytest.mark.parametrize("signature_type", config.SIGNATURE_TYPES)
 def test_prompt_renders_every_declared_label_and_its_definition(signature_type):
     """Every token resolves, and the taxonomy supplies both halves of a label.
@@ -118,6 +167,57 @@ def test_unloadable_configs_are_rejected_by_field(config_dir, edit, match):
 def test_an_unknown_signature_type_is_rejected():
     with pytest.raises(ValueError, match="unknown insights signature type"):
         config.load_config("sentiment")
+
+
+def test_the_clustering_recipe_is_a_separate_digest_from_the_signature_configs():
+    """A partition can be refit without re-extracting, so the two digests answer different
+    questions and a reader must never see one standing in for the other.
+    """
+    clustering = config.load_clustering_config()
+    digest = config.config_sha(clustering)
+
+    assert digest not in {_digest("intent"), _digest("failure")}
+    assert clustering.algorithm == "hdbscan"
+    assert clustering.scope == "global"
+    # The reduced space is what gets clustered; the projection is drawn. Separate knobs,
+    # because reading the projection's neighbor count as the partition's is a real mistake.
+    assert clustering.reduction.dimensions == 15
+    assert clustering.reduction.neighbors == 15
+    assert clustering.reduction.metric == "cosine"
+    assert clustering.reduction.random_state == 0
+    assert clustering.reduction.minimum_rows == 50
+    assert clustering.density.min_cluster_size == clustering.density.min_samples == 3
+    assert clustering.density.metric == "euclidean"
+
+
+@pytest.mark.parametrize(
+    ("edit", "match"),
+    [
+        (lambda raw: raw.update(algorithm="kmeans"), "algorithm"),
+        (lambda raw: raw["reduction"].update(spectral_init=True), "spectral_init"),
+        (lambda raw: raw["reduction"].pop("random_state"), "random_state"),
+        (lambda raw: raw.update(config_schema_version=2), "config_schema_version"),
+    ],
+    ids=["unimplemented_algorithm", "undeclared_knob", "missing_seed", "wrong_version"],
+)
+def test_an_unloadable_clustering_recipe_is_rejected_by_field(config_dir, edit, match):
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        edit(raw)
+
+    with pytest.raises(ValidationError, match=match):
+        config.load_clustering_config()
+
+
+def test_unpinning_the_reduction_seed_moves_the_clustering_digest(config_dir):
+    """An unpinned refit is a different pipeline generation, so rows must not claim the old one."""
+    before = config.config_sha(config.load_clustering_config())
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["reduction"]["random_state"] = None
+    unpinned = config.load_clustering_config()
+
+    assert unpinned.reduction.random_state is None
+    assert config.config_sha(unpinned) != before
 
 
 @pytest.mark.parametrize(

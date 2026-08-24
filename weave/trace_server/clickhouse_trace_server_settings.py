@@ -16,11 +16,6 @@ INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 BATCH_UPDATE_CHUNK_SIZE = 100  # Split large UPDATE queries to avoid SQL limits
 
-# Max retries for insert operations that fail due to "Empty query" errors.
-# This can happen when clickhouse-connect's internal generator is consumed
-# during an HTTP retry after a connection reset (e.g., CH Cloud's 10s keep-alive timeout).
-INSERT_MAX_RETRIES = 3
-
 
 # ClickHouse size limits and error handling
 CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
@@ -171,18 +166,24 @@ MIGRATION_DDL_QUERY_SETTINGS: dict[str, int | str] = {
 def merge_default_query_settings(
     overrides: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
-    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_QUERY_SETTINGS."""
+    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_QUERY_SETTINGS.
+
+    Always a fresh dict, so callers can add per-query keys.
+    """
     if not overrides:
-        return CLICKHOUSE_DEFAULT_QUERY_SETTINGS
+        return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS}
     return {**CLICKHOUSE_DEFAULT_QUERY_SETTINGS, **overrides}
 
 
 def merge_default_command_settings(
     overrides: dict[str, int | str] | None = None,
 ) -> dict[str, int | str]:
-    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_COMMAND_SETTINGS."""
+    """Merge caller-provided settings on top of CLICKHOUSE_DEFAULT_COMMAND_SETTINGS.
+
+    Always a fresh dict, so callers can add per-command keys.
+    """
     if not overrides:
-        return CLICKHOUSE_DEFAULT_COMMAND_SETTINGS
+        return {**CLICKHOUSE_DEFAULT_COMMAND_SETTINGS}
     return {**CLICKHOUSE_DEFAULT_COMMAND_SETTINGS, **overrides}
 
 
