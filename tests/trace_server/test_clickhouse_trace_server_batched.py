@@ -1288,6 +1288,62 @@ def test_insert_retries_only_invalid_utf8(error):
         assert mock_ch_client.insert.call_count == 1
 
 
+def test_correlation_id_replaces_a_caller_supplied_log_comment():
+    """The trace server owns `log_comment`: an inherited value could repeat
+    across queries and would silently become the correlation id.
+    """
+    settings = {"log_comment": "some-upstream-annotation"}
+    correlation_id = chts_utilities.set_correlation_id(settings)
+
+    assert correlation_id != "some-upstream-annotation"
+    assert settings["log_comment"] == correlation_id
+    assert uuid.UUID(correlation_id).version == 7
+
+
+def test_each_call_gets_its_own_correlation_id():
+    """The settings merge helpers hand back a fresh dict, so ids never carry
+    over between calls.
+    """
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = QueryResult(summary={})
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._query("SELECT 1", parameters={})
+        first = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+        server._query("SELECT 1", parameters={})
+        second = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+
+    assert first != second
+
+
+def test_one_correlation_id_across_an_insert_retry():
+    """A sanitize-and-retry is one logical write, so both attempts carry the
+    same correlation id while ClickHouse mints a query_id per attempt.
+    """
+    mock_ch_client = MagicMock()
+    stamps: list[str] = []
+
+    def capture(*args, **kwargs):
+        stamps.append(kwargs["settings"]["log_comment"])
+        if len(stamps) == 1:
+            raise UnicodeEncodeError("utf-8", "\ud800", 0, 1, "surrogate")
+        return QuerySummary({})
+
+    mock_ch_client.insert.side_effect = capture
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._insert("t", data=[["\ud800"]], column_names=["a"])
+
+    assert len(stamps) == 2
+    assert stamps[0] == stamps[1]
+
+
 def test_record_query_id_reads_both_driver_result_types():
     """`query_id` is a property on QueryResult but a method on QuerySummary, so
     only `summary` reads the same on both.
