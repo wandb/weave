@@ -738,6 +738,12 @@ deterministic.
 - An authorized server route may set `pii-v1` from the owning organization's
   policy. Never populate the field from caller-controlled OTLP content or a
   process environment fallback.
+- Agent OTel ingest applies the policy before credential redaction, blob
+  stripping, derived-column extraction, and insertion. A detector failure
+  rejects the complete request before any insert.
+- PII redaction covers span, resource, event, and link attributes plus the
+  status message. Span names, event names, IDs, trace state, and timestamps are
+  structural and remain unchanged.
 
 ### Credential-shaped fields in agent span columns
 - The agents OTel ingest calls `redact_credentials_from_span` before

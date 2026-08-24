@@ -118,6 +118,7 @@ from weave.trace_server.query_builder.agent_query_builder import (
 from weave.trace_server.query_builder.agent_stats_query_builder import (
     build_agent_span_stats_query,
 )
+from weave.trace_server.sensitive_data.span_redaction import redact_pii_from_span
 from weave.trace_server.trace_server_common import (
     AgentFeedbackByTarget,
     group_agent_feedback_by_target,
@@ -869,6 +870,8 @@ class AgentWriteHandler:
 
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
+            # Outside the try: a scan failure rejects the whole request before any insert.
+            redact_pii_from_span(span, req.sensitive_data_policy)
             try:
                 # Before the blob strip: that step can move a value into file
                 # storage.
