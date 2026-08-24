@@ -10,6 +10,8 @@ from unittest.mock import MagicMock, Mock, patch
 import clickhouse_connect
 import pytest
 from clickhouse_connect.driver.exceptions import DatabaseError, ProgrammingError
+from clickhouse_connect.driver.query import QueryResult
+from clickhouse_connect.driver.summary import QuerySummary
 
 from tests.trace_server.test_project_version import make_project_id
 from weave.trace_server import ch_sentinel_values
@@ -1284,12 +1286,26 @@ def test_insert_retries_only_invalid_utf8(error):
         assert mock_ch_client.insert.call_count == 1
 
 
+def test_record_query_id_reads_both_driver_result_types():
+    """`query_id` is a property on QueryResult but a method on QuerySummary, so
+    only `summary` reads the same on both.
+    """
+    assert (
+        chts_utilities.record_query_id(QueryResult(summary={"query_id": "read"}))
+        == "read"
+    )
+    assert (
+        chts_utilities.record_query_id(QuerySummary({"query_id": "write"})) == "write"
+    )
+    assert chts_utilities.record_query_id(QuerySummary({})) is None
+
+
 def test_no_query_id_is_sent_to_clickhouse():
     """A client-supplied query_id can collide with a running query (code 216),
     so the server mints it and our own id rides in log_comment.
     """
     mock_ch_client = MagicMock()
-    mock_ch_client.query.return_value = MagicMock(summary={}, query_id="server-side")
+    mock_ch_client.query.return_value = QueryResult(summary={"query_id": "server-side"})
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
@@ -1308,7 +1324,7 @@ def test_no_query_id_is_sent_to_clickhouse():
 def test_correlation_id_and_query_id_are_set_on_the_dd_span():
     """Both ids are on the span, so an APM trace can be pivoted to query_log."""
     mock_ch_client = MagicMock()
-    mock_ch_client.query.return_value = MagicMock(summary={}, query_id="server-side")
+    mock_ch_client.query.return_value = QueryResult(summary={"query_id": "server-side"})
     tagged: list[dict] = []
 
     with (
@@ -1337,8 +1353,8 @@ def test_correlation_id_is_logged_on_success_and_failure(caplog):
     server has answered.
     """
     mock_ch_client = MagicMock()
-    mock_ch_client.query.return_value = MagicMock(
-        summary={"read_rows": "1"}, query_id="server-side"
+    mock_ch_client.query.return_value = QueryResult(
+        summary={"read_rows": "1", "query_id": "server-side"}
     )
 
     with patch.object(

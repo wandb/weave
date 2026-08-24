@@ -308,10 +308,12 @@ def set_correlation_id(settings: dict[str, Any]) -> str:
 def record_query_id(result: QueryResult | QuerySummary) -> str | None:
     """Tag the span with the server-minted query_id off a driver result.
 
-    Both types read it off the `X-ClickHouse-Query-Id` response header, which is
-    absent on a summary the driver built without a response.
+    Read through `summary`, the accessor both types share and where the driver
+    stores the `X-ClickHouse-Query-Id` response header: `query_id` itself is a
+    property on QueryResult but a plain method on QuerySummary. It is absent on
+    a summary the driver built without a response.
     """
-    query_id = result.query_id or None
+    query_id = result.summary.get("query_id") or None
     if query_id:
         set_current_span_dd_tags({"clickhouse.query_id": query_id})
     return query_id
