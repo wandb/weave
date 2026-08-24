@@ -2031,7 +2031,7 @@ def test_alias_pointing_at_soft_deleted_version_yields_clean_failure(ch_server):
 
 
 def _turn_ended_span_row() -> AgentSpanCHInsertable:
-    """A finished root span; ScoreAgentSpansEvent.from_row yields a turn_ended event."""
+    """A finished root span with a conversation; both event classes yield a turn_ended event."""
     return AgentSpanCHInsertable(
         project_id="p",
         trace_id="tr",
@@ -2042,6 +2042,7 @@ def _turn_ended_span_row() -> AgentSpanCHInsertable:
         ended_at=dt.datetime(2024, 1, 1, 12, 0, 0),
         agent_name="a",
         operation_name="invoke_agent",
+        conversation_id="c",
     )
 
 
