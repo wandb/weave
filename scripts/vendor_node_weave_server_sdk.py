@@ -2,11 +2,9 @@
 
 The SDK itself is generated in wandb/core, which this script does not do:
 
-    make -C core/services/weave-trace/tools/codegen build \\
-        SDK_TARGETS=typescript SDK_OUTPUT=/tmp/weave-sdk
+    make -C core/services/weave-trace/tools/codegen build SDK_TARGETS=typescript SDK_OUTPUT=/tmp/weave-sdk
 
-    python scripts/vendor_node_weave_server_sdk.py \\
-        --sdk-output /tmp/weave-sdk --core ../core
+    python scripts/vendor_node_weave_server_sdk.py --sdk-output /tmp/weave-sdk --core ../core
 
 That replaces sdks/node/src/vendor/weave-server-sdk/ with the generated
 src/ tree and records what it was generated from. Reading `git diff`
