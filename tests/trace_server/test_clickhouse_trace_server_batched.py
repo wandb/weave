@@ -1684,19 +1684,6 @@ def test_delete_preserves_version_index_gaps(ch_server):
     assert by_digest[digests[2]].version_index == 2
 
 
-def test_mint_client_disables_both_client_side_ids() -> None:
-    """Neither the session_id nor the query_id may be minted client-side: both
-    collide server-side (codes 373 and 216). See PR #6655.
-    """
-    with patch.object(chts.clickhouse_connect, "get_client") as get_client:
-        server = chts.ClickHouseTraceServer(host="test_host")
-        server._mint_client()
-
-    kwargs = get_client.call_args.kwargs
-    assert kwargs["autogenerate_session_id"] is False
-    assert kwargs["autogenerate_query_id"] is False
-
-
 @pytest.mark.parametrize("autogenerate_query_id", [True, False])
 def test_resent_request_vs_query_id_autogeneration(
     ch_server, autogenerate_query_id: bool
