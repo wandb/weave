@@ -723,6 +723,14 @@ deterministic.
 - The walk is copy-on-write and replaces only non-empty strings. Both properties
   are load-bearing — see the module docstring — so keep them if you touch it.
 
+### Agent PII policy
+
+- `GenAIOTelExportReq.sensitive_data_policy` is an internal, omittable,
+  non-nullable field. Omission resolves to `off`.
+- An authorized server route may set `pii-v1` from the owning organization's
+  policy. Never populate the field from caller-controlled OTLP content or a
+  process environment fallback.
+
 ### Credential-shaped fields in agent span columns
 - The agents OTel ingest calls `redact_credentials_from_span` before
   `strip_inline_blobs_from_span`, and outside the file-storage guard around it.
