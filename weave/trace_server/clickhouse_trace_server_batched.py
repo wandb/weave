@@ -7521,9 +7521,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         autogenerate_session_id=False: weave-trace uses no session features,
         and the default collides on overlapping queries with SESSION_IS_LOCKED
         (code 373). See PR #6655.
-        autogenerate_query_id=False: weave-trace correlates through
-        `log_comment` instead, and the default collides on a resent request with
-        QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING (code 216). See PR #7787.
+        autogenerate_query_id=False: the default collides on a resent request
+        with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING (code 216). See PR #7787.
         `send_receive_timeout` overrides the HTTP read timeout (migration clients
         need to outlast replicated-DDL propagation); None keeps the library default.
         """
