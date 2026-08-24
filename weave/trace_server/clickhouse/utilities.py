@@ -17,6 +17,7 @@ import sqlparse
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.datadog import set_current_span_dd_tags
 from weave.trace_server.errors import InsertTooLarge
+from weave.trace_server.ids import generate_id
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.tracing import traced
 
@@ -288,11 +289,33 @@ def convert_to_insert_too_large(e: Exception) -> Exception:
     return e
 
 
+def set_correlation_id(settings: dict[str, Any]) -> str:
+    """Stamp our own id on a ClickHouse call via `log_comment` and return it.
+
+    We never send a `query_id`: the driver reuses the URL across its internal
+    retries, and a client-supplied id that the server has already registered
+    fails with QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING. ClickHouse mints the
+    query_id per attempt; `log_comment` carries ours and is queryable in
+    system.query_log without a uniqueness constraint.
+    """
+    correlation_id = str(settings.setdefault("log_comment", generate_id()))
+    set_current_span_dd_tags({"clickhouse.correlation_id": correlation_id})
+    return correlation_id
+
+
+def record_query_id(result: Any) -> str | None:
+    """Tag the span with the server-minted query_id off a driver result."""
+    query_id = getattr(result, "query_id", None) or None
+    if query_id:
+        set_current_span_dd_tags({"clickhouse.query_id": query_id})
+    return query_id
+
+
 def log_and_raise_insert_error(
     e: Exception,
     table: str,
     data: Sequence[Sequence[Any]],
-    query_id: str | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(num_bytes(row) for row in data)
@@ -301,7 +324,7 @@ def log_and_raise_insert_error(
         extra={
             "error_str": str(e),
             "table": table,
-            "query_id": query_id,
+            "correlation_id": correlation_id,
             "data_len": len(data),
             "data_bytes": data_bytes,
         },

@@ -20,6 +20,7 @@ from weave.trace_server.agents.clickhouse import AgentWriteHandler
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
 from weave.trace_server.agents.types import GenAIOTelExportReq, GenAIOTelExportRes
 from weave.trace_server.ch_sentinel_values import EXPIRE_AT_NEVER
+from weave.trace_server.clickhouse import utilities as chts_utilities
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_to_row,
     ch_complete_call_to_row,
@@ -1283,38 +1284,62 @@ def test_insert_retries_only_invalid_utf8(error):
         assert mock_ch_client.insert.call_count == 1
 
 
-def test_query_id_is_set_on_the_dd_span():
-    """The id is on the span too, so an APM trace can be pivoted to query_log."""
+def test_no_query_id_is_sent_to_clickhouse():
+    """A client-supplied query_id can collide with a running query (code 216),
+    so the server mints it and our own id rides in log_comment.
+    """
     mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.query.return_value = MagicMock(summary={})
+    mock_ch_client.query.return_value = MagicMock(summary={}, query_id="server-side")
+
+    with patch.object(
+        chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
+    ):
+        server = chts.ClickHouseTraceServer(host="test_host")
+        server._query("SELECT 1", parameters={})
+        server._insert("t", data=[[1]], column_names=["a"])
+
+    query_settings = mock_ch_client.query.call_args.kwargs["settings"]
+    insert_settings = mock_ch_client.insert.call_args.kwargs["settings"]
+    assert "query_id" not in query_settings
+    assert "query_id" not in insert_settings
+    assert query_settings["log_comment"] != insert_settings["log_comment"]
+
+
+def test_correlation_id_and_query_id_are_set_on_the_dd_span():
+    """Both ids are on the span, so an APM trace can be pivoted to query_log."""
+    mock_ch_client = MagicMock()
+    mock_ch_client.query.return_value = MagicMock(summary={}, query_id="server-side")
     tagged: list[dict] = []
 
     with (
         patch.object(
             chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
         ),
-        patch.object(chts, "set_current_span_dd_tags", tagged.append),
+        patch.object(chts_utilities, "set_current_span_dd_tags", tagged.append),
     ):
         server = chts.ClickHouseTraceServer(host="test_host")
         server._query("SELECT 1", parameters={})
 
-    sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-    assert {"clickhouse.query_id": sent_id} in tagged
+    correlation_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+    assert {"clickhouse.correlation_id": correlation_id} in tagged
+    assert {"clickhouse.query_id": "server-side"} in tagged
 
 
-def _logged_query_id(caplog, message: str) -> str:
-    return next(r.query_id for r in caplog.records if r.message == message)
+def _logged_ids(caplog, message: str) -> tuple[str, str | None]:
+    record = next(r for r in caplog.records if r.message == message)
+    return record.correlation_id, getattr(record, "query_id", None)
 
 
 @pytest.mark.disable_logging_error_check
-def test_query_id_is_logged_on_success_and_failure(caplog):
-    """The minted query_id reaches both log lines, so a failed query is still
-    correlatable with system.query_log.
+def test_correlation_id_is_logged_on_success_and_failure(caplog):
+    """The minted correlation_id reaches both log lines, so a failed query is
+    still correlatable with system.query_log; the query_id only exists once the
+    server has answered.
     """
     mock_ch_client = MagicMock()
-    mock_ch_client.command.return_value = None
-    mock_ch_client.query.return_value = MagicMock(summary={"read_rows": "1"})
+    mock_ch_client.query.return_value = MagicMock(
+        summary={"read_rows": "1"}, query_id="server-side"
+    )
 
     with patch.object(
         chts.ClickHouseTraceServer, "_mint_client", return_value=mock_ch_client
@@ -1323,15 +1348,15 @@ def test_query_id_is_logged_on_success_and_failure(caplog):
 
         with caplog.at_level(logging.INFO):
             server._query("SELECT 1", parameters={})
-        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-        assert _logged_query_id(caplog, "clickhouse_query") == sent_id
+        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+        assert _logged_ids(caplog, "clickhouse_query") == (sent_id, "server-side")
 
         caplog.clear()
         mock_ch_client.query.side_effect = DatabaseError("boom")
         with caplog.at_level(logging.INFO), pytest.raises(DatabaseError):
             server._query("SELECT 1", parameters={})
-        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["query_id"]
-        assert _logged_query_id(caplog, "clickhouse_query_error") == sent_id
+        sent_id = mock_ch_client.query.call_args.kwargs["settings"]["log_comment"]
+        assert _logged_ids(caplog, "clickhouse_query_error") == (sent_id, None)
 
 
 @pytest.mark.disable_logging_error_check
