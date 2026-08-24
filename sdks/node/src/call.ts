@@ -78,6 +78,7 @@ function buildProxyHandlers(
   };
 }
 
+/** @inline */
 export interface Call extends CallSchema {
   setDisplayName(displayName: string): Promise<void>;
 }

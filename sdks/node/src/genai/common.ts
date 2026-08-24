@@ -5,6 +5,8 @@ import type {Attributes, Context} from '@opentelemetry/api';
  * parent Context (with the parent span already attached), the conversation id,
  * and the custom attributes. All three are forwarded down the handle chain, so
  * every descendant span inherits them.
+ *
+ * @inline
  */
 export interface ChildSpanContext {
   parentContext: Context;

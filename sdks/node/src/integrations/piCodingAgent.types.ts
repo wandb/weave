@@ -10,6 +10,7 @@
 // Model
 // ---------------------------------------------------------------------------
 
+/** @inline */
 export interface PiModel {
   /** Model ID string, e.g. "claude-3-5-sonnet-20241022" */
   id: string;
@@ -21,6 +22,7 @@ export interface PiModel {
 // Usage
 // ---------------------------------------------------------------------------
 
+/** @inline */
 export interface PiUsage {
   /** Prompt / input tokens */
   input: number;
@@ -40,6 +42,7 @@ export interface PiUsage {
 // Messages
 // ---------------------------------------------------------------------------
 
+/** @inline */
 export interface PiAssistantMessage {
   role: 'assistant';
   /** Actual model string returned by the provider */
@@ -61,6 +64,7 @@ export interface PiAssistantMessage {
   errorMessage?: string;
 }
 
+/** @inline */
 export type PiAgentMessage =
   | PiAssistantMessage
   | {role: string; content: unknown};
@@ -120,6 +124,7 @@ export type PiExtensionEvent =
 // Extension context
 // ---------------------------------------------------------------------------
 
+/** @inline */
 export interface PiExtensionContext {
   /** Current working directory */
   cwd: string;
@@ -133,11 +138,13 @@ export interface PiExtensionContext {
 // Extension API
 // ---------------------------------------------------------------------------
 
+/** @inline */
 export type PiExtensionHandler<E> = (
   event: E,
   ctx: PiExtensionContext
 ) => Promise<void> | void;
 
+/** @inline */
 export interface PiExtensionApi {
   on<T extends PiExtensionEvent['type']>(
     type: T,

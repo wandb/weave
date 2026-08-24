@@ -468,6 +468,7 @@ export class CallStack {
 }
 
 type CallStartParams = StartedCallSchemaForInsert;
+/** @inline */
 type CallEndParams = EndedCallSchemaForInsert & {display_name?: string | null};
 
 // Merged start + end payload for the `calls/complete` endpoint.

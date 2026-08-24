@@ -728,6 +728,7 @@ function wrapStreamForTracing(args: {
   });
 }
 
+/** @inline */
 interface OpenAIAPI {
   baseURL?: string;
   chat: {

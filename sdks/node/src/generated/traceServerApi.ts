@@ -41,6 +41,8 @@ export type AgentChatAgentHandoff = object;
 /**
  * AgentChatAgentStart
  * Payload for an agent lifecycle boundary.
+ *
+ * @inline
  */
 export interface AgentChatAgentStart {
   /** Model */
@@ -56,6 +58,8 @@ export interface AgentChatAgentStart {
 /**
  * AgentChatAssistantMessage
  * Payload for assistant text emitted by an agent or LLM span.
+ *
+ * @inline
  */
 export interface AgentChatAssistantMessage {
   /** Text */
@@ -87,6 +91,8 @@ export interface AgentChatAssistantMessage {
 /**
  * AgentChatContextCompacted
  * Payload for a context-window compaction event.
+ *
+ * @inline
  */
 export interface AgentChatContextCompacted {
   /** Compaction Summary */
@@ -105,6 +111,8 @@ export interface AgentChatContextCompacted {
  * grouped under the payload matching `type`, and exactly one payload must be
  * set. This keeps subtype nullability explicit while preserving a single
  * ordered timeline model for callers.
+ *
+ * @inline
  */
 export interface AgentChatMessage {
   /** Type */
@@ -138,6 +146,8 @@ export interface AgentChatMessage {
 /**
  * AgentChatToolCall
  * Payload for a tool call timeline event.
+ *
+ * @inline
  */
 export interface AgentChatToolCall {
   /** Tool Name */
@@ -157,6 +167,8 @@ export interface AgentChatToolCall {
 /**
  * AgentChatUserMessage
  * Payload for a user prompt in the chat timeline.
+ *
+ * @inline
  */
 export interface AgentChatUserMessage {
   /** Text */
@@ -366,6 +378,8 @@ export interface AgentConversationSpansRes {
 /**
  * AgentCustomAttrSchemaItem
  * One custom attribute key/type observed in the matching spans.
+ *
+ * @inline
  */
 export interface AgentCustomAttrSchemaItem {
   /** Source */
@@ -442,6 +456,8 @@ export interface AgentCustomAttrsSchemaRes {
  * accepted for existing callers.
  * The other sources target keys inside the typed custom attribute Map columns,
  * which accept arbitrary user-defined keys.
+ *
+ * @inline
  */
 export interface AgentGroupByRef {
   /**
@@ -493,6 +509,8 @@ export interface AgentSchema {
 /**
  * AgentSearchConversationResult
  * A conversation containing messages that matched the search query.
+ *
+ * @inline
  */
 export interface AgentSearchConversationResult {
   /** Conversation Id */
@@ -513,6 +531,8 @@ export interface AgentSearchConversationResult {
 /**
  * AgentSearchMatchedMessage
  * A single message that matched the search query.
+ *
+ * @inline
  */
 export interface AgentSearchMatchedMessage {
   /** Span Id */
@@ -1041,6 +1061,8 @@ export interface AgentSpanSchema {
 /**
  * AgentSpanStatsColumn
  * Metadata describing one column in an agent span stats result row.
+ *
+ * @inline
  */
 export interface AgentSpanStatsColumn {
   /** Name */
@@ -1058,6 +1080,8 @@ export interface AgentSpanStatsColumn {
 /**
  * AgentSpanStatsMetricSpec
  * Metric to extract from each matching span and aggregate into chart rows.
+ *
+ * @inline
  */
 export interface AgentSpanStatsMetricSpec {
   /**
@@ -1211,6 +1235,8 @@ export interface AgentSpanStatsTimeBucketSpec {
 /**
  * AgentSpanValueRef
  * Reference to a span field or typed custom attribute map value.
+ *
+ * @inline
  */
 export interface AgentSpanValueRef {
   /**
@@ -1324,6 +1350,8 @@ export interface AgentTraceChatReq {
  * AgentTraceChatRes
  * Structured chat view: a linear sequence of messages representing
  * the agent trajectory for a single trace.
+ *
+ * @inline
  */
 export interface AgentTraceChatRes {
   /** Trace Id */
@@ -1499,6 +1527,8 @@ export interface AliasesListRes {
  *         ]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface AndOperation {
   /** $And */
@@ -2463,6 +2493,8 @@ export interface CompletedCallSchemaForInsert {
  *         }
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface ContainsOperation {
   /**
@@ -2482,6 +2514,8 @@ export interface ContainsOperation {
  * - `input`: The string to search.
  * - `substr`: The substring to search for.
  * - `case_insensitive`: If true, match is case-insensitive.
+ *
+ * @inline
  */
 export interface ContainsSpec {
   /** Input */
@@ -2536,6 +2570,8 @@ export interface ContainsSpec {
  *         }
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface ConvertOperation {
   /**
@@ -2553,6 +2589,8 @@ export interface ConvertOperation {
  *
  * - `input`: The operand to convert.
  * - `to`: The type to convert to.
+ *
+ * @inline
  */
 export interface ConvertSpec {
   /** Input */
@@ -2874,7 +2912,11 @@ export interface DeletedObjVersion {
   leaf_object_class?: string | null;
 }
 
-/** EndedCallSchemaForInsert */
+/**
+ * EndedCallSchemaForInsert
+ *
+ * @inline
+ */
 export interface EndedCallSchemaForInsert {
   /** Project Id */
   project_id: string;
@@ -2911,6 +2953,8 @@ export interface EndedCallSchemaForInsert {
  *         "$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface EqOperation {
   /**
@@ -4231,6 +4275,8 @@ export interface GeolocationRes {
  *     ```
  *     {"$getField": "op_name"}
  *     ```
+ *
+ * @inline
  */
 export interface GetFieldOperator {
   /** $Getfield */
@@ -4247,6 +4293,8 @@ export interface GetFieldOperator {
  *         "$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface GtOperation {
   /**
@@ -4267,6 +4315,8 @@ export interface GtOperation {
  *         "$gte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface GteOperation {
   /**
@@ -4334,6 +4384,8 @@ export interface ImageGenerationRequestInputs {
  *         ]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface InOperation {
   /**
@@ -4487,7 +4539,11 @@ export interface LLMModelDetails {
   license: string;
 }
 
-/** LLMUsageSchema */
+/**
+ * LLMUsageSchema
+ *
+ * @inline
+ */
 export interface LLMUsageSchema {
   /** Prompt Tokens */
   prompt_tokens?: number | null;
@@ -4540,6 +4596,8 @@ export interface Limit {
  *     ```
  *     {"$literal": "predict"}
  *     ```
+ *
+ * @inline
  */
 export interface LiteralOperation {
   /** $Literal */
@@ -4562,6 +4620,8 @@ export interface LiteralOperation {
  *         "$lt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface LtOperation {
   /**
@@ -4582,6 +4642,8 @@ export interface LtOperation {
  *         "$lte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface LteOperation {
   /**
@@ -4881,6 +4943,8 @@ export interface NormalizedMessage {
  *         ]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface NotOperation {
   /**
@@ -5288,6 +5352,8 @@ export interface OpReadRes {
  *         ]
  *     }
  *     ```
+ *
+ * @inline
  */
 export interface OrOperation {
   /** $Or */
@@ -5839,6 +5905,8 @@ export interface ServerInfoRes {
  *     ```
  *     {"$size": {"$getField": "scorer_tags"}}
  *     ```
+ *
+ * @inline
  */
 export interface SizeOperation {
   /** $Size */
@@ -5867,7 +5935,11 @@ export interface SortBy {
   direction: 'asc' | 'desc';
 }
 
-/** StartedCallSchemaForInsert */
+/**
+ * StartedCallSchemaForInsert
+ *
+ * @inline
+ */
 export interface StartedCallSchemaForInsert {
   /** Project Id */
   project_id: string;
@@ -5907,7 +5979,11 @@ export interface StartedCallSchemaForInsert {
   wb_run_step?: number | null;
 }
 
-/** SummaryInsertMap */
+/**
+ * SummaryInsertMap
+ *
+ * @inline
+ */
 export interface SummaryInsertMap {
   /** Usage */
   usage?: Record<string, LLMUsageSchema>;
@@ -6267,7 +6343,11 @@ export interface UsageMetricSpec {
   percentiles?: number[];
 }
 
-/** ValidationError */
+/**
+ * ValidationError
+ *
+ * @inline
+ */
 export interface ValidationError {
   /** Location */
   loc: (string | number)[];
@@ -6301,7 +6381,11 @@ export interface CustomRuntimeApplyBody {
   runtime_ids: CustomRuntimeID[];
 }
 
-/** CustomRuntimeApplyRes */
+/**
+ * CustomRuntimeApplyRes
+ *
+ * @inline
+ */
 export interface CustomRuntimeApplyRes {
   /**
    * Name
@@ -6334,7 +6418,11 @@ export interface CustomRuntimeID {
   max_tokens?: number;
 }
 
-/** CustomRuntimeIDRes */
+/**
+ * CustomRuntimeIDRes
+ *
+ * @inline
+ */
 export interface CustomRuntimeIDRes {
   /**
    * Id

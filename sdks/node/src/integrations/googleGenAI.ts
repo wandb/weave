@@ -38,12 +38,14 @@ interface GeminiStreamState {
   lastChunk?: any;
 }
 
+/** @inline */
 interface GoogleGenAIModelsAPI {
   generateContent: (...args: any[]) => Promise<any>;
   generateContentStream: (...args: any[]) => Promise<AsyncIterable<any>>;
   [key: string]: any;
 }
 
+/** @inline */
 interface GoogleGenAIAPI {
   models?: GoogleGenAIModelsAPI;
   chats?: {
