@@ -1691,7 +1691,7 @@ def test_resent_request_vs_query_id_autogeneration(
     """Query-id guard: a client-side query_id is pinned in the request URL above
     the driver's retry loop, so a resent request hits the still-running original
     with code 216; with it disabled ClickHouse mints one per attempt and the
-    resend succeeds. Same shape as the session_id fix in PR #6655.
+    resend succeeds.
     """
     client = clickhouse_connect.get_client(
         host=ch_server._host,
