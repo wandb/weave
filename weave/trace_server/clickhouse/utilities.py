@@ -323,7 +323,7 @@ def log_and_raise_insert_error(
     e: Exception,
     table: str,
     data: Sequence[Sequence[Any]],
-    correlation_id: str | None = None,
+    correlation_id: str,
 ) -> None:
     """Log insert error with data size info and re-raise."""
     data_bytes = sum(num_bytes(row) for row in data)
