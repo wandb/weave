@@ -1,6 +1,6 @@
 import {uuidv7} from 'uuidv7';
 
-// TODO: Maybe move the interfaces to something like trace_server_interface.py
+import {stainlessPromise} from './stainlessPromise';
 
 export interface Call {
   project_id: string;
@@ -13,7 +13,7 @@ export interface Call {
   inputs: any;
   output?: any;
   exception?: string;
-  [key: string]: any; // Index signature to allow dynamic property access
+  [key: string]: any;
 }
 
 interface QueryParams {
@@ -22,6 +22,7 @@ interface QueryParams {
   order_by?: keyof Call;
   order_dir?: 'asc' | 'desc';
   filters?: Partial<Call>;
+  filter?: {call_ids?: string[]};
 }
 
 interface Obj {
@@ -49,6 +50,10 @@ interface Table {
   rows: Array<{digest: string; val: any}>;
 }
 
+function ok<T>(data: T, response?: Response) {
+  return stainlessPromise(data, response);
+}
+
 export class InMemoryTraceServer {
   private _calls: Call[] = [];
   private _objs: Obj[] = [];
@@ -57,8 +62,8 @@ export class InMemoryTraceServer {
   private _lastCallCount: number = 0;
   private _lastChangeTime: number = Date.now();
 
-  call = {
-    callStartBatchCallUpsertBatchPost: async (batchReq: {
+  calls = {
+    upsertBatch: (batchReq: {
       batch: Array<{mode: 'start' | 'end'; req: any}>;
     }) => {
       for (const item of batchReq.batch) {
@@ -73,110 +78,20 @@ export class InMemoryTraceServer {
           }
         }
       }
+      return ok({});
+    },
+
+    streamQuery: (queryParams: QueryParams) => {
+      const filteredCalls = this._filterCalls(queryParams);
+      const body =
+        filteredCalls.map(call => JSON.stringify(call)).join('\n') +
+        (filteredCalls.length ? '\n' : '');
+      return stainlessPromise(undefined, new Response(body));
     },
   };
 
-  // Handles the hand-rolled v2 ingest endpoints (calls_complete + eager
-  // start/end). Mirrors the gorilla routes the SDK posts to directly.
-  request = async (params: {
-    path: string;
-    method?: string;
-    body?: {
-      batch?: Call[];
-      start?: Call;
-      end?: (Partial<Call> & {id: string}) | undefined;
-    };
-  }) => {
-    const {path, body} = params;
-    if (path.endsWith('/calls/complete')) {
-      for (const complete of body?.batch ?? []) {
-        const existing = this._calls.find(c => c.id === complete.id);
-        if (existing) {
-          Object.assign(existing, complete);
-        } else {
-          this._calls.push(complete);
-        }
-        this._updateChangeTime();
-      }
-      return {data: {}};
-    }
-    if (path.endsWith('/call/start')) {
-      const start = body?.start;
-      if (start) {
-        this._calls.push(start);
-        this._updateChangeTime();
-      }
-      return {data: {id: start?.id, trace_id: start?.trace_id}};
-    }
-    if (path.endsWith('/call/end')) {
-      const end = body?.end;
-      const call = end && this._calls.find(c => c.id === end.id);
-      if (call && end) {
-        Object.assign(call, end);
-        this._updateChangeTime();
-      }
-      return {data: {}};
-    }
-    throw new Error(`InMemoryTraceServer: unhandled request to ${path}`);
-  };
-
-  // Mirrors the generated client: the v2 helper delegates to `request`, so the
-  // request spy still sees the calls/complete path.
-  v2 = {
-    callsCompleteV2EntityProjectCallsCompletePost: async (
-      entity: string,
-      project: string,
-      data: {batch: Call[]}
-    ) =>
-      this.request({
-        path: `/v2/${entity}/${project}/calls/complete`,
-        method: 'POST',
-        body: data,
-      }),
-  };
-
-  calls = {
-    callsStreamQueryPost: async (queryParams: QueryParams) => {
-      let filteredCalls = this._calls.filter(
-        call => call.project_id === queryParams.project_id
-      );
-
-      // Apply filters if any
-      if (queryParams.filters) {
-        filteredCalls = filteredCalls.filter(call => {
-          return Object.entries(queryParams.filters || {}).every(
-            ([key, value]) => call[key] === value
-          );
-        });
-      }
-
-      // Apply ordering
-      if (queryParams.order_by) {
-        filteredCalls.sort((a, b) => {
-          if (a[queryParams.order_by!] < b[queryParams.order_by!])
-            return queryParams.order_dir === 'asc' ? -1 : 1;
-          if (a[queryParams.order_by!] > b[queryParams.order_by!])
-            return queryParams.order_dir === 'asc' ? 1 : -1;
-          return 0;
-        });
-      }
-
-      // Apply limit
-      if (queryParams.limit) {
-        filteredCalls = filteredCalls.slice(0, queryParams.limit);
-      }
-
-      return {
-        calls: filteredCalls,
-        next_page_token: null, // Simplified: no pagination in this in-memory version
-      };
-    },
-  };
-
-  obj = {
-    objCreateObjCreatePost: async (req: {
-      obj: {project_id: string; object_id: string; val: any};
-    }) => {
+  objects = {
+    create: (req: {obj: {project_id: string; object_id: string; val: any}}) => {
       const now = new Date().toISOString();
       const digest = this.generateDigest(req.obj.val);
 
@@ -193,7 +108,6 @@ export class InMemoryTraceServer {
         val: req.obj.val,
       };
 
-      // Update version_index and is_latest for existing objects
       const existingObjs = this._objs.filter(
         obj =>
           obj.project_id === req.obj.project_id &&
@@ -205,19 +119,10 @@ export class InMemoryTraceServer {
       }
 
       this._objs.push(newObj);
-
-      return {
-        data: {
-          digest: digest,
-        },
-      };
+      return ok({digest});
     },
 
-    objReadObjReadPost: async (req: {
-      project_id: string;
-      object_id: string;
-      digest?: string;
-    }) => {
+    read: (req: {project_id: string; object_id: string; digest?: string}) => {
       const obj = this._objs.find(
         o =>
           o.project_id === req.project_id &&
@@ -231,98 +136,152 @@ export class InMemoryTraceServer {
         );
       }
 
-      return {
-        data: {
-          obj: obj,
-        },
-      };
+      return ok({obj});
     },
   };
 
-  table = {
-    tableCreateTableCreatePost: async (req: {
-      table: {project_id: string; rows: any[]};
-    }) => {
+  tables = {
+    create: (req: {table: {project_id: string; rows: any[]}}) => {
       const digest = this.generateDigest(req.table.rows);
-
-      // Create row entries with individual digests
       const rows = req.table.rows.map(rowVal => ({
         digest: this.generateDigest(rowVal),
         val: rowVal,
       }));
-
-      const newTable: Table = {
+      this._tables.push({
         project_id: req.table.project_id,
-        digest: digest,
-        rows: rows,
-      };
-
-      this._tables.push(newTable);
-
-      return {
-        data: {
-          digest: digest,
-        },
-      };
+        digest,
+        rows,
+      });
+      return ok({digest});
     },
 
-    tableQueryTableQueryPost: async (req: {
-      project_id: string;
-      digest: string;
-    }) => {
+    query: (req: {project_id: string; digest: string}) => {
       const table = this._tables.find(
         t => t.project_id === req.project_id && t.digest === req.digest
       );
-
       if (!table) {
         throw new Error(
           `Table not found: ${req.project_id}/table/${req.digest}`
         );
       }
-
-      return {
-        data: {
-          rows: table.rows,
-        },
-      };
+      return ok({rows: table.rows});
     },
   };
 
-  file = {
-    fileCreateFileCreatePost: async (data: {
-      project_id: string;
-      file: Blob;
-    }) => {
-      const digest = this.generateDigest(await data.file.arrayBuffer());
-
-      const newFile: File = {
-        project_id: data.project_id,
-        digest: digest,
-        content: data.file,
-      };
-
-      this._files.push(newFile);
-
-      return {
-        digest: digest,
-      };
+  files = {
+    create: (data: {project_id: string; file: Blob}) => {
+      return ok(
+        (async () => {
+          const digest = this.generateDigest(await data.file.arrayBuffer());
+          this._files.push({
+            project_id: data.project_id,
+            digest,
+            content: data.file,
+          });
+          return {digest};
+        })()
+      );
     },
   };
 
   feedback = {
-    feedbackCreateFeedbackCreatePost: async (_req: any) => {
-      // Stub implementation for feedback API (used by scorer feedback attachment)
-      return {
-        data: {
-          id: uuidv7(),
-        },
-      };
+    create: (_req: any) => ok({id: uuidv7()}),
+  };
+
+  v2Calls = {
+    complete: (_project: string, params: {entity: string; batch: Call[]}) => {
+      this._applyCompletes(params.batch);
+      return ok({});
     },
   };
 
+  post = (
+    path: string,
+    opts?: {
+      body?: {
+        batch?: Call[];
+        start?: Call;
+        end?: (Partial<Call> & {id: string}) | undefined;
+      };
+    }
+  ) => {
+    const body = opts?.body;
+    if (path.endsWith('/calls/complete')) {
+      this._applyCompletes(body?.batch ?? []);
+      return ok({});
+    }
+    if (path.endsWith('/call/start')) {
+      const start = body?.start;
+      if (start) {
+        this._calls.push(start);
+        this._updateChangeTime();
+      }
+      return ok({id: start?.id, trace_id: start?.trace_id});
+    }
+    if (path.endsWith('/call/end')) {
+      const end = body?.end;
+      const call = end && this._calls.find(c => c.id === end.id);
+      if (call && end) {
+        Object.assign(call, end);
+        this._updateChangeTime();
+      }
+      return ok({});
+    }
+    throw new Error(`InMemoryTraceServer: unhandled post to ${path}`);
+  };
+
+  put = (path: string, _opts?: {body?: unknown}) => {
+    throw new Error(`InMemoryTraceServer: unhandled put to ${path}`);
+  };
+
+  private _applyCompletes(batch: Call[]) {
+    for (const complete of batch) {
+      const existing = this._calls.find(c => c.id === complete.id);
+      if (existing) {
+        Object.assign(existing, complete);
+      } else {
+        this._calls.push(complete);
+      }
+      this._updateChangeTime();
+    }
+  }
+
+  private _filterCalls(queryParams: QueryParams): Call[] {
+    let filteredCalls = this._calls.filter(
+      call => call.project_id === queryParams.project_id
+    );
+
+    if (queryParams.filters) {
+      filteredCalls = filteredCalls.filter(call => {
+        return Object.entries(queryParams.filters || {}).every(
+          ([key, value]) => call[key] === value
+        );
+      });
+    }
+
+    if (queryParams.filter?.call_ids) {
+      const ids = new Set(queryParams.filter.call_ids);
+      filteredCalls = filteredCalls.filter(call => ids.has(call.id));
+    }
+
+    if (queryParams.order_by) {
+      filteredCalls.sort((a, b) => {
+        if (a[queryParams.order_by!] < b[queryParams.order_by!])
+          return queryParams.order_dir === 'asc' ? -1 : 1;
+        if (a[queryParams.order_by!] > b[queryParams.order_by!])
+          return queryParams.order_dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    if (queryParams.limit) {
+      filteredCalls = filteredCalls.slice(0, queryParams.limit);
+    }
+
+    return filteredCalls;
+  }
+
   private generateDigest(_data: any): string {
-    // In a real implementation, you'd want to use a proper hashing algorithm.
-    // For simplicity, we're using uuidv7 here.
     return uuidv7();
   }
 
@@ -331,16 +290,6 @@ export class InMemoryTraceServer {
     this._lastCallCount = this._calls.length;
   }
 
-  /**
-   * Waits for all pending operations to complete by checking if the call count
-   * has stabilized for a minimum period. This is specifically designed for tests
-   * where we need to wait for the weave client's async batch processing.
-   *
-   * @param stabilizationTime - How long to wait for no changes (default: 50ms)
-   * @param maxWaitTime - Maximum time to wait before giving up (default: 2000ms)
-   * @param minWaitTime - Minimum time to wait even if calls appear immediately (default: 20ms)
-   * @returns Promise that resolves when operations have stabilized
-   */
   async waitForPendingOperations(
     stabilizationTime: number = 50,
     maxWaitTime: number = 1500,
@@ -350,19 +299,16 @@ export class InMemoryTraceServer {
     const initialCallCount = this._calls.length;
     let hasSeenNewCalls = false;
 
-    // Wait minimum time to allow async operations to start
     await new Promise(resolve => setTimeout(resolve, minWaitTime));
 
     while (Date.now() - startTime < maxWaitTime) {
       const currentCallCount = this._calls.length;
       const timeSinceLastChange = Date.now() - this._lastChangeTime;
 
-      // Track if we've seen new calls since we started waiting
       if (currentCallCount > initialCallCount) {
         hasSeenNewCalls = true;
       }
 
-      // If we've seen new calls and they've been stable for the stabilization time, we're done
       if (
         hasSeenNewCalls &&
         currentCallCount === this._lastCallCount &&
@@ -371,17 +317,14 @@ export class InMemoryTraceServer {
         return;
       }
 
-      // Update our tracking
       if (currentCallCount !== this._lastCallCount) {
         this._lastCallCount = currentCallCount;
         this._lastChangeTime = Date.now();
       }
 
-      // Small delay before checking again
       await new Promise(resolve => setTimeout(resolve, 5));
     }
 
-    // If we get here, we timed out, but don't throw - just proceed
     console.warn(
       `waitForPendingOperations timed out after ${maxWaitTime}ms. Calls: initial=${initialCallCount}, final=${this._calls.length}`
     );
@@ -393,13 +336,18 @@ export class InMemoryTraceServer {
     filters?: Partial<Call>
   ): Promise<Call[]> {
     await this.waitForPendingOperations();
-    const result = await this.calls.callsStreamQueryPost({
+    return this.listCalls(projectId, limit, filters);
+  }
+
+  listCalls(
+    projectId: string,
+    limit?: number,
+    filters?: Partial<Call>
+  ): Call[] {
+    return this._filterCalls({
       project_id: projectId,
       limit,
       filters,
     });
-    return result.calls;
   }
-
-  // ... other existing methods ...
 }

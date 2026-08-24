@@ -122,7 +122,7 @@ describe('serializing objects the SDK does not own', () => {
       }
       dataset: Dataset<{a: number}>;
     }
-    const uploaded = jest.spyOn(traceServer.obj, 'objCreateObjCreatePost');
+    const uploaded = jest.spyOn(traceServer.objects, 'create');
     const call = op(
       async (_params: {direct: Holder; nested: Holder[]}) => 'ok',
       {name: 'call', parameterNames: 'useParam0Object'}
@@ -218,13 +218,13 @@ describe('serializing objects the SDK does not own', () => {
 
     await requireGlobalClient().publish(new Config(), 'published-config');
 
-    const read = await traceServer.obj.objReadObjReadPost({
+    const read = await traceServer.objects.read({
       project_id: projectId,
       object_id: 'published-config',
     });
     // Only call inputs stop at class instances; publishing one is an explicit
     // request to store it.
-    expect(read.data.obj.val).toEqual({region: 'us-east', retries: 3});
+    expect(read.obj.val).toEqual({region: 'us-east', retries: 3});
   });
 
   test('a class instance returned from an op is still recorded in full', async () => {

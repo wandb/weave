@@ -7,6 +7,7 @@ import {getGlobalClient} from '../clientApi';
 import {markOpEager, op} from '../op';
 import {initWithCustomTraceServer} from './clientMock';
 import {InMemoryTraceServer} from './helpers/inMemoryTraceServer';
+import {stainlessReject} from './helpers/stainlessPromise';
 
 const projectId = 'test-entity/test-project';
 
@@ -18,8 +19,17 @@ function client() {
   return c;
 }
 
-function pathsHit(spy: jest.SpyInstance): string[] {
-  return spy.mock.calls.map(args => (args[0] as {path: string}).path);
+function postPaths(spy: jest.SpyInstance): string[] {
+  return spy.mock.calls.map(args => args[0] as string);
+}
+
+function completeCalledWith(
+  spy: jest.SpyInstance
+): Array<{project: string; entity: string}> {
+  return spy.mock.calls.map(args => ({
+    project: args[0] as string,
+    entity: (args[1] as {entity: string}).entity,
+  }));
 }
 
 describe('calls_complete pairing (default path)', () => {
@@ -31,11 +41,8 @@ describe('calls_complete pairing (default path)', () => {
   });
 
   test('a finished op is written once via calls/complete with merged start+end', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
-    const legacySpy = jest.spyOn(
-      traceServer.call,
-      'callStartBatchCallUpsertBatchPost'
-    );
+    const completeSpy = jest.spyOn(traceServer.v2Calls, 'complete');
+    const legacySpy = jest.spyOn(traceServer.calls, 'upsertBatch');
 
     const double = op(function double(x: number) {
       return x * 2;
@@ -56,12 +63,14 @@ describe('calls_complete pairing (default path)', () => {
     expect(call.exception ?? null).toBeNull();
 
     // Exactly one complete write, and nothing on the legacy path.
-    expect(pathsHit(requestSpy)).toEqual([`/v2/${projectId}/calls/complete`]);
+    expect(completeCalledWith(completeSpy)).toEqual([
+      {project: 'test-project', entity: 'test-entity'},
+    ]);
     expect(legacySpy).not.toHaveBeenCalled();
   });
 
   test('nested calls produce one complete per call with correct parentage', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const completeSpy = jest.spyOn(traceServer.v2Calls, 'complete');
 
     const inner = op(function inner(x: number) {
       return x + 1;
@@ -83,10 +92,12 @@ describe('calls_complete pairing (default path)', () => {
       expect(ic.parent_id).toBe(outerCall?.id);
       expect(ic.trace_id).toBe(outerCall?.trace_id);
     }
-    // 3 completes (children pair and flush as they finish, parent last).
-    expect(pathsHit(requestSpy).every(p => p.endsWith('/calls/complete'))).toBe(
-      true
-    );
+    expect(completeCalledWith(completeSpy).length).toBeGreaterThan(0);
+    expect(
+      completeCalledWith(completeSpy).every(
+        c => c.project === 'test-project' && c.entity === 'test-entity'
+      )
+    ).toBe(true);
   });
 
   test('a thrown op records the exception in the complete write', async () => {
@@ -103,7 +114,7 @@ describe('calls_complete pairing (default path)', () => {
   });
 
   test('out-of-order end-before-start still pairs into one complete', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const completeSpy = jest.spyOn(traceServer.v2Calls, 'complete');
     const c = client();
     const id = 'call-ooo';
     const trace = 'trace-ooo';
@@ -131,11 +142,13 @@ describe('calls_complete pairing (default path)', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].inputs.a).toBe(1);
     expect(calls[0].output).toBe('late');
-    expect(pathsHit(requestSpy)).toEqual([`/v2/${projectId}/calls/complete`]);
+    expect(completeCalledWith(completeSpy)).toEqual([
+      {project: 'test-project', entity: 'test-entity'},
+    ]);
   });
 
   test('an unfinished call is flushed via the eager start endpoint, not dropped', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const postSpy = jest.spyOn(traceServer, 'post');
     const c = client();
     c.saveCallStart({
       project_id: projectId,
@@ -153,11 +166,11 @@ describe('calls_complete pairing (default path)', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0].id).toBe('orphan');
     expect(calls[0].ended_at).toBeUndefined();
-    expect(pathsHit(requestSpy)).toEqual([`/v2/${projectId}/call/start`]);
+    expect(postPaths(postSpy)).toEqual([`/v2/${projectId}/call/start`]);
   });
 
   test('a start without an id is sent via the eager endpoint, not dropped', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const postSpy = jest.spyOn(traceServer, 'post');
     const c = client();
     c.saveCallStart({
       project_id: projectId,
@@ -168,7 +181,7 @@ describe('calls_complete pairing (default path)', () => {
     });
     await c.waitForBatchProcessing();
     // Unpairable (no id): cannot become a complete, so it ships as a raw start.
-    expect(pathsHit(requestSpy)).toEqual([`/v2/${projectId}/call/start`]);
+    expect(postPaths(postSpy)).toEqual([`/v2/${projectId}/call/start`]);
   });
 });
 
@@ -181,7 +194,7 @@ describe('calls_complete eager path', () => {
   });
 
   test('an eager op sends start and end via the v2 single endpoints', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const postSpy = jest.spyOn(traceServer, 'post');
     const longRunning = op(function longRunning(x: number) {
       return x;
     });
@@ -189,12 +202,11 @@ describe('calls_complete eager path', () => {
     await longRunning(7);
     await client().waitForBatchProcessing();
 
-    const paths = pathsHit(requestSpy).sort();
+    const paths = postPaths(postSpy).sort();
     expect(paths).toEqual([
       `/v2/${projectId}/call/end`,
       `/v2/${projectId}/call/start`,
     ]);
-    // Never paired into a complete.
     expect(paths).not.toContain(`/v2/${projectId}/calls/complete`);
 
     const calls = await traceServer.getCalls(projectId);
@@ -215,11 +227,9 @@ describe('legacy path (useCallsComplete=false)', () => {
   });
 
   test('finished op goes through call/upsert_batch and never the v2 endpoints', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
-    const legacySpy = jest.spyOn(
-      traceServer.call,
-      'callStartBatchCallUpsertBatchPost'
-    );
+    const postSpy = jest.spyOn(traceServer, 'post');
+    const completeSpy = jest.spyOn(traceServer.v2Calls, 'complete');
+    const legacySpy = jest.spyOn(traceServer.calls, 'upsertBatch');
 
     const triple = op(function triple(x: number) {
       return x * 3;
@@ -228,7 +238,8 @@ describe('legacy path (useCallsComplete=false)', () => {
     await client().waitForBatchProcessing();
 
     expect(legacySpy).toHaveBeenCalled();
-    expect(requestSpy).not.toHaveBeenCalled();
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(completeSpy).not.toHaveBeenCalled();
 
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
@@ -247,14 +258,14 @@ describe('automatic upgrade to calls_complete', () => {
   });
 
   test('CALLS_COMPLETE_MODE_REQUIRED on the legacy path re-pairs via calls/complete', async () => {
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const completeSpy = jest.spyOn(traceServer.v2Calls, 'complete');
     // The first (and only) legacy attempt is rejected by a pinned project.
-    jest
-      .spyOn(traceServer.call, 'callStartBatchCallUpsertBatchPost')
-      .mockRejectedValueOnce({
+    jest.spyOn(traceServer.calls, 'upsertBatch').mockReturnValueOnce(
+      stainlessReject({
         status: 400,
         error: {error_code: 'CALLS_COMPLETE_MODE_REQUIRED'},
-      });
+      })
+    );
 
     const adder = op(function adder(x: number) {
       return x + 100;
@@ -263,7 +274,9 @@ describe('automatic upgrade to calls_complete', () => {
     await client().waitForBatchProcessing();
 
     // Upgraded: the call lands via the complete endpoint with full data.
-    expect(pathsHit(requestSpy)).toContain(`/v2/${projectId}/calls/complete`);
+    expect(completeCalledWith(completeSpy)).toEqual([
+      {project: 'test-project', entity: 'test-entity'},
+    ]);
     const calls = await traceServer.getCalls(projectId);
     expect(calls).toHaveLength(1);
     expect(calls[0].inputs.arg0).toBe(1);
@@ -280,9 +293,11 @@ describe('send error handling', () => {
   });
 
   test('a non-retryable 4xx drops the batch instead of retrying forever', async () => {
-    const requestSpy = jest
-      .spyOn(traceServer, 'request')
-      .mockRejectedValue({status: 400, error: {detail: 'invalid uuid'}});
+    const completeSpy = jest
+      .spyOn(traceServer.v2Calls, 'complete')
+      .mockReturnValue(
+        stainlessReject({status: 400, error: {detail: 'invalid uuid'}})
+      );
 
     const bad = op(function bad(x: number) {
       return x;
@@ -291,19 +306,21 @@ describe('send error handling', () => {
     await client().waitForBatchProcessing();
 
     // One attempt, then dropped: no requeue storm, no process.exit.
-    expect(requestSpy).toHaveBeenCalledTimes(1);
+    expect(completeSpy).toHaveBeenCalledTimes(1);
   });
 
   test('a retryable 5xx requeues and the call eventually lands', async () => {
-    const real = traceServer.request.bind(traceServer);
+    const real = traceServer.v2Calls.complete.bind(traceServer.v2Calls);
     let attempts = 0;
-    jest.spyOn(traceServer, 'request').mockImplementation(async params => {
-      attempts++;
-      if (attempts === 1) {
-        throw {status: 503};
-      }
-      return real(params);
-    });
+    jest
+      .spyOn(traceServer.v2Calls, 'complete')
+      .mockImplementation((project, params) => {
+        attempts++;
+        if (attempts === 1) {
+          return stainlessReject({status: 503});
+        }
+        return real(project, params);
+      });
 
     const flaky = op(function flaky(x: number) {
       return x * 2;
@@ -317,7 +334,9 @@ describe('send error handling', () => {
   });
 
   test('gives up gracefully after sustained errors without killing the process', async () => {
-    jest.spyOn(traceServer, 'request').mockRejectedValue({status: 503});
+    jest
+      .spyOn(traceServer.v2Calls, 'complete')
+      .mockReturnValue(stainlessReject({status: 503}));
     const c = client();
     (c as unknown as {BATCH_INTERVAL: number}).BATCH_INTERVAL = 1;
 
@@ -350,7 +369,9 @@ describe('send error handling', () => {
     // Eager start/end go via the v2 single endpoints and requeue in place
     // (they never throw out of sendBatch), so their failures must still feed
     // the give-up counter or a down server would requeue forever and hang.
-    jest.spyOn(traceServer, 'request').mockRejectedValue({status: 503});
+    jest
+      .spyOn(traceServer, 'post')
+      .mockReturnValue(stainlessReject({status: 503}));
     const c = client();
     (c as unknown as {BATCH_INTERVAL: number}).BATCH_INTERVAL = 1;
 

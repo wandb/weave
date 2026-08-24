@@ -339,7 +339,7 @@ describe('Op Flow', () => {
   test('eager call-end carries the same trace_id as the call-start', async () => {
     // The eager path sends start and end as separate v2 requests, so the end
     // payload must independently carry trace_id (a merged read would mask it).
-    const requestSpy = jest.spyOn(traceServer, 'request');
+    const postSpy = jest.spyOn(traceServer, 'post');
 
     const myOp = op((x: number) => x * 2, {name: 'myOp'});
     markOpEager(myOp);
@@ -347,19 +347,22 @@ describe('Op Flow', () => {
 
     await traceServer.waitForPendingOperations();
 
-    const startReq = requestSpy.mock.calls.find(([p]) =>
-      p.path.endsWith('/call/start')
-    )?.[0];
-    const endReq = requestSpy.mock.calls.find(([p]) =>
-      p.path.endsWith('/call/end')
-    )?.[0];
+    const startReq = postSpy.mock.calls.find(([path]) =>
+      (path as string).endsWith('/call/start')
+    );
+    const endReq = postSpy.mock.calls.find(([path]) =>
+      (path as string).endsWith('/call/end')
+    );
 
     expect(startReq).toBeDefined();
     expect(endReq).toBeDefined();
 
-    const startTraceId = startReq!.body!.start!.trace_id;
+    const startTraceId = (startReq![1] as {body: {start: {trace_id: string}}})
+      .body.start.trace_id;
     expect(startTraceId).toBeTruthy();
-    expect(endReq!.body!.end!.trace_id).toBe(startTraceId);
+    expect(
+      (endReq![1] as {body: {end: {trace_id: string}}}).body.end.trace_id
+    ).toBe(startTraceId);
   });
 
   test('call-end carries is_eval=false for a non-eval op', async () => {
