@@ -7793,17 +7793,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return
 
         duration_ms = round((time.monotonic() - start) * 1000, 1)
+        # command() also returns scalars, which carry no query_id.
+        query_id = record_query_id(result) if isinstance(result, QuerySummary) else None
         logger.info(
             "clickhouse_command",
             extra={
                 "trace_duration_ms": duration_ms,
                 "command": command,
                 "parameters": processed_params,
-                "query_id": (
-                    record_query_id(result)
-                    if isinstance(result, QuerySummary)
-                    else None
-                ),
+                "query_id": query_id,
                 "correlation_id": correlation_id,
             },
         )
