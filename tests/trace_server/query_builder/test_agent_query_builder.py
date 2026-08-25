@@ -2115,6 +2115,67 @@ class TestMakeConversationChatSpansQuery:
         """
         assert_sql(expected, expected_pb.get_params(), query, pb.get_params())
 
+    def test_with_started_at_bound(self) -> None:
+        started_at = datetime.datetime(2026, 8, 18, tzinfo=datetime.timezone.utc)
+        req = AgentConversationChatReq(
+            project_id="p1", conversation_id="c1", started_at_gte=started_at
+        )
+        spans_pb = ParamBuilder("genai")
+        spans_query = make_conversation_chat_spans_query(spans_pb, req)
+
+        expected_pb = ParamBuilder("genai")
+        expected_pb.add("p1", param_type="String")
+        expected_pb.add("c1", param_type="String")
+        expected_pb.add(50, param_type="UInt64")
+        expected_pb.add(0, param_type="UInt64")
+        expected_pb.add(started_at, param_type="DateTime64(6)")
+        source = cost_augmented_source_sql(expected_pb, "p1")
+        expected_spans = f"""
+            WITH turn_page AS (
+                SELECT trace_id, min(started_at) AS turn_started_at
+                FROM spans
+                WHERE project_id = {{genai_0:String}}
+                AND conversation_id = {{genai_1:String}}
+                AND started_at >= {{genai_4:DateTime64(6)}}
+                GROUP BY trace_id
+                ORDER BY turn_started_at DESC, trace_id DESC
+                LIMIT {{genai_2:UInt64}} OFFSET {{genai_3:UInt64}}
+            )
+            SELECT {QUALIFIED_CHAT_VIEW_COLS}, {QUALIFIED_SPANS_COST_COLS}
+            FROM {source} s
+            INNER JOIN turn_page t ON s.trace_id = t.trace_id
+            WHERE s.project_id = {{genai_0:String}}
+            AND s.trace_id IN (SELECT trace_id FROM turn_page)
+            AND s.conversation_id IN ({{genai_1:String}}, '')
+            AND s.started_at >= {{genai_4:DateTime64(6)}}
+            ORDER BY t.turn_started_at ASC, t.trace_id ASC, s.started_at ASC
+        """
+        assert_sql(
+            expected_spans,
+            expected_pb.get_params(),
+            spans_query,
+            spans_pb.get_params(),
+        )
+
+        count_pb = ParamBuilder("genai")
+        count_query = make_conversation_chat_turns_count_query(count_pb, req)
+        expected_count = """
+            SELECT count() FROM (
+                SELECT trace_id
+                FROM spans s
+                WHERE s.project_id = {genai_0:String}
+                AND s.conversation_id = {genai_1:String}
+                AND s.started_at >= {genai_2:DateTime64(6)}
+                GROUP BY trace_id
+            )
+        """
+        assert_sql(
+            expected_count,
+            {"genai_0": "p1", "genai_1": "c1", "genai_2": started_at},
+            count_query,
+            count_pb.get_params(),
+        )
+
     def test_with_pagination(self) -> None:
         pb = ParamBuilder("genai")
         query = make_conversation_chat_spans_query(

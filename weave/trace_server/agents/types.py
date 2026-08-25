@@ -1181,6 +1181,7 @@ class AgentConversationChatReq(BaseModel):
 
     project_id: str
     conversation_id: str
+    started_at_gte: datetime.datetime | None = None
     limit: int = Field(
         default=MAX_CONVERSATION_CHAT_TURNS,
         ge=0,
