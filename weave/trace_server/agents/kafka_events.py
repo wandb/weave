@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import BaseModel
 from typing_extensions import Self
@@ -30,18 +30,26 @@ class _AgentSpansEvent(BaseModel):
     event_type: AgentSpanOpName
     status_code: StatusCodeLiteral
     project_id: str
+    entity_name: str | None = None
     trace_id: str
     span_id: str
     operation_name: str | None
     parent_span_id: str | None
     conversation_id: str | None
 
+    # Subclasses set this to require a non-empty `conversation_id` on the row.
+    requires_conversation: ClassVar[bool] = False
+
     @classmethod
-    def from_row(cls, row: AgentSpanCHInsertable) -> Self | None:
+    def from_row(
+        cls, row: AgentSpanCHInsertable, entity_name: str | None = None
+    ) -> Self | None:
         """Return an event from a finished span row if it matches an event type.
 
         Currently only "turn_ended" is supported, but the interface is designed to support multiple types.
         """
+        if cls.requires_conversation and not row.conversation_id:
+            return None
         event_type: AgentSpanOpName | None = None
         # A span with no parent is assumed to represent the end of a turn
         if not row.parent_span_id:
@@ -52,6 +60,7 @@ class _AgentSpansEvent(BaseModel):
                 event_type=event_type,
                 status_code=row.status_code,
                 project_id=row.project_id,
+                entity_name=entity_name,
                 trace_id=row.trace_id,
                 span_id=row.span_id,
                 # Resolve optional fields to None (instead of empty strings)
@@ -77,6 +86,9 @@ class ScoreAgentSpansEvent(_AgentSpansEvent):
 
 class EmbedAgentSpansEvent(_AgentSpansEvent):
     """Trigger event for Agent Insights embedding."""
+
+    # Insights only judges turns with real conversation semantics.
+    requires_conversation: ClassVar[bool] = True
 
     def emit(self, producer: KafkaProducer | None) -> None:
         """Produce this event for Agent Insights without raising."""

@@ -36,6 +36,14 @@ export const PARENT_CALL_ID_SPAN_ATTR = 'weave.parent_call.id';
 export const PARENT_CALL_TRACE_ID_SPAN_ATTR = 'weave.parent_call.trace_id';
 
 /**
+ * Call-attribute key, under the reserved `weave` namespace, holding the OTel
+ * span that was current when the call started as `{trace_id, span_id}` hex.
+ * Spelled the same as `weave/trace_server/constants.py`: the two SDKs write one
+ * field and a mismatch shows up as an empty filter result, not as an error.
+ */
+export const INVOKING_SPAN_ATTR_KEY = 'invoking_span';
+
+/**
  * Request header advertising the sampling-relevant capabilities this SDK build
  * guarantees, so a future server-side ingest sampler can tell a sampling-safe
  * client from an older one and leave unsupported traffic unsampled. Sent on

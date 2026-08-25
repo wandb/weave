@@ -59,6 +59,7 @@ SHARDS_WITHOUT_EXTRAS = {
     "trace_server_bindings",
     "trace_server_migrator",
     "openai_realtime",
+    "stainless",
     "autogen_tests",
     "verifiers_test",
     "pandas_test",

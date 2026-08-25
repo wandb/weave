@@ -5,6 +5,7 @@ import {uuidv7} from 'uuidv7';
 import {
   EVAL_META_KEY,
   EVALUATION_RUN_OP_NAME,
+  INVOKING_SPAN_ATTR_KEY,
   MAX_OBJECT_NAME_LENGTH,
 } from './constants';
 import {computeDigest} from './digest';
@@ -32,6 +33,7 @@ import type {
   AgentSpanStatsColumn,
   AgentCustomAttrSchemaItem,
 } from './generated/traceServerApi';
+import {invokingSpanAttr} from './invokingSpan';
 import {
   type AudioType,
   DEFAULT_AUDIO_TYPE,
@@ -1984,6 +1986,11 @@ export class WeaveClient {
     attributes?: Record<string, any>,
     eagerCallStart: boolean = false
   ) {
+    // Read before the awaits below, because the link says which span was
+    // current when the call started and a span alive then may have closed by
+    // the time the attributes are assembled.
+    const invokingSpan = invokingSpanAttr();
+
     // EvalLinkSpanProcessor runs from OTel callbacks and only has access to
     // the in-memory call stack. Store the short op name for stack lookup
     // because the persisted `opName` below is a full ref URI; store the
@@ -2016,6 +2023,14 @@ export class WeaveClient {
       ...combinedAttributes,
     };
 
+    // After the merge: a caller's own `weave` object replaces ours wholesale.
+    // Dropped first: this key is ours to write, never a caller's to supply.
+    const weaveAttributes: Record<string, any> = {...mergedAttributes.weave};
+    delete weaveAttributes[INVOKING_SPAN_ATTR_KEY];
+    if (invokingSpan !== null) {
+      weaveAttributes[INVOKING_SPAN_ATTR_KEY] = invokingSpan;
+    }
+
     const startReq = {
       project_id: this.projectId,
       id: currentCall.callId,
@@ -2024,7 +2039,7 @@ export class WeaveClient {
       parent_id: parentCall?.callId,
       started_at: startTime.toISOString(),
       display_name: displayName,
-      attributes: mergedAttributes,
+      attributes: {...mergedAttributes, weave: weaveAttributes},
       inputs,
     };
     internalCall.updateWithCallSchemaData(startReq);

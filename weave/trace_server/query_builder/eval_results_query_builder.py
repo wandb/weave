@@ -6,8 +6,11 @@ Generates ClickHouse CTEs for the eval_results CTE chain:
   ranked_digests                   → GROUP BY row_digest, HAVING filters, ROW_NUMBER for sort
   ranked_digest_count              → total matching rows (for pagination metadata)
   page_digests                     → paginated slice of ranked_digests
-  page_resolved_inputs             → table_rows JOIN for the paginated digests only
-  page_rows                        → call IDs + resolved_inputs for the page
+  page_rows                        → call IDs + digests + order for the page
+
+Heavy data (call payload columns, dataset-row val_dump) is fetched by separate
+statements with literal id/digest params in PREWHERE — see
+build_eval_results_hydration_query and build_table_rows_resolution_query.
 """
 
 from functools import partial
@@ -68,6 +71,32 @@ def _build_eval_start_lower_bound(
     )"""
 
 
+def _build_eval_end_upper_bound(project_id_param: str, eval_root_ids_param: str) -> str:
+    """sortable_datetime ceiling for the calls_merged scan, as a scalar subquery.
+
+    Predict-and-score calls finish before their eval root does, so bounding by
+    the roots' latest ended_at (plus a buffer) keeps the scan inside the eval
+    run window instead of eval start -> now. Falls back to a far-future
+    datetime (no ceiling) when any root is still running or has no rows.
+    """
+    return f"""coalesce(
+        (
+            SELECT CASE
+                WHEN countIf(root_ended_at IS NULL) > 0 THEN NULL
+                ELSE max(root_ended_at) + toIntervalSecond({DATETIME_BUFFER_TIME_SECONDS})
+            END
+            FROM (
+                SELECT max(roots.ended_at) AS root_ended_at
+                FROM calls_merged AS roots
+                PREWHERE roots.project_id = {project_id_param}
+                WHERE roots.id IN {eval_root_ids_param}
+                GROUP BY roots.id
+            )
+        ),
+        toDateTime64('2100-01-01 00:00:00', 3)
+    )"""
+
+
 def _sort_filter_uses_inputs(
     sort_by: list[tsi.EvalResultsSortBy] | None,
     filters: list[tsi.EvalResultsFilter] | None,
@@ -122,6 +151,16 @@ def build_predict_and_score_calls_cte(
         eval_start_lower_bound = _build_eval_start_lower_bound(
             project_id_param, eval_root_ids_param
         )
+        eval_end_upper_bound = _build_eval_end_upper_bound(
+            project_id_param, eval_root_ids_param
+        )
+        # The inner id subquery matches on call-start rows only (they carry
+        # parent_id/op_name), reading light columns. It lives in PREWHERE (an
+        # explicit PREWHERE disables automatic condition movement) so the outer
+        # aggregation reads inputs_dump/output_dump for just those ids instead
+        # of every call in the window. The outer keeps only the lower time
+        # bound: delete rows are written at deletion time (after the eval
+        # window) and must still merge in so HAVING can exclude deleted calls.
         return f"""predict_and_score_calls AS (
     SELECT
         calls_merged.id AS call_id,
@@ -131,16 +170,17 @@ def build_predict_and_score_calls_cte(
         {row_digest_expr} AS row_digest
     FROM calls_merged
     PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE (
-        calls_merged.parent_id IN {eval_root_ids_param}
-        OR calls_merged.parent_id IS NULL
+    AND calls_merged.id IN (
+        SELECT calls_merged.id
+        FROM calls_merged
+        PREWHERE calls_merged.project_id = {project_id_param}
+        WHERE calls_merged.parent_id IN {eval_root_ids_param}
+        AND calls_merged.id NOT IN {eval_root_ids_param}
+        AND {op_match_where}
+        AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
+        AND calls_merged.sortable_datetime <= {eval_end_upper_bound}
     )
-    AND calls_merged.id NOT IN {eval_root_ids_param}
-    AND (
-        {op_match_where}
-        OR calls_merged.op_name IS NULL
-    )
-    AND calls_merged.sortable_datetime >= {eval_start_lower_bound}
+    WHERE calls_merged.sortable_datetime >= {eval_start_lower_bound}
     GROUP BY (calls_merged.project_id, calls_merged.id)
     HAVING any(calls_merged.parent_id) IN {eval_root_ids_param}
         AND ({op_match_having})
@@ -479,77 +519,43 @@ page_digests AS (
 )"""
 
 
-def build_page_resolved_inputs_cte(project_id_param: str) -> str:
-    """Hydrate dataset-row val_dump for just the page's digests."""
-    return f"""page_resolved_inputs AS (
-    SELECT digest, any(val_dump) AS val_dump
-    FROM table_rows
-    PREWHERE project_id = {project_id_param}
-    WHERE digest IN (SELECT row_digest FROM page_digests)
-    GROUP BY digest
-)"""
-
-
 def build_page_rows_cte() -> str:
-    """Build page_rows CTE: joins page digests with the per-page val_dump
-    resolution.
+    """Build page_rows CTE: page digests joined back to their calls.
+
+    Dataset-row resolution deliberately does NOT happen here: a
+    `digest IN (SELECT ... FROM page_digests)` scan of table_rows reads
+    val_dump for every row in the surviving granules (GBs on fat datasets)
+    even though only the page's digests are needed. Callers that want
+    resolved rows fetch them with build_table_rows_resolution_query using
+    the returned digests as a literal PREWHERE param.
     """
     return """page_rows AS (
     SELECT
         predict_and_score_calls_resolved.call_id AS call_id,
         predict_and_score_calls_resolved.eval_call_id AS eval_call_id,
         predict_and_score_calls_resolved.row_digest AS row_digest,
-        page_digests.row_order AS row_order,
-        COALESCE(
-            nullIf(page_resolved_inputs.val_dump, ''),
-            JSONExtractRaw(predict_and_score_calls_resolved.inputs_dump, 'example')
-        ) AS resolved_inputs
+        page_digests.row_order AS row_order
     FROM predict_and_score_calls_resolved
     INNER JOIN page_digests ON predict_and_score_calls_resolved.row_digest = page_digests.row_digest
-    LEFT JOIN page_resolved_inputs ON page_resolved_inputs.digest = predict_and_score_calls_resolved.row_digest
 )"""
 
 
-def _build_page_calls_cte(project_id_param: str, read_table: str) -> str:
-    """Build page_calls CTE: pre-filter and pre-aggregate source table for page rows only."""
-    if read_table == "calls_merged":
-        return f"""page_calls AS (
-    SELECT
-        calls_merged.id AS call_id,
-        any(calls_merged.project_id) AS project_id,
-        any(calls_merged.trace_id) AS trace_id,
-        any(calls_merged.op_name) AS op_name,
-        any(calls_merged.started_at) AS started_at,
-        any(calls_merged.ended_at) AS ended_at,
-        any(calls_merged.attributes_dump) AS attributes_dump,
-        any(calls_merged.inputs_dump) AS inputs_dump,
-        any(calls_merged.output_dump) AS output_dump,
-        any(calls_merged.summary_dump) AS summary_dump
-    FROM calls_merged
-    PREWHERE calls_merged.project_id = {project_id_param}
-    WHERE calls_merged.id IN (SELECT call_id FROM page_rows)
-    GROUP BY (calls_merged.project_id, calls_merged.id)
-)"""
-    else:
-        return f"""page_calls AS (
-    SELECT
-        calls_complete.id AS call_id,
-        calls_complete.project_id,
-        calls_complete.trace_id,
-        calls_complete.op_name,
-        calls_complete.started_at,
-        calls_complete.ended_at,
-        calls_complete.attributes_dump,
-        calls_complete.inputs_dump,
-        calls_complete.output_dump,
-        calls_complete.summary_dump
-    FROM calls_complete
-    WHERE calls_complete.project_id = {project_id_param}
-      AND calls_complete.id IN (SELECT call_id FROM page_rows)
-)"""
+def build_table_rows_resolution_query(
+    project_id: str,
+    digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Resolve dataset-row val_dump for a literal digest list (PREWHERE)."""
+    project_id_param = param_slot(pb.add_param(project_id), "String")
+    digests_param = pb.add(digests, None, "Array(String)")
+    return f"""SELECT digest, any(val_dump) AS val_dump
+FROM table_rows
+PREWHERE project_id = {project_id_param}
+AND digest IN {digests_param}
+GROUP BY digest"""
 
 
-def build_eval_results_query(
+def build_eval_results_page_query(
     project_id: str,
     eval_root_ids: list[str],
     sort_by: list[tsi.EvalResultsSortBy] | None,
@@ -561,11 +567,16 @@ def build_eval_results_query(
     read_table: str,
     filter_logic_operator: str = "or",
 ) -> str:
-    """Build the complete eval_results SQL query.
+    """Build the page-selection SQL: which rows to show, on light columns only.
 
-    The CTE chain carries only lightweight columns for sort/filter/pagination.
-    A page_calls CTE pre-filters the source table to just the page's call IDs,
-    then the outer SELECT joins two small tables (page_rows + page_calls).
+    Returns one row per page call with call_id, eval_call_id, row_digest,
+    row_order, resolved_inputs, and the total row count. Heavy call payloads
+    are fetched by a second statement (build_eval_results_hydration_query)
+    with the selected ids as a literal parameter: an in-statement
+    `id IN (SELECT ... FROM page_rows)` cannot sit in PREWHERE (chained-CTE
+    references re-evaluate pathologically), and from WHERE the dump columns
+    are read for every row in the surviving granules -- GBs on fat projects
+    to display 50 rows.
     """
     cte_chain = build_eval_results_cte_chain(
         project_id,
@@ -579,31 +590,63 @@ def build_eval_results_query(
         read_table,
         filter_logic_operator,
     )
-    project_id_param = param_slot(pb.add_param(project_id), "String")
-    page_calls_cte = _build_page_calls_cte(project_id_param, read_table)
-
-    return f"""WITH {cte_chain.strip()},
-
-{page_calls_cte}
+    return f"""WITH {cte_chain.strip()}
 SELECT
-    page_rows.call_id AS id,
-    page_rows.eval_call_id AS parent_id,
-    page_calls.project_id,
-    page_calls.trace_id,
-    page_calls.op_name,
-    page_calls.started_at,
-    page_calls.ended_at,
-    page_calls.attributes_dump,
-    page_calls.inputs_dump,
-    page_calls.output_dump,
-    page_calls.summary_dump,
-    page_rows.row_digest AS __row_digest,
-    page_rows.row_order AS __row_order,
-    page_rows.resolved_inputs AS __resolved_inputs,
-    (SELECT total_rows FROM ranked_digest_count) AS __total_rows
+    page_rows.call_id AS call_id,
+    page_rows.eval_call_id AS eval_call_id,
+    page_rows.row_digest AS row_digest,
+    page_rows.row_order AS row_order,
+    (SELECT total_rows FROM ranked_digest_count) AS total_rows
 FROM page_rows
-LEFT JOIN page_calls ON page_calls.call_id = page_rows.call_id
 ORDER BY page_rows.row_order ASC"""
+
+
+def build_eval_results_hydration_query(
+    project_id: str,
+    call_ids: list[str],
+    pb: ParamBuilder,
+    read_table: str,
+) -> str:
+    """Build the hydration SQL: heavy call columns for a literal id list.
+
+    The literal id set sits in PREWHERE, so ClickHouse row-filters on
+    (project_id, id) before reading the dump columns -- reads stay
+    proportional to the page, not to the granules the page's rows live in.
+    """
+    project_id_param = param_slot(pb.add_param(project_id), "String")
+    call_ids_param = pb.add(call_ids, None, "Array(String)")
+
+    if read_table == "calls_merged":
+        return f"""SELECT
+    calls_merged.id AS id,
+    any(calls_merged.project_id) AS project_id,
+    any(calls_merged.trace_id) AS trace_id,
+    any(calls_merged.op_name) AS op_name,
+    any(calls_merged.started_at) AS started_at,
+    any(calls_merged.ended_at) AS ended_at,
+    any(calls_merged.attributes_dump) AS attributes_dump,
+    any(calls_merged.inputs_dump) AS inputs_dump,
+    any(calls_merged.output_dump) AS output_dump,
+    any(calls_merged.summary_dump) AS summary_dump
+FROM calls_merged
+PREWHERE calls_merged.project_id = {project_id_param}
+AND calls_merged.id IN {call_ids_param}
+GROUP BY (calls_merged.project_id, calls_merged.id)"""
+    else:
+        return f"""SELECT
+    calls_complete.id AS id,
+    calls_complete.project_id,
+    calls_complete.trace_id,
+    calls_complete.op_name,
+    calls_complete.started_at,
+    calls_complete.ended_at,
+    calls_complete.attributes_dump,
+    calls_complete.inputs_dump,
+    calls_complete.output_dump,
+    calls_complete.summary_dump
+FROM calls_complete
+PREWHERE calls_complete.project_id = {project_id_param}
+AND calls_complete.id IN {call_ids_param}"""
 
 
 def build_eval_results_cte_chain(
@@ -666,7 +709,6 @@ def build_eval_results_cte_chain(
         pb,
         filter_logic_operator,
     )
-    page_resolved_cte = build_page_resolved_inputs_cte(project_id_param)
     page_rows_cte = build_page_rows_cte()
 
     return f"""{calls_cte},
@@ -674,7 +716,5 @@ def build_eval_results_cte_chain(
 {resolved_cte},
 
 {ranked_cte},
-
-{page_resolved_cte},
 
 {page_rows_cte}"""

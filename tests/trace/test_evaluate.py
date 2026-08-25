@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import weave
 from tests.conftest import LATENCY_TOL
 from weave import Dataset, Evaluation, Model
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 
 dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 dataset = Dataset(rows=dataset_rows)
@@ -281,6 +282,90 @@ async def test_basic_evaluation_with_scorer_styles(
 
 
 @pytest.mark.parametrize(
+    "dataset_name",
+    [
+        "my-dataset",
+        "!!!",
+        "d" * (MAX_OBJECT_NAME_LENGTH - len("-evaluation")),
+        "d" * 120,
+    ],
+)
+def test_evaluation_name_is_derived_unchanged_while_it_has_a_distinct_id(dataset_name):
+    """Only a name that lands on the dataset's own id is rewritten, so anything short of
+    that -- including names the id limit still truncates -- derives as it always did.
+    """
+    evaluation = Evaluation(dataset=Dataset(name=dataset_name, rows=dataset_rows))
+
+    assert evaluation.name == f"{dataset_name}-evaluation"
+
+
+def test_evaluation_name_is_rewritten_when_it_lands_on_the_dataset_id():
+    """The suffix is what tells the two objects apart, so when truncation would cut it
+    off the name carries a digest instead, one character under the limit.
+    """
+    evaluation = Evaluation(
+        dataset=Dataset(name="d" * MAX_OBJECT_NAME_LENGTH, rows=dataset_rows)
+    )
+
+    assert evaluation.name == "d" * 60 + "_5b10_" + "d" * 61
+
+
+def test_evaluation_name_is_rewritten_off_a_dataset_named_after_an_evaluation():
+    """A dataset whose own name already ends in the suffix is the case that reserving
+    room for the suffix would have left colliding.
+    """
+    evaluation = Evaluation(
+        dataset=Dataset(name="x" * 117 + "-evaluation", rows=dataset_rows)
+    )
+
+    assert evaluation.name == "x" * 60 + "_4978_" + "x" * 50 + "-evaluation"
+
+
+def test_evaluation_name_is_rewritten_off_a_dataset_id_the_digest_reproduces():
+    """A digest is not a guarantee: this dataset name is one the truncation maps to
+    itself. Staying a character under the limit is what separates the ids.
+    """
+    dataset_name = (
+        "1" + "a" * 60 + "_f1c7_uation-evaluation-evaluation-evaluation"
+        "-evaluation-evaluation"
+    )
+
+    evaluation = Evaluation(dataset=Dataset(name=dataset_name, rows=dataset_rows))
+
+    assert evaluation.name == (
+        "1" + "a" * 59 + "_43a2_uation-evaluation-evaluation-evaluation"
+        "-evaluation-evaluation"
+    )
+
+
+def test_evaluation_name_is_derived_from_a_name_utf8_cannot_encode():
+    """A name can carry a lone surrogate, which sanitizing drops, so rewriting one must
+    not raise where publishing it did not.
+    """
+    evaluation = Evaluation(
+        dataset=Dataset(name="\ud800" + "d" * MAX_OBJECT_NAME_LENGTH, rows=dataset_rows)
+    )
+
+    assert evaluation.name == "d" * 60 + "_5b10_" + "d" * 61
+
+
+def test_evaluation_derived_name_does_not_collide_with_its_dataset(client):
+    """Object names are truncated to the id limit, so a dataset name that already
+    reaches it used to swallow the derived suffix and both objects landed on one id,
+    which the server rejects (WB-30574).
+    """
+    dataset_name = "d" * MAX_OBJECT_NAME_LENGTH
+    dataset = Dataset(name=dataset_name, rows=dataset_rows)
+    evaluation = Evaluation(dataset=dataset)
+
+    dataset_ref = weave.publish(dataset)
+    evaluation_ref = weave.publish(evaluation)
+
+    assert dataset_ref.name == dataset_name
+    assert evaluation_ref.name == "d" * 60 + "_5b10_" + "d" * 61
+
+
+@pytest.mark.parametrize(
     "scorer_name",
     ["my scorer", "my-scorer()*&^%$@#/", "my-scorer", "       my scorer     "],
 )
@@ -527,3 +612,28 @@ async def test_evaluate_with_pydantic_summary(weave_active):
     model = EvalModel()
     result = await evaluation.evaluate(model)
     assert result["MyScorer"].awesome == 3
+
+
+@pytest.mark.asyncio
+async def test_summary_counts_rows_the_model_failed_on(weave_active):
+    """A row whose model raised reaches the aggregation as an empty dict, and counts."""
+
+    @weave.op
+    def sometimes_raises(input):
+        if input == "boom":
+            raise ValueError("boom")
+        return 1
+
+    @weave.op
+    def dict_score(output):
+        return {"correct": output == 1}
+
+    evaluation = Evaluation(
+        dataset=[{"input": "ok"}, {"input": "boom"}], scorers=[dict_score]
+    )
+    result = await evaluation.evaluate(sometimes_raises)
+    assert result == {
+        "output": {"mean": 1.0},
+        "dict_score": {"correct": {"true_count": 1, "true_fraction": 0.5}},
+        "model_latency": {"mean": pytest.approx(0, abs=LATENCY_TOL)},
+    }

@@ -1464,6 +1464,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def genai_otel_export(
         self, req: tsi.agent_types.GenAIOTelExportReq
     ) -> tsi.agent_types.GenAIOTelExportRes:
+        # Capture the entity before conversion, while `project_id` is still
+        # `entity/project`: recovering it downstream costs a gorilla round-trip.
+        req.entity_name = req.project_id.split("/", 1)[0] or None
         # Convert `req.project_id` DIRECTLY: this is the request's own project
         # translation and must always hit the id converter once.
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

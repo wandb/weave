@@ -110,6 +110,12 @@ Generate implicit cost `created_at` values in UTC because insertion interprets n
 
 Note: the scripts read `modelsBegin.json`/`modelsFinal.json`, which are symlinks into wandb/core and only resolve when this repo is checked out as the submodule inside wandb/core (`services/weave-trace/weave-python/weave-public`).
 
+`weave/vendor/weave_server_sdk/` is the generated Weave Trace API client, copied
+in from wandb/core rather than depended on because it is not published to PyPI.
+Never edit it by hand — regenerate it in core, then re-run
+`scripts/vendor_weave_server_sdk.py` with `--sdk-output` and `--core`. See
+`weave/vendor/README.md`.
+
 Persisted `AgentDashboard` objects intentionally use a closed, discriminated
 schema. Supported panel variants and their configuration fields must be added
 to `builtin_object_classes/agent_dashboard.py`; do not replace panel settings
@@ -149,6 +155,15 @@ that matches no span as normal — the write does not check that the span reache
 our backend. Spans opened by `trace_server.tracing` are the one exclusion, and
 they are recognised through `WEAVE_SERVER_SPAN_KEY` on the context rather than
 off the span object, which under the OTel→DD bridge is not an SDK span.
+
+`WeaveClient.createCall` in the Node SDK writes the same key with the same
+meaning, but sees fewer spans. That SDK registers no OTel context manager and
+never calls `startActiveSpan`, so its own spans never become current and
+`getActiveSpan` returns only instrumentation the user installed themselves.
+Linking the `execute_tool` spans the `openai-agents` and `google_adk`
+integrations emit has to read those integrations' own state instead — the
+agents SDK keeps its current span in its own AsyncLocalStorage, and the ADK
+plugin keeps a map of open tool spans.
 
 If `sdks/node/node_modules` is missing, run `pnpm install --frozen-lockfile` in `sdks/node` first. Do not use `npm install`; this SDK is pinned to pnpm.
 
@@ -222,6 +237,11 @@ no-server OTel tests. PR CI runs `tests-3.10(shard='claude_agent_sdk')` once
 without a marker filter so both tracing paths contribute coverage.
 Calls-based tests must include the integration's intentional text and thinking
 child calls in exact operation-set assertions.
+
+Every other shard, `flow` included, is run by CI with `-m "trace_server"`, and
+that filter comes from the workflow rather than from `noxfile.py`. A test that
+uses no server fixture therefore never runs in CI unless it carries
+`@pytest.mark.trace_server` itself.
 
 ### Running Tests
 
@@ -391,6 +411,22 @@ deterministic.
   to `Batches` `create`, `retrieve` and `results` instead, so for those a test
   reconfigures the mock it captured before patching, or reaches it through
   `__wrappedFunction`.
+
+### TypeScript Anthropic token accounting
+
+- Anthropic reports `input_tokens` as fresh, uncached prompt only and bills the
+  rest through `cache_read_input_tokens` and `cache_creation_input_tokens`.
+  Weave's cost math subtracts those two from the prompt total, so the usage
+  summary has to carry an inclusive `input_tokens`. `totalInputTokens()` in
+  `integrations/anthropicUsage.ts` is where that sum lives, for this integration
+  and for the Claude Agent SDK OTel tracer; it mirrors the Python
+  `total_input_tokens()`.
+- Only the summary is normalized. The provider's own `usage` object stays
+  untouched, so the response the caller receives keeps Anthropic's own numbers.
+- Streaming `message_delta` usage is cumulative, and every field except
+  `output_tokens` is nullable. Skip the null ones, as the vendor's own client
+  does, and overwrite rather than add — a delta carries the running total, not
+  an increment.
 
 ### TypeScript custom type round trip
 

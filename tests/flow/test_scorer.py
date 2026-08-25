@@ -108,3 +108,117 @@ def test_auto_summarize_mixed_basemodel_and_weave_dict():
     result = auto_summarize(data)
     assert result["correct"] == {"true_count": 2, "true_fraction": 2 / 3}
     assert abs(result["confidence"]["mean"] - (0.9 + 0.4 + 0.7) / 3) < 1e-9
+
+
+# A row whose model or scorer raised is recorded as an empty dict.
+
+
+class _Passed(BaseModel):
+    passed: bool
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (
+            [{"correct": True}, {"correct": True}, {}, {}],
+            {"correct": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        (
+            [_Passed(passed=True), _Passed(passed=True), {}, {}],
+            {"passed": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        (
+            [{}, {}, _Passed(passed=True), _Passed(passed=True)],
+            {"passed": {"true_count": 2, "true_fraction": 0.5}},
+        ),
+        ([True, True, {}, {}], {"true_count": 2, "true_fraction": 0.5}),
+        ([{}, {}, True, True], {"true_count": 2, "true_fraction": 0.5}),
+        (
+            [{"a": {"b": True}}, {}],
+            {"a": {"b": {"true_count": 1, "true_fraction": 0.5}}},
+        ),
+    ],
+    ids=[
+        "dict",
+        "basemodel-last",
+        "basemodel-first",
+        "bool-last",
+        "bool-first",
+        "nested",
+    ],
+)
+def test_auto_summarize_counts_unscored_rows(data, expected):
+    """An unscored row stays in the denominator and never picks the branch, at any position."""
+    assert auto_summarize(data) == expected
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ([1.0, 1.0, {}, {}], {"mean": 1.0}),
+        ([{}, {}, 1.0, 1.0], {"mean": 1.0}),
+        ([{"distance": 2.0}, {}, {}], {"distance": {"mean": 2.0}}),
+        ([{"distance": 1.0}, {"distance": None}, {}, {}], {"distance": {"mean": 1.0}}),
+    ],
+    ids=["bare-last", "bare-first", "nested", "nested-none-leaf"],
+)
+def test_auto_summarize_numeric_scores_with_unscored_rows(data, expected):
+    """A numeric column with unscored rows averages the scored values instead of raising."""
+    assert auto_summarize(data) == expected
+
+
+@pytest.mark.trace_server
+def test_auto_summarize_keeps_nested_empty_dicts():
+    """Only a top-level empty dict is an unscored row; a nested one is a real value."""
+    data = [
+        {"metadata": {"usage": {}}},
+        {"metadata": {"usage": {"input_tokens": 10, "ok": True}}},
+    ]
+    assert auto_summarize(data) == {
+        "metadata": {
+            "usage": {
+                "input_tokens": {"mean": 10.0},
+                "ok": {"true_count": 1, "true_fraction": 1.0},
+            }
+        }
+    }
+
+
+@pytest.mark.trace_server
+def test_auto_summarize_separates_unscored_rows_from_nested_empty_dicts():
+    """One column, both kinds of empty dict: only the top-level one moves a denominator."""
+    data = [
+        {"usage": {}, "ok": True},
+        {"usage": {"tokens": 10}, "ok": True},
+        {},
+    ]
+    assert auto_summarize(data) == {
+        "usage": {"tokens": {"mean": 10.0}},
+        "ok": {"true_count": 2, "true_fraction": 2 / 3},
+    }
+
+
+@pytest.mark.trace_server
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ([0.0, 1.0], {"mean": 0.5}),
+        (
+            [{"correct": True}, {"correct": None}],
+            {"correct": {"true_count": 1, "true_fraction": 1.0}},
+        ),
+        ([{}, {}], None),
+        ([None, None], None),
+        ([], {}),
+    ],
+    ids=["falsy-number", "none-leaf", "all-unscored", "all-none", "empty"],
+)
+def test_auto_summarize_results_unchanged(data, expected):
+    """Values the current implementation already returns; the unscored count must not move them.
+
+    A falsy number and a None leaf are real values, not unscored rows.
+    """
+    assert auto_summarize(data) == expected

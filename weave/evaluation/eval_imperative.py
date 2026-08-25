@@ -28,7 +28,7 @@ from weave.evaluation.eval import (
 from weave.evaluation.eval_meta import EVAL_META_KEY
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
-from weave.flow.scorer import auto_summarize as auto_summarize_fn
+from weave.flow.scorer import _auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.object.obj import Object
 from weave.shared.digest import compute_row_digest
@@ -1132,7 +1132,9 @@ class EvaluationLogger:
             data_to_summarize = [
                 pred._captured_scores for pred in self._accumulated_predictions
             ]
-            summary_data = auto_summarize_fn(data_to_summarize)
+            # Here an empty dict means no score was logged, not that scoring failed:
+            # a failed score is logged as None.
+            summary_data = auto_summarize_fn(data_to_summarize, unscored=0)
         else:
             summary_data = summary
 
