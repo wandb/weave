@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from typing_extensions import Required, TypedDict
 
-from .._types import FileTypes
-
-__all__ = ["FileCreateParams"]
+__all__ = ["TraceChatParams"]
 
 
-class FileCreateParams(TypedDict, total=False):
-    file: Required[FileTypes]
-
+class TraceChatParams(TypedDict, total=False):
     project_id: Required[str]
 
-    expected_digest: Optional[str]
+    trace_id: Required[str]
+
+    include_feedback: bool

@@ -1,15 +1,14 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from datetime import datetime
-from typing_extensions import TypeAlias
 
 from .._models import BaseModel
 
-__all__ = ["V2EvaluationRunListResponse", "V2EvaluationRunListResponseItem"]
+__all__ = ["V2EvaluationRunListResponse"]
 
 
-class V2EvaluationRunListResponseItem(BaseModel):
+class V2EvaluationRunListResponse(BaseModel):
     evaluation: str
     """Reference to the evaluation (weave:// URI)"""
 
@@ -33,6 +32,3 @@ class V2EvaluationRunListResponseItem(BaseModel):
 
     summary: Optional[Dict[str, object]] = None
     """Summary data for the evaluation run"""
-
-
-V2EvaluationRunListResponse: TypeAlias = List[V2EvaluationRunListResponseItem]
