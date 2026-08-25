@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope, KeyValue
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
 from opentelemetry.proto.trace.v1.trace_pb2 import ResourceSpans, ScopeSpans
@@ -17,7 +18,9 @@ from opentelemetry.proto.trace.v1.trace_pb2 import Span as PbSpan
 
 from tests.trace_server.helpers import make_project_id
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.agents import ingest_sampling
 from weave.trace_server.agents.types import AgentSpansQueryReq, GenAIOTelExportReq
+from weave.trace_server.opentelemetry.python_spans import Span
 from weave.trace_server.sensitive_data.policy import SensitiveDataPolicy
 
 _NOW_NS = 1_767_225_600_000_000_000
@@ -147,6 +150,46 @@ def test_pii_policy_redacts_stored_span_details(ch_server) -> None:
         == '[{"name": "lookup", "description": "for <CREDIT_CARD>"}]'
     )
     assert row.compaction_summary == "card <CREDIT_CARD>"
+
+
+def test_pii_policy_redacts_before_ingest_sampling(
+    ch_server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WEAVE_INGEST_SAMPLE_RATE", "0.0")
+    observed_redacted_span = False
+    original_decide_spans = ingest_sampling.decide_spans
+
+    def inspect_sampled_spans(
+        config: ingest_sampling.SamplingConfig,
+        spans: list[Span],
+        byte_sizes: list[int],
+    ) -> list[ingest_sampling.SpanDecision]:
+        nonlocal observed_redacted_span
+        observed_redacted_span = True
+        assert spans[0].attributes["gen_ai"]["prompt"] == "Email <EMAIL_ADDRESS>"
+        assert spans[0].resource is not None
+        assert spans[0].resource.attributes == {
+            "service": {"owner": "call <PHONE_NUMBER>"}
+        }
+        assert spans[0].status.message == "card <CREDIT_CARD>"
+        return original_decide_spans(config, spans, byte_sizes)
+
+    monkeypatch.setattr(ingest_sampling, "decide_spans", inspect_sampled_spans)
+
+    project_id = make_project_id("span_pii_before_sampling")
+    res = ch_server.genai_otel_export(
+        _export_req(
+            project_id,
+            _pii_proto_span(b"\x43" * 8),
+            SensitiveDataPolicy.PII_V1,
+        )
+    )
+
+    assert observed_redacted_span
+    assert res.accepted_spans == 1
+    assert res.rejected_spans == 0
+    stored = ch_server.agent_spans_query(AgentSpansQueryReq(project_id=project_id))
+    assert stored.spans == []
 
 
 def test_off_policy_stores_span_values_unchanged(ch_server) -> None:

@@ -837,13 +837,13 @@ class AgentWriteHandler:
         The `messages` search table is populated by a ClickHouse
         materialized view off the spans table (migration 030).
 
-        When ingest sampling is enabled (rate < 1.0), spans are parsed first
-        and whole traces are kept or dropped *before* the expensive
-        blob-strip/extraction steps run, so dropped traces never write
-        Content files. Dropped spans are neither stored nor returned (they
-        never reach the scoring Kafka emit) but still count as accepted —
-        the client sees an ordinary success. See agents/ingest_sampling.py
-        (WB-36877).
+        Every parsed span is redacted before ingest sampling or any storage
+        preparation. When ingest sampling is enabled (rate < 1.0), whole
+        traces are then kept or dropped *before* the expensive
+        blob-strip/extraction steps run, so dropped traces never write Content
+        files. Dropped spans are neither stored nor returned (they never reach
+        the scoring Kafka emit) but still count as accepted — the client sees
+        an ordinary success. See agents/ingest_sampling.py (WB-36877).
         """
         span_rows: list[AgentSpanCHInsertable] = []
         accepted = 0
@@ -857,7 +857,7 @@ class AgentWriteHandler:
         def parse_span(protobuf_span: Any, resource: Resource) -> Span | None:
             nonlocal rejected
             try:
-                return Span.from_proto(protobuf_span, resource)
+                span = Span.from_proto(protobuf_span, resource)
             except AttributePathConflictError as e:
                 _record_ingest_failure(
                     failure_counts,
@@ -867,11 +867,13 @@ class AgentWriteHandler:
                 rejected += 1
                 errors.append(str(e))
                 return None
+            # Outside the parse-error handler: a detector failure rejects the
+            # whole request before sampling or any storage preparation.
+            redact_pii_from_span(span, req.sensitive_data_policy)
+            return span
 
         def extract_row(span: Span, run_id: str | None) -> AgentSpanCHInsertable | None:
             nonlocal accepted, rejected
-            # Outside the try: a scan failure rejects the whole request before any insert.
-            redact_pii_from_span(span, req.sensitive_data_policy)
             try:
                 # Before the blob strip: that step can move a value into file
                 # storage.
@@ -924,7 +926,7 @@ class AgentWriteHandler:
                         if row is not None:
                             span_rows.append(row)
         else:
-            # Pass 1 (cheap): parse everything, then decide keep/drop per
+            # Pass 1: parse and redact everything, then decide keep/drop per
             # trace before any blob-strip/extraction work happens.
             parsed: list[tuple[Span, str | None]] = []
             byte_sizes: list[int] = []
