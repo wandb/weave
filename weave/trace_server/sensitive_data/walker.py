@@ -66,8 +66,17 @@ def _is_json_candidate(value: str) -> bool:
 
 
 def _redact_json_string(value: str) -> str:
+    saw_duplicate_key = False
+
+    def _build_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        nonlocal saw_duplicate_key
+        mapping = dict(pairs)
+        if len(mapping) != len(pairs):
+            saw_duplicate_key = True
+        return mapping
+
     try:
-        parsed = json.loads(value)
+        parsed = json.loads(value, object_pairs_hook=_build_object)
     except ValueError:
         return redact_pii_string(value)
     except RecursionError as error:
@@ -75,7 +84,8 @@ def _redact_json_string(value: str) -> str:
     if not isinstance(parsed, (dict, list, str)):
         return redact_pii_string(value)
     redacted = redact_pii_value(parsed)
-    if redacted is parsed:
+    # A duplicate key shadows a value the walk never saw; reserialize to drop it.
+    if redacted is parsed and not saw_duplicate_key:
         return value
     return json.dumps(redacted, separators=(",", ":"))
 

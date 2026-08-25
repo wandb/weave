@@ -164,6 +164,13 @@ def test_walker_redacts_json_escaped_values_without_scanning_keys() -> None:
     )
 
 
+def test_walker_drops_shadowed_duplicate_json_keys() -> None:
+    assert redact_pii_value('{"x":"ada@example.com","x":"safe"}') == '{"x":"safe"}'
+    assert redact_pii_value(
+        '{"nested":[{"x":"ada@example.com","x":"safe"}],"count":1}'
+    ) == ('{"nested":[{"x":"safe"}],"count":1}')
+
+
 def test_walker_does_not_rewrite_string_enum_discriminators() -> None:
     assert (
         redact_pii_value(_StructuralLabel.EMAIL_SHAPED) is _StructuralLabel.EMAIL_SHAPED
