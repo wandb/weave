@@ -95,12 +95,16 @@ trace_server = [
   "litellm>=1.36.1,<1.82.7",
   # OTEL trace support
   "opentelemetry-proto>=1.28.0",
-  "opentelemetry-semantic-conventions-ai>=0.4.3",
-  "openinference-semantic-conventions>=0.1.17",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
   # Redis for optional task tracking and caching
   "redis>=5.0.0",
+  "clickhouse_connect>=1.6,<1.7",
+  "sqlparse>=0.5.0,<0.6",
+  "confluent-kafka>=2.9.0",
+  "openai>=1.99.9",
+  "requests>=2.32.0",
+  "urllib3>=2.0.0",
 ]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
@@ -434,27 +438,11 @@ dev = [
   "ty>=0.0.2",
   "import-linter>=2.0",
 ]
-trace_server = [
-  # Same dependencies as the trace_server optional dependency, but as a dependency group for tests
-  # BYOB - S3
-  "boto3>=1.34.0",
-  # BYOB - Azure
-  "azure-identity>=1.25.0,<2.0.0",
-  "azure-storage-blob>=12.24.0,<12.26.0",
-  # BYOB - GCP
-  "google-cloud-storage>=2.7.0",
-  # LLM Support
-  "litellm>=1.36.1,<1.82.7",
-  # OTEL trace support
-  "opentelemetry-proto>=1.12.0",
-  "opentelemetry-semantic-conventions-ai>=0.4.3",
-  "openinference-semantic-conventions>=0.1.17",
-  # For emoji shortcode support in Feedback
-  "emoji>=2.12.1",
-]
 trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
+  "opentelemetry-semantic-conventions-ai>=0.4.3",
+  "openinference-semantic-conventions>=0.1.17",
 ]
 autogen_tests = [
   "autogen-agentchat>=0.5.7; python_version >= '3.10'",
@@ -476,10 +464,7 @@ test = [
   "pytest-rerunfailures>=14.0",
   "pytest-timeout>=2.3.1",
   "pytest-shard==0.1.2",
-  # todo(nkumar): these are trace-server deps not test. however moving them breaks integration tests.
-  "clickhouse_connect>=1.6,<1.7",
   "fastapi>=0.110.0",
-  "sqlparse==0.5.0",
   "rich",
 
   # Integration Tests
