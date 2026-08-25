@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import functools
 import json
+import logging
 import os
 import threading
 import time
@@ -17,13 +18,16 @@ import httpx
 from weave.compat.wandb.wandb_thin.errors import AuthenticationError
 from weave.trace import env
 
-IDENTITY_TOKEN_FILE_ENV = "WANDB_IDENTITY_TOKEN_FILE"
+logger = logging.getLogger(__name__)
+
 CREDENTIALS_FILE_ENV = "WANDB_CREDENTIALS_FILE"
 DEFAULT_CREDENTIALS_FILE = Path("~/.config/wandb/credentials.json").expanduser()
+EXPIRES_AT_FORMAT = "%Y-%m-%d %H:%M:%S"
+IDENTITY_TOKEN_FILE_ENV = "WANDB_IDENTITY_TOKEN_FILE"
+TOKEN_EXCHANGE_FAILURE_COOLDOWN_SECONDS = 30
 TOKEN_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 TOKEN_REFRESH_SKEW = timedelta(minutes=5)
-TOKEN_EXCHANGE_FAILURE_COOLDOWN_SECONDS = 30
-EXPIRES_AT_FORMAT = "%Y-%m-%d %H:%M:%S"
+WANDB_API_BASIC_USERNAME = "api"
 
 
 class WandbCredentials(ABC):
@@ -48,7 +52,9 @@ class ApiKeyCredentials(WandbCredentials):
         self.api_key = api_key
 
     def authorization_header(self) -> str:
-        encoded = base64.b64encode(f"api:{self.api_key}".encode()).decode()
+        encoded = base64.b64encode(
+            f"{WANDB_API_BASIC_USERNAME}:{self.api_key}".encode()
+        ).decode()
         return f"Basic {encoded}"
 
     def bearer_token(self) -> str:
@@ -69,6 +75,8 @@ class IdentityTokenCredentials(WandbCredentials):
         self.token_file = token_file
         self.credentials_file = credentials_file
         self._lock = threading.Lock()
+        self._cached_access_token: tuple[str, datetime] | None = None
+        self._credentials_write_warning_emitted = False
         self._exchange_failure: tuple[float, str] | None = None
 
     def authorization_header(self) -> str:
@@ -99,10 +107,26 @@ class IdentityTokenCredentials(WandbCredentials):
                 )
                 raise
             self._exchange_failure = None
-            self._write_cached_token(token, expires_at)
+            self._cached_access_token = (token, expires_at)
+            try:
+                self._write_cached_token(token, expires_at)
+            except OSError:
+                if not self._credentials_write_warning_emitted:
+                    logger.warning(
+                        "Unable to persist W&B access token to %s; "
+                        "using in-process caching",
+                        self.credentials_file,
+                    )
+                    self._credentials_write_warning_emitted = True
             return token
 
     def _read_cached_token(self) -> str | None:
+        if self._cached_access_token is not None:
+            token, expires_at = self._cached_access_token
+            if expires_at - TOKEN_REFRESH_SKEW > datetime.now(timezone.utc):
+                return token
+            self._cached_access_token = None
+
         try:
             data = json.loads(self.credentials_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError, OSError):
@@ -128,6 +152,7 @@ class IdentityTokenCredentials(WandbCredentials):
             return None
         if expires_at - TOKEN_REFRESH_SKEW <= datetime.now(timezone.utc):
             return None
+        self._cached_access_token = (token, expires_at)
         return token
 
     def _exchange_token(self) -> tuple[str, datetime]:

@@ -68,6 +68,46 @@ def test_identity_credentials_exchange_once_and_reuse_cache(
         assert credentials_file.stat().st_mode & 0o777 == 0o600
 
 
+def test_identity_credentials_fall_back_to_memory_when_cache_is_read_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    token_file = tmp_path / "identity.jwt"
+    token_file.write_text("identity-token", encoding="utf-8")
+    request = httpx.Request("POST", "https://api.wandb.test/oidc/token")
+    exchange_count = 0
+
+    def post(*args, **kwargs) -> httpx.Response:
+        nonlocal exchange_count
+        exchange_count += 1
+        return httpx.Response(
+            200,
+            json={"access_token": "access-token", "expires_in": 3600},
+            request=request,
+        )
+
+    def fail_write(*args) -> None:
+        raise OSError("read-only filesystem")
+
+    credentials = auth.IdentityTokenCredentials(
+        "https://api.wandb.test",
+        token_file,
+        tmp_path / "credentials.json",
+    )
+    monkeypatch.setattr(auth.httpx, "post", post)
+    monkeypatch.setattr(credentials, "_write_cached_token", fail_write)
+    caplog.set_level("WARNING", logger=auth.__name__)
+
+    assert credentials.access_token() == "access-token"
+    assert credentials.access_token() == "access-token"
+    assert exchange_count == 1
+    assert [record.message for record in caplog.records] == [
+        f"Unable to persist W&B access token to {credentials.credentials_file}; "
+        "using in-process caching"
+    ]
+
+
 def test_identity_credentials_refresh_expiring_token(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

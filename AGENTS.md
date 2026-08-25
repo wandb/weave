@@ -99,6 +99,8 @@ The Python SDK resolves either an API key or a federated identity token through
 `WANDB_CREDENTIALS_FILE`, and applies Bearer auth to every W&B and Weave
 transport. Failed token exchanges are cached in-process for 30 seconds to
 prevent request traffic from repeatedly calling an unavailable token endpoint.
+If the credentials file is not writable, the exchanged token remains cached
+in-process and credential persistence emits one warning per credentials object.
 
 ## Generated Files — Do Not Hand-Edit
 
