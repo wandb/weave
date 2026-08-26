@@ -155,13 +155,9 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
     async def ach_client(self) -> AsyncClient:
         """The aiohttp-backed ClickHouse client for the running loop.
 
-        One client serves every coroutine on a loop: aiohttp multiplexes over
-        its own connector pool, so there is no thread-local equivalent to mint
-        here. It is keyed by loop because an aiohttp session is bound to the
-        loop that created it; a server outliving its loop (tests, repeated
-        `asyncio.run`) would otherwise reuse a session tied to a closed one.
-        The superseded session is dropped rather than closed: its loop is gone,
-        so there is nothing left to await on.
+        Keyed by loop because an aiohttp session is bound to the loop that
+        created it. A superseded session is dropped rather than closed: its
+        loop is gone, so there is nothing left to await on.
         """
         loop = asyncio.get_running_loop()
         if self._ach_loop is not loop:
@@ -175,11 +171,7 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
         return self._ach
 
     async def _amint_client(self) -> AsyncClient:
-        """Mirror `_mint_client`'s connection options on the async driver.
-
-        `autogenerate_session_id` already defaults to False on the async client;
-        it is passed anyway so the two mint paths read the same.
-        """
+        """Mirror `_mint_client`'s connection options on the async driver."""
         client = await clickhouse_connect.get_async_client(
             host=self._host,
             port=self._port,
