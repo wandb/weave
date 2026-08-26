@@ -391,6 +391,20 @@ _CALLS_COMPLETE_SENTINEL_COLUMNS: list[tuple[int, str]] = [
 ]
 
 
+def calls_stats_res(raw_res: QueryResult, columns: list[str]) -> tsi.CallsQueryStatsRes:
+    """Stats row -> response, shared by the sync and async paths."""
+    res_dict = (
+        dict(zip(columns, raw_res.result_rows[0], strict=False))
+        if raw_res.result_rows
+        else {}
+    )
+    return tsi.CallsQueryStatsRes(
+        count=res_dict.get("count", 0),
+        has_more=bool(res_dict.get("has_more", 0)),
+        total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
+    )
+
+
 class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
@@ -1542,17 +1556,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         query, columns, settings = build_calls_stats_query(req, pb, read_table)
         raw_res = self._query(query, pb.get_params(), settings=settings or None)
 
-        res_dict = (
-            dict(zip(columns, raw_res.result_rows[0], strict=False))
-            if raw_res.result_rows
-            else {}
-        )
-
-        return tsi.CallsQueryStatsRes(
-            count=res_dict.get("count", 0),
-            has_more=bool(res_dict.get("has_more", 0)),
-            total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
-        )
+        return calls_stats_res(raw_res, columns)
 
     def _get_prices_for_models(
         self, models: set[str], project_id: str
@@ -1853,8 +1857,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     @traced_generator(name="clickhouse_trace_server_batched.calls_query_stream")
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        """Returns a stream of calls that match the given query."""
+    def _build_calls_query(
+        self, req: tsi.CallsQueryReq
+    ) -> tuple[CallsQuery, dict[str, Any] | None]:
+        """Everything `calls_query_stream` decides before it reads.
+
+        Split out so the native-async twin runs the identical query rather
+        than a second, drifting copy of the column and settings logic.
+        """
         read_table = self.table_routing_resolver.resolve_read_table(
             req.project_id, self.ch_client
         )
@@ -1952,6 +1962,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if read_table == ReadTable.CALLS_COMPLETE:
             settings = ch_settings.update_settings_for_calls_complete_read(settings)
 
+        return cq, settings
+
+    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        """Returns a stream of calls that match the given query."""
+        cq, settings = self._build_calls_query(req)
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params(), settings=settings)
 
