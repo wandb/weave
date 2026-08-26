@@ -31,7 +31,8 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
     assert clustering.model_dump() == {
         "config_schema_version": 1,
         "algorithm": "hdbscan",
-        "scope": "global",
+        "scope": "category",
+        "max_clusters": 100,
         "reduction": {
             "dimensions": 15,
             "neighbors": 15,
@@ -72,6 +73,11 @@ def test_clustering_config_is_typed_and_content_addressed(config_dir):
         raw.pop("untracked_parameter")
         raw["density"]["min_cluster_size"] = 1
     with pytest.raises(ValidationError, match="min_cluster_size"):
+        config.load_clustering_config()
+
+    with _edit_yaml(os.path.join(config_dir, "clustering.yaml")) as raw:
+        raw["max_clusters"] = 0
+    with pytest.raises(ValidationError, match="max_clusters"):
         config.load_clustering_config()
 
 
@@ -178,7 +184,8 @@ def test_the_clustering_recipe_is_a_separate_digest_from_the_signature_configs()
 
     assert digest not in {_digest("intent"), _digest("failure")}
     assert clustering.algorithm == "hdbscan"
-    assert clustering.scope == "global"
+    assert clustering.scope == "category"
+    assert clustering.max_clusters == 100
     # The reduced space is what gets clustered; the projection is drawn. Separate knobs,
     # because reading the projection's neighbor count as the partition's is a real mistake.
     assert clustering.reduction.dimensions == 15
