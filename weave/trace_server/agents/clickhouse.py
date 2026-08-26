@@ -7,9 +7,10 @@ handling) and hydrates result rows into agent schemas.
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast
 
@@ -144,6 +145,7 @@ logger = logging.getLogger(__name__)
 QueryParams: TypeAlias = dict[str, Any]
 ClickHouseRow: TypeAlias = dict[str, Any]
 QueryFn = Callable[[str, QueryParams], "QueryResult"]
+AsyncQueryFn = Callable[[str, QueryParams], "Awaitable[QueryResult]"]
 
 #: Signature of the server's `feedback_query` method.
 FeedbackQueryFn = Callable[[FeedbackQueryReq], FeedbackQueryRes]
@@ -163,6 +165,51 @@ class _SpanGroupDistKey(NamedTuple):
 
     group_key: str
     alias: str
+
+
+def ungrouped_spans_res(total: int, rows: list[ClickHouseRow]) -> AgentSpansQueryRes:
+    """Rows -> response for a spans query with no `group_by`."""
+    return AgentSpansQueryRes(
+        spans=[AgentSpanSchema(**normalize_span_row(r)) for r in rows],
+        total_count=total,
+    )
+
+
+def search_res_from_rows(rows: list[ClickHouseRow]) -> AgentSearchRes:
+    """Matched message rows -> conversations, newest activity first."""
+    convs: dict[str, AgentSearchConversationResult] = {}
+    for r in rows:
+        cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
+        started_at = _datetime_or_min(r.get("started_at"))
+        if cid not in convs:
+            convs[cid] = AgentSearchConversationResult(
+                conversation_id=cid,
+                conversation_name=safe_str(r.get("conversation_name")),
+                agent_name=safe_str(r.get("agent_name")),
+                matched_messages=[],
+                last_activity=started_at,
+            )
+        convs[cid].matched_messages.append(
+            AgentSearchMatchedMessage(
+                span_id=safe_str(r.get("span_id")),
+                trace_id=safe_str(r.get("trace_id")),
+                role=safe_str(r.get("role")),
+                content_preview=safe_str(r.get("content")),
+                content_digest=safe_str(r.get("content_digest")),
+                started_at=started_at,
+            )
+        )
+        # Track the most recent match across all rows for this
+        # conversation so the sidebar sort order is stable regardless
+        # of row arrival order.
+        convs[cid].last_activity = max(convs[cid].last_activity, started_at)
+
+    results = sorted(
+        convs.values(),
+        key=lambda c: c.last_activity,
+        reverse=True,
+    )
+    return AgentSearchRes(results=results, total_conversations=len(results))
 
 
 @dataclass(frozen=True)
@@ -196,8 +243,7 @@ class AgentQueryHandler:
         )
 
         if not req.group_by:
-            spans = [AgentSpanSchema(**normalize_span_row(r)) for r in rows]
-            return AgentSpansQueryRes(spans=spans, total_count=total)
+            return ungrouped_spans_res(total, rows)
 
         aliases = [group_by_ref_alias(ref) for ref in req.group_by]
         measure_aliases = [measure.alias for measure in req.measures]
@@ -611,41 +657,7 @@ class AgentQueryHandler:
 
     def search_messages(self, req: AgentSearchReq) -> AgentSearchRes:
         """Full-text search across message content."""
-        rows = self._run_message_search_query(req)
-
-        convs: dict[str, AgentSearchConversationResult] = {}
-        for r in rows:
-            cid = safe_str(r.get("conversation_id")) or NO_CONVERSATION_LABEL
-            started_at = _datetime_or_min(r.get("started_at"))
-            if cid not in convs:
-                convs[cid] = AgentSearchConversationResult(
-                    conversation_id=cid,
-                    conversation_name=safe_str(r.get("conversation_name")),
-                    agent_name=safe_str(r.get("agent_name")),
-                    matched_messages=[],
-                    last_activity=started_at,
-                )
-            convs[cid].matched_messages.append(
-                AgentSearchMatchedMessage(
-                    span_id=safe_str(r.get("span_id")),
-                    trace_id=safe_str(r.get("trace_id")),
-                    role=safe_str(r.get("role")),
-                    content_preview=safe_str(r.get("content")),
-                    content_digest=safe_str(r.get("content_digest")),
-                    started_at=started_at,
-                )
-            )
-            # Track the most recent match across all rows for this
-            # conversation so the sidebar sort order is stable regardless
-            # of row arrival order.
-            convs[cid].last_activity = max(convs[cid].last_activity, started_at)
-
-        results = sorted(
-            convs.values(),
-            key=lambda c: c.last_activity,
-            reverse=True,
-        )
-        return AgentSearchRes(results=results, total_conversations=len(results))
+        return search_res_from_rows(self._run_message_search_query(req))
 
     # ------------------------------------------------------------------
     # Internal: spans-for-one-trace with chat projection
@@ -794,6 +806,35 @@ class AgentQueryHandler:
         total = _first_cell_int(self._query(count_sql, params))
         rows = _rows_as_dicts(self._query(list_sql, params))
         return total, rows
+
+    async def arun_paginated(
+        self,
+        count_builder: Callable[[ParamBuilder, PaginatedReqT], str],
+        list_builder: Callable[[ParamBuilder, PaginatedReqT], str],
+        req: PaginatedReqT,
+        aquery: AsyncQueryFn,
+    ) -> tuple[int, list[ClickHouseRow]]:
+        """`_run_paginated` over an awaitable query function.
+
+        The SQL is built by the same builders; only the two round trips differ,
+        and they are issued together because neither depends on the other.
+        """
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        count_sql = count_builder(pb, req)
+        list_sql = list_builder(pb, req)
+        params = pb.get_params()
+        count_res, list_res = await asyncio.gather(
+            aquery(count_sql, params), aquery(list_sql, params)
+        )
+        return _first_cell_int(count_res), _rows_as_dicts(list_res)
+
+    async def arun_message_search_query(
+        self, req: AgentSearchReq, aquery: AsyncQueryFn
+    ) -> list[ClickHouseRow]:
+        """`_run_message_search_query` over an awaitable query function."""
+        pb = ParamBuilder(PARAM_NAMESPACE)
+        sql = make_message_search_query(pb, req)
+        return _rows_as_dicts(await aquery(sql, pb.get_params()))
 
     def _run_message_search_query(self, req: AgentSearchReq) -> list[ClickHouseRow]:
         """Build and run the message search SQL, returning rows as dicts."""
