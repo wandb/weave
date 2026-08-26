@@ -1,0 +1,24 @@
+{
+  "minimum_server_version": "0.81.0",
+  "minimum_trace_server_version": "0.1.0",
+  "server_image": "wandb/weave-trace@sha256:4e5e6eee23bf3b6ead02dba12b167e8f6db28365d8ef42b93983b6402402364b",
+  "server_weave_commit": "b7773bee4f8f9ee537ecd2f6632e20e4c270f22e",
+  "support_window_days": 90,
+  "feedback_create_batch": {
+    "path": "/feedback/batch/create",
+    "request_fields": [
+      "annotation_ref",
+      "call_ref",
+      "creator",
+      "feedback_type",
+      "id",
+      "payload",
+      "project_id",
+      "queue_id",
+      "runnable_ref",
+      "trigger_ref",
+      "wb_user_id",
+      "weave_ref"
+    ]
+  }
+}

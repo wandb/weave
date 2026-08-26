@@ -64,6 +64,16 @@ enough to validate the Core Metadata version emitted by current Hatchling; for
 example, Hatchling 1.32 emits Metadata 2.5, which requires the action's Twine 7
 and Packaging 26 stack rather than Twine 6.1 and Packaging 25.
 
+### Client-server compatibility
+
+- `client_server_compatibility.json` is the source of truth for the minimum
+  supported W&B server release, trace protocol, immutable image, and contract
+  snapshot exercised by client CI.
+- Advancing the minimum server requires an explicit pull request that updates
+  the compatibility contract and `MIN_TRACE_SERVER_VERSION` together.
+- Python and TypeScript client releases must pass
+  `.github/workflows/client-server-compatibility.yaml` before publication.
+
 ### Codex Development (nox)
 
 - Your machine should be setup for you automatically via `bin/codex_setup.sh`

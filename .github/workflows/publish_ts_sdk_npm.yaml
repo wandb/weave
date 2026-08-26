@@ -16,8 +16,12 @@ on:
         default: latest
 
 jobs:
+  minimum-server-compatibility:
+    uses: ./.github/workflows/client-server-compatibility.yaml
+
   publish-typescript-sdk:
     name: Publish TypeScript SDK to npm
+    needs: [minimum-server-compatibility]
     runs-on: ubuntu-8core
     timeout-minutes: 15
     environment:

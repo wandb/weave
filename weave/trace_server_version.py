@@ -29,4 +29,6 @@
 #
 # Use semantic versioning: "MAJOR.MINOR.PATCH" (e.g., "0.1.0", "1.0.0")
 # =============================================================================
-MIN_TRACE_SERVER_VERSION: str | None = None
+# GA W&B server release exercised by client release and nightly compatibility tests.
+MIN_SUPPORTED_SERVER_VERSION = "0.81.0"
+MIN_TRACE_SERVER_VERSION: str | None = "0.1.0"
