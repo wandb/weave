@@ -120,6 +120,7 @@ from weave.trace_server.calls_query_builder.usage_query_builder import (
     build_usage_query,
 )
 from weave.trace_server.ch_sentinel_values import SENTINEL_EPOCH
+from weave.trace_server.clickhouse import operations as ch_ops
 from weave.trace_server.clickhouse.schema_converters import (
     ch_call_dict_to_call_schema_dict,
     ch_call_to_row,
@@ -135,18 +136,15 @@ from weave.trace_server.clickhouse.schema_converters import (
 )
 from weave.trace_server.clickhouse.utilities import (
     any_value_to_dump,
-    convert_to_insert_too_large,
     datetime_to_microseconds,
     dict_value_to_dump,
     ensure_datetimes_have_tz,
     ensure_datetimes_have_tz_strict,
     find_call_descendants,
-    log_and_raise_insert_error,
     maybe_enqueue_minimal_call_end,
     num_bytes,
     process_parameters,
     record_query_id,
-    sanitize_invalid_utf8_surrogates,
     set_correlation_id,
     started_at_gte_query,
     string_to_int_in_range,
@@ -179,7 +177,6 @@ from weave.trace_server.constants import (
 )
 from weave.trace_server.custom_runtime import apply_custom_runtime
 from weave.trace_server.datadog import (
-    record_db_insert,
     set_current_span_dd_tags,
     set_root_span_dd_tags,
     tag_db_insert_path,
@@ -7707,48 +7704,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, int | str] | None = None,
     ) -> QueryResult:
         """Directly queries the database and returns the result."""
-        merged = ch_settings.merge_default_query_settings(settings)
-        correlation_id = set_correlation_id(merged)
-
-        parameters = process_parameters(parameters)
-        start = time.monotonic()
-        try:
-            res = self.ch_client.query(
-                query,
-                parameters=parameters,
-                column_formats=column_formats,
-                use_none=True,
-                settings=merged,
-            )
-        except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_query_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "query": query,
-                    "parameters": parameters,
-                    "correlation_id": correlation_id,
-                },
-            )
-            # always raises, optionally with custom error class
-            handle_clickhouse_query_error(e)
-            return None
-
-        duration_ms = round((time.monotonic() - start) * 1000, 1)
-        logger.info(
-            "clickhouse_query",
-            extra={
-                "trace_duration_ms": duration_ms,
-                "query": query,
-                "parameters": parameters,
-                "summary": res.summary,
-                "query_id": record_query_id(res),
-                "correlation_id": correlation_id,
-            },
+        return ch_ops.run_sync(
+            ch_ops.query_sequence(query, parameters, column_formats, settings),
+            self._execute_sync,
         )
-        return res
 
     @traced(name="clickhouse_trace_server_batched._command")
     def _command(
@@ -7764,46 +7723,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             parameters: Optional dictionary of query parameters.
             settings: Optional dictionary of ClickHouse settings (overrides defaults).
         """
-        merged = ch_settings.merge_default_command_settings(settings)
-        correlation_id = set_correlation_id(merged)
-
-        processed_params = process_parameters(parameters) if parameters else None
-        start = time.monotonic()
-        try:
-            result = self.ch_client.command(
-                command,
-                parameters=processed_params,
-                settings=merged,
-            )
-        except Exception as e:
-            duration_ms = round((time.monotonic() - start) * 1000, 1)
-            logger.exception(
-                "clickhouse_command_error",
-                extra={
-                    "trace_duration_ms": duration_ms,
-                    "error_str": str(e),
-                    "command": command,
-                    "parameters": processed_params,
-                    "correlation_id": correlation_id,
-                },
-            )
-            handle_clickhouse_query_error(e)
-            return
-
-        duration_ms = round((time.monotonic() - start) * 1000, 1)
-        # command() also returns scalars, which carry no query_id.
-        query_id = record_query_id(result) if isinstance(result, QuerySummary) else None
-        logger.info(
-            "clickhouse_command",
-            extra={
-                "trace_duration_ms": duration_ms,
-                "command": command,
-                "parameters": processed_params,
-                "query_id": query_id,
-                "correlation_id": correlation_id,
-            },
+        return ch_ops.run_sync(
+            ch_ops.command_sequence(command, parameters, settings),
+            self._execute_sync,
         )
-        return
 
     @traced(name="clickhouse_trace_server_batched._insert")
     def _insert(
@@ -7814,77 +7737,44 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         settings: dict[str, Any] | None = None,
         do_sync_insert: bool = False,  # overrides _use_async_insert
     ) -> QuerySummary:
-        record_db_insert(table=table, count=len(data))
-        set_current_span_dd_tags(
-            {
-                "clickhouse_trace_server_batched._insert.table": table,
-            }
-        )
-        set_root_span_dd_tags(
-            {
-                "weave_trace_server.insert.table": table,
-                "weave_trace_server.insert.row_count": len(data),
-            }
+        return ch_ops.run_sync(
+            ch_ops.insert_sequence(
+                table,
+                data,
+                column_names,
+                settings,
+                do_sync_insert,
+                use_async_insert=self._use_async_insert,
+                use_replicated_tables=self._use_replicated_tables,
+            ),
+            self._execute_sync,
         )
 
-        async_insert = self._use_async_insert and not do_sync_insert
-        if async_insert:
-            settings = ch_settings.update_settings_for_async_insert(settings)
-            set_current_span_dd_tags(
-                {
-                    "clickhouse_trace_server_batched._insert.async_insert": True,
-                }
+    def _execute_sync(self, operation: ch_ops.Operation) -> Any:
+        """Perform one prepared ClickHouse operation on the blocking driver."""
+        client = self.ch_client
+        if isinstance(operation, ch_ops.QueryOp):
+            return client.query(
+                operation.query,
+                parameters=operation.parameters,
+                column_formats=operation.column_formats,
+                use_none=True,
+                settings=operation.settings,
             )
-
-        # Replicated/distributed engines block-dedup byte-identical inserts;
-        # a unique token opts out (non-replicated CH Cloud is unaffected).
-        if self._use_replicated_tables:
-            settings = {**(settings or {}), "insert_deduplication_token": generate_id()}
-
-        start = time.monotonic()
-        sanitized_invalid_utf8 = False
-        # At most two attempts: the original, plus one retry after sanitizing
-        # invalid client UTF-8.
-        settings = dict(settings or {})
-        # One correlation id covers both attempts: it is the same logical write.
-        correlation_id = set_correlation_id(settings)
-        for _ in range(2):
-            try:
-                result = self.ch_client.insert(
-                    table, data=data, column_names=column_names, settings=settings
-                )
-
-            # Invalid client Unicode: sanitize the batch and retry once.
-            except UnicodeEncodeError as e:
-                if sanitized_invalid_utf8:
-                    log_and_raise_insert_error(e, table, data, correlation_id)
-                sanitized_invalid_utf8 = True
-                data = sanitize_invalid_utf8_surrogates(data)
-                continue
-
-            # InsertTooLarge: raise immediately, no retry
-            except ValueError as e:
-                converted = convert_to_insert_too_large(e)
-                log_and_raise_insert_error(converted, table, data, correlation_id)
-
-            # All other errors (including exhausted empty-query retries): no retry
-            except Exception as e:
-                log_and_raise_insert_error(e, table, data, correlation_id)
-
-            else:
-                duration_ms = round((time.monotonic() - start) * 1000, 1)
-                logger.info(
-                    "clickhouse_insert",
-                    extra={
-                        "trace_duration_ms": duration_ms,
-                        "table": table,
-                        "row_count": len(data),
-                        "async_insert": async_insert,
-                        "query_id": record_query_id(result),
-                        "correlation_id": correlation_id,
-                    },
-                )
-                return result
+        if isinstance(operation, ch_ops.CommandOp):
+            return client.command(
+                operation.command,
+                parameters=operation.parameters,
+                settings=operation.settings,
+            )
+        if isinstance(operation, ch_ops.InsertOp):
+            return client.insert(
+                operation.table,
+                data=operation.data,
+                column_names=operation.column_names,
+                settings=operation.settings,
+            )
+        raise TypeError(f"unknown ClickHouse operation: {type(operation).__name__}")
 
     def _async_insert_settings(self) -> dict[str, Any] | None:
         """Async insert settings when the server has async inserts enabled, else None."""
