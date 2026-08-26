@@ -122,9 +122,9 @@ class IdentityTokenCredentials(WandbCredentials):
 
     def _read_cached_token(self) -> str | None:
         if self._cached_access_token is not None:
-            token, expires_at = self._cached_access_token
+            cached_token, expires_at = self._cached_access_token
             if expires_at - TOKEN_REFRESH_SKEW > datetime.now(timezone.utc):
-                return token
+                return cached_token
             self._cached_access_token = None
 
         try:
