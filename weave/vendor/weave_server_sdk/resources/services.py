@@ -52,7 +52,7 @@ class ServicesResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> object:
-        """Read Root"""
+        """Read Root (stainless-sync smoke)"""
         return self._get(
             "/health",
             options=make_request_options(
@@ -145,7 +145,7 @@ class AsyncServicesResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> object:
-        """Read Root"""
+        """Read Root (stainless-sync smoke)"""
         return await self._get(
             "/health",
             options=make_request_options(
