@@ -24,8 +24,19 @@ from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.agents.clickhouse import AgentWriteHandler
+from weave.trace_server.agents.clickhouse import (
+    AgentQueryHandler,
+    AgentWriteHandler,
+    search_res_from_rows,
+    ungrouped_spans_res,
+)
 from weave.trace_server.agents.schema import AgentSpanCHInsertable
+from weave.trace_server.agents.types import (
+    AgentSearchReq,
+    AgentSearchRes,
+    AgentSpansQueryReq,
+    AgentSpansQueryRes,
+)
 from weave.trace_server.clickhouse import operations as ch_ops
 from weave.trace_server.clickhouse_trace_server_batched import (
     CLICKHOUSE_SECURE_PORT,
@@ -33,7 +44,12 @@ from weave.trace_server.clickhouse_trace_server_batched import (
     CompletionPrepResult,
 )
 from weave.trace_server.datadog import tag_db_insert_path
+from weave.trace_server.feedback import TABLE_FEEDBACK, format_feedback_to_res
 from weave.trace_server.llm_completion import lite_llm_acompletion
+from weave.trace_server.query_builder.agent_query_builder import (
+    make_spans_count_query,
+    make_spans_list_query,
+)
 from weave.trace_server.tracing import traced
 
 _T = TypeVar("_T")
@@ -234,6 +250,49 @@ class AsyncClickHouseTraceServer(ClickHouseTraceServer):
             ),
             self._execute_async,
         )
+
+    # -- Agent reads and writes over the native transport ----------------------
+
+    @traced(name="async_clickhouse_trace_server.aagent_spans_query")
+    async def aagent_spans_query(self, req: AgentSpansQueryReq) -> AgentSpansQueryRes:
+        """Native-async twin of `agent_spans_query`, for ungrouped queries.
+
+        Grouped queries hydrate with further reads and stay on
+        `agent_spans_query`.
+        """
+        if req.group_by:
+            raise ValueError(
+                "aagent_spans_query does not support group_by; use agent_spans_query"
+            )
+        handler = AgentQueryHandler(self._query, self.feedback_query)
+        total, rows = await handler.arun_paginated(
+            make_spans_count_query, make_spans_list_query, req, self._aquery
+        )
+        return ungrouped_spans_res(total, rows)
+
+    @traced(name="async_clickhouse_trace_server.aagent_search")
+    async def aagent_search(self, req: AgentSearchReq) -> AgentSearchRes:
+        """Native-async twin of `agent_search`."""
+        handler = AgentQueryHandler(self._query, self.feedback_query)
+        rows = await handler.arun_message_search_query(req, self._aquery)
+        return search_res_from_rows(rows)
+
+    @tag_db_insert_path("feedback_create")
+    async def afeedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tsi.FeedbackCreateRes:
+        """Native-async twin of `feedback_create`.
+
+        Keeps the sync-insert override: a caller is waiting on the write.
+        """
+        prepared, row = await asyncio.to_thread(self._prepare_feedback_create, req)
+        await self._ainsert(
+            TABLE_FEEDBACK.name,
+            prepared.data,
+            prepared.column_names,
+            do_sync_insert=True,
+        )
+        return format_feedback_to_res(row)
 
     async def _execute_async(self, operation: ch_ops.Operation) -> Any:
         """Perform one prepared ClickHouse operation on the aiohttp driver."""

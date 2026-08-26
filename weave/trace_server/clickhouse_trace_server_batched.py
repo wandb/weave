@@ -6800,13 +6800,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
     @tag_db_insert_path("feedback_create")
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req, self)
-        validate_feedback_agent_req_targets(req)
-
-        processed_payload = process_feedback_payload(req)
-        row = format_feedback_to_row(req, processed_payload)
-        prepared = TABLE_FEEDBACK.insert(row).prepare()
+        prepared, row = self._prepare_feedback_create(req)
         self._insert(
             TABLE_FEEDBACK.name,
             prepared.data,
@@ -6816,6 +6810,16 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         return format_feedback_to_res(row)
+
+    def _prepare_feedback_create(self, req: tsi.FeedbackCreateReq):
+        """Validate and format one feedback row, up to the insert."""
+        assert_non_null_wb_user_id(req)
+        validate_feedback_create_req(req, self)
+        validate_feedback_agent_req_targets(req)
+
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
+        return TABLE_FEEDBACK.insert(row).prepare(), row
 
     @traced(name="clickhouse_trace_server_batched.feedback_create_batch")
     @tag_db_insert_path("feedback_create_batch")
