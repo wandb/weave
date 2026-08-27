@@ -9,6 +9,7 @@ American phone numbers, formatted international phone numbers, compact
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from typing import Literal, NamedTuple
 
 PIIEntity = Literal["EMAIL_ADDRESS", "PHONE_NUMBER", "US_SSN", "CREDIT_CARD"]
@@ -76,57 +77,62 @@ class Detection(NamedTuple):
 
 def detect_pii(text: str) -> list[Detection]:
     """Return non-overlapping PII spans without retaining matched text."""
-    detections: list[Detection] = []
+    return list(_iter_detections(text))
 
-    if text.find("@") != -1:
-        for match in _EMAIL_RE.finditer(text):
-            candidate = match.group(0)
-            if _valid_email(candidate) and _absolute_token_boundaries(
-                text, match.start(), match.end()
-            ):
-                detections.append(
-                    Detection(match.start(), match.end(), "EMAIL_ADDRESS")
-                )
 
-    if _ASCII_DIGIT_RE.search(text) is not None:
-        # Only emails can overlap numerics, and both lists ascend by start.
-        email_count = len(detections)
-        email_index = 0
-        for run in _NUMERIC_RUN_RE.finditer(text):
-            if not _has_minimum_digits(text, run.start(), run.end()):
-                continue
-            candidate = run.group(0)
-            numeric_detections = _select_non_overlapping(
-                _detect_numeric(candidate, run.start(), text)
-            )
-            for detection in numeric_detections:
-                while (
-                    email_index < email_count
-                    and detections[email_index].end <= detection.start
-                ):
-                    email_index += 1
-                if (
-                    email_index < email_count
-                    and detections[email_index].start < detection.end
-                ):
-                    continue
-                detections.append(detection)
+def _iter_detections(text: str) -> Iterator[Detection]:
+    """Yield accepted detections in ascending order without collecting them.
 
-    return _select_non_overlapping(detections)
+    Emails and numeric runs each ascend and never self-overlap, so a two-stream
+    merge replaces collecting and sorting every detection; a numeric detection
+    overlapping the pending email is dropped, keeping email priority.
+    """
+    emails = _iter_email_detections(text) if text.find("@") != -1 else iter(())
+    numerics = (
+        _iter_numeric_detections(text)
+        if _ASCII_DIGIT_RE.search(text) is not None
+        else iter(())
+    )
+    email = next(emails, None)
+    for detection in numerics:
+        while email is not None and email.end <= detection.start:
+            yield email
+            email = next(emails, None)
+        if email is not None and email.start < detection.end:
+            continue
+        yield detection
+    while email is not None:
+        yield email
+        email = next(emails, None)
+
+
+def _iter_email_detections(text: str) -> Iterator[Detection]:
+    for match in _EMAIL_RE.finditer(text):
+        if _valid_email(match.group(0)) and _absolute_token_boundaries(
+            text, match.start(), match.end()
+        ):
+            yield Detection(match.start(), match.end(), "EMAIL_ADDRESS")
+
+
+def _iter_numeric_detections(text: str) -> Iterator[Detection]:
+    for run in _NUMERIC_RUN_RE.finditer(text):
+        if not _has_minimum_digits(text, run.start(), run.end()):
+            continue
+        yield from _select_non_overlapping(
+            _detect_numeric(run.group(0), run.start(), text)
+        )
 
 
 def redact_pii_string(text: str) -> str:
     """Replace supported PII spans with stable typed markers."""
-    detections = detect_pii(text)
-    if not detections:
-        return text
-
     parts: list[str] = []
     cursor = 0
-    for detection in detections:
+    for detection in _iter_detections(text):
         parts.append(text[cursor : detection.start])
         parts.append(REPLACEMENT_MARKERS[detection.entity])
         cursor = detection.end
+    if not parts:
+        return text
     parts.append(text[cursor:])
     return "".join(parts)
 
