@@ -1,5 +1,5 @@
 {
-  "core_commit": "7a3d8f9798ffab83a79c19f187f87e8b2d35369d",
+  "core_commit": "0fd73adfb21b56e6bd9cb061ea66697fb166c0c7",
   "services/weave-trace/openapi.json": "sha256:86c72b943c9c9dc937dbe689caca9649c70fdf32d035cadd7ab10edaece22541",
   "services/weave-trace/tools/codegen/openapi.stainless.yml": "sha256:8d97893a6d3cd556d885f67d6d26e74a3438d49a63430886286cc8318a760319"
 }

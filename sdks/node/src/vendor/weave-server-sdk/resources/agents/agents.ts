@@ -52,45 +52,45 @@ export class Agents extends APIResource {
  * trajectory for a single trace.
  */
 export interface AgentTraceChatRes {
-  trace_id: string;
+  agent_name: string | null;
 
-  agent_name?: string | null;
+  agent_version: string | null;
 
-  agent_version?: string | null;
+  ended_at: string | null;
 
-  ended_at?: string | null;
+  feedback: Array<{ [key: string]: unknown }> | null;
 
-  feedback?: Array<{ [key: string]: unknown }> | null;
+  messages: Array<AgentTraceChatRes.Message>;
 
-  messages?: Array<AgentTraceChatRes.Message>;
+  provider: string | null;
 
-  provider?: string | null;
+  root_span_name: string | null;
 
-  root_span_name?: string | null;
+  started_at: string | null;
 
-  started_at?: string | null;
+  status_code: 'UNSET' | 'OK' | 'ERROR' | null;
 
-  status_code?: 'UNSET' | 'OK' | 'ERROR' | null;
+  total_cache_creation_input_tokens: number;
 
-  total_cache_creation_input_tokens?: number;
+  total_cache_read_input_tokens: number;
 
-  total_cache_read_input_tokens?: number;
-
-  total_cost_usd?: number | null;
+  total_cost_usd: number | null;
 
   /**
    * Wall-clock duration of the trace root span in milliseconds. This is not a sum of
    * child span durations.
    */
-  total_duration_ms?: number | null;
+  total_duration_ms: number | null;
 
-  total_input_tokens?: number;
+  total_input_tokens: number;
 
-  total_output_tokens?: number;
+  total_output_tokens: number;
 
-  total_reasoning_tokens?: number;
+  total_reasoning_tokens: number;
 
-  wb_user_id?: string | null;
+  trace_id: string;
+
+  wb_user_id: string | null;
 }
 
 export namespace AgentTraceChatRes {
@@ -103,6 +103,43 @@ export namespace AgentTraceChatRes {
    * model for callers.
    */
   export interface Message {
+    /**
+     * Payload for a future agent-to-agent handoff event.
+     */
+    agent_handoff: unknown | null;
+
+    agent_name: string | null;
+
+    /**
+     * Payload for an agent lifecycle boundary.
+     */
+    agent_start: Message.AgentStart | null;
+
+    agent_version: string | null;
+
+    /**
+     * Payload for assistant text emitted by an agent or LLM span.
+     */
+    assistant_message: Message.AssistantMessage | null;
+
+    /**
+     * Payload for a context-window compaction event.
+     */
+    context_compacted: Message.ContextCompacted | null;
+
+    feedback: Array<{ [key: string]: unknown }> | null;
+
+    span_id: string | null;
+
+    started_at: string | null;
+
+    status_code: 'UNSET' | 'OK' | 'ERROR' | null;
+
+    /**
+     * Payload for a tool call timeline event.
+     */
+    tool_call: Message.ToolCall | null;
+
     type:
       | 'user_message'
       | 'assistant_message'
@@ -112,46 +149,9 @@ export namespace AgentTraceChatRes {
       | 'context_compacted';
 
     /**
-     * Payload for a future agent-to-agent handoff event.
-     */
-    agent_handoff?: unknown | null;
-
-    agent_name?: string | null;
-
-    /**
-     * Payload for an agent lifecycle boundary.
-     */
-    agent_start?: Message.AgentStart | null;
-
-    agent_version?: string | null;
-
-    /**
-     * Payload for assistant text emitted by an agent or LLM span.
-     */
-    assistant_message?: Message.AssistantMessage | null;
-
-    /**
-     * Payload for a context-window compaction event.
-     */
-    context_compacted?: Message.ContextCompacted | null;
-
-    feedback?: Array<{ [key: string]: unknown }> | null;
-
-    span_id?: string | null;
-
-    started_at?: string | null;
-
-    status_code?: 'UNSET' | 'OK' | 'ERROR' | null;
-
-    /**
-     * Payload for a tool call timeline event.
-     */
-    tool_call?: Message.ToolCall | null;
-
-    /**
      * Payload for a user prompt in the chat timeline.
      */
-    user_message?: Message.UserMessage | null;
+    user_message: Message.UserMessage | null;
   }
 
   export namespace Message {
@@ -159,79 +159,79 @@ export namespace AgentTraceChatRes {
      * Payload for an agent lifecycle boundary.
      */
     export interface AgentStart {
-      model?: string | null;
+      model: string | null;
 
-      status?: 'UNSET' | 'OK' | 'ERROR' | null;
+      status: 'UNSET' | 'OK' | 'ERROR' | null;
 
-      system_instructions?: string | null;
+      system_instructions: string | null;
 
-      tool_definitions?: string | null;
+      tool_definitions: string | null;
     }
 
     /**
      * Payload for assistant text emitted by an agent or LLM span.
      */
     export interface AssistantMessage {
+      content_refs: Array<string>;
+
+      duration_ms: number | null;
+
+      input_cost_usd: number | null;
+
+      input_tokens: number | null;
+
+      model: string | null;
+
+      output_cost_usd: number | null;
+
+      output_tokens: number | null;
+
+      reasoning_content: string | null;
+
+      reasoning_tokens: number | null;
+
+      status: 'UNSET' | 'OK' | 'ERROR' | null;
+
       text: string;
 
-      content_refs?: Array<string>;
-
-      duration_ms?: number | null;
-
-      input_cost_usd?: number | null;
-
-      input_tokens?: number | null;
-
-      model?: string | null;
-
-      output_cost_usd?: number | null;
-
-      output_tokens?: number | null;
-
-      reasoning_content?: string | null;
-
-      reasoning_tokens?: number | null;
-
-      status?: 'UNSET' | 'OK' | 'ERROR' | null;
-
-      total_cost_usd?: number | null;
+      total_cost_usd: number | null;
     }
 
     /**
      * Payload for a context-window compaction event.
      */
     export interface ContextCompacted {
-      compaction_items_after?: number | null;
+      compaction_items_after: number | null;
 
-      compaction_items_before?: number | null;
+      compaction_items_before: number | null;
 
-      compaction_summary?: string | null;
+      compaction_summary: string | null;
     }
 
     /**
      * Payload for a tool call timeline event.
      */
     export interface ToolCall {
-      content_refs?: Array<string>;
+      content_refs: Array<string>;
 
-      duration_ms?: number | null;
+      duration_ms: number | null;
 
-      status?: 'UNSET' | 'OK' | 'ERROR' | null;
+      status: 'UNSET' | 'OK' | 'ERROR' | null;
 
-      tool_arguments?: string | null;
+      tool_arguments: string | null;
 
-      tool_name?: string | null;
+      tool_name: string | null;
 
-      tool_result?: string | null;
+      tool_result: string | null;
     }
 
     /**
      * Payload for a user prompt in the chat timeline.
      */
     export interface UserMessage {
-      text: string;
+      content_refs: Array<string>;
 
-      content_refs?: Array<string>;
+      text: string;
     }
   }
 }
@@ -242,7 +242,7 @@ export namespace AgentTraceChatRes {
 export interface AgentQueryResponse {
   agents: Array<AgentQueryResponse.Agent>;
 
-  total_count?: number;
+  total_count: number;
 }
 
 export namespace AgentQueryResponse {
@@ -264,13 +264,13 @@ export namespace AgentQueryResponse {
 
     span_count: number;
 
+    total_cost_usd: number | null;
+
     total_duration_ms: number;
 
     total_input_tokens: number;
 
     total_output_tokens: number;
-
-    total_cost_usd?: number | null;
   }
 }
 
@@ -280,7 +280,7 @@ export namespace AgentQueryResponse {
 export interface AgentSearchResponse {
   results: Array<AgentSearchResponse.Result>;
 
-  total_conversations?: number;
+  total_conversations: number;
 }
 
 export namespace AgentSearchResponse {
