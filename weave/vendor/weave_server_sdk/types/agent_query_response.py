@@ -25,13 +25,13 @@ class Agent(BaseModel):
 
     span_count: int
 
+    total_cost_usd: Optional[float] = None
+
     total_duration_ms: int
 
     total_input_tokens: int
 
     total_output_tokens: int
-
-    total_cost_usd: Optional[float] = None
 
 
 class AgentQueryResponse(BaseModel):
@@ -39,4 +39,4 @@ class AgentQueryResponse(BaseModel):
 
     agents: List[Agent]
 
-    total_count: Optional[int] = None
+    total_count: int

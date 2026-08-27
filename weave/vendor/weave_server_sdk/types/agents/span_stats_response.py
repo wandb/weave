@@ -12,30 +12,30 @@ __all__ = ["SpanStatsResponse", "Column"]
 class Column(BaseModel):
     """Metadata describing one column in an agent span stats result row."""
 
+    aggregation: Optional[str] = None
+
+    metric: Optional[str] = None
+
     name: str
 
     role: Literal["time", "bucket", "group", "metric"]
 
     value_type: Literal["datetime", "number", "boolean", "string"]
 
-    aggregation: Optional[str] = None
-
-    metric: Optional[str] = None
-
 
 class SpanStatsResponse(BaseModel):
     """Response containing chart-ready agent span stats rows."""
 
+    bucket_type: Literal["time", "number"]
+
+    columns: List[Column]
+
     end: datetime
+
+    granularity: Optional[int] = None
+
+    rows: List[Dict[str, Union[datetime, str, float, bool, None]]]
 
     start: datetime
 
     timezone: str
-
-    bucket_type: Optional[Literal["time", "number"]] = None
-
-    columns: Optional[List[Column]] = None
-
-    granularity: Optional[int] = None
-
-    rows: Optional[List[Dict[str, Union[datetime, str, float, bool, None]]]] = None
