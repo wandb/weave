@@ -22,14 +22,14 @@ class ConversationChatResponse(BaseModel):
 
     feedback: Optional[List[Dict[str, object]]] = None
 
-    has_more: Optional[bool] = None
+    has_more: bool
 
-    limit: Optional[int] = None
+    limit: int
 
-    offset: Optional[int] = None
+    offset: int
 
     total_cost_usd: Optional[float] = None
 
-    total_turns: Optional[int] = None
+    total_turns: int
 
-    turns: Optional[List[AgentTraceChatRes]] = None
+    turns: List[AgentTraceChatRes]
