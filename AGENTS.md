@@ -711,7 +711,9 @@ deterministic.
   fail instead of falling back to a policy.
 - `redact_pii_value` walks supported trace values copy-on-write, combines
   credential-key replacement with PII replacement, and never scans dictionary
-  keys. Clean subtrees retain their identity.
+  keys. Clean subtrees retain their identity. Its traversal depth is capped at
+  200, including decoded JSON-string re-entry, and over-nested or cyclic values
+  raise `RequestTooLarge` instead of exhausting the Python stack.
 - Complete Weave refs, valid base64 data URLs, and valid standalone base64
   payloads pass through unchanged. Malformed lookalikes remain eligible for
   scanning.

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 from enum import Enum
 
 import pytest
 from pydantic import BaseModel, ConfigDict, Field
 
 from weave.trace_server.credential_redaction import REDACTED_VALUE
+from weave.trace_server.errors import RequestTooLarge
 from weave.trace_server.sensitive_data.detectors import redact_pii_string
 from weave.trace_server.sensitive_data.walker import redact_pii_value
 
@@ -19,6 +21,19 @@ class _PayloadModel(BaseModel):
 
     values: tuple[object, ...]
     excluded: str = Field(exclude=True)
+
+
+class _NestedPayload(BaseModel):
+    value: object
+
+
+def _assert_nesting_rejected(value: object) -> None:
+    with pytest.raises(RequestTooLarge) as exc_info:
+        redact_pii_value(value)
+
+    assert str(exc_info.value) == (
+        "Request payload nesting exceeds the maximum supported depth of 200."
+    )
 
 
 def test_redacts_supported_pii_with_typed_markers() -> None:
@@ -281,12 +296,35 @@ def test_walker_does_not_preserve_invalid_encoded_content(
     assert redact_pii_value(value).startswith(expected_prefix)
 
 
-def test_walker_fails_loudly_on_cyclic_input() -> None:
+@pytest.mark.parametrize("container", ["dict", "list", "tuple", "model"])
+def test_walker_rejects_deeply_nested_structures(container: str) -> None:
+    value: object = "ada@example.com"
+    for _ in range(800):
+        if container == "dict":
+            value = {"value": value}
+        elif container == "list":
+            value = [value]
+        elif container == "tuple":
+            value = (value,)
+        else:
+            value = _NestedPayload(value=value)
+
+    _assert_nesting_rejected(value)
+
+
+def test_walker_rejects_deeply_nested_json_string() -> None:
+    value: object = "ada@example.com"
+    for _ in range(800):
+        value = [value]
+
+    _assert_nesting_rejected(json.dumps(value))
+
+
+def test_walker_rejects_cyclic_input_without_recursion_error() -> None:
     payload: dict[str, object] = {}
     payload["self"] = payload
 
-    with pytest.raises(RecursionError):
-        redact_pii_value(payload)
+    _assert_nesting_rejected(payload)
 
     assert payload["self"] is payload
 
